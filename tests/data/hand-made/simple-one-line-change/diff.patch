@@ -1,0 +1,5 @@
+7a8,11
+>             indices.insert(v, i);
+>         }
+> 
+>         for (i, v) in nums.iter().enumerate() {

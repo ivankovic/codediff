@@ -1,0 +1,751 @@
+===
+match
+---
+=>: => [332,334]
+=>: => [425,427]
+===
+match
+---
+let: let [394,397]
+let: let [487,490]
+===
+match
+---
+>: > [80,81]
+>: > [80,81]
+===
+match
+---
+identifier: target [83,89]
+identifier: target [83,89]
+===
+match
+---
+identifier: two_sum [59,66]
+identifier: two_sum [59,66]
+===
+match
+---
+let_declaration [245,279]
+let_declaration [338,372]
+===
+match
+---
+=>: => [598,600]
+=>: => [691,693]
+===
+match
+---
+=: = [251,252]
+=: = [344,345]
+===
+match
+---
+field_identifier: iter [180,184]
+field_identifier: iter [273,277]
+===
+match
+---
+match_pattern [593,597]
+match_pattern [686,690]
+===
+match
+---
+let: let [118,121]
+let: let [118,121]
+===
+match
+---
+unit_expression [601,603]
+unit_expression [694,696]
+===
+match
+---
+*: * [360,361]
+*: * [453,454]
+===
+match
+---
+identifier: Vec::new [406,414]
+identifier: Vec::new [499,507]
+===
+match
+---
+identifier: t [249,250]
+identifier: t [342,343]
+===
+match
+---
+match_arm [319,576]
+match_arm [412,669]
+===
+match
+---
+as: as [494,496]
+as: as [587,589]
+===
+match
+---
+primitive_type: i32 [77,80]
+primitive_type: i32 [77,80]
+===
+match
+---
+let_declaration [394,417]
+let_declaration [487,510]
+===
+match
+---
+mutable_specifier: mut [122,125]
+mutable_specifier: mut [122,125]
+===
+match
+---
+match_block [301,618]
+match_block [394,711]
+===
+match
+---
+block [108,662]
+block [108,755]
+===
+match
+---
+field_expression [175,184]
+field_expression [268,277]
+===
+match
+---
+parameter [83,94]
+parameter [83,94]
+===
+match
+---
+unary_expression [491,493]
+unary_expression [584,586]
+===
+match
+---
+match_arm [593,604]
+match_arm [686,697]
+===
+match
+---
+field_expression [253,274]
+field_expression [346,367]
+===
+match
+---
+identifier: t [299,300]
+identifier: t [392,393]
+===
+match
+---
+identifier: r [442,443]
+identifier: r [535,536]
+===
+match
+---
+<: < [102,103]
+<: < [102,103]
+===
+match
+---
+identifier: r [484,485]
+identifier: r [577,578]
+===
+match
+---
+&: & [275,276]
+&: & [368,369]
+===
+match
+---
+expression_statement [293,618]
+expression_statement [386,711]
+===
+match
+---
+tuple_pattern [324,330]
+tuple_pattern [417,423]
+===
+match
+---
+binary_expression [360,367]
+binary_expression [453,460]
+===
+match
+---
+if_expression [357,558]
+if_expression [450,651]
+===
+match
+---
+unary_expression [360,362]
+unary_expression [453,455]
+===
+match
+---
+type_cast_expression [491,500]
+type_cast_expression [584,593]
+===
+match
+---
+impl: impl [32,36]
+impl: impl [32,36]
+===
+match
+---
+identifier: std::collections::HashMap [4,29]
+identifier: std::collections::HashMap [4,29]
+===
+match
+---
+identifier: y [492,493]
+identifier: y [585,586]
+===
+match
+---
+field_identifier: push [486,490]
+field_identifier: push [579,583]
+===
+match
+---
+field_identifier: enumerate [187,196]
+field_identifier: enumerate [280,289]
+===
+match
+---
+identifier: v [230,231]
+identifier: v [323,324]
+===
+match
+---
+return_expression [527,535]
+return_expression [620,628]
+===
+match
+---
+call_expression [253,278]
+call_expression [346,371]
+===
+match
+---
+identifier: i [449,450]
+identifier: i [542,543]
+===
+match
+---
+type_identifier: Solution [37,45]
+type_identifier: Solution [37,45]
+===
+match
+---
+block [335,576]
+block [428,669]
+===
+match
+---
+reference_expression [275,277]
+reference_expression [368,370]
+===
+match
+---
+let_declaration [118,151]
+let_declaration [118,151]
+===
+match
+---
+identifier: r [534,535]
+identifier: r [627,628]
+===
+match
+---
+type_identifier: Vec [73,76]
+type_identifier: Vec [73,76]
+===
+match
+---
+arguments [184,186]
+arguments [277,279]
+===
+match
+---
+expression_statement [442,459]
+expression_statement [535,552]
+===
+match
+---
+primitive_type: i32 [103,106]
+primitive_type: i32 [103,106]
+===
+match
+---
+match_expression [293,618]
+match_expression [386,711]
+===
+match
+---
+arguments [653,655]
+arguments [746,748]
+===
+match
+---
+primitive_type: i32 [497,500]
+primitive_type: i32 [590,593]
+===
+match
+---
+tuple_struct_pattern [319,331]
+tuple_struct_pattern [412,424]
+===
+match
+---
+arguments [274,278]
+arguments [367,371]
+===
+match
+---
+let: let [245,248]
+let: let [338,341]
+===
+match
+---
+field_expression [484,490]
+field_expression [577,583]
+===
+match
+---
+let_declaration [213,232]
+let_declaration [306,325]
+===
+match
+---
+identifier: indices [253,260]
+identifier: indices [346,353]
+===
+match
+---
+identifier: Some [319,323]
+identifier: Some [412,416]
+===
+match
+---
+generic_type [73,81]
+generic_type [73,81]
+===
+match
+---
+*: * [491,492]
+*: * [584,585]
+===
+match
+---
+type_arguments [76,81]
+type_arguments [76,81]
+===
+match
+---
+identifier: nums [175,179]
+identifier: nums [268,272]
+===
+match
+---
+type_cast_expression [449,457]
+type_cast_expression [542,550]
+===
+match
+---
+field_expression [175,196]
+field_expression [268,289]
+===
+match
+---
+use_declaration [0,30]
+use_declaration [0,30]
+===
+match
+---
+expression_statement [357,558]
+expression_statement [450,651]
+===
+match
+---
+expression_statement [527,536]
+expression_statement [620,629]
+===
+match
+---
+call_expression [136,150]
+call_expression [136,150]
+===
+match
+---
+identifier: r [402,403]
+identifier: r [495,496]
+===
+match
+---
+in: in [172,174]
+in: in [265,267]
+===
+match
+---
+return: return [638,644]
+return: return [731,737]
+===
+match
+---
+=: = [404,405]
+=: = [497,498]
+===
+match
+---
+identifier: None [593,597]
+identifier: None [686,690]
+===
+match
+---
+identifier: Vec::new [645,653]
+identifier: Vec::new [738,746]
+===
+match
+---
+identifier: indices [126,133]
+identifier: indices [126,133]
+===
+match
+---
+call_expression [175,186]
+call_expression [268,279]
+===
+match
+---
+block [199,628]
+block [292,721]
+===
+match
+---
+parameter [67,81]
+parameter [67,81]
+===
+match
+---
+arguments [148,150]
+arguments [148,150]
+===
+match
+---
+as: as [451,453]
+as: as [544,546]
+===
+match
+---
+call_expression [406,416]
+call_expression [499,509]
+===
+match
+---
+type_arguments [102,107]
+type_arguments [102,107]
+===
+match
+---
+for: for [161,164]
+for: for [254,257]
+===
+match
+---
+identifier: i [166,167]
+identifier: i [259,260]
+===
+match
+---
+identifier: nums [67,71]
+identifier: nums [67,71]
+===
+match
+---
+identifier: target [221,227]
+identifier: target [314,320]
+===
+match
+---
+_: _ [325,326]
+_: _ [418,419]
+===
+match
+---
+identifier: y [361,362]
+identifier: y [454,455]
+===
+match
+---
+expression_statement [484,502]
+expression_statement [577,595]
+===
+match
+---
+primitive_type: i32 [91,94]
+primitive_type: i32 [91,94]
+===
+match
+---
+call_expression [175,198]
+call_expression [268,291]
+===
+match
+---
+identifier: y [328,329]
+identifier: y [421,422]
+===
+match
+---
+arguments [414,416]
+arguments [507,509]
+===
+match
+---
+type_identifier: Vec [99,102]
+type_identifier: Vec [99,102]
+===
+match
+---
+arguments [196,198]
+arguments [289,291]
+===
+match
+---
+primitive_type: i32 [454,457]
+primitive_type: i32 [547,550]
+===
+match
+---
+-: - [228,229]
+-: - [321,322]
+===
+match
+---
+>: > [106,107]
+>: > [106,107]
+===
+match
+---
+for_expression [161,628]
+for_expression [254,721]
+===
+match
+---
+field_identifier: push [444,448]
+field_identifier: push [537,541]
+===
+match
+---
+match: match [293,298]
+match: match [386,391]
+===
+match
+---
+if: if [357,359]
+if: if [450,452]
+===
+match
+---
+call_expression [645,655]
+call_expression [738,748]
+===
+match
+---
+binary_expression [221,231]
+binary_expression [314,324]
+===
+match
+---
+visibility_modifier: pub [52,55]
+visibility_modifier: pub [52,55]
+===
+match
+---
+source_file [0,664]
+source_file [0,757]
+===
+match
+---
+field_expression [442,448]
+field_expression [535,541]
+===
+match
+---
+=: = [134,135]
+=: = [134,135]
+===
+match
+---
+let: let [213,216]
+let: let [306,309]
+===
+match
+---
+call_expression [484,501]
+call_expression [577,594]
+===
+match
+---
+identifier: i [366,367]
+identifier: i [459,460]
+===
+match
+---
+mutable_specifier: mut [398,401]
+mutable_specifier: mut [491,494]
+===
+match
+---
+identifier: v [169,170]
+identifier: v [262,263]
+===
+match
+---
+use: use [0,3]
+use: use [0,3]
+===
+match
+---
+function_item [52,662]
+function_item [52,755]
+===
+match
+---
+block [368,558]
+block [461,651]
+===
+match
+---
+impl_item [32,664]
+impl_item [32,757]
+===
+match
+---
+identifier: x [276,277]
+identifier: x [369,370]
+===
+match
+---
+=: = [219,220]
+=: = [312,313]
+===
+match
+---
+field_identifier: get_key_value [261,274]
+field_identifier: get_key_value [354,367]
+===
+match
+---
+parameters [66,95]
+parameters [66,95]
+===
+match
+---
+arguments [490,501]
+arguments [583,594]
+===
+match
+---
+return_expression [638,655]
+return_expression [731,748]
+===
+match
+---
+identifier: HashMap::new [136,148]
+identifier: HashMap::new [136,148]
+===
+match
+---
+declaration_list [46,664]
+declaration_list [46,757]
+===
+match
+---
+arguments [448,458]
+arguments [541,551]
+===
+match
+---
+!=: != [363,365]
+!=: != [456,458]
+===
+match
+---
+match_pattern [319,331]
+match_pattern [412,424]
+===
+match
+---
+return: return [527,533]
+return: return [620,626]
+===
+match
+---
+identifier: x [217,218]
+identifier: x [310,311]
+===
+match
+---
+expression_statement [638,656]
+expression_statement [731,749]
+===
+match
+---
+call_expression [442,458]
+call_expression [535,551]
+===
+match
+---
+tuple_pattern [165,171]
+tuple_pattern [258,264]
+===
+match
+---
+expression_statement [161,628]
+expression_statement [254,721]
+===
+match
+---
+<: < [76,77]
+<: < [76,77]
+===
+match
+---
+generic_type [99,107]
+generic_type [99,107]
+===
+insert-tree
+---
+expression_statement [161,244]
+    for_expression [161,244]
+        for: for [161,164]
+        tuple_pattern [165,171]
+            identifier: i [166,167]
+            identifier: v [169,170]
+        in: in [172,174]
+        call_expression [175,198]
+            field_expression [175,196]
+                call_expression [175,186]
+                    field_expression [175,184]
+                        identifier: nums [175,179]
+                        field_identifier: iter [180,184]
+                    arguments [184,186]
+                field_identifier: enumerate [187,196]
+            arguments [196,198]
+        block [199,244]
+            expression_statement [213,234]
+                call_expression [213,233]
+                    field_expression [213,227]
+                        identifier: indices [213,220]
+                        field_identifier: insert [221,227]
+                    arguments [227,233]
+                        identifier: v [228,229]
+                        identifier: i [231,232]
+to
+block [108,662]
+at 1
