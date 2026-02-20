@@ -25,7 +25,6 @@ pub struct TestPair {
     pub before: String,
     pub after: String,
     pub unix_diff: String,
-    pub gumtree_diff: String,
 }
 
 pub fn load_hand_written_test_pairs() -> Result<Vec<TestPair>> {
@@ -33,10 +32,7 @@ pub fn load_hand_written_test_pairs() -> Result<Vec<TestPair>> {
 
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
-        .join("data")
-        .join("hand-made");
-
-    println!("Reading hand-made inputs from {:?}", root.as_path());
+        .join("data");
 
     for entry in fs::read_dir(root)? {
         let entry = entry?;
@@ -46,12 +42,10 @@ pub fn load_hand_written_test_pairs() -> Result<Vec<TestPair>> {
             let before_path = path.join("before.rs");
             let after_path = path.join("after.rs");
             let unix_diff_path = path.join("diff.patch");
-            let gumtree_diff_path = path.join("gumtreediff.txt");
 
             let before = fs::read_to_string(&before_path)?;
             let after = fs::read_to_string(&after_path)?;
             let unix_diff = fs::read_to_string(&unix_diff_path)?;
-            let gumtree_diff = fs::read_to_string(&gumtree_diff_path)?;
 
             result.push(TestPair {
                 before_path,
@@ -59,7 +53,6 @@ pub fn load_hand_written_test_pairs() -> Result<Vec<TestPair>> {
                 before,
                 after,
                 unix_diff,
-                gumtree_diff,
             });
         }
     }

@@ -5,3 +5,5 @@ In the function Solution::two_sum, the following code was added:
             indices.insert(v, i);
         }
 ```
+
+This fixes a bug and makes the code produce the correct output.
