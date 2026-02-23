@@ -28,7 +28,8 @@ pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instea
 * Any function that accepts this structure or any sub-field should not assume any fields are set
 * and should always first check that the required data is actually available, if not it should try
 * to construct it, and if that doesn't work it should fail-safe, ideally returning a safe zero
-* result.
+* result. This allows the calling code to extremely efficiently process large files, and files that
+* only pretend to be code but are data or configuration.
 */
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Code {

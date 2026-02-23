@@ -59,33 +59,7 @@ fn main() {
     }
     drop(stats_tx);
 
-    let producer_path = args.path.clone();
-    let producer = thread::spawn(move || {
-        if producer_path.is_file() {
-            // Ignore error if no receivers (program shutting down)
-            if !metadata::is_anomalous(producer_path.as_path()) {
-                let _ = path_tx.send(producer_path);
-            }
-        } else if producer_path.is_dir() {
-            for entry in WalkDir::new(&producer_path)
-                .into_iter()
-                .filter_map(Result::ok)
-            {
-                if entry.file_type().is_file() {
-                    if metadata::is_anomalous(entry.path()) {
-                        continue;
-                    }
-
-                    // This will block when the queue is full.
-                    if path_tx.send(entry.into_path()).is_err() {
-                        // All workers are gone, stop producing.
-                        break;
-                    }
-                }
-            }
-        }
-        drop(path_tx);
-    });
+    let path_producer = thread::spawn(move || all_files_from_path(&args.path, path_tx));
 
     let stats_collector = thread::spawn(move || {
         let mut map: HashMap<PathBuf, CodeStats> = HashMap::new();
@@ -95,7 +69,7 @@ fn main() {
         map
     });
 
-    let _ = producer.join();
+    let _ = path_producer.join();
     for w in workers {
         let _ = w.join();
     }
@@ -106,6 +80,32 @@ fn main() {
     if let Err(e) = export_stats_sqlite(args.db.as_path(), stats) {
         eprintln!("Failed to save results: {:?}", e)
     }
+}
+
+fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> {
+    if root.is_file() {
+        // Ignore error if no receivers (program shutting down)
+        if !metadata::is_anomalous(root) {
+            let _ = path_tx.send(PathBuf::from(root));
+        }
+    } else if root.is_dir() {
+        for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
+            if entry.file_type().is_file() {
+                if metadata::is_anomalous(entry.path()) {
+                    continue;
+                }
+
+                // This will block when the queue is full.
+                if path_tx.send(entry.into_path()).is_err() {
+                    // All workers are gone, stop producing.
+                    break;
+                }
+            }
+        }
+    }
+    drop(path_tx);
+
+    Ok(())
 }
 
 fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Result<()> {
@@ -193,5 +193,15 @@ fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)
         if stats_tx.send((path, s)).is_err() {
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn end_to_end() -> Result<()> {
+        Ok(())
     }
 }

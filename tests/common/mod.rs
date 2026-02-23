@@ -17,45 +17,52 @@
  */
 use anyhow::Result;
 use std::fs;
-use std::path::PathBuf;
+use std::vec::Vec;
 
-pub struct TestPair {
-    pub before_path: PathBuf,
-    pub after_path: PathBuf,
-    pub before: String,
-    pub after: String,
-    pub unix_diff: String,
-}
+use codediff::code::{Code, metadata};
 
-pub fn load_hand_written_test_pairs() -> Result<Vec<TestPair>> {
+pub fn handmade_test_code() -> Result<Vec<Code>> {
     let mut result = Vec::new();
 
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
-        .join("data");
+        .join("data")
+        .join("code");
+
+    println!("Reading hand-made inputs from {:?}", root.as_path());
 
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_dir() {
-            let before_path = path.join("before.rs");
-            let after_path = path.join("after.rs");
-            let unix_diff_path = path.join("diff.patch");
+        if path.is_file() {
+            let contents = fs::read_to_string(&path)?;
 
-            let before = fs::read_to_string(&before_path)?;
-            let after = fs::read_to_string(&after_path)?;
-            let unix_diff = fs::read_to_string(&unix_diff_path)?;
+            let mut code = Code {
+                contents,
+                ..Default::default()
+            };
+            code.metadata.path = Some(path.with_extension(""));
 
-            result.push(TestPair {
-                before_path,
-                after_path,
-                before,
-                after,
-                unix_diff,
-            });
+            metadata::hermetic_expand(&mut code.metadata);
+
+            result.push(code);
         }
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn handmade_test_code_loads() -> Result<()> {
+        let test_codes = handmade_test_code()?;
+
+        assert!(!test_codes.is_empty());
+
+        Ok(())
+    }
 }
