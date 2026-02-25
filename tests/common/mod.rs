@@ -65,4 +65,13 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn handmande_git_repository_loads() -> Result<()> {
+        let test_git_repo_path = handmande_git_repository();
+
+        assert!(test_git_repo_path.is_dir());
+
+        Ok(())
+    }
 }
