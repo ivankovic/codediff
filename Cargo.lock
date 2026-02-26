@@ -254,6 +254,7 @@ dependencies = [
  "regex",
  "rusqlite",
  "serde",
+ "tempfile",
  "tree-sitter 0.25.10",
  "tree-sitter-bash",
  "tree-sitter-c",
