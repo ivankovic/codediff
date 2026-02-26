@@ -16,13 +16,13 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use anyhow::Result;
+use git2::{Repository, Signature};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::vec::Vec;
+use tempfile::tempdir;
 
 use codediff::code::{Code, metadata};
-use git2::{Repository, Signature};
-use tempfile::tempdir;
 
 pub fn handmade_test_code() -> Result<Vec<Code>> {
     let mut result = Vec::new();
@@ -57,25 +57,29 @@ pub fn handmade_test_code() -> Result<Vec<Code>> {
 }
 
 pub fn handmade_git_repository() -> Result<PathBuf> {
-    // Create a temporary directory for our git repository
+    let (repo_path, repo) = initialize_repository()?;
+    let dirs = read_fake_git_repo_testdata()?;
+    add_commits(&repo, &repo_path, dirs)?;
+    Ok(repo_path)
+}
+
+fn initialize_repository() -> Result<(PathBuf, Repository)> {
     let temp_dir = tempdir().expect("Failed to create temporary directory");
     let repo_path = temp_dir.path().to_path_buf();
 
-    // Initialize a git repository
     let repo = Repository::init(repo_path.clone()).expect("Failed to initialize git repository");
+    let _ = temp_dir.keep();
 
-    // Create a signature for commits
-    let signature =
-        Signature::now("Test Author", "test@example.com").expect("Failed to create signature");
+    Ok((repo_path, repo))
+}
 
-    // Get the path to the test data
+fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
     let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("data")
         .join("fake-git-repo");
 
-    // Read directories in sequence (1, 2, 3, etc.)
-    let mut dirs: Vec<_> = fs::read_dir(&test_data_root)
+    let mut dirs: Vec<_> = fs::read_dir(test_data_root)
         .expect("Failed to read test data directory")
         .filter_map(|entry| {
             let entry = entry.ok()?;
@@ -94,115 +98,110 @@ pub fn handmade_git_repository() -> Result<PathBuf> {
 
     // Sort directories by their numeric names
     dirs.sort_by_key(|&(num, _)| num);
+    Ok(dirs)
+}
 
-    // Process each directory as a separate commit
+fn add_commits(repo: &Repository, repo_path: &Path, dirs: Vec<(u32, PathBuf)>) -> Result<()> {
+    let signature =
+        Signature::now("Test Author", "test@example.com").expect("Failed to create signature");
+
     for (commit_num, dir_path) in dirs {
-        // Read all .test files in the directory
-        let files: Vec<_> = fs::read_dir(dir_path)
-            .expect("Failed to read directory")
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                let path = entry.path();
-                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("test") {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        copy_test_files_to_repo(&dir_path, commit_num, repo_path)?;
+        create_commit(repo, &signature, commit_num)?;
+    }
+    Ok(())
+}
 
-        // Copy files to the repository, removing .test extension
-        for file_path in files {
-            let content = fs::read_to_string(&file_path).expect("Failed to read file");
-
-            // Create the target path without .test extension
-            let relative_path = file_path
-                .strip_prefix(&test_data_root)
-                .expect("Failed to strip prefix");
-            let target_path = repo_path.join(relative_path);
-
-            // Remove the directory number from path and .test extension
-            let mut final_path = target_path.clone();
-            if let Some(file_name_os) = target_path.file_name() {
-                if let Some(file_name) = file_name_os.to_str() {
-                    if let Some(new_file_name) = file_name.strip_suffix(".test") {
-                        final_path.set_file_name(new_file_name);
-                    }
-                }
+/// Copy test files from source directory to repository, transforming paths
+fn copy_test_files_to_repo(dir_path: &Path, commit_num: u32, repo_path: &Path) -> Result<()> {
+    let files: Vec<_> = fs::read_dir(dir_path)
+        .expect("Failed to read directory")
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("test") {
+                Some(path)
+            } else {
+                None
             }
+        })
+        .collect();
 
-            // Remove the first directory component (the number)
-            if let Some(parent) = final_path.parent() {
-                if let Some(grandparent) = parent.parent() {
-                    let file_name = final_path.file_name().unwrap();
-                    final_path = grandparent.join(file_name);
-                }
-            }
-
-            // Create parent directories if they don't exist
-            if let Some(parent) = final_path.parent() {
-                fs::create_dir_all(parent).expect("Failed to create parent directories");
-            }
-
-            // Write the file content
-            fs::write(&final_path, content).expect("Failed to write file");
+    for file_path in files {
+        let content = fs::read_to_string(&file_path).expect("Failed to read file");
+        let final_path = path_in_repo(&file_path, commit_num, repo_path);
+        if let Some(parent) = final_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create parent directories");
         }
-
-        // Create a commit for this state
-        let commit_message = format!("Commit {}", commit_num);
-
-        // Stage all files
-        let mut index = repo.index().expect("Failed to open index");
-        index
-            .add_all(["*"], git2::IndexAddOption::DEFAULT, None)
-            .expect("Failed to add files to index");
-        index.write().expect("Failed to write index");
-
-        // Get the tree from the index
-        let tree_id = index.write_tree().expect("Failed to write tree");
-        let tree = repo.find_tree(tree_id).expect("Failed to find tree");
-
-        // Get the current HEAD commit if it exists
-        let parent_commit = if commit_num > 1 {
-            let obj = repo
-                .head()
-                .expect("Failed to get HEAD")
-                .resolve()
-                .expect("Failed to resolve HEAD");
-            Some(obj.peel_to_commit().expect("Failed to peel to commit"))
-        } else {
-            None
-        };
-
-        // Create the commit
-        if let Some(parent) = parent_commit {
-            repo.commit(
-                Some("HEAD"),
-                &signature,
-                &signature,
-                &commit_message,
-                &tree,
-                &[&parent],
-            )
-            .expect("Failed to create commit");
-        } else {
-            // First commit
-            repo.commit(
-                Some("HEAD"),
-                &signature,
-                &signature,
-                &commit_message,
-                &tree,
-                &[],
-            )
-            .expect("Failed to create initial commit");
-        }
+        fs::write(&final_path, content).expect("Failed to write file");
     }
 
-    // Keep the tempdir so it persists until the end of the test
-    let path = temp_dir.path().to_path_buf();
-    let _ = temp_dir.keep();
-    Ok(path)
+    Ok(())
+}
+
+fn path_in_repo(file_path: &Path, commit_num: u32, repo_path: &Path) -> PathBuf {
+    let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("data")
+        .join("fake-git-repo")
+        .join(commit_num.to_string());
+
+    let relative_path = file_path
+        .strip_prefix(test_data_root)
+        .expect("Failed to strip prefix")
+        .with_extension("");
+
+    repo_path.join(relative_path)
+}
+
+/// Create a git commit for the current repository state
+fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> Result<()> {
+    let commit_message = format!("Commit {}", commit_num);
+
+    let mut index = repo.index().expect("Failed to open index");
+    index
+        .add_all(["*"], git2::IndexAddOption::DEFAULT, None)
+        .expect("Failed to add files to index");
+    index.write().expect("Failed to write index");
+
+    let tree_id = index.write_tree().expect("Failed to write tree");
+    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+
+    let parent_commit = if commit_num > 1 {
+        let obj = repo
+            .head()
+            .expect("Failed to get HEAD")
+            .resolve()
+            .expect("Failed to resolve HEAD");
+        Some(obj.peel_to_commit().expect("Failed to peel to commit"))
+    } else {
+        None
+    };
+
+    if let Some(parent) = parent_commit {
+        repo.commit(
+            Some("HEAD"),
+            signature,
+            signature,
+            &commit_message,
+            &tree,
+            &[&parent],
+        )
+        .expect("Failed to create commit");
+    } else {
+        // First commit
+        repo.commit(
+            Some("HEAD"),
+            signature,
+            signature,
+            &commit_message,
+            &tree,
+            &[],
+        )
+        .expect("Failed to create initial commit");
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -244,6 +243,32 @@ mod tests {
         assert!(main_rs_path.is_file());
         let content = fs::read_to_string(main_rs_path)?;
         assert!(content.contains("Hello World"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_path_to_repo_path() -> Result<()> {
+        let test_data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("data")
+            .join("fake-git-repo");
+
+        let file_path = test_data_root
+            .join("1")
+            .join("should_not_be_removed")
+            .join("file.rs.test");
+
+        let repo_path = PathBuf::from("some/random/path");
+
+        let in_repo_path = path_in_repo(&file_path, 1, &repo_path);
+
+        assert_eq!(
+            in_repo_path
+                .to_str()
+                .expect("Unable to convert path to string"),
+            "some/random/path/should_not_be_removed/file.rs"
+        );
 
         Ok(())
     }
