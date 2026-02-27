@@ -24,10 +24,9 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tree_sitter::Parser as TSParser;
-use walkdir::WalkDir;
 
-use codediff::metadata;
 use codediff::stats::CodeStats;
+use codediff::stats::filesystem;
 
 #[derive(Parser)]
 struct Args {
@@ -59,7 +58,7 @@ fn main() {
     }
     drop(stats_tx);
 
-    let path_producer = thread::spawn(move || all_files_from_path(&args.path, path_tx));
+    let path_producer = thread::spawn(move || filesystem::all_files_from_path(&args.path, path_tx));
 
     let stats_collector = thread::spawn(move || {
         let mut map: HashMap<PathBuf, CodeStats> = HashMap::new();
@@ -82,30 +81,15 @@ fn main() {
     }
 }
 
-fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> {
-    if root.is_file() {
-        // Ignore error if no receivers (program shutting down)
-        if !metadata::is_anomalous(root) {
-            let _ = path_tx.send(PathBuf::from(root));
-        }
-    } else if root.is_dir() {
-        for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
-            if entry.file_type().is_file() {
-                if metadata::is_anomalous(entry.path()) {
-                    continue;
-                }
+fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)>) {
+    let mut parser = TSParser::new();
 
-                // This will block when the queue is full.
-                if path_tx.send(entry.into_path()).is_err() {
-                    // All workers are gone, stop producing.
-                    break;
-                }
-            }
+    while let Ok(path) = path_rx.recv() {
+        let s = codediff::stats::for_path(&path, &mut parser);
+        if stats_tx.send((path, s)).is_err() {
+            break;
         }
     }
-    drop(path_tx);
-
-    Ok(())
 }
 
 fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Result<()> {
@@ -185,23 +169,8 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
     Ok(())
 }
 
-fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)>) {
-    let mut parser = TSParser::new();
-
-    while let Ok(path) = path_rx.recv() {
-        let s = codediff::stats::for_path(&path, &mut parser);
-        if stats_tx.send((path, s)).is_err() {
-            break;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
-    fn end_to_end() -> Result<()> {
-        Ok(())
-    }
+    fn end_to_end() {}
 }

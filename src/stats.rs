@@ -26,6 +26,8 @@ use crate::code::language;
 use crate::code::metadata;
 use crate::code::{self, Code};
 
+pub mod filesystem;
+
 static AUTO_GENERATED_RE: OnceLock<Regex> = OnceLock::new();
 
 /**

@@ -19,6 +19,9 @@ pub mod code;
 pub mod metadata;
 pub mod stats;
 
+#[cfg(test)]
+pub mod test;
+
 #[derive(Debug, Default, Clone)]
 pub struct TwoDiff {
     pub unix_diff_format: String,

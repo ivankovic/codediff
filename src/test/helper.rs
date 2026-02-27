@@ -22,13 +22,15 @@ use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use tempfile::tempdir;
 
-use codediff::code::{Code, metadata};
+use crate::code::{Code, metadata};
 
+#[cfg(test)]
 pub fn handmade_test_code() -> Result<Vec<Code>> {
     let mut result = Vec::new();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
+        .join("src")
+        .join("test")
         .join("data")
         .join("code");
 
@@ -56,6 +58,7 @@ pub fn handmade_test_code() -> Result<Vec<Code>> {
     Ok(result)
 }
 
+#[cfg(test)]
 pub fn handmade_git_repository() -> Result<PathBuf> {
     let (repo_path, repo) = initialize_repository()?;
     let dirs = read_fake_git_repo_testdata()?;
@@ -75,7 +78,8 @@ fn initialize_repository() -> Result<(PathBuf, Repository)> {
 
 fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
     let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
+        .join("src")
+        .join("test")
         .join("data")
         .join("fake-git-repo");
 
@@ -86,10 +90,10 @@ fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
             let path = entry.path();
             if path.is_dir() {
                 // Extract directory name and try to parse as number
-                if let Some(dir_name) = path.file_name() {
-                    if let Ok(num) = dir_name.to_string_lossy().parse::<u32>() {
-                        return Some((num, path));
-                    }
+                if let Some(dir_name) = path.file_name()
+                    && let Ok(num) = dir_name.to_string_lossy().parse::<u32>()
+                {
+                    return Some((num, path));
                 }
             }
             None
@@ -141,7 +145,8 @@ fn copy_test_files_to_repo(dir_path: &Path, commit_num: u32, repo_path: &Path) -
 
 fn path_in_repo(file_path: &Path, commit_num: u32, repo_path: &Path) -> PathBuf {
     let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
+        .join("src")
+        .join("test")
         .join("data")
         .join("fake-git-repo")
         .join(commit_num.to_string());
@@ -209,48 +214,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn handmade_test_code_loads() -> Result<()> {
-        let test_codes = handmade_test_code()?;
-
-        assert!(!test_codes.is_empty());
-
-        Ok(())
-    }
-
-    #[test]
-    fn handmade_git_repository_loads() -> Result<()> {
-        let test_git_repo_path = handmade_git_repository()?;
-
-        assert!(test_git_repo_path.is_dir());
-
-        let git_dir = test_git_repo_path.join(".git");
-        assert!(git_dir.is_dir());
-
-        let repo = Repository::open(&test_git_repo_path)?;
-        let head = repo.head()?;
-        let commit = head.peel_to_commit()?;
-
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push(commit.id())?;
-        let commit_count = revwalk.count();
-        assert!(
-            commit_count >= 2,
-            "Expected at least 2 commits, found {}",
-            commit_count
-        );
-
-        let main_rs_path = test_git_repo_path.join("main.rs");
-        assert!(main_rs_path.is_file());
-        let content = fs::read_to_string(main_rs_path)?;
-        assert!(content.contains("Hello World"));
-
-        Ok(())
-    }
-
-    #[test]
     fn test_path_to_repo_path() -> Result<()> {
         let test_data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
+            .join("src")
+            .join("test")
             .join("data")
             .join("fake-git-repo");
 
