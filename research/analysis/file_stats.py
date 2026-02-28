@@ -24,7 +24,7 @@ os.makedirs("plots", exist_ok=True)
 # Load CSV
 df = pl.read_database_uri(
     "SELECT * FROM files",
-    "sqlite:///var/tmp/research/small/stats.sqlite",
+    "sqlite:///var/tmp/research/tiny/stats.sqlite",
 )
 
 # Add filename column
@@ -223,4 +223,3 @@ plt.xlabel("Bytes")
 plt.ylabel("AST Nodes")
 plt.savefig("plots/ast_nodes_bytes_distribution.png")
 plt.close()
-

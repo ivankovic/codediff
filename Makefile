@@ -2,12 +2,13 @@ SCRIPTS_FETCH_DIR := ./research/fetch_data
 
 LIST_FULL := ./research/list_of_repositories.csv
 LIST_SMALL  := ./research/list_of_repositories_100.csv
+LIST_TINY  := ./research/list_of_repositories_tiny.csv
 
-# Default mode is "small", can be overridden with "make MODE=full"
-MODE ?= small
+# Default mode is "tiny", can be overridden with "make MODE=small" or "make MODE=full"
+MODE ?= tiny
 
 # Resolve the appropriate list based on mode
-LIST := $(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL))
+LIST := $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL)))
 
 # Resolve directories based on mode
 REPOSITORIES_DIR := /var/tmp/research/$(MODE)/repositories/
@@ -42,6 +43,9 @@ commit-stats: build
 analyze: file-stats
 
 # Mode-specific convenience targets
+tiny: override MODE=tiny
+tiny: analyze
+
 small: override MODE=small
 small: analyze
 

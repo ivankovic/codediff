@@ -229,6 +229,8 @@ mod tests {
             FROM files LIMIT 1",
         )?;
 
+        let mut main_rs_found = false;
+
         let mut rows = columns_stmt.query([])?;
         if let Some(row) = rows.next()? {
             // Verify we can read all the expected columns
@@ -247,6 +249,8 @@ mod tests {
             if let Some(path_content) = &path
                 && path_content.ends_with("main.rs")
             {
+                main_rs_found = true;
+
                 assert!(tip.is_some(), "Tip should be present");
                 assert!(bytes > 0, "File should have some bytes");
 
@@ -274,6 +278,8 @@ mod tests {
                 }
             }
         }
+
+        assert!(main_rs_found, "main.rs was not found! It MUST exist.");
 
         Ok(())
     }
