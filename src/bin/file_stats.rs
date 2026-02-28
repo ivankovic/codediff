@@ -172,9 +172,9 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
                 path,
                 language,
                 tip,
-                s.bytes as i64,
                 s.automatically_generated as i32,
                 s.ast_nodes as i64,
+                s.bytes as i64,
                 s.failed_to_convert_to_utf8 as i32,
                 s.failed_to_parse as i32,
                 s.too_large_to_parse as i32,
@@ -190,13 +190,91 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
 mod tests {
     use super::*;
     use codediff::test::helper;
+    use rusqlite::Connection;
+    use std::path::Path;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn end_to_end() -> Result<()> {
-        // Create a temporary git repository for testing
         let repo_path = helper::handmade_git_repository()?;
+
+        let db_file = NamedTempFile::new()?;
+        let db_path = db_file.path();
+
+        file_stats(&repo_path, db_path, 2, 1000)?;
+
+        verify_database_contents(db_path)?;
+
+        Ok(())
+    }
+
+    fn verify_database_contents(db_path: &Path) -> Result<()> {
+        let conn = Connection::open(db_path)?;
+
+        let mut stmt =
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='files'")?;
+        let table_exists = stmt.exists([])?;
+        assert!(table_exists, "Files table should exist in the database");
+
+        let mut count_stmt = conn.prepare("SELECT COUNT(*) as count FROM files")?;
+        let count: i64 = count_stmt.query_row([], |row| row.get(0))?;
+        assert!(
+            count > 0,
+            "Database should contain at least one file record"
+        );
+
+        let mut columns_stmt = conn.prepare(
+            "SELECT path, language, tip, automatically_generated, ast_nodes, bytes,
+            failed_to_convert_to_utf8, failed_to_parse, too_large_to_parse
+            FROM files LIMIT 1",
+        )?;
+
+        let mut rows = columns_stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            // Verify we can read all the expected columns
+            let path: Option<String> = row.get(0)?;
+            let _language: Option<String> = row.get(1)?;
+            let tip: Option<String> = row.get(2)?;
+            let automatically_generated: i32 = row.get(3)?;
+            let ast_nodes: i64 = row.get(4)?;
+            let bytes: i64 = row.get(5)?;
+            let failed_to_convert_to_utf8: i32 = row.get(6)?;
+            let failed_to_parse: i32 = row.get(7)?;
+            let too_large_to_parse: i32 = row.get(8)?;
+
+            assert!(path.is_some(), "Path should be present");
+
+            if let Some(path_content) = &path
+                && path_content.ends_with("main.rs")
+            {
+                assert!(tip.is_some(), "Tip should be present");
+                assert!(bytes > 0, "File should have some bytes");
+
+                assert_eq!(
+                    automatically_generated, 0,
+                    "Test files should not be marked as automatically generated"
+                );
+                assert!(ast_nodes >= 0, "AST nodes should be non-negative");
+
+                assert_eq!(
+                    failed_to_convert_to_utf8, 0,
+                    "Test files should not fail UTF-8 conversion"
+                );
+                assert_eq!(failed_to_parse, 0, "Test files should parse successfully");
+                assert_eq!(
+                    too_large_to_parse, 0,
+                    "Test files should not be too large to parse"
+                );
+
+                if let Some(tip_content) = &tip {
+                    assert!(
+                        tip_content.contains("Code"),
+                        "Tip should indicate this is code"
+                    );
+                }
+            }
+        }
 
         Ok(())
     }
 }
-
