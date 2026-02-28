@@ -36,7 +36,7 @@ df = df.with_columns(pl.col("filename").str.split(".").list.last().alias("extens
 # Add category and subcategory columns from tip
 # Parse tip format like "Code(Build)" or "Data(Image)"
 def parse_tip(tip):
-    if tip is None or tip == "":
+    if tip is None or tip == "" or tip == "null":
         return ("Unknown", "")
     if "(" in tip and tip.endswith(")"):
         category = tip.split("(")[0]
@@ -47,10 +47,8 @@ def parse_tip(tip):
         return (tip, "")
 
 
-# Apply the parse_tip function to create category and subcategory columns
 df = df.with_columns(
-    pl.col("tip").map_elements(lambda x: parse_tip(x)[0]).alias("category"),
-    pl.col("tip").map_elements(lambda x: parse_tip(x)[1]).alias("subcategory"),
+    pl.col("tip").str.split("(").list.first().fill_null("Unknown").alias("category")
 )
 
 # Compute extra columns
@@ -225,3 +223,4 @@ plt.xlabel("Bytes")
 plt.ylabel("AST Nodes")
 plt.savefig("plots/ast_nodes_bytes_distribution.png")
 plt.close()
+
