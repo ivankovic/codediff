@@ -24,7 +24,6 @@ use tempfile::tempdir;
 
 use crate::code::{Code, metadata};
 
-#[cfg(test)]
 pub fn handmade_test_code() -> Result<Vec<Code>> {
     let mut result = Vec::new();
 
@@ -58,7 +57,6 @@ pub fn handmade_test_code() -> Result<Vec<Code>> {
     Ok(result)
 }
 
-#[cfg(test)]
 pub fn handmade_git_repository() -> Result<PathBuf> {
     let (repo_path, repo) = initialize_repository()?;
     let dirs = read_fake_git_repo_testdata()?;

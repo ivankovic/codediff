@@ -189,6 +189,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use codediff::test::helper;
 
     #[test]
     fn end_to_end() -> Result<()> {

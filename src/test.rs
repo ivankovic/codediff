@@ -15,13 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use anyhow::Result;
-
 pub mod helper;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use anyhow::Result;
 
     #[test]
     fn handmade_test_code_loads() -> Result<()> {
