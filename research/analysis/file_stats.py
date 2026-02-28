@@ -22,40 +22,45 @@ import matplotlib.pyplot as plt
 # Load CSV
 df = pl.read_database_uri(
     "SELECT * FROM files",
-    "sqlite:///var/tmp/research/stats.sqlite",
+    "sqlite:///var/tmp/research/small/stats.sqlite",
 )
 
 # Add filename column
 df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
 
+# Add extension column
+df = df.with_columns(
+    pl.col("filename").str.split(".").list.last().alias("extension")
+)
+
 # Compute extra columns
-file_type_counts = (
-    df.group_by("file_type").agg(pl.len().alias("count")).sort("count", descending=True)
+tip_counts = (
+    df.group_by("tip").agg(pl.len().alias("count")).sort("count", descending=True)
 )
 
 plt.figure()
 plt.pie(
-    file_type_counts["count"],
-    labels=file_type_counts["file_type"],
+    tip_counts["count"],
+    labels=tip_counts["tip"],
     autopct="%1.1f%%",
 )
-plt.legend(file_type_counts["file_type"], loc="center left", bbox_to_anchor=(1, 0.5))
+plt.legend(tip_counts["tip"], loc="center left", bbox_to_anchor=(1, 0.5))
 plt.title("File Types")
-plt.savefig("plots/file_types.png", bbox_inches="tight")
+plt.savefig("plots/tips.png", bbox_inches="tight")
 plt.close()
 
-undefined_file_type = df.filter(pl.col("file_type") == "Unable to determine")
-undefined_file_type_extensions = (
-    undefined_file_type.group_by("extension")
+undefined_tip = df.filter(pl.col("tip") == "Unable to determine")
+undefined_tip_extensions = (
+    undefined_tip.group_by("extension")
     .agg(pl.len().alias("count"))
     .sort("count", descending=True)
     .head(10)
 )
 print("Undefined file type top 10 extensions:")
-print(undefined_file_type_extensions)
+print(undefined_tip_extensions)
 
 # print("Undefined language 10 random files:")
-# sample = undefined_file_type.sample(30)
+# sample = undefined_tip.sample(30)
 # for row in sample.iter_rows():
 #    print(row)
 # exit(1)
@@ -96,7 +101,7 @@ plt.savefig(language_output_path, dpi=300)
 print(f"Plot saved to {language_output_path}")
 
 # Only Code
-df = df.filter(pl.col("file_type") == "Code")
+df = df.filter(pl.col("tip") == "Code")
 
 language_agg = df.group_by("language").len().rename({"len": "count"})
 pdf = language_agg.to_pandas()
