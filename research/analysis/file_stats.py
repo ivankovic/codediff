@@ -19,6 +19,8 @@ import polars as pl
 import numpy as np
 import matplotlib.pyplot as plt
 
+os.makedirs("plots", exist_ok=True)
+
 # Load CSV
 df = pl.read_database_uri(
     "SELECT * FROM files",
@@ -27,29 +29,47 @@ df = pl.read_database_uri(
 
 # Add filename column
 df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
-
 # Add extension column
+df = df.with_columns(pl.col("filename").str.split(".").list.last().alias("extension"))
+
+
+# Add category and subcategory columns from tip
+# Parse tip format like "Code(Build)" or "Data(Image)"
+def parse_tip(tip):
+    if tip is None or tip == "":
+        return ("Unknown", "")
+    if "(" in tip and tip.endswith(")"):
+        category = tip.split("(")[0]
+        subcategory = tip.split("(")[1].rstrip(")")
+        return (category, subcategory)
+    else:
+        # Fallback for old format
+        return (tip, "")
+
+
+# Apply the parse_tip function to create category and subcategory columns
 df = df.with_columns(
-    pl.col("filename").str.split(".").list.last().alias("extension")
+    pl.col("tip").map_elements(lambda x: parse_tip(x)[0]).alias("category"),
+    pl.col("tip").map_elements(lambda x: parse_tip(x)[1]).alias("subcategory"),
 )
 
 # Compute extra columns
 tip_counts = (
-    df.group_by("tip").agg(pl.len().alias("count")).sort("count", descending=True)
+    df.group_by("category").agg(pl.len().alias("count")).sort("count", descending=True)
 )
 
 plt.figure()
 plt.pie(
     tip_counts["count"],
-    labels=tip_counts["tip"],
+    labels=tip_counts["category"],
     autopct="%1.1f%%",
 )
-plt.legend(tip_counts["tip"], loc="center left", bbox_to_anchor=(1, 0.5))
+plt.legend(tip_counts["category"], loc="center left", bbox_to_anchor=(1, 0.5))
 plt.title("File Types")
 plt.savefig("plots/tips.png", bbox_inches="tight")
 plt.close()
 
-undefined_tip = df.filter(pl.col("tip") == "Unable to determine")
+undefined_tip = df.filter(pl.col("category") == "Unknown")
 undefined_tip_extensions = (
     undefined_tip.group_by("extension")
     .agg(pl.len().alias("count"))
@@ -101,7 +121,7 @@ plt.savefig(language_output_path, dpi=300)
 print(f"Plot saved to {language_output_path}")
 
 # Only Code
-df = df.filter(pl.col("tip") == "Code")
+df = df.filter(pl.col("category") == "Code")
 
 language_agg = df.group_by("language").len().rename({"len": "count"})
 pdf = language_agg.to_pandas()
@@ -186,9 +206,15 @@ sample = non_empty_code.filter(
 )
 sample = sample.sample(fraction=0.02, seed=4859)
 
-m, b = np.polyfit(non_empty_code["bytes"], non_empty_code["ast_nodes"], 1)
-print(f"<ast nodes> = {m} * <bytes> + {b}")
-fit = m * sample["bytes"] + b
+# Use the sample data for polyfit to avoid empty arrays
+if len(sample) > 0:
+    m, b = np.polyfit(sample["bytes"], sample["ast_nodes"], 1)
+    print(f"<ast nodes> = {m} * <bytes> + {b}")
+    fit = m * sample["bytes"] + b
+else:
+    print("Not enough data points for polynomial fit")
+    m, b = 0, 0
+    fit = sample["bytes"] * 0  # Create array of zeros
 
 plt.figure()
 # plt.hexbin(df["bytes"], df["ast_nodes"], gridsize=200)
