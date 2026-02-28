@@ -96,6 +96,11 @@ pub fn is_generated(code: &str) -> bool {
 * Expand existing statistics by parsing the code and processing the AST.
 */
 pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<()> {
+    println!(
+        "I'm expanding from code for: {:?}",
+        stats.code.metadata.path
+    );
+
     match &stats.code.metadata.tip {
         Some(tip) => {
             match tip {
@@ -143,6 +148,11 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
                 // We know what the langauge is, but we don't support TreeSitter parsing for this file.
             }
         }
+    } else {
+        // The language is not set...
+        return Err(anyhow!(
+            "Can't compute statistics for code that has no language"
+        ));
     };
 
     Ok(())

@@ -28,9 +28,11 @@ df = pl.read_database_uri(
 )
 
 # Add filename column
-df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
+df = df.with_columns(pl.col("path").str.split(
+    "/").list.last().alias("filename"))
 # Add extension column
-df = df.with_columns(pl.col("filename").str.split(".").list.last().alias("extension"))
+df = df.with_columns(pl.col("filename").str.split(
+    ".").list.last().alias("extension"))
 
 
 # Add category and subcategory columns from tip
@@ -48,13 +50,17 @@ def parse_tip(tip):
 
 
 df = df.with_columns(
-    pl.col("tip").str.split("(").list.first().fill_null("Unknown").alias("category")
+    pl.col("tip").str.split(
+        "(").list.first().fill_null("Unknown").alias("category")
 )
 
 # Compute extra columns
 tip_counts = (
-    df.group_by("category").agg(pl.len().alias("count")).sort("count", descending=True)
+    df.group_by("category").agg(pl.len().alias(
+        "count")).sort("count", descending=True)
 )
+print("Type counts:")
+print(tip_counts)
 
 plt.figure()
 plt.pie(

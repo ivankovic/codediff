@@ -258,7 +258,7 @@ mod tests {
                     automatically_generated, 0,
                     "Test files should not be marked as automatically generated"
                 );
-                assert!(ast_nodes >= 0, "AST nodes should be non-negative");
+                assert!(ast_nodes > 0, "AST nodes should be non-zero");
 
                 assert_eq!(
                     failed_to_convert_to_utf8, 0,
