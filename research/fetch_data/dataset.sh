@@ -74,8 +74,8 @@ shift || true
 case "$cmd" in
   update)
     PROJECT_FILTER="all"
-    ROOT_FOLDER="/tmp/research/repositories"
-    LIST="list_of_repositories.csv"
+    ROOT_FOLDER=""
+    LIST=""
 
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -96,6 +96,21 @@ case "$cmd" in
           ;;
       esac
     done
+
+    # Check if required parameters are provided
+    if [[ -z "$ROOT_FOLDER" ]]; then
+      echo "Error: --root parameter is required"
+      echo "Usage:"
+      echo "  update --project <filter> --root <folder> --list <csv>"
+      exit 1
+    fi
+
+    if [[ -z "$LIST" ]]; then
+      echo "Error: --list parameter is required"
+      echo "Usage:"
+      echo "  update --project <filter> --root <folder> --list <csv>"
+      exit 1
+    fi
 
     update "$PROJECT_FILTER" "$ROOT_FOLDER" "$LIST"
     ;;
