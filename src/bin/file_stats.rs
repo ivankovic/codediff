@@ -46,9 +46,24 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    let project_path = &args.path;
+    let db_path = &args.db;
     let n_threads = args.threads.unwrap_or_else(num_cpus::get);
-    let (path_tx, path_rx) = bounded::<PathBuf>(args.queue_capacity);
-    let (stats_tx, stats_rx) = bounded::<(PathBuf, CodeStats)>(args.queue_capacity);
+    let queue_capacity = args.queue_capacity;
+
+    if let Err(e) = file_stats(project_path, db_path, n_threads, queue_capacity) {
+        eprintln!("Failed to compute file stats: {:?}", e)
+    }
+}
+
+fn file_stats(
+    project_path: &Path,
+    db_path: &Path,
+    n_threads: usize,
+    queue_capacity: usize,
+) -> Result<()> {
+    let (path_tx, path_rx) = bounded::<PathBuf>(queue_capacity);
+    let (stats_tx, stats_rx) = bounded::<(PathBuf, CodeStats)>(queue_capacity);
 
     let mut workers = Vec::with_capacity(n_threads);
     for _ in 0..n_threads {
@@ -58,7 +73,10 @@ fn main() {
     }
     drop(stats_tx);
 
-    let path_producer = thread::spawn(move || filesystem::all_files_from_path(&args.path, path_tx));
+    let project_path_owned = project_path.to_owned();
+
+    let path_producer =
+        thread::spawn(move || filesystem::all_files_from_path(&project_path_owned, path_tx));
 
     let stats_collector = thread::spawn(move || {
         let mut map: HashMap<PathBuf, CodeStats> = HashMap::new();
@@ -75,10 +93,9 @@ fn main() {
 
     let stats = stats_collector.join().expect("Stats collector panicked!");
 
-    println!("Collected stats for {} files", stats.len());
-    if let Err(e) = export_stats_sqlite(args.db.as_path(), stats) {
-        eprintln!("Failed to save results: {:?}", e)
-    }
+    export_stats_sqlite(db_path, stats)?;
+
+    Ok(())
 }
 
 fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)>) {
@@ -171,6 +188,14 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn end_to_end() {}
+    fn end_to_end() -> Result<()> {
+        // Create a temporary git repository for testing
+        let repo_path = helper::handmade_git_repository()?;
+
+        Ok(())
+    }
 }
+
