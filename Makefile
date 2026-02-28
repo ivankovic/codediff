@@ -1,8 +1,5 @@
 SCRIPTS_FETCH_DIR := ./research/fetch_data
 
-REPOSITORIES_DIR := /var/tmp/research/repositories/
-RESEARCH_DIR := /var/tmp/research/
-
 LIST_FULL := ./research/list_of_repositories.csv
 LIST_SMALL  := ./research/list_of_repositories_100.csv
 
@@ -11,6 +8,10 @@ MODE ?= small
 
 # Resolve the appropriate list based on mode
 LIST := $(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL))
+
+# Resolve directories based on mode
+REPOSITORIES_DIR := /var/tmp/research/$(MODE)/repositories/
+RESEARCH_DIR := /var/tmp/research/$(MODE)/
 
 clean: clean-db
 	rm -rf $(REPOSITORIES_DIR)
