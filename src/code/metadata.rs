@@ -16,16 +16,23 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::code::Metadata;
+use crate::code::language;
 use crate::code::tip;
 
 /**
 * Compute all metadata fileds, that can be computed without reading any new information.
 */
 pub fn hermetic_expand(m: &mut Metadata) {
-    if m.tip.is_none() {
-        if let Some(path) = &m.path {
-            m.tip = tip::type_from_path(path.as_path());
-        }
+    if m.tip.is_none()
+        && let Some(path) = &m.path
+    {
+        m.tip = tip::type_from_path(path.as_path());
+    }
+
+    if m.language.is_none()
+        && let Some(path) = &m.path
+    {
+        m.language = language::language_for_path(path.as_path());
     }
 }
 
@@ -45,5 +52,6 @@ mod tests {
         hermetic_expand(&mut m);
 
         assert!(m.tip.is_some());
+        assert!(m.language.is_some());
     }
 }

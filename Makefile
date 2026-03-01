@@ -33,7 +33,7 @@ fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
 # Analyze file statistics
 file-stats: build
 	./target/release/file_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
-	(cd research && uv run ./analysis/file_stats.py)
+	(cd research && uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite)
 
 # Analyze commit statistics
 commit-stats: build

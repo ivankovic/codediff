@@ -15,16 +15,20 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
+import sys
 import polars as pl
 import numpy as np
 import matplotlib.pyplot as plt
+
+# Get database path from command line argument or use default
+db_path = sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
 
 os.makedirs("plots", exist_ok=True)
 
 # Load CSV
 df = pl.read_database_uri(
     "SELECT * FROM files",
-    "sqlite:///var/tmp/research/tiny/stats.sqlite",
+    f"sqlite://{db_path}",
 )
 
 # Add filename column

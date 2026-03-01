@@ -96,11 +96,6 @@ pub fn is_generated(code: &str) -> bool {
 * Expand existing statistics by parsing the code and processing the AST.
 */
 pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<()> {
-    println!(
-        "I'm expanding from code for: {:?}",
-        stats.code.metadata.path
-    );
-
     match &stats.code.metadata.tip {
         Some(tip) => {
             match tip {
