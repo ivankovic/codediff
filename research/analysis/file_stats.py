@@ -32,11 +32,9 @@ df = pl.read_database_uri(
 )
 
 # Add filename column
-df = df.with_columns(pl.col("path").str.split(
-    "/").list.last().alias("filename"))
+df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
 # Add extension column
-df = df.with_columns(pl.col("filename").str.split(
-    ".").list.last().alias("extension"))
+df = df.with_columns(pl.col("filename").str.split(".").list.last().alias("extension"))
 
 
 # Add category and subcategory columns from tip
@@ -54,25 +52,22 @@ def parse_tip(tip):
 
 
 df = df.with_columns(
-    pl.col("tip").str.split(
-        "(").list.first().fill_null("Unknown").alias("category")
+    pl.col("tip").str.split("(").list.first().fill_null("Unknown").alias("category")
 )
 
 # Compute extra columns
 tip_counts = (
-    df.group_by("category").agg(pl.len().alias(
-        "count")).sort("count", descending=True)
+    df.group_by("category").agg(pl.len().alias("count")).sort("count", descending=True)
 )
 print("Type counts:")
 print(tip_counts)
 
-plt.figure()
+plt.figure(figsize=(10, 5))
 plt.pie(
     tip_counts["count"],
     labels=tip_counts["category"],
     autopct="%1.1f%%",
 )
-plt.legend(tip_counts["category"], loc="center left", bbox_to_anchor=(1, 0.5))
 plt.title("File Types")
 plt.savefig("plots/tips.png", bbox_inches="tight")
 plt.close()
@@ -97,7 +92,7 @@ df = df.with_columns(
     pl.col("path")
     .str.replace_all(r"/+", "/")
     .str.replace_all(r"/\./", "/")
-    .str.strip_prefix("/tmp/research/repositories/")
+    .str.strip_prefix("/var/tmp/research/small/repositories/")
     .str.split("/")
     .list.get(0)
     .alias("project")
@@ -233,3 +228,4 @@ plt.xlabel("Bytes")
 plt.ylabel("AST Nodes")
 plt.savefig("plots/ast_nodes_bytes_distribution.png")
 plt.close()
+
