@@ -98,6 +98,7 @@ pub enum Language {
     TypeScript,
     Vimscript,
     YAML,
+    XML,
 }
 
 impl std::fmt::Display for Language {

@@ -64,6 +64,7 @@ pub fn language_for_extension(ext: &str) -> Option<Language> {
         "tsx" => Some(Language::TSX),
         "vim" => Some(Language::Vimscript),
         "yaml" | "yml" => Some(Language::YAML),
+        "xml" | "xht" | "xhtml" => Some(Language::XML),
         _ => None,
     }
 }
@@ -97,6 +98,7 @@ pub fn to_treesitter(language: &Language) -> Option<tree_sitter::Language> {
         Language::TypeScript => Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
         Language::Vimscript => Some(tree_sitter_vim::language()),
         Language::YAML => Some(tree_sitter_yaml::LANGUAGE.into()),
+        Language::XML => Some(tree_sitter_xml::LANGUAGE_XML.into()),
         // Bazel, Dart, MarkDown, SQL, ProtoBuf and Lisp are not supported at this time.
         _ => None,
     }
