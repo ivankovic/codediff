@@ -126,6 +126,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
 
             ast_nodes INTEGER,
             bytes INTEGER,
+            lines_of_code INTEGER,
 
             failed_to_convert_to_utf8 INTEGER,
             failed_to_parse INTEGER,
@@ -161,11 +162,12 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
                 automatically_generated,
                 ast_nodes,
                 bytes,
+                lines_of_code,
                 failed_to_convert_to_utf8,
                 failed_to_parse,
                 too_large_to_parse
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);
             "#,
             params![
                 now,
@@ -175,6 +177,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<PathBuf, CodeStats>) -> Resul
                 s.automatically_generated as i32,
                 s.ast_nodes as i64,
                 s.bytes as i64,
+                s.lines_of_code as i64,
                 s.failed_to_convert_to_utf8 as i32,
                 s.failed_to_parse as i32,
                 s.too_large_to_parse as i32,
@@ -224,7 +227,7 @@ mod tests {
         );
 
         let mut columns_stmt = conn.prepare(
-            "SELECT path, language, tip, automatically_generated, ast_nodes, bytes,
+            "SELECT path, language, tip, automatically_generated, ast_nodes, bytes, lines_of_code,
             failed_to_convert_to_utf8, failed_to_parse, too_large_to_parse
             FROM files LIMIT 1",
         )?;
@@ -240,9 +243,10 @@ mod tests {
             let automatically_generated: i32 = row.get(3)?;
             let ast_nodes: i64 = row.get(4)?;
             let bytes: i64 = row.get(5)?;
-            let failed_to_convert_to_utf8: i32 = row.get(6)?;
-            let failed_to_parse: i32 = row.get(7)?;
-            let too_large_to_parse: i32 = row.get(8)?;
+            let lines_of_code: i64 = row.get(6)?;
+            let failed_to_convert_to_utf8: i32 = row.get(7)?;
+            let failed_to_parse: i32 = row.get(8)?;
+            let too_large_to_parse: i32 = row.get(9)?;
 
             assert!(path.is_some(), "Path should be present");
 
@@ -253,6 +257,7 @@ mod tests {
 
                 assert!(tip.is_some(), "Tip should be present");
                 assert!(bytes > 0, "File should have some bytes");
+                assert!(lines_of_code > 0, "Main should have some lines");
 
                 assert_eq!(
                     automatically_generated, 0,
@@ -284,3 +289,4 @@ mod tests {
         Ok(())
     }
 }
+

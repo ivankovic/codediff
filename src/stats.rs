@@ -43,6 +43,7 @@ pub struct CodeStats {
 
     // Numerical stats.
     pub ast_nodes: usize,
+    pub lines_of_code: u64,
     pub bytes: u64,
 
     // Errors.
@@ -132,6 +133,8 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
                     return Ok(());
                 }
 
+                stats.lines_of_code = stats.code.contents.matches('\n').count() as u64;
+
                 match parser.parse(&stats.code.contents, None) {
                     Some(tree) => {
                         stats.ast_nodes = count_nodes(tree.root_node());
@@ -219,5 +222,25 @@ mod tests {
 };"
         ));
         assert!(!is_generated(""));
+    }
+
+    #[test]
+    fn counts_lines_correctly() {
+        let mut stats = CodeStats {
+            code: Code {
+                contents: "line 1\nline 2\nline 3".to_string(),
+                metadata: crate::code::Metadata {
+                    language: Some(crate::code::Language::Rust),
+                    tip: Some(crate::code::Type::Code("rust".to_string())),
+                    ..Default::default()
+                },
+            },
+            ..Default::default()
+        };
+        let mut parser = tree_sitter::Parser::new();
+        expand_from_code(&mut stats, &mut parser).unwrap();
+
+        // 3 lines needs 2 newlines if there is no trailing newline :)
+        assert_eq!(stats.lines_of_code, 2);
     }
 }
