@@ -105,9 +105,24 @@ file_count = df.select(pl.len())
 print(f"Files: {file_count['len'][0]}")
 
 files_per_project = df.group_by("project").len().rename({"len": "file_count"})
+
+files_per_project_p50 = files_per_project.select(
+    pl.col("file_count").quantile(0.50)
+).item()
 files_per_project_p90 = files_per_project.select(
     pl.col("file_count").quantile(0.90)
 ).item()
+files_per_project_p99 = files_per_project.select(
+    pl.col("file_count").quantile(0.99)
+).item()
+files_per_project_p999 = files_per_project.select(
+    pl.col("file_count").quantile(0.999)
+).item()
+
+print(f"Files per project p50: {files_per_project_p50}")
+print(f"Files per project p90: {files_per_project_p90}")
+print(f"Files per project p99: {files_per_project_p99}")
+print(f"Files per project p999: {files_per_project_p999}")
 
 files_per_project = files_per_project.filter(
     pl.col("file_count") < files_per_project_p90
@@ -128,6 +143,8 @@ df = df.filter(pl.col("category") == "Code")
 
 language_agg = df.group_by("language").len().rename({"len": "count"})
 pdf = language_agg.to_pandas()
+
+print(f"Languages: {language_agg.count()[0]}")
 pdf_sorted = pdf.sort_values("count", ascending=False)
 
 # Top 9
@@ -156,43 +173,48 @@ p50_ast = df.select(pl.col("ast_nodes").quantile(0.50)).item()
 p50_bytes = df.select(pl.col("bytes").quantile(0.50)).item()
 
 print(f"50th percentile — ast_nodes: {p50_ast:,}")
-print(f"50th percentile — bytes:     {p50_bytes:,}")
 
 # Compute 99th percentiles
 p99_ast = df.select(pl.col("ast_nodes").quantile(0.99)).item()
+
+print(f"99th percentile — ast_nodes: {p99_ast:,}")
+
+p90_bytes = df.select(pl.col("bytes").quantile(0.90)).item()
 p99_bytes = df.select(pl.col("bytes").quantile(0.99)).item()
 p999_bytes = df.select(pl.col("bytes").quantile(0.999)).item()
 p9995_bytes = df.select(pl.col("bytes").quantile(0.99955555)).item()
 
-print(f"99th percentile — ast_nodes: {p99_ast:,}")
+print(f"50th percentile — bytes:     {p50_bytes:,}")
+print(f"90th percentile — bytes:     {p90_bytes:,}")
 print(f"99th percentile — bytes:     {p99_bytes:,}")
 print(f"99.9th percentile — bytes:     {p999_bytes:,}")
 print(f"99.95th percentile — bytes:     {p9995_bytes:,}")
 
 # Trim values to ≤ 99th percentile (separately per metric)
 df_ast_trim = df.filter(pl.col("ast_nodes") <= p99_ast)
-df_bytes_trim = df.filter(pl.col("bytes") <= p99_bytes)
+df_bytes_trim = df.filter(pl.col("bytes") <= p90_bytes)
 
 # Plot
-plt.figure(figsize=(10, 5))
-
-plt.subplot(1, 2, 1)
+plt.figure(figsize=(8, 8))
 plt.hist(df_ast_trim["ast_nodes"].to_numpy(), bins=50, edgecolor="black")
 plt.title("AST Nodes ≤ 99th percentile")
 plt.xlabel("ast_nodes")
 plt.ylabel("Frequency")
 plt.xticks(rotation=30)
 
-plt.subplot(1, 2, 2)
+size_output_path = "plots/ast_nodes_distribution.png"
+os.makedirs(os.path.dirname(size_output_path), exist_ok=True)
+plt.savefig(size_output_path, dpi=300)
+print(f"Plot saved to {size_output_path}")
+
+plt.figure(figsize=(8, 8))
 plt.hist(df_bytes_trim["bytes"].to_numpy(), bins=50, edgecolor="black")
-plt.title("Bytes ≤ 99th percentile")
+plt.title("Distribution of code file sizes (Excluding 90+ percentile)")
 plt.xlabel("bytes")
 plt.ylabel("Frequency")
 plt.xticks(rotation=30)
 
-plt.tight_layout()
-
-size_output_path = "plots/ast_nodes_bytes_distribution.png"
+size_output_path = "plots/bytes_distribution.png"
 os.makedirs(os.path.dirname(size_output_path), exist_ok=True)
 plt.savefig(size_output_path, dpi=300)
 print(f"Plot saved to {size_output_path}")
@@ -226,6 +248,5 @@ plt.plot(sample["bytes"], fit, color="red", linestyle="--")
 plt.title("Correlation of AST Nodes and Bytes (99th percentile removed)")
 plt.xlabel("Bytes")
 plt.ylabel("AST Nodes")
-plt.savefig("plots/ast_nodes_bytes_distribution.png")
+plt.savefig("plots/ast_nodes_bytes_correlation.png")
 plt.close()
-

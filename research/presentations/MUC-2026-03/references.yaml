@@ -1,0 +1,65 @@
+gumtreediff-2014:
+  title: "Fine-grained and accurate source code differencing"
+  author:
+    - name: "Jean-Rémy Falleri"
+    - name: "Floréal Morandat"
+    - name: "Xavier Blanc"
+    - name: "Matias Martinez"
+    - name: "Martin Monperrus"
+  issued:
+    year: 2014
+  page: "313-324"
+  DOI: "10.1145/2642937.2642982"
+  URL: "http://doi.acm.org/10.1145/2642937.2642982"
+  container-title: "ACM/IEEE International Conference on Automated Software Engineering"
+  event: "ASE '14"
+  event-place: "Vasteras, Sweden"
+  type: "article"
+
+commit-size-distribution-paper:
+  title: "The Commit Size Distribution of Open Source Software"
+  author:
+    - name: "Arafat, O."
+    - name: "Riehle, D."
+  issued:
+    year: 2009
+  page: "1-8"
+  DOI: "10.1109/HICSS.2009.421"
+  container-title: "2009 42nd Hawaii International Conference on System Sciences"
+  keywords: "Open source software;History;Relational databases;Best practices;Power generation economics;Aggregates;Computer industry;Application software;Embedded software;Programming"
+  type: "article"
+
+ast-api-1:
+  title: "Mining billions of AST nodes to study actual and potential usage of Java language features"
+  author:
+    - name: "Dyer, Robert"
+    - name: "Rajan, Hridesh"
+    - name: "Nguyen, Hoan Anh"
+    - name: "Nguyen, Tien N."
+  issued:
+    year: 2014
+  ISBN: "9781450327565"
+  publisher: "Association for Computing Machinery"
+  address: "New York, NY, USA"
+  URL: "https://doi.org/10.1145/2568225.2568295"
+  DOI: "10.1145/2568225.2568295"
+  abstract: "Programming languages evolve over time, adding additional language features to simplify common tasks and make the language easier to use. For example, the Java Language Specification has four editions and is currently drafting a fifth. While the addition of language features is driven by an assumed need by the community (often with direct requests for such features), there is little empirical evidence demonstrating how these new features are adopted by developers once released. In this paper, we analyze over 31k open-source Java projects representing over 9 million Java files, which when parsed contain over 18 billion AST nodes. We analyze this corpus to find uses of new Java language features over time. Our study gives interesting insights, such as: there are millions of places features could potentially be used but weren't; developers convert existing code to use new features; and we found thousands of instances of potential resource handling bugs."
+  container-title: "Proceedings of the 36th International Conference on Software Engineering"
+  page: "779–790"
+  numpages: "12"
+  keywords: "Java, empirical study, language feature use, software mining"
+  event-place: "Hyderabad, India"
+  event: "ICSE 2014"
+  type: "article"
+
+ast-api-2:
+  title: "Large-scale, AST-based API-usage analysis of open-source Java projects"
+  author:
+    - name: "Lämmel, Ralf"
+    - name: "Pek, Ekaterina"
+    - name: "Starek, Jürgen"
+  issued:
+    year: 2011
+  page: "1317-1324"
+  container-title: "Proceedings of the 2011 ACM Symposium on Applied Computing"
+  type: "article"
