@@ -20,6 +20,60 @@ import polars as pl
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def compute_percentiles_and_plot(df, column_name, output_filename):
+    """
+    Compute 50, 90, 99, 99.9, and 99.99 percentiles for a column and create a distribution plot.
+
+    Args:
+        df: Polars DataFrame containing the data
+        column_name: Name of the column to analyze
+        output_filename: Base filename for the output plot (will be saved in plots/ directory)
+
+    Returns:
+        Dictionary containing the computed percentiles
+    """
+    # Compute percentiles
+    percentiles = {}
+    percentiles["p50"] = df.select(pl.col(column_name).quantile(0.50)).item()
+    percentiles["p90"] = df.select(pl.col(column_name).quantile(0.90)).item()
+    percentiles["p99"] = df.select(pl.col(column_name).quantile(0.99)).item()
+    percentiles["p999"] = df.select(pl.col(column_name).quantile(0.999)).item()
+    percentiles["p9999"] = df.select(pl.col(column_name).quantile(0.9999)).item()
+
+    print(f"Percentiles for {column_name}:")
+    print(f"  50th percentile:   {percentiles['p50']:,}")
+    print(f"  90th percentile:   {percentiles['p90']:,}")
+    print(f"  99th percentile:   {percentiles['p99']:,}")
+    print(f"  99.9th percentile: {percentiles['p999']:,}")
+    print(f"  99.99th percentile: {percentiles['p9999']:,}")
+
+    # Create distribution plot
+    plt.figure(figsize=(8, 8))
+
+    # Trim to 99th percentile for better visualization
+    trim_threshold = percentiles["p99"]
+    df_trimmed = df.filter(pl.col(column_name) <= trim_threshold)
+
+    plt.hist(df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black")
+
+    title = f"Distribution of {column_name} (99th percentile filtered)"
+    plt.title(title)
+    plt.xlabel(column_name)
+    plt.ylabel("Frequency")
+    plt.xticks(rotation=30)
+
+    # Save plot
+    output_path = f"plots/{output_filename}"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+
+    print(f"Plot saved to {output_path}")
+
+    return percentiles
+
+
 # Get database path from command line argument or use default
 db_path = sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
 
@@ -106,37 +160,15 @@ print(f"Files: {file_count['len'][0]}")
 
 files_per_project = df.group_by("project").len().rename({"len": "file_count"})
 
-files_per_project_p50 = files_per_project.select(
-    pl.col("file_count").quantile(0.50)
-).item()
-files_per_project_p90 = files_per_project.select(
-    pl.col("file_count").quantile(0.90)
-).item()
-files_per_project_p99 = files_per_project.select(
-    pl.col("file_count").quantile(0.99)
-).item()
-files_per_project_p999 = files_per_project.select(
-    pl.col("file_count").quantile(0.999)
-).item()
-
-print(f"Files per project p50: {files_per_project_p50}")
-print(f"Files per project p90: {files_per_project_p90}")
-print(f"Files per project p99: {files_per_project_p99}")
-print(f"Files per project p999: {files_per_project_p999}")
-
-files_per_project = files_per_project.filter(
-    pl.col("file_count") < files_per_project_p90
+# Compute percentiles and create distribution plot for files per project
+files_per_project_percentiles = compute_percentiles_and_plot(
+    files_per_project, "file_count", "files_per_project.png"
 )
 
-plt.hist(files_per_project["file_count"])
-plt.xlabel("Number of files in project")
-plt.ylabel("Number of projects")
-plt.title("Distribution of file counts per project (Excluding 90+ percentile)")
-
-language_output_path = "plots/files_per_project.png"
-os.makedirs(os.path.dirname(language_output_path), exist_ok=True)
-plt.savefig(language_output_path, dpi=300)
-print(f"Plot saved to {language_output_path}")
+# Filter for the correlation analysis (keep original filtering logic)
+files_per_project = files_per_project.filter(
+    pl.col("file_count") < files_per_project_percentiles["p90"]
+)
 
 # Only Code
 df = df.filter(pl.col("category") == "Code")
@@ -167,57 +199,13 @@ os.makedirs(os.path.dirname(language_output_path), exist_ok=True)
 plt.savefig(language_output_path, dpi=300)
 print(f"Plot saved to {language_output_path}")
 
-# Compute 50th percentiles of sizes
-
-p50_ast = df.select(pl.col("ast_nodes").quantile(0.50)).item()
-p50_bytes = df.select(pl.col("bytes").quantile(0.50)).item()
-
-print(f"50th percentile — ast_nodes: {p50_ast:,}")
-
-# Compute 99th percentiles
-p99_ast = df.select(pl.col("ast_nodes").quantile(0.99)).item()
-
-print(f"99th percentile — ast_nodes: {p99_ast:,}")
-
-p90_bytes = df.select(pl.col("bytes").quantile(0.90)).item()
-p99_bytes = df.select(pl.col("bytes").quantile(0.99)).item()
-p999_bytes = df.select(pl.col("bytes").quantile(0.999)).item()
-p9995_bytes = df.select(pl.col("bytes").quantile(0.99955555)).item()
-
-print(f"50th percentile — bytes:     {p50_bytes:,}")
-print(f"90th percentile — bytes:     {p90_bytes:,}")
-print(f"99th percentile — bytes:     {p99_bytes:,}")
-print(f"99.9th percentile — bytes:     {p999_bytes:,}")
-print(f"99.95th percentile — bytes:     {p9995_bytes:,}")
-
-# Trim values to ≤ 99th percentile (separately per metric)
-df_ast_trim = df.filter(pl.col("ast_nodes") <= p99_ast)
-df_bytes_trim = df.filter(pl.col("bytes") <= p90_bytes)
-
-# Plot
-plt.figure(figsize=(8, 8))
-plt.hist(df_ast_trim["ast_nodes"].to_numpy(), bins=50, edgecolor="black")
-plt.title("AST Nodes ≤ 99th percentile")
-plt.xlabel("ast_nodes")
-plt.ylabel("Frequency")
-plt.xticks(rotation=30)
-
-size_output_path = "plots/ast_nodes_distribution.png"
-os.makedirs(os.path.dirname(size_output_path), exist_ok=True)
-plt.savefig(size_output_path, dpi=300)
-print(f"Plot saved to {size_output_path}")
-
-plt.figure(figsize=(8, 8))
-plt.hist(df_bytes_trim["bytes"].to_numpy(), bins=50, edgecolor="black")
-plt.title("Distribution of code file sizes (Excluding 90+ percentile)")
-plt.xlabel("bytes")
-plt.ylabel("Frequency")
-plt.xticks(rotation=30)
-
-size_output_path = "plots/bytes_distribution.png"
-os.makedirs(os.path.dirname(size_output_path), exist_ok=True)
-plt.savefig(size_output_path, dpi=300)
-print(f"Plot saved to {size_output_path}")
+# Compute percentiles and create distribution plots for ast_nodes and bytes
+ast_percentiles = compute_percentiles_and_plot(
+    df, "ast_nodes", "ast_nodes_distribution.png"
+)
+bytes_percentiles = compute_percentiles_and_plot(
+    df, "bytes", "bytes_distribution.png"
+)
 
 non_empty_code = df.filter((pl.col("bytes") > 0) & (pl.col("ast_nodes") > 0))
 
@@ -227,7 +215,8 @@ print(
 )
 
 sample = non_empty_code.filter(
-    (pl.col("bytes") <= p99_bytes) & (pl.col("ast_nodes") <= p99_ast)
+    (pl.col("bytes") <= bytes_percentiles["p99"])
+    & (pl.col("ast_nodes") <= ast_percentiles["p99"])
 )
 sample = sample.sample(fraction=0.02, seed=4859)
 
