@@ -299,6 +299,28 @@
   - _Commit size_: Half of all commits is under 10 lines. But they go up to tens of thousands of lines.
 ]
 
+#make-section[What am I doing next?]
+
+#slide[
+  = CodeDiff
+
+  - I really hate how code diffing works today. If you have ever seen a GitHub diff where somebody inlines Python code in a new function, you know what annoys me.
+
+  - But there are better theorethical diffing algorithms.
+
+  - But none of them are implemented with usage-first mentality. Most are research-first and explicitly say that they are not aiming to be fast and robust.
+
+  - I want a fast, robust, AST based diff!
+
+  - Theorethical algorithms are O(|AST|#super[2]). But we now know, the actual sizes are such that it would be much better to design something that works with tens of thousands of nodes but only 10-100 changed lines!
+]
+
+#slide[
+  #show: focus
+
+  It is easier to make a _robust_ tool if you know the real constraints.
+]
+
 #slide[
   #show: focus
   #text(size: 2.25em)[Thank you for your attention]
