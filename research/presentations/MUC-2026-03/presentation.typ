@@ -173,7 +173,7 @@
 
     - 4 _types_ of files
   ][
-    #image("language_distribution.png")
+    #image("plots/language_distribution.png")
   ]
 ]
 
@@ -197,7 +197,7 @@
       - Project guides, e.g. README.md
       - Legal, e.g. licences
   ][
-    #image("file_types.png")
+    #image("plots/tips.png")
   ]
 ]
 
@@ -213,7 +213,7 @@
 
     - 99.9th percentile:
   ][
-    #image("files_per_project.png")
+    #image("plots/files_per_project.png")
   ]
 ]
 
@@ -229,7 +229,7 @@
 
     - 99.9th percentile:
   ][
-    #image("bytes_distribution.png")
+    #image("plots/bytes_distribution.png")
   ]
 ]
 
@@ -245,7 +245,7 @@
 
     - 99.9th percentile:
   ][
-    #image("bytes_distribution.png")
+    #image("plots/lines_of_code_distribution.png")
   ]
 ]
 
@@ -261,7 +261,7 @@
 
     - 99.9th percentile:
   ][
-    #image("ast_nodes_distribution.png")
+    #image("plots/ast_nodes_distribution.png")
   ]
 ]
 
@@ -279,7 +279,7 @@
 
       - E.g. O(bytes#super[2]) = O(|AST|#super[2])
   ][
-    #image("ast_nodes_bytes_correlation.png")
+    #image("plots/ast_nodes_bytes_correlation.png")
   ]
 ]
 
