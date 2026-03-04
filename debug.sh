@@ -32,7 +32,7 @@ cargo build --release
 
 # Target directory (current dir if not specified)
 PARENT="$1"
-DB_PATH=/tmp/research/file-stats.sqlite3
+DB_PATH=/var/tmp/research/debug-stats.sqlite3
 
 case "$MODE" in
   dirs)
