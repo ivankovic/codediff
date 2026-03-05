@@ -80,7 +80,7 @@
 
     - What is the maximal number of nodes your tool will ever see?
 
-    - What is the second largest number? Or how about 99.999th percentile?
+    - What is the second largest number? Or how about 99.99th percentile?
 ]
 
 #slide[
@@ -165,9 +165,9 @@
   = Attack of the clones
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Repositories: 100
+    - Repositories: 7423
 
-    - Number of files: 1347492
+    - Number of files: 6169828
 
     - Languages: 31
 
@@ -205,13 +205,13 @@
   = Files per project
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Median:
+    - Median: 93
 
-    - 90th percentile:
+    - 90th percentile: 1 500
 
-    - 99th percentile:
+    - 99th percentile: 11 769
 
-    - 99.9th percentile:
+    - 99.9th percentile: 49 049
   ][
     #image("plots/files_per_project.png")
   ]
@@ -221,13 +221,13 @@
   = Bytes per file (Code files only)
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Median: 1508
+    - Median: 2 268
 
-    - 90th percentile:
+    - 90th percentile: 17 759
 
-    - 99th percentile:
+    - 99th percentile: 134 118
 
-    - 99.9th percentile:
+    - 99.9th percentile: 1 193 619
   ][
     #image("plots/bytes_distribution.png")
   ]
@@ -237,13 +237,13 @@
   = LOC per file (Code files only)
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Median: 1508
+    - Median: 59
 
-    - 90th percentile:
+    - 90th percentile: 452
 
-    - 99th percentile:
+    - 99th percentile: 2 780
 
-    - 99.9th percentile:
+    - 99.9th percentile: 12 909
   ][
     #image("plots/lines_of_code_distribution.png")
   ]
@@ -253,13 +253,17 @@
   = AST nodes per file (Code files only)
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Median: 1508
+    - Median: 332
 
-    - 90th percentile:
+    - 90th percentile: 3 552
 
-    - 99th percentile:
+    - 99th percentile: 24 516
 
-    - 99.9th percentile:
+    - 99.9th percentile: 138 995
+
+    - _99.99th percentile_: 289 352
+
+    - _Maximum_: 905 004
   ][
     #image("plots/ast_nodes_distribution.png")
   ]
@@ -269,11 +273,11 @@
   = Correlation between bytes and AST nodes (Code files only)
 
   #grid(columns: (1fr, 1fr), gutter: 4em)[
-    - Pearson correlation: 0.8793
+    - Pearson correlation: 0.8952
 
-    - Formula: $ |"AST"| = "bytes" * 0.21128 + 18.78731 $
+    - Formula: $ |"AST"| = "bytes" * 0.2124 + 49.9386 $
 
-    - More useful formula: $ |"AST"| = "bytes" / 4 $
+    - More useful formula: $ |"AST"| = "bytes" / 5 $
 
     - _This allows comparing algorithms that operate on bytes and AST nodes!_
 
@@ -294,7 +298,7 @@
 
   - _Bytes per file_: Tens of thousands mostly, can be half a million. Million is rare.
 
-  - _AST nodes per file_: Number of bytes divided by 4. Thousands to tens of thousands. Quarter million is rare.
+  - _AST nodes per file_: A fift of the number of bytes. Thousands to tens of thousands. Quarter million is rare.
 
   - _Commit size_: Half of all commits is under 10 lines. But they go up to tens of thousands of lines.
 ]
@@ -306,13 +310,15 @@
 
   - I really hate how code diffing works today. If you have ever seen a GitHub diff where somebody inlines Python code in a new function, you know what annoys me.
 
-  - But there are better theorethical diffing algorithms.
+  - Theorethical algorithms are O(|AST|#super[2]). And some have been implemented, but in their Documentation they explicitly say they are not aiming to be robust and fast for production usage. They are mostly research artefacts.
 
-  - But none of them are implemented with usage-first mentality. Most are research-first and explicitly say that they are not aiming to be fast and robust.
+  - The difference between:
 
-  - I want a fast, robust, AST based diff!
+    - Make an algoritmically better code diffing algorithm faster than O(|AST|#super[2])
 
-  - Theorethical algorithms are O(|AST|#super[2]). But we now know, the actual sizes are such that it would be much better to design something that works with tens of thousands of nodes but only 10-100 changed lines!
+    - vs
+
+    - Make a diffing binary that can diff up to 1M AST nodes, with 47.5% of all diffs being 10 or fewer lines. The diff must be computed under 100ms for 99.99% of all commits
 ]
 
 #slide[
