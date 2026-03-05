@@ -39,7 +39,8 @@ def compute_percentiles_and_plot(df, column_name, output_filename):
     percentiles["p90"] = df.select(pl.col(column_name).quantile(0.90)).item()
     percentiles["p99"] = df.select(pl.col(column_name).quantile(0.99)).item()
     percentiles["p999"] = df.select(pl.col(column_name).quantile(0.999)).item()
-    percentiles["p9999"] = df.select(pl.col(column_name).quantile(0.9999)).item()
+    percentiles["p9999"] = df.select(
+        pl.col(column_name).quantile(0.9999)).item()
 
     print(f"Percentiles for {column_name}:")
     print(f"  50th percentile:   {percentiles['p50']:,}")
@@ -74,6 +75,34 @@ def compute_percentiles_and_plot(df, column_name, output_filename):
     return percentiles
 
 
+def export_percentiles_to_csv(df, columns, output_filename):
+    """
+    Compute percentiles for multiple columns and export to CSV.
+
+    Args:
+        df: Polars DataFrame containing the data
+        columns: List of column names to analyze
+        output_filename: Path for the output CSV file
+    """
+    results = []
+
+    for column in columns:
+        percentiles = {}
+        percentiles["metric"] = column
+        percentiles["p50"] = df.select(pl.col(column).quantile(0.50)).item()
+        percentiles["p90"] = df.select(pl.col(column).quantile(0.90)).item()
+        percentiles["p99"] = df.select(pl.col(column).quantile(0.99)).item()
+        percentiles["p999"] = df.select(pl.col(column).quantile(0.999)).item()
+        percentiles["p9999"] = df.select(
+            pl.col(column).quantile(0.9999)).item()
+        results.append(percentiles)
+
+    # Create DataFrame and export to CSV
+    result_df = pl.DataFrame(results)
+    result_df.write_csv(output_filename)
+    print(f"Percentiles exported to {output_filename}")
+
+
 def load_data(db_path):
     """
     Load data from the database and perform initial transformations.
@@ -91,7 +120,8 @@ def load_data(db_path):
     )
 
     # Add filename column
-    df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
+    df = df.with_columns(pl.col("path").str.split(
+        "/").list.last().alias("filename"))
     # Add extension column
     df = df.with_columns(
         pl.col("filename").str.split(".").list.last().alias("extension")
@@ -99,7 +129,8 @@ def load_data(db_path):
 
     # Add category column from tip
     df = df.with_columns(
-        pl.col("tip").str.split("(").list.first().fill_null("Unknown").alias("category")
+        pl.col("tip").str.split(
+            "(").list.first().fill_null("Unknown").alias("category")
     )
 
     # Extract project name from path
@@ -108,6 +139,7 @@ def load_data(db_path):
         .str.replace_all(r"/+", "/")
         .str.replace_all(r"/\./", "/")
         .str.strip_prefix("/var/tmp/research/small/repositories/")
+        .str.strip_prefix("/var/tmp/research/full/repositories/")
         .str.split("/")
         .list.get(0)
         .alias("project")
@@ -158,7 +190,8 @@ def compute_full_dataset_stats(df):
     file_count = df.select(pl.len())
     print(f"Files: {file_count['len'][0]}")
 
-    files_per_project = df.group_by("project").len().rename({"len": "file_count"})
+    files_per_project = df.group_by(
+        "project").len().rename({"len": "file_count"})
 
     # Compute percentiles and create distribution plot for files per project
     files_per_project_percentiles = compute_percentiles_and_plot(
@@ -220,12 +253,14 @@ def compute_code_only_stats(df):
     bytes_percentiles = compute_percentiles_and_plot(
         df, "bytes", "bytes_distribution.png"
     )
-    compute_percentiles_and_plot(df, "lines_of_code", "lines_of_code_distribution.png")
+    compute_percentiles_and_plot(
+        df, "lines_of_code", "lines_of_code_distribution.png")
     ast_percentiles = compute_percentiles_and_plot(
         df, "ast_nodes", "ast_nodes_distribution.png"
     )
 
-    non_empty_code = df.filter((pl.col("bytes") > 0) & (pl.col("ast_nodes") > 0))
+    non_empty_code = df.filter(
+        (pl.col("bytes") > 0) & (pl.col("ast_nodes") > 0))
 
     print(
         "Pearson correlation between bytes and ast_nodes: ",
@@ -258,12 +293,18 @@ def compute_code_only_stats(df):
     plt.savefig("plots/ast_nodes_bytes_correlation.png")
     plt.close()
 
+    # Export percentiles to CSV
+    export_percentiles_to_csv(
+        df, ["bytes", "ast_nodes", "lines_of_code"], "code_percentiles.csv"
+    )
+
 
 # Main execution
 if __name__ == "__main__":
     # Get database path from command line argument or use default
     db_path = (
-        sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
+        sys.argv[1] if len(
+            sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
     )
 
     os.makedirs("plots", exist_ok=True)
@@ -279,4 +320,3 @@ if __name__ == "__main__":
 
     # Compute code-only statistics
     compute_code_only_stats(code_df)
-
