@@ -40,7 +40,7 @@
   #v(5fr)
 
   #text(size: 0.85em, weight: "medium")[BMW] \
-  #text(size: 0.85em)[München, #datetime.today().display()]
+  #text(size: 0.85em)[München, 09-10.3.2026.]
 
 ]
 
