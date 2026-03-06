@@ -87,9 +87,11 @@ def export_percentiles_to_csv(df, columns, output_filename):
     """
     results = []
 
+    # Compute percentiles for all languages combined
     for column in columns:
         percentiles = {}
         percentiles["metric"] = column
+        percentiles["language"] = "All languages"
         percentiles["p50"] = df.select(pl.col(column).quantile(0.50)).item()
         percentiles["p90"] = df.select(pl.col(column).quantile(0.90)).item()
         percentiles["p99"] = df.select(pl.col(column).quantile(0.99)).item()
@@ -97,6 +99,23 @@ def export_percentiles_to_csv(df, columns, output_filename):
         percentiles["p9999"] = df.select(pl.col(column).quantile(0.9999)).item()
         percentiles["max"] = df.select(pl.col(column).max()).item()
         results.append(percentiles)
+
+    # Compute percentiles per language
+    languages = df.select(pl.col("language")).unique()["language"].to_list()
+    for language in languages:
+        language_df = df.filter(pl.col("language") == language)
+        if len(language_df) > 0:
+            for column in columns:
+                percentiles = {}
+                percentiles["metric"] = column
+                percentiles["language"] = language
+                percentiles["p50"] = language_df.select(pl.col(column).quantile(0.50)).item()
+                percentiles["p90"] = language_df.select(pl.col(column).quantile(0.90)).item()
+                percentiles["p99"] = language_df.select(pl.col(column).quantile(0.99)).item()
+                percentiles["p999"] = language_df.select(pl.col(column).quantile(0.999)).item()
+                percentiles["p9999"] = language_df.select(pl.col(column).quantile(0.9999)).item()
+                percentiles["max"] = language_df.select(pl.col(column).max()).item()
+                results.append(percentiles)
 
     # Create DataFrame and export to CSV
     result_df = pl.DataFrame(results)
@@ -315,4 +334,3 @@ if __name__ == "__main__":
 
     # Compute code-only statistics
     compute_code_only_stats(code_df)
-
