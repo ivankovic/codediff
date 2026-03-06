@@ -3,6 +3,8 @@
 
 #bibliography("references.yaml")
 
+#let percentiles = csv("percentiles.csv")
+
 #show: setup.with(colour-accent: rgb("#E27B01"))
 
 // There is no specific function to create a cover slide for the
@@ -287,6 +289,57 @@
   ]
 ]
 
+#slide[
+  = Differences between selected languages - Bytes
+
+  #set align(center)
+
+  #table(
+   columns: 7,
+   [_Language_], [_p50_], [_p90 ↓_], [_p99_], [_p99.9_], [_p99.99_], [_Max_],
+   ..percentiles
+      .filter(row => row.at(1) in ("C", "CPP", "Go", "Rust", "Java", "Python", "TypeScript", "JavaScript"))
+      .filter(row => row.at(0) == "bytes")
+      .map(row => row.slice(1))
+      .sorted(key: row => float(row.at(2)))
+      .flatten(),
+  )
+]
+
+#slide[
+  = Differences between selected languages - Lines
+
+  #set align(center)
+
+  #table(
+   columns: 7,
+   [_Language_], [_p50_], [_p90 ↓_], [_p99_], [_p99.9_], [_p99.99_], [_Max_],
+   ..percentiles
+      .filter(row => row.at(1) in ("C", "CPP", "Go", "Rust", "Java", "Python", "TypeScript", "JavaScript"))
+      .filter(row => row.at(0) == "lines_of_code")
+      .map(row => row.slice(1))
+      .sorted(key: row => float(row.at(2)))
+      .flatten(),
+  )
+]
+
+#slide[
+  = Differences between selected languages - AST Nodes
+
+  #set align(center)
+
+  #table(
+   columns: 7,
+   [_Language_], [_p50_], [_p90 ↓_], [_p99_], [_p99.9_], [_p99.99_], [_Max_],
+   ..percentiles
+      .filter(row => row.at(1) in ("C", "CPP", "Go", "Rust", "Java", "Python", "TypeScript", "JavaScript"))
+      .filter(row => row.at(0) == "ast_nodes")
+      .map(row => row.slice(1))
+      .sorted(key: row => float(row.at(2)))
+      .flatten(),
+  )
+]
+
 #make-section[Rules of thumb]
 
 #slide[
@@ -326,7 +379,6 @@
 
   It is easier to make a _robust_ tool if you know the real constraints.
 ]
-
 #slide[
   #show: focus
   #text(size: 2.25em)[Thank you for your attention]
