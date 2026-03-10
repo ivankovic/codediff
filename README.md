@@ -38,7 +38,7 @@ CodeDiff has two types of tests:
 
 ## Automated tests
 
-Tests in src/ must run in uner 5 seconds. Most tests should run under 1 second.
+Tests in src/ must run in under 5 seconds. Most tests should run under 1 second.
 
 Tests in tests/ must run in under 10 seconds. Most tests should run under 5 seconds.
 
