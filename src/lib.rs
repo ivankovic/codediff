@@ -16,19 +16,16 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod code;
+pub mod diff;
 pub mod metadata;
 pub mod stats;
 
 pub mod test;
 
-#[derive(Debug, Default, Clone)]
-pub struct TwoDiff {
-    pub unix_diff_format: String,
-    pub gumtree_diff_format: String,
-}
+use crate::diff::Diff;
 
-pub fn diff(_before: &str, _after: &str) -> TwoDiff {
-    TwoDiff::default()
+pub fn diff(_before: &str, _after: &str) -> Diff {
+    Diff::default()
 }
 
 #[cfg(test)]
@@ -39,6 +36,6 @@ mod tests {
     fn empty_diff() {
         let d = diff("", "");
 
-        assert_eq!(d.unix_diff_format, "");
+        assert!(d.ast.is_some());
     }
 }

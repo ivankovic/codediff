@@ -29,7 +29,9 @@ pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instea
 * and should always first check that the required data is actually available, if not it should try
 * to construct it, and if that doesn't work it should fail-safe, ideally returning a safe zero
 * result. This allows the calling code to extremely efficiently process large files, and files that
-* only pretend to be code but are data or configuration.
+* only pretend to be code but are data or configuration. To help the compiler enforce this, most
+* leaf fields should be wrapped in Option. Ideally, the only non-Option wrapped field is the code
+* itself.
 */
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Code {

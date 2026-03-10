@@ -33,8 +33,7 @@ fn main() -> std::io::Result<()> {
     let after = fs::read_to_string(args.after)?;
 
     let d = diff(&before, &after);
-    println!("Unix Diff - {}", d.unix_diff_format);
-    println!("Gumtree Diff - {}", d.gumtree_diff_format);
+    println!("Diff: {:}", d);
 
     Ok(())
 }

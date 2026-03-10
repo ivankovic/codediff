@@ -55,7 +55,6 @@ struct Stats {
     lines_added: u64,
     lines_removed: u64,
     lines_changed: u64,
-    unix_diff_script_bytes: u64,
 }
 
 fn main() {
@@ -227,7 +226,6 @@ fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
     let mut result = stats.clone();
 
     let d = diff(before, after);
-    result.unix_diff_script_bytes = d.unix_diff_format.len() as u64;
 
     Ok(result)
 }
