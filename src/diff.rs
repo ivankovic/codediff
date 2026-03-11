@@ -113,4 +113,30 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn diff_identical_rust_code() -> Result<()> {
+        let rust_code = r#"
+fn main() {
+    println!("Hello, world!");
+}
+"#;
+
+        let before = from_string(rust_code, &Language::Rust);
+        let after = from_string(rust_code, &Language::Rust);
+
+        let diff = diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+        let diff_ast = diff.ast.unwrap();
+
+        // No changes means no deleted or added nodes.
+        assert_eq!(diff_ast.added.len(), 0);
+        assert_eq!(diff_ast.deleted.len(), 0);
+
+        // There are exactly 22 nodes in the tree.
+        assert_eq!(diff_ast.mapping.len(), 22);
+
+        Ok(())
+    }
 }
