@@ -19,10 +19,11 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
+use tempfile::tempdir;
 use tree_sitter::Parser as TSParser;
 
-use codediff::code::{Code, from_file};
 use codediff::code::language::to_treesitter;
+use codediff::code::{Code, from_file};
 
 /// Command line arguments for the ASCII visualizer
 #[derive(Parser, Debug)]
@@ -90,10 +91,35 @@ fn print_ast_tree(node: tree_sitter::Node, contents: &[u8], indent: usize) {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Create Code object from file
-    let code = from_file(&args.file_path)?;
+    // Check if the file path ends with ".test"
+    let (file_path, _temp_dir) = if args.file_path.to_string_lossy().ends_with(".test") {
+        // Create a temporary directory
+        let temp_dir = tempdir()?;
+        let temp_dir_path = temp_dir.path();
 
-    println!("Visualizing AST for: {}", args.file_path.display());
+        // Create filename with ".test" removed
+        let original_filename = args.file_path.file_name().unwrap().to_string_lossy();
+        let new_filename = original_filename.trim_end_matches(".test");
+        let temp_path = temp_dir_path.join(new_filename);
+
+        // Read the original file content
+        let original_content = std::fs::read_to_string(&args.file_path).map_err(|e| {
+            anyhow::anyhow!("Failed to read file {}: {}", args.file_path.display(), e)
+        })?;
+
+        // Write to the temporary file
+        std::fs::write(&temp_path, original_content)
+            .map_err(|e| anyhow::anyhow!("Failed to write to temp file: {}", e))?;
+
+        (temp_path, Some(temp_dir))
+    } else {
+        (args.file_path, None)
+    };
+
+    // Create Code object from file
+    let code = from_file(&file_path)?;
+
+    println!("Visualizing AST for: {}", file_path.display());
     println!("Language: {:?}", code.metadata.language);
     println!("File size: {} bytes", code.contents.len());
     println!("\nAST Tree:");
@@ -104,5 +130,6 @@ fn main() -> Result<()> {
     let contents_bytes = code.contents.as_bytes();
     print_ast_tree(root_node, contents_bytes, 0);
 
+    // The temp_dir will be dropped here, cleaning up automatically
     Ok(())
 }
