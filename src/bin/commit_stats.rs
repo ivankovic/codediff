@@ -17,7 +17,7 @@
  */
 use anyhow::Result;
 use clap::Parser;
-use codediff::diff;
+use codediff::code::Language;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
 use serde::Serialize;
@@ -55,6 +55,7 @@ struct Stats {
     lines_added: u64,
     lines_removed: u64,
     lines_changed: u64,
+    unix_diff_script_bytes: u64,
 }
 
 fn main() {
@@ -225,7 +226,7 @@ fn process_delta_loop(
 fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
     let mut result = stats.clone();
 
-    let d = diff(before, after);
+    let _ = codediff::diff_strings(before, after, &Language::Unknown);
 
     Ok(result)
 }

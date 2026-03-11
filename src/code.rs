@@ -42,6 +42,28 @@ pub struct Code {
 }
 
 /**
+* Constructs a Code structure from the given string and language.
+*
+* Note that the metadata type will be assumed to be Code. If for some reason you want to use this
+* to construct configuration, data or documentation, make sure to update the metadata accordingly
+* after construction.
+*
+* TODO: Make this code auto-recognize type based on contents to correctly construct Code objects
+* that are actually Configuration, e.g. docker-compose YAML files. It will require expanding the
+* language.rs detection to support content aware metadata expansion.
+*/
+pub fn from_string(contents: &str, language: &Language) -> Code {
+    Code {
+        contents: contents.to_string(),
+        metadata: Metadata {
+            path: None,
+            tip: Some(Type::Code("Code".to_string())),
+            language: Some(language.clone()),
+        },
+    }
+}
+
+/**
 * The metadata around the code, but not the code itself.
 *
 * This is only the metadata that is necessary for the diffing. Statistics and test data should not
@@ -130,5 +152,17 @@ pub enum Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         std::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn code_from_empty_string() {
+        let c = from_string("", &Language::Rust);
+
+        assert_eq!(c.contents, "");
     }
 }

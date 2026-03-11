@@ -16,7 +16,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use clap::Parser;
-use codediff::diff;
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,8 +31,8 @@ fn main() -> std::io::Result<()> {
     let before = fs::read_to_string(args.before)?;
     let after = fs::read_to_string(args.after)?;
 
-    let d = diff(&before, &after);
-    println!("Diff: {:}", d);
+    let d = codediff::diff_strings(&before, &after, &codediff::code::Language::Rust);
+    println!("Diff: {:?}", d);
 
     Ok(())
 }

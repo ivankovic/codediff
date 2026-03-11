@@ -22,10 +22,19 @@ pub mod stats;
 
 pub mod test;
 
-use crate::diff::Diff;
+use crate::{code::Code, code::Language, code::from_string, diff::ASTDiff, diff::Diff};
 
-pub fn diff(_before: &str, _after: &str) -> Diff {
-    Diff::default()
+pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
+    let code_before = from_string(before, language);
+    let code_after = from_string(after, language);
+
+    diff_code(&code_before, &code_after)
+}
+
+pub fn diff_code(before: &Code, after: &Code) -> Diff {
+    Diff {
+        ast: Some(ASTDiff::default()),
+    }
 }
 
 #[cfg(test)]
@@ -34,7 +43,7 @@ mod tests {
 
     #[test]
     fn empty_diff() {
-        let d = diff("", "");
+        let d = diff_strings("", "", &Language::Rust);
 
         assert!(d.ast.is_some());
     }
