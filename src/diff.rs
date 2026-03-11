@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 /*  This file is part of the CodeDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
@@ -18,6 +16,9 @@ use std::collections::{HashMap, HashSet};
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+
+use crate::code::Code;
 
 /**
 * The main data structure. Contains the difference between two Code structures.
@@ -78,4 +79,38 @@ pub enum ASTMappingReason {
     /// The common situation where this happens is refactoring order-independent blocks, e.g.
     /// fields definitions in a struct.
     FullyMappedSubtrees,
+}
+
+/**
+* This is the main entry point in the AST diffing algorithm.
+*/
+pub fn diff_code(before: &Code, after: &Code) -> Diff {
+    Diff {
+        ast: Some(ASTDiff::default()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::code::{Language, from_string};
+    use anyhow::Result;
+
+    use super::*;
+
+    #[test]
+    fn diff_empty_rust_code() -> Result<()> {
+        let before = from_string("", &Language::Rust);
+        let after = from_string("", &Language::Rust);
+
+        let diff = diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+        let diff_ast = diff.ast.unwrap();
+
+        assert_eq!(diff_ast.mapping.len(), 0);
+        assert_eq!(diff_ast.added.len(), 0);
+        assert_eq!(diff_ast.deleted.len(), 0);
+
+        Ok(())
+    }
 }

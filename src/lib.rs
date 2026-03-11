@@ -22,8 +22,14 @@ pub mod stats;
 
 pub mod test;
 
-use crate::{code::Code, code::Language, code::from_string, diff::ASTDiff, diff::Diff};
+use crate::{code::Language, code::from_string, diff::Diff, diff::diff_code};
 
+/**
+* Compute the difference between two programms, given as strings in a given language.
+*
+* TODO: If the language is Unknown, try to auto-detect it. That should be done in from_string.
+* Also, when doing that, check that both strings are in the same language.
+*/
 pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
     let code_before = from_string(before, language);
     let code_after = from_string(after, language);
@@ -31,18 +37,12 @@ pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
     diff_code(&code_before, &code_after)
 }
 
-pub fn diff_code(before: &Code, after: &Code) -> Diff {
-    Diff {
-        ast: Some(ASTDiff::default()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn empty_diff() {
+    fn diff_empty_strings() {
         let d = diff_strings("", "", &Language::Rust);
 
         assert!(d.ast.is_some());
