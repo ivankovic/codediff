@@ -60,27 +60,19 @@ fn get_ast(code: &Code) -> Result<tree_sitter::Tree> {
 }
 
 /// Print the ASCII tree representation of the AST
-fn print_ast_tree(node: tree_sitter::Node, contents: &[u8], indent: usize) {
+fn print_ast_tree(node: tree_sitter::Node, contents: &[u8], indent: usize) -> usize {
     let indent_str = "  ".repeat(indent);
     let node_type = node.kind();
-    let node_text = node.utf8_text(contents).unwrap_or("<invalid utf8>");
 
-    println!(
-        "{}{} [{}:{}-{}:{}] - {} ({} chars)",
-        indent_str,
-        node_type,
-        node.start_position().row + 1,
-        node.start_position().column + 1,
-        node.end_position().row + 1,
-        node.end_position().column + 1,
-        node_text,
-        node.end_byte() - node.start_byte()
-    );
+    println!("{}{}", indent_str, node_type);
 
     let mut cursor = node.walk();
+    let mut child_count = 0;
     for child in node.children(&mut cursor) {
-        print_ast_tree(child, contents, indent + 1);
+        child_count += print_ast_tree(child, contents, indent + 1);
     }
+
+    child_count + 1
 }
 
 /**
@@ -128,7 +120,9 @@ fn main() -> Result<()> {
     let tree = get_ast(&code)?;
     let root_node = tree.root_node();
     let contents_bytes = code.contents.as_bytes();
-    print_ast_tree(root_node, contents_bytes, 0);
+    let total_nodes = print_ast_tree(root_node, contents_bytes, 0);
+
+    println!("\nTotal nodes: {}", total_nodes);
 
     // The temp_dir will be dropped here, cleaning up automatically
     Ok(())
