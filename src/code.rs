@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use anyhow;
 use serde::Serialize;
 use std::fmt;
 
@@ -61,6 +62,31 @@ pub fn from_string(contents: &str, language: &Language) -> Code {
             language: Some(language.clone()),
         },
     }
+}
+
+/**
+* Constructs a Code structure from the given file path.
+*
+* The language is automatically detected from the file extension. If the extension is not
+* recognized, the language will be set to Unknown.
+*
+* Note that the metadata type will be assumed to be Code. The path will be stored in the metadata.
+*
+* TODO: Use the hermetic expansion from metadata.rs to expand the metadata.
+*/
+pub fn from_file(path: &std::path::Path) -> anyhow::Result<Code> {
+    use std::fs;
+
+    let contents = fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read file {}: {}", path.display(), e))?;
+
+    // Determine language from file extension
+    let language = language::language_for_path(path).unwrap_or(Language::Unknown);
+
+    let mut code = from_string(&contents, &language);
+    code.metadata.path = Some(path.to_path_buf());
+
+    Ok(code)
 }
 
 /**
@@ -164,5 +190,24 @@ mod tests {
         let c = from_string("", &Language::Rust);
 
         assert_eq!(c.contents, "");
+    }
+
+    #[test]
+    fn code_from_file() -> anyhow::Result<()> {
+        use crate::test::helper::handmade_test_code_as_paths;
+
+        let paths = handmade_test_code_as_paths()?;
+        let hello_world_path = paths
+            .get("hello-world.rs")
+            .expect("hello-world.rs should exist in test data");
+
+        let code = from_file(hello_world_path)?;
+
+        assert_eq!(code.metadata.language, Some(Language::Rust));
+        assert!(code.metadata.path.is_some());
+        assert!(code.contents.contains("fn main()"));
+        assert!(code.contents.contains("Hello, World"));
+
+        Ok(())
     }
 }

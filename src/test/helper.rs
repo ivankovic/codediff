@@ -17,6 +17,7 @@
  */
 use anyhow::Result;
 use git2::{Repository, Signature};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
@@ -24,16 +25,25 @@ use tempfile::tempdir;
 
 use crate::code::{Code, metadata};
 
-pub fn handmade_test_code() -> Result<Vec<Code>> {
-    let mut result = Vec::new();
+/**
+* Returns handmade test code as Code objects.
+*
+* Useful for testing any function that takes Code as input.
+*
+* Note that the actual files are stored with ".test" extension in "src/test/data/code". This is so
+* that the build system doesn't treat data as code. To make sure the files are correctly treated
+* during testing, ".test" extension is removed in this function.
+*
+* Returns a HashMap where the key is the file name without the ".test" extension.
+*/
+pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
+    let mut result = HashMap::new();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
         .join("data")
         .join("code");
-
-    println!("Reading hand-made inputs from {:?}", root.as_path());
 
     for entry in fs::read_dir(root)? {
         let entry = entry?;
@@ -50,7 +60,63 @@ pub fn handmade_test_code() -> Result<Vec<Code>> {
 
             metadata::hermetic_expand(&mut code.metadata);
 
-            result.push(code);
+            // Extract file name without .test extension for the key
+            let new_path = path.with_extension("");
+            let file_name = new_path.file_name().unwrap();
+            result.insert(file_name.to_string_lossy().into_owned(), code);
+        }
+    }
+
+    Ok(result)
+}
+
+/**
+* Returns handmade test code, but as paths to a temporary file system.
+*
+* The files are returned as a hash map, where the key of the map is the name of the file in the
+* "src/test/data/code" directory, with the ".test" extension removed. E.g.
+* "src/test/data/code/hello_world.rs.test" will become the following key-value pair:
+*
+* ("hello_world.rs", PathBuf("<temporary directory>/hello_world.rs"))
+*
+* This is useful for testing code that expects paths. This function will correctly remove the
+* ".test" extension when copying the code over to the temporary filesystem, so that all metadata
+* recognition works correctly.
+*/
+pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
+    let mut result = HashMap::new();
+
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("code");
+
+    let temp_dir = tempdir().expect("Failed to create temporary directory");
+    let temp_path = temp_dir.path().to_path_buf();
+    let _ = temp_dir.keep();
+
+    println!(
+        "Copying hand-made inputs from {:?} to {:?}",
+        root.as_path(),
+        temp_path
+    );
+
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            let contents = fs::read_to_string(&path)?;
+
+            // Create the destination path with .test extension removed
+            let new_path = path.with_extension("");
+            let file_name_os_str = new_path.file_name().unwrap();
+
+            let dest_path = temp_path.join(file_name_os_str);
+            fs::write(&dest_path, contents).expect("Failed to write file");
+
+            result.insert(file_name_os_str.to_string_lossy().into_owned(), dest_path);
         }
     }
 
@@ -209,6 +275,8 @@ fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> R
 
 #[cfg(test)]
 mod tests {
+    use crate::code::Language;
+
     use super::*;
 
     #[test]
@@ -234,6 +302,46 @@ mod tests {
                 .expect("Unable to convert path to string"),
             "some/random/path/should_not_be_removed/file.rs"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn handmade_code_contains_hello_world() -> Result<()> {
+        let codes = handmade_test_code()?;
+
+        assert!(!codes.is_empty());
+
+        assert!(codes.contains_key("hello-world.rs"));
+
+        let code = codes.get("hello-world.rs").unwrap();
+
+        assert_ne!(code.contents, "");
+
+        assert!(code.metadata.language.is_some());
+        if let Some(l) = &code.metadata.language {
+            assert_eq!(*l, Language::Rust);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_handmade_test_code_as_paths() -> Result<()> {
+        let paths = handmade_test_code_as_paths()?;
+
+        assert!(!paths.is_empty(), "Should have found test code files");
+
+        for (key, path) in &paths {
+            assert!(path.exists(), "Path should exist: {:?}", path);
+            assert!(path.is_file(), "Path should be a file: {:?}", path);
+
+            assert!(
+                !key.ends_with(".test"),
+                "Key should not contain .test extension: {}",
+                key
+            );
+        }
 
         Ok(())
     }
