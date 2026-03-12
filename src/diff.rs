@@ -84,22 +84,6 @@ pub enum ASTMappingReason {
 }
 
 /**
-* Information about the mapping of two AST nodes.
-*/
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct ASTMapping {
-    /// A score between 0 and 1, showing how similar the nodes are.
-    ///
-    /// 1 means the nodes and all their subtrees are identical.
-    /// 0 means that there is no overlap at all.
-    ///
-    /// The score is *not linear*. 0.5 is *not* "twice as similar" as 0.25.
-    pub similarity: f64,
-    /// Why were the two nodes mapped to each other?
-    pub reason: ASTMappingReason,
-}
-
-/**
 * This is the main entry point in the AST diffing algorithm.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {

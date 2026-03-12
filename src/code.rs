@@ -19,8 +19,7 @@ pub mod language;
 pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
 
-use anyhow;
-use serde::Serialize;
+use anyhow::{Result, anyhow};
 use std::fmt;
 
 /**
@@ -34,12 +33,15 @@ use std::fmt;
 * leaf fields should be wrapped in Option. Ideally, the only non-Option wrapped field is the code
 * itself.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct Code {
     /// The actual code.
     pub contents: String,
     /// The metadata about the code.
     pub metadata: Metadata,
+    /// The AST.
+    #[serde(skip_serializing)]
+    pub ast: Option<tree_sitter::Tree>,
 }
 
 /**
@@ -52,6 +54,8 @@ pub struct Code {
 * TODO: Make this code auto-recognize type based on contents to correctly construct Code objects
 * that are actually Configuration, e.g. docker-compose YAML files. It will require expanding the
 * language.rs detection to support content aware metadata expansion.
+*
+* TODO: Move to impl block for Code.
 */
 pub fn from_string(contents: &str, language: &Language) -> Code {
     Code {
@@ -61,6 +65,26 @@ pub fn from_string(contents: &str, language: &Language) -> Code {
             tip: Some(Type::Code("Code".to_string())),
             language: Some(language.clone()),
         },
+        ..Default::default()
+    }
+}
+
+impl Code {
+    /**
+     * Parse the contents of the Code and fill out the AST.
+     */
+    pub fn parse(&mut self, parser: &mut tree_sitter::Parser) {
+        let language = self
+            .metadata
+            .language
+            .as_ref()
+            .expect("Language must be set to parse code");
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Unable to convert CodeDiff language to TreeSitter language");
+        parser
+            .set_language(&ts_language)
+            .expect("Unable to set TreeSitter language");
+        self.ast = Some(parser.parse(&self.contents, None).unwrap());
     }
 }
 
@@ -74,11 +98,11 @@ pub fn from_string(contents: &str, language: &Language) -> Code {
 *
 * TODO: Use the hermetic expansion from metadata.rs to expand the metadata.
 */
-pub fn from_file(path: &std::path::Path) -> anyhow::Result<Code> {
+pub fn from_file(path: &std::path::Path) -> Result<Code> {
     use std::fs;
 
     let contents = fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Failed to read file {}: {}", path.display(), e))?;
+        .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
 
     // Determine language from file extension
     let language = language::language_for_path(path).unwrap_or(Language::Unknown);
@@ -97,7 +121,7 @@ pub fn from_file(path: &std::path::Path) -> anyhow::Result<Code> {
 *
 * Most fields in this class should be optional, to allow for efficient computation.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct Metadata {
     /// The path to the code, if one exists.
     pub path: Option<std::path::PathBuf>,
@@ -114,7 +138,7 @@ pub struct Metadata {
 * Implemented as a crate enum instead of reusing someting like TreeSitter language to allow for
 * better error handling of unknown or not-supported languages.
 */
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub enum Language {
     #[default]
     Unknown,
@@ -165,7 +189,7 @@ impl std::fmt::Display for Language {
 * arbitrary string that provides fine grained information on what type of code, configuration,
 * data or documentation exactly the file contents are.
 */
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub enum Type {
     #[default]
     Unknown,
@@ -184,6 +208,7 @@ impl std::fmt::Display for Type {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test::helper;
 
     #[test]
     fn code_from_empty_string() {
@@ -193,10 +218,8 @@ mod tests {
     }
 
     #[test]
-    fn code_from_file() -> anyhow::Result<()> {
-        use crate::test::helper::handmade_test_code_as_paths;
-
-        let paths = handmade_test_code_as_paths()?;
+    fn code_from_file() -> Result<()> {
+        let paths = helper::handmade_test_code_as_paths()?;
         let hello_world_path = paths
             .get("hello-world.rs")
             .expect("hello-world.rs should exist in test data");
@@ -207,6 +230,31 @@ mod tests {
         assert!(code.metadata.path.is_some());
         assert!(code.contents.contains("fn main()"));
         assert!(code.contents.contains("Hello, World"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_code() -> Result<()> {
+        let mut codes = helper::handmade_test_code()?;
+        let hello_world = codes
+            .get_mut("hello-world.rs")
+            .expect("hello-world.rs should exist in test data");
+
+        let language = hello_world
+            .metadata
+            .language
+            .as_ref()
+            .expect("Language should be set");
+
+        let ts_language = crate::code::language::to_treesitter(language).expect("Unable to convert CodeDiff language to TreeSitter language in tests. Something is wrong with the test infrastructure.");
+
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&ts_language)?;
+
+        hello_world.parse(&mut parser);
+
+        assert!(hello_world.ast.is_some());
 
         Ok(())
     }

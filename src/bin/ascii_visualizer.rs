@@ -48,7 +48,6 @@ fn get_ast(code: &Code) -> Result<tree_sitter::Tree> {
         .context("Code has no language metadata")?;
 
     let ts_language = to_treesitter(language).context("Language not supported by TreeSitter")?;
-
     let mut parser = TSParser::new();
     parser.set_language(&ts_language)?;
 

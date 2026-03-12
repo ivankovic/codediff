@@ -234,6 +234,7 @@ mod tests {
                     tip: Some(crate::code::Type::Code("rust".to_string())),
                     ..Default::default()
                 },
+                ..Default::default()
             },
             ..Default::default()
         };

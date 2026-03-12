@@ -37,6 +37,31 @@ use crate::code::{Code, metadata};
 * Returns a HashMap where the key is the file name without the ".test" extension.
 */
 pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
+    let mut codes = handmade_unparsed_test_code()?;
+
+    let mut parser = tree_sitter::Parser::new();
+
+    for (_, code) in codes.iter_mut() {
+        if let Some(language) = &code.metadata.language {
+            let ts_language = crate::code::language::to_treesitter(language)
+                .expect("Handmade test code for unknown language?");
+
+            parser.set_language(&ts_language)?;
+
+            code.parse(&mut parser);
+        }
+    }
+
+    Ok(codes)
+}
+
+/**
+* Returns handmade test code as Code objects.
+*
+* This is a special version of handmade_test_code that doesn't parse the code. This is useful for
+* testing functions that consume Data and similar files that don't get parsed.
+*/
+pub fn handmade_unparsed_test_code() -> Result<HashMap<String, Code>> {
     let mut result = HashMap::new();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -322,6 +347,9 @@ mod tests {
         if let Some(l) = &code.metadata.language {
             assert_eq!(*l, Language::Rust);
         }
+
+        // Check that it parsed successfully.
+        assert!(code.ast.is_some());
 
         Ok(())
     }
