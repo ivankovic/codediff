@@ -15,13 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use anyhow;
-use serde::Serialize;
-use std::fmt;
-
 pub mod language;
 pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
+
+use anyhow;
+use serde::Serialize;
+use std::fmt;
 
 /**
 * The main data structure. It owns and contains the actual code and all metadata.

@@ -15,6 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod hash;
+
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -82,9 +84,33 @@ pub enum ASTMappingReason {
 }
 
 /**
+* Information about the mapping of two AST nodes.
+*/
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ASTMapping {
+    /// A score between 0 and 1, showing how similar the nodes are.
+    ///
+    /// 1 means the nodes and all their subtrees are identical.
+    /// 0 means that there is no overlap at all.
+    ///
+    /// The score is *not linear*. 0.5 is *not* "twice as similar" as 0.25.
+    pub similarity: f64,
+    /// Why were the two nodes mapped to each other?
+    pub reason: ASTMappingReason,
+}
+
+/**
 * This is the main entry point in the AST diffing algorithm.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
+    // Compute the hash of both trees.
+
+    // TODO: Implement
+
+    // Top-to-bottom, and stopping before we reach parernts of leaf nodes, match nodes that have
+    // identical hashes.
+
+    // TODO: Implement
     Diff {
         ast: Some(ASTDiff::default()),
     }
@@ -92,7 +118,10 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
 
 #[cfg(test)]
 mod tests {
-    use crate::code::{Language, from_string};
+    use crate::{
+        code::{Language, from_string},
+        test,
+    };
     use anyhow::Result;
 
     use super::*;
@@ -116,14 +145,9 @@ mod tests {
 
     #[test]
     fn diff_identical_rust_code() -> Result<()> {
-        let rust_code = r#"
-fn main() {
-    println!("Hello, world!");
-}
-"#;
-
-        let before = from_string(rust_code, &Language::Rust);
-        let after = from_string(rust_code, &Language::Rust);
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
 
         let diff = diff_code(&before, &after);
 
@@ -134,8 +158,32 @@ fn main() {
         assert_eq!(diff_ast.added.len(), 0);
         assert_eq!(diff_ast.deleted.len(), 0);
 
-        // The mapping should be empty since diff_code returns a default ASTDiff
-        assert_eq!(diff_ast.mapping.len(), 0);
+        // The hello-world.rs TreeSitter AST has 22 nodes.
+        // It looks like this:
+        //
+        // source_file
+        //   function_item
+        //     fn
+        //     identifier
+        //     parameters
+        //       (
+        //       )
+        //     block
+        //       {
+        //       expression_statement
+        //         macro_invocation
+        //           identifier
+        //           !
+        //           token_tree
+        //             (
+        //             string_literal
+        //               "
+        //               string_content
+        //               "
+        //             )
+        //         ;
+        //       }
+        assert_eq!(diff_ast.mapping.len(), 22);
 
         Ok(())
     }
