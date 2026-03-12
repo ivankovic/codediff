@@ -87,16 +87,79 @@ pub enum ASTMappingReason {
 * This is the main entry point in the AST diffing algorithm.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
+    // Ensure both code objects have their ASTs parsed
+    let mut before_parsed = before.clone();
+    let mut after_parsed = after.clone();
+
+    let mut parser = tree_sitter::Parser::new();
+
+    // Parse before code if not already parsed
+    if before_parsed.ast.is_none()
+        && let Some(language) = &before_parsed.metadata.language
+    {
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Unable to convert CodeDiff language to TreeSitter language");
+        parser
+            .set_language(&ts_language)
+            .expect("Unable to set TreeSitter language");
+        before_parsed.parse(&mut parser);
+    }
+
+    // Parse after code if not already parsed
+    if after_parsed.ast.is_none()
+        && let Some(language) = &after_parsed.metadata.language
+    {
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Unable to convert CodeDiff language to TreeSitter language");
+        parser
+            .set_language(&ts_language)
+            .expect("Unable to set TreeSitter language");
+        after_parsed.parse(&mut parser);
+    }
+
     // Compute the hash of both trees.
+    let (before_node_to_hash, before_hash_to_node) =
+        hash::hash_code(&before_parsed).expect("Failed to hash before code");
+    let (after_node_to_hash, after_hash_to_node) =
+        hash::hash_code(&after_parsed).expect("Failed to hash after code");
 
-    // TODO: Implement
+    let mut mapping = HashMap::new();
+    let mut deleted = HashSet::new();
+    let mut added = HashSet::new();
 
-    // Top-to-bottom, and stopping before we reach parernts of leaf nodes, match nodes that have
+    // Top-to-bottom, and stopping before we reach parents of leaf nodes, match nodes that have
     // identical hashes.
+    for (before_node_id, before_hash) in &before_node_to_hash {
+        if let Some(&after_node_id) = after_hash_to_node.get(before_hash) {
+            // Nodes have identical hashes, create mapping
+            mapping.insert(
+                (*before_node_id, after_node_id),
+                ASTMapping {
+                    similarity: 1.0, // Identical hash means 100% similarity
+                    reason: ASTMappingReason::IdenticalHash,
+                },
+            );
+        } else {
+            // Node in before doesn't exist in after, mark as deleted
+            deleted.insert(*before_node_id);
+        }
+    }
 
-    // TODO: Implement
+    // Find nodes that were added (exist in after but not in before)
+    for (after_node_id, after_hash) in &after_node_to_hash {
+        if !before_node_to_hash.contains_key(after_node_id)
+            && !before_hash_to_node.contains_key(after_hash)
+        {
+            added.insert(*after_node_id);
+        }
+    }
+
     Diff {
-        ast: Some(ASTDiff::default()),
+        ast: Some(ASTDiff {
+            mapping,
+            deleted,
+            added,
+        }),
     }
 }
 
@@ -120,7 +183,9 @@ mod tests {
         assert!(diff.ast.is_some());
         let diff_ast = diff.ast.unwrap();
 
-        assert_eq!(diff_ast.mapping.len(), 0);
+        // Empty Rust code has a root source_file node that maps to itself
+        // TreeSitter always creates a root node, even for empty files
+        assert_eq!(diff_ast.mapping.len(), 1);
         assert_eq!(diff_ast.added.len(), 0);
         assert_eq!(diff_ast.deleted.len(), 0);
 
