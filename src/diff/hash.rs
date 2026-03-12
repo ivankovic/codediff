@@ -20,8 +20,18 @@ use std::collections::HashMap;
 
 /**
 * Compute a hash of the given TreeSitter tree from the given root node.
+* The result is a pair of hash maps:
+*   - One hash map going from the TS Node IDs to their hashes
+*   - One going from hashes to their TS Node IDs.
 *
 * Note that TS Node IDs are semi-stable. The TS documentation goes into detail, but for our purpose
 * they are stable between edits and re-parsing, and since we do neither we are ok.
+*
+* The aim is for the hash to have the following properties:
+*   - Fast. Speed is of the essence. 99.999% of files in the full dataset should hash in under 50ms.
+*   - Robust. The hash is used for duplicate detection so statistical properties must be robust.
+*
+* There is NO requirement for security. Crypto hashes are way too slow for our use case and
+* reversing the hash is irrelevant, we return the reverse map anyhow.
 */
 pub fn hash_treesitter_tree() -> Result<HashMap<usize, u64>> {}
