@@ -16,7 +16,9 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use anyhow::Result;
+use metrohash::MetroHash64;
 use std::collections::HashMap;
+use std::hash::Hasher;
 
 use crate::code::Code;
 
@@ -38,10 +40,47 @@ use crate::code::Code;
 * reversing the hash is irrelevant, we return the reverse map anyhow.
 */
 pub fn hash_code(code: &Code) -> Result<(HashMap<usize, u64>, HashMap<u64, usize>)> {
-    let mut node_to_hash = HashMap::new();
-    let mut hash_to_node = HashMap::new();
+    let mut node_to_hash: HashMap<usize, u64> = HashMap::new();
+    let mut hash_to_node: HashMap<u64, usize> = HashMap::new();
 
-    return Ok((node_to_hash, hash_to_node));
+    let ast = code
+        .ast
+        .as_ref()
+        .expect("AST must be parsed before hashing");
+    let root_node = ast.root_node();
+
+    let mut cursor = root_node.walk();
+    let mut stack = Vec::new();
+    stack.push(root_node);
+
+    while let Some(node) = stack.pop() {
+        let node_id = node.id();
+
+        // Compute hash for this node
+        let mut hasher = MetroHash64::new();
+        hasher.write(node.kind_id().to_le_bytes().as_slice());
+        hasher.write(node.start_byte().to_le_bytes().as_slice());
+        hasher.write(node.end_byte().to_le_bytes().as_slice());
+        hasher.write(node.child_count().to_le_bytes().as_slice());
+
+        // Add children hashes to the hash (if any)
+        for child in node.children(&mut cursor) {
+            if let Some(&child_hash) = node_to_hash.get(&child.id()) {
+                hasher.write(child_hash.to_le_bytes().as_slice());
+            }
+        }
+
+        let hash = hasher.finish();
+        node_to_hash.insert(node_id, hash);
+        hash_to_node.insert(hash, node_id);
+
+        // Push children to stack for processing
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    Ok((node_to_hash, hash_to_node))
 }
 
 #[cfg(test)]

@@ -47,6 +47,7 @@ tree-sitter-vim = "0.4"
 tree-sitter-xml = "0.7.0"
 tree-sitter-yaml = "0.7"
 walkdir = "2"
+metrohash = "1.0.7"
 
 [dev-dependencies]
 tempfile = "3.10.1"
