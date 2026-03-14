@@ -92,32 +92,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_empty_rust_code() -> Result<()> {
+    fn hash_all_handmade_codes() -> Result<()> {
         let codes = helper::handmade_test_code()?;
 
-        let hello_world = codes
-            .get("hello-world.rs")
-            .expect("hello-world.rs should exist in test data");
+        for (_, code) in codes {
+            let (node_to_hash, hash_to_node) = hash_code(&code)?;
 
-        let (node_to_hash, hash_to_node) = hash_code(hello_world)?;
+            assert!(!node_to_hash.is_empty());
+            assert_eq!(node_to_hash.len(), hash_to_node.len());
 
-        assert!(!node_to_hash.is_empty());
-        assert_eq!(node_to_hash.len(), hash_to_node.len());
+            // TODO: Assert that the entire tree, i.e. each node, was hashed.
 
-        // Note that since the Map is not a multi map, if the two maps have exactly the same size
-        // and each element from one map has a matching element in the other map, we don't need to
-        // check the other map because it must also be completely covered.
-        //
-        // Otherwise, either the length would be different or the map would need to contain
-        // duplicate keys, i.e. be a multi-map.
-        for (node, hash) in node_to_hash {
-            let t = hash_to_node.get(&hash);
+            // Note that since the Map is not a multi map, if the two maps have exactly the same size
+            // and each element from one map has a matching element in the other map, we don't need to
+            // check the other map because it must also be completely covered.
+            //
+            // Otherwise, either the length would be different or the map would need to contain
+            // duplicate keys, i.e. be a multi-map.
+            for (node, hash) in node_to_hash {
+                let t = hash_to_node.get(&hash);
 
-            match t {
-                Some(node_from_hash) => {
-                    assert_eq!(&node, node_from_hash);
+                match t {
+                    Some(node_from_hash) => {
+                        assert_eq!(&node, node_from_hash);
+                    }
+                    None => {
+                        panic!("Node->Hash map has an entry that doesn't exist in Hash->Node map!")
+                    }
                 }
-                None => panic!("Node->Hash map has an entry that doesn't exist in Hash->Node map!"),
             }
         }
 

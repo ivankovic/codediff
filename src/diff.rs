@@ -232,6 +232,48 @@ mod tests {
         //             )
         //         ;
         //       }
+        //
+        //  The code is identical, so the minimal diff script is just empty.
+        assert_eq!(diff_ast.mapping.len(), 22);
+
+        Ok(())
+    }
+
+    #[test]
+    fn diff_hello_world_with_translated_string() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        // The after code is the same basic Rust hello world, but the message is in Croatian
+        // instead of in English. So there is exactly 1 different node, the string_content node,
+        // and only the value of the node is different, going from "Hello, World" to "Zdravo,
+        // Svijete".
+        //
+        // But because this node is deep in the tree, the following nodes no longer have exact same
+        // hashes:
+        //
+        // source_file
+        //   function_item
+        //     block
+        //       expression_statement
+        //         macro_invocation
+        //           token_tree
+        //             string_literal
+        //               string_content
+        //
+        //  The optimal smallest diff script is
+        //
+        //  update(<string content node>, "Zdravo, Svijete")
+        let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
+
+        let diff = diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+        let diff_ast = diff.ast.unwrap();
+
+        // No changes means no deleted or added nodes.
+        assert_eq!(diff_ast.added.len(), 0);
+        assert_eq!(diff_ast.deleted.len(), 0);
+
         assert_eq!(diff_ast.mapping.len(), 22);
 
         Ok(())
