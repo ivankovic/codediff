@@ -73,11 +73,15 @@ pub fn hash_code(code: &Code) -> Result<ASTMetadata> {
         let node_id = node.id();
 
         // Compute full hash for this node (includes structure and values)
-        let full_hash = compute_full_hash(&node, &mut cursor, &metadata.node_to_full_hash);
+        let full_hash = compute_full_hash(
+            &node,
+            &mut cursor,
+            &metadata.node_to_full_hash,
+            &code.contents,
+        );
 
         // Compute structural hash for this node (includes only structure, not values)
-        let structural_hash =
-            compute_structural_hash(&node, &mut cursor, &metadata.node_to_structural_hash);
+        let structural_hash = compute_structural_hash(&node, &mut cursor);
 
         // Store full hash mappings
         metadata.node_to_full_hash.insert(node_id, full_hash);
@@ -108,20 +112,24 @@ pub fn hash_code(code: &Code) -> Result<ASTMetadata> {
 
 /**
 * Compute the full hash for a node, including both structure and values.
-* This is a recursive function that hashes the node type, position, and all children.
+* This is a recursive function that hashes the node type, text content, and all children.
 */
 fn compute_full_hash<'a>(
     node: &tree_sitter::Node<'a>,
     cursor: &mut tree_sitter::TreeCursor<'a>,
     node_to_hash: &HashMap<usize, u64>,
+    source_code: &str,
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
-    // Hash node type and position
+    // Hash node type and child count
     hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.start_byte().to_le_bytes().as_slice());
-    hasher.write(node.end_byte().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
+
+    // Hash the actual text content of the node
+    if let Ok(text) = node.utf8_text(source_code.as_bytes()) {
+        hasher.write(text.as_bytes());
+    }
 
     // Add children hashes to the hash (if any)
     for child in node.children(cursor) {
@@ -141,7 +149,6 @@ fn compute_full_hash<'a>(
 fn compute_structural_hash<'a>(
     node: &tree_sitter::Node<'a>,
     cursor: &mut tree_sitter::TreeCursor<'a>,
-    node_to_hash: &HashMap<usize, u64>,
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
@@ -149,11 +156,12 @@ fn compute_structural_hash<'a>(
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    // Add children structural hashes to the hash (if any)
-    for child in node.children(cursor) {
-        if let Some(&child_hash) = node_to_hash.get(&child.id()) {
-            hasher.write(child_hash.to_le_bytes().as_slice());
-        }
+    // Compute children structural hashes recursively (if any)
+    // We need to collect children first to avoid borrowing issues
+    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
+    for child in children {
+        let child_hash = compute_structural_hash(&child, cursor);
+        hasher.write(child_hash.to_le_bytes().as_slice());
     }
 
     hasher.finish()
@@ -340,11 +348,30 @@ mod tests {
         // Full hashes should be different (different value of the string constant)...
         assert_ne!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
 
-        // ...but structural hashes should be the same.
+        // ...but structural hashes should be the same (same distribution of hashes).
+        // Compare the structural_hash_to_node maps by checking they have the same keys
+        // and that each key maps to sets of the same size (same number of nodes per hash).
         assert_eq!(
-            metadata1.node_to_structural_hash,
-            metadata2.node_to_structural_hash
+            metadata1.structural_hash_to_node.len(),
+            metadata2.structural_hash_to_node.len(),
+            "Different number of unique structural hashes"
         );
+
+        for (hash1, nodes1) in &metadata1.structural_hash_to_node {
+            if let Some(nodes2) = metadata2.structural_hash_to_node.get(hash1) {
+                assert_eq!(
+                    nodes1.len(),
+                    nodes2.len(),
+                    "Different number of nodes for structural hash {:?}",
+                    hash1
+                );
+            } else {
+                panic!(
+                    "Structural hash {:?} found in first code but not in second",
+                    hash1
+                );
+            }
+        }
 
         Ok(())
     }
