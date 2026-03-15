@@ -224,6 +224,27 @@ mod tests {
         //  The code is identical, so the minimal diff script is just empty.
         assert_eq!(diff_ast.mapped.len(), 22);
 
+        // The root node of before should match to the root node of after, and the reason should be
+        // an identical hash. All other nodes should have the reason being an identical hash of
+        // ancestors.
+
+        // Check that root node has IdenticalHash reason
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let root_mapping = diff_ast
+            .mapped
+            .get(&(before_root_id, after_root_id))
+            .expect("Root node should be mapped");
+        assert_eq!(root_mapping.reason, ASTMappingReason::IdenticalHash);
+
+        // Check that all other nodes have IdenticalHashOfAncestor reason
+        for ((before_id, after_id), mapping) in &diff_ast.mapped {
+            if *before_id != before_root_id && *after_id != after_root_id {
+                assert_eq!(mapping.reason, ASTMappingReason::IdenticalHashOfAncestor);
+            }
+        }
+
         Ok(())
     }
 
