@@ -244,54 +244,55 @@ mod tests {
     fn test_full_vs_structural_hashing() -> Result<()> {
         let codes = helper::handmade_test_code()?;
 
-        // Get hello-world.rs which should have some structural similarities
-        let code = codes
-            .get("hello-world.rs")
-            .ok_or_else(|| anyhow::anyhow!("Test file 'hello-world.rs' not found"))?;
-        let metadata = hash_code(code)?;
+        // Test on all handmade code files
+        for (filename, code) in &codes {
+            let metadata = hash_code(code)?;
 
-        // Full hashes should be more unique than structural hashes
-        let full_hash_count = metadata.full_hash_to_node.len();
-        let structural_hash_count = metadata.structural_hash_to_node.len();
+            // Full hashes should be more unique than structural hashes
+            let full_hash_count = metadata.full_hash_to_node.len();
+            let structural_hash_count = metadata.structural_hash_to_node.len();
 
-        // Structural hashes should generally have fewer unique values since they ignore content
-        assert!(
-            structural_hash_count <= full_hash_count,
-            "Structural hashes ({}) should be <= full hashes ({})",
-            structural_hash_count,
-            full_hash_count
-        );
+            // Structural hashes should generally have fewer unique values since they ignore content
+            assert!(
+                structural_hash_count <= full_hash_count,
+                "For file {}: Structural hashes ({}) should be <= full hashes ({})",
+                filename,
+                structural_hash_count,
+                full_hash_count
+            );
 
-        // Test that nodes with same structural hash can have different full hashes
-        // (this happens when nodes have same structure but different content)
-        let mut found_different_content_same_structure = false;
+            // Test that nodes with same structural hash can have different full hashes
+            // (this happens when nodes have same structure but different content)
+            let mut found_different_content_same_structure = false;
 
-        for (_, node_set) in &metadata.structural_hash_to_node {
-            if node_set.len() > 1 {
-                // Multiple nodes share the same structural hash
-                let mut full_hashes = HashSet::new();
-                for node_id in node_set {
-                    if let Some(full_hash) = metadata.node_to_full_hash.get(node_id) {
-                        full_hashes.insert(full_hash);
+            for (_, node_set) in &metadata.structural_hash_to_node {
+                if node_set.len() > 1 {
+                    // Multiple nodes share the same structural hash
+                    let mut full_hashes = HashSet::new();
+                    for node_id in node_set {
+                        if let Some(full_hash) = metadata.node_to_full_hash.get(node_id) {
+                            full_hashes.insert(full_hash);
+                        }
+                    }
+
+                    // If there are multiple full hashes for the same structural hash,
+                    // it means we found nodes with same structure but different content
+                    if full_hashes.len() > 1 {
+                        found_different_content_same_structure = true;
+                        break;
                     }
                 }
-
-                // If there are multiple full hashes for the same structural hash,
-                // it means we found nodes with same structure but different content
-                if full_hashes.len() > 1 {
-                    found_different_content_same_structure = true;
-                    break;
-                }
             }
-        }
 
-        // This should be true for most non-trivial code
-        // (e.g., multiple string literals, different variable names, etc.)
-        if metadata.node_to_full_hash.len() > 10 {
-            assert!(
-                found_different_content_same_structure,
-                "Expected to find nodes with same structure but different content in non-trivial code"
-            );
+            // This should be true for most non-trivial code
+            // (e.g., multiple string literals, different variable names, etc.)
+            if metadata.node_to_full_hash.len() > 10 {
+                assert!(
+                    found_different_content_same_structure,
+                    "For file {}: Expected to find nodes with same structure but different content in non-trivial code",
+                    filename
+                );
+            }
         }
 
         Ok(())
@@ -336,20 +337,13 @@ mod tests {
         let metadata1 = hash_code(code1)?;
         let metadata2 = hash_code(code2)?;
 
-        // Full hashes should be different (different content)
+        // Full hashes should be different (different value of the string constant)...
         assert_ne!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
 
-        // But structural hashes should be similar (same structure)
-        // The root nodes should have the same structural hash
-        let root1 = code1.ast.as_ref().unwrap().root_node().id();
-        let root2 = code2.ast.as_ref().unwrap().root_node().id();
-
-        let struct_hash1 = metadata1.node_to_structural_hash.get(&root1);
-        let struct_hash2 = metadata2.node_to_structural_hash.get(&root2);
-
+        // ...but structural hashes should be the same.
         assert_eq!(
-            struct_hash1, struct_hash2,
-            "Root nodes should have same structural hash for similar code structure"
+            metadata1.node_to_structural_hash,
+            metadata2.node_to_structural_hash
         );
 
         Ok(())
