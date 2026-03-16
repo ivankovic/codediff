@@ -26,7 +26,8 @@ use crate::diff::ASTMetadata;
 /**
 * Compute hashes for the given TreeSitter tree from the given root node.
 *
-* This function computes both full hashes and structural hashes for all nodes in the AST.
+* This function computes both full hashes and structural hashes for all nodes in the AST
+* and populates the provided ASTMetadata structure.
 *
 * Full hashes include both the structure (node types) and the values of the nodes and their
 * entire subtree, in order. This creates unique hashes for nodes with different content.
@@ -34,7 +35,7 @@ use crate::diff::ASTMetadata;
 * Structural hashes include only the types of AST nodes in the subtree, not the values of the
 * nodes. This creates hashes that are robust to changes like constant value changes.
 *
-* The result is an ASTMetadata structure containing:
+* The metadata structure will be populated with:
 *   - node_to_full_hash: Map from node IDs to full hashes
 *   - full_hash_to_node: Reverse map from full hashes to sets of node IDs (since multiple nodes
 *     can have the same full hash)
@@ -50,14 +51,16 @@ use crate::diff::ASTMetadata;
 *
 * There is NO requirement for security. Crypto hashes are way too slow for our use case and
 * reversing the hash is irrelevant, we return the reverse map anyhow.
+*
+* @param code The Code structure containing the AST to hash
+* @param metadata Mutable reference to ASTMetadata that will be populated with hash data
 */
-pub fn hash_code(code: &Code) -> Result<ASTMetadata> {
-    let mut metadata = ASTMetadata {
-        node_to_full_hash: HashMap::new(),
-        full_hash_to_node: HashMap::new(),
-        node_to_structural_hash: HashMap::new(),
-        structural_hash_to_node: HashMap::new(),
-    };
+pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    // Clear existing data in the metadata
+    metadata.node_to_full_hash.clear();
+    metadata.full_hash_to_node.clear();
+    metadata.node_to_structural_hash.clear();
+    metadata.structural_hash_to_node.clear();
 
     let ast = code
         .ast
@@ -107,7 +110,7 @@ pub fn hash_code(code: &Code) -> Result<ASTMetadata> {
         }
     }
 
-    Ok(metadata)
+    Ok(())
 }
 
 /**
@@ -180,7 +183,8 @@ mod tests {
         let codes = helper::handmade_test_code()?;
 
         for (_, code) in codes {
-            let metadata = hash_code(&code)?;
+            let mut metadata = ASTMetadata::default();
+            hash_code(&code, &mut metadata)?;
 
             // Test full hashing
             assert!(!metadata.node_to_full_hash.is_empty());
@@ -254,7 +258,8 @@ mod tests {
 
         // Test on all handmade code files
         for (filename, code) in &codes {
-            let metadata = hash_code(code)?;
+            let mut metadata = ASTMetadata::default();
+            hash_code(code, &mut metadata)?;
 
             // Full hashes should be more unique than structural hashes
             let full_hash_count = metadata.full_hash_to_node.len();
@@ -313,8 +318,10 @@ mod tests {
         let code = codes
             .get("hello-world.rs")
             .ok_or_else(|| anyhow::anyhow!("Test file 'hello-world.rs' not found"))?;
-        let metadata1 = hash_code(code)?;
-        let metadata2 = hash_code(code)?;
+        let mut metadata1 = ASTMetadata::default();
+        let mut metadata2 = ASTMetadata::default();
+        hash_code(code, &mut metadata1)?;
+        hash_code(code, &mut metadata2)?;
 
         // Both full and structural hashes should be identical for identical code
         assert_eq!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
@@ -342,8 +349,10 @@ mod tests {
         let code2 = codes
             .get("zdravo-svijete.rs")
             .ok_or_else(|| anyhow::anyhow!("Test file 'zdravo-svijete.rs' not found"))?;
-        let metadata1 = hash_code(code1)?;
-        let metadata2 = hash_code(code2)?;
+        let mut metadata1 = ASTMetadata::default();
+        let mut metadata2 = ASTMetadata::default();
+        hash_code(code1, &mut metadata1)?;
+        hash_code(code2, &mut metadata2)?;
 
         // Full hashes should be different (different value of the string constant)...
         assert_ne!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
