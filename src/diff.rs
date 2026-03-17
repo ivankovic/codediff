@@ -307,67 +307,14 @@ fn top_down_matching(
 *    they do, we add them and their subtrees to the matching.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
-    // Parse the ASTs if they haven't been parsed yet
-    //
-    // Use the original code objects directly
-    let before_parsed = before;
-    let after_parsed = after;
-
-    // Parse ASTs if they haven't been parsed yet
-    let mut before_parsed_mut = before_parsed.clone();
-    let mut after_parsed_mut = after_parsed.clone();
-
-    let (before_ast, after_ast) = if before_parsed.ast.is_some() && after_parsed.ast.is_some() {
-        // Both already parsed, use originals
-        (
-            before_parsed.ast.as_ref().unwrap(),
-            after_parsed.ast.as_ref().unwrap(),
-        )
-    } else {
-        // Need to parse
-        if before_parsed_mut.ast.is_none() {
-            let mut parser = tree_sitter::Parser::new();
-            if let Some(language) = &before_parsed_mut.metadata.language {
-                let ts_language = crate::code::language::to_treesitter(language)
-                    .expect("Unable to convert CodeDiff language to TreeSitter language");
-                parser
-                    .set_language(&ts_language)
-                    .expect("Unable to set TreeSitter language");
-                before_parsed_mut.parse(&mut parser);
-            }
-        }
-
-        if after_parsed_mut.ast.is_none() {
-            let mut parser = tree_sitter::Parser::new();
-            if let Some(language) = &after_parsed_mut.metadata.language {
-                let ts_language = crate::code::language::to_treesitter(language)
-                    .expect("Unable to convert CodeDiff language to TreeSitter language");
-                parser
-                    .set_language(&ts_language)
-                    .expect("Unable to set TreeSitter language");
-                after_parsed_mut.parse(&mut parser);
-            }
-        }
-
-        (
-            before_parsed_mut.ast.as_ref().unwrap(),
-            after_parsed_mut.ast.as_ref().unwrap(),
-        )
-    };
+    // Check that both code objects have been parsed
+    let before_ast = before.ast.as_ref().expect("Before code must be parsed");
+    let after_ast = after.ast.as_ref().expect("After code must be parsed");
 
     // Compute metadata for both before and after code
-    // Use the parsed versions that we know have ASTs
-    let before_metadata = if before_parsed.ast.is_some() {
-        compute_metadata(before_parsed).unwrap_or_default()
-    } else {
-        compute_metadata(&before_parsed_mut).unwrap_or_default()
-    };
-
-    let after_metadata = if after_parsed.ast.is_some() {
-        compute_metadata(after_parsed).unwrap_or_default()
-    } else {
-        compute_metadata(&after_parsed_mut).unwrap_or_default()
-    };
+    // Use the original code objects that we know have ASTs (checked above)
+    let before_metadata = compute_metadata(before).unwrap_or_default();
+    let after_metadata = compute_metadata(after).unwrap_or_default();
 
     let mut diff = ASTDiff {
         before_metadata: Some(before_metadata.clone()),
@@ -400,57 +347,15 @@ mod tests {
     #[test]
     fn test_compute_metadata() -> Result<()> {
         let code = Code::from_string("fn main() {}", &Language::Rust);
-        let mut parsed_code = code.clone();
-
-        // Parse the code
-        let mut parser = tree_sitter::Parser::new();
-        if let Some(language) = &parsed_code.metadata.language {
-            let ts_language = crate::code::language::to_treesitter(language)
-                .expect("Unable to convert CodeDiff language to TreeSitter language");
-            parser
-                .set_language(&ts_language)
-                .expect("Unable to set TreeSitter language");
-            parsed_code.parse(&mut parser);
-        }
 
         // Compute metadata
-        let metadata = compute_metadata(&parsed_code)?;
+        let metadata = compute_metadata(&code)?;
 
         // Verify metadata is computed
         assert!(!metadata.node_to_full_hash.is_empty());
         assert!(!metadata.full_hash_to_node.is_empty());
         assert!(!metadata.node_to_structural_hash.is_empty());
         assert!(!metadata.structural_hash_to_node.is_empty());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_root_node_mapping() -> Result<()> {
-        let test_codes = test::helper::handmade_test_code()?;
-        let before = test_codes.get("hello-world.rs").unwrap().clone();
-        let after = test_codes.get("hello-world.rs").unwrap().clone();
-
-        let diff = diff_code(&before, &after);
-
-        assert!(diff.ast.is_some());
-        let diff_ast = diff.ast.unwrap();
-
-        // Check that we have some mappings
-        assert!(
-            diff_ast.mapped.len() > 0,
-            "Expected some mappings but got none"
-        );
-
-        // Check that root node is mapped
-        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
-
-        assert!(
-            diff_ast
-                .mapped
-                .contains_key(&(before_root_id, after_root_id))
-        );
 
         Ok(())
     }
@@ -533,9 +438,8 @@ mod tests {
         assert_eq!(root_mapping.reason, ASTMappingReason::IdenticalHash);
 
         // Check that all other nodes have IdenticalHashOfAncestor reason
-        for ((before_id, after_id), _mapping) in &diff_ast.mapped {
+        for ((before_id, after_id), mapping) in &diff_ast.mapped {
             if *before_id != before_root_id && *after_id != after_root_id {
-                let mapping = diff_ast.mapped.get(&(*before_id, *after_id)).unwrap();
                 assert_eq!(mapping.reason, ASTMappingReason::IdenticalHashOfAncestor);
             }
         }
