@@ -31,8 +31,17 @@ use crate::code::Language;
 pub fn is_reference_node(node_kind: &str, language: &Language) -> bool {
     // Language-specific reference nodes
     match language {
-        Language::Rust => node_kind == "function_item" || node_kind == "source_file",
-        Language::Python => node_kind == "module",
+        Language::Rust => {
+            node_kind == "source_file" ||  // The root node of any sopurce file
+            node_kind == "function_item"
+        }
+        Language::Python => node_kind == "module", // Python modules/source files
+        Language::Java => node_kind == "program", // Java source files are represented as "program" nodes
+        Language::C => node_kind == "translation_unit", // C source files use "translation_unit" as root
+        Language::CPP => node_kind == "translation_unit", // C++ also uses "translation_unit" as root
+        Language::Go => node_kind == "source_file", // Go source files use "source_file" as root
+        Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
+        Language::TypeScript => node_kind == "program", // TypeScript also uses "program" as root
         // Add other languages as needed
         _ => false,
     }

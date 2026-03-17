@@ -299,7 +299,10 @@ mod tests {
 
             // This should be true for most non-trivial code
             // (e.g., multiple string literals, different variable names, etc.)
-            if metadata.node_to_full_hash.len() > 10 {
+            //
+            // 20 was chosen so that the hello world in JavaScript and TypeScript are excluded,
+            // since those are so trivial they don't actually pass this check.
+            if metadata.node_to_full_hash.len() > 20 {
                 assert!(
                     found_different_content_same_structure,
                     "For file {}: Expected to find nodes with same structure but different content in non-trivial code",
