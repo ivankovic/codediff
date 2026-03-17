@@ -15,29 +15,24 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-
 use crate::code::Language;
 
 /**
- * Determines if a node with the given kind is a reference node for the given language.
- *
- * Reference nodes are nodes that are used as anchors for diffing. Typically these are
- * nodes that represent significant structural elements in the code, such as source files
- * or function definitions.
- *
- * @param node_kind The kind of the node (e.g., "source_file", "function_item")
- * @param language The programming language
- * @return true if the node is a reference node, false otherwise
- */
+* Determines if a node with the given kind is a reference node for the given language.
+*
+* Reference nodes are nodes that are used as anchors for diffing. Typically these are
+* nodes that represent significant structural elements in the code, such as source files
+* or function definitions.
+*
+* You can think of reference nodes as "parts of code humans think about". I.e. humans rarely think
+* about a specific semicolon in a C++ file, but they do think about entire functions as whole
+* entities.
+*/
 pub fn is_reference_node(node_kind: &str, language: &Language) -> bool {
-    // Common reference nodes across many languages
-    if node_kind == "source_file" {
-        return true;
-    }
-
     // Language-specific reference nodes
     match language {
-        Language::Rust => node_kind == "function_item",
+        Language::Rust => node_kind == "function_item" || node_kind == "source_file",
+        Language::Python => node_kind == "module",
         // Add other languages as needed
         _ => false,
     }
