@@ -1,0 +1,6 @@
+#include <iostream>
+
+int main() {
+    std::cout << "Zdravo, Svijete!" << std::endl;
+    return 0;
+}
