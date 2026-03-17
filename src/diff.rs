@@ -326,6 +326,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
         .language
         .as_ref()
         .expect("Language must be set");
+
     top_down_matching(
         before_ast,
         after_ast,
@@ -445,6 +446,67 @@ mod tests {
         for ((before_id, after_id), mapping) in &diff_ast.mapped {
             if *before_id != before_root_id && *after_id != after_root_id {
                 assert_eq!(mapping.reason, ASTMappingReason::IdenticalHashOfAncestor);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn identical_code_must_always_match() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+
+        for (filename, code) in &test_codes {
+            let diff = diff_code(code, code);
+
+            assert!(
+                diff.ast.is_some(),
+                "AST diff should be computed for {}",
+                filename
+            );
+            let diff_ast = diff.ast.unwrap();
+
+            // No changes means no deleted or added nodes
+            assert_eq!(
+                diff_ast.added.len(),
+                0,
+                "No nodes should be added when diffing identical code: {}",
+                filename
+            );
+            assert_eq!(
+                diff_ast.deleted.len(),
+                0,
+                "No nodes should be deleted when diffing identical code: {}",
+                filename
+            );
+
+            // Get the root nodes
+            let before_root_id = code.ast.as_ref().unwrap().root_node().id();
+            let after_root_id = code.ast.as_ref().unwrap().root_node().id();
+
+            // Check that root node has IdenticalHash reason
+            let root_mapping = diff_ast
+                .mapped
+                .get(&(before_root_id, after_root_id))
+                .expect("Root node should be mapped");
+            assert_eq!(
+                root_mapping.reason,
+                ASTMappingReason::IdenticalHash,
+                "Root node should have IdenticalHash reason for {}",
+                filename
+            );
+
+            // Check that all other nodes have IdenticalHashOfAncestor reason
+            for ((before_id, after_id), mapping) in &diff_ast.mapped {
+                if *before_id != before_root_id || *after_id != after_root_id {
+                    assert_eq!(
+                        mapping.reason,
+                        ASTMappingReason::IdenticalHashOfAncestor,
+                        "Non-root node should have IdenticalHashOfAncestor reason for {}, got {:?}",
+                        filename,
+                        mapping.reason
+                    );
+                }
             }
         }
 
