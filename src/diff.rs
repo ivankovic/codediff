@@ -16,12 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod hash;
+pub mod reference_nodes;
 
 use anyhow::Result;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
-use crate::code::Code;
+use crate::code::{Code, Language};
 
 /**
 * The main data structure. Contains the difference between two Code structures.
@@ -163,6 +164,7 @@ pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
 * @param after_tree The after AST tree
 * @param before_metadata Metadata for the before tree
 * @param after_metadata Metadata for the after tree
+* @param language The programming language
 * @param diff The diff object to populate with mappings
 */
 fn top_down_matching(
@@ -170,6 +172,7 @@ fn top_down_matching(
     after_tree: &tree_sitter::Tree,
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
+    language: &Language,
     diff: &mut ASTDiff,
 ) {
     let before_root = before_tree.root_node();
@@ -192,12 +195,7 @@ fn top_down_matching(
         }
 
         // Check if this is a reference node (source_file or function_item)
-        let node_kind = before_node.kind();
-        let is_reference_node = node_kind == "source_file"
-            || node_kind == "function_item"
-            || before_node.id() == before_root.id();
-
-        if is_reference_node {
+        if reference_nodes::is_reference_node(before_node.kind(), language) {
             // Get the full hash for this node
             if let Some(before_hash) = before_metadata.node_to_full_hash.get(&before_node_id) {
                 // Look for a node in the after tree with the same hash
@@ -323,11 +321,17 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
     };
 
     // Perform top-down matching
+    let language = before
+        .metadata
+        .language
+        .as_ref()
+        .expect("Language must be set");
     top_down_matching(
         before_ast,
         after_ast,
         &before_metadata,
         &after_metadata,
+        language,
         &mut diff,
     );
 
