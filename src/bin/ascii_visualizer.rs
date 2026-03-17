@@ -23,7 +23,7 @@ use tempfile::tempdir;
 use tree_sitter::Parser as TSParser;
 
 use codediff::code::language::to_treesitter;
-use codediff::code::{Code, from_file};
+use codediff::code::Code;
 
 /// Command line arguments for the ASCII visualizer
 #[derive(Parser, Debug)]
@@ -108,7 +108,7 @@ fn main() -> Result<()> {
     };
 
     // Create Code object from file
-    let code = from_file(&file_path)?;
+    let code = Code::from_file(&file_path)?;
 
     println!("Visualizing AST for: {}", file_path.display());
     println!("Language: {:?}", code.metadata.language);

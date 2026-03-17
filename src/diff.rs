@@ -390,7 +390,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
 #[cfg(test)]
 mod tests {
     use crate::{
-        code::{Language, from_string},
+        code::{Code, Language},
         test,
     };
     use anyhow::Result;
@@ -399,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_compute_metadata() -> Result<()> {
-        let code = from_string("fn main() {}", &Language::Rust);
+        let code = Code::from_string("fn main() {}", &Language::Rust);
         let mut parsed_code = code.clone();
 
         // Parse the code
@@ -457,8 +457,8 @@ mod tests {
 
     #[test]
     fn diff_empty_rust_code() -> Result<()> {
-        let before = from_string("", &Language::Rust);
-        let after = from_string("", &Language::Rust);
+        let before = Code::from_string("", &Language::Rust);
+        let after = Code::from_string("", &Language::Rust);
 
         let diff = diff_code(&before, &after);
 

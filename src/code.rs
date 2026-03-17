@@ -44,31 +44,6 @@ pub struct Code {
     pub ast: Option<tree_sitter::Tree>,
 }
 
-/**
-* Constructs a Code structure from the given string and language.
-*
-* Note that the metadata type will be assumed to be Code. If for some reason you want to use this
-* to construct configuration, data or documentation, make sure to update the metadata accordingly
-* after construction.
-*
-* TODO: Make this code auto-recognize type based on contents to correctly construct Code objects
-* that are actually Configuration, e.g. docker-compose YAML files. It will require expanding the
-* language.rs detection to support content aware metadata expansion.
-*
-* TODO: Move to impl block for Code.
-*/
-pub fn from_string(contents: &str, language: &Language) -> Code {
-    Code {
-        contents: contents.to_string(),
-        metadata: Metadata {
-            path: None,
-            tip: Some(Type::Code("Code".to_string())),
-            language: Some(language.clone()),
-        },
-        ..Default::default()
-    }
-}
-
 impl Code {
     /**
      * Parse the contents of the Code and fill out the AST.
@@ -86,31 +61,60 @@ impl Code {
             .expect("Unable to set TreeSitter language");
         self.ast = Some(parser.parse(&self.contents, None).unwrap());
     }
-}
 
-/**
-* Constructs a Code structure from the given file path.
-*
-* The language is automatically detected from the file extension. If the extension is not
-* recognized, the language will be set to Unknown.
-*
-* Note that the metadata type will be assumed to be Code. The path will be stored in the metadata.
-*
-* TODO: Use the hermetic expansion from metadata.rs to expand the metadata.
-*/
-pub fn from_file(path: &std::path::Path) -> Result<Code> {
-    use std::fs;
+    /**
+     * Constructs a Code structure from the given string and language.
+     *
+     * Note that the metadata type will be assumed to be Code. If for some reason you want to use this
+     * to construct configuration, data or documentation, make sure to update the metadata accordingly
+     * after construction.
+     *
+     * TODO: Make this code auto-recognize type based on contents to correctly construct Code objects
+     * that are actually Configuration, e.g. docker-compose YAML files. It will require expanding the
+     * language.rs detection to support content aware metadata expansion.
+     */
+    pub fn from_string(contents: &str, language: &Language) -> Self {
+        let mut code = Code {
+            contents: contents.to_string(),
+            metadata: Metadata {
+                path: None,
+                tip: Some(Type::Code("Code".to_string())),
+                language: Some(language.clone()),
+            },
+            ..Default::default()
+        };
 
-    let contents = fs::read_to_string(path)
-        .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
+        // Parse the code to populate the AST
+        let mut parser = tree_sitter::Parser::new();
+        code.parse(&mut parser);
 
-    // Determine language from file extension
-    let language = language::language_for_path(path).unwrap_or(Language::Unknown);
+        code
+    }
 
-    let mut code = from_string(&contents, &language);
-    code.metadata.path = Some(path.to_path_buf());
+    /**
+     * Constructs a Code structure from the given file path.
+     *
+     * The language is automatically detected from the file extension. If the extension is not
+     * recognized, the language will be set to Unknown.
+     *
+     * Note that the metadata type will be assumed to be Code. The path will be stored in the metadata.
+     *
+     * TODO: Use the hermetic expansion from metadata.rs to expand the metadata.
+     */
+    pub fn from_file(path: &std::path::Path) -> Result<Self> {
+        use std::fs;
 
-    Ok(code)
+        let contents = fs::read_to_string(path)
+            .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
+
+        // Determine language from file extension
+        let language = language::language_for_path(path).unwrap_or(Language::Unknown);
+
+        let mut code = Code::from_string(&contents, &language);
+        code.metadata.path = Some(path.to_path_buf());
+
+        Ok(code)
+    }
 }
 
 /**
@@ -212,9 +216,12 @@ mod tests {
 
     #[test]
     fn code_from_empty_string() {
-        let c = from_string("", &Language::Rust);
+        let code = Code::from_string("", &Language::Rust);
 
-        assert_eq!(c.contents, "");
+        assert_eq!(code.contents, "");
+        assert_eq!(code.metadata.language, Some(Language::Rust));
+
+        assert!(code.ast.is_some());
     }
 
     #[test]
@@ -224,12 +231,14 @@ mod tests {
             .get("hello-world.rs")
             .expect("hello-world.rs should exist in test data");
 
-        let code = from_file(hello_world_path)?;
+        let code = Code::from_file(hello_world_path)?;
 
         assert_eq!(code.metadata.language, Some(Language::Rust));
         assert!(code.metadata.path.is_some());
         assert!(code.contents.contains("fn main()"));
         assert!(code.contents.contains("Hello, World"));
+
+        assert!(code.ast.is_some());
 
         Ok(())
     }

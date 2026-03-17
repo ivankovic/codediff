@@ -22,7 +22,7 @@ pub mod stats;
 
 pub mod test;
 
-use crate::{code::Language, code::from_string, diff::Diff, diff::diff_code};
+use crate::{code::{Language, Code}, diff::Diff, diff::diff_code};
 
 /**
 * Compute the difference between two programms, given as strings in a given language.
@@ -31,8 +31,8 @@ use crate::{code::Language, code::from_string, diff::Diff, diff::diff_code};
 * Also, when doing that, check that both strings are in the same language.
 */
 pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
-    let code_before = from_string(before, language);
-    let code_after = from_string(after, language);
+    let code_before = Code::from_string(before, language);
+    let code_after = Code::from_string(after, language);
 
     diff_code(&code_before, &code_after)
 }
