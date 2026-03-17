@@ -141,9 +141,6 @@ pub struct ASTMetadata {
 *
 * This function creates a default ASTMetadata object and populates it by calling hash_code
 * from hash.rs to compute both full and structural hashes for all nodes in the AST.
-*
-* @param code The Code structure to compute metadata for
-* @return Result containing the populated ASTMetadata
 */
 pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
@@ -159,13 +156,6 @@ pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
 * it checks if a node with the same full hash exists in the after tree. If they do, it adds
 * the two nodes to the mapped collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
-*
-* @param before_tree The before AST tree
-* @param after_tree The after AST tree
-* @param before_metadata Metadata for the before tree
-* @param after_metadata Metadata for the after tree
-* @param language The programming language
-* @param diff The diff object to populate with mappings
 */
 fn top_down_matching(
     before_tree: &tree_sitter::Tree,
@@ -200,7 +190,10 @@ fn top_down_matching(
             if let Some(before_hash) = before_metadata.node_to_full_hash.get(&before_node_id) {
                 // Look for a node in the after tree with the same hash
                 if let Some(after_node_ids) = after_metadata.full_hash_to_node.get(before_hash) {
-                    // For now, just take the first matching node
+                    // If we have multiple reference nodes with exactly the same full hash, then
+                    // there is simply duplicated code in the file, and quite big chunks of it too.
+                    // For now, we take the first node and match to that.
+                    //
                     // TODO: Implement better matching strategy for multiple nodes with same hash
                     if let Some(&after_node_id) = after_node_ids.iter().next() {
                         // Find the actual node with the matching ID
