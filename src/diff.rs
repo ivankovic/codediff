@@ -94,6 +94,8 @@ pub struct ASTMapping {
     /// Note that in theory, most algorithms should work the same even if moves are not free, as
     /// long as the move is the cheapest operation. In that case, "Free" operation would be a truly
     /// identical match, because some base case has to exist.
+    ///
+    /// Currently, all costs are simply set to 1.
     pub cost: u64,
     /// Why were the two nodes mapped to each other?
     pub reason: ASTMappingReason,
@@ -170,6 +172,39 @@ pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     hash::hash_code(code, &mut metadata)?;
     Ok(metadata)
+}
+
+/**
+* Return the cost of matching a specific node from before to a specific node from after.
+*
+* This function uses the RTED algorithm which has O(|<before subtree>| * |<after subtree>|) complexity.
+*
+* The algorithm is a dynamic programming solution to tree matching. It maintains a matrix,
+* cost[<before id>][<after id>] that stores the cost of matching <before id> to <after id> and all
+* nodes in their subtrees.
+*
+* The cost of matching <before ID> to <after ID> is the minimum of the following options:
+*
+* 1. If kind(<before id>) == kind(<after id>) and value(<before id>) == value(<after id>) then the
+*    cost is 0
+* 2. If kind(<before id>) == kind(<after id>) and value(<before id>) != value(<after id>) then the
+*    cost can be a constant, CostOfUpdate.
+* 3. If we choose to delete <before id> node, then <before id> is mapped to 0, and the cost can be
+*    a constant, CostOfDelete plus the cost of matching <after id> to the parent of <before id>.
+* 4. If we choose to insert <after id> node, then it is mapped from 0, and the cost can be a
+*    constant, CostOfInsert plus the cost of matching <before id> to the parent of <after id>.
+*
+* To make this function efficient across calls, a memoization map is given to the function that
+* stores intermediate results.
+*/
+fn rted_cost(
+    before_node: usize,
+    after_node: usize,
+    before: &Code,
+    after: &Code,
+    memoo: HashMap<(usize, usize), u64>,
+) -> Result<u64> {
+    Ok(0)
 }
 
 /**
@@ -369,6 +404,42 @@ mod tests {
         assert!(!metadata.full_hash_to_node.is_empty());
         assert!(!metadata.node_to_structural_hash.is_empty());
         assert!(!metadata.structural_hash_to_node.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn rted_cost_of_identical_code() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+        let memoo = HashMap::new();
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let cost = rted_cost(before_root_id, after_root_id, &before, &after, memoo)?;
+
+        // Identical code has RTED cost of 0.
+        assert_eq!(cost, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn rted_cost_of_a_single_update() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
+        let memoo = HashMap::new();
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let cost = rted_cost(before_root_id, after_root_id, &before, &after, memoo)?;
+
+        // A single update must be done, which has a cost of 1.
+        assert_eq!(cost, 1);
 
         Ok(())
     }
