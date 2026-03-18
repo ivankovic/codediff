@@ -67,13 +67,41 @@ pub struct ASTDiff {
 */
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ASTMapping {
-    /// A score between 0 and 1, showing how similar the nodes are.
+    /// The cost of the mapping.
     ///
-    /// 1 means the nodes and all their subtrees are identical.
-    /// 0 means that there is no overlap at all.
+    /// The cost is recursively defined the cost to match the nodes plus the total cost to match
+    /// the subtrees of the nodes.
     ///
-    /// The score is *not linear*. 0.5 is *not* "twice as similar" as 0.25.
-    pub similarity: f64,
+    /// The cost to match individual nodes is:
+    ///
+    /// 1. If the kind of the node and the value of the node are equal, the cost is 0
+    /// 2. If the kind of the node is equal, but the value is not, the cost is <update value cost>
+    /// 3. If the mapping is from a before node to a non-existant node, then the cost is <delete
+    ///    cost>
+    /// 4. If the mapping is from a non-existant node to an after node, then the cost is <addition
+    ///    cost>
+    ///
+    /// The exact values of the costs can be fine-tuned depending on the algorithm, but in general
+    /// we recognize those 4 costs:
+    ///
+    /// 0. "Free" operation, which can be a "move" or simply unchanged code.
+    /// 1. Cost to update the value of a node
+    /// 2. Cost to delete a node
+    /// 3. Cost to add a node
+    ///
+    /// Note that there is a missing case, if the kind of the node is not equal. This is not an
+    /// allowed operation. In the edit script, a "change the kind of the node" is equal to:
+    ///
+    /// 1. Insert a new node with the new kind
+    /// 2. Move the children from the old node to the new node
+    /// 3. Delete the old node
+    ///
+    /// So the cost would be the cost of add plus a cost of delete, since moves are free.
+    ///
+    /// Note that in theory, most algorithms should work the same even if moves are not free, as
+    /// long as the move is the cheapest operation. In that case, "Free" operation would be a truly
+    /// identical match, because some base case has to exist.
+    pub cost: u64,
     /// Why were the two nodes mapped to each other?
     pub reason: ASTMappingReason,
 }
@@ -219,7 +247,7 @@ fn top_down_matching(
                             diff.mapped.insert(
                                 (before_node_id, after_node_id),
                                 ASTMapping {
-                                    similarity: 1.0,
+                                    cost: 0,
                                     reason: ASTMappingReason::IdenticalHash,
                                 },
                             );
@@ -253,7 +281,7 @@ fn top_down_matching(
                                             diff.mapped.insert(
                                                 (before_child_id, after_child_id),
                                                 ASTMapping {
-                                                    similarity: 1.0,
+                                                    cost: 0,
                                                     reason:
                                                         ASTMappingReason::IdenticalHashOfAncestor,
                                                 },
@@ -435,6 +463,9 @@ mod tests {
             .expect("Root node should be mapped");
         assert_eq!(root_mapping.reason, ASTMappingReason::IdenticalHash);
 
+        // A fully identical code can never have a cost.
+        assert_eq!(root_mapping.cost, 0);
+
         // Check that all other nodes have IdenticalHashOfAncestor reason
         for ((before_id, after_id), mapping) in &diff_ast.mapped {
             if *before_id != before_root_id && *after_id != after_root_id {
@@ -488,6 +519,9 @@ mod tests {
                 "Root node should have IdenticalHash reason for {}",
                 filename
             );
+
+            // A fully identical code can never have a cost.
+            assert_eq!(root_mapping.cost, 0);
 
             // Check that all other nodes have IdenticalHashOfAncestor reason
             for ((before_id, after_id), mapping) in &diff_ast.mapped {
