@@ -22,8 +22,8 @@ use std::path::PathBuf;
 use tempfile::tempdir;
 use tree_sitter::Parser as TSParser;
 
-use codediff::code::language::to_treesitter;
 use codediff::code::Code;
+use codediff::code::language::to_treesitter;
 
 /// Command line arguments for the ASCII visualizer
 #[derive(Parser, Debug)]
@@ -61,9 +61,8 @@ fn get_ast(code: &Code) -> Result<tree_sitter::Tree> {
 /// Print the ASCII tree representation of the AST
 fn print_ast_tree(node: tree_sitter::Node, contents: &[u8], indent: usize) -> usize {
     let indent_str = "  ".repeat(indent);
-    let node_type = node.kind();
 
-    println!("{}{}", indent_str, node_type);
+    println!("{}{} - {}", indent_str, node.kind(), node.id());
 
     let mut cursor = node.walk();
     let mut child_count = 0;

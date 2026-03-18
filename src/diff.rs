@@ -44,18 +44,11 @@ pub struct Diff {
 
 /**
 * Difference between two Code structures, based on their TreeSitter ASTs.
-*
-* In theory, instead of having deleted and added separately, we could also have just mapped and use
-* "0" as a "null" mapping that serves the same purpose. But this is cleaner.
 */
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ASTDiff {
     /// Map of AST nodes from the before AST to the after AST.
     pub mapped: HashMap<(usize, usize), ASTMapping>,
-    /// The nodes in the before AST that were deleted and so do not map to any nodes in after.
-    pub deleted: HashSet<usize>,
-    /// The nodes in the after AST that were added and so do not map to any nodes in before.
-    pub added: HashSet<usize>,
     /// Metadata about the before AST, including hashes for all nodes.
     pub before_metadata: Option<ASTMetadata>,
     /// Metadata about the after AST, including hashes for all nodes.
@@ -112,6 +105,9 @@ pub struct ASTMapping {
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub enum ASTMappingReason {
     #[default]
+    /// The node is not actually mapped to any other node. Conceptually, in the algorithm this
+    /// means the node is mapped to a sentinel "null" node.
+    DeletionOrInsertion,
     /// The hash of the nodes and their subtrees is identical and so they were matched. Note that
     /// typically leaf nodes will never get this mapping reason, since maping common nodes, e.g.
     /// ";" to random other ";" in the code is extremely confusing and unnatural to humans.
@@ -399,8 +395,6 @@ mod tests {
         // Rust treesitter files contain a source_file node even when empty.
         // The algorithm should map this node correctly.
         assert_eq!(diff_ast.mapped.len(), 1);
-        assert_eq!(diff_ast.added.len(), 0);
-        assert_eq!(diff_ast.deleted.len(), 0);
 
         Ok(())
     }
@@ -415,10 +409,6 @@ mod tests {
 
         assert!(diff.ast.is_some());
         let diff_ast = diff.ast.unwrap();
-
-        // No changes means no deleted or added nodes.
-        assert_eq!(diff_ast.added.len(), 0);
-        assert_eq!(diff_ast.deleted.len(), 0);
 
         // The hello-world.rs TreeSitter AST has 22 nodes.
         // It looks like this:
@@ -490,20 +480,6 @@ mod tests {
             );
             let diff_ast = diff.ast.unwrap();
 
-            // No changes means no deleted or added nodes
-            assert_eq!(
-                diff_ast.added.len(),
-                0,
-                "No nodes should be added when diffing identical code: {}",
-                filename
-            );
-            assert_eq!(
-                diff_ast.deleted.len(),
-                0,
-                "No nodes should be deleted when diffing identical code: {}",
-                filename
-            );
-
             // Get the root nodes
             let before_root_id = code.ast.as_ref().unwrap().root_node().id();
             let after_root_id = code.ast.as_ref().unwrap().root_node().id();
@@ -573,10 +549,6 @@ mod tests {
 
         assert!(diff.ast.is_some());
         let diff_ast = diff.ast.unwrap();
-
-        // No changes means no deleted or added nodes.
-        assert_eq!(diff_ast.added.len(), 0);
-        assert_eq!(diff_ast.deleted.len(), 0);
 
         // One mapping is an update, but it still maps.
         assert_eq!(diff_ast.mapped.len(), 22);
