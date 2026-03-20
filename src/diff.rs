@@ -19,10 +19,14 @@ pub mod hash;
 pub mod reference_nodes;
 
 use anyhow::Result;
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::code::{Code, Language};
+
+pub const COST_INSERT: u64 = 1;
+pub const COST_DELETE: u64 = 1;
+pub const COST_UPDATE: u64 = 1;
+pub const COST_MOVE: u64 = 0;
 
 /**
 * The main data structure. Contains the difference between two Code structures.
@@ -34,9 +38,9 @@ use crate::code::{Code, Language};
 * only pretend to be code but are data or configuration. To help the compiler enforce this, most
 * fields should be wrapped in Option.
 *
-* See code.rs for the Code structure.
+* See code.rs for the Code struct.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Diff {
     /// Difference based on the ASTs.
     pub ast: Option<ASTDiff>,
@@ -45,10 +49,10 @@ pub struct Diff {
 /**
 * Difference between two Code structures, based on their TreeSitter ASTs.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct ASTDiff {
     /// Map of AST nodes from the before AST to the after AST.
-    pub mapped: HashMap<(usize, usize), ASTMapping>,
+    pub mapping: HashMap<(usize, usize), ASTMapping>,
     /// Metadata about the before AST, including hashes for all nodes.
     pub before_metadata: Option<ASTMetadata>,
     /// Metadata about the after AST, including hashes for all nodes.
@@ -56,60 +60,53 @@ pub struct ASTDiff {
 }
 
 /**
-* Information about the mapping of two AST nodes.
+* Information about the mapping of two AST subtrees.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct ASTMapping {
     /// The cost of the mapping.
     ///
-    /// The cost is recursively defined the cost to match the nodes plus the total cost to match
-    /// the subtrees of the nodes.
+    /// The cost is recursively defined the cost to match the root nodes plus the total cost to match
+    /// the subtrees of the root nodes. The cost to match the root nodes corresponds to the
+    /// operation required to match the nodes in the diff script: a delete, insert, update or move.
     ///
-    /// The cost to match individual nodes is:
-    ///
-    /// 1. If the kind of the node and the value of the node are equal, the cost is 0
-    /// 2. If the kind of the node is equal, but the value is not, the cost is <update value cost>
-    /// 3. If the mapping is from a before node to a non-existant node, then the cost is <delete
-    ///    cost>
-    /// 4. If the mapping is from a non-existant node to an after node, then the cost is <addition
-    ///    cost>
-    ///
-    /// The exact values of the costs can be fine-tuned depending on the algorithm, but in general
-    /// we recognize those 4 costs:
-    ///
-    /// 0. "Free" operation, which can be a "move" or simply unchanged code.
-    /// 1. Cost to update the value of a node
-    /// 2. Cost to delete a node
-    /// 3. Cost to add a node
-    ///
-    /// Note that there is a missing case, if the kind of the node is not equal. This is not an
-    /// allowed operation. In the edit script, a "change the kind of the node" is equal to:
-    ///
-    /// 1. Insert a new node with the new kind
-    /// 2. Move the children from the old node to the new node
-    /// 3. Delete the old node
-    ///
-    /// So the cost would be the cost of add plus a cost of delete, since moves are free.
-    ///
-    /// Note that in theory, most algorithms should work the same even if moves are not free, as
-    /// long as the move is the cheapest operation. In that case, "Free" operation would be a truly
-    /// identical match, because some base case has to exist.
-    ///
-    /// Currently, all costs are simply set to 1.
+    /// The cost strategy is dynamic, but a common cost strategy is unit cost (1) for delete,
+    /// insert and update and a free (0 cost) move.
     pub cost: u64,
-    /// Why were the two nodes mapped to each other?
+    /// What operation has to be done to make this mapping valid?
+    pub operation: ASTMappingOperation,
+    /// Why were the two subtrees mapping together?
     pub reason: ASTMappingReason,
 }
 
 /**
-* Why were the two nodes mapped to each other?
+* The operations that can be used to transform one tree into another.
 */
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum ASTMappingOperation {
+    #[default]
+    /// No operation is needed. The match is perfect.
+    Identical,
+    /// The node and it's entire subtree is moved to a different parent node.
+    Move,
+    /// The node's value is updated.
+    Update,
+    /// The node is inserted between a parent node and a consecutive subsequence of the parent
+    /// node's children. Note that the subsequence can be empty.
+    Insert,
+    /// The node is deleted and it's children, if any, are connected to it's parent node. If the
+    /// root node is deleted, in theory the children form a forrest of trees instead. This only
+    /// happens theorethically during some algorithm computations, since a diff script that deletes
+    /// the root node would be guaranteed to create invalid code, unless the code is already empty.
+    Delete,
+}
+
+/**
+* Why were the two subtrees mapped to each other?
+*/
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum ASTMappingReason {
     #[default]
-    /// The node is not actually mapped to any other node. Conceptually, in the algorithm this
-    /// means the node is mapped to a sentinel "null" node.
-    DeletionOrInsertion,
     /// The hash of the nodes and their subtrees is identical and so they were matched. Note that
     /// typically leaf nodes will never get this mapping reason, since maping common nodes, e.g.
     /// ";" to random other ";" in the code is extremely confusing and unnatural to humans.
@@ -122,7 +119,7 @@ pub enum ASTMappingReason {
     /// The hash of the nodes is *not* the same, but their subtrees fully match each-other.
     /// The common situation where this happens is refactoring order-independent blocks, e.g.
     /// fields definitions in a struct.
-    FullyMappedSubtrees,
+    FullymappingSubtrees,
     /// The subtrees of the nodes are structurally identical, but the values of leaf nodes differ.
     /// E.g., a constant value was changed but the code structure is identical.
     StructurallyIdenticalSubtrees,
@@ -132,6 +129,8 @@ pub enum ASTMappingReason {
     /// identical in type, it implies a "update()" command in the diff script, thus increasing the
     /// cost of the script by 1.
     StructurallyIdenticalAncestor,
+    /// Using RTED it was determined that this is the optimal mapping.
+    RTED,
 }
 
 /**
@@ -141,7 +140,7 @@ pub enum ASTMappingReason {
 * leaf node that is repeated dozens or hundreds of times across a file. Those nodes will all have
 * the exact same hash.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct ASTMetadata {
     /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
     /// values of the node and it's entire subtree, in order. The nodes are identified by their
@@ -175,45 +174,12 @@ pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
 }
 
 /**
-* Return the cost of matching a specific node from before to a specific node from after.
-*
-* This function uses the RTED algorithm which has O(|<before subtree>| * |<after subtree>|) complexity.
-*
-* The algorithm is a dynamic programming solution to tree matching. It maintains a matrix,
-* cost[<before id>][<after id>] that stores the cost of matching <before id> to <after id> and all
-* nodes in their subtrees.
-*
-* The cost of matching <before ID> to <after ID> is the minimum of the following options:
-*
-* 1. If kind(<before id>) == kind(<after id>) and value(<before id>) == value(<after id>) then the
-*    cost is 0
-* 2. If kind(<before id>) == kind(<after id>) and value(<before id>) != value(<after id>) then the
-*    cost can be a constant, CostOfUpdate.
-* 3. If we choose to delete <before id> node, then <before id> is mapped to 0, and the cost can be
-*    a constant, CostOfDelete plus the cost of matching <after id> to the parent of <before id>.
-* 4. If we choose to insert <after id> node, then it is mapped from 0, and the cost can be a
-*    constant, CostOfInsert plus the cost of matching <before id> to the parent of <after id>.
-*
-* To make this function efficient across calls, a memoization map is given to the function that
-* stores intermediate results.
-*/
-fn rted_cost(
-    before_node: usize,
-    after_node: usize,
-    before: &Code,
-    after: &Code,
-    memoo: HashMap<(usize, usize), u64>,
-) -> Result<u64> {
-    Ok(0)
-}
-
-/**
 * Perform top-down matching between two AST trees.
 *
 * This function does a pre-order (parent before children) traversal of the before tree.
 * For each node, it checks if the node is a "source_file" or "function_item". If they are,
 * it checks if a node with the same full hash exists in the after tree. If they do, it adds
-* the two nodes to the mapped collection with the IdenticalHash reason, and then recursively
+* the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
 */
 fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mut ASTDiff) {
@@ -231,16 +197,16 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
         .as_ref()
         .expect("After metadata must be computed");
 
-    // Stack for pre-order traversal: (node, is_child_of_mapped_parent)
+    // Stack for pre-order traversal: (node, is_child_of_mapping_parent)
     let mut stack = Vec::new();
     stack.push((before_root, false));
 
-    while let Some((before_node, _is_child_of_mapped)) = stack.pop() {
+    while let Some((before_node, _is_child_of_mapping)) = stack.pop() {
         let before_node_id = before_node.id();
 
-        // Skip already mapped nodes
+        // Skip already mapping nodes
         if diff
-            .mapped
+            .mapping
             .iter()
             .any(|((before_id, _), _)| *before_id == before_node_id)
         {
@@ -279,10 +245,11 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
                         let after_node_id = matching_after_node.id();
 
                         // Add this mapping
-                        diff.mapped.insert(
+                        diff.mapping.insert(
                             (before_node_id, after_node_id),
                             ASTMapping {
                                 cost: 0,
+                                operation: ASTMappingOperation::Identical,
                                 reason: ASTMappingReason::IdenticalHash,
                             },
                         );
@@ -309,14 +276,15 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
                                     let after_child_id = after_child.id();
 
                                     if !diff
-                                        .mapped
+                                        .mapping
                                         .iter()
                                         .any(|((child_id, _), _)| *child_id == before_child_id)
                                     {
-                                        diff.mapped.insert(
+                                        diff.mapping.insert(
                                             (before_child_id, after_child_id),
                                             ASTMapping {
                                                 cost: 0,
+                                                operation: ASTMappingOperation::Identical,
                                                 reason: ASTMappingReason::IdenticalHashOfAncestor,
                                             },
                                         );
@@ -336,11 +304,11 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
         let mut children_cursor = before_node.walk();
         let children: Vec<_> = before_node.children(&mut children_cursor).collect();
         for child in children.into_iter().rev() {
-            let is_child_mapped = diff
-                .mapped
+            let is_child_mapping = diff
+                .mapping
                 .iter()
                 .any(|((child_id, _), _)| *child_id == child.id());
-            stack.push((child, is_child_mapped));
+            stack.push((child, is_child_mapping));
         }
     }
 }
@@ -409,42 +377,6 @@ mod tests {
     }
 
     #[test]
-    fn rted_cost_of_identical_code() -> Result<()> {
-        let test_codes = test::helper::handmade_test_code()?;
-        let before = test_codes.get("hello-world.rs").unwrap().clone();
-        let after = test_codes.get("hello-world.rs").unwrap().clone();
-        let memoo = HashMap::new();
-
-        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
-
-        let cost = rted_cost(before_root_id, after_root_id, &before, &after, memoo)?;
-
-        // Identical code has RTED cost of 0.
-        assert_eq!(cost, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn rted_cost_of_a_single_update() -> Result<()> {
-        let test_codes = test::helper::handmade_test_code()?;
-        let before = test_codes.get("hello-world.rs").unwrap().clone();
-        let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
-        let memoo = HashMap::new();
-
-        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
-
-        let cost = rted_cost(before_root_id, after_root_id, &before, &after, memoo)?;
-
-        // A single update must be done, which has a cost of 1.
-        assert_eq!(cost, 1);
-
-        Ok(())
-    }
-
-    #[test]
     fn diff_empty_rust_code() -> Result<()> {
         let before = Code::from_string("", &Language::Rust);
         let after = Code::from_string("", &Language::Rust);
@@ -456,7 +388,7 @@ mod tests {
 
         // Rust treesitter files contain a source_file node even when empty.
         // The algorithm should map this node correctly.
-        assert_eq!(diff_ast.mapped.len(), 1);
+        assert_eq!(diff_ast.mapping.len(), 1);
 
         Ok(())
     }
@@ -499,7 +431,7 @@ mod tests {
         //       }
         //
         //  The code is identical, so the minimal diff script is just empty.
-        assert_eq!(diff_ast.mapped.len(), 22);
+        assert_eq!(diff_ast.mapping.len(), 22);
 
         // The root node of before should match to the root node of after, and the reason should be
         // an identical hash. All other nodes should have the reason being an identical hash of
@@ -510,16 +442,16 @@ mod tests {
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
         let root_mapping = diff_ast
-            .mapped
+            .mapping
             .get(&(before_root_id, after_root_id))
-            .expect("Root node should be mapped");
+            .expect("Root node should be mapping");
         assert_eq!(root_mapping.reason, ASTMappingReason::IdenticalHash);
 
         // A fully identical code can never have a cost.
         assert_eq!(root_mapping.cost, 0);
 
         // Check that all other nodes have IdenticalHashOfAncestor reason
-        for ((before_id, after_id), mapping) in &diff_ast.mapped {
+        for ((before_id, after_id), mapping) in &diff_ast.mapping {
             if *before_id != before_root_id && *after_id != after_root_id {
                 assert_eq!(mapping.reason, ASTMappingReason::IdenticalHashOfAncestor);
             }
@@ -547,9 +479,9 @@ mod tests {
 
             // Check that root node has IdenticalHash reason
             let root_mapping = diff_ast
-                .mapped
+                .mapping
                 .get(&(before_root_id, after_root_id))
-                .expect("Root node should be mapped");
+                .expect("Root node should be mapping");
             assert_eq!(
                 root_mapping.reason,
                 ASTMappingReason::IdenticalHash,
@@ -561,7 +493,7 @@ mod tests {
             assert_eq!(root_mapping.cost, 0);
 
             // Check that all other nodes have IdenticalHashOfAncestor reason
-            for ((before_id, after_id), mapping) in &diff_ast.mapped {
+            for ((before_id, after_id), mapping) in &diff_ast.mapping {
                 if *before_id != before_root_id || *after_id != after_root_id {
                     assert_eq!(
                         mapping.reason,
@@ -612,7 +544,7 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         // One mapping is an update, but it still maps.
-        assert_eq!(diff_ast.mapped.len(), 22);
+        assert_eq!(diff_ast.mapping.len(), 22);
 
         Ok(())
     }
