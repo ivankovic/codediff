@@ -275,7 +275,18 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
 
             git_reported_status TEXT NOT NULL,
             bytes_before INTEGER,
-            bytes_after INTEGER
+            bytes_after INTEGER,
+            lines_before INTEGER,
+            lines_after INTEGER,
+            nodes_before INTEGER,
+            nodes_after INTEGER,
+            unix_diff_script_bytes INTEGER,
+            lines_added INTEGER,
+            lines_removed INTEGER,
+            lines_changed INTEGER,
+            nodes_added INTEGER,
+            nodes_removed INTEGER,
+            nodes_changed INTEGER
         );
         "#,
         [],
@@ -297,9 +308,20 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
                 last_updated,
                 git_reported_status,
                 bytes_before,
-                bytes_after
+                bytes_after,
+                lines_before,
+                lines_after,
+                nodes_before,
+                nodes_after,
+                unix_diff_script_bytes,
+                lines_added,
+                lines_removed,
+                lines_changed,
+                nodes_added,
+                nodes_removed,
+                nodes_changed
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6);
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17);
             "#,
             params![
                 s.commit_id,
@@ -307,7 +329,18 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
                 now,
                 s.git_reported_status,
                 s.bytes_before,
-                s.bytes_after
+                s.bytes_after,
+                s.lines_before,
+                s.lines_after,
+                s.nodes_before,
+                s.nodes_after,
+                s.unix_diff_script_bytes,
+                s.lines_added,
+                s.lines_removed,
+                s.lines_changed,
+                s.nodes_added,
+                s.nodes_removed,
+                s.nodes_changed
             ],
         )?;
     }
@@ -354,8 +387,8 @@ mod tests {
         );
 
         let mut columns_stmt = conn.prepare(
-            "SELECT commit_id, relative_file_path, git_reported_status, bytes_before, bytes_after
-            FROM commits LIMIT 1",
+            "SELECT commit_id, relative_file_path, git_reported_status, bytes_before, bytes_after, lines_before, lines_after
+            FROM commits WHERE git_reported_status != 'Added' LIMIT 1",
         )?;
 
         let mut main_rs_found = false;
@@ -368,6 +401,8 @@ mod tests {
             let git_reported_status: String = row.get(2)?;
             let bytes_before: i64 = row.get(3)?;
             let bytes_after: i64 = row.get(4)?;
+            let lines_before: i64 = row.get(5)?;
+            let lines_after: i64 = row.get(6)?;
 
             assert!(!commit_id.is_empty(), "Commit ID should be present");
             assert!(!relative_file_path.is_empty(), "Relative file path should be present");
@@ -376,8 +411,10 @@ mod tests {
             if relative_file_path.ends_with("main.rs") {
                 main_rs_found = true;
 
-                assert!(bytes_before >= 0, "Bytes before should be non-negative");
-                assert!(bytes_after >= 0, "Bytes after should be non-negative");
+                assert!(bytes_before > 0, "Bytes before should be strictly greater than 0");
+                assert!(bytes_after > 0, "Bytes after should be strictly greater than 0");
+                assert!(lines_before > 0, "Lines before should be strictly greater than 0");
+                assert!(lines_after > 0, "Lines after should be strictly greater than 0");
             }
         }
 
