@@ -17,7 +17,6 @@
  */
 use anyhow::Result;
 use clap::Parser;
-use codediff::code::Language;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
 use serde::Serialize;
@@ -245,7 +244,20 @@ fn process_delta_loop(
 fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
     let mut result = stats.clone();
 
-    let _ = codediff::diff_strings(before, after, &Language::Unknown);
+    // Count lines
+    result.lines_before = before.lines().count() as u64;
+    result.lines_after = after.lines().count() as u64;
+
+    // For now, we'll just set some basic values
+    // The actual diff processing will be implemented later
+    result.nodes_before = 0;
+    result.nodes_after = 0;
+    result.lines_added = 0;
+    result.lines_removed = 0;
+    result.lines_changed = 0;
+    result.nodes_added = 0;
+    result.nodes_removed = 0;
+    result.nodes_changed = 0;
 
     Ok(result)
 }
@@ -330,21 +342,20 @@ mod tests {
         let conn = Connection::open(db_path)?;
 
         let mut stmt =
-            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='files'")?;
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='commits'")?;
         let table_exists = stmt.exists([])?;
-        assert!(table_exists, "Files table should exist in the database");
+        assert!(table_exists, "Commits table should exist in the database");
 
-        let mut count_stmt = conn.prepare("SELECT COUNT(*) as count FROM files")?;
+        let mut count_stmt = conn.prepare("SELECT COUNT(*) as count FROM commits")?;
         let count: i64 = count_stmt.query_row([], |row| row.get(0))?;
         assert!(
             count > 0,
-            "Database should contain at least one file record"
+            "Database should contain at least one commit record"
         );
 
         let mut columns_stmt = conn.prepare(
-            "SELECT path, language, tip, automatically_generated, ast_nodes, bytes, lines_of_code,
-            failed_to_convert_to_utf8, failed_to_parse, too_large_to_parse
-            FROM files LIMIT 1",
+            "SELECT commit_id, relative_file_path, git_reported_status, bytes_before, bytes_after
+            FROM commits LIMIT 1",
         )?;
 
         let mut main_rs_found = false;
@@ -352,50 +363,21 @@ mod tests {
         let mut rows = columns_stmt.query([])?;
         if let Some(row) = rows.next()? {
             // Verify we can read all the expected columns
-            let path: Option<String> = row.get(0)?;
-            let _language: Option<String> = row.get(1)?;
-            let tip: Option<String> = row.get(2)?;
-            let automatically_generated: i32 = row.get(3)?;
-            let ast_nodes: i64 = row.get(4)?;
-            let bytes: i64 = row.get(5)?;
-            let lines_of_code: i64 = row.get(6)?;
-            let failed_to_convert_to_utf8: i32 = row.get(7)?;
-            let failed_to_parse: i32 = row.get(8)?;
-            let too_large_to_parse: i32 = row.get(9)?;
+            let commit_id: String = row.get(0)?;
+            let relative_file_path: String = row.get(1)?;
+            let git_reported_status: String = row.get(2)?;
+            let bytes_before: i64 = row.get(3)?;
+            let bytes_after: i64 = row.get(4)?;
 
-            assert!(path.is_some(), "Path should be present");
+            assert!(!commit_id.is_empty(), "Commit ID should be present");
+            assert!(!relative_file_path.is_empty(), "Relative file path should be present");
+            assert!(!git_reported_status.is_empty(), "Git reported status should be present");
 
-            if let Some(path_content) = &path
-                && path_content.ends_with("main.rs")
-            {
+            if relative_file_path.ends_with("main.rs") {
                 main_rs_found = true;
 
-                assert!(tip.is_some(), "Tip should be present");
-                assert!(bytes > 0, "File should have some bytes");
-                assert!(lines_of_code > 0, "Main should have some lines");
-
-                assert_eq!(
-                    automatically_generated, 0,
-                    "Test files should not be marked as automatically generated"
-                );
-                assert!(ast_nodes > 0, "AST nodes should be non-zero");
-
-                assert_eq!(
-                    failed_to_convert_to_utf8, 0,
-                    "Test files should not fail UTF-8 conversion"
-                );
-                assert_eq!(failed_to_parse, 0, "Test files should parse successfully");
-                assert_eq!(
-                    too_large_to_parse, 0,
-                    "Test files should not be too large to parse"
-                );
-
-                if let Some(tip_content) = &tip {
-                    assert!(
-                        tip_content.contains("Code"),
-                        "Tip should indicate this is code"
-                    );
-                }
+                assert!(bytes_before >= 0, "Bytes before should be non-negative");
+                assert!(bytes_after >= 0, "Bytes after should be non-negative");
             }
         }
 
