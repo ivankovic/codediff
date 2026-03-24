@@ -106,7 +106,9 @@ async fn process_repositories_parallel(
     n_threads: usize,
     queue_capacity: usize,
 ) -> Result<()> {
-    let mut tasks = Vec::with_capacity(repo_paths.len());
+    let mut all_stats = HashMap::new();
+    let mut tasks: Vec<tokio::task::JoinHandle<Result<HashMap<(String, String), Stats>>>> =
+        Vec::with_capacity(repo_paths.len());
 
     for repo_path in repo_paths {
         let db_path = db_path.to_path_buf();
@@ -115,14 +117,25 @@ async fn process_repositories_parallel(
         println!("Processing {}", repo_path.display());
 
         tasks.push(tokio::spawn(async move {
-            repository_stats_async(repo_path, db_path, n_threads, queue_capacity).await
+            let stats =
+                repository_stats_async(repo_path, db_path, n_threads, queue_capacity).await?;
+            Ok(stats)
         }));
     }
 
-    // Wait for all tasks to complete
+    // Collect all stats from completed tasks
     for task in tasks {
-        task.await??;
+        let stats = task.await??;
+        all_stats.extend(stats);
     }
+
+    println!(
+        "Computed stats for {} (commit, path) pairs",
+        all_stats.len()
+    );
+
+    // Export all stats to SQLite after all processing is complete
+    export_stats_sqlite(db_path, all_stats)?;
 
     Ok(())
 }
@@ -154,10 +167,10 @@ async fn main() -> Result<()> {
 
 fn repository_stats(
     repository_path: &Path,
-    db_path: &Path,
+    _db_path: &Path,
     n_threads: usize,
     queue_capacity: usize,
-) -> Result<()> {
+) -> Result<HashMap<(String, String), Stats>> {
     let repo = git2::Repository::open(repository_path)?;
 
     let (delta_tx, delta_rx) = bounded::<(Stats, String, String)>(queue_capacity);
@@ -192,9 +205,7 @@ fn repository_stats(
     }
     let stats = stats_collector.join().expect("Stats collector panicked!");
 
-    export_stats_sqlite(db_path, stats)?;
-
-    Ok(())
+    Ok(stats)
 }
 
 /// Async version of repository_stats
@@ -203,14 +214,12 @@ async fn repository_stats_async(
     db_path: PathBuf,
     n_threads: usize,
     queue_capacity: usize,
-) -> Result<()> {
+) -> Result<HashMap<(String, String), Stats>> {
     // Run the synchronous version in a blocking task
     tokio::task::spawn_blocking(move || {
         repository_stats(&repository_path, &db_path, n_threads, queue_capacity)
     })
-    .await??;
-
-    Ok(())
+    .await?
 }
 
 fn path_from_delta(delta: &git2::DiffDelta) -> String {
@@ -354,7 +363,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
     conn.execute(
         r#"
         CREATE TABLE IF NOT EXISTS commits (
-            commit_id TEXT PRIMARY KEY,
+            commit_id TEXT NOT NULL,
             relative_file_path TEXT NOT NULL,
 
             last_updated INTEGER NOT NULL,
@@ -372,7 +381,9 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
             lines_changed INTEGER,
             nodes_added INTEGER,
             nodes_removed INTEGER,
-            nodes_changed INTEGER
+            nodes_changed INTEGER,
+
+            PRIMARY KEY (commit_id, relative_file_path)
         );
         "#,
         [],
@@ -450,7 +461,8 @@ mod tests {
         let db_file = NamedTempFile::new()?;
         let db_path = db_file.path();
 
-        repository_stats(&repo_path, db_path, 2, 1000)?;
+        let stats = repository_stats(&repo_path, db_path, 2, 1000)?;
+        export_stats_sqlite(db_path, stats)?;
 
         verify_database_contents(db_path)?;
 
