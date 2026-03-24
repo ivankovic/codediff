@@ -27,8 +27,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long)]
-    repository_path: PathBuf,
+    #[arg(long = "path")]
+    path: PathBuf,
 
     #[arg(long)]
     db: PathBuf,
@@ -69,17 +69,87 @@ struct Stats {
     nodes_changed: u64,
 }
 
-fn main() {
+/// Find all git repositories in subfolders of the given path
+fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
+    let mut repo_paths = Vec::new();
+
+    println!("Looking for repositories...");
+
+    if base_path.is_dir() {
+        for entry in walkdir::WalkDir::new(base_path)
+            .follow_links(true)
+            .sort_by_file_name()
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_dir() {
+                let git_dir = entry.path().join(".git");
+                if git_dir.exists() {
+                    repo_paths.push(entry.path().to_path_buf());
+                }
+            }
+        }
+    } else if base_path.join(".git").exists() {
+        // Single repository path
+        repo_paths.push(base_path.to_path_buf());
+    }
+
+    println!("Found {} repositories.", repo_paths.len());
+
+    Ok(repo_paths)
+}
+
+/// Process multiple repositories in parallel using async
+async fn process_repositories_parallel(
+    repo_paths: &[PathBuf],
+    db_path: &Path,
+    n_threads: usize,
+    queue_capacity: usize,
+) -> Result<()> {
+    let mut tasks = Vec::with_capacity(repo_paths.len());
+
+    for repo_path in repo_paths {
+        let db_path = db_path.to_path_buf();
+        let repo_path = repo_path.to_path_buf();
+
+        println!("Processing {}", repo_path.display());
+
+        tasks.push(tokio::spawn(async move {
+            repository_stats_async(repo_path, db_path, n_threads, queue_capacity).await
+        }));
+    }
+
+    // Wait for all tasks to complete
+    for task in tasks {
+        task.await??;
+    }
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Args::parse();
 
-    let repository_path = &args.repository_path;
+    let base_path = &args.path;
     let db_path = &args.db;
     let n_threads = args.threads.unwrap_or_else(num_cpus::get);
     let queue_capacity = args.queue_capacity;
 
-    if let Err(e) = repository_stats(repository_path, db_path, n_threads, queue_capacity) {
-        eprintln!("Failed to compute repository stats: {:?}", e)
+    // Find all git repositories in subfolders
+    let repo_paths = find_git_repositories(base_path)?;
+
+    if repo_paths.is_empty() {
+        eprintln!("No git repositories found in: {:?}", base_path);
+        return Ok(());
     }
+
+    println!("Found {} git repositories to process", repo_paths.len());
+
+    // Process all repositories in parallel
+    process_repositories_parallel(&repo_paths, db_path, n_threads, queue_capacity).await?;
+
+    Ok(())
 }
 
 fn repository_stats(
@@ -123,6 +193,22 @@ fn repository_stats(
     let stats = stats_collector.join().expect("Stats collector panicked!");
 
     export_stats_sqlite(db_path, stats)?;
+
+    Ok(())
+}
+
+/// Async version of repository_stats
+async fn repository_stats_async(
+    repository_path: PathBuf,
+    db_path: PathBuf,
+    n_threads: usize,
+    queue_capacity: usize,
+) -> Result<()> {
+    // Run the synchronous version in a blocking task
+    tokio::task::spawn_blocking(move || {
+        repository_stats(&repository_path, &db_path, n_threads, queue_capacity)
+    })
+    .await??;
 
     Ok(())
 }
@@ -405,16 +491,34 @@ mod tests {
             let lines_after: i64 = row.get(6)?;
 
             assert!(!commit_id.is_empty(), "Commit ID should be present");
-            assert!(!relative_file_path.is_empty(), "Relative file path should be present");
-            assert!(!git_reported_status.is_empty(), "Git reported status should be present");
+            assert!(
+                !relative_file_path.is_empty(),
+                "Relative file path should be present"
+            );
+            assert!(
+                !git_reported_status.is_empty(),
+                "Git reported status should be present"
+            );
 
             if relative_file_path.ends_with("main.rs") {
                 main_rs_found = true;
 
-                assert!(bytes_before > 0, "Bytes before should be strictly greater than 0");
-                assert!(bytes_after > 0, "Bytes after should be strictly greater than 0");
-                assert!(lines_before > 0, "Lines before should be strictly greater than 0");
-                assert!(lines_after > 0, "Lines after should be strictly greater than 0");
+                assert!(
+                    bytes_before > 0,
+                    "Bytes before should be strictly greater than 0"
+                );
+                assert!(
+                    bytes_after > 0,
+                    "Bytes after should be strictly greater than 0"
+                );
+                assert!(
+                    lines_before > 0,
+                    "Lines before should be strictly greater than 0"
+                );
+                assert!(
+                    lines_after > 0,
+                    "Lines after should be strictly greater than 0"
+                );
             }
         }
 
