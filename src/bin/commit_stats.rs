@@ -33,6 +33,12 @@ struct Args {
 
     #[arg(long)]
     db: PathBuf,
+
+    #[arg(long)]
+    threads: Option<usize>,
+
+    #[arg(long, default_value_t = 10000)]
+    queue_capacity: usize,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -45,34 +51,48 @@ struct Stats {
     // Absolute values
     bytes_before: u64,
     bytes_after: u64,
+
+    lines_before: u64,
+    lines_after: u64,
+
     nodes_before: u64,
     nodes_after: u64,
 
     // Measures of the difference
-    nodes_added: u64,
-    nodes_removed: u64,
-    nodes_changed: u64,
+    unix_diff_script_bytes: u64,
+
     lines_added: u64,
     lines_removed: u64,
     lines_changed: u64,
-    unix_diff_script_bytes: u64,
+
+    nodes_added: u64,
+    nodes_removed: u64,
+    nodes_changed: u64,
 }
 
 fn main() {
     let args = Args::parse();
 
-    let repo = match git2::Repository::open(args.repository_path.as_path()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Failed to open repository: {:?}", e);
-            return;
-        }
-    };
+    let repository_path = &args.repository_path;
+    let db_path = &args.db;
+    let n_threads = args.threads.unwrap_or_else(num_cpus::get);
+    let queue_capacity = args.queue_capacity;
 
-    let n_threads = num_cpus::get();
+    if let Err(e) = repository_stats(repository_path, db_path, n_threads, queue_capacity) {
+        eprintln!("Failed to compute repository stats: {:?}", e)
+    }
+}
 
-    let (delta_tx, delta_rx) = bounded::<(Stats, String, String)>(10000);
-    let (stats_tx, stats_rx) = bounded::<Stats>(10000);
+fn repository_stats(
+    repository_path: &Path,
+    db_path: &Path,
+    n_threads: usize,
+    queue_capacity: usize,
+) -> Result<()> {
+    let repo = git2::Repository::open(repository_path)?;
+
+    let (delta_tx, delta_rx) = bounded::<(Stats, String, String)>(queue_capacity);
+    let (stats_tx, stats_rx) = bounded::<Stats>(queue_capacity);
 
     let mut delta_workers = Vec::with_capacity(n_threads);
     for _ in 0..n_threads {
@@ -103,10 +123,9 @@ fn main() {
     }
     let stats = stats_collector.join().expect("Stats collector panicked!");
 
-    println!("Collected stats for {} files", stats.len());
-    if let Err(e) = export_stats_sqlite(args.db.as_path(), stats) {
-        eprintln!("Failed to save results: {:?}", e)
-    }
+    export_stats_sqlite(db_path, stats)?;
+
+    Ok(())
 }
 
 fn path_from_delta(delta: &git2::DiffDelta) -> String {
@@ -283,4 +302,105 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> 
 
     tx.commit()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use codediff::test::helper;
+    use rusqlite::Connection;
+    use std::path::Path;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn end_to_end() -> Result<()> {
+        let repo_path = helper::handmade_git_repository()?;
+
+        let db_file = NamedTempFile::new()?;
+        let db_path = db_file.path();
+
+        repository_stats(&repo_path, db_path, 2, 1000)?;
+
+        verify_database_contents(db_path)?;
+
+        Ok(())
+    }
+
+    fn verify_database_contents(db_path: &Path) -> Result<()> {
+        let conn = Connection::open(db_path)?;
+
+        let mut stmt =
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='files'")?;
+        let table_exists = stmt.exists([])?;
+        assert!(table_exists, "Files table should exist in the database");
+
+        let mut count_stmt = conn.prepare("SELECT COUNT(*) as count FROM files")?;
+        let count: i64 = count_stmt.query_row([], |row| row.get(0))?;
+        assert!(
+            count > 0,
+            "Database should contain at least one file record"
+        );
+
+        let mut columns_stmt = conn.prepare(
+            "SELECT path, language, tip, automatically_generated, ast_nodes, bytes, lines_of_code,
+            failed_to_convert_to_utf8, failed_to_parse, too_large_to_parse
+            FROM files LIMIT 1",
+        )?;
+
+        let mut main_rs_found = false;
+
+        let mut rows = columns_stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            // Verify we can read all the expected columns
+            let path: Option<String> = row.get(0)?;
+            let _language: Option<String> = row.get(1)?;
+            let tip: Option<String> = row.get(2)?;
+            let automatically_generated: i32 = row.get(3)?;
+            let ast_nodes: i64 = row.get(4)?;
+            let bytes: i64 = row.get(5)?;
+            let lines_of_code: i64 = row.get(6)?;
+            let failed_to_convert_to_utf8: i32 = row.get(7)?;
+            let failed_to_parse: i32 = row.get(8)?;
+            let too_large_to_parse: i32 = row.get(9)?;
+
+            assert!(path.is_some(), "Path should be present");
+
+            if let Some(path_content) = &path
+                && path_content.ends_with("main.rs")
+            {
+                main_rs_found = true;
+
+                assert!(tip.is_some(), "Tip should be present");
+                assert!(bytes > 0, "File should have some bytes");
+                assert!(lines_of_code > 0, "Main should have some lines");
+
+                assert_eq!(
+                    automatically_generated, 0,
+                    "Test files should not be marked as automatically generated"
+                );
+                assert!(ast_nodes > 0, "AST nodes should be non-zero");
+
+                assert_eq!(
+                    failed_to_convert_to_utf8, 0,
+                    "Test files should not fail UTF-8 conversion"
+                );
+                assert_eq!(failed_to_parse, 0, "Test files should parse successfully");
+                assert_eq!(
+                    too_large_to_parse, 0,
+                    "Test files should not be too large to parse"
+                );
+
+                if let Some(tip_content) = &tip {
+                    assert!(
+                        tip_content.contains("Code"),
+                        "Tip should indicate this is code"
+                    );
+                }
+            }
+        }
+
+        assert!(main_rs_found, "main.rs was not found! It MUST exist.");
+
+        Ok(())
+    }
 }
