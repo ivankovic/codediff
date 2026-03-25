@@ -17,6 +17,7 @@
  */
 use anyhow::Result;
 use clap::Parser;
+use codediff::code::{Code, Language};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
 use serde::Serialize;
@@ -46,6 +47,8 @@ struct Stats {
     relative_file_path: String,
 
     git_reported_status: String,
+
+    language: String,
 
     // Absolute values
     bytes_before: u64,
@@ -232,6 +235,11 @@ fn path_from_delta(delta: &git2::DiffDelta) -> String {
     }
 }
 
+fn detect_language_from_path(path: &str) -> Language {
+    let path_buf = PathBuf::from(path);
+    codediff::code::language::language_for_path(&path_buf).unwrap_or(Language::Unknown)
+}
+
 fn process_repository(
     repo: &git2::Repository,
     delta_tx: Sender<(Stats, String, String)>,
@@ -339,14 +347,29 @@ fn process_delta_loop(
 fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
     let mut result = stats.clone();
 
-    // Count lines
-    result.lines_before = before.lines().count() as u64;
-    result.lines_after = after.lines().count() as u64;
+    // Detect language from file path
+    let language = detect_language_from_path(&result.relative_file_path);
 
-    // For now, we'll just set some basic values
+    // Create Code objects for before and after versions
+    let before_code = Code::from_string(before, &language);
+    let after_code = Code::from_string(after, &language);
+
+    // Count lines from Code objects
+    result.lines_before = before_code.contents.lines().count() as u64;
+    result.lines_after = after_code.contents.lines().count() as u64;
+
+    // Count nodes from ASTs if available
+    result.nodes_before = before_code
+        .ast
+        .as_ref()
+        .map_or(0, |ast| ast.root_node().child_count() as u64);
+    result.nodes_after = after_code
+        .ast
+        .as_ref()
+        .map_or(0, |ast| ast.root_node().child_count() as u64);
+
+    // For now, we'll just set some basic values for changes
     // The actual diff processing will be implemented later
-    result.nodes_before = 0;
-    result.nodes_after = 0;
     result.lines_added = 0;
     result.lines_removed = 0;
     result.lines_changed = 0;

@@ -49,17 +49,18 @@ impl Code {
      * Parse the contents of the Code and fill out the AST.
      */
     pub fn parse(&mut self, parser: &mut tree_sitter::Parser) {
-        let language = self
-            .metadata
-            .language
-            .as_ref()
-            .expect("Language must be set to parse code");
-        let ts_language = crate::code::language::to_treesitter(language)
-            .expect("Unable to convert CodeDiff language to TreeSitter language");
-        parser
-            .set_language(&ts_language)
-            .expect("Unable to set TreeSitter language");
-        self.ast = Some(parser.parse(&self.contents, None).unwrap());
+        let language = match self.metadata.language.as_ref() {
+            Some(lang) => lang,
+            None => return,
+        };
+        let ts_language = match crate::code::language::to_treesitter(language) {
+            Some(ts_lang) => ts_lang,
+            None => return,
+        };
+        if parser.set_language(&ts_language).is_err() {
+            return;
+        }
+        self.ast = parser.parse(&self.contents, None).into();
     }
 
     /**
