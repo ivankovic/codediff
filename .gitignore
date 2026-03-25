@@ -12,7 +12,7 @@ target/
 
 # ---> Research directory. Part of the project but not part of the product.
 **/research/data/*
-**/research/plots/*
+**/research/**/plots/
 
 # ---> Python, only used in research/ directory.
 
