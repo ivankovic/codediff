@@ -53,6 +53,40 @@ pub struct CodeStats {
 }
 
 /**
+* Statistics about a diff between two versions of a file.
+*/
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DiffStats {
+    pub commit_id: String,
+    pub relative_file_path: String,
+
+    pub git_reported_status: String,
+
+    pub language: String,
+
+    // Absolute values
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+
+    pub lines_before: u64,
+    pub lines_after: u64,
+
+    pub nodes_before: u64,
+    pub nodes_after: u64,
+
+    // Measures of the difference
+    pub unix_diff_script_bytes: u64,
+
+    pub lines_added: u64,
+    pub lines_removed: u64,
+    pub lines_changed: u64,
+
+    pub nodes_added: u64,
+    pub nodes_removed: u64,
+    pub nodes_changed: u64,
+}
+
+/**
 * Count the nodes in a TreeSitter tree.
 */
 pub fn count_nodes(root: Node) -> usize {

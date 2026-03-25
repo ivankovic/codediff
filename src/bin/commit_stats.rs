@@ -18,9 +18,9 @@
 use anyhow::Result;
 use clap::Parser;
 use codediff::code::{Code, Language};
+use codediff::stats::DiffStats;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
-use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -39,37 +39,6 @@ struct Args {
 
     #[arg(long, default_value_t = 10000)]
     queue_capacity: usize,
-}
-
-#[derive(Debug, Clone, Default, Serialize)]
-struct Stats {
-    commit_id: String,
-    relative_file_path: String,
-
-    git_reported_status: String,
-
-    language: String,
-
-    // Absolute values
-    bytes_before: u64,
-    bytes_after: u64,
-
-    lines_before: u64,
-    lines_after: u64,
-
-    nodes_before: u64,
-    nodes_after: u64,
-
-    // Measures of the difference
-    unix_diff_script_bytes: u64,
-
-    lines_added: u64,
-    lines_removed: u64,
-    lines_changed: u64,
-
-    nodes_added: u64,
-    nodes_removed: u64,
-    nodes_changed: u64,
 }
 
 /// Find all git repositories in subfolders of the given path
@@ -110,7 +79,7 @@ async fn process_repositories_parallel(
     queue_capacity: usize,
 ) -> Result<()> {
     let mut all_stats = HashMap::new();
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<HashMap<(String, String), Stats>>>> =
+    let mut tasks: Vec<tokio::task::JoinHandle<Result<HashMap<(String, String), DiffStats>>>> =
         Vec::with_capacity(repo_paths.len());
 
     for repo_path in repo_paths {
@@ -173,11 +142,11 @@ fn repository_stats(
     _db_path: &Path,
     n_threads: usize,
     queue_capacity: usize,
-) -> Result<HashMap<(String, String), Stats>> {
+) -> Result<HashMap<(String, String), DiffStats>> {
     let repo = git2::Repository::open(repository_path)?;
 
-    let (delta_tx, delta_rx) = bounded::<(Stats, String, String)>(queue_capacity);
-    let (stats_tx, stats_rx) = bounded::<Stats>(queue_capacity);
+    let (delta_tx, delta_rx) = bounded::<(DiffStats, String, String)>(queue_capacity);
+    let (stats_tx, stats_rx) = bounded::<DiffStats>(queue_capacity);
 
     let mut delta_workers = Vec::with_capacity(n_threads);
     for _ in 0..n_threads {
@@ -192,7 +161,7 @@ fn repository_stats(
     let delta_producer = thread::spawn(move || process_repository(&repo, delta_tx));
 
     let stats_collector = thread::spawn(move || {
-        let mut map: HashMap<(String, String), Stats> = HashMap::new();
+        let mut map: HashMap<(String, String), DiffStats> = HashMap::new();
         while let Ok(stats) = stats_rx.recv() {
             map.insert(
                 (stats.commit_id.clone(), stats.relative_file_path.clone()),
@@ -217,7 +186,7 @@ async fn repository_stats_async(
     db_path: PathBuf,
     n_threads: usize,
     queue_capacity: usize,
-) -> Result<HashMap<(String, String), Stats>> {
+) -> Result<HashMap<(String, String), DiffStats>> {
     // Run the synchronous version in a blocking task
     tokio::task::spawn_blocking(move || {
         repository_stats(&repository_path, &db_path, n_threads, queue_capacity)
@@ -242,7 +211,7 @@ fn detect_language_from_path(path: &str) -> Language {
 
 fn process_repository(
     repo: &git2::Repository,
-    delta_tx: Sender<(Stats, String, String)>,
+    delta_tx: Sender<(DiffStats, String, String)>,
 ) -> Result<()> {
     let mut walk = repo.revwalk()?;
     // We don't need to set sorting here, because we don't really care.
@@ -269,7 +238,7 @@ fn process_repository(
         )?;
 
         for delta in diff.deltas() {
-            let mut result = Stats {
+            let mut result = DiffStats {
                 commit_id: id.to_string(),
                 relative_file_path: path_from_delta(&delta),
                 ..Default::default()
@@ -326,8 +295,8 @@ fn process_repository(
 }
 
 fn process_delta_loop(
-    delta_rx: Receiver<(Stats, String, String)>,
-    stats_tx: Sender<Stats>,
+    delta_rx: Receiver<(DiffStats, String, String)>,
+    stats_tx: Sender<DiffStats>,
 ) -> Result<()> {
     while let Ok((stats, before, after)) = delta_rx.recv() {
         match process_delta(&stats, &before, &after) {
@@ -344,7 +313,7 @@ fn process_delta_loop(
     Ok(())
 }
 
-fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
+fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffStats> {
     let mut result = stats.clone();
 
     // Detect language from file path
@@ -380,7 +349,7 @@ fn process_delta(stats: &Stats, before: &str, after: &str) -> Result<Stats> {
     Ok(result)
 }
 
-fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), Stats>) -> Result<()> {
+fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>) -> Result<()> {
     let mut conn = Connection::open(path)?;
 
     conn.execute(
