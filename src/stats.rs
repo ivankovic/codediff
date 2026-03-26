@@ -60,9 +60,11 @@ pub struct DiffStats {
     pub commit_id: String,
     pub relative_file_path: String,
 
-    pub git_reported_status: String,
+    // Code objects for before and after versions
+    pub before: Option<Code>,
+    pub after: Option<Code>,
 
-    pub language: String,
+    pub git_reported_status: String,
 
     // Absolute values
     pub bytes_before: u64,

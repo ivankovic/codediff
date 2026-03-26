@@ -58,9 +58,9 @@ function update() {
 
     if [ -d "$project_path" ]; then
       cd "$project_path"
-      git fetch --depth=10
+      git fetch --depth=1000
     else
-      GIT_ASKPASS=true git clone --depth=100 "$repository" "$project_path"
+      GIT_ASKPASS=true git clone --depth=1000 "$repository" "$project_path"
       if [ $? -ne 0 ]; then
         echo "$project_name" >> "$2"/failed
       fi

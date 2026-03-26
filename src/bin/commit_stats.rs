@@ -41,23 +41,21 @@ struct Args {
     queue_capacity: usize,
 }
 
-/// Find all git repositories in subfolders of the given path
+/// Find all git repositories in top-level subdirectories of the given path
 fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
     let mut repo_paths = Vec::new();
 
     println!("Looking for repositories...");
 
     if base_path.is_dir() {
-        for entry in walkdir::WalkDir::new(base_path)
-            .follow_links(true)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            if entry.file_type().is_dir() {
-                let git_dir = entry.path().join(".git");
+        // Only check immediate children (top-level directories)
+        for entry in std::fs::read_dir(base_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                let git_dir = path.join(".git");
                 if git_dir.exists() {
-                    repo_paths.push(entry.path().to_path_buf());
+                    repo_paths.push(path);
                 }
             }
         }
@@ -78,36 +76,80 @@ async fn process_repositories_parallel(
     n_threads: usize,
     queue_capacity: usize,
 ) -> Result<()> {
-    let mut all_stats = HashMap::new();
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<HashMap<(String, String), DiffStats>>>> =
-        Vec::with_capacity(repo_paths.len());
+    // Create a channel for repository processing results
+    let (result_tx, result_rx) = bounded::<HashMap<(String, String), DiffStats>>(queue_capacity);
 
-    for repo_path in repo_paths {
-        let db_path = db_path.to_path_buf();
-        let repo_path = repo_path.to_path_buf();
+    // Create a fixed-size thread pool for processing repositories
+    let mut workers = Vec::with_capacity(n_threads);
+    let (repo_tx, repo_rx) = bounded::<(PathBuf, PathBuf, usize, usize)>(queue_capacity);
 
-        println!("Processing {}", repo_path.display());
+    // Spawn worker threads
+    for _ in 0..n_threads {
+        let repo_rx = repo_rx.clone();
+        let result_tx = result_tx.clone();
+        workers.push(thread::spawn(move || {
+            while let Ok((repo_path, db_path, worker_threads, worker_queue_capacity)) =
+                repo_rx.recv()
+            {
+                println!("Processing {}", repo_path.display());
 
-        tasks.push(tokio::spawn(async move {
-            let stats =
-                repository_stats_async(repo_path, db_path, n_threads, queue_capacity).await?;
-            Ok(stats)
+                // Process this repository synchronously
+                let result =
+                    repository_stats(&repo_path, &db_path, worker_threads, worker_queue_capacity);
+
+                match result {
+                    Ok(stats) => {
+                        if result_tx.send(stats).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to process repository {}: {}",
+                            repo_path.display(),
+                            e
+                        );
+                    }
+                }
+            }
         }));
     }
+    drop(result_tx);
 
-    // Collect all stats from completed tasks
-    for task in tasks {
-        let stats = task.await??;
-        all_stats.extend(stats);
+    // Queue all repositories for processing
+    for repo_path in repo_paths {
+        let repo_path = repo_path.to_path_buf();
+        let db_path = db_path.to_path_buf();
+        if repo_tx
+            .send((repo_path, db_path, 1, queue_capacity))
+            .is_err()
+        {
+            break;
+        }
+    }
+    drop(repo_tx);
+
+    // Collect results and write to SQLite incrementally
+    let mut total_pairs = 0;
+    while let Ok(stats) = result_rx.recv() {
+        let count = stats.len();
+        total_pairs += count;
+
+        // Write stats to SQLite immediately
+        export_stats_sqlite(db_path, stats)?;
+
+        println!("Processed {} (commit, path) pairs", count);
+    }
+
+    // Wait for all workers to finish
+    for worker in workers {
+        let _ = worker.join();
     }
 
     println!(
-        "Computed stats for {} (commit, path) pairs",
-        all_stats.len()
+        "Computed stats for {} total (commit, path) pairs",
+        total_pairs
     );
-
-    // Export all stats to SQLite after all processing is complete
-    export_stats_sqlite(db_path, all_stats)?;
 
     Ok(())
 }
@@ -180,20 +222,6 @@ fn repository_stats(
     Ok(stats)
 }
 
-/// Async version of repository_stats
-async fn repository_stats_async(
-    repository_path: PathBuf,
-    db_path: PathBuf,
-    n_threads: usize,
-    queue_capacity: usize,
-) -> Result<HashMap<(String, String), DiffStats>> {
-    // Run the synchronous version in a blocking task
-    tokio::task::spawn_blocking(move || {
-        repository_stats(&repository_path, &db_path, n_threads, queue_capacity)
-    })
-    .await?
-}
-
 fn path_from_delta(delta: &git2::DiffDelta) -> String {
     match delta.old_file().path() {
         Some(path) => String::from(path.to_string_lossy()),
@@ -255,12 +283,18 @@ fn process_repository(
 
                     let after_blob = repo.find_blob(delta.new_file().id())?;
                     after = String::from_utf8(after_blob.content().to_vec())?;
+
+                    let language = detect_language_from_path(&result.relative_file_path);
+                    result.after = Some(Code::from_string(&after, &language));
                 }
                 git2::Delta::Deleted => {
                     result.git_reported_status = String::from("Deleted");
 
                     let before_blob = repo.find_blob(delta.old_file().id())?;
                     before = String::from_utf8(before_blob.content().to_vec())?;
+
+                    let language = detect_language_from_path(&result.relative_file_path);
+                    result.before = Some(Code::from_string(&before, &language));
 
                     after = String::from("");
                 }
@@ -272,6 +306,10 @@ fn process_repository(
 
                     let after_blob = repo.find_blob(delta.new_file().id())?;
                     after = String::from_utf8(after_blob.content().to_vec())?;
+
+                    let language = detect_language_from_path(&result.relative_file_path);
+                    result.before = Some(Code::from_string(&before, &language));
+                    result.after = Some(Code::from_string(&after, &language));
                 }
                 _ => {
                     result.git_reported_status = String::from("Other");
@@ -319,22 +357,34 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
     // Detect language from file path
     let language = detect_language_from_path(&result.relative_file_path);
 
-    // Create Code objects for before and after versions
-    let before_code = Code::from_string(before, &language);
-    let after_code = Code::from_string(after, &language);
+    // Create Code objects for before and after versions if not already set
+    if result.before.is_none() && !before.is_empty() {
+        result.before = Some(Code::from_string(before, &language));
+    }
+    if result.after.is_none() && !after.is_empty() {
+        result.after = Some(Code::from_string(after, &language));
+    }
 
     // Count lines from Code objects
-    result.lines_before = before_code.contents.lines().count() as u64;
-    result.lines_after = after_code.contents.lines().count() as u64;
+    result.lines_before = result
+        .before
+        .as_ref()
+        .map_or(0, |code| code.contents.lines().count() as u64);
+    result.lines_after = result
+        .after
+        .as_ref()
+        .map_or(0, |code| code.contents.lines().count() as u64);
 
     // Count nodes from ASTs if available
-    result.nodes_before = before_code
-        .ast
+    result.nodes_before = result
+        .before
         .as_ref()
+        .and_then(|code| code.ast.as_ref())
         .map_or(0, |ast| ast.root_node().child_count() as u64);
-    result.nodes_after = after_code
-        .ast
+    result.nodes_after = result
+        .after
         .as_ref()
+        .and_then(|code| code.ast.as_ref())
         .map_or(0, |ast| ast.root_node().child_count() as u64);
 
     // For now, we'll just set some basic values for changes
@@ -361,6 +411,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
             last_updated INTEGER NOT NULL,
 
             git_reported_status TEXT NOT NULL,
+            language TEXT NOT NULL,
             bytes_before INTEGER,
             bytes_after INTEGER,
             lines_before INTEGER,
@@ -389,6 +440,18 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
     let tx = conn.transaction()?;
 
     for (_, s) in stats {
+        let language = s
+            .after
+            .as_ref()
+            .and_then(|c| c.metadata.language.as_ref())
+            .map(|l| l.to_string())
+            .or_else(|| {
+                s.before
+                    .as_ref()
+                    .and_then(|c| c.metadata.language.as_ref())
+                    .map(|l| l.to_string())
+            });
+
         tx.execute(
             r#"
             INSERT OR REPLACE INTO commits (
@@ -396,6 +459,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
                 relative_file_path,
                 last_updated,
                 git_reported_status,
+                language,
                 bytes_before,
                 bytes_after,
                 lines_before,
@@ -410,13 +474,14 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
                 nodes_removed,
                 nodes_changed
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17);
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18);
             "#,
             params![
                 s.commit_id,
                 s.relative_file_path,
                 now,
                 s.git_reported_status,
+                language,
                 s.bytes_before,
                 s.bytes_after,
                 s.lines_before,
