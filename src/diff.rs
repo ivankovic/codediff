@@ -266,18 +266,13 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
 }
 
 /**
-* Perform top-down matching between two AST trees.
+* Perform size-ordered matching between two AST trees.
 *
 * This function uses the pre-computed reference_nodes_ordered list to efficiently
 * find reference nodes in order of decreasing subtree size. For each reference node,
 * it checks if a node with the same full hash exists in the after tree. If they do, it adds
 * the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
-*
-* This approach is more efficient than traversing the entire tree because:
-* 1. It only examines reference nodes (not all nodes)
-* 2. It processes them in order from largest to smallest subtree
-* 3. Larger matches are found first, which can prevent smaller overlapping matches
 */
 fn match_identical_trees(before: &Code, after: &Code, language: &Language, diff: &mut ASTDiff) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
@@ -405,17 +400,30 @@ fn match_identical_trees(before: &Code, after: &Code, language: &Language, diff:
 }
 
 /**
+* Perform size-ordered matching between two AST trees.
+*
+* This function uses the pre-computed reference_nodes_ordered list to efficiently
+* find reference nodes in order of decreasing subtree size.
+*
+* For each reference node, it checks if a node with the same structural hash exists in the after
+* tree. If it does, it adds it to the mapping with StructurallyIdenticalSubtrees reason. It then
+* descends the child subtrees and mapps them using the StructurallyIdenticalAncestor reason. When
+* adding both roots and children to the subtree, it checks the value of the node and if the values
+* match, the operation is Identical, but if the values differ the operation is an Update.
+*/
+fn match_structurally_identical_trees(
+    before: &Code,
+    after: &Code,
+    language: &Language,
+    diff: &mut ASTDiff,
+) {
+}
+
+/**
 * This is the main entry point in the AST diffing algorithm.
 *
-* The algorithm is as follows:
-*
-* 1. We compute the metadata for both trees.
-* 2. Traversing the before tree in pre-order (parent before childern) we look for "human reference
-*    nodes" and check if they have an exact full hash match in the after tree. If they do, we add
-*    them and their subtrees to the matching.
-* 3. Traversing the before tree in post-order (children before parent) we look for "structural
-*    reference nodes" and check if they have an exact structural hash match in the after tree. If
-*    they do, we add them and their subtrees to the matching.
+* The algorithm is encoded in the code and is intentionally not explained in the Doccomment to
+* avoid it going stale. Please see the code.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
     // Compute metadata for both before and after code
@@ -437,6 +445,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
         .expect("Language must be set");
 
     match_identical_trees(before, after, language, &mut diff);
+    match_structurally_identical_trees(before, after, language, &mut diff);
 
     Diff { ast: Some(diff) }
 }
@@ -610,9 +619,6 @@ mod tests {
 
     #[test]
     fn diff_hello_world_with_translated_string() -> Result<()> {
-        // TODO: Uncomment this test when the implementation is ready
-        return Ok(());
-
         let test_codes = test::helper::handmade_test_code()?;
         let before = test_codes.get("hello-world.rs").unwrap().clone();
         // The after code is the same basic Rust hello world, but the message is in Croatian
