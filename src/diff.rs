@@ -803,6 +803,95 @@ mod tests {
         // One mapping is an update, but it still maps.
         assert_eq!(diff_ast.mapping.len(), 22);
 
+        // Use TreeSitter query to find the string_content nodes and verify their mapping
+        let before_tree = before.ast.as_ref().expect("Before code must be parsed");
+        let after_tree = after.ast.as_ref().expect("After code must be parsed");
+        let language = before
+            .metadata
+            .language
+            .as_ref()
+            .expect("Language must be set");
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Failed to get TreeSitter language");
+
+        // Create a query to find string_content nodes
+        let query_source = "(string_content) @string_content";
+        let query = tree_sitter::Query::new(&ts_language, query_source)
+            .expect("Failed to create TreeSitter query");
+
+        // Execute query on before tree and collect string_content nodes
+        let mut before_cursor = tree_sitter::QueryCursor::new();
+        let mut before_matches =
+            before_cursor.matches(&query, before_tree.root_node(), before.contents.as_bytes());
+
+        let mut before_string_nodes = Vec::new();
+        while let Some(qmatch) = before_matches.next() {
+            for capture in qmatch.captures {
+                if capture.node.kind() == "string_content" {
+                    before_string_nodes.push(capture);
+                }
+            }
+        }
+
+        // Execute query on after tree and collect string_content nodes
+        let mut after_cursor = tree_sitter::QueryCursor::new();
+        let mut after_matches =
+            after_cursor.matches(&query, after_tree.root_node(), after.contents.as_bytes());
+
+        let mut after_string_nodes = Vec::new();
+        while let Some(qmatch) = after_matches.next() {
+            for capture in qmatch.captures {
+                if capture.node.kind() == "string_content" {
+                    after_string_nodes.push(capture);
+                }
+            }
+        }
+
+        // We should have exactly one string_content node in each tree
+        assert_eq!(
+            before_string_nodes.len(),
+            1,
+            "Should find exactly one string_content node in before tree"
+        );
+        assert_eq!(
+            after_string_nodes.len(),
+            1,
+            "Should find exactly one string_content node in after tree"
+        );
+
+        let before_string_node = &before_string_nodes[0].node;
+        let after_string_node = &after_string_nodes[0].node;
+
+        // Verify that these nodes are mapped in the diff
+        let before_node_id = before_string_node.id();
+        let after_node_id = after_string_node.id();
+
+        let mapping = diff_ast.mapping.get(&(before_node_id, after_node_id));
+        assert!(mapping.is_some(), "String content nodes should be mapped");
+
+        let mapping = mapping.unwrap();
+
+        // The mapping should be an Update operation since the content changed
+        assert_eq!(
+            mapping.operation,
+            ASTMappingOperation::Update,
+            "String content mapping should be an Update operation"
+        );
+
+        // The reason should be StructurallyIdenticalAncestor since this node is part of a
+        // structurally identical subtree (the parent nodes match structurally)
+        assert_eq!(
+            mapping.reason,
+            ASTMappingReason::StructurallyIdenticalAncestor,
+            "String content mapping reason should be StructurallyIdenticalAncestor"
+        );
+
+        // The cost should be COST_UPDATE (1)
+        assert_eq!(
+            mapping.cost, COST_UPDATE,
+            "String content mapping cost should be COST_UPDATE"
+        );
+
         Ok(())
     }
 }
