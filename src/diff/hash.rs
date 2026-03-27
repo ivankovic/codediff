@@ -387,4 +387,48 @@ mod tests {
 
         Ok(())
     }
+
+    /// Benchmark function for hash_code performance
+    /// This can be used for quick performance testing without criterion
+    pub fn benchmark_hash_code(code: &Code, iterations: usize) -> Result<std::time::Duration> {
+        use std::time::Instant;
+
+        let start = Instant::now();
+
+        for _ in 0..iterations {
+            let mut metadata = ASTMetadata::default();
+            hash_code(code, &mut metadata)?;
+        }
+
+        let duration = start.elapsed();
+        Ok(duration)
+    }
+
+    #[test]
+    fn test_benchmark_function_works() -> Result<()> {
+        let codes = helper::handmade_test_code()?;
+
+        let code = codes
+            .get("hello-world.rs")
+            .ok_or_else(|| anyhow::anyhow!("Test file 'hello-world.rs' not found"))?;
+
+        // Test that benchmark function runs without error
+        let duration = benchmark_hash_code(code, 1000)?;
+
+        // Should complete in reasonable time (less than 200 millisecond for 1000 iterations, or
+        // 0.2 milliseconds per iteration)
+        assert!(
+            duration.as_millis() < 200,
+            "Benchmark took too long: {:?}",
+            duration
+        );
+
+        // Duration should be measurable (greater than 0)
+        assert!(
+            duration.as_nanos() > 0,
+            "Benchmark duration should be measurable"
+        );
+
+        Ok(())
+    }
 }

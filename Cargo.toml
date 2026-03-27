@@ -54,5 +54,13 @@ metrohash = "1.0.7"
 [dev-dependencies]
 tempfile = "3.10.1"
 
+[[bench]]
+name = "hash_benchmark"
+harness = false
+
+[dev-dependencies.criterion]
+version = "0.5"
+features = ["html_reports"]
+
 
 
