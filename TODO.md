@@ -1,6 +1,8 @@
 # Next features to implement
 
-*  Add ability to assert on individual node matching easily in tests
+*  Implement extraction of relevant nodes and speed up iteration only on those nodes in order of
+   tree size.
+*  Update doc-comments in diff.rs
 *  Structural matching based on structural hash + updates
 *  Add RTED
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
