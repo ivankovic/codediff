@@ -18,6 +18,7 @@
 use anyhow::Result;
 use clap::Parser;
 use codediff::code::{Code, Language};
+use codediff::metadata;
 use codediff::stats::DiffStats;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
@@ -47,8 +48,12 @@ fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
 
     println!("Looking for repositories...");
 
-    if base_path.is_dir() {
-        // Only check immediate children (top-level directories)
+    // Check if the base path itself is a git repository
+    if base_path.join(".git").exists() {
+        // If it's a git repo, don't scan for more repos
+        repo_paths.push(base_path.to_path_buf());
+    } else if base_path.is_dir() {
+        // If it's a normal directory, look for git repos in subdirectories
         for entry in std::fs::read_dir(base_path)? {
             let entry = entry?;
             let path = entry.path();
@@ -59,9 +64,6 @@ fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
                 }
             }
         }
-    } else if base_path.join(".git").exists() {
-        // Single repository path
-        repo_paths.push(base_path.to_path_buf());
     }
 
     println!("Found {} repositories.", repo_paths.len());
@@ -353,6 +355,12 @@ fn process_delta_loop(
 
 fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffStats> {
     let mut result = stats.clone();
+
+    // Skip processing if this is a known anomalous path
+    let file_path = Path::new(&result.relative_file_path);
+    if metadata::is_anomalous(file_path) {
+        return Ok(result);
+    }
 
     // Detect language from file path
     let language = detect_language_from_path(&result.relative_file_path);

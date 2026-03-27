@@ -23,6 +23,7 @@ while [ $# -gt 1 ]; do
   case "$1" in
     --all) MODE="all" ;;     # files + directories
     --dirs) MODE="dirs" ;;   # directories only
+    --repositories) MODE="repositories" ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -35,6 +36,15 @@ PARENT="$1"
 DB_PATH=/var/tmp/research/debug-stats.sqlite3
 
 case "$MODE" in
+  repositories)
+    for PATH_TO_PROCESS in "$PARENT"/*/; do
+      [ -d "$PATH_TO_PROCESS" ] || continue
+      echo "Repository: $PATH_TO_PROCESS"
+      if ! ./target/release/commit_stats --path="$PATH_TO_PROCESS" --db="$DB_PATH" >/dev/null 2>&1; then
+        echo "FAILED: $PATH_TO_PROCESS"
+      fi
+    done
+    ;;
   dirs)
     for PATH_TO_PROCESS in "$PARENT"/*/; do
       [ -d "$PATH_TO_PROCESS" ] || continue
