@@ -268,16 +268,20 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
 /**
 * Perform top-down matching between two AST trees.
 *
-* This function does a pre-order (parent before children) traversal of the before tree.
-* For each node, it checks if the node is a "source_file" or "function_item". If they are,
+* This function uses the pre-computed reference_nodes_ordered list to efficiently
+* find reference nodes in order of decreasing subtree size. For each reference node,
 * it checks if a node with the same full hash exists in the after tree. If they do, it adds
 * the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
+*
+* This approach is more efficient than traversing the entire tree because:
+* 1. It only examines reference nodes (not all nodes)
+* 2. It processes them in order from largest to smallest subtree
+* 3. Larger matches are found first, which can prevent smaller overlapping matches
 */
-fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mut ASTDiff) {
+fn match_identical_trees(before: &Code, after: &Code, language: &Language, diff: &mut ASTDiff) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
-    let before_root = before_tree.root_node();
     let after_root = after_tree.root_node();
 
     let before_metadata = diff
@@ -289,14 +293,12 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
         .as_ref()
         .expect("After metadata must be computed");
 
-    // Stack for pre-order traversal: (node, is_child_of_mapping_parent)
-    let mut stack = Vec::new();
-    stack.push((before_root, false));
+    // Get the pre-computed reference nodes ordered by subtree size (largest first)
+    let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
 
-    while let Some((before_node, _is_child_of_mapping)) = stack.pop() {
-        let before_node_id = before_node.id();
-
-        // Skip already mapping nodes
+    // Iterate over reference nodes in order (largest subtrees first)
+    for &before_node_id in reference_nodes_ordered {
+        // Skip already mapped nodes
         if diff
             .mapping
             .iter()
@@ -305,102 +307,99 @@ fn top_down_matching(before: &Code, after: &Code, language: &Language, diff: &mu
             continue;
         }
 
-        // Check if this is a reference node (source_file or function_item)
-        if reference_nodes::is_reference_node(before_node.kind(), language)
-            && let Some(before_hash) = before_metadata.node_to_full_hash.get(&before_node_id)
-        {
-            // Look for a node in the after tree with the same hash
-            if let Some(after_node_ids) = after_metadata.full_hash_to_node.get(before_hash) {
-                // If we have multiple reference nodes with exactly the same full hash, then
-                // there is simply duplicated code in the file, and quite big chunks of it too.
-                // For now, we take the first node and match to that.
-                //
-                // TODO: Implement better matching strategy for multiple nodes with same hash
-                if let Some(&after_node_id) = after_node_ids.iter().next() {
-                    // Find the actual node with the matching ID
-                    let mut found_after_node = None;
-                    let mut after_cursor = after_root.walk();
-                    let mut after_stack = vec![after_root];
+        // Get the node from the AST
+        let before_node = before_tree
+            .root_node()
+            .descendant_for_byte_range(before_node_id, before_node_id);
+        let Some(before_node) = before_node else {
+            continue;
+        };
 
-                    while let Some(current_after_node) = after_stack.pop() {
-                        if current_after_node.id() == after_node_id {
-                            found_after_node = Some(current_after_node);
-                            break;
-                        }
+        // Get the hash for this reference node
+        let Some(before_hash) = before_metadata.node_to_full_hash.get(&before_node_id) else {
+            continue;
+        };
 
-                        for child in current_after_node.children(&mut after_cursor) {
-                            after_stack.push(child);
-                        }
+        // Look for a node in the after tree with the same hash
+        if let Some(after_node_ids) = after_metadata.full_hash_to_node.get(before_hash) {
+            // If we have multiple reference nodes with exactly the same full hash, then
+            // there is simply duplicated code in the file, and quite big chunks of it too.
+            // For now, we take the first node and match to that.
+            //
+            // TODO: Implement better matching strategy for multiple nodes with same hash
+            if let Some(&after_node_id) = after_node_ids.iter().next() {
+                // Find the actual node with the matching ID
+                let mut found_after_node = None;
+                let mut after_cursor = after_root.walk();
+                let mut after_stack = vec![after_root];
+
+                while let Some(current_after_node) = after_stack.pop() {
+                    if current_after_node.id() == after_node_id {
+                        found_after_node = Some(current_after_node);
+                        break;
                     }
 
-                    if let Some(matching_after_node) = found_after_node {
-                        let after_node_id = matching_after_node.id();
+                    for child in current_after_node.children(&mut after_cursor) {
+                        after_stack.push(child);
+                    }
+                }
 
-                        // Add this mapping
-                        diff.mapping.insert(
-                            (before_node_id, after_node_id),
-                            ASTMapping {
-                                cost: 0,
-                                operation: ASTMappingOperation::Identical,
-                                reason: ASTMappingReason::IdenticalHash,
-                            },
-                        );
+                if let Some(matching_after_node) = found_after_node {
+                    let after_node_id = matching_after_node.id();
 
-                        // Recursively add all descendants with IdenticalHashOfAncestor reason
-                        let mut stack = vec![(before_node, matching_after_node)];
+                    // Add this mapping
+                    diff.mapping.insert(
+                        (before_node_id, after_node_id),
+                        ASTMapping {
+                            cost: 0,
+                            operation: ASTMappingOperation::Identical,
+                            reason: ASTMappingReason::IdenticalHash,
+                        },
+                    );
 
-                        while let Some((before_parent, after_parent)) = stack.pop() {
-                            let mut before_children_cursor = before_parent.walk();
-                            let mut after_children_cursor = after_parent.walk();
+                    // Recursively add all descendants with IdenticalHashOfAncestor reason
+                    let mut stack = vec![(before_node, matching_after_node)];
 
-                            let before_children: Vec<_> = before_parent
-                                .children(&mut before_children_cursor)
-                                .collect();
-                            let after_children: Vec<_> =
-                                after_parent.children(&mut after_children_cursor).collect();
+                    while let Some((before_parent, after_parent)) = stack.pop() {
+                        let mut before_children_cursor = before_parent.walk();
+                        let mut after_children_cursor = after_parent.walk();
 
-                            // Match children by position and kind
-                            for (before_child, after_child) in
-                                before_children.into_iter().zip(after_children.into_iter())
-                            {
-                                if before_child.kind() == after_child.kind() {
-                                    let before_child_id = before_child.id();
-                                    let after_child_id = after_child.id();
+                        let before_children: Vec<_> = before_parent
+                            .children(&mut before_children_cursor)
+                            .collect();
+                        let after_children: Vec<_> =
+                            after_parent.children(&mut after_children_cursor).collect();
 
-                                    if !diff
-                                        .mapping
-                                        .iter()
-                                        .any(|((child_id, _), _)| *child_id == before_child_id)
-                                    {
-                                        diff.mapping.insert(
-                                            (before_child_id, after_child_id),
-                                            ASTMapping {
-                                                cost: 0,
-                                                operation: ASTMappingOperation::Identical,
-                                                reason: ASTMappingReason::IdenticalHashOfAncestor,
-                                            },
-                                        );
+                        // Match children by position and kind
+                        for (before_child, after_child) in
+                            before_children.into_iter().zip(after_children.into_iter())
+                        {
+                            if before_child.kind() == after_child.kind() {
+                                let before_child_id = before_child.id();
+                                let after_child_id = after_child.id();
 
-                                        // Add this child to stack to process its children
-                                        stack.push((before_child, after_child));
-                                    }
+                                if !diff
+                                    .mapping
+                                    .iter()
+                                    .any(|((child_id, _), _)| *child_id == before_child_id)
+                                {
+                                    diff.mapping.insert(
+                                        (before_child_id, after_child_id),
+                                        ASTMapping {
+                                            cost: 0,
+                                            operation: ASTMappingOperation::Identical,
+                                            reason: ASTMappingReason::IdenticalHashOfAncestor,
+                                        },
+                                    );
+
+                                    // Add this child to stack to process its children
+                                    stack.push((before_child, after_child));
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-
-        // Continue traversal - add children to stack in reverse order for pre-order traversal
-        let mut children_cursor = before_node.walk();
-        let children: Vec<_> = before_node.children(&mut children_cursor).collect();
-        for child in children.into_iter().rev() {
-            let is_child_mapping = diff
-                .mapping
-                .iter()
-                .any(|((child_id, _), _)| *child_id == child.id());
-            stack.push((child, is_child_mapping));
         }
     }
 }
@@ -437,7 +436,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
         .as_ref()
         .expect("Language must be set");
 
-    top_down_matching(before, after, language, &mut diff);
+    match_identical_trees(before, after, language, &mut diff);
 
     Diff { ast: Some(diff) }
 }
