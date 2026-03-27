@@ -1,5 +1,7 @@
 # Next features to implement
 
+*  Add more tests. Test all hello world translations in all languages.
+*  Add more tests, add a move block test.
 *  Update doc-comments in diff.rs
 *  Add RTED
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
@@ -8,7 +10,6 @@
 # Benchmarking
 
 *  Add diff-cost benchmarking to diff.rs. The diff cost is the number of inserts + deletions + updates.
-*  Add time benchmarking to hash.rs
 
 # Possible code health improvements
 
