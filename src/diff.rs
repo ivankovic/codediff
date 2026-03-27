@@ -168,11 +168,85 @@ pub struct ASTMetadata {
 *
 * This function creates a default ASTMetadata object and populates it by calling hash_code
 * from hash.rs to compute both full and structural hashes for all nodes in the AST.
+* It also discovers all reference nodes and orders them by subtree size.
 */
 pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     hash::hash_code(code, &mut metadata)?;
+    // Discover all reference nodes and order them by subtree size
+    discover_reference_nodes(code, &mut metadata)?;
     Ok(metadata)
+}
+
+/**
+* Discover all reference nodes in the AST and order them by subtree size.
+*
+* This function traverses the AST to find all nodes that are considered reference nodes
+* (as defined by is_reference_node), calculates their subtree sizes, and stores them
+* in the metadata.reference_nodes_ordered vector, sorted by size in descending order.
+*/
+fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    let ast = code.ast.as_ref().expect("AST must be parsed");
+    let root_node = ast.root_node();
+    let language = code
+        .metadata
+        .language
+        .as_ref()
+        .expect("Language must be set");
+
+    let mut cursor = root_node.walk();
+    let mut stack = Vec::new();
+    stack.push(root_node);
+
+    let mut reference_nodes_with_sizes = Vec::new();
+    while let Some(node) = stack.pop() {
+        let node_id = node.id();
+
+        if reference_nodes::is_reference_node(node.kind(), language) {
+            let subtree_size = count_subtree_nodes(&node);
+            reference_nodes_with_sizes.push((node_id, subtree_size));
+        }
+
+        // Continue traversal - add children to stack
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    // Sort reference nodes by subtree size in descending order
+    reference_nodes_with_sizes.sort_by(|a, b| b.1.cmp(&a.1));
+
+    // Extract just the node IDs in order
+    metadata.reference_nodes_ordered = reference_nodes_with_sizes
+        .into_iter()
+        .map(|(node_id, _)| node_id)
+        .collect();
+
+    Ok(())
+}
+
+/**
+* Count the number of nodes in a subtree rooted at the given node.
+*
+* This function performs a depth-first traversal to count all nodes
+* in the subtree, including the root node itself.
+*/
+fn count_subtree_nodes(node: &tree_sitter::Node) -> usize {
+    let mut cursor = node.walk();
+    let mut stack = Vec::new();
+    stack.push(*node);
+    let mut count = 0;
+
+    while let Some(current_node) = stack.pop() {
+        count += 1;
+
+        // Add children to stack for processing
+        for child in current_node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    count
 }
 
 /**
@@ -381,6 +455,7 @@ mod tests {
         let root_id = code.ast.as_ref().unwrap().root_node().id();
 
         assert_eq!(metadata.reference_nodes_ordered[0], root_id);
+        assert_eq!(metadata.reference_nodes_ordered.len(), 2);
 
         Ok(())
     }
