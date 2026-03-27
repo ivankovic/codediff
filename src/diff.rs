@@ -20,6 +20,7 @@ pub mod reference_nodes;
 
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
+use tree_sitter::StreamingIterator;
 
 use crate::code::Code;
 

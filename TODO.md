@@ -12,7 +12,6 @@
 
 # Possible code health improvements
 
-*  Check that we actually need Serialize on all structures. Why do we even have that?
 *  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code in
    diff.rs
 

@@ -17,7 +17,6 @@
  */
 use anyhow::{Result, anyhow};
 use regex::Regex;
-use serde::Serialize;
 use std::io::Read;
 use std::sync::OnceLock;
 use tree_sitter::{Node, Parser as TSParser};
@@ -34,7 +33,7 @@ static AUTO_GENERATED_RE: OnceLock<Regex> = OnceLock::new();
 * All metadata that is not used in normal functionality of the system but is instead used for
 * testing, research and planning.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct CodeStats {
     pub code: Code,
 
@@ -55,7 +54,7 @@ pub struct CodeStats {
 /**
 * Statistics about a diff between two versions of a file.
 */
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct DiffStats {
     pub commit_id: String,
     pub relative_file_path: String,

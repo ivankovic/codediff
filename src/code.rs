@@ -33,14 +33,13 @@ use std::fmt;
 * leaf fields should be wrapped in Option. Ideally, the only non-Option wrapped field is the code
 * itself.
 */
-#[derive(Debug, Clone, Default, serde::Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Code {
     /// The actual code.
     pub contents: String,
     /// The metadata about the code.
     pub metadata: Metadata,
     /// The AST.
-    #[serde(skip_serializing)]
     pub ast: Option<tree_sitter::Tree>,
 }
 
@@ -126,7 +125,7 @@ impl Code {
 *
 * Most fields in this class should be optional, to allow for efficient computation.
 */
-#[derive(Debug, Clone, Default, serde::Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Metadata {
     /// The path to the code, if one exists.
     pub path: Option<std::path::PathBuf>,
@@ -143,7 +142,7 @@ pub struct Metadata {
 * Implemented as a crate enum instead of reusing someting like TreeSitter language to allow for
 * better error handling of unknown or not-supported languages.
 */
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum Language {
     #[default]
     Unknown,
@@ -194,7 +193,7 @@ impl std::fmt::Display for Language {
 * arbitrary string that provides fine grained information on what type of code, configuration,
 * data or documentation exactly the file contents are.
 */
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum Type {
     #[default]
     Unknown,
