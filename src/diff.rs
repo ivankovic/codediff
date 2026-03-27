@@ -194,20 +194,60 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         .as_ref()
         .expect("Language must be set");
 
-    let mut cursor = root_node.walk();
+    // Map to store subtree sizes for all nodes
+    let mut node_to_subtree_size = HashMap::new();
+
+    // Perform post-order traversal to compute subtree sizes efficiently
+    let mut stack = Vec::new();
+    stack.push((root_node, false)); // (node, processed)
+
+    while let Some((node, processed)) = stack.pop() {
+        if processed {
+            // Post-order processing: compute subtree size
+            let node_id = node.id();
+            let mut size = 1; // Count this node itself
+
+            // Add sizes of all children
+            let mut child_cursor = node.walk();
+            for child in node.children(&mut child_cursor) {
+                if let Some(&child_size) = node_to_subtree_size.get(&child.id()) {
+                    size += child_size;
+                }
+            }
+
+            node_to_subtree_size.insert(node_id, size);
+        } else {
+            // Pre-order: push back as processed, then push children
+            stack.push((node, true));
+
+            // Push children in reverse order for proper traversal
+            let mut child_cursor = node.walk();
+            let children: Vec<_> = node.children(&mut child_cursor).collect();
+            for child in children.into_iter().rev() {
+                stack.push((child, false));
+            }
+        }
+    }
+
+    // Collect reference nodes with their subtree sizes
+    let mut reference_nodes_with_sizes = Vec::new();
+
+    // Traverse again to find reference nodes
     let mut stack = Vec::new();
     stack.push(root_node);
 
-    let mut reference_nodes_with_sizes = Vec::new();
     while let Some(node) = stack.pop() {
         let node_id = node.id();
 
+        // Check if this node is a reference node
         if reference_nodes::is_reference_node(node.kind(), language) {
-            let subtree_size = count_subtree_nodes(&node);
-            reference_nodes_with_sizes.push((node_id, subtree_size));
+            if let Some(&subtree_size) = node_to_subtree_size.get(&node_id) {
+                reference_nodes_with_sizes.push((node_id, subtree_size));
+            }
         }
 
         // Continue traversal - add children to stack
+        let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             stack.push(child);
         }
@@ -223,30 +263,6 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         .collect();
 
     Ok(())
-}
-
-/**
-* Count the number of nodes in a subtree rooted at the given node.
-*
-* This function performs a depth-first traversal to count all nodes
-* in the subtree, including the root node itself.
-*/
-fn count_subtree_nodes(node: &tree_sitter::Node) -> usize {
-    let mut cursor = node.walk();
-    let mut stack = Vec::new();
-    stack.push(*node);
-    let mut count = 0;
-
-    while let Some(current_node) = stack.pop() {
-        count += 1;
-
-        // Add children to stack for processing
-        for child in current_node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-
-    count
 }
 
 /**
