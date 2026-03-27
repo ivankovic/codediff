@@ -159,6 +159,8 @@ pub struct ASTMetadata {
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
     /// declaration will hash to the same structural hash. Therefor, the map value is a set.
     pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// Set of reference nodes in this tree, ordered by subtree size.
+    pub reference_nodes_ordered: Vec<usize>,
 }
 
 /**
@@ -362,7 +364,8 @@ mod tests {
 
     #[test]
     fn test_compute_metadata() -> Result<()> {
-        let code = Code::from_string("fn main() {}", &Language::Rust);
+        let test_codes = test::helper::handmade_test_code()?;
+        let code = test_codes.get("hello-world.rs").unwrap().clone();
 
         // Compute metadata
         let metadata = compute_metadata(&code)?;
@@ -372,6 +375,12 @@ mod tests {
         assert!(!metadata.full_hash_to_node.is_empty());
         assert!(!metadata.node_to_structural_hash.is_empty());
         assert!(!metadata.structural_hash_to_node.is_empty());
+        assert!(!metadata.reference_nodes_ordered.is_empty());
+
+        // The first, largest reference node must always be the root.
+        let root_id = code.ast.as_ref().unwrap().root_node().id();
+
+        assert_eq!(metadata.reference_nodes_ordered[0], root_id);
 
         Ok(())
     }
