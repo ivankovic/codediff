@@ -158,7 +158,86 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 * Returns a HashMap where the key is the directory name and the value is the (before, after) Code
 * object pair.
 */
-pub fn handmade_test_diffs() -> Result<HashMap<String, (Code, Code)>> {}
+pub fn handmade_test_diffs() -> Result<HashMap<String, (Code, Code)>> {
+    let mut result = HashMap::new();
+
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+
+    let mut parser = tree_sitter::Parser::new();
+
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
+
+            let mut before_code = None;
+            let mut after_code = None;
+
+            // Read all files in the directory
+            for file_entry in fs::read_dir(&path)? {
+                let file_entry = file_entry?;
+                let file_path = file_entry.path();
+
+                if file_path.is_file() {
+                    let file_name = file_path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+
+                    if file_name.starts_with("before.") && file_name.ends_with(".test") {
+                        let contents = fs::read_to_string(&file_path)?;
+                        let mut code = Code {
+                            contents,
+                            ..Default::default()
+                        };
+                        code.metadata.path = Some(file_path.with_extension(""));
+                        metadata::hermetic_expand(&mut code.metadata);
+                        before_code = Some(code);
+                    } else if file_name.starts_with("after.") && file_name.ends_with(".test") {
+                        let contents = fs::read_to_string(&file_path)?;
+                        let mut code = Code {
+                            contents,
+                            ..Default::default()
+                        };
+                        code.metadata.path = Some(file_path.with_extension(""));
+                        metadata::hermetic_expand(&mut code.metadata);
+                        after_code = Some(code);
+                    }
+                }
+            }
+
+            // Parse both codes if they exist
+            if let (Some(mut before), Some(mut after)) = (before_code, after_code) {
+                if let Some(language) = &before.metadata.language {
+                    let ts_language = crate::code::language::to_treesitter(language)
+                        .expect("Handmade test code for unknown language?");
+
+                    parser.set_language(&ts_language)?;
+                    before.parse(&mut parser);
+                }
+
+                if let Some(language) = &after.metadata.language {
+                    let ts_language = crate::code::language::to_treesitter(language)
+                        .expect("Handmade test code for unknown language?");
+
+                    parser.set_language(&ts_language)?;
+                    after.parse(&mut parser);
+                }
+
+                result.insert(dir_name, (before, after));
+            }
+        }
+    }
+
+    Ok(result)
+}
 
 /**
 * Returns a path to a fully functional git repository that is on a temporary path.
@@ -392,10 +471,29 @@ mod tests {
     }
 
     #[test]
+    fn test_handmade_test_diffs_returns_all_diffs() -> Result<()> {
+        let diffs = handmade_test_diffs()?;
+
+        println!("Found {} test diffs:", diffs.len());
+        for key in diffs.keys() {
+            println!("  - {}", key);
+        }
+
+        // We should have all the expected diffs
+        assert!(diffs.contains_key("no-change"));
+        assert!(diffs.contains_key("hello-world-added-message"));
+        assert!(diffs.contains_key("leet-code-1-bugfix"));
+
+        assert_eq!(diffs.len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_handmade_test_diffs_no_change_diff() -> Result<()> {
         let diffs = handmade_test_diffs()?;
 
-        assert!(diffs.is_empty(), "Should have found some test diffs");
+        assert!(!diffs.is_empty(), "Should have found some test diffs");
 
         assert!(diffs.contains_key("no-change"));
 
