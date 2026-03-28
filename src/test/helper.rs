@@ -148,6 +148,23 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
     Ok(result)
 }
 
+/**
+* Returns handmade (before, after) pairs, as Code objects.
+*
+* Note that the actual files are stored with ".test" extension in "src/test/data/diffs/<dir>/". This is so
+* that the build system doesn't treat data as code. To make sure the files are correctly treated
+* during testing, ".test" extension is removed in this function.
+*
+* Returns a HashMap where the key is the directory name and the value is the (before, after) Code
+* object pair.
+*/
+pub fn handmade_test_diffs() -> Result<HashMap<String, (Code, Code)>> {}
+
+/**
+* Returns a path to a fully functional git repository that is on a temporary path.
+*
+* The repository contains handmade commits to be used in tests.
+*/
 pub fn handmade_git_repository() -> Result<PathBuf> {
     let (repo_path, repo) = initialize_repository()?;
     let dirs = read_fake_git_repo_testdata()?;
@@ -370,6 +387,26 @@ mod tests {
                 key
             );
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_handmade_test_diffs_no_change_diff() -> Result<()> {
+        let diffs = handmade_test_diffs()?;
+
+        assert!(diffs.is_empty(), "Should have found some test diffs");
+
+        assert!(diffs.contains_key("no-change"));
+
+        let (before, after) = diffs.get("no-change").unwrap();
+
+        assert_ne!(before.contents, "");
+        assert_ne!(after.contents, "");
+        assert_eq!(before.contents, after.contents);
+
+        assert!(before.metadata.language.is_some());
+        assert_eq!(before.metadata.language, after.metadata.language);
 
         Ok(())
     }

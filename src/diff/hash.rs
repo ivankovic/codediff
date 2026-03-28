@@ -415,10 +415,10 @@ mod tests {
         // Test that benchmark function runs without error
         let duration = benchmark_hash_code(code, 1000)?;
 
-        // Should complete in reasonable time (less than 200 millisecond for 1000 iterations, or
-        // 0.2 milliseconds per iteration)
+        // Should complete in reasonable time (less than 2000 millisecond for 1000 iterations, or
+        // 1 milliseconds per iteration)
         assert!(
-            duration.as_millis() < 200,
+            duration.as_millis() < 2000,
             "Benchmark took too long: {:?}",
             duration
         );

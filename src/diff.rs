@@ -20,6 +20,9 @@ pub mod reference_nodes;
 
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
+
+//  StreamingIterator has to be imported for .next() on query to work.
+#[allow(unused_imports)]
 use tree_sitter::StreamingIterator;
 
 use crate::code::Code;
@@ -130,8 +133,9 @@ pub enum ASTMappingReason {
     /// identical in type, it implies a "update()" command in the diff script, thus increasing the
     /// cost of the script by 1.
     StructurallyIdenticalAncestor,
-    /// Using RTED it was determined that this is the optimal mapping.
-    RTED,
+    /// Using highly modified Vintsyuk edit distance algorithm it was determined that this is the
+    /// optimal mapping if only Insert, Delete, Update and Identical operations are allowed.
+    OptimalIDU,
 }
 
 /**
@@ -241,10 +245,10 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         let node_id = node.id();
 
         // Check if this node is a reference node
-        if reference_nodes::is_reference_node(node.kind(), language) {
-            if let Some(&subtree_size) = node_to_subtree_size.get(&node_id) {
-                reference_nodes_with_sizes.push((node_id, subtree_size));
-            }
+        if reference_nodes::is_reference_node(node.kind(), language)
+            && let Some(&subtree_size) = node_to_subtree_size.get(&node_id)
+        {
+            reference_nodes_with_sizes.push((node_id, subtree_size));
         }
 
         // Continue traversal - add children to stack
@@ -722,55 +726,6 @@ mod tests {
     }
 
     #[test]
-    fn identical_code_must_always_match() -> Result<()> {
-        let test_codes = test::helper::handmade_test_code()?;
-
-        for (filename, code) in &test_codes {
-            let diff = diff_code(code, code);
-
-            assert!(
-                diff.ast.is_some(),
-                "AST diff should be computed for {}",
-                filename
-            );
-            let diff_ast = diff.ast.unwrap();
-
-            let before_root_id = code.ast.as_ref().unwrap().root_node().id();
-            let after_root_id = code.ast.as_ref().unwrap().root_node().id();
-
-            // Check that root node has IdenticalHash reason
-            let root_mapping = diff_ast
-                .mapping
-                .get(&(before_root_id, after_root_id))
-                .expect("Root node should be mapping");
-            assert_eq!(
-                root_mapping.reason,
-                ASTMappingReason::IdenticalHash,
-                "Root node should have IdenticalHash reason for {}",
-                filename
-            );
-
-            // A fully identical code can never have a cost.
-            assert_eq!(root_mapping.cost, 0);
-
-            // Check that all other nodes have IdenticalHashOfAncestor reason
-            for ((before_id, after_id), mapping) in &diff_ast.mapping {
-                if *before_id != before_root_id || *after_id != after_root_id {
-                    assert_eq!(
-                        mapping.reason,
-                        ASTMappingReason::IdenticalHashOfAncestor,
-                        "Non-root node should have IdenticalHashOfAncestor reason for {}, got {:?}",
-                        filename,
-                        mapping.reason
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    #[test]
     fn diff_hello_world_with_translated_string() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
         let before = test_codes.get("hello-world.rs").unwrap().clone();
@@ -892,6 +847,113 @@ mod tests {
             mapping.cost, COST_UPDATE,
             "String content mapping cost should be COST_UPDATE"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn identical_code_must_always_match() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+
+        for (filename, code) in &test_codes {
+            let diff = diff_code(code, code);
+
+            assert!(
+                diff.ast.is_some(),
+                "AST diff should be computed for {}",
+                filename
+            );
+            let diff_ast = diff.ast.unwrap();
+
+            let before_root_id = code.ast.as_ref().unwrap().root_node().id();
+            let after_root_id = code.ast.as_ref().unwrap().root_node().id();
+
+            // Check that root node has IdenticalHash reason
+            let root_mapping = diff_ast
+                .mapping
+                .get(&(before_root_id, after_root_id))
+                .expect("Root node should be mapping");
+            assert_eq!(
+                root_mapping.reason,
+                ASTMappingReason::IdenticalHash,
+                "Root node should have IdenticalHash reason for {}",
+                filename
+            );
+
+            // A fully identical code can never have a cost.
+            assert_eq!(root_mapping.cost, 0);
+
+            // Check that all other nodes have IdenticalHashOfAncestor reason
+            for ((before_id, after_id), mapping) in &diff_ast.mapping {
+                if *before_id != before_root_id || *after_id != after_root_id {
+                    assert_eq!(
+                        mapping.reason,
+                        ASTMappingReason::IdenticalHashOfAncestor,
+                        "Non-root node should have IdenticalHashOfAncestor reason for {}, got {:?}",
+                        filename,
+                        mapping.reason
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn hello_world_translations_in_all_langauges() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+
+        for (filename, before) in &test_codes {
+            if !filename.starts_with("hello-world") {
+                continue;
+            }
+            let after = test_codes
+                .get(&filename.replace("hello-world", "zdravo-svijete"))
+                .unwrap()
+                .clone();
+
+            let diff = diff_code(before, &after);
+
+            assert!(
+                diff.ast.is_some(),
+                "AST diff should be computed for {}",
+                filename
+            );
+            let diff_ast = diff.ast.unwrap();
+
+            let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+            let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+            // Check that root node has IdenticalHash reason
+            let root_mapping = diff_ast
+                .mapping
+                .get(&(before_root_id, after_root_id))
+                .expect("Root node should be mapping");
+            assert_eq!(
+                root_mapping.reason,
+                ASTMappingReason::StructurallyIdenticalSubtrees,
+                "Root node should have StructurallyIdenticalSubtrees reason for {}",
+                filename
+            );
+
+            // Cost should always be exactly 1, since in all languages it is a simple string
+            // constant update.
+            assert_eq!(root_mapping.cost, 1);
+
+            // Check that all other nodes have IdenticalHashOfAncestor reason
+            for ((before_id, after_id), mapping) in &diff_ast.mapping {
+                if *before_id != before_root_id || *after_id != after_root_id {
+                    assert_eq!(
+                        mapping.reason,
+                        ASTMappingReason::StructurallyIdenticalAncestor,
+                        "Non-root node should have StructurallyIdenticalAncestor reason for {}, got {:?}",
+                        filename,
+                        mapping.reason
+                    );
+                }
+            }
+        }
 
         Ok(())
     }

@@ -1,0 +1,4 @@
+fn main() {
+  println!("Hello, World!");
+  println!("I'm a Rust test case where a line was added!");
+}
