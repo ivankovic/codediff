@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod hash;
+pub mod optimal_iud;
 pub mod reference_nodes;
 
 use anyhow::Result;
@@ -133,8 +134,8 @@ pub enum ASTMappingReason {
     /// identical in type, it implies a "update()" command in the diff script, thus increasing the
     /// cost of the script by 1.
     StructurallyIdenticalAncestor,
-    /// Using highly modified Vintsyuk edit distance algorithm it was determined that this is the
-    /// optimal mapping if only Insert, Delete, Update and Identical operations are allowed.
+    /// Using highly modified edit distance algorithm it was determined that this is the optimal
+    /// mapping if only Insert, Delete, Update and Identical operations are allowed.
     OptimalIDU,
 }
 
@@ -590,8 +591,7 @@ fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut AS
 * avoid it going stale. Please see the code.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
-    // Compute metadata for both before and after code
-    // Use the original code objects that we know have ASTs (checked above)
+    // TODO: Don't compute metadata if it is already computed.
     let before_metadata = compute_metadata(before).unwrap_or_default();
     let after_metadata = compute_metadata(after).unwrap_or_default();
 
@@ -603,6 +603,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
 
     match_identical_trees(before, after, &mut diff);
     match_structurally_identical_trees(before, after, &mut diff);
+    optimal_iud::find(before, after, &mut diff);
 
     Diff { ast: Some(diff) }
 }

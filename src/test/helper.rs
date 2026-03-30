@@ -22,8 +22,24 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use tempfile::tempdir;
+use tree_sitter::Node;
 
 use crate::code::{Code, metadata};
+
+/**
+* Follows path from the root node and returns the resulting node, if the path is valid.
+*
+* The path is a vector of strings. Each string is one of the following:
+*
+* 1) The type of the node, e.g. "expression_statement". If only the type is given, the first child
+*    node matching the type is used for traversal.
+* 2) The type of the node, followed by a number, e.g. "block:3". The n-th child matching the type
+*    is used for traversal. In the case of "block:3", the third block node. Note the 1-indexing
+*    used to make the string easier to read for humans.
+*
+* If the path is invalid, an error is returned.
+*/
+pub fn node_for_path(root: Node, path: Vec<&Str>) -> Result<Node> {}
 
 /**
 * Returns handmade test code as Code objects.
@@ -396,9 +412,71 @@ fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> R
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use crate::code::Language;
 
     use super::*;
+
+    #[test]
+    fn test_node_for_path() -> Result<()> {
+        let test_codes = handmade_test_code()?;
+        let code = test_codes.get("hello-world.rs").unwrap().clone();
+
+        // The hello-world.rs TreeSitter AST has 22 nodes.
+        // It looks like this:
+        //
+        // source_file
+        //   function_item
+        //     fn
+        //     identifier
+        //     parameters
+        //       (
+        //       )
+        //     block
+        //       {
+        //       expression_statement
+        //         macro_invocation
+        //           identifier
+        //           !
+        //           token_tree
+        //             (
+        //             string_literal
+        //               "
+        //               string_content
+        //               "
+        //             )
+        //         ;
+        //       }
+        //
+        //  The code is identical, so the minimal diff script is just empty.
+
+        let ast = code.ast.unwrap();
+
+        // Correct paths
+
+        let mut t = node_for_path(
+            ast.root_node(),
+            vec!["function_item", "block", "expression_statement"],
+        )?;
+        assert_eq!(t.kind(), "expression_statement");
+
+        let mut t = node_for_path(
+            ast.root_node(),
+            vec![
+                "function_item:1",
+                "block:1",
+                "expression_statement",
+                "macro_invocation:1",
+            ],
+        )?;
+        assert_eq!(t.kind(), "macro_invocation");
+
+        // Invalid paths
+        assert!(node_for_path(ast.root_node(), "no such node").is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_path_to_repo_path() -> Result<()> {
