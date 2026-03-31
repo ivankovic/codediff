@@ -20,8 +20,7 @@ use metrohash::MetroHash64;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hasher;
 
-use crate::code::Code;
-use crate::diff::ASTMetadata;
+use crate::code::{Code, ASTMetadata};
 
 /**
 * Compute hashes for the given TreeSitter tree from the given root node.

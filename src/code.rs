@@ -18,8 +18,10 @@
 pub mod language;
 pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
+pub mod hash;
 
 use anyhow::{Result, anyhow};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 /**
@@ -80,6 +82,7 @@ impl Code {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(language.clone()),
+                ast_metadata: None,
             },
             ..Default::default()
         };
@@ -134,6 +137,39 @@ pub struct Metadata {
     pub tip: Option<Type>,
     /// The language.
     pub language: Option<Language>,
+    /// AST metadata including hashes and reference nodes.
+    pub ast_metadata: Option<ASTMetadata>,
+}
+
+/**
+* Metadata about the AST.
+*
+* Note that hashes don't make sense for all nodes. E.g., the semicolon in Rust and C++ will have a
+* leaf node that is repeated dozens or hundreds of times across a file. Those nodes will all have
+* the exact same hash.
+*/
+#[derive(Debug, Clone, Default)]
+pub struct ASTMetadata {
+    /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
+    /// values of the node and it's entire subtree, in order. The nodes are identified by their
+    /// treesitter node id.
+    pub node_to_full_hash: HashMap<usize, u64>,
+    /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node id>.
+    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
+    /// declaration called "i" will hash to the same hash. Therefor, the map is actually going from
+    /// a hash to a set of nodes.
+    pub full_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
+    /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
+    /// changes. The nodes are identified by their treesitter node id.
+    pub node_to_structural_hash: HashMap<usize, u64>,
+    /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node id>
+    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
+    /// declaration will hash to the same structural hash. Therefor, the map value is a set.
+    pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// Set of reference nodes in this tree, ordered by subtree size.
+    pub reference_nodes_ordered: Vec<usize>,
+    // TODO: Add a node-id -> node cache
 }
 
 /**

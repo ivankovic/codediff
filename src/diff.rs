@@ -15,14 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-pub mod hash;
 pub mod optimal_iud;
 pub mod reference_nodes;
 
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use crate::code::Code;
+use crate::code::{Code, ASTMetadata};
 
 pub const COST_INSERT: u64 = 1;
 pub const COST_DELETE: u64 = 1;
@@ -194,36 +193,7 @@ pub enum ASTMappingReason {
     OptimalIDU,
 }
 
-/**
-* Metadata about the AST.
-*
-* Note that hashes don't make sense for all nodes. E.g., the semicolon in Rust and C++ will have a
-* leaf node that is repeated dozens or hundreds of times across a file. Those nodes will all have
-* the exact same hash.
-*/
-#[derive(Debug, Clone, Default)]
-pub struct ASTMetadata {
-    /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
-    /// values of the node and it's entire subtree, in order. The nodes are identified by their
-    /// treesitter node id.
-    pub node_to_full_hash: HashMap<usize, u64>,
-    /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node id>.
-    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration called "i" will hash to the same hash. Therefor, the map is actually going from
-    /// a hash to a set of nodes.
-    pub full_hash_to_node: HashMap<u64, HashSet<usize>>,
-    /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
-    /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
-    /// changes. The nodes are identified by their treesitter node id.
-    pub node_to_structural_hash: HashMap<usize, u64>,
-    /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node id>
-    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration will hash to the same structural hash. Therefor, the map value is a set.
-    pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
-    /// Set of reference nodes in this tree, ordered by subtree size.
-    pub reference_nodes_ordered: Vec<usize>,
-    // TODO: Add a node-id -> node cache
-}
+
 
 /**
 * Compute metadata for the given Code structure.
@@ -234,7 +204,7 @@ pub struct ASTMetadata {
 */
 pub fn compute_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
-    hash::hash_code(code, &mut metadata)?;
+    crate::code::hash::hash_code(code, &mut metadata)?;
     // Discover all reference nodes and order them by subtree size
     discover_reference_nodes(code, &mut metadata)?;
     Ok(metadata)
