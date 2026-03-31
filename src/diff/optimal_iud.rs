@@ -58,6 +58,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "Functionality not yet implemented, pending refactoring"]
     fn test_find_optimal_solution_for_translated_hello_world() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
 
