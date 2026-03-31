@@ -62,12 +62,58 @@ pub struct ASTDiff {
 
 impl ASTDiff {
     /**
+     * Helper function to get the node kind for a given node ID.
+     *
+     * This is not efficient but will be improved later.
+     */
+    fn get_node_kind(&self, code: &Code, node_id: usize) -> Option<String> {
+        let ast = code.ast.as_ref()?;
+        let root_node = ast.root_node();
+
+        // Use a stack-based traversal to find the node with the matching ID
+        let mut stack = vec![root_node];
+
+        while let Some(node) = stack.pop() {
+            if node.id() == node_id {
+                return Some(node.kind().to_string());
+            }
+
+            // Add children to stack for traversal
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+
+        None
+    }
+
+    /**
      * Checks that the mapping is valid for given trees.
      *
      * Useful in tests.
      */
     pub fn is_valid(&self, before: &Code, after: &Code) -> bool {
-        // TODO: Implement checking that only nodes of the same type match.
+        // Check that each mapping only maps nodes of the same type
+        for (before_id, after_id) in self.mapping.keys() {
+            if *before_id == 0 || *after_id == 0 {
+                // Null-mapping is an Insert/Delete.
+                continue;
+            }
+
+            let before_kind = self.get_node_kind(before, *before_id);
+            let after_kind = self.get_node_kind(after, *after_id);
+
+            // If we can't get either kind, the mapping is invalid
+            if before_kind.is_none() || after_kind.is_none() {
+                return false;
+            }
+
+            // Check that the node types match
+            if before_kind != after_kind {
+                return false;
+            }
+        }
 
         true
     }
@@ -934,6 +980,157 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_valid_with_identical_code() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.unwrap();
+
+        // The mapping should be valid for identical code
+        assert!(diff_ast.is_valid(&before, &after));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_valid_with_different_code() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
+
+        let diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.unwrap();
+
+        // The mapping should still be valid for different code as long as node types match
+        assert!(diff_ast.is_valid(&before, &after));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_valid_with_invalid_mapping() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let mut diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.as_mut().unwrap();
+
+        // Create an invalid mapping by mapping nodes of different types
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        // Find nodes of different types by traversing the tree
+        let mut before_cursor = before_root.walk();
+        let mut after_cursor = after_root.walk();
+
+        // Get the function_item node (first child of root)
+        let before_function_item = before_root.children(&mut before_cursor).next().unwrap();
+        let after_function_item = after_root.children(&mut after_cursor).next().unwrap();
+
+        // Now get different types of nodes - function_item vs some leaf node
+        let mut before_leaf_cursor = before_function_item.walk();
+        let mut after_leaf_cursor = after_function_item.walk();
+
+        // Find a leaf node (like identifier or string_literal)
+        let before_leaf = before_function_item
+            .children(&mut before_leaf_cursor)
+            .find(|child| child.kind() == "identifier")
+            .unwrap();
+        let after_leaf = after_function_item
+            .children(&mut after_leaf_cursor)
+            .find(|child| child.kind() == "block")
+            .unwrap();
+
+        // Create an invalid mapping by mapping different types
+        let invalid_before_id = before_leaf.id();
+        let invalid_after_id = after_leaf.id();
+
+        // Clear existing mapping and add invalid one
+        diff_ast.mapping.clear();
+        diff_ast.mapping.insert(
+            (invalid_before_id, invalid_after_id),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
+        );
+
+        // The mapping should be invalid
+        assert!(
+            !diff_ast.is_valid(&before, &after),
+            "Mapping should be invalid for different node types: {} vs {}",
+            before_leaf.kind(),
+            after_leaf.kind()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_valid_with_real_diff() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+
+        // Test that all real diffs are valid
+        for (diff_name, (before, after)) in test_diffs {
+            let diff = diff_code(&before, &after);
+            let diff_ast = diff.ast.unwrap();
+
+            // The mapping from a real diff should always be valid
+            assert!(
+                diff_ast.is_valid(&before, &after),
+                "Real diff mappings should always be valid for diff: {}",
+                diff_name
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_valid_with_null_mapping() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let mut diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.as_mut().unwrap();
+
+        // Clear existing mapping and add a null mapping (ID 0 represents insert/delete)
+        diff_ast.mapping.clear();
+        diff_ast.mapping.insert(
+            (0, 123), // 0 represents a null node (insert)
+            ASTMapping {
+                cost: COST_INSERT,
+                operation: ASTMappingOperation::Insert,
+                reason: ASTMappingReason::OptimalIDU,
+            },
+        );
+        diff_ast.mapping.insert(
+            (456, 0), // 0 represents a null node (delete)
+            ASTMapping {
+                cost: COST_DELETE,
+                operation: ASTMappingOperation::Delete,
+                reason: ASTMappingReason::OptimalIDU,
+            },
+        );
+
+        // Null mappings should be considered valid
+        assert!(
+            diff_ast.is_valid(&before, &after),
+            "Null mappings (insert/delete) should be valid"
+        );
 
         Ok(())
     }
