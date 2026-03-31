@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use anyhow::Result;
+use anyhow::{Result, bail};
 use git2::{Repository, Signature};
 use std::collections::HashMap;
 use std::fs;
@@ -39,7 +39,50 @@ use crate::code::{Code, metadata};
 *
 * If the path is invalid, an error is returned.
 */
-pub fn node_for_path(root: Node, path: Vec<&Str>) -> Result<Node> {}
+pub fn node_for_path<'a>(root: Node<'a>, path: Vec<&str>) -> Result<Node<'a>> {
+    let mut current_node = root;
+
+    for path_segment in path {
+        // Parse the path segment to extract node type and optional index
+        let parts: Vec<&str> = path_segment.split(':').collect();
+        let node_type = parts[0];
+
+        // Determine which child index to use
+        let child_index = if parts.len() > 1 {
+            parts[1]
+                .parse::<usize>()
+                .map_err(|_| anyhow::anyhow!("Invalid index in path segment: {}", path_segment))?
+                - 1 // Convert to 0-indexed
+        } else {
+            0 // Use first matching child
+        };
+
+        // Find the matching child node
+        let mut found_node = None;
+        let mut current_count = 0;
+
+        let mut cursor = current_node.walk();
+        for child in current_node.children(&mut cursor) {
+            if child.kind() == node_type {
+                if current_count == child_index {
+                    found_node = Some(child);
+                    break;
+                }
+                current_count += 1;
+            }
+        }
+
+        match found_node {
+            Some(node) => current_node = node,
+            None => bail!(
+                "Path segment '{}' not found at current position",
+                path_segment
+            ),
+        }
+    }
+
+    Ok(current_node)
+}
 
 /**
 * Returns handmade test code as Code objects.
@@ -455,13 +498,13 @@ mod tests {
 
         // Correct paths
 
-        let mut t = node_for_path(
+        let t = node_for_path(
             ast.root_node(),
             vec!["function_item", "block", "expression_statement"],
         )?;
         assert_eq!(t.kind(), "expression_statement");
 
-        let mut t = node_for_path(
+        let t = node_for_path(
             ast.root_node(),
             vec![
                 "function_item:1",
@@ -473,7 +516,7 @@ mod tests {
         assert_eq!(t.kind(), "macro_invocation");
 
         // Invalid paths
-        assert!(node_for_path(ast.root_node(), "no such node").is_err());
+        assert!(node_for_path(ast.root_node(), vec!["no such node"]).is_err());
 
         Ok(())
     }

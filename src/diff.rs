@@ -22,10 +22,6 @@ pub mod reference_nodes;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 
-//  StreamingIterator has to be imported for .next() on query to work.
-#[allow(unused_imports)]
-use tree_sitter::StreamingIterator;
-
 use crate::code::Code;
 
 pub const COST_INSERT: u64 = 1;
@@ -62,6 +58,19 @@ pub struct ASTDiff {
     pub before_metadata: Option<ASTMetadata>,
     /// Metadata about the after AST, including hashes for all nodes.
     pub after_metadata: Option<ASTMetadata>,
+}
+
+impl ASTDiff {
+    /**
+     * Checks that the mapping is valid for given trees.
+     *
+     * Useful in tests.
+     */
+    pub fn is_valid(&self, before: &Code, after: &Code) -> bool {
+        // TODO: Implement checking that only nodes of the same type match.
+
+        true
+    }
 }
 
 /**
@@ -167,6 +176,7 @@ pub struct ASTMetadata {
     pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
+    // TODO: Add a node-id -> node cache
 }
 
 /**
@@ -760,64 +770,33 @@ mod tests {
         // One mapping is an update, but it still maps.
         assert_eq!(diff_ast.mapping.len(), 22);
 
-        // Use TreeSitter query to find the string_content nodes and verify their mapping
-        let before_tree = before.ast.as_ref().expect("Before code must be parsed");
-        let after_tree = after.ast.as_ref().expect("After code must be parsed");
-        let language = before
-            .metadata
-            .language
-            .as_ref()
-            .expect("Language must be set");
-        let ts_language = crate::code::language::to_treesitter(language)
-            .expect("Failed to get TreeSitter language");
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
 
-        // Create a query to find string_content nodes
-        let query_source = "(string_content) @string_content";
-        let query = tree_sitter::Query::new(&ts_language, query_source)
-            .expect("Failed to create TreeSitter query");
-
-        // Execute query on before tree and collect string_content nodes
-        let mut before_cursor = tree_sitter::QueryCursor::new();
-        let mut before_matches =
-            before_cursor.matches(&query, before_tree.root_node(), before.contents.as_bytes());
-
-        let mut before_string_nodes = Vec::new();
-        while let Some(qmatch) = before_matches.next() {
-            for capture in qmatch.captures {
-                if capture.node.kind() == "string_content" {
-                    before_string_nodes.push(capture);
-                }
-            }
-        }
-
-        // Execute query on after tree and collect string_content nodes
-        let mut after_cursor = tree_sitter::QueryCursor::new();
-        let mut after_matches =
-            after_cursor.matches(&query, after_tree.root_node(), after.contents.as_bytes());
-
-        let mut after_string_nodes = Vec::new();
-        while let Some(qmatch) = after_matches.next() {
-            for capture in qmatch.captures {
-                if capture.node.kind() == "string_content" {
-                    after_string_nodes.push(capture);
-                }
-            }
-        }
-
-        // We should have exactly one string_content node in each tree
-        assert_eq!(
-            before_string_nodes.len(),
-            1,
-            "Should find exactly one string_content node in before tree"
-        );
-        assert_eq!(
-            after_string_nodes.len(),
-            1,
-            "Should find exactly one string_content node in after tree"
-        );
-
-        let before_string_node = &before_string_nodes[0].node;
-        let after_string_node = &after_string_nodes[0].node;
+        let before_string_node = test::helper::node_for_path(
+            before_ast.root_node(),
+            vec![
+                "function_item",
+                "block",
+                "expression_statement",
+                "macro_invocation",
+                "token_tree",
+                "string_literal",
+                "string_content",
+            ],
+        )?;
+        let after_string_node = test::helper::node_for_path(
+            after_ast.root_node(),
+            vec![
+                "function_item",
+                "block",
+                "expression_statement",
+                "macro_invocation",
+                "token_tree",
+                "string_literal",
+                "string_content",
+            ],
+        )?;
 
         // Verify that these nodes are mapped in the diff
         let before_node_id = before_string_node.id();
