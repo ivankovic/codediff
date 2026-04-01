@@ -22,6 +22,29 @@ use std::collections::HashMap;
 
 use crate::code::Code;
 
+/// Build a node cache for a Code object to enable efficient node lookup by ID.
+/// Returns None if the AST is not parsed.
+fn build_node_cache(code: &Code) -> Option<HashMap<usize, tree_sitter::Node<'_>>> {
+    code.ast.as_ref().map(|ast| {
+        let root_node = ast.root_node();
+        let mut cache = HashMap::new();
+        let mut stack = vec![root_node];
+
+        while let Some(node) = stack.pop() {
+            // Cache this node
+            cache.insert(node.id(), node);
+
+            // Add children to stack for traversal
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+
+        cache
+    })
+}
+
 pub const COST_INSERT: u64 = 1;
 pub const COST_DELETE: u64 = 1;
 pub const COST_UPDATE: u64 = 1;
@@ -56,60 +79,47 @@ pub struct ASTDiff {
 
 impl ASTDiff {
     /**
-     * Helper function to get the node kind for a given node ID.
-     *
-     * This is not efficient but will be improved later.
-     */
-    fn get_node_kind(&self, code: &Code, node_id: usize) -> Option<String> {
-        let ast = code.ast.as_ref()?;
-        let root_node = ast.root_node();
-
-        // Use a stack-based traversal to find the node with the matching ID
-        let mut stack = vec![root_node];
-
-        while let Some(node) = stack.pop() {
-            if node.id() == node_id {
-                return Some(node.kind().to_string());
-            }
-
-            // Add children to stack for traversal
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                stack.push(child);
-            }
-        }
-
-        None
-    }
-
-    /**
-     * Helper function to find a node by its ID in the tree.
-     */
-    pub fn find_node_by_id(node: tree_sitter::Node, target_id: usize) -> Option<tree_sitter::Node> {
-        // Use DFS to find the node with the matching ID
-        let mut stack = vec![node];
-
-        while let Some(current_node) = stack.pop() {
-            if current_node.id() == target_id {
-                return Some(current_node);
-            }
-
-            // Add children to stack for traversal
-            let mut cursor = current_node.walk();
-            for child in current_node.children(&mut cursor) {
-                stack.push(child);
-            }
-        }
-
-        None
-    }
-
-    /**
      * Checks that the mapping is valid for given trees.
      *
      * Useful in tests.
      */
-    pub fn is_valid(&self, before: &Code, after: &Code) -> bool {
+    pub fn is_valid(
+        &self,
+        before: &Code,
+        after: &Code,
+        before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+        after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    ) -> bool {
+        // Compute caches if not provided
+        let before_cache_owned = if let Some(_cache) = before_cache {
+            None // Use the provided cache
+        } else {
+            build_node_cache(before) // Compute new cache
+        };
+
+        let after_cache_owned = if let Some(_cache) = after_cache {
+            None // Use the provided cache
+        } else {
+            build_node_cache(after) // Compute new cache
+        };
+
+        // Get references to the caches
+        let before_cache = if let Some(cache) = before_cache {
+            cache
+        } else if let Some(ref cache) = before_cache_owned {
+            cache
+        } else {
+            return false; // Can't validate without cache
+        };
+
+        let after_cache = if let Some(cache) = after_cache {
+            cache
+        } else if let Some(ref cache) = after_cache_owned {
+            cache
+        } else {
+            return false; // Can't validate without cache
+        };
+
         // Check that each mapping only maps nodes of the same type
         for (before_id, after_id) in self.mapping.keys() {
             if *before_id == 0 || *after_id == 0 {
@@ -117,16 +127,19 @@ impl ASTDiff {
                 continue;
             }
 
-            let before_kind = self.get_node_kind(before, *before_id);
-            let after_kind = self.get_node_kind(after, *after_id);
+            // Get nodes from cache - if not found, mapping is invalid
+            let before_node = before_cache.get(before_id);
+            let after_node = after_cache.get(after_id);
 
-            // If we can't get either kind, the mapping is invalid
-            if before_kind.is_none() || after_kind.is_none() {
+            // If we can't get either node, the mapping is invalid
+            if before_node.is_none() || after_node.is_none() {
                 return false;
             }
 
             // Check that the node types match
-            if before_kind != after_kind {
+            let before_node = before_node.unwrap();
+            let after_node = after_node.unwrap();
+            if before_node.kind() != after_node.kind() {
                 return false;
             }
         }
@@ -219,17 +232,29 @@ pub enum ASTMappingReason {
 * the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
 */
-fn match_identical_trees(before: &Code, after: &Code, diff: &mut ASTDiff) {
+fn match_identical_trees(
+    before: &Code,
+    after: &Code,
+    before_cache: &HashMap<usize, tree_sitter::Node>,
+    _after_cache: &HashMap<usize, tree_sitter::Node>,
+    diff: &mut ASTDiff,
+) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
     // Compute metadata if not already available
-    let before_metadata = before.metadata.ast_metadata.as_ref()
+    let before_metadata = before
+        .metadata
+        .ast_metadata
+        .as_ref()
         .cloned()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
-    
-    let after_metadata = after.metadata.ast_metadata.as_ref()
+
+    let after_metadata = after
+        .metadata
+        .ast_metadata
+        .as_ref()
         .cloned()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
@@ -247,9 +272,8 @@ fn match_identical_trees(before: &Code, after: &Code, diff: &mut ASTDiff) {
             continue;
         }
 
-        // Get the node from the AST by finding it in the tree
-        // We need to traverse the tree to find the node with the matching ID
-        let before_node = ASTDiff::find_node_by_id(before_tree.root_node(), before_node_id);
+        // Get the node from the cache
+        let before_node = before_cache.get(&before_node_id).cloned();
         let Some(before_node) = before_node else {
             continue;
         };
@@ -355,17 +379,29 @@ fn match_identical_trees(before: &Code, after: &Code, diff: &mut ASTDiff) {
 * adding both roots and children to the subtree, it checks the value of the node and if the values
 * match, the operation is Identical, but if the values differ the operation is an Update.
 */
-fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut ASTDiff) {
+fn match_structurally_identical_trees(
+    before: &Code,
+    after: &Code,
+    before_cache: &HashMap<usize, tree_sitter::Node>,
+    _after_cache: &HashMap<usize, tree_sitter::Node>,
+    diff: &mut ASTDiff,
+) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
     // Compute metadata if not already available
-    let before_metadata = before.metadata.ast_metadata.as_ref()
+    let before_metadata = before
+        .metadata
+        .ast_metadata
+        .as_ref()
         .cloned()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
-    
-    let after_metadata = after.metadata.ast_metadata.as_ref()
+
+    let after_metadata = after
+        .metadata
+        .ast_metadata
+        .as_ref()
         .cloned()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
@@ -383,8 +419,8 @@ fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut AS
             continue;
         }
 
-        // Get the node from the AST by finding it in the tree
-        let before_node = ASTDiff::find_node_by_id(before_tree.root_node(), before_node_id);
+        // Get the node from the cache
+        let before_node = before_cache.get(&before_node_id).cloned();
         let Some(before_node) = before_node else {
             continue;
         };
@@ -527,14 +563,28 @@ fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut AS
 * avoid it going stale. Please see the code.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
+    // Build node caches for efficient lookup
+    let before_cache = build_node_cache(before);
+    let after_cache = build_node_cache(after);
+
     // Compute metadata fresh for the diff algorithm
     let mut diff = ASTDiff {
         ..Default::default()
     };
 
-    match_identical_trees(before, after, &mut diff);
-    match_structurally_identical_trees(before, after, &mut diff);
-    optimal_iud::find(before, after, &mut diff);
+    // Unwrap caches - they should always be built by now
+    let before_cache = before_cache.expect("Before cache must be built");
+    let after_cache = after_cache.expect("After cache must be built");
+
+    match_identical_trees(before, after, &before_cache, &after_cache, &mut diff);
+    match_structurally_identical_trees(before, after, &before_cache, &after_cache, &mut diff);
+    optimal_iud::find(
+        before,
+        after,
+        Some(&before_cache),
+        Some(&after_cache),
+        &mut diff,
+    );
 
     Diff { ast: Some(diff) }
 }
@@ -869,7 +919,7 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         // The mapping should be valid for identical code
-        assert!(diff_ast.is_valid(&before, &after));
+        assert!(diff_ast.is_valid(&before, &after, None, None));
 
         Ok(())
     }
@@ -884,7 +934,7 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         // The mapping should still be valid for different code as long as node types match
-        assert!(diff_ast.is_valid(&before, &after));
+        assert!(diff_ast.is_valid(&before, &after, None, None));
 
         Ok(())
     }
@@ -944,7 +994,7 @@ mod tests {
 
         // The mapping should be invalid
         assert!(
-            !diff_ast.is_valid(&before, &after),
+            !diff_ast.is_valid(&before, &after, None, None),
             "Mapping should be invalid for different node types: {} vs {}",
             before_leaf.kind(),
             after_leaf.kind()
@@ -964,7 +1014,7 @@ mod tests {
 
             // The mapping from a real diff should always be valid
             assert!(
-                diff_ast.is_valid(&before, &after),
+                diff_ast.is_valid(&before, &after, None, None),
                 "Real diff mappings should always be valid for diff: {}",
                 diff_name
             );
@@ -1003,7 +1053,7 @@ mod tests {
 
         // Null mappings should be considered valid
         assert!(
-            diff_ast.is_valid(&before, &after),
+            diff_ast.is_valid(&before, &after, None, None),
             "Null mappings (insert/delete) should be valid"
         );
 

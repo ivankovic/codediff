@@ -18,6 +18,7 @@
 
 use crate::code::Code;
 use crate::diff::ASTDiff;
+use std::collections::HashMap;
 
 /**
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
@@ -44,7 +45,13 @@ use crate::diff::ASTDiff;
 *    after i-th child of N_b and j-th child of N_a. This means a dynamic programming solution is
 *    possible.
 */
-pub fn find(_before: &Code, _after: &Code, _diff: &mut ASTDiff) {
+pub fn find(
+    _before: &Code,
+    _after: &Code,
+    _before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    _after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    _diff: &mut ASTDiff,
+) {
     // TODO: Implement optimal IUD (Insert, Update, Delete) algorithm
 }
 
@@ -69,7 +76,7 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, &mut diff);
+        find(&before, &after, None, None, &mut diff);
 
         // The trees are almost identical. A complete solution exists.
         assert_eq!(diff.mapping.len(), 22);
