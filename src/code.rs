@@ -15,10 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod hash;
 pub mod language;
 pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
-pub mod hash;
 
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet};
@@ -61,7 +61,7 @@ impl Code {
         if parser.set_language(&ts_language).is_err() {
             return;
         }
-        self.ast = parser.parse(&self.contents, None).into();
+        self.ast = parser.parse(&self.contents, None);
     }
 
     /**

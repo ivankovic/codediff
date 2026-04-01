@@ -18,10 +18,9 @@
 pub mod optimal_iud;
 pub mod reference_nodes;
 
-
 use std::collections::HashMap;
 
-use crate::code::{Code, ASTMetadata};
+use crate::code::{ASTMetadata, Code};
 
 pub const COST_INSERT: u64 = 1;
 pub const COST_DELETE: u64 = 1;
@@ -93,19 +92,19 @@ impl ASTDiff {
     pub fn find_node_by_id(node: tree_sitter::Node, target_id: usize) -> Option<tree_sitter::Node> {
         // Use DFS to find the node with the matching ID
         let mut stack = vec![node];
-        
+
         while let Some(current_node) = stack.pop() {
             if current_node.id() == target_id {
                 return Some(current_node);
             }
-            
+
             // Add children to stack for traversal
             let mut cursor = current_node.walk();
             for child in current_node.children(&mut cursor) {
                 stack.push(child);
             }
         }
-        
+
         None
     }
 
@@ -214,10 +213,6 @@ pub enum ASTMappingReason {
     /// mapping if only Insert, Delete, Update and Identical operations are allowed.
     OptimalIDU,
 }
-
-
-
-
 
 /**
 * Perform size-ordered matching between two AST trees.
