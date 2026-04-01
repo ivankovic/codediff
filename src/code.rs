@@ -65,6 +65,66 @@ impl Code {
     }
 
     /**
+     * Ensure the code is parsed and metadata is computed.
+     *
+     * This function provides a convenient way to ensure that a Code structure has both its AST
+     * parsed and its metadata computed. It follows these steps:
+     *
+     * 1. If the code is already parsed and metadata is set: Do nothing (early return)
+     * 2. If the code is parsed but metadata is not computed: Compute the metadata (especially ASTMetadata)
+     * 3. If the code is not parsed: Parse the code first, then compute metadata
+     *
+     * This is useful when you want to guarantee that all computable metadata is available
+     * without having to manually check and call parse() and metadata computation separately.
+     *
+     * Returns an error if the language is not set in the metadata or if the language is not
+     * supported by tree-sitter.
+     */
+    pub fn ensure_parsed(&mut self) -> Result<()> {
+        // Return error if language is not set
+        let language = match self.metadata.language.as_ref() {
+            Some(lang) => lang,
+            None => return Err(anyhow!("Language must be set to parse code")),
+        };
+
+        // Check if we need to parse
+        let needs_parsing = self.ast.is_none();
+
+        // Check if we need to compute metadata
+        let needs_metadata = self.metadata.ast_metadata.is_none();
+
+        // If nothing needs to be done, return early
+        if !needs_parsing && !needs_metadata {
+            return Ok(());
+        }
+
+        // Parse if needed
+        if needs_parsing {
+            let ts_language = match crate::code::language::to_treesitter(language) {
+                Some(ts_lang) => ts_lang,
+                None => {
+                    return Err(anyhow!(
+                        "Language {} is not supported by tree-sitter",
+                        language
+                    ));
+                }
+            };
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&ts_language).is_err() {
+                return Err(anyhow!("Failed to set tree-sitter language"));
+            }
+            self.ast = parser.parse(&self.contents, None);
+        }
+
+        // Compute metadata if needed (and if we have a valid AST)
+        if needs_metadata && self.ast.is_some() {
+            self.metadata.ast_metadata = Some(crate::code::metadata::compute_ast_metadata(self)?);
+        }
+
+        Ok(())
+    }
+
+    /**
      * Constructs a Code structure from the given string and language.
      *
      * Note that the metadata type will be assumed to be Code. If for some reason you want to use this
@@ -153,7 +213,7 @@ pub struct Metadata {
 * leaf node that is repeated dozens or hundreds of times across a file. Those nodes will all have
 * the exact same hash.
 */
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ASTMetadata {
     /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
     /// values of the node and it's entire subtree, in order. The nodes are identified by their
@@ -387,5 +447,157 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn ensure_parsed_already_parsed_and_metadata_set() -> Result<()> {
+        // Test case 1: Code is already parsed and metadata is set
+        let mut code = Code::from_string("fn main() { println!(\"Hello\"); }", &Language::Rust);
+
+        // Both AST and metadata should already be set by from_string
+        assert!(code.ast.is_some());
+        assert!(code.metadata.ast_metadata.is_some());
+
+        // Store original metadata for comparison
+        let original_metadata = code.metadata.ast_metadata.clone();
+
+        // Call ensure_parsed - should do nothing and return Ok
+        code.ensure_parsed()?;
+
+        // Verify nothing changed (AST should still be Some, metadata should be unchanged)
+        assert!(code.ast.is_some());
+        assert_eq!(code.metadata.ast_metadata, original_metadata);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ensure_parsed_parsed_but_no_metadata() -> Result<()> {
+        // Test case 2: Code is parsed but metadata is not computed
+        let mut code = Code {
+            contents: "fn main() { println!(\"Hello\"); }".to_string(),
+            metadata: Metadata {
+                path: None,
+                tip: Some(Type::Code("Code".to_string())),
+                language: Some(Language::Rust),
+                ast_metadata: None, // Metadata not set
+            },
+            ..Default::default()
+        };
+
+        // Parse the code manually
+        let mut parser = tree_sitter::Parser::new();
+        code.parse(&mut parser);
+
+        // AST should be set, but metadata should not be
+        assert!(code.ast.is_some());
+        assert!(code.metadata.ast_metadata.is_none());
+
+        // Call ensure_parsed - should compute metadata
+        code.ensure_parsed()?;
+
+        // Verify AST is still set and metadata is now computed
+        assert!(code.ast.is_some());
+        assert!(code.metadata.ast_metadata.is_some());
+
+        let metadata = code.metadata.ast_metadata.as_ref().unwrap();
+        assert!(!metadata.node_to_full_hash.is_empty());
+        assert!(!metadata.node_to_structural_hash.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ensure_parsed_not_parsed() -> Result<()> {
+        // Test case 3: Code is not parsed at all
+        let mut code = Code {
+            contents: "fn main() { println!(\"Hello\"); }".to_string(),
+            metadata: Metadata {
+                path: None,
+                tip: Some(Type::Code("Code".to_string())),
+                language: Some(Language::Rust),
+                ast_metadata: None,
+            },
+            ..Default::default()
+        };
+
+        // Neither AST nor metadata should be set
+        assert!(code.ast.is_none());
+        assert!(code.metadata.ast_metadata.is_none());
+
+        // Call ensure_parsed - should parse and compute metadata
+        code.ensure_parsed()?;
+
+        // Verify both AST and metadata are now set
+        assert!(code.ast.is_some());
+        assert!(code.metadata.ast_metadata.is_some());
+
+        let metadata = code.metadata.ast_metadata.as_ref().unwrap();
+        assert!(!metadata.node_to_full_hash.is_empty());
+        assert!(!metadata.node_to_structural_hash.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ensure_parsed_no_language() {
+        // Test case 4: Code has no language set - should return error
+        let mut code = Code {
+            contents: "fn main() { println!(\"Hello\"); }".to_string(),
+            metadata: Metadata {
+                path: None,
+                tip: Some(Type::Code("Code".to_string())),
+                language: None, // No language set
+                ast_metadata: None,
+            },
+            ..Default::default()
+        };
+
+        // Call ensure_parsed - should return error
+        let result = code.ensure_parsed();
+
+        // Verify it returns an error
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Language must be set")
+        );
+
+        // Verify nothing changed
+        assert!(code.ast.is_none());
+        assert!(code.metadata.ast_metadata.is_none());
+    }
+
+    #[test]
+    fn ensure_parsed_unsupported_language() {
+        // Test case 5: Code has unsupported language - should return error
+        let mut code = Code {
+            contents: "fn main() { println!(\"Hello\"); }".to_string(),
+            metadata: Metadata {
+                path: None,
+                tip: Some(Type::Code("Code".to_string())),
+                language: Some(Language::Bazel), // Bazel is not supported by tree-sitter
+                ast_metadata: None,
+            },
+            ..Default::default()
+        };
+
+        // Call ensure_parsed - should return error for unsupported language
+        let result = code.ensure_parsed();
+
+        // Verify it returns an error
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("not supported by tree-sitter")
+        );
+
+        // Verify nothing changed
+        assert!(code.ast.is_none());
+        assert!(code.metadata.ast_metadata.is_none());
     }
 }
