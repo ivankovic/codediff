@@ -91,6 +91,11 @@ impl Code {
         let mut parser = tree_sitter::Parser::new();
         code.parse(&mut parser);
 
+        // Compute AST metadata
+        if let Ok(ast_metadata) = crate::code::metadata::compute_ast_metadata(&code) {
+            code.metadata.ast_metadata = Some(ast_metadata);
+        }
+
         code
     }
 
@@ -300,6 +305,86 @@ mod tests {
         hello_world.parse(&mut parser);
 
         assert!(hello_world.ast.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ast_metadata_computed_in_from_string() {
+        let code = Code::from_string("fn main() { println!(\"Hello, World\"); }", &Language::Rust);
+
+        assert!(code.metadata.ast_metadata.is_some());
+
+        let ast_metadata = code.metadata.ast_metadata.as_ref().unwrap();
+        assert!(!ast_metadata.node_to_full_hash.is_empty());
+        assert!(!ast_metadata.full_hash_to_node.is_empty());
+        assert!(!ast_metadata.node_to_structural_hash.is_empty());
+        assert!(!ast_metadata.structural_hash_to_node.is_empty());
+    }
+
+    #[test]
+    fn ast_metadata_computed_in_from_file() -> Result<()> {
+        let paths = helper::handmade_test_code_as_paths()?;
+        let hello_world_path = paths
+            .get("hello-world.rs")
+            .expect("hello-world.rs should exist in test data");
+
+        let code = Code::from_file(hello_world_path)?;
+
+        assert!(code.metadata.ast_metadata.is_some());
+
+        let ast_metadata = code.metadata.ast_metadata.as_ref().unwrap();
+        assert!(!ast_metadata.node_to_full_hash.is_empty());
+        assert!(!ast_metadata.full_hash_to_node.is_empty());
+        assert!(!ast_metadata.node_to_structural_hash.is_empty());
+        assert!(!ast_metadata.structural_hash_to_node.is_empty());
+
+        // Test that reference nodes are discovered and ordered
+        assert!(!ast_metadata.reference_nodes_ordered.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ast_metadata_consistency() -> Result<()> {
+        let paths = helper::handmade_test_code_as_paths()?;
+        let hello_world_path = paths
+            .get("hello-world.rs")
+            .expect("hello-world.rs should exist in test data");
+
+        // Read the file content
+        let content = std::fs::read_to_string(hello_world_path)?;
+
+        // Create code from file
+        let code_from_file = Code::from_file(hello_world_path)?;
+
+        // Create code from string
+        let code_from_string = Code::from_string(&content, &Language::Rust);
+
+        // Both should have AST metadata
+        assert!(code_from_file.metadata.ast_metadata.is_some());
+        assert!(code_from_string.metadata.ast_metadata.is_some());
+
+        let metadata_from_file = code_from_file.metadata.ast_metadata.as_ref().unwrap();
+        let metadata_from_string = code_from_string.metadata.ast_metadata.as_ref().unwrap();
+
+        // The metadata should be identical (same content, same language)
+        assert_eq!(
+            metadata_from_file.node_to_full_hash.len(),
+            metadata_from_string.node_to_full_hash.len()
+        );
+        assert_eq!(
+            metadata_from_file.full_hash_to_node.len(),
+            metadata_from_string.full_hash_to_node.len()
+        );
+        assert_eq!(
+            metadata_from_file.node_to_structural_hash.len(),
+            metadata_from_string.node_to_structural_hash.len()
+        );
+        assert_eq!(
+            metadata_from_file.structural_hash_to_node.len(),
+            metadata_from_string.structural_hash_to_node.len()
+        );
 
         Ok(())
     }

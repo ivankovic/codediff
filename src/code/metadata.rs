@@ -160,4 +160,30 @@ mod tests {
         assert!(m.tip.is_some());
         assert!(m.language.is_some());
     }
+
+    #[test]
+    fn compute_ast_metadata_works() -> Result<()> {
+        use crate::test::helper;
+        
+        let codes = helper::handmade_test_code()?;
+        let code = codes.get("hello-world.rs").expect("hello-world.rs should exist");
+        
+        let ast_metadata = compute_ast_metadata(code)?;
+        
+        // Test that all metadata fields are populated
+        assert!(!ast_metadata.node_to_full_hash.is_empty());
+        assert!(!ast_metadata.full_hash_to_node.is_empty());
+        assert!(!ast_metadata.node_to_structural_hash.is_empty());
+        assert!(!ast_metadata.structural_hash_to_node.is_empty());
+        assert!(!ast_metadata.reference_nodes_ordered.is_empty());
+        
+        // Test that the reference nodes are actually ordered by size (descending)
+        // We can't test the exact ordering without knowing the tree structure,
+        // but we can test that it's not empty and contains valid node IDs
+        for &node_id in &ast_metadata.reference_nodes_ordered {
+            assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
+        }
+        
+        Ok(())
+    }
 }
