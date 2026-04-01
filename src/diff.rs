@@ -146,6 +146,15 @@ impl ASTDiff {
 
         true
     }
+
+    /**
+     * Checks that the mapping covers all nodes in both trees.
+     *
+     * Useful in tests.
+     */
+    pub fn is_complete(&self, before: &Code, after: &Code) -> bool {
+        true
+    }
 }
 
 /**

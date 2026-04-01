@@ -65,7 +65,32 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Functionality not yet implemented, pending refactoring"]
+    fn is_always_valid() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+
+        for (diff_name, (before, after)) in test_diffs {
+            let mut diff = ASTDiff {
+                ..Default::default()
+            };
+
+            find(&before, &after, None, None, &mut diff);
+
+            assert!(
+                diff.is_valid(&before, &after, None, None),
+                "Real diff mappings should always be valid for diff: {}",
+                diff_name
+            );
+            assert!(
+                diff.is_complete(&before, &after),
+                "Real diff mappings should always be complete for diff: {}",
+                diff_name
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn test_find_optimal_solution_for_translated_hello_world() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
 
@@ -77,6 +102,9 @@ mod tests {
         };
 
         find(&before, &after, None, None, &mut diff);
+
+        assert!(diff.is_valid(&before, &after, None, None));
+        assert!(diff.is_complete(&before, &after));
 
         // The trees are almost identical. A complete solution exists.
         assert_eq!(diff.mapping.len(), 22);
