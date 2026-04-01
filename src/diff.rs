@@ -20,7 +20,7 @@ pub mod reference_nodes;
 
 use std::collections::HashMap;
 
-use crate::code::{ASTMetadata, Code};
+use crate::code::Code;
 
 pub const COST_INSERT: u64 = 1;
 pub const COST_DELETE: u64 = 1;
@@ -52,10 +52,6 @@ pub struct Diff {
 pub struct ASTDiff {
     /// Map of AST nodes from the before AST to the after AST.
     pub mapping: HashMap<(usize, usize), ASTMapping>,
-    /// Metadata about the before AST, including hashes for all nodes.
-    pub before_metadata: Option<ASTMetadata>,
-    /// Metadata about the after AST, including hashes for all nodes.
-    pub after_metadata: Option<ASTMetadata>,
 }
 
 impl ASTDiff {
@@ -228,14 +224,14 @@ fn match_identical_trees(before: &Code, after: &Code, diff: &mut ASTDiff) {
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
-    let before_metadata = diff
-        .before_metadata
-        .as_ref()
-        .expect("Before metadata must be computed");
-    let after_metadata = diff
-        .after_metadata
-        .as_ref()
-        .expect("After metadata must be computed");
+    // Compute metadata if not already available
+    let before_metadata = before.metadata.ast_metadata.as_ref()
+        .cloned()
+        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
+    
+    let after_metadata = after.metadata.ast_metadata.as_ref()
+        .cloned()
+        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
     let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
@@ -364,14 +360,14 @@ fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut AS
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
-    let before_metadata = diff
-        .before_metadata
-        .as_ref()
-        .expect("Before metadata must be computed");
-    let after_metadata = diff
-        .after_metadata
-        .as_ref()
-        .expect("After metadata must be computed");
+    // Compute metadata if not already available
+    let before_metadata = before.metadata.ast_metadata.as_ref()
+        .cloned()
+        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
+    
+    let after_metadata = after.metadata.ast_metadata.as_ref()
+        .cloned()
+        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
     let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
@@ -532,13 +528,7 @@ fn match_structurally_identical_trees(before: &Code, after: &Code, diff: &mut AS
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
     // Compute metadata fresh for the diff algorithm
-    // We can't use pre-computed metadata because node IDs are not stable across parses
-    let before_metadata = crate::code::metadata::compute_ast_metadata(before).unwrap_or_default();
-    let after_metadata = crate::code::metadata::compute_ast_metadata(after).unwrap_or_default();
-
     let mut diff = ASTDiff {
-        before_metadata: Some(before_metadata.clone()),
-        after_metadata: Some(after_metadata.clone()),
         ..Default::default()
     };
 

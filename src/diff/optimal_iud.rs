@@ -65,12 +65,7 @@ mod tests {
         let before = test_codes.get("hello-world.rs").unwrap().clone();
         let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
 
-        let before_metadata = crate::code::metadata::compute_ast_metadata(&before).unwrap_or_default();
-        let after_metadata = crate::code::metadata::compute_ast_metadata(&after).unwrap_or_default();
-
         let mut diff = ASTDiff {
-            before_metadata: Some(before_metadata.clone()),
-            after_metadata: Some(after_metadata.clone()),
             ..Default::default()
         };
 
