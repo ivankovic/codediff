@@ -144,6 +144,8 @@ impl ASTDiff {
             }
         }
 
+        // TODO: Check that the cost of the root nodes is the same both before and after.
+
         true
     }
 
@@ -153,6 +155,7 @@ impl ASTDiff {
      * Useful in tests.
      */
     pub fn is_complete(&self, before: &Code, after: &Code) -> bool {
+        // TODO: We need to add a map (node_id) -> mapping to be able to implement this efficiently
         true
     }
 }

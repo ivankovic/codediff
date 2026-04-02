@@ -57,7 +57,7 @@ pub fn find(
 
 #[cfg(test)]
 mod tests {
-    use crate::test;
+    use crate::{diff::COST_INSERT, test};
     use anyhow::Result;
 
     use crate::diff::COST_UPDATE;
@@ -91,7 +91,52 @@ mod tests {
     }
 
     #[test]
-    fn test_find_optimal_solution_for_translated_hello_world() -> Result<()> {
+    fn hello_world_added_message() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        find(&before, &after, None, None, &mut diff);
+
+        assert!(
+            diff.is_valid(&before, &after, None, None),
+            "Real diff mappings should always be valid"
+        );
+        assert!(
+            diff.is_complete(&before, &after),
+            "Real diff mappings should always be complete"
+        );
+
+        let before_ast = before.ast.unwrap();
+
+        let added_expression_node = test::helper::node_for_path(
+            before_ast.root_node(),
+            vec!["function_item", "block", "expression_statement:2"],
+        )?;
+
+        let added_expression_node_mapping = diff.mapping.get(&(0, added_expression_node.id()));
+        assert!(
+            added_expression_node_mapping.is_some(),
+            "The node that represents the added line is not mapped as an added node"
+        );
+        let added_expression_node_mapping = added_expression_node_mapping.unwrap();
+
+        // The cost should be COST_UPDATE (1)
+        assert_eq!(
+            // There are 10 nodes in the subtree + the node itself for 11.
+            added_expression_node_mapping.cost,
+            COST_INSERT * 11,
+            "String content mapping cost should be COST_UPDATE"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn translated_hello_world() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
 
         let before = test_codes.get("hello-world.rs").unwrap().clone();
