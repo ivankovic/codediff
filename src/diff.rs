@@ -144,8 +144,6 @@ impl ASTDiff {
             }
         }
 
-        // TODO: Check that the cost of the root nodes is the same both before and after.
-
         true
     }
 
