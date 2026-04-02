@@ -153,7 +153,48 @@ impl ASTDiff {
      * Useful in tests.
      */
     pub fn is_complete(&self, before: &Code, after: &Code) -> bool {
-        // TODO: We need to add a map (node_id) -> mapping to be able to implement this efficiently
+        // Build node caches for efficient lookup
+        let before_cache = build_node_cache(before);
+        let after_cache = build_node_cache(after);
+
+        let Some(before_cache) = before_cache else {
+            return false;
+        };
+        let Some(after_cache) = after_cache else {
+            return false;
+        };
+
+        // Create sets of all nodes seen in mappings
+        let mut seen_before_nodes = HashMap::new();
+        let mut seen_after_nodes = HashMap::new();
+
+        for ((before_id, after_id), mapping) in &self.mapping {
+            seen_before_nodes.insert(before_id, mapping);
+            seen_after_nodes.insert(after_id, mapping);
+        }
+
+        // Check that all nodes in before tree are covered
+        for node_id in before_cache.keys() {
+            if !seen_before_nodes.contains_key(node_id) {
+                // Check if this is a root node that might not need mapping
+                if node_id == &before.ast.as_ref().unwrap().root_node().id() {
+                    continue;
+                }
+                return false;
+            }
+        }
+
+        // Check that all nodes in after tree are covered
+        for node_id in after_cache.keys() {
+            if !seen_after_nodes.contains_key(node_id) {
+                // Check if this is a root node that might not need mapping
+                if node_id == &after.ast.as_ref().unwrap().root_node().id() {
+                    continue;
+                }
+                return false;
+            }
+        }
+
         true
     }
 }
@@ -825,6 +866,17 @@ mod tests {
                 filename
             );
             let diff_ast = diff.ast.unwrap();
+
+            assert!(
+                diff_ast.is_valid(code, code, None, None),
+                "Identical code must always produce a valid diff: {}",
+                filename
+            );
+            assert!(
+                diff_ast.is_complete(code, code),
+                "Identical code must always produce a complete diff: {}",
+                filename
+            );
 
             let before_root_id = code.ast.as_ref().unwrap().root_node().id();
             let after_root_id = code.ast.as_ref().unwrap().root_node().id();
