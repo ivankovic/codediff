@@ -75,9 +75,26 @@ pub struct Diff {
 pub struct ASTDiff {
     /// Map of AST nodes from the before AST to the after AST.
     pub mapping: HashMap<(usize, usize), ASTMapping>,
+    /// Map of nodes from the before tree to the after tree, or 0 if it is a delete.
+    /// Useful if you are walking the before tree and need to look up the mapping.
+    pub before_node_map: HashMap<usize, usize>,
+    /// Map of nodes from the after tree to the before tree, or 0 if it is an insert.
+    /// Useful if you are walking the after tree and need to look up the mapping.
+    pub after_node_map: HashMap<usize, usize>,
 }
 
 impl ASTDiff {
+    /**
+     * Add a mapping between two nodes to the diff.
+     *
+     * Note that either id can be zero. Zero is used for insert or delete.
+     */
+    pub fn add_mapping(&mut self, before_id: usize, after_id: usize, mapping: ASTMapping) {
+        self.mapping.insert((before_id, after_id), mapping);
+        self.before_node_map.insert(before_id, after_id);
+        self.after_node_map.insert(after_id, before_id);
+    }
+
     /**
      * Checks that the mapping is valid for given trees.
      *
@@ -213,7 +230,7 @@ pub struct ASTMapping {
     /// The cost strategy is dynamic, but a common cost strategy is unit cost (1) for delete,
     /// insert and update and a free (0 cost) move.
     pub cost: u64,
-    /// What operation has to be done to make this mapping valid?
+    /// What operation has to be done to the root nodes to make this mapping valid?
     pub operation: ASTMappingOperation,
     /// Why were the two subtrees mapping together?
     pub reason: ASTMappingReason,
@@ -362,8 +379,9 @@ fn match_identical_trees(
                     let after_node_id = matching_after_node.id();
 
                     // Add this mapping
-                    diff.mapping.insert(
-                        (before_node_id, after_node_id),
+                    diff.add_mapping(
+                        before_node_id,
+                        after_node_id,
                         ASTMapping {
                             cost: 0,
                             operation: ASTMappingOperation::Identical,
@@ -397,8 +415,9 @@ fn match_identical_trees(
                                     .iter()
                                     .any(|((child_id, _), _)| *child_id == before_child_id)
                                 {
-                                    diff.mapping.insert(
-                                        (before_child_id, after_child_id),
+                                    diff.add_mapping(
+                                        before_child_id,
+                                        after_child_id,
                                         ASTMapping {
                                             cost: 0,
                                             operation: ASTMappingOperation::Identical,
@@ -526,8 +545,9 @@ fn match_structurally_identical_trees(
                     };
 
                     // Add this mapping
-                    diff.mapping.insert(
-                        (before_node_id, after_node_id),
+                    diff.add_mapping(
+                        before_node_id,
+                        after_node_id,
                         ASTMapping {
                             cost: if operation == ASTMappingOperation::Identical {
                                 0
@@ -580,8 +600,9 @@ fn match_structurally_identical_trees(
                                         ASTMappingOperation::Update
                                     };
 
-                                    diff.mapping.insert(
-                                        (before_child_id, after_child_id),
+                                    diff.add_mapping(
+                                        before_child_id,
+                                        after_child_id,
                                         ASTMapping {
                                             cost: if child_operation
                                                 == ASTMappingOperation::Identical
@@ -1096,16 +1117,18 @@ mod tests {
 
         // Clear existing mapping and add a null mapping (ID 0 represents insert/delete)
         diff_ast.mapping.clear();
-        diff_ast.mapping.insert(
-            (0, 123), // 0 represents a null node (insert)
+        diff_ast.add_mapping(
+            0,
+            123, // 0 represents a null node (insert)
             ASTMapping {
                 cost: COST_INSERT,
                 operation: ASTMappingOperation::Insert,
                 reason: ASTMappingReason::OptimalIDU,
             },
         );
-        diff_ast.mapping.insert(
-            (456, 0), // 0 represents a null node (delete)
+        diff_ast.add_mapping(
+            456,
+            0, // 0 represents a null node (delete)
             ASTMapping {
                 cost: COST_DELETE,
                 operation: ASTMappingOperation::Delete,
@@ -1118,6 +1141,78 @@ mod tests {
             diff_ast.is_valid(&before, &after, None, None),
             "Null mappings (insert/delete) should be valid"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_mapping_updates_all_maps() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        // Add a mapping using the new method
+        diff.add_mapping(
+            before_root_id,
+            after_root_id,
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
+        );
+
+        // Verify that all maps were updated correctly
+        assert_eq!(diff.mapping.len(), 1);
+        assert_eq!(diff.before_node_map.len(), 1);
+        assert_eq!(diff.after_node_map.len(), 1);
+
+        // Check that the main mapping contains the correct entry
+        assert!(diff.mapping.contains_key(&(before_root_id, after_root_id)));
+
+        // Check that before_node_map contains the correct mapping
+        assert_eq!(
+            diff.before_node_map.get(&before_root_id),
+            Some(&after_root_id)
+        );
+
+        // Check that after_node_map contains the correct mapping
+        assert_eq!(
+            diff.after_node_map.get(&after_root_id),
+            Some(&before_root_id)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_diff_populates_all_maps() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.unwrap();
+
+        // All maps should have the same number of entries
+        assert_eq!(diff_ast.mapping.len(), diff_ast.before_node_map.len());
+        assert_eq!(diff_ast.mapping.len(), diff_ast.after_node_map.len());
+
+        // For identical code, we should have a complete mapping
+        assert!(diff_ast.mapping.len() > 0);
+
+        // Verify that the maps are consistent
+        for ((before_id, after_id), _mapping) in &diff_ast.mapping {
+            assert_eq!(diff_ast.before_node_map.get(before_id), Some(after_id));
+            assert_eq!(diff_ast.after_node_map.get(after_id), Some(before_id));
+        }
 
         Ok(())
     }
