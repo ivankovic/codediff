@@ -263,6 +263,7 @@ mod tests {
             "Real diff mappings should always be complete"
         );
 
+        let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
 
         let added_if_node = test::helper::node_for_path(
@@ -283,8 +284,30 @@ mod tests {
             "String content mapping cost should be COST_UPDATE"
         );
 
-        // TODO: For this check, we need a way to look up node->mapping.
-        // let indented_existing_node = before.ast.unwrap();
+        let existing_expression_node = test::helper::node_for_path(
+            before_ast.root_node(),
+            vec!["if_statement", "block", "expression_statement:4"],
+        )?;
+
+        let expression_node_in_after_id = diff
+            .before_node_map
+            .get(&existing_expression_node.id())
+            .expect("The indented expression is not found in the diff");
+
+        let existing_expression_node_mapping = diff
+            .mapping
+            .get(&(existing_expression_node.id(), *expression_node_in_after_id));
+
+        assert!(
+            existing_expression_node_mapping.is_some(),
+            "The node that represents the newly conditioned line is not in the diff"
+        );
+        let existing_expression_node_mapping = existing_expression_node_mapping.unwrap();
+
+        assert_eq!(
+            existing_expression_node_mapping.cost, 0,
+            "The existing expression should have cost 0"
+        );
 
         Ok(())
     }
