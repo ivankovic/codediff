@@ -24,26 +24,8 @@ use std::collections::HashMap;
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
 * but only using Insert, Delete and Update operations.
 *
-* Insert, Delete and Update operations do not cross across subtrees. This allows the problem to be
-* decomposed into subproblems and solved independently. In comparison, the Move operation can move
-* a node anywhere in the tree and so it prevents the solution for the entire AST to be decomposed
-* in smaller subtrees.
-*
-* In this doccomment, N_b and N_a refer to a node in the before tree and node in the after tree
-* respectively. Child_b_i refers to the i-th child node of the node in the before tree
-* (N_b), and Child_a_j the j-th child node of the node in the after tree (N_a).
-*
-* The optimal algorithm uses the following observations.
-*
-* 1) Solution for (N_b, N_a) exists only if N_b and N_a have the same kind. Otherwise, the cost is
-*    infinite because the solution is impossible.
-* 2) If the nodes N_b and N_a have a value, if their values match then the cost of solving (N_b,
-*    N_a) is a combination of solutions for their children. If the values differ, the solution is a
-*    combination of children solutions plus the unit cost of an update.
-* 3) Because AST nodes are ordered, solution for Child_b_i and Child_a_j will depend on solutions
-*    for Child_b_0 to Child_b_(i-1) and Child_a_0 to Child_a_(j-1) but will not depend on nodes
-*    after i-th child of N_b and j-th child of N_a. This means a dynamic programming solution is
-*    possible.
+* The algorithm is pretty complex. The recommended way to understand it is to start by reading the
+* tests.
 */
 pub fn find(
     _before: &Code,
@@ -127,8 +109,9 @@ mod tests {
         );
         let added_expression_node_mapping = added_expression_node_mapping.unwrap();
 
+        // The added line has 11 nodes, starting with an expression_statement as the root of the
+        // subtree.
         assert_eq!(
-            // There are 10 nodes in the subtree + the node itself for 11.
             added_expression_node_mapping.cost,
             COST_INSERT * 11,
             "String content mapping cost should be COST_UPDATE"
@@ -174,7 +157,6 @@ mod tests {
         let deleted_expression_node_mapping = deleted_expression_node_mapping.unwrap();
 
         assert_eq!(
-            // There are 10 nodes in the subtree + the node itself for 11.
             deleted_expression_node_mapping.cost,
             COST_DELETE * 11,
             "String content mapping cost should be COST_UPDATE"
@@ -281,7 +263,7 @@ mod tests {
         assert_eq!(
             added_if_node_mapping.cost,
             COST_INSERT * 13,
-            "String content mapping cost should be COST_UPDATE"
+            "Adding an if should add 13 nodes total."
         );
 
         let existing_expression_node = test::helper::node_for_path(
@@ -301,6 +283,77 @@ mod tests {
         assert!(
             existing_expression_node_mapping.is_some(),
             "The node that represents the newly conditioned line is not in the diff"
+        );
+        let existing_expression_node_mapping = existing_expression_node_mapping.unwrap();
+
+        assert_eq!(
+            existing_expression_node_mapping.cost, 0,
+            "The existing expression should have cost 0"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn python_leetcode_1_added_if_block_reverse() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+
+        // Note that we do a sneaky and flip (before, after) to get a delete instead of an add.
+        let (after, before) = test_diffs.get("python-added-if-block").unwrap().clone();
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        find(&before, &after, None, None, &mut diff);
+
+        assert!(
+            diff.is_valid(&before, &after, None, None),
+            "Real diff mappings should always be valid"
+        );
+        assert!(
+            diff.is_complete(&before, &after),
+            "Real diff mappings should always be complete"
+        );
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let deleted_if_node = test::helper::node_for_path(
+            after_ast.root_node(),
+            vec!["if_statement", "block", "if_statement"],
+        )?;
+
+        let deleted_if_node_mapping = diff.mapping.get(&(0, deleted_if_node.id()));
+        assert!(
+            deleted_if_node_mapping.is_some(),
+            "The node that represents the deleted if statement is not mapped as an deleted node"
+        );
+        let deleted_if_node_mapping = deleted_if_node_mapping.unwrap();
+
+        assert_eq!(
+            deleted_if_node_mapping.cost,
+            COST_DELETE * 13,
+            "Deleting the if deletes 13 nodes."
+        );
+
+        let existing_expression_node = test::helper::node_for_path(
+            before_ast.root_node(),
+            vec!["if_statement", "block", "expression_statement:4"],
+        )?;
+
+        let expression_node_in_after_id = diff
+            .before_node_map
+            .get(&existing_expression_node.id())
+            .expect("The un-indented expression is not found in the diff");
+
+        let existing_expression_node_mapping = diff
+            .mapping
+            .get(&(existing_expression_node.id(), *expression_node_in_after_id));
+
+        assert!(
+            existing_expression_node_mapping.is_some(),
+            "The node that represents the newly un-conditioned line is not in the diff"
         );
         let existing_expression_node_mapping = existing_expression_node_mapping.unwrap();
 
@@ -369,7 +422,7 @@ mod tests {
         );
         let mapping = mapping.unwrap();
 
-        // The cost should be COST_UPDATE (1)
+        // The cost should be COST_UPDATE (1), since only the string constant value has changed.
         assert_eq!(
             mapping.cost, COST_UPDATE,
             "String content mapping cost should be COST_UPDATE"
