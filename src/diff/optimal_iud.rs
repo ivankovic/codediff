@@ -22,10 +22,51 @@ use std::collections::HashMap;
 
 /**
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
-* but only using Insert, Delete and Update operations.
+* but only using Insert, Delete and Update operations, and the "null operation" Identical that simply
+* matches indentical nodes.
 *
-* The algorithm is pretty complex. The recommended way to understand it is to start by reading the
-* tests.
+* The algorithm is complex and depends on many observations that seem disconnected at first.
+*
+* There are limits to operations:
+*
+* 1) Update operations are only possible on leaf nodes of the same kind.
+* 2) Identical operation is only permitted on leaf nodes that have the same kind and value.
+* 3) Identical operation is only permitted on intermediate nodes that have the same kind.
+*
+* The nodes in the AST are ordered. The subtrees of the AST are also ordered by using the ordering
+* of their nodes. For nodes in different subtrees, we order them based on their ancestors, all the
+* way to the root node if necessary.
+*
+* The solutions for distinct subtrees X and Y are always independent. This is because there is no
+* set of operations that can cross independent subtrees. This is crucial because it allows us to
+* decompose the problem, but it is also the reason why the Move operation cannot be allowed since
+* it would break this requirement by allowing a subtree of X to move to Y.
+*
+* However, the diff can already contain Move operations, so the algorithm has to be robust to
+* existence of Move operations, even if it is not allowed to add new ones.
+*
+* This leads to the following function: Cost([B], [A]) where [B] and [A] are lists of nodes in
+* before and after, respectively. These nodes are the root nodes of their respective subtrees.
+*
+* Cost([B], [A]) = minimum between the following 4 choices, corresponding to the Identical, Update,
+* Delete and Insert operations:
+*
+* 1. If the first node in [B] has the same kind and value as [A], map them as identical and
+*    recursively call Cost([B] - first([B]), [A] - first([A])) plus add the
+*    Cost(children(first[B])), children(first([A])).
+* 2. If the first node in [B] has the same kind but NOT value as [A], map them as identical and
+*    recursively call Cost([B] - first([B]), [A] - first([A])) plus add the
+*    Cost(children(first[B])), children(first([A])) plus one COST_UPDATE.
+* 3. For each node in [A], called [A_i], compute the cost of deleting first([B]) as if it's children
+*    were nodes [A_0] to [A_i], not including [A_i]. Note that "no nodes" is the valid first
+*    choice. For a given i, the cost is COST_DELETE plus Cost(children(first([B])), [A_0 to A_i]) +
+*    Cost([B] - first([B]), [A_i to end]). Try for all values of i and keep the smallest result.
+* 4. Similar to 3, but in [B] and using COST_INSERT to find the optimal insert operation for the
+*    first node in [A].
+*
+* To reconstruct the actual operations, for each Cost([B], [A]), we need to keep the information on
+* what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
+* optimal index for the operation.
 */
 pub fn find(
     _before: &Code,
