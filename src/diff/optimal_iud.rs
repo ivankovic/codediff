@@ -16,9 +16,9 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::code::Code;
 use crate::diff::ASTDiff;
-use std::collections::HashMap;
+use crate::{code::Code, diff::ASTMappingOperation};
+use std::collections::{HashMap, HashSet};
 
 /**
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
@@ -69,13 +69,39 @@ use std::collections::HashMap;
 * optimal index for the operation.
 */
 pub fn find(
-    _before: &Code,
-    _after: &Code,
-    _before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
-    _after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
-    _diff: &mut ASTDiff,
+    before: &Code,
+    after: &Code,
+    before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    diff: &mut ASTDiff,
 ) {
-    // TODO: Implement optimal IUD (Insert, Update, Delete) algorithm
+    let mut memoo = HashMap::new();
+
+    solve(vec![], vec![], before_cache, after_cache, &mut memoo);
+}
+
+/**
+* Stores the solution to a specific list of subtrees.
+*
+* It has to keep enough information to allow for the diff to be reconstructed from the partial
+* subtree solutions.
+*/
+struct Solution {
+    /// Cost of this solution
+    cost: i32,
+    /// Which operation is optimal for the first root nodes
+    operation: ASTMappingOperation,
+    /// If the operation is Insert or Delete, what was the optimal index
+    index: usize,
+}
+
+fn solve(
+    before_subtrees: Vec<usize>,
+    after_subtrees: Vec<usize>,
+    before_cache: &HashMap<usize, tree_sitter::Node>,
+    after_cache: &HashMap<usize, tree_sitter::Node>,
+    memoo: &mut HashMap<(Vec<usize>, Vec<usize>), Solution>,
+) {
 }
 
 #[cfg(test)]
