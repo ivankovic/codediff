@@ -1206,10 +1206,10 @@ mod tests {
         assert_eq!(diff_ast.mapping.len(), diff_ast.after_node_map.len());
 
         // For identical code, we should have a complete mapping
-        assert!(diff_ast.mapping.len() > 0);
+        assert!(!diff_ast.mapping.is_empty());
 
         // Verify that the maps are consistent
-        for ((before_id, after_id), _mapping) in &diff_ast.mapping {
+        for (before_id, after_id) in diff_ast.mapping.keys() {
             assert_eq!(diff_ast.before_node_map.get(before_id), Some(after_id));
             assert_eq!(diff_ast.after_node_map.get(after_id), Some(before_id));
         }
