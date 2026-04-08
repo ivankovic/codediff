@@ -68,16 +68,17 @@ use std::collections::{HashMap, HashSet};
 * what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
 * optimal index for the operation.
 */
+use crate::diff::NodeCache;
+
 pub fn find(
     before: &Code,
     after: &Code,
-    before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
-    after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+    node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
     let mut memoo = HashMap::new();
 
-    solve(vec![], vec![], before_cache, after_cache, &mut memoo);
+    solve(vec![], vec![], &node_cache.before, &node_cache.after, &mut memoo);
 }
 
 /**
@@ -125,15 +126,16 @@ mod tests {
                 ..Default::default()
             };
 
-            find(&before, &after, None, None, &mut diff);
+            let node_cache = NodeCache::build(&before, &after);
+            find(&before, &after, &node_cache, &mut diff);
 
             assert!(
-                diff.is_valid(&before, &after, None, None),
+                diff.is_valid(&before, &after, &node_cache),
                 "Real diff mappings should always be valid for diff: {}",
                 diff_name
             );
             assert!(
-                diff.is_complete(&before, &after),
+                diff.is_complete(&before, &after, &node_cache),
                 "Real diff mappings should always be complete for diff: {}",
                 diff_name
             );
@@ -156,12 +158,14 @@ mod tests {
             let mut b_a_diff = ASTDiff {
                 ..Default::default()
             };
-            find(&b, &a, None, None, &mut b_a_diff);
+            let node_cache_ba = NodeCache::build(&b, &a);
+            find(&b, &a, &node_cache_ba, &mut b_a_diff);
 
             let mut a_b_diff = ASTDiff {
                 ..Default::default()
             };
-            find(&a, &b, None, None, &mut a_b_diff);
+            let node_cache_ab = NodeCache::build(&a, &b);
+            find(&a, &b, &node_cache_ab, &mut a_b_diff);
 
             let b_a_root_mapping = b_a_diff
                 .mapping
@@ -191,14 +195,15 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, None, None, &mut diff);
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff);
 
         assert!(
-            diff.is_valid(&before, &after, None, None),
+            diff.is_valid(&before, &after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after),
+            diff.is_complete(&before, &after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
@@ -238,14 +243,15 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, None, None, &mut diff);
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff);
 
         assert!(
-            diff.is_valid(&before, &after, None, None),
+            diff.is_valid(&before, &after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after),
+            diff.is_complete(&before, &after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
@@ -341,14 +347,15 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, None, None, &mut diff);
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff);
 
         assert!(
-            diff.is_valid(&before, &after, None, None),
+            diff.is_valid(&before, &after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after),
+            diff.is_complete(&before, &after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
@@ -412,14 +419,15 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, None, None, &mut diff);
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff);
 
         assert!(
-            diff.is_valid(&before, &after, None, None),
+            diff.is_valid(&before, &after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after),
+            diff.is_complete(&before, &after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
@@ -483,10 +491,11 @@ mod tests {
             ..Default::default()
         };
 
-        find(&before, &after, None, None, &mut diff);
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff);
 
-        assert!(diff.is_valid(&before, &after, None, None));
-        assert!(diff.is_complete(&before, &after));
+        assert!(diff.is_valid(&before, &after, &node_cache));
+        assert!(diff.is_complete(&before, &after, &node_cache));
 
         // The trees are almost identical. A complete solution exists.
         assert_eq!(diff.mapping.len(), 22);

@@ -22,27 +22,62 @@ use std::collections::HashMap;
 
 use crate::code::Code;
 
-/// Build a node cache for a Code object to enable efficient node lookup by ID.
-/// Returns None if the AST is not parsed.
-fn build_node_cache(code: &Code) -> Option<HashMap<usize, tree_sitter::Node<'_>>> {
-    code.ast.as_ref().map(|ast| {
-        let root_node = ast.root_node();
-        let mut cache = HashMap::new();
-        let mut stack = vec![root_node];
+/// A structure that holds node caches for both before and after Code objects.
+#[derive(Debug, Clone, Default)]
+pub struct NodeCache {
+    /// Cache of nodes from the before Code object, keyed by node ID.
+    pub before: HashMap<usize, tree_sitter::Node<'static>>,
+    /// Cache of nodes from the after Code object, keyed by node ID.
+    pub after: HashMap<usize, tree_sitter::Node<'static>>,
+}
 
-        while let Some(node) = stack.pop() {
-            // Cache this node
-            cache.insert(node.id(), node);
+impl NodeCache {
+    /// Build node caches for both Code objects.
+    /// This function will always build the caches - it assumes ASTs are parsed.
+    pub fn build(before: &Code, after: &Code) -> Self {
+        let before_cache = before.ast.as_ref().map(|ast| {
+            let root_node = ast.root_node();
+            let mut cache = HashMap::new();
+            let mut stack = vec![root_node];
 
-            // Add children to stack for traversal
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                stack.push(child);
+            while let Some(node) = stack.pop() {
+                // Cache this node
+                cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+
+                // Add children to stack for traversal
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    stack.push(child);
+                }
             }
-        }
 
-        cache
-    })
+            cache
+        }).unwrap_or_default();
+
+        let after_cache = after.ast.as_ref().map(|ast| {
+            let root_node = ast.root_node();
+            let mut cache = HashMap::new();
+            let mut stack = vec![root_node];
+
+            while let Some(node) = stack.pop() {
+                // Cache this node
+                cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+
+                // Add children to stack for traversal
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    stack.push(child);
+                }
+            }
+
+            cache
+        }).unwrap_or_default();
+
+        NodeCache {
+            before: before_cache,
+            after: after_cache,
+        }
+    }
 }
 
 pub const COST_INSERT: u64 = 1;
@@ -104,39 +139,8 @@ impl ASTDiff {
         &self,
         before: &Code,
         after: &Code,
-        before_cache: Option<&HashMap<usize, tree_sitter::Node>>,
-        after_cache: Option<&HashMap<usize, tree_sitter::Node>>,
+        node_cache: &NodeCache,
     ) -> bool {
-        // Compute caches if not provided
-        let before_cache_owned = if let Some(_cache) = before_cache {
-            None // Use the provided cache
-        } else {
-            build_node_cache(before) // Compute new cache
-        };
-
-        let after_cache_owned = if let Some(_cache) = after_cache {
-            None // Use the provided cache
-        } else {
-            build_node_cache(after) // Compute new cache
-        };
-
-        // Get references to the caches
-        let before_cache = if let Some(cache) = before_cache {
-            cache
-        } else if let Some(ref cache) = before_cache_owned {
-            cache
-        } else {
-            return false; // Can't validate without cache
-        };
-
-        let after_cache = if let Some(cache) = after_cache {
-            cache
-        } else if let Some(ref cache) = after_cache_owned {
-            cache
-        } else {
-            return false; // Can't validate without cache
-        };
-
         // Check that each mapping only maps nodes of the same type
         for (before_id, after_id) in self.mapping.keys() {
             if *before_id == 0 || *after_id == 0 {
@@ -145,8 +149,8 @@ impl ASTDiff {
             }
 
             // Get nodes from cache - if not found, mapping is invalid
-            let before_node = before_cache.get(before_id);
-            let after_node = after_cache.get(after_id);
+            let before_node = node_cache.before.get(before_id);
+            let after_node = node_cache.after.get(after_id);
 
             // If we can't get either node, the mapping is invalid
             if before_node.is_none() || after_node.is_none() {
@@ -169,18 +173,7 @@ impl ASTDiff {
      *
      * Useful in tests.
      */
-    pub fn is_complete(&self, before: &Code, after: &Code) -> bool {
-        // Build node caches for efficient lookup
-        let before_cache = build_node_cache(before);
-        let after_cache = build_node_cache(after);
-
-        let Some(before_cache) = before_cache else {
-            return false;
-        };
-        let Some(after_cache) = after_cache else {
-            return false;
-        };
-
+    pub fn is_complete(&self, before: &Code, after: &Code, node_cache: &NodeCache) -> bool {
         // Create sets of all nodes seen in mappings
         let mut seen_before_nodes = HashMap::new();
         let mut seen_after_nodes = HashMap::new();
@@ -191,7 +184,7 @@ impl ASTDiff {
         }
 
         // Check that all nodes in before tree are covered
-        for node_id in before_cache.keys() {
+        for node_id in node_cache.before.keys() {
             if !seen_before_nodes.contains_key(node_id) {
                 // Check if this is a root node that might not need mapping
                 if node_id == &before.ast.as_ref().unwrap().root_node().id() {
@@ -202,7 +195,7 @@ impl ASTDiff {
         }
 
         // Check that all nodes in after tree are covered
-        for node_id in after_cache.keys() {
+        for node_id in node_cache.after.keys() {
             if !seen_after_nodes.contains_key(node_id) {
                 // Check if this is a root node that might not need mapping
                 if node_id == &after.ast.as_ref().unwrap().root_node().id() {
@@ -303,8 +296,7 @@ pub enum ASTMappingReason {
 fn match_identical_trees(
     before: &Code,
     after: &Code,
-    before_cache: &HashMap<usize, tree_sitter::Node>,
-    _after_cache: &HashMap<usize, tree_sitter::Node>,
+    node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
@@ -341,7 +333,7 @@ fn match_identical_trees(
         }
 
         // Get the node from the cache
-        let before_node = before_cache.get(&before_node_id).cloned();
+        let before_node = node_cache.before.get(&before_node_id).cloned();
         let Some(before_node) = before_node else {
             continue;
         };
@@ -452,8 +444,7 @@ fn match_identical_trees(
 fn match_structurally_identical_trees(
     before: &Code,
     after: &Code,
-    before_cache: &HashMap<usize, tree_sitter::Node>,
-    _after_cache: &HashMap<usize, tree_sitter::Node>,
+    node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
@@ -490,7 +481,7 @@ fn match_structurally_identical_trees(
         }
 
         // Get the node from the cache
-        let before_node = before_cache.get(&before_node_id).cloned();
+        let before_node = node_cache.before.get(&before_node_id).cloned();
         let Some(before_node) = before_node else {
             continue;
         };
@@ -635,26 +626,20 @@ fn match_structurally_identical_trees(
 * avoid it going stale. Please see the code.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
-    // Build node caches for efficient lookup
-    let before_cache = build_node_cache(before);
-    let after_cache = build_node_cache(after);
+    // Build node cache for efficient lookup
+    let node_cache = NodeCache::build(before, after);
 
     // Compute metadata fresh for the diff algorithm
     let mut diff = ASTDiff {
         ..Default::default()
     };
 
-    // Unwrap caches - they should always be built by now
-    let before_cache = before_cache.expect("Before cache must be built");
-    let after_cache = after_cache.expect("After cache must be built");
-
-    match_identical_trees(before, after, &before_cache, &after_cache, &mut diff);
-    match_structurally_identical_trees(before, after, &before_cache, &after_cache, &mut diff);
+    match_identical_trees(before, after, &node_cache, &mut diff);
+    match_structurally_identical_trees(before, after, &node_cache, &mut diff);
     optimal_iud::find(
         before,
         after,
-        Some(&before_cache),
-        Some(&after_cache),
+        &node_cache,
         &mut diff,
     );
 
@@ -888,13 +873,14 @@ mod tests {
             );
             let diff_ast = diff.ast.unwrap();
 
+            let node_cache = NodeCache::build(code, code);
             assert!(
-                diff_ast.is_valid(code, code, None, None),
+                diff_ast.is_valid(code, code, &node_cache),
                 "Identical code must always produce a valid diff: {}",
                 filename
             );
             assert!(
-                diff_ast.is_complete(code, code),
+                diff_ast.is_complete(code, code, &node_cache),
                 "Identical code must always produce a complete diff: {}",
                 filename
             );
@@ -1002,7 +988,8 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         // The mapping should be valid for identical code
-        assert!(diff_ast.is_valid(&before, &after, None, None));
+        let node_cache = NodeCache::build(&before, &after);
+        assert!(diff_ast.is_valid(&before, &after, &node_cache));
 
         Ok(())
     }
@@ -1017,7 +1004,8 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         // The mapping should still be valid for different code as long as node types match
-        assert!(diff_ast.is_valid(&before, &after, None, None));
+        let node_cache = NodeCache::build(&before, &after);
+        assert!(diff_ast.is_valid(&before, &after, &node_cache));
 
         Ok(())
     }
@@ -1076,8 +1064,9 @@ mod tests {
         );
 
         // The mapping should be invalid
+        let node_cache = NodeCache::build(&before, &after);
         assert!(
-            !diff_ast.is_valid(&before, &after, None, None),
+            !diff_ast.is_valid(&before, &after, &node_cache),
             "Mapping should be invalid for different node types: {} vs {}",
             before_leaf.kind(),
             after_leaf.kind()
@@ -1096,8 +1085,9 @@ mod tests {
             let diff_ast = diff.ast.unwrap();
 
             // The mapping from a real diff should always be valid
+            let node_cache = NodeCache::build(&before, &after);
             assert!(
-                diff_ast.is_valid(&before, &after, None, None),
+                diff_ast.is_valid(&before, &after, &node_cache),
                 "Real diff mappings should always be valid for diff: {}",
                 diff_name
             );
@@ -1137,8 +1127,9 @@ mod tests {
         );
 
         // Null mappings should be considered valid
+        let node_cache = NodeCache::build(&before, &after);
         assert!(
-            diff_ast.is_valid(&before, &after, None, None),
+            diff_ast.is_valid(&before, &after, &node_cache),
             "Null mappings (insert/delete) should be valid"
         );
 
