@@ -111,7 +111,14 @@ struct Solution {
 }
 
 impl Solution {
-    // TODO: Add function new that returns a default solution.
+    fn new() -> Self {
+        Solution {
+            cost: 0,
+            operation: ASTMappingOperation::NotYetSet,
+            index: 0,
+            complete: false,
+        }
+    }
 }
 
 /**
@@ -132,7 +139,11 @@ fn solve(
     if before_subtrees.is_empty() && after_subtrees.is_empty() {
         return 0;
     }
-    // TODO: Check if memoo already has the solution for this input and return that.
+
+    // Check if memoo already has the solution for this input and return that.
+    if let Some(solution) = memoo.get(&(before_subtrees.clone(), after_subtrees.clone())) {
+        return solution.cost;
+    }
 
     let mut result = Solution::new();
 
@@ -161,7 +172,7 @@ fn solve(
     }
 
     // TODO: Insert the solution into memoo with the before and after subtrees as the key.
-    return result.cost;
+    result.cost;
 }
 
 /**

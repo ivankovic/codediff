@@ -35,43 +35,51 @@ impl NodeCache {
     /// Build node caches for both Code objects.
     /// This function will always build the caches - it assumes ASTs are parsed.
     pub fn build(before: &Code, after: &Code) -> Self {
-        let before_cache = before.ast.as_ref().map(|ast| {
-            let root_node = ast.root_node();
-            let mut cache = HashMap::new();
-            let mut stack = vec![root_node];
+        let before_cache = before
+            .ast
+            .as_ref()
+            .map(|ast| {
+                let root_node = ast.root_node();
+                let mut cache = HashMap::new();
+                let mut stack = vec![root_node];
 
-            while let Some(node) = stack.pop() {
-                // Cache this node
-                cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+                while let Some(node) = stack.pop() {
+                    // Cache this node
+                    cache.insert(node.id(), unsafe { std::mem::transmute(node) });
 
-                // Add children to stack for traversal
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    stack.push(child);
+                    // Add children to stack for traversal
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        stack.push(child);
+                    }
                 }
-            }
 
-            cache
-        }).unwrap_or_default();
+                cache
+            })
+            .unwrap_or_default();
 
-        let after_cache = after.ast.as_ref().map(|ast| {
-            let root_node = ast.root_node();
-            let mut cache = HashMap::new();
-            let mut stack = vec![root_node];
+        let after_cache = after
+            .ast
+            .as_ref()
+            .map(|ast| {
+                let root_node = ast.root_node();
+                let mut cache = HashMap::new();
+                let mut stack = vec![root_node];
 
-            while let Some(node) = stack.pop() {
-                // Cache this node
-                cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+                while let Some(node) = stack.pop() {
+                    // Cache this node
+                    cache.insert(node.id(), unsafe { std::mem::transmute(node) });
 
-                // Add children to stack for traversal
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    stack.push(child);
+                    // Add children to stack for traversal
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        stack.push(child);
+                    }
                 }
-            }
 
-            cache
-        }).unwrap_or_default();
+                cache
+            })
+            .unwrap_or_default();
 
         NodeCache {
             before: before_cache,
@@ -135,12 +143,7 @@ impl ASTDiff {
      *
      * Useful in tests.
      */
-    pub fn is_valid(
-        &self,
-        before: &Code,
-        after: &Code,
-        node_cache: &NodeCache,
-    ) -> bool {
+    pub fn is_valid(&self, before: &Code, after: &Code, node_cache: &NodeCache) -> bool {
         // Check that each mapping only maps nodes of the same type
         for (before_id, after_id) in self.mapping.keys() {
             if *before_id == 0 || *after_id == 0 {
@@ -235,6 +238,8 @@ pub struct ASTMapping {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum ASTMappingOperation {
     #[default]
+    /// Sentinel value.
+    NotYetSet,
     /// No operation is needed. The match is perfect.
     Identical,
     /// The node and it's entire subtree is moved to a different parent node.
@@ -293,12 +298,7 @@ pub enum ASTMappingReason {
 * the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
 */
-fn match_identical_trees(
-    before: &Code,
-    after: &Code,
-    node_cache: &NodeCache,
-    diff: &mut ASTDiff,
-) {
+fn match_identical_trees(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
@@ -636,12 +636,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
 
     match_identical_trees(before, after, &node_cache, &mut diff);
     match_structurally_identical_trees(before, after, &node_cache, &mut diff);
-    optimal_iud::find(
-        before,
-        after,
-        &node_cache,
-        &mut diff,
-    );
+    optimal_iud::find(before, after, &node_cache, &mut diff);
 
     Diff { ast: Some(diff) }
 }
