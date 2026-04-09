@@ -142,18 +142,22 @@ fn solve(
     } else if after_subtrees.is_empty() {
     } else {
         // The cost if we match the first roots
+        // TODO: implement
 
         // The cost if we delete the first root in before
         // We need to check all possible subsequences of root nodes in after_subtrees, including
         // the empty set, to check which is the optimal number of nodes in after_subtrees to match
         // with the children of the first root node in before_subtrees.
+        // TODO: implement
 
         // The cost if we insert the first root in after
         // We need to check all possible subsequences of root nodes in before_subtrees, including
         // the empty set, to check which is the optimal number of nodes in before_subtrees to match
         // with the children of the first root node in after_subtrees.
+        // TODO: implement
 
-        // Pick the smallest of the tree costs, that is our final result.
+        // Pick the cheapest of the tree costs, that is our final result.
+        // TODO: implement
     }
 
     // TODO: Insert the solution into memoo with the before and after subtrees as the key.
@@ -173,6 +177,8 @@ fn update_diff(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
+    // TODO: Reconstruct the diff, similar to what we do in solve but just picking the solution
+    // always from the memoo map. We might need to refactor this to recursively go down the tree.
 }
 
 #[cfg(test)]
