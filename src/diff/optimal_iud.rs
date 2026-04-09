@@ -43,7 +43,11 @@ use std::collections::{HashMap, HashSet};
 * it would break this requirement by allowing a subtree of X to move to Y.
 *
 * However, the diff can already contain Move operations, so the algorithm has to be robust to
-* existence of Move operations, even if it is not allowed to add new ones.
+* existence of Move operations, even if it is not allowed to add new ones. We do this by simply
+* skipping any already mapped node. Note that we could use the computed cost for already mapped
+* nodes, but it is not necessary because the mapping is symetrical, so the cost will be ignored
+* both in the before and after tree for already mapped nodes. This works even if the mapping is
+* outside of the subproblem.
 *
 * This leads to the following function: Cost([B], [A]) where [B] and [A] are lists of nodes in
 * before and after, respectively. These nodes are the root nodes of their respective subtrees.
@@ -70,19 +74,25 @@ use std::collections::{HashMap, HashSet};
 */
 use crate::diff::NodeCache;
 
-pub fn find(
-    before: &Code,
-    after: &Code,
-    node_cache: &NodeCache,
-    diff: &mut ASTDiff,
-) {
+pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let mut memoo = HashMap::new();
 
-    solve(vec![], vec![], &node_cache.before, &node_cache.after, &mut memoo);
+    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+    solve(
+        vec![before_root_id],
+        vec![after_root_id],
+        node_cache,
+        diff,
+        &mut memoo,
+    );
+
+    update_diff(before, after, &memoo, node_cache, diff);
 }
 
 /**
-* Stores the solution to a specific list of subtrees.
+* Stores the solution for a specific list of subtrees.
 *
 * It has to keep enough information to allow for the diff to be reconstructed from the partial
 * subtree solutions.
@@ -94,14 +104,74 @@ struct Solution {
     operation: ASTMappingOperation,
     /// If the operation is Insert or Delete, what was the optimal index
     index: usize,
+    /// Is the solution just for the first-node in the subtrees or is it a total solution for all
+    /// subtrees at the same time? This is an optimization that speeds up the algorithm if one of
+    /// the subtree sets is empty.
+    complete: bool,
 }
 
+impl Solution {
+    // TODO: Add function new that returns a default solution.
+}
+
+/**
+* Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
+* operations.
+*
+* The function returns the cost, but the actual mapping can be reconstructed using the memoo
+* memooization map.
+*/
 fn solve(
     before_subtrees: Vec<usize>,
     after_subtrees: Vec<usize>,
-    before_cache: &HashMap<usize, tree_sitter::Node>,
-    after_cache: &HashMap<usize, tree_sitter::Node>,
+    node_cache: &NodeCache,
+    diff: &ASTDiff,
     memoo: &mut HashMap<(Vec<usize>, Vec<usize>), Solution>,
+) -> i32 {
+    // If both subtrees are empty, there is nothing to do.
+    if before_subtrees.is_empty() && after_subtrees.is_empty() {
+        return 0;
+    }
+    // TODO: Check if memoo already has the solution for this input and return that.
+
+    let mut result = Solution::new();
+
+    // If one subtree is empty, the cost is just the cost to Insert/Delete all not-already-mapped
+    // nodes in the other subtree.
+    if before_subtrees.is_empty() {
+    } else if after_subtrees.is_empty() {
+    } else {
+        // The cost if we match the first roots
+
+        // The cost if we delete the first root in before
+        // We need to check all possible subsequences of root nodes in after_subtrees, including
+        // the empty set, to check which is the optimal number of nodes in after_subtrees to match
+        // with the children of the first root node in before_subtrees.
+
+        // The cost if we insert the first root in after
+        // We need to check all possible subsequences of root nodes in before_subtrees, including
+        // the empty set, to check which is the optimal number of nodes in before_subtrees to match
+        // with the children of the first root node in after_subtrees.
+
+        // Pick the smallest of the tree costs, that is our final result.
+    }
+
+    // TODO: Insert the solution into memoo with the before and after subtrees as the key.
+    return result.cost;
+}
+
+/**
+* Update the diff using the solution stored in memoo.
+*
+* Note that this function is linear in the number of nodes, since it knows exactly which path to
+* choose because of the already computed memoo map.
+*/
+fn update_diff(
+    before: &Code,
+    after: &Code,
+    memoo: &HashMap<(Vec<usize>, Vec<usize>), Solution>,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
 ) {
 }
 
