@@ -251,8 +251,8 @@ fn solve(
             .get(&before_subtrees[0])
             .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
         let after_first_node = node_cache
-            .before
-            .get(&before_subtrees[0])
+            .after
+            .get(&after_subtrees[0])
             .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
 
         // The cost if we match the first roots
