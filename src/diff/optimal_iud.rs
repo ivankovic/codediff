@@ -193,13 +193,33 @@ fn solve(
     if let Some(solution) = memoo.get(&(before_subtrees.clone(), after_subtrees.clone())) {
         return Ok(solution.cost);
     }
-
     let mut result = Solution::new();
 
-    // If one subtree is empty, the cost is just the cost to Insert/Delete all not-already-mapped
-    // nodes in the other subtree.
-    if before_subtrees.is_empty() {
-        // Count unmatched nodes in after_subtrees
+    let mut before_first_unmached_node_index = 0;
+    let mut before_has_unmached_nodes = false;
+    for (i, node_id) in before_subtrees.iter().enumerate() {
+        if !diff.before_node_map.contains_key(node_id) {
+            before_has_unmached_nodes = true;
+            before_first_unmached_node_index = i;
+        }
+    }
+
+    let mut after_first_unmached_node_index = 0;
+    let mut after_has_unmached_nodes = false;
+    for (i, node_id) in after_subtrees.iter().enumerate() {
+        if !diff.after_node_map.contains_key(node_id) {
+            after_has_unmached_nodes = true;
+            after_first_unmached_node_index = i;
+        }
+    }
+
+    if !before_has_unmached_nodes && !after_has_unmached_nodes {
+        result.cost = 0;
+        result.complete = true;
+        // TODO: We need something like "AlreadySolved" operation... but it doesn't make sense in
+        // the broader context...
+        result.operation = ASTMappingOperation::NotYetSet;
+    } else if before_subtrees.is_empty() || !before_has_unmached_nodes {
         let mut total_cost = 0;
         for &after_id in &after_subtrees {
             let unmatched =
@@ -207,9 +227,9 @@ fn solve(
             total_cost += unmatched as u64 * COST_INSERT;
         }
         result.cost = total_cost;
+        result.operation = ASTMappingOperation::Insert;
         result.complete = true;
-    } else if after_subtrees.is_empty() {
-        // Count unmatched nodes in before_subtrees
+    } else if after_subtrees.is_empty() || !after_has_unmached_nodes {
         let mut total_cost = 0;
         for &before_id in &before_subtrees {
             let unmatched =
@@ -217,7 +237,16 @@ fn solve(
             total_cost += unmatched as u64 * COST_DELETE;
         }
         result.cost = total_cost;
+        result.operation = ASTMappingOperation::Delete;
         result.complete = true;
+    } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
+        return solve(
+            before_subtrees[before_first_unmached_node_index..].to_vec(),
+            after_subtrees[after_first_unmached_node_index..].to_vec(),
+            node_cache,
+            diff,
+            memoo,
+        );
     } else {
         let before_first_node = node_cache
             .before
@@ -292,7 +321,7 @@ fn solve(
         // the empty set, to check which is the optimal number of nodes in before_subtrees to match
         // with the children of the first root node in after_subtrees.
         let mut solution_if_insert = Solution::new();
-        solution_if_insert.operation = ASTMappingOperation::INSERT;
+        solution_if_insert.operation = ASTMappingOperation::Insert;
         solution_if_insert.cost = MAX;
 
         for i in 0..=after_subtrees.len() {
