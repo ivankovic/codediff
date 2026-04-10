@@ -20,6 +20,8 @@ pub mod reference_nodes;
 
 use std::collections::HashMap;
 
+use tree_sitter::Node;
+
 use crate::code::Code;
 
 /// A structure that holds node caches for both before and after Code objects.
@@ -85,6 +87,16 @@ impl NodeCache {
             before: before_cache,
             after: after_cache,
         }
+    }
+
+    pub fn get_in_any(&self, node_id: &usize) -> Option<&Node> {
+        if self.before.contains_key(node_id) {
+            return self.before.get(node_id);
+        }
+        if self.after.contains_key(node_id) {
+            return self.after.get(node_id);
+        }
+        None
     }
 }
 
@@ -249,11 +261,19 @@ pub enum ASTMappingOperation {
     /// The node is inserted between a parent node and a consecutive subsequence of the parent
     /// node's children. Note that the subsequence can be empty.
     Insert,
+    /// The node and all it's children are inserted. This is a special operation that makes the
+    /// algorithm more efficient but also uglier to implement. It results in much shorter edit
+    /// scripts and shallower recursion depth, but it changes the domain of operations from "one
+    /// node" to "subtrees".
+    InsertWithChildren,
     /// The node is deleted and it's children, if any, are connected to it's parent node. If the
     /// root node is deleted, in theory the children form a forrest of trees instead. This only
     /// happens theorethically during some algorithm computations, since a diff script that deletes
     /// the root node would be guaranteed to create invalid code, unless the code is already empty.
     Delete,
+    /// The node and all it's children are deleted. Same as InsertWithChildren, this is a more
+    /// complex operation that results in more efficient code.
+    DeleteWithChildren,
 }
 
 /**

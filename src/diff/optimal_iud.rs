@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::u64::MAX;
 use tree_sitter::Node;
 
-use crate::diff::ASTDiff;
+use crate::diff::{ASTDiff, ASTMapping};
 use crate::{code::Code, diff::ASTMappingOperation};
 
 /**
@@ -77,7 +77,7 @@ use crate::{code::Code, diff::ASTMappingOperation};
 */
 use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
 
-pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) -> Result<()> {
     let mut memoo = HashMap::new();
 
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
@@ -89,9 +89,11 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
         node_cache,
         diff,
         &mut memoo,
-    );
+    )?;
 
-    update_diff(before, after, &memoo, node_cache, diff);
+    update_diff(before, after, node_cache, &memoo, diff)?;
+
+    Ok(())
 }
 
 /**
@@ -108,10 +110,6 @@ struct Solution {
     operation: ASTMappingOperation,
     /// If the operation is Insert or Delete, what was the optimal index
     index: usize,
-    /// Is the solution just for the first-node in the subtrees or is it a total solution for all
-    /// subtrees at the same time? This is an optimization that speeds up the algorithm if one of
-    /// the subtree sets is empty.
-    complete: bool,
 }
 
 impl Solution {
@@ -120,9 +118,6 @@ impl Solution {
             cost: 0,
             operation: ASTMappingOperation::NotYetSet,
             index: 0,
-            // Complete should never be set to true by default, the algorithm depends on it being
-            // false.
-            complete: false,
         }
     }
 }
@@ -215,7 +210,6 @@ fn solve(
 
     if !before_has_unmached_nodes && !after_has_unmached_nodes {
         result.cost = 0;
-        result.complete = true;
         // TODO: We need something like "AlreadySolved" operation... but it doesn't make sense in
         // the broader context...
         result.operation = ASTMappingOperation::NotYetSet;
@@ -227,8 +221,7 @@ fn solve(
             total_cost += unmatched as u64 * COST_INSERT;
         }
         result.cost = total_cost;
-        result.operation = ASTMappingOperation::Insert;
-        result.complete = true;
+        result.operation = ASTMappingOperation::InsertWithChildren;
     } else if after_subtrees.is_empty() || !after_has_unmached_nodes {
         let mut total_cost = 0;
         for &before_id in &before_subtrees {
@@ -237,8 +230,7 @@ fn solve(
             total_cost += unmatched as u64 * COST_DELETE;
         }
         result.cost = total_cost;
-        result.operation = ASTMappingOperation::Delete;
-        result.complete = true;
+        result.operation = ASTMappingOperation::DeleteWithChildren;
     } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
         return solve(
             before_subtrees[before_first_unmached_node_index..].to_vec(),
@@ -372,6 +364,44 @@ fn solve(
     Ok(result.cost)
 }
 
+fn add_subtree_to_diff(
+    node_ids: Vec<usize>,
+    operation: &ASTMappingOperation,
+    cost_of_one_operation: u64,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+) -> Result<u64> {
+    let total_cost = 0;
+
+    for node_id in node_ids {
+        let node = node_cache
+            .get_in_any(&node_id)
+            .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+
+        let cost = add_subtree_to_diff(
+            ids_of_children(node),
+            operation,
+            cost_of_one_operation,
+            node_cache,
+            diff,
+        )? + cost_of_one_operation;
+
+        let mapping = ASTMapping {
+            cost,
+            operation: operation.clone(),
+            reason: super::ASTMappingReason::OptimalIDU,
+        };
+
+        if *operation == ASTMappingOperation::InsertWithChildren {
+            diff.add_mapping(0, node_id, mapping);
+        } else {
+            diff.add_mapping(node_id, 0, mapping);
+        }
+    }
+
+    Ok(total_cost)
+}
+
 /**
 * Update the diff using the solution stored in memoo.
 *
@@ -381,10 +411,10 @@ fn solve(
 fn update_diff(
     before: &Code,
     after: &Code,
-    memoo: &HashMap<(Vec<usize>, Vec<usize>), Solution>,
     node_cache: &NodeCache,
+    memoo: &HashMap<(Vec<usize>, Vec<usize>), Solution>,
     diff: &mut ASTDiff,
-) {
+) -> Result<()> {
     let mut stack = Vec::new();
 
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
@@ -392,8 +422,68 @@ fn update_diff(
 
     stack.push((vec![before_root_id], vec![after_root_id]));
 
-    // TODO: iterate over the stack, reading the solution from Memoo and adding the subtrees to
-    // stack.
+    while let Some((before_nodes, after_nodes)) = stack.pop() {
+        if before_nodes.is_empty() && after_nodes.is_empty() {
+            continue;
+        }
+
+        let mut before_first_unmached_node_index = 0;
+        let mut before_has_unmached_nodes = false;
+        for (i, node_id) in before_nodes.iter().enumerate() {
+            if !diff.before_node_map.contains_key(node_id) {
+                before_has_unmached_nodes = true;
+                before_first_unmached_node_index = i;
+            }
+        }
+
+        let mut after_first_unmached_node_index = 0;
+        let mut after_has_unmached_nodes = false;
+        for (i, node_id) in after_nodes.iter().enumerate() {
+            if !diff.after_node_map.contains_key(node_id) {
+                after_has_unmached_nodes = true;
+                after_first_unmached_node_index = i;
+            }
+        }
+
+        if !before_has_unmached_nodes && !after_has_unmached_nodes {
+            continue;
+        }
+        if before_has_unmached_nodes
+            && after_has_unmached_nodes
+            && (before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0)
+        {
+            stack.push((
+                before_nodes[before_first_unmached_node_index..].to_vec(),
+                after_nodes[after_first_unmached_node_index..].to_vec(),
+            ));
+            continue;
+        }
+
+        let solution = memoo
+            .get(&(before_nodes.clone(), after_nodes.clone()))
+            .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
+
+        if solution.operation == ASTMappingOperation::DeleteWithChildren {
+            add_subtree_to_diff(
+                before_nodes,
+                &solution.operation,
+                COST_DELETE,
+                node_cache,
+                diff,
+            )?;
+        } else if solution.operation == ASTMappingOperation::InsertWithChildren {
+            add_subtree_to_diff(
+                after_nodes,
+                &solution.operation,
+                COST_INSERT,
+                node_cache,
+                diff,
+            )?;
+        }
+        // TODO: Other operations.
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -570,7 +660,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff);
+        find(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
