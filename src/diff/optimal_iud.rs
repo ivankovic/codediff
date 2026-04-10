@@ -129,24 +129,27 @@ impl Solution {
 /**
 * Counts the number of unmatched nodes for the given subtree.
 */
-fn count_unmatched_nodes(root_id: usize, node_cache: &NodeCache, diff: &ASTDiff) -> usize {
+fn count_unmatched_nodes(
+    node_id: usize,
+    node_cache: &HashMap<usize, tree_sitter::Node<'static>>,
+    mapped_nodes: &HashMap<usize, usize>,
+) -> usize {
     // Get the node from cache
-    let node = match node_cache.before.get(&root_id) {
+    let node = match node_cache.get(&node_id) {
         Some(n) => n,
         None => return 0,
     };
 
-    // Count this node if not mapped to itself (which means it's not mapped at all)
-    let mut count = if !diff.mapping.contains_key(&(root_id, root_id)) {
-        1
-    } else {
-        0
-    };
+    let mut count = 0;
+
+    if !mapped_nodes.contains_key(&node_id) {
+        count += 1;
+    }
 
     // Recursively count children
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        count += count_unmatched_nodes(child.id(), node_cache, diff);
+        count += count_unmatched_nodes(child.id(), node_cache, mapped_nodes);
     }
 
     count
@@ -186,7 +189,8 @@ fn solve(
         // Count unmatched nodes in after_subtrees
         let mut total_cost = 0;
         for &after_id in &after_subtrees {
-            let unmatched = count_unmatched_nodes(after_id, node_cache, diff);
+            let unmatched =
+                count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
             total_cost += unmatched as i32 * COST_INSERT as i32;
         }
         result.cost = total_cost;
@@ -195,7 +199,8 @@ fn solve(
         // Count unmatched nodes in before_subtrees
         let mut total_cost = 0;
         for &before_id in &before_subtrees {
-            let unmatched = count_unmatched_nodes(before_id, node_cache, diff);
+            let unmatched =
+                count_unmatched_nodes(before_id, &node_cache.before, &diff.before_node_map);
             total_cost += unmatched as i32 * COST_DELETE as i32;
         }
         result.cost = total_cost;
@@ -292,7 +297,10 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(count_unmatched_nodes(root_id, &node_cache, &diff), 22);
+        assert_eq!(
+            count_unmatched_nodes(root_id, &node_cache.before, &diff.before_node_map),
+            22
+        );
 
         diff.add_mapping(
             root_id,
@@ -304,7 +312,10 @@ mod tests {
             },
         );
 
-        assert_eq!(count_unmatched_nodes(root_id, &node_cache, &diff), 21);
+        assert_eq!(
+            count_unmatched_nodes(root_id, &node_cache.before, &diff.before_node_map),
+            21
+        );
 
         Ok(())
     }
