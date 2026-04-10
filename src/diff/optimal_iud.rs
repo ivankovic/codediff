@@ -84,6 +84,8 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
     let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
     solve(
+        before,
+        after,
         vec![before_root_id],
         vec![after_root_id],
         node_cache,
@@ -173,6 +175,8 @@ fn ids_of_children(node: &Node) -> Vec<usize> {
 * memooization map.
 */
 fn solve(
+    before: &Code,
+    after: &Code,
     before_subtrees: Vec<usize>,
     after_subtrees: Vec<usize>,
     node_cache: &NodeCache,
@@ -233,6 +237,8 @@ fn solve(
         result.operation = ASTMappingOperation::DeleteWithChildren;
     } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
         return solve(
+            before,
+            after,
             before_subtrees[before_first_unmached_node_index..].to_vec(),
             after_subtrees[after_first_unmached_node_index..].to_vec(),
             node_cache,
@@ -260,12 +266,16 @@ fn solve(
                 solution_if_match.operation = ASTMappingOperation::Identical;
             } else {
                 cost = solve(
+                    before,
+                    after,
                     before_subtrees[1..].to_vec(),
                     after_subtrees[1..].to_vec(),
                     node_cache,
                     diff,
                     memoo,
                 )? + solve(
+                    before,
+                    after,
                     ids_of_children(before_first_node),
                     ids_of_children(after_first_node),
                     node_cache,
@@ -289,12 +299,16 @@ fn solve(
             let mut cost = COST_DELETE;
 
             cost += solve(
+                before,
+                after,
                 before_subtrees[1..].to_vec(),
                 after_subtrees[i..].to_vec(),
                 node_cache,
                 diff,
                 memoo,
             )? + solve(
+                before,
+                after,
                 ids_of_children(before_first_node),
                 after_subtrees[..i].to_vec(),
                 node_cache,
@@ -320,12 +334,16 @@ fn solve(
             let mut cost = COST_INSERT;
 
             cost += solve(
+                before,
+                after,
                 before_subtrees[1..].to_vec(),
                 after_subtrees[i..].to_vec(),
                 node_cache,
                 diff,
                 memoo,
             )? + solve(
+                before,
+                after,
                 before_subtrees[..i].to_vec(),
                 ids_of_children(after_first_node),
                 node_cache,
@@ -371,7 +389,7 @@ fn add_subtree_to_diff(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) -> Result<u64> {
-    let total_cost = 0;
+    let mut total_cost = 0;
 
     for node_id in node_ids {
         let node = node_cache
@@ -385,6 +403,8 @@ fn add_subtree_to_diff(
             node_cache,
             diff,
         )? + cost_of_one_operation;
+
+        total_cost += cost;
 
         let mapping = ASTMapping {
             cost,
