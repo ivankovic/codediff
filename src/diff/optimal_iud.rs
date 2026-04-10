@@ -72,7 +72,7 @@ use std::collections::{HashMap, HashSet};
 * what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
 * optimal index for the operation.
 */
-use crate::diff::NodeCache;
+use crate::diff::{NodeCache, COST_INSERT, COST_DELETE};
 
 pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let mut memoo = HashMap::new();
@@ -83,6 +83,8 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
     solve(
         vec![before_root_id],
         vec![after_root_id],
+        before,
+        after,
         node_cache,
         diff,
         &mut memoo,
@@ -97,6 +99,7 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
 * It has to keep enough information to allow for the diff to be reconstructed from the partial
 * subtree solutions.
 */
+#[derive(Clone)]
 struct Solution {
     /// Cost of this solution
     cost: i32,
@@ -130,7 +133,26 @@ fn count_unmatched_nodes(
     node_cache: &NodeCache,
     diff: &ASTDiff,
 ) -> usize {
-    0
+    // Get the node from cache
+    let node = match node_cache.before.get(&root_id) {
+        Some(n) => n,
+        None => return 0,
+    };
+
+    // Count this node if not mapped to itself (which means it's not mapped at all)
+    let mut count = if !diff.mapping.contains_key(&(root_id, root_id)) {
+        1
+    } else {
+        0
+    };
+
+    // Recursively count children
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        count += count_unmatched_nodes(child.id(), code, node_cache, diff);
+    }
+
+    count
 }
 
 /**
@@ -143,6 +165,8 @@ fn count_unmatched_nodes(
 fn solve(
     before_subtrees: Vec<usize>,
     after_subtrees: Vec<usize>,
+    before: &Code,
+    after: &Code,
     node_cache: &NodeCache,
     diff: &ASTDiff,
     memoo: &mut HashMap<(Vec<usize>, Vec<usize>), Solution>,
@@ -162,7 +186,21 @@ fn solve(
     // If one subtree is empty, the cost is just the cost to Insert/Delete all not-already-mapped
     // nodes in the other subtree.
     if before_subtrees.is_empty() {
+        // Count unmatched nodes in after_subtrees
+        let mut total_cost = 0;
+        for &after_id in &after_subtrees {
+            let unmatched = count_unmatched_nodes(after_id, after, node_cache, diff);
+            total_cost += unmatched as i32 * COST_INSERT as i32;
+        }
+        result.cost = total_cost;
     } else if after_subtrees.is_empty() {
+        // Count unmatched nodes in before_subtrees
+        let mut total_cost = 0;
+        for &before_id in &before_subtrees {
+            let unmatched = count_unmatched_nodes(before_id, before, node_cache, diff);
+            total_cost += unmatched as i32 * COST_DELETE as i32;
+        }
+        result.cost = total_cost;
     } else {
         // The cost if we match the first roots
         // TODO: implement
@@ -183,8 +221,9 @@ fn solve(
         // TODO: implement
     }
 
-    // TODO: Insert the solution into memoo with the before and after subtrees as the key.
-    result.cost;
+    // Insert the solution into memoo with the before and after subtrees as the key.
+    memoo.insert((before_subtrees, after_subtrees), result.clone());
+    result.cost
 }
 
 /**
