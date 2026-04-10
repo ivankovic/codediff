@@ -15,10 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use anyhow::Result;
+use std::collections::HashMap;
+use std::u64::MAX;
+use tree_sitter::Node;
 
 use crate::diff::ASTDiff;
 use crate::{code::Code, diff::ASTMappingOperation};
-use std::collections::{HashMap, HashSet};
 
 /**
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
@@ -83,8 +86,6 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
     solve(
         vec![before_root_id],
         vec![after_root_id],
-        before,
-        after,
         node_cache,
         diff,
         &mut memoo,
@@ -102,7 +103,7 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
 #[derive(Clone)]
 struct Solution {
     /// Cost of this solution
-    cost: i32,
+    cost: u64,
     /// Which operation is optimal for the first root nodes
     operation: ASTMappingOperation,
     /// If the operation is Insert or Delete, what was the optimal index
@@ -156,6 +157,20 @@ fn count_unmatched_nodes(
 }
 
 /**
+* Returns the ids of the child nodes.
+*/
+fn ids_of_children(node: &Node) -> Vec<usize> {
+    let mut ids = Vec::new();
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        ids.push(child.id());
+    }
+
+    ids
+}
+
+/**
 * Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
 * operations.
 *
@@ -165,20 +180,18 @@ fn count_unmatched_nodes(
 fn solve(
     before_subtrees: Vec<usize>,
     after_subtrees: Vec<usize>,
-    before: &Code,
-    after: &Code,
     node_cache: &NodeCache,
     diff: &ASTDiff,
     memoo: &mut HashMap<(Vec<usize>, Vec<usize>), Solution>,
-) -> i32 {
+) -> Result<u64> {
     // If both subtrees are empty, there is nothing to do.
     if before_subtrees.is_empty() && after_subtrees.is_empty() {
-        return 0;
+        return Ok(0);
     }
 
     // Check if memoo already has the solution for this input and return that.
     if let Some(solution) = memoo.get(&(before_subtrees.clone(), after_subtrees.clone())) {
-        return solution.cost;
+        return Ok(solution.cost);
     }
 
     let mut result = Solution::new();
@@ -191,7 +204,7 @@ fn solve(
         for &after_id in &after_subtrees {
             let unmatched =
                 count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
-            total_cost += unmatched as i32 * COST_INSERT as i32;
+            total_cost += unmatched as u64 * COST_INSERT;
         }
         result.cost = total_cost;
         result.complete = true;
@@ -201,28 +214,109 @@ fn solve(
         for &before_id in &before_subtrees {
             let unmatched =
                 count_unmatched_nodes(before_id, &node_cache.before, &diff.before_node_map);
-            total_cost += unmatched as i32 * COST_DELETE as i32;
+            total_cost += unmatched as u64 * COST_DELETE;
         }
         result.cost = total_cost;
         result.complete = true;
     } else {
+        let before_first_node = node_cache
+            .before
+            .get(&before_subtrees[0])
+            .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+        let after_first_node = node_cache
+            .before
+            .get(&before_subtrees[0])
+            .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+
         // The cost if we match the first roots
         let mut solution_if_match = Solution::new();
-        // TODO: Implement, remember to check if a mach is at all possible, i.e. the node kinds
-        // have to match.
+        if before_first_node.kind() == after_first_node.kind() {
+            let mut cost = 0;
+
+            if before_first_node.child_count() == 0 && after_first_node.child_count() == 0 {
+                // TODO: Figure out how we check if the nodes value is identical and if not, set
+                // the operation to update and increase the cost by 1.
+                solution_if_match.operation = ASTMappingOperation::Identical;
+            } else {
+                cost = solve(
+                    before_subtrees[1..].to_vec(),
+                    after_subtrees[1..].to_vec(),
+                    node_cache,
+                    diff,
+                    memoo,
+                )? + solve(
+                    ids_of_children(before_first_node),
+                    ids_of_children(after_first_node),
+                    node_cache,
+                    diff,
+                    memoo,
+                )?;
+                solution_if_match.operation = ASTMappingOperation::Identical;
+            }
+            solution_if_match.cost = cost;
+        }
 
         // The cost if we delete the first root in before
         // We need to check all possible subsequences of root nodes in after_subtrees, including
         // the empty set, to check which is the optimal number of nodes in after_subtrees to match
         // with the children of the first root node in before_subtrees.
         let mut solution_if_delete = Solution::new();
+        solution_if_delete.operation = ASTMappingOperation::Delete;
+        solution_if_delete.cost = MAX;
+
+        for i in 0..=after_subtrees.len() {
+            let mut cost = COST_DELETE;
+
+            cost += solve(
+                before_subtrees[1..].to_vec(),
+                after_subtrees[i..].to_vec(),
+                node_cache,
+                diff,
+                memoo,
+            )? + solve(
+                ids_of_children(before_first_node),
+                after_subtrees[..i].to_vec(),
+                node_cache,
+                diff,
+                memoo,
+            )?;
+
+            if cost < solution_if_delete.cost {
+                solution_if_delete.cost = cost;
+                solution_if_delete.index = i;
+            }
+        }
 
         // The cost if we insert the first root in after
         // We need to check all possible subsequences of root nodes in before_subtrees, including
         // the empty set, to check which is the optimal number of nodes in before_subtrees to match
         // with the children of the first root node in after_subtrees.
-        // TODO: implement
         let mut solution_if_insert = Solution::new();
+        solution_if_insert.operation = ASTMappingOperation::INSERT;
+        solution_if_insert.cost = MAX;
+
+        for i in 0..=after_subtrees.len() {
+            let mut cost = COST_INSERT;
+
+            cost += solve(
+                before_subtrees[1..].to_vec(),
+                after_subtrees[i..].to_vec(),
+                node_cache,
+                diff,
+                memoo,
+            )? + solve(
+                before_subtrees[..i].to_vec(),
+                ids_of_children(after_first_node),
+                node_cache,
+                diff,
+                memoo,
+            )?;
+
+            if cost < solution_if_insert.cost {
+                solution_if_insert.cost = cost;
+                solution_if_insert.index = i;
+            }
+        }
 
         // Pick the cheapest of the tree costs, that is our final result.
         //
@@ -246,7 +340,7 @@ fn solve(
 
     // Insert the solution into memoo with the before and after subtrees as the key.
     memoo.insert((before_subtrees, after_subtrees), result.clone());
-    result.cost
+    Ok(result.cost)
 }
 
 /**
