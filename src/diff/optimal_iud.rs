@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::u64::MAX;
 use tree_sitter::Node;
 
-use crate::diff::{ASTDiff, ASTMapping};
+use crate::diff::{ASTDiff, ASTMapping, COST_UPDATE};
 use crate::{code::Code, diff::ASTMappingOperation};
 
 /**
@@ -261,9 +261,15 @@ fn solve(
             let mut cost = 0;
 
             if before_first_node.child_count() == 0 && after_first_node.child_count() == 0 {
-                // TODO: Figure out how we check if the nodes value is identical and if not, set
-                // the operation to update and increase the cost by 1.
-                solution_if_match.operation = ASTMappingOperation::Identical;
+                let before_text = before_first_node.utf8_text(before.contents.as_bytes());
+                let after_text = after_first_node.utf8_text(after.contents.as_bytes());
+
+                if before_text == after_text {
+                    solution_if_match.operation = ASTMappingOperation::Identical;
+                } else {
+                    solution_if_match.operation = ASTMappingOperation::Update;
+                    cost += COST_UPDATE;
+                }
             } else {
                 cost = solve(
                     before,
