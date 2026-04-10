@@ -72,7 +72,7 @@ use std::collections::{HashMap, HashSet};
 * what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
 * optimal index for the operation.
 */
-use crate::diff::{NodeCache, COST_INSERT, COST_DELETE};
+use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
 
 pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let mut memoo = HashMap::new();
@@ -119,6 +119,8 @@ impl Solution {
             cost: 0,
             operation: ASTMappingOperation::NotYetSet,
             index: 0,
+            // Complete should never be set to true by default, the algorithm depends on it being
+            // false.
             complete: false,
         }
     }
@@ -127,12 +129,7 @@ impl Solution {
 /**
 * Counts the number of unmatched nodes for the given subtree.
 */
-fn count_unmatched_nodes(
-    root_id: usize,
-    code: &Code,
-    node_cache: &NodeCache,
-    diff: &ASTDiff,
-) -> usize {
+fn count_unmatched_nodes(root_id: usize, node_cache: &NodeCache, diff: &ASTDiff) -> usize {
     // Get the node from cache
     let node = match node_cache.before.get(&root_id) {
         Some(n) => n,
@@ -149,7 +146,7 @@ fn count_unmatched_nodes(
     // Recursively count children
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        count += count_unmatched_nodes(child.id(), code, node_cache, diff);
+        count += count_unmatched_nodes(child.id(), node_cache, diff);
     }
 
     count
@@ -189,36 +186,55 @@ fn solve(
         // Count unmatched nodes in after_subtrees
         let mut total_cost = 0;
         for &after_id in &after_subtrees {
-            let unmatched = count_unmatched_nodes(after_id, after, node_cache, diff);
+            let unmatched = count_unmatched_nodes(after_id, node_cache, diff);
             total_cost += unmatched as i32 * COST_INSERT as i32;
         }
         result.cost = total_cost;
+        result.complete = true;
     } else if after_subtrees.is_empty() {
         // Count unmatched nodes in before_subtrees
         let mut total_cost = 0;
         for &before_id in &before_subtrees {
-            let unmatched = count_unmatched_nodes(before_id, before, node_cache, diff);
+            let unmatched = count_unmatched_nodes(before_id, node_cache, diff);
             total_cost += unmatched as i32 * COST_DELETE as i32;
         }
         result.cost = total_cost;
+        result.complete = true;
     } else {
         // The cost if we match the first roots
-        // TODO: implement
+        let mut solution_if_match = Solution::new();
 
         // The cost if we delete the first root in before
         // We need to check all possible subsequences of root nodes in after_subtrees, including
         // the empty set, to check which is the optimal number of nodes in after_subtrees to match
         // with the children of the first root node in before_subtrees.
-        // TODO: implement
+        let mut solution_if_delete = Solution::new();
 
         // The cost if we insert the first root in after
         // We need to check all possible subsequences of root nodes in before_subtrees, including
         // the empty set, to check which is the optimal number of nodes in before_subtrees to match
         // with the children of the first root node in after_subtrees.
         // TODO: implement
+        let mut solution_if_insert = Solution::new();
 
         // Pick the cheapest of the tree costs, that is our final result.
-        // TODO: implement
+        //
+        // There is a subtle preference here, if the costs are exactly equal, we prefer matching
+        // and if delete and insert are both equal and cheaper than match, we prefer a delete.
+        //
+        // This is based on how the diff is displayed to humans and personal human preference of
+        // the author.
+        if solution_if_match.cost <= solution_if_delete.cost {
+            if solution_if_match.cost <= solution_if_insert.cost {
+                result = solution_if_match;
+            } else {
+                result = solution_if_insert;
+            }
+        } else if solution_if_delete.cost <= solution_if_insert.cost {
+            result = solution_if_delete;
+        } else {
+            result = solution_if_insert;
+        }
     }
 
     // Insert the solution into memoo with the before and after subtrees as the key.
@@ -274,10 +290,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(
-            count_unmatched_nodes(root_id, &code, &node_cache, &diff),
-            22
-        );
+        assert_eq!(count_unmatched_nodes(root_id, &node_cache, &diff), 22);
 
         diff.add_mapping(
             root_id,
@@ -289,10 +302,7 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            count_unmatched_nodes(root_id, &code, &node_cache, &diff),
-            21
-        );
+        assert_eq!(count_unmatched_nodes(root_id, &node_cache, &diff), 21);
 
         Ok(())
     }
