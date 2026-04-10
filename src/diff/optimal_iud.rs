@@ -122,6 +122,18 @@ impl Solution {
 }
 
 /**
+* Counts the number of unmatched nodes for the given subtree.
+*/
+fn count_unmatched_nodes(
+    root_id: usize,
+    code: &Code,
+    node_cache: &NodeCache,
+    diff: &ASTDiff,
+) -> usize {
+    0
+}
+
+/**
 * Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
 * operations.
 *
@@ -188,8 +200,15 @@ fn update_diff(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
-    // TODO: Reconstruct the diff, similar to what we do in solve but just picking the solution
-    // always from the memoo map. We might need to refactor this to recursively go down the tree.
+    let mut stack = Vec::new();
+
+    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+    stack.push((vec![before_root_id], vec![after_root_id]));
+
+    // TODO: iterate over the stack, reading the solution from Memoo and adding the subtrees to
+    // stack.
 }
 
 #[cfg(test)]
@@ -203,6 +222,41 @@ mod tests {
     use crate::diff::COST_UPDATE;
 
     use super::*;
+
+    #[test]
+    fn test_count_unmatched_nodes() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+        let code = test_codes.get("hello-world.rs").unwrap().clone();
+
+        let root_id = code.ast.as_ref().unwrap().root_node().id();
+
+        let node_cache = NodeCache::build(&code, &code);
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        assert_eq!(
+            count_unmatched_nodes(root_id, &code, &node_cache, &diff),
+            22
+        );
+
+        diff.add_mapping(
+            root_id,
+            root_id,
+            crate::diff::ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: crate::diff::ASTMappingReason::IdenticalHash,
+            },
+        );
+
+        assert_eq!(
+            count_unmatched_nodes(root_id, &code, &node_cache, &diff),
+            21
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn is_always_valid() -> Result<()> {
