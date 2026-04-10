@@ -203,6 +203,8 @@ fn solve(
     } else {
         // The cost if we match the first roots
         let mut solution_if_match = Solution::new();
+        // TODO: Implement, remember to check if a mach is at all possible, i.e. the node kinds
+        // have to match.
 
         // The cost if we delete the first root in before
         // We need to check all possible subsequences of root nodes in after_subtrees, including
