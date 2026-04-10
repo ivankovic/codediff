@@ -419,8 +419,10 @@ fn add_subtree_to_diff(
         };
 
         if *operation == ASTMappingOperation::InsertWithChildren {
-            diff.add_mapping(0, node_id, mapping);
-        } else {
+            if !diff.after_node_map.contains_key(&node_id) {
+                diff.add_mapping(0, node_id, mapping);
+            }
+        } else if !diff.before_node_map.contains_key(&node_id) {
             diff.add_mapping(node_id, 0, mapping);
         }
     }
@@ -488,6 +490,11 @@ fn update_diff(
         let solution = memoo
             .get(&(before_nodes.clone(), after_nodes.clone()))
             .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
+        let mapping = ASTMapping {
+            cost: solution.cost,
+            operation: solution.operation.clone(),
+            reason: super::ASTMappingReason::OptimalIDU,
+        };
 
         if solution.operation == ASTMappingOperation::DeleteWithChildren {
             add_subtree_to_diff(
@@ -505,6 +512,11 @@ fn update_diff(
                 node_cache,
                 diff,
             )?;
+        } else if solution.operation == ASTMappingOperation::Identical {
+            diff.add_mapping(before_nodes[0], after_nodes[0], mapping);
+            if before_nodes.len() > 1 || after_nodes.len() > 1 {
+                stack.push((before_nodes[1..].to_vec(), after_nodes[1..].to_vec()));
+            }
         }
         // TODO: Other operations.
     }
