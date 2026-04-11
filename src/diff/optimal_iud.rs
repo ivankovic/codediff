@@ -523,6 +523,7 @@ fn update_diff(
             if before_nodes.len() > 1 || after_nodes.len() > 1 {
                 stack.push((before_nodes[1..].to_vec(), after_nodes[1..].to_vec()));
             }
+            // TODO:Add children. WE need to get the nodes out of cache for that.
         }
         // TODO: Other operations.
     }
