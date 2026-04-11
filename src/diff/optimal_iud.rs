@@ -397,7 +397,7 @@ fn add_subtree_to_diff(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) -> Result<u64> {
-    let mut total_cost = 0;
+    let mut total_cost = cost_of_one_operation;
 
     for node_id in node_ids {
         let node = node_cache
@@ -410,7 +410,7 @@ fn add_subtree_to_diff(
             cost_of_one_operation,
             node_cache,
             diff,
-        )? + cost_of_one_operation;
+        )?;
 
         total_cost += cost;
 
