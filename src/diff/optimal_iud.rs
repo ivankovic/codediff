@@ -200,6 +200,7 @@ fn solve(
         if !diff.before_node_map.contains_key(node_id) {
             before_has_unmached_nodes = true;
             before_first_unmached_node_index = i;
+            break;
         }
     }
 
@@ -209,6 +210,7 @@ fn solve(
         if !diff.after_node_map.contains_key(node_id) {
             after_has_unmached_nodes = true;
             after_first_unmached_node_index = i;
+            break;
         }
     }
 
@@ -271,25 +273,25 @@ fn solve(
                     cost += COST_UPDATE;
                 }
             } else {
-                cost = solve(
-                    before,
-                    after,
-                    before_subtrees[1..].to_vec(),
-                    after_subtrees[1..].to_vec(),
-                    node_cache,
-                    diff,
-                    memoo,
-                )? + solve(
-                    before,
-                    after,
-                    ids_of_children(before_first_node),
-                    ids_of_children(after_first_node),
-                    node_cache,
-                    diff,
-                    memoo,
-                )?;
                 solution_if_match.operation = ASTMappingOperation::Identical;
             }
+            cost += solve(
+                before,
+                after,
+                before_subtrees[1..].to_vec(),
+                after_subtrees[1..].to_vec(),
+                node_cache,
+                diff,
+                memoo,
+            )? + solve(
+                before,
+                after,
+                ids_of_children(before_first_node),
+                ids_of_children(after_first_node),
+                node_cache,
+                diff,
+                memoo,
+            )?;
             solution_if_match.cost = cost;
         }
 
@@ -336,14 +338,14 @@ fn solve(
         solution_if_insert.operation = ASTMappingOperation::Insert;
         solution_if_insert.cost = MAX;
 
-        for i in 0..=after_subtrees.len() {
+        for i in 0..=before_subtrees.len() {
             let mut cost = COST_INSERT;
 
             cost += solve(
                 before,
                 after,
-                before_subtrees[1..].to_vec(),
-                after_subtrees[i..].to_vec(),
+                before_subtrees[i..].to_vec(),
+                after_subtrees[1..].to_vec(),
                 node_cache,
                 diff,
                 memoo,
@@ -461,6 +463,7 @@ fn update_diff(
             if !diff.before_node_map.contains_key(node_id) {
                 before_has_unmached_nodes = true;
                 before_first_unmached_node_index = i;
+                break;
             }
         }
 
@@ -470,6 +473,7 @@ fn update_diff(
             if !diff.after_node_map.contains_key(node_id) {
                 after_has_unmached_nodes = true;
                 after_first_unmached_node_index = i;
+                break;
             }
         }
 
@@ -512,7 +516,9 @@ fn update_diff(
                 node_cache,
                 diff,
             )?;
-        } else if solution.operation == ASTMappingOperation::Identical {
+        } else if solution.operation == ASTMappingOperation::Identical
+            || solution.operation == ASTMappingOperation::Update
+        {
             diff.add_mapping(before_nodes[0], after_nodes[0], mapping);
             if before_nodes.len() > 1 || after_nodes.len() > 1 {
                 stack.push((before_nodes[1..].to_vec(), after_nodes[1..].to_vec()));
@@ -572,6 +578,38 @@ mod tests {
     }
 
     #[test]
+    fn solve_for_hello_world_translation() -> Result<()> {
+        let test_codes = test::helper::handmade_test_code()?;
+
+        let before = test_codes.get("hello-world.rs").unwrap().clone();
+        let after = test_codes.get("zdravo-svijete.rs").unwrap().clone();
+
+        let diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let mut memoo = HashMap::new();
+        let node_cache = NodeCache::build(&before, &after);
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let total_cost = solve(
+            &before,
+            &after,
+            vec![before_root_id],
+            vec![after_root_id],
+            &node_cache,
+            &diff,
+            &mut memoo,
+        )?;
+
+        assert_eq!(total_cost, 1);
+
+        Ok(())
+    }
+
+    #[test]
     fn is_always_valid() -> Result<()> {
         let test_diffs = test::helper::handmade_test_diffs()?;
 
@@ -581,7 +619,7 @@ mod tests {
             };
 
             let node_cache = NodeCache::build(&before, &after);
-            find(&before, &after, &node_cache, &mut diff);
+            find(&before, &after, &node_cache, &mut diff)?;
 
             assert!(
                 diff.is_valid(&before, &after, &node_cache),
@@ -946,7 +984,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff);
+        find(&before, &after, &node_cache, &mut diff)?;
 
         assert!(diff.is_valid(&before, &after, &node_cache));
         assert!(diff.is_complete(&before, &after, &node_cache));
