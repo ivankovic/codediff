@@ -611,6 +611,67 @@ mod tests {
     }
 
     #[test]
+    fn solve_for_hello_world_added_message() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+
+        let diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let mut memoo = HashMap::new();
+        let node_cache = NodeCache::build(&before, &after);
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let total_cost = solve(
+            &before,
+            &after,
+            vec![before_root_id],
+            vec![after_root_id],
+            &node_cache,
+            &diff,
+            &mut memoo,
+        )?;
+
+        assert_eq!(total_cost, 11);
+
+        Ok(())
+    }
+
+    #[test]
+    fn solve_for_hello_world_deleted_message() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        // Swap before and after around to turn an add into a delete.
+        let (after, before) = test_diffs.get("hello-world-added-message").unwrap().clone();
+
+        let diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let mut memoo = HashMap::new();
+        let node_cache = NodeCache::build(&before, &after);
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let total_cost = solve(
+            &before,
+            &after,
+            vec![before_root_id],
+            vec![after_root_id],
+            &node_cache,
+            &diff,
+            &mut memoo,
+        )?;
+
+        assert_eq!(total_cost, 11);
+
+        Ok(())
+    }
+
+    #[test]
     fn is_always_valid() -> Result<()> {
         let test_diffs = test::helper::handmade_test_diffs()?;
 
@@ -652,13 +713,13 @@ mod tests {
                 ..Default::default()
             };
             let node_cache_ba = NodeCache::build(&b, &a);
-            find(&b, &a, &node_cache_ba, &mut b_a_diff);
+            find(&b, &a, &node_cache_ba, &mut b_a_diff)?;
 
             let mut a_b_diff = ASTDiff {
                 ..Default::default()
             };
             let node_cache_ab = NodeCache::build(&a, &b);
-            find(&a, &b, &node_cache_ab, &mut a_b_diff);
+            find(&a, &b, &node_cache_ab, &mut a_b_diff)?;
 
             let b_a_root_mapping = b_a_diff
                 .mapping
@@ -689,7 +750,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff);
+        find(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
