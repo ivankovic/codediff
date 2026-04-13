@@ -627,7 +627,7 @@ fn update_diff(
 #[cfg(test)]
 mod tests {
     use crate::{
-        diff::{COST_DELETE, COST_INSERT},
+        diff::{ASTMappingReason, COST_DELETE, COST_INSERT},
         test,
     };
     use anyhow::Result;
@@ -1327,6 +1327,41 @@ mod tests {
             mapping.cost, COST_UPDATE,
             "String content mapping cost should be COST_UPDATE"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn leetcode_1_bugfix() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        // Swap before and after around to turn an add into a delete.
+        let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let node_cache = NodeCache::build(&before, &after);
+        find(&before, &after, &node_cache, &mut diff)?;
+
+        assert!(diff.is_valid(&before, &after, &node_cache));
+        assert!(diff.is_complete(&before, &after, &node_cache));
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root_id = before_ast.root_node().id();
+        let after_root_id = after_ast.root_node().id();
+
+        // Check that root node has IdenticalHash reason
+        let root_mapping = diff
+            .mapping
+            .get(&(before_root_id, after_root_id))
+            .expect("Root node should be mapped");
+        assert_eq!(root_mapping.reason, ASTMappingReason::OptimalIDU,);
+
+        // A fully identical code can never have a cost.
+        assert_eq!(root_mapping.cost, 41);
 
         Ok(())
     }
