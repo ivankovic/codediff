@@ -870,6 +870,38 @@ mod tests {
     }
 
     #[test]
+    fn solve_for_leetcode_1_bugfix() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        // Swap before and after around to turn an add into a delete.
+        let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+
+        let diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let mut memoo = HashMap::new();
+        let node_cache = NodeCache::build(&before, &after);
+
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        let total_cost = solve(
+            &before,
+            &after,
+            vec![before_root_id],
+            vec![after_root_id],
+            &node_cache,
+            &diff,
+            &mut memoo,
+        )?;
+
+        // 41 new nodes are added
+        assert_eq!(total_cost, 41);
+
+        Ok(())
+    }
+
+    #[test]
     fn is_always_valid() -> Result<()> {
         let test_diffs = test::helper::handmade_test_diffs()?;
 
