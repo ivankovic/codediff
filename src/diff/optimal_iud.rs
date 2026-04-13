@@ -250,7 +250,7 @@ fn solve(
     let (before_has_unmached_nodes, before_first_unmached_node_index) =
         skip_matched_nodes(&before_subtrees, diff);
     let (after_has_unmached_nodes, after_first_unmached_node_index) =
-        skip_matched_nodes(&before_subtrees, diff);
+        skip_matched_nodes(&after_subtrees, diff);
 
     let algorithm_branch = choose_algorithm_branch(
         &before_subtrees,
@@ -285,7 +285,6 @@ fn solve(
                     count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
                 total_cost += unmatched as u64 * COST_INSERT;
             }
-            println!("I AM INSERTING EVERYTHIN: {}", total_cost);
             result.cost = total_cost;
             result.operation = ASTMappingOperation::InsertWithChildren;
         }
@@ -756,7 +755,6 @@ mod tests {
 
         // First check that the subproblem where before is [] and after is the
         // expression_statement node that as added, and it's subtree, was solved
-
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
             vec!["function_item", "block", "expression_statement:2"],
@@ -767,11 +765,10 @@ mod tests {
             .get(&(Vec::new(), vec![addedd_subtree_root_id]))
             .unwrap();
         assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
-        assert_eq!(solution.cost, 11);
+        assert_eq!(solution.cost, 12);
 
         // Then check that the solution was correctly propagated up the subproblem branch.
-
-        assert_eq!(total_cost, 11);
+        assert_eq!(total_cost, 12);
 
         Ok(())
     }
@@ -802,7 +799,7 @@ mod tests {
             &mut memoo,
         )?;
 
-        assert_eq!(total_cost, 11);
+        assert_eq!(total_cost, 12);
 
         Ok(())
     }
