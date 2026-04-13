@@ -310,6 +310,8 @@ fn solve(
 
             // The cost if we match the first roots
             let mut solution_if_match = Solution::new();
+            solution_if_match.cost = u64::MAX;
+
             if before_first_node.kind() == after_first_node.kind() {
                 let mut cost = 0;
 
@@ -741,6 +743,44 @@ mod tests {
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
+        // The optimal solution is to add 12 new nodes.
+        // To find this, the algorithm should find the following optimal branch:
+        //
+        // ([source_file], [source_file])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([function_item], [function_item])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([fn, identifier, params, block], [fn, identifier, params, block])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([identifier, params, block], [identifier, params, block])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([params, block], [params, block])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([block], [block])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([{, expression_statement, }], [{, expression_statement, expression_statement, }])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([expression_statement, }], [expression_statement, expression_statement, }])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // ([}], [expression_statement, }])
+        //      -> Branch: SolveFirstRoots Operation: Insert Index: 0
+        //
+        // ([], [macro_invocation, ;])
+        //      -> Branch: InsertAll Operation: InsertWithChildren
+        //
+        // ([}], [}])
+        //      -> Branch: SolveFirstRoots Operation: Identical
+        //
+        // Of course it will explore other sub-problems too, but they should all be more expensive.
+
         let total_cost = solve(
             &before,
             &after,
@@ -751,6 +791,7 @@ mod tests {
             &mut memoo,
         )?;
 
+        let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
 
         // First check that the subproblem where before is [] and after is the
@@ -767,7 +808,30 @@ mod tests {
         assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
         assert_eq!(solution.cost, 12);
 
-        // Then check that the solution was correctly propagated up the subproblem branch.
+        // Now we work backwards as explained in the comment above...
+        let before_closing_bracket = test::helper::node_for_path(
+            before_ast.root_node(),
+            vec!["function_item", "block", "}"],
+        )?;
+        let before_closing_bracket_id = before_closing_bracket.id();
+
+        let after_closing_bracket = test::helper::node_for_path(
+            after_ast.root_node(),
+            vec!["function_item", "block", "}"],
+        )?;
+        let after_closing_bracket_id = after_closing_bracket.id();
+
+        let solution = memoo
+            .get(&(
+                vec![before_closing_bracket_id],
+                vec![addedd_subtree_root_id, after_closing_bracket_id],
+            ))
+            .unwrap();
+        assert_eq!(solution.cost, 12);
+        assert_eq!(solution.index, 0);
+        assert_eq!(solution.operation, ASTMappingOperation::Insert);
+
+        // Finally, check the return value
         assert_eq!(total_cost, 12);
 
         Ok(())
