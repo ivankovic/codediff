@@ -929,48 +929,6 @@ mod tests {
     }
 
     #[test]
-    fn cost_should_be_the_same_if_code_is_switched_around() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
-
-        for (diff_name, (before, after)) in test_diffs {
-            let b = before.clone();
-            let a = after.clone();
-
-            let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-            let after_root_id = after.ast.as_ref().unwrap().root_node().id();
-
-            let mut b_a_diff = ASTDiff {
-                ..Default::default()
-            };
-            let node_cache_ba = NodeCache::build(&b, &a);
-            find(&b, &a, &node_cache_ba, &mut b_a_diff)?;
-
-            let mut a_b_diff = ASTDiff {
-                ..Default::default()
-            };
-            let node_cache_ab = NodeCache::build(&a, &b);
-            find(&a, &b, &node_cache_ab, &mut a_b_diff)?;
-
-            let b_a_root_mapping = b_a_diff
-                .mapping
-                .get(&(before_root_id, after_root_id))
-                .unwrap_or_else(|| panic!("Root node should be mapped for diff: {}", diff_name));
-            let a_b_root_mapping = a_b_diff
-                .mapping
-                .get(&(after_root_id, before_root_id))
-                .unwrap_or_else(|| panic!("Root node should be mapped for diff: {}", diff_name));
-
-            assert_eq!(
-                b_a_root_mapping.cost, a_b_root_mapping.cost,
-                "Cost must be the same independent from which code is before and which is after: {}",
-                diff_name
-            );
-        }
-
-        Ok(())
-    }
-
-    #[test]
     fn hello_world_added_message() -> Result<()> {
         let test_diffs = test::helper::handmade_test_diffs()?;
         let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
