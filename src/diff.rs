@@ -261,6 +261,8 @@ pub struct ASTMapping {
 pub enum ASTMappingOperation {
     #[default]
     /// Sentinel value.
+    NotYetSet,
+    /// A meta-operation that only makes sense if the diff is partially solved by other means.
     DoNothing,
     /// No operation is needed. The match is perfect.
     Identical,
