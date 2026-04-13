@@ -922,11 +922,11 @@ mod tests {
             let b_a_root_mapping = b_a_diff
                 .mapping
                 .get(&(before_root_id, after_root_id))
-                .expect("Root node should be mapped");
+                .unwrap_or_else(|| panic!("Root node should be mapped for diff: {}", diff_name));
             let a_b_root_mapping = a_b_diff
                 .mapping
                 .get(&(after_root_id, before_root_id))
-                .expect("Root node should be mapped");
+                .unwrap_or_else(|| panic!("Root node should be mapped for diff: {}", diff_name));
 
             assert_eq!(
                 b_a_root_mapping.cost, a_b_root_mapping.cost,
