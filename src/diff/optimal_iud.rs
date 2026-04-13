@@ -169,6 +169,7 @@ fn ids_of_children(node: &Node) -> Vec<usize> {
 fn skip_matched_nodes(subtrees: &[usize], diff: &ASTDiff) -> (bool, usize) {
     let mut first_unmached_node_index = 0;
     let mut has_unmached_nodes = false;
+
     for (i, node_id) in subtrees.iter().enumerate() {
         if !diff.is_node_mapped(node_id) {
             has_unmached_nodes = true;
@@ -284,6 +285,7 @@ fn solve(
                     count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
                 total_cost += unmatched as u64 * COST_INSERT;
             }
+            println!("I AM INSERTING EVERYTHIN: {}", total_cost);
             result.cost = total_cost;
             result.operation = ASTMappingOperation::InsertWithChildren;
         }
@@ -668,6 +670,32 @@ mod tests {
     }
 
     #[test]
+    fn skip_matched_nodes_test() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        let (_, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+
+        let diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let after_ast = after.ast.unwrap();
+
+        let added_subtree = test::helper::node_for_path(
+            after_ast.root_node(),
+            vec!["function_item", "block", "expression_statement:2"],
+        )?;
+        let addedd_subtree_root_id = added_subtree.id();
+
+        let (has_unmached_nodes, first_unmached_node_index) =
+            skip_matched_nodes(&[addedd_subtree_root_id], &diff);
+
+        assert!(has_unmached_nodes);
+        assert_eq!(first_unmached_node_index, 0);
+
+        Ok(())
+    }
+
+    #[test]
     fn solve_for_hello_world_translation() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
 
@@ -738,8 +766,8 @@ mod tests {
         let solution = memoo
             .get(&(Vec::new(), vec![addedd_subtree_root_id]))
             .unwrap();
-        assert_eq!(solution.cost, 11);
         assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
+        assert_eq!(solution.cost, 11);
 
         // Then check that the solution was correctly propagated up the subproblem branch.
 
