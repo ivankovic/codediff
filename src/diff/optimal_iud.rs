@@ -724,6 +724,25 @@ mod tests {
             &mut memoo,
         )?;
 
+        let after_ast = after.ast.unwrap();
+
+        // First check that the subproblem where before is [] and after is the
+        // expression_statement node that as added, and it's subtree, was solved
+
+        let added_subtree = test::helper::node_for_path(
+            after_ast.root_node(),
+            vec!["function_item", "block", "expression_statement:2"],
+        )?;
+        let addedd_subtree_root_id = added_subtree.id();
+
+        let solution = memoo
+            .get(&(Vec::new(), vec![addedd_subtree_root_id]))
+            .unwrap();
+        assert_eq!(solution.cost, 11);
+        assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
+
+        // Then check that the solution was correctly propagated up the subproblem branch.
+
         assert_eq!(total_cost, 11);
 
         Ok(())
