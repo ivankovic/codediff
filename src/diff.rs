@@ -89,7 +89,7 @@ impl NodeCache {
         }
     }
 
-    pub fn get_in_any(&self, node_id: &usize) -> Option<&Node> {
+    pub fn get_in_any(&self, node_id: &usize) -> Option<&Node<'_>> {
         if self.before.contains_key(node_id) {
             return self.before.get(node_id);
         }
@@ -155,7 +155,7 @@ impl ASTDiff {
      *
      * Useful in tests.
      */
-    pub fn is_valid(&self, before: &Code, after: &Code, node_cache: &NodeCache) -> bool {
+    pub fn is_valid(&self, _before: &Code, _after: &Code, node_cache: &NodeCache) -> bool {
         // Check that each mapping only maps nodes of the same type
         for (before_id, after_id) in self.mapping.keys() {
             if *before_id == 0 || *after_id == 0 {
@@ -331,7 +331,7 @@ pub enum ASTMappingReason {
 * adds all their children nodes with the IdenticalHashOfAncestor reason.
 */
 fn match_identical_trees(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_tree = before.ast.as_ref().expect("Before code must be parsed");
+    let _before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
@@ -479,7 +479,7 @@ fn match_structurally_identical_trees(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) {
-    let before_tree = before.ast.as_ref().expect("Before code must be parsed");
+    let _before_tree = before.ast.as_ref().expect("Before code must be parsed");
     let after_tree = after.ast.as_ref().expect("After code must be parsed");
     let after_root = after_tree.root_node();
 
@@ -668,7 +668,7 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
 
     match_identical_trees(before, after, &node_cache, &mut diff);
     match_structurally_identical_trees(before, after, &node_cache, &mut diff);
-    optimal_iud::find(before, after, &node_cache, &mut diff);
+    let _ = optimal_iud::find(before, after, &node_cache, &mut diff);
 
     Diff { ast: Some(diff) }
 }
