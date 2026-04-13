@@ -451,14 +451,14 @@ fn add_subtree_to_diff(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) -> Result<u64> {
-    let mut total_cost = cost_of_one_operation;
+    let mut total_cost = 0;
 
     for node_id in node_ids {
         let node = node_cache
             .get_in_any(&node_id)
             .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
 
-        let cost = add_subtree_to_diff(
+        let children_cost = add_subtree_to_diff(
             ids_of_children(node),
             operation,
             cost_of_one_operation,
@@ -466,10 +466,11 @@ fn add_subtree_to_diff(
             diff,
         )?;
 
-        total_cost += cost;
+        let node_cost = cost_of_one_operation + children_cost;
+        total_cost += node_cost;
 
         let mapping = ASTMapping {
-            cost,
+            cost: node_cost,
             operation: operation.clone(),
             reason: super::ASTMappingReason::OptimalIDU,
         };
@@ -514,7 +515,7 @@ fn update_diff(
         let (before_has_unmached_nodes, before_first_unmached_node_index) =
             skip_matched_nodes(&before_subtrees, diff);
         let (after_has_unmached_nodes, after_first_unmached_node_index) =
-            skip_matched_nodes(&before_subtrees, diff);
+            skip_matched_nodes(&after_subtrees, diff);
 
         let algorithm_branch = choose_algorithm_branch(
             &before_subtrees,
@@ -972,11 +973,11 @@ mod tests {
         );
         let added_expression_node_mapping = added_expression_node_mapping.unwrap();
 
-        // The added line has 11 nodes, starting with an expression_statement as the root of the
+        // The added line has 12 nodes, starting with an expression_statement as the root of the
         // subtree.
         assert_eq!(
             added_expression_node_mapping.cost,
-            COST_INSERT * 11,
+            COST_INSERT * 12,
             "String content mapping cost should be COST_UPDATE"
         );
 
@@ -1013,16 +1014,16 @@ mod tests {
             vec!["function_item", "block", "expression_statement:2"],
         )?;
 
-        let deleted_expression_node_mapping = diff.mapping.get(&(0, deleted_expression_node.id()));
+        let deleted_expression_node_mapping = diff.mapping.get(&(deleted_expression_node.id(), 0));
         assert!(
             deleted_expression_node_mapping.is_some(),
-            "The node that represents the added line is not mapped as a deleted node"
+            "The node that represents the deleted line is not mapped as a deleted node"
         );
         let deleted_expression_node_mapping = deleted_expression_node_mapping.unwrap();
 
         assert_eq!(
             deleted_expression_node_mapping.cost,
-            COST_DELETE * 11,
+            COST_DELETE * 12,
             "String content mapping cost should be COST_UPDATE"
         );
 
@@ -1099,7 +1100,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff);
+        find(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
@@ -1171,7 +1172,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff);
+        find(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
