@@ -222,6 +222,16 @@ impl ASTDiff {
 
         true
     }
+
+    /**
+     * Returns true if the node is mapped in any subtree.
+     */
+    pub fn is_node_mapped(&self, node_id: &usize) -> bool {
+        if self.before_node_map.contains_key(node_id) || self.after_node_map.contains_key(node_id) {
+            return true;
+        }
+        false
+    }
 }
 
 /**
@@ -251,7 +261,7 @@ pub struct ASTMapping {
 pub enum ASTMappingOperation {
     #[default]
     /// Sentinel value.
-    NotYetSet,
+    DoNothing,
     /// No operation is needed. The match is perfect.
     Identical,
     /// The node and it's entire subtree is moved to a different parent node.

@@ -17,7 +17,6 @@
  */
 use anyhow::Result;
 use std::collections::HashMap;
-use std::u64::MAX;
 use tree_sitter::Node;
 
 use crate::diff::{ASTDiff, ASTMapping, COST_UPDATE};
@@ -167,6 +166,59 @@ fn ids_of_children(node: &Node) -> Vec<usize> {
     ids
 }
 
+fn skip_matched_nodes(subtrees: &[usize], diff: &ASTDiff) -> (bool, usize) {
+    let mut first_unmached_node_index = 0;
+    let mut has_unmached_nodes = false;
+    for (i, node_id) in subtrees.iter().enumerate() {
+        if !diff.is_node_mapped(node_id) {
+            has_unmached_nodes = true;
+            first_unmached_node_index = i;
+            break;
+        }
+    }
+
+    (has_unmached_nodes, first_unmached_node_index)
+}
+
+/**
+* This is the branch of the algorithm that we choose based on the current state.
+*
+* We want to re-use exactly the same logic for solving the problem and for reconstructing the
+* solution so we need this enum to tell us what we did.
+*/
+#[derive(Debug, Clone, PartialEq)]
+enum AlgorithmChoice {
+    EmptyState,
+    AllNodesMatched,
+    SkipMatchedNodes,
+    InsertAll,
+    DeleteAll,
+    SolveFirstRoots,
+}
+
+fn choose_algorithm_branch(
+    before_subtrees: &[usize],
+    after_subtrees: &[usize],
+    before_has_unmached_nodes: bool,
+    before_first_unmached_node_index: usize,
+    after_has_unmached_nodes: bool,
+    after_first_unmached_node_index: usize,
+) -> AlgorithmChoice {
+    if before_subtrees.is_empty() && after_subtrees.is_empty() {
+        return AlgorithmChoice::EmptyState;
+    } else if !before_has_unmached_nodes && !after_has_unmached_nodes {
+        return AlgorithmChoice::AllNodesMatched;
+    } else if before_subtrees.is_empty() || !before_has_unmached_nodes {
+        return AlgorithmChoice::InsertAll;
+    } else if after_subtrees.is_empty() || !after_has_unmached_nodes {
+        return AlgorithmChoice::DeleteAll;
+    } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
+        return AlgorithmChoice::SkipMatchedNodes;
+    }
+
+    AlgorithmChoice::SolveFirstRoots
+}
+
 /**
 * Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
 * operations.
@@ -194,194 +246,193 @@ fn solve(
     }
     let mut result = Solution::new();
 
-    let mut before_first_unmached_node_index = 0;
-    let mut before_has_unmached_nodes = false;
-    for (i, node_id) in before_subtrees.iter().enumerate() {
-        if !diff.before_node_map.contains_key(node_id) {
-            before_has_unmached_nodes = true;
-            before_first_unmached_node_index = i;
-            break;
+    let (before_has_unmached_nodes, before_first_unmached_node_index) =
+        skip_matched_nodes(&before_subtrees, diff);
+    let (after_has_unmached_nodes, after_first_unmached_node_index) =
+        skip_matched_nodes(&before_subtrees, diff);
+
+    let algorithm_branch = choose_algorithm_branch(
+        &before_subtrees,
+        &after_subtrees,
+        before_has_unmached_nodes,
+        before_first_unmached_node_index,
+        after_has_unmached_nodes,
+        after_first_unmached_node_index,
+    );
+
+    match algorithm_branch {
+        AlgorithmChoice::EmptyState | AlgorithmChoice::AllNodesMatched => {
+            result.cost = 0;
+            result.operation = ASTMappingOperation::DoNothing;
         }
-    }
-
-    let mut after_first_unmached_node_index = 0;
-    let mut after_has_unmached_nodes = false;
-    for (i, node_id) in after_subtrees.iter().enumerate() {
-        if !diff.after_node_map.contains_key(node_id) {
-            after_has_unmached_nodes = true;
-            after_first_unmached_node_index = i;
-            break;
+        AlgorithmChoice::SkipMatchedNodes => {
+            result.cost = solve(
+                before,
+                after,
+                before_subtrees[before_first_unmached_node_index..].to_vec(),
+                after_subtrees[after_first_unmached_node_index..].to_vec(),
+                node_cache,
+                diff,
+                memoo,
+            )?;
+            result.operation = ASTMappingOperation::DoNothing;
         }
-    }
-
-    if !before_has_unmached_nodes && !after_has_unmached_nodes {
-        result.cost = 0;
-        // TODO: We need something like "AlreadySolved" operation... but it doesn't make sense in
-        // the broader context...
-        result.operation = ASTMappingOperation::NotYetSet;
-    } else if before_subtrees.is_empty() || !before_has_unmached_nodes {
-        let mut total_cost = 0;
-        for &after_id in &after_subtrees {
-            let unmatched =
-                count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
-            total_cost += unmatched as u64 * COST_INSERT;
+        AlgorithmChoice::InsertAll => {
+            let mut total_cost = 0;
+            for &after_id in &after_subtrees {
+                let unmatched =
+                    count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
+                total_cost += unmatched as u64 * COST_INSERT;
+            }
+            result.cost = total_cost;
+            result.operation = ASTMappingOperation::InsertWithChildren;
         }
-        result.cost = total_cost;
-        result.operation = ASTMappingOperation::InsertWithChildren;
-    } else if after_subtrees.is_empty() || !after_has_unmached_nodes {
-        let mut total_cost = 0;
-        for &before_id in &before_subtrees {
-            let unmatched =
-                count_unmatched_nodes(before_id, &node_cache.before, &diff.before_node_map);
-            total_cost += unmatched as u64 * COST_DELETE;
+        AlgorithmChoice::DeleteAll => {
+            let mut total_cost = 0;
+            for &before_id in &before_subtrees {
+                let unmatched =
+                    count_unmatched_nodes(before_id, &node_cache.before, &diff.before_node_map);
+                total_cost += unmatched as u64 * COST_DELETE;
+            }
+            result.cost = total_cost;
+            result.operation = ASTMappingOperation::DeleteWithChildren;
         }
-        result.cost = total_cost;
-        result.operation = ASTMappingOperation::DeleteWithChildren;
-    } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
-        return solve(
-            before,
-            after,
-            before_subtrees[before_first_unmached_node_index..].to_vec(),
-            after_subtrees[after_first_unmached_node_index..].to_vec(),
-            node_cache,
-            diff,
-            memoo,
-        );
-    } else {
-        let before_first_node = node_cache
-            .before
-            .get(&before_subtrees[0])
-            .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
-        let after_first_node = node_cache
-            .after
-            .get(&after_subtrees[0])
-            .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+        AlgorithmChoice::SolveFirstRoots => {
+            let before_first_node = node_cache
+                .before
+                .get(&before_subtrees[0])
+                .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+            let after_first_node = node_cache
+                .after
+                .get(&after_subtrees[0])
+                .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
 
-        // The cost if we match the first roots
-        let mut solution_if_match = Solution::new();
-        if before_first_node.kind() == after_first_node.kind() {
-            let mut cost = 0;
+            // The cost if we match the first roots
+            let mut solution_if_match = Solution::new();
+            if before_first_node.kind() == after_first_node.kind() {
+                let mut cost = 0;
 
-            if before_first_node.child_count() == 0 && after_first_node.child_count() == 0 {
-                let before_text = before_first_node.utf8_text(before.contents.as_bytes());
-                let after_text = after_first_node.utf8_text(after.contents.as_bytes());
+                if before_first_node.child_count() == 0 && after_first_node.child_count() == 0 {
+                    let before_text = before_first_node.utf8_text(before.contents.as_bytes());
+                    let after_text = after_first_node.utf8_text(after.contents.as_bytes());
 
-                if before_text == after_text {
-                    solution_if_match.operation = ASTMappingOperation::Identical;
+                    if before_text == after_text {
+                        solution_if_match.operation = ASTMappingOperation::Identical;
+                    } else {
+                        solution_if_match.operation = ASTMappingOperation::Update;
+                        cost += COST_UPDATE;
+                    }
                 } else {
-                    solution_if_match.operation = ASTMappingOperation::Update;
-                    cost += COST_UPDATE;
+                    solution_if_match.operation = ASTMappingOperation::Identical;
                 }
-            } else {
-                solution_if_match.operation = ASTMappingOperation::Identical;
+                cost += solve(
+                    before,
+                    after,
+                    before_subtrees[1..].to_vec(),
+                    after_subtrees[1..].to_vec(),
+                    node_cache,
+                    diff,
+                    memoo,
+                )? + solve(
+                    before,
+                    after,
+                    ids_of_children(before_first_node),
+                    ids_of_children(after_first_node),
+                    node_cache,
+                    diff,
+                    memoo,
+                )?;
+                solution_if_match.cost = cost;
             }
-            cost += solve(
-                before,
-                after,
-                before_subtrees[1..].to_vec(),
-                after_subtrees[1..].to_vec(),
-                node_cache,
-                diff,
-                memoo,
-            )? + solve(
-                before,
-                after,
-                ids_of_children(before_first_node),
-                ids_of_children(after_first_node),
-                node_cache,
-                diff,
-                memoo,
-            )?;
-            solution_if_match.cost = cost;
-        }
 
-        // The cost if we delete the first root in before
-        // We need to check all possible subsequences of root nodes in after_subtrees, including
-        // the empty set, to check which is the optimal number of nodes in after_subtrees to match
-        // with the children of the first root node in before_subtrees.
-        let mut solution_if_delete = Solution::new();
-        solution_if_delete.operation = ASTMappingOperation::Delete;
-        solution_if_delete.cost = MAX;
+            // The cost if we delete the first root in before
+            // We need to check all possible subsequences of root nodes in after_subtrees, including
+            // the empty set, to check which is the optimal number of nodes in after_subtrees to match
+            // with the children of the first root node in before_subtrees.
+            let mut solution_if_delete = Solution::new();
+            solution_if_delete.operation = ASTMappingOperation::Delete;
+            solution_if_delete.cost = u64::MAX;
 
-        for i in 0..=after_subtrees.len() {
-            let mut cost = COST_DELETE;
+            for i in 0..=after_subtrees.len() {
+                let mut cost = COST_DELETE;
 
-            cost += solve(
-                before,
-                after,
-                before_subtrees[1..].to_vec(),
-                after_subtrees[i..].to_vec(),
-                node_cache,
-                diff,
-                memoo,
-            )? + solve(
-                before,
-                after,
-                ids_of_children(before_first_node),
-                after_subtrees[..i].to_vec(),
-                node_cache,
-                diff,
-                memoo,
-            )?;
+                cost += solve(
+                    before,
+                    after,
+                    before_subtrees[1..].to_vec(),
+                    after_subtrees[i..].to_vec(),
+                    node_cache,
+                    diff,
+                    memoo,
+                )? + solve(
+                    before,
+                    after,
+                    ids_of_children(before_first_node),
+                    after_subtrees[..i].to_vec(),
+                    node_cache,
+                    diff,
+                    memoo,
+                )?;
 
-            if cost < solution_if_delete.cost {
-                solution_if_delete.cost = cost;
-                solution_if_delete.index = i;
+                if cost < solution_if_delete.cost {
+                    solution_if_delete.cost = cost;
+                    solution_if_delete.index = i;
+                }
             }
-        }
 
-        // The cost if we insert the first root in after
-        // We need to check all possible subsequences of root nodes in before_subtrees, including
-        // the empty set, to check which is the optimal number of nodes in before_subtrees to match
-        // with the children of the first root node in after_subtrees.
-        let mut solution_if_insert = Solution::new();
-        solution_if_insert.operation = ASTMappingOperation::Insert;
-        solution_if_insert.cost = MAX;
+            // The cost if we insert the first root in after
+            // We need to check all possible subsequences of root nodes in before_subtrees, including
+            // the empty set, to check which is the optimal number of nodes in before_subtrees to match
+            // with the children of the first root node in after_subtrees.
+            let mut solution_if_insert = Solution::new();
+            solution_if_insert.operation = ASTMappingOperation::Insert;
+            solution_if_insert.cost = u64::MAX;
 
-        for i in 0..=before_subtrees.len() {
-            let mut cost = COST_INSERT;
+            for i in 0..=before_subtrees.len() {
+                let mut cost = COST_INSERT;
 
-            cost += solve(
-                before,
-                after,
-                before_subtrees[i..].to_vec(),
-                after_subtrees[1..].to_vec(),
-                node_cache,
-                diff,
-                memoo,
-            )? + solve(
-                before,
-                after,
-                before_subtrees[..i].to_vec(),
-                ids_of_children(after_first_node),
-                node_cache,
-                diff,
-                memoo,
-            )?;
+                cost += solve(
+                    before,
+                    after,
+                    before_subtrees[i..].to_vec(),
+                    after_subtrees[1..].to_vec(),
+                    node_cache,
+                    diff,
+                    memoo,
+                )? + solve(
+                    before,
+                    after,
+                    before_subtrees[..i].to_vec(),
+                    ids_of_children(after_first_node),
+                    node_cache,
+                    diff,
+                    memoo,
+                )?;
 
-            if cost < solution_if_insert.cost {
-                solution_if_insert.cost = cost;
-                solution_if_insert.index = i;
+                if cost < solution_if_insert.cost {
+                    solution_if_insert.cost = cost;
+                    solution_if_insert.index = i;
+                }
             }
-        }
 
-        // Pick the cheapest of the tree costs, that is our final result.
-        //
-        // There is a subtle preference here, if the costs are exactly equal, we prefer matching
-        // and if delete and insert are both equal and cheaper than match, we prefer a delete.
-        //
-        // This is based on how the diff is displayed to humans and personal human preference of
-        // the author.
-        if solution_if_match.cost <= solution_if_delete.cost {
-            if solution_if_match.cost <= solution_if_insert.cost {
-                result = solution_if_match;
+            // Pick the cheapest of the tree costs, that is our final result.
+            //
+            // There is a subtle preference here, if the costs are exactly equal, we prefer matching
+            // and if delete and insert are both equal and cheaper than match, we prefer a delete.
+            //
+            // This is based on how the diff is displayed to humans and personal human preference of
+            // the author.
+            if solution_if_match.cost <= solution_if_delete.cost {
+                if solution_if_match.cost <= solution_if_insert.cost {
+                    result = solution_if_match;
+                } else {
+                    result = solution_if_insert;
+                }
+            } else if solution_if_delete.cost <= solution_if_insert.cost {
+                result = solution_if_delete;
             } else {
                 result = solution_if_insert;
             }
-        } else if solution_if_delete.cost <= solution_if_insert.cost {
-            result = solution_if_delete;
-        } else {
-            result = solution_if_insert;
         }
     }
 
@@ -452,47 +503,27 @@ fn update_diff(
 
     stack.push((vec![before_root_id], vec![after_root_id]));
 
-    while let Some((before_nodes, after_nodes)) = stack.pop() {
-        if before_nodes.is_empty() && after_nodes.is_empty() {
+    while let Some((before_subtrees, after_subtrees)) = stack.pop() {
+        if before_subtrees.is_empty() && after_subtrees.is_empty() {
             continue;
         }
 
-        let mut before_first_unmached_node_index = 0;
-        let mut before_has_unmached_nodes = false;
-        for (i, node_id) in before_nodes.iter().enumerate() {
-            if !diff.before_node_map.contains_key(node_id) {
-                before_has_unmached_nodes = true;
-                before_first_unmached_node_index = i;
-                break;
-            }
-        }
+        let (before_has_unmached_nodes, before_first_unmached_node_index) =
+            skip_matched_nodes(&before_subtrees, diff);
+        let (after_has_unmached_nodes, after_first_unmached_node_index) =
+            skip_matched_nodes(&before_subtrees, diff);
 
-        let mut after_first_unmached_node_index = 0;
-        let mut after_has_unmached_nodes = false;
-        for (i, node_id) in after_nodes.iter().enumerate() {
-            if !diff.after_node_map.contains_key(node_id) {
-                after_has_unmached_nodes = true;
-                after_first_unmached_node_index = i;
-                break;
-            }
-        }
-
-        if !before_has_unmached_nodes && !after_has_unmached_nodes {
-            continue;
-        }
-        if before_has_unmached_nodes
-            && after_has_unmached_nodes
-            && (before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0)
-        {
-            stack.push((
-                before_nodes[before_first_unmached_node_index..].to_vec(),
-                after_nodes[after_first_unmached_node_index..].to_vec(),
-            ));
-            continue;
-        }
+        let algorithm_branch = choose_algorithm_branch(
+            &before_subtrees,
+            &after_subtrees,
+            before_has_unmached_nodes,
+            before_first_unmached_node_index,
+            after_has_unmached_nodes,
+            after_first_unmached_node_index,
+        );
 
         let solution = memoo
-            .get(&(before_nodes.clone(), after_nodes.clone()))
+            .get(&(before_subtrees.clone(), after_subtrees.clone()))
             .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
         let mapping = ASTMapping {
             cost: solution.cost,
@@ -500,32 +531,90 @@ fn update_diff(
             reason: super::ASTMappingReason::OptimalIDU,
         };
 
-        if solution.operation == ASTMappingOperation::DeleteWithChildren {
-            add_subtree_to_diff(
-                before_nodes,
-                &solution.operation,
-                COST_DELETE,
-                node_cache,
-                diff,
-            )?;
-        } else if solution.operation == ASTMappingOperation::InsertWithChildren {
-            add_subtree_to_diff(
-                after_nodes,
-                &solution.operation,
-                COST_INSERT,
-                node_cache,
-                diff,
-            )?;
-        } else if solution.operation == ASTMappingOperation::Identical
-            || solution.operation == ASTMappingOperation::Update
-        {
-            diff.add_mapping(before_nodes[0], after_nodes[0], mapping);
-            if before_nodes.len() > 1 || after_nodes.len() > 1 {
-                stack.push((before_nodes[1..].to_vec(), after_nodes[1..].to_vec()));
+        match algorithm_branch {
+            AlgorithmChoice::EmptyState | AlgorithmChoice::AllNodesMatched => {
+                continue;
             }
-            // TODO:Add children. WE need to get the nodes out of cache for that.
+            AlgorithmChoice::SkipMatchedNodes => {
+                stack.push((
+                    before_subtrees[before_first_unmached_node_index..].to_vec(),
+                    after_subtrees[after_first_unmached_node_index..].to_vec(),
+                ));
+            }
+            AlgorithmChoice::InsertAll => {
+                // Terminal branch, nothing to add to the stack.
+                add_subtree_to_diff(
+                    after_subtrees,
+                    &solution.operation,
+                    COST_INSERT,
+                    node_cache,
+                    diff,
+                )?;
+            }
+            AlgorithmChoice::DeleteAll => {
+                add_subtree_to_diff(
+                    before_subtrees,
+                    &solution.operation,
+                    COST_DELETE,
+                    node_cache,
+                    diff,
+                )?;
+                // Terminal branch, nothing to add to the stack.
+            }
+            AlgorithmChoice::SolveFirstRoots => {
+                let before_first_node = node_cache
+                    .before
+                    .get(&before_subtrees[0])
+                    .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+                let after_first_node = node_cache
+                    .after
+                    .get(&after_subtrees[0])
+                    .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+                match solution.operation {
+                    ASTMappingOperation::Identical | ASTMappingOperation::Update => {
+                        diff.add_mapping(before_subtrees[0], after_subtrees[0], mapping);
+                        if before_subtrees.len() > 1 || after_subtrees.len() > 1 {
+                            stack.push((
+                                before_subtrees[1..].to_vec(),
+                                after_subtrees[1..].to_vec(),
+                            ));
+                        }
+
+                        stack.push((
+                            ids_of_children(before_first_node),
+                            ids_of_children(after_first_node),
+                        ));
+                    }
+                    ASTMappingOperation::Insert => {
+                        diff.add_mapping(0, after_subtrees[0], mapping);
+
+                        stack.push((
+                            before_subtrees[solution.index..].to_vec(),
+                            after_subtrees[1..].to_vec(),
+                        ));
+                        stack.push((
+                            before_subtrees[..solution.index].to_vec(),
+                            ids_of_children(after_first_node),
+                        ));
+                    }
+                    ASTMappingOperation::Delete => {
+                        diff.add_mapping(before_subtrees[0], 0, mapping);
+
+                        stack.push((
+                            before_subtrees[1..].to_vec(),
+                            after_subtrees[solution.index..].to_vec(),
+                        ));
+                        stack.push((
+                            ids_of_children(before_first_node),
+                            after_subtrees[..solution.index].to_vec(),
+                        ));
+                    }
+                    _ => {
+                        unreachable!("Invalid operation for first root solution");
+                    }
+                }
+            }
         }
-        // TODO: Other operations.
     }
 
     Ok(())
