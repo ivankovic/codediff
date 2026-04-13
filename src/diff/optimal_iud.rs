@@ -1187,11 +1187,11 @@ mod tests {
         let after_ast = after.ast.unwrap();
 
         let deleted_if_node = test::helper::node_for_path(
-            after_ast.root_node(),
+            before_ast.root_node(),
             vec!["if_statement", "block", "if_statement"],
         )?;
 
-        let deleted_if_node_mapping = diff.mapping.get(&(0, deleted_if_node.id()));
+        let deleted_if_node_mapping = diff.mapping.get(&(deleted_if_node.id(), 0));
         assert!(
             deleted_if_node_mapping.is_some(),
             "The node that represents the deleted if statement is not mapped as an deleted node"
@@ -1205,18 +1205,18 @@ mod tests {
         );
 
         let existing_expression_node = test::helper::node_for_path(
-            before_ast.root_node(),
+            after_ast.root_node(),
             vec!["if_statement", "block", "expression_statement:4"],
         )?;
 
-        let expression_node_in_after_id = diff
-            .before_node_map
+        let expression_node_in_before_id = diff
+            .after_node_map
             .get(&existing_expression_node.id())
             .expect("The un-indented expression is not found in the diff");
 
         let existing_expression_node_mapping = diff
             .mapping
-            .get(&(existing_expression_node.id(), *expression_node_in_after_id));
+            .get(&(*expression_node_in_before_id, existing_expression_node.id()));
 
         assert!(
             existing_expression_node_mapping.is_some(),
