@@ -1399,4 +1399,63 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn all_handmade_diffs_have_expected_costs() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+
+        // Static map of expected costs for each diff
+        let expected_costs: std::collections::HashMap<&str, u64> = [
+            ("no-change", 0),
+            ("hello-world-added-message", 12),
+            ("leet-code-1-bugfix", 41),
+            ("python-added-if-block", 13),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
+        for (diff_name, (before, after)) in test_diffs {
+            let mut diff = ASTDiff {
+                ..Default::default()
+            };
+
+            let node_cache = NodeCache::build(&before, &after);
+            find(&before, &after, &node_cache, &mut diff)?;
+
+            assert!(
+                diff.is_valid(&before, &after, &node_cache),
+                "Diff should be valid for: {}",
+                diff_name
+            );
+            assert!(
+                diff.is_complete(&before, &after, &node_cache),
+                "Diff should be complete for: {}",
+                diff_name
+            );
+
+            // Get the expected cost for this diff
+            let expected_cost = expected_costs
+                .get(diff_name.as_str())
+                .copied()
+                .unwrap_or_else(|| panic!("No expected cost defined for diff: {}", diff_name));
+
+            // Get the root node mapping to check the cost
+            let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+            let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+            let root_mapping = diff
+                .mapping
+                .get(&(before_root_id, after_root_id))
+                .expect("Root node should be mapped");
+
+            assert_eq!(
+                root_mapping.cost, expected_cost,
+                "Expected cost {} for diff '{}', but got {}",
+                expected_cost, diff_name, root_mapping.cost
+            );
+        }
+
+        Ok(())
+    }
 }
