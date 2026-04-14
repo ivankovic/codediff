@@ -349,6 +349,10 @@ fn solve(
                 solution_if_match.cost = cost;
             }
 
+            // We use this to opportunisticaly skip entire branches of subproblems that cannot
+            // possibly result in a better solution.
+            let mut best_cost_so_far = solution_if_match.cost;
+
             // The cost if we delete the first root in before
             // We need to check all possible subsequences of root nodes in after_subtrees, including
             // the empty set, to check which is the optimal number of nodes in after_subtrees to match
@@ -360,11 +364,11 @@ fn solve(
             // Pre-compute the common slice to avoid repeated allocation
             let before_rest = before_subtrees[1..].to_vec();
             let before_children = ids_of_children(before_first_node);
-            
+
             for i in 0..=after_subtrees.len() {
                 let mut cost = COST_DELETE;
 
-                cost += solve(
+                let cost_to_match_rest = solve(
                     before,
                     after,
                     before_rest.clone(),
@@ -372,19 +376,29 @@ fn solve(
                     node_cache,
                     diff,
                     memoo,
-                )? + solve(
-                    before,
-                    after,
-                    before_children.clone(),
-                    after_subtrees[..i].to_vec(),
-                    node_cache,
-                    diff,
-                    memoo,
                 )?;
+
+                if cost + cost_to_match_rest >= best_cost_so_far {
+                    continue;
+                }
+
+                cost += cost_to_match_rest
+                    + solve(
+                        before,
+                        after,
+                        before_children.clone(),
+                        after_subtrees[..i].to_vec(),
+                        node_cache,
+                        diff,
+                        memoo,
+                    )?;
 
                 if cost < solution_if_delete.cost {
                     solution_if_delete.cost = cost;
                     solution_if_delete.index = i;
+                }
+                if cost < best_cost_so_far {
+                    best_cost_so_far = cost;
                 }
             }
 
@@ -399,11 +413,11 @@ fn solve(
             // Pre-compute the common slices to avoid repeated allocation
             let after_rest = after_subtrees[1..].to_vec();
             let after_children = ids_of_children(after_first_node);
-            
+
             for i in 0..=before_subtrees.len() {
                 let mut cost = COST_INSERT;
 
-                cost += solve(
+                let cost_to_mach_rest = solve(
                     before,
                     after,
                     before_subtrees[i..].to_vec(),
@@ -411,19 +425,29 @@ fn solve(
                     node_cache,
                     diff,
                     memoo,
-                )? + solve(
-                    before,
-                    after,
-                    before_subtrees[..i].to_vec(),
-                    after_children.clone(),
-                    node_cache,
-                    diff,
-                    memoo,
                 )?;
+
+                if cost + cost_to_mach_rest >= best_cost_so_far {
+                    continue;
+                }
+
+                cost += cost_to_mach_rest
+                    + solve(
+                        before,
+                        after,
+                        before_subtrees[..i].to_vec(),
+                        after_children.clone(),
+                        node_cache,
+                        diff,
+                        memoo,
+                    )?;
 
                 if cost < solution_if_insert.cost {
                     solution_if_insert.cost = cost;
                     solution_if_insert.index = i;
+                }
+                if cost < best_cost_so_far {
+                    best_cost_so_far = cost;
                 }
             }
 
