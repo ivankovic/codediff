@@ -1,0 +1,20 @@
+def process_data(data):
+    """Process data with validation"""
+    if not data:
+        return None
+    
+    # Basic processing
+    result = []
+    for item in data:
+        if item > 0:
+            result.append(item * 2)
+    
+    return result
+
+def main():
+    data = [1, -2, 3, -4, 5]
+    processed = process_data(data)
+    print(f"Processed: {processed}")
+
+if __name__ == "__main__":
+    main()

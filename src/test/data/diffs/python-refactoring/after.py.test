@@ -1,0 +1,19 @@
+def calculate_stats(numbers):
+    """Calculate basic statistics"""
+    if not numbers:
+        return None
+    
+    # Use built-in functions for cleaner code
+    total = sum(numbers)
+    count = len(numbers)
+    average = total / count
+    max_val = max(numbers)
+    min_val = min(numbers)
+    
+    return {
+        'average': average,
+        'max': max_val,
+        'min': min_val,
+        'count': count,
+        'total': total  # Added total to returned stats
+    }

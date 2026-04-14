@@ -1,0 +1,28 @@
+def calculate_stats(numbers):
+    """Calculate basic statistics"""
+    if not numbers:
+        return None
+    
+    total = 0
+    count = 0
+    for num in numbers:
+        total += num
+        count += 1
+    
+    average = total / count
+    
+    # Find max and min
+    max_val = numbers[0]
+    min_val = numbers[0]
+    for num in numbers:
+        if num > max_val:
+            max_val = num
+        if num < min_val:
+            min_val = num
+    
+    return {
+        'average': average,
+        'max': max_val,
+        'min': min_val,
+        'count': count
+    }

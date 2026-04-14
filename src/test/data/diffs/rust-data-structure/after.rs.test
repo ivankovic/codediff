@@ -1,0 +1,28 @@
+[derive(Debug, Clone, Copy)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn new(x: i32, y: i32) -> Self {
+        Point { x, y }
+    }
+    
+    fn distance_from_origin(&self) -> f64 {
+        ((self.x.pow(2) + self.y.pow(2)) as f64).sqrt()
+    }
+}
+
+fn main() {
+    let points = vec![
+        Point::new(1, 2),
+        Point::new(3, 4),
+        Point::new(5, 6),
+    ];
+    
+    for point in &points {
+        println!("Point: ({}, {}) - Distance: {:.2}", 
+                 point.x, point.y, point.distance_from_origin());
+    }
+}

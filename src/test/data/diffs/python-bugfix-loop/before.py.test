@@ -1,0 +1,24 @@
+def find_duplicate(nums):
+    """Find duplicate number in array where numbers are from 1 to n-1"""
+    seen = set()
+    
+    for num in nums:
+        if num in seen:
+            return num
+        seen.add(num)
+    
+    return -1
+
+def test_find_duplicate():
+    # Test case 1: duplicate exists
+    nums1 = [1, 3, 4, 2, 2]
+    assert find_duplicate(nums1) == 2
+    
+    # Test case 2: no duplicate
+    nums2 = [1, 2, 3, 4]
+    assert find_duplicate(nums2) == -1
+    
+    print("All tests passed!")
+
+if __name__ == "__main__":
+    test_find_duplicate()

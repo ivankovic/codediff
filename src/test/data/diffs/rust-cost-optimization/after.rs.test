@@ -1,0 +1,34 @@
+fn solve(subtrees: &[usize]) -> u64 {
+    let mut best_cost = u64::MAX;
+    
+    // Optimized approach: early termination when current cost exceeds best
+    for i in 0..subtrees.len() {
+        let cost = calculate_cost(subtrees, i);
+        
+        // Early termination optimization
+        if cost >= best_cost {
+            continue;
+        }
+        
+        if cost < best_cost {
+            best_cost = cost;
+        }
+    }
+    
+    best_cost
+}
+
+fn calculate_cost(subtrees: &[usize], index: usize) -> u64 {
+    // Simulate some cost calculation
+    let mut cost = 0;
+    for &id in &subtrees[..index] {
+        cost += id as u64;
+    }
+    cost
+}
+
+fn main() {
+    let subtrees = vec![1, 2, 3, 4, 5];
+    let result = solve(&subtrees);
+    println!("Best cost: {}", result);
+}

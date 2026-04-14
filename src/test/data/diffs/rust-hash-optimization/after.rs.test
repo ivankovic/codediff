@@ -1,0 +1,41 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct SubtreeKey {
+    hash: u64,
+    len: usize,
+    subtrees: Vec<usize>,
+}
+
+impl Hash for SubtreeKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+        self.len.hash(state);
+    }
+}
+
+impl SubtreeKey {
+    fn new(subtrees: &[usize]) -> Self {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for &id in subtrees {
+            id.hash(&mut hasher);
+        }
+        SubtreeKey {
+            hash: hasher.finish(),
+            len: subtrees.len(),
+            subtrees: subtrees.to_vec(),
+        }
+    }
+}
+
+fn main() {
+    let mut memoo: HashMap<(SubtreeKey, SubtreeKey), u64> = HashMap::new();
+    let before_subtrees = vec![1, 2, 3];
+    let after_subtrees = vec![4, 5, 6];
+    
+    let before_key = SubtreeKey::new(&before_subtrees);
+    let after_key = SubtreeKey::new(&after_subtrees);
+    let key = (before_key.clone(), after_key.clone());
+    memoo.insert(key, 42);
+}

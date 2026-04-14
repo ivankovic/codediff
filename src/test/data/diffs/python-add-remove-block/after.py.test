@@ -1,0 +1,28 @@
+def process_data(data):
+    """Process data with validation and filtering"""
+    if not data:
+        return None
+    
+    # Basic processing
+    result = []
+    for item in data:
+        if item > 0:
+            result.append(item * 2)
+    
+    # Added: Additional filtering block
+    if len(result) > 0:
+        filtered = []
+        for num in result:
+            if num < 10:
+                filtered.append(num)
+        return filtered
+    
+    return result
+
+def main():
+    data = [1, -2, 3, -4, 5]
+    processed = process_data(data)
+    print(f"Processed: {processed}")
+
+if __name__ == "__main__":
+    main()

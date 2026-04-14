@@ -1,0 +1,33 @@
+import requests
+from typing import Optional, Dict, Any
+
+def fetch_user_data(user_id: int, timeout: int = 10) -> Optional[Dict[str, Any]]:
+    """Fetch user data from API with improved error handling"""
+    url = f"https://api.example.com/v2/users/{user_id}"  # API version updated
+    
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching user data: {e}")
+        return None
+
+def get_user_email(user_id: int) -> Optional[str]:
+    """Get user email from API with type hints"""
+    user_data = fetch_user_data(user_id)
+    if user_data:
+        return user_data.get('email')
+    return None
+
+def get_user_info(user_id: int) -> Dict[str, Any]:
+    """New function to get comprehensive user info"""
+    user_data = fetch_user_data(user_id)
+    if not user_data:
+        return {'error': 'User not found'}
+    
+    return {
+        'email': user_data.get('email'),
+        'name': user_data.get('name'),
+        'id': user_id
+    }

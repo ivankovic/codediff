@@ -1,0 +1,22 @@
+use std::collections::HashMap;
+
+struct SubtreeKey {
+    subtrees: Vec<usize>,
+}
+
+impl SubtreeKey {
+    fn new(subtrees: &[usize]) -> Self {
+        SubtreeKey {
+            subtrees: subtrees.to_vec(),
+        }
+    }
+}
+
+fn main() {
+    let mut memoo: HashMap<(Vec<usize>, Vec<usize>), u64> = HashMap::new();
+    let before_subtrees = vec![1, 2, 3];
+    let after_subtrees = vec![4, 5, 6];
+    
+    let key = (before_subtrees.clone(), after_subtrees.clone());
+    memoo.insert(key, 42);
+}
