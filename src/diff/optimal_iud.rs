@@ -1447,6 +1447,15 @@ mod tests {
             ("hello-world-added-message", 12),
             ("leet-code-1-bugfix", 41),
             ("python-added-if-block", 13),
+            ("rust-error-handling", 63),
+            ("python-api-change", 230),
+            ("rust-cost-optimization", 16),
+            ("python-bugfix-loop", 43),
+            ("rust-hash-optimization", 223),
+            ("python-add-remove-block", 50),
+            ("rust-algorithm-change", 86),
+            ("python-refactoring", 93),
+            ("rust-data-structure", 145),
         ]
         .iter()
         .cloned()
@@ -1470,6 +1479,15 @@ mod tests {
                 "Diff should be complete for: {}",
                 diff_name
             );
+
+            // Get the root node mapping to check the cost
+            let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+            let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+            let root_mapping = diff
+                .mapping
+                .get(&(before_root_id, after_root_id))
+                .expect("Root node should be mapped");
 
             // Get the expected cost for this diff
             let expected_cost = expected_costs
