@@ -1359,4 +1359,44 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn no_change_skips_already_matched_nodes() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_diffs()?;
+        let (before, after) = test_diffs.get("no-change").unwrap().clone();
+
+        // First, run the full diff algorithm which should match all nodes
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+        let node_cache = NodeCache::build(&before, &after);
+
+        // This should match all nodes with IdenticalHash
+        crate::diff::match_identical_trees(&before, &after, &node_cache, &mut diff);
+
+        // Verify that all nodes are already mapped
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+        assert!(diff.mapping.contains_key(&(before_root_id, after_root_id)));
+
+        // Now test that find() correctly skips over already matched nodes
+        // by measuring execution time - it should be very fast (< 30ms)
+        let start_time = std::time::Instant::now();
+        let result = find(&before, &after, &node_cache, &mut diff);
+        let duration = start_time.elapsed();
+
+        assert!(result.is_ok(), "find() should succeed");
+        assert!(
+            duration.as_millis() < 30,
+            "find() should complete in < 30ms when all nodes are already matched, but took {}ms",
+            duration.as_millis()
+        );
+
+        // Verify the diff is still valid and complete
+        assert!(diff.is_valid(&before, &after, &node_cache));
+        assert!(diff.is_complete(&before, &after, &node_cache));
+
+        Ok(())
+    }
 }
