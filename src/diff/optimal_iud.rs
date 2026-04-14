@@ -17,10 +17,40 @@
  */
 use anyhow::Result;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use tree_sitter::Node;
 
 use crate::diff::{ASTDiff, ASTMapping, COST_UPDATE};
 use crate::{code::Code, diff::ASTMappingOperation};
+
+/// A hashable wrapper for subtree vectors to use as memoization keys
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct SubtreeKey {
+    hash: u64,
+    len: usize,
+    subtrees: Vec<usize>,
+}
+
+impl Hash for SubtreeKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+        self.len.hash(state);
+    }
+}
+
+impl SubtreeKey {
+    fn new(subtrees: &[usize]) -> Self {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for &id in subtrees {
+            id.hash(&mut hasher);
+        }
+        SubtreeKey {
+            hash: hasher.finish(),
+            len: subtrees.len(),
+            subtrees: subtrees.to_vec(),
+        }
+    }
+}
 
 /**
 * Find the optimal mapping for all nodes in before and after that have not yet been mapped in diff,
@@ -234,7 +264,7 @@ fn solve(
     after_subtrees: Vec<usize>,
     node_cache: &NodeCache,
     diff: &ASTDiff,
-    memoo: &mut HashMap<(Vec<usize>, Vec<usize>), Solution>,
+    memoo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
 ) -> Result<u64> {
     // If both subtrees are empty, there is nothing to do.
     if before_subtrees.is_empty() && after_subtrees.is_empty() {
@@ -242,7 +272,9 @@ fn solve(
     }
 
     // Check if memoo already has the solution for this input and return that.
-    let key = (before_subtrees.clone(), after_subtrees.clone());
+    let before_key = SubtreeKey::new(&before_subtrees);
+    let after_key = SubtreeKey::new(&after_subtrees);
+    let key = (before_key.clone(), after_key.clone());
     if let Some(solution) = memoo.get(&key) {
         return Ok(solution.cost);
     }
@@ -473,7 +505,7 @@ fn solve(
     }
 
     // Insert the solution into memoo with the before and after subtrees as the key.
-    let key = (before_subtrees, after_subtrees);
+    let key = (before_key, after_key);
     let cost = result.cost;
     memoo.insert(key, result);
     Ok(cost)
@@ -532,7 +564,7 @@ fn update_diff(
     before: &Code,
     after: &Code,
     node_cache: &NodeCache,
-    memoo: &HashMap<(Vec<usize>, Vec<usize>), Solution>,
+    memoo: &HashMap<(SubtreeKey, SubtreeKey), Solution>,
     diff: &mut ASTDiff,
 ) -> Result<()> {
     let mut stack = Vec::new();
@@ -561,7 +593,9 @@ fn update_diff(
             after_first_unmached_node_index,
         );
 
-        let key = (before_subtrees.clone(), after_subtrees.clone());
+        let before_key = SubtreeKey::new(&before_subtrees);
+        let after_key = SubtreeKey::new(&after_subtrees);
+        let key = (before_key, after_key);
         let solution = memoo
             .get(&key)
             .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
@@ -839,7 +873,10 @@ mod tests {
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
-        let solution = memoo
+        let old_memoo: HashMap<(Vec<usize>, Vec<usize>), Solution> = memoo.iter()
+            .map(|((before_key, after_key), solution)| ((before_key.subtrees.clone(), after_key.subtrees.clone()), solution.clone()))
+            .collect();
+        let solution = old_memoo
             .get(&(Vec::new(), vec![addedd_subtree_root_id]))
             .unwrap();
         assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
@@ -858,7 +895,7 @@ mod tests {
         )?;
         let after_closing_bracket_id = after_closing_bracket.id();
 
-        let solution = memoo
+        let solution = old_memoo
             .get(&(
                 vec![before_closing_bracket_id],
                 vec![addedd_subtree_root_id, after_closing_bracket_id],
