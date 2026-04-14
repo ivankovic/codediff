@@ -32,104 +32,51 @@ fn benchmark_optimal_iud_find(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(60));
     group.warm_up_time(Duration::from_secs(2));
 
-    // 1. Simple translation (hello-world.rs -> zdravo-svijete.rs)
-    let before_hello = test_codes.get("hello-world.rs").unwrap().clone();
-    let after_hello = test_codes.get("zdravo-svijete.rs").unwrap().clone();
-    group.bench_function("hello_world_translation", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache = NodeCache::build(black_box(&before_hello), black_box(&after_hello));
-            find(
-                black_box(&before_hello),
-                black_box(&after_hello),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
-        });
-    });
+    // Automatically create benchmarks for all test diffs
+    for (test_name, (before, after)) in &test_diffs {
+        // Create a safe benchmark name by replacing non-alphanumeric characters
+        let benchmark_name = test_name
+            .replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_")
+            .to_lowercase();
 
-    // 2. Line addition (hello-world-added-message)
-    let (before_add, after_add) = test_diffs.get("hello-world-added-message").unwrap().clone();
-    group.bench_function("hello_world_added_message", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache = NodeCache::build(black_box(&before_add), black_box(&after_add));
-            find(
-                black_box(&before_add),
-                black_box(&after_add),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
+        group.bench_function(benchmark_name, |b| {
+            let before = before.clone();
+            let after = after.clone();
+            b.iter(|| {
+                let mut diff = ASTDiff::default();
+                let node_cache = NodeCache::build(black_box(&before), black_box(&after));
+                find(
+                    black_box(&before),
+                    black_box(&after),
+                    black_box(&node_cache),
+                    black_box(&mut diff),
+                )
+                .expect("find failed");
+            });
         });
-    });
+    }
 
-    // 3. Line deletion (reverse of hello-world-added-message)
-    let (after_del, before_del) = test_diffs.get("hello-world-added-message").unwrap().clone();
-    group.bench_function("hello_world_deleted_message", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache = NodeCache::build(black_box(&before_del), black_box(&after_del));
-            find(
-                black_box(&before_del),
-                black_box(&after_del),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
+    // Also benchmark the hello-world translation case which is in test_codes but not test_diffs
+    if let (Some(before_hello), Some(after_hello)) = (
+        test_codes.get("hello-world.rs"),
+        test_codes.get("zdravo-svijete.rs")
+    ) {
+        group.bench_function("hello_world_translation", |b| {
+            let before_hello = before_hello.clone();
+            let after_hello = after_hello.clone();
+            b.iter(|| {
+                let mut diff = ASTDiff::default();
+                let node_cache = NodeCache::build(black_box(&before_hello), black_box(&after_hello));
+                find(
+                    black_box(&before_hello),
+                    black_box(&after_hello),
+                    black_box(&node_cache),
+                    black_box(&mut diff),
+                )
+                .expect("find failed");
+            });
         });
-    });
-
-    // 4. Complex bugfix (leet-code-1-bugfix)
-    let (before_bugfix, after_bugfix) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
-    group.bench_function("leetcode_1_bugfix", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache = NodeCache::build(black_box(&before_bugfix), black_box(&after_bugfix));
-            find(
-                black_box(&before_bugfix),
-                black_box(&after_bugfix),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
-        });
-    });
-
-    // 5. Python if block addition
-    let (before_python, after_python) = test_diffs.get("python-added-if-block").unwrap().clone();
-    group.bench_function("python_added_if_block", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache = NodeCache::build(black_box(&before_python), black_box(&after_python));
-            find(
-                black_box(&before_python),
-                black_box(&after_python),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
-        });
-    });
-
-    // 6. Python if block deletion (reverse)
-    let (after_python_del, before_python_del) =
-        test_diffs.get("python-added-if-block").unwrap().clone();
-    group.bench_function("python_deleted_if_block", |b| {
-        b.iter(|| {
-            let mut diff = ASTDiff::default();
-            let node_cache =
-                NodeCache::build(black_box(&before_python_del), black_box(&after_python_del));
-            find(
-                black_box(&before_python_del),
-                black_box(&after_python_del),
-                black_box(&node_cache),
-                black_box(&mut diff),
-            )
-            .expect("find failed");
-        });
-    });
+    }
 
     group.finish();
 }
