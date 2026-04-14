@@ -242,7 +242,8 @@ fn solve(
     }
 
     // Check if memoo already has the solution for this input and return that.
-    if let Some(solution) = memoo.get(&(before_subtrees.clone(), after_subtrees.clone())) {
+    let key = (before_subtrees.clone(), after_subtrees.clone());
+    if let Some(solution) = memoo.get(&key) {
         return Ok(solution.cost);
     }
     let mut result = Solution::new();
@@ -270,8 +271,8 @@ fn solve(
             result.cost = solve(
                 before,
                 after,
-                before_subtrees[before_first_unmached_node_index..].to_vec(),
-                after_subtrees[after_first_unmached_node_index..].to_vec(),
+                before_subtrees[before_first_unmached_node_index..].to_owned(),
+                after_subtrees[after_first_unmached_node_index..].to_owned(),
                 node_cache,
                 diff,
                 memoo,
@@ -331,8 +332,8 @@ fn solve(
                 cost += solve(
                     before,
                     after,
-                    before_subtrees[1..].to_vec(),
-                    after_subtrees[1..].to_vec(),
+                    before_subtrees[1..].to_owned(),
+                    after_subtrees[1..].to_owned(),
                     node_cache,
                     diff,
                     memoo,
@@ -356,13 +357,17 @@ fn solve(
             solution_if_delete.operation = ASTMappingOperation::Delete;
             solution_if_delete.cost = u64::MAX;
 
+            // Pre-compute the common slice to avoid repeated allocation
+            let before_rest = before_subtrees[1..].to_vec();
+            let before_children = ids_of_children(before_first_node);
+            
             for i in 0..=after_subtrees.len() {
                 let mut cost = COST_DELETE;
 
                 cost += solve(
                     before,
                     after,
-                    before_subtrees[1..].to_vec(),
+                    before_rest.clone(),
                     after_subtrees[i..].to_vec(),
                     node_cache,
                     diff,
@@ -370,7 +375,7 @@ fn solve(
                 )? + solve(
                     before,
                     after,
-                    ids_of_children(before_first_node),
+                    before_children.clone(),
                     after_subtrees[..i].to_vec(),
                     node_cache,
                     diff,
@@ -391,6 +396,10 @@ fn solve(
             solution_if_insert.operation = ASTMappingOperation::Insert;
             solution_if_insert.cost = u64::MAX;
 
+            // Pre-compute the common slices to avoid repeated allocation
+            let after_rest = after_subtrees[1..].to_vec();
+            let after_children = ids_of_children(after_first_node);
+            
             for i in 0..=before_subtrees.len() {
                 let mut cost = COST_INSERT;
 
@@ -398,7 +407,7 @@ fn solve(
                     before,
                     after,
                     before_subtrees[i..].to_vec(),
-                    after_subtrees[1..].to_vec(),
+                    after_rest.clone(),
                     node_cache,
                     diff,
                     memoo,
@@ -406,7 +415,7 @@ fn solve(
                     before,
                     after,
                     before_subtrees[..i].to_vec(),
-                    ids_of_children(after_first_node),
+                    after_children.clone(),
                     node_cache,
                     diff,
                     memoo,
@@ -440,8 +449,10 @@ fn solve(
     }
 
     // Insert the solution into memoo with the before and after subtrees as the key.
-    memoo.insert((before_subtrees, after_subtrees), result.clone());
-    Ok(result.cost)
+    let key = (before_subtrees, after_subtrees);
+    let cost = result.cost;
+    memoo.insert(key, result);
+    Ok(cost)
 }
 
 fn add_subtree_to_diff(
@@ -526,8 +537,9 @@ fn update_diff(
             after_first_unmached_node_index,
         );
 
+        let key = (before_subtrees.clone(), after_subtrees.clone());
         let solution = memoo
-            .get(&(before_subtrees.clone(), after_subtrees.clone()))
+            .get(&key)
             .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
         let mapping = ASTMapping {
             cost: solution.cost,
