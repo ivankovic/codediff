@@ -16,8 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use codediff::diff::ASTMetadata;
-use codediff::diff::hash::hash_code;
+use codediff::code::{ASTMetadata, hash::hash_code};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::time::Duration;
 
