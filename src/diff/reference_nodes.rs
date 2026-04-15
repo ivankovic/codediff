@@ -42,6 +42,20 @@ pub fn is_reference_node(node_kind: &str, language: &Language) -> bool {
         Language::Go => node_kind == "source_file", // Go source files use "source_file" as root
         Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
         Language::TypeScript => node_kind == "program", // TypeScript also uses "program" as root
+        Language::TSX => node_kind == "program", // TSX also uses "program" as root
+        Language::PHP => node_kind == "program", // PHP also uses "program" as root
+        Language::Ruby => node_kind == "program", // Ruby also uses "program" as root
+        Language::R => node_kind == "program", // R also uses "program" as root
+        Language::Swift => node_kind == "source_file", // Swift source files use "source_file" as root
+        Language::Kotlin => node_kind == "source_file", // Kotlin source files use "source_file" as root
+        Language::Scala => node_kind == "compilation_unit", // Scala source files use "compilation_unit" as root
+        Language::CSharp => node_kind == "compilation_unit", // C# source files use "compilation_unit" as root
+        Language::HTML => node_kind == "document", // HTML documents use "document" as root
+        Language::CSS => node_kind == "stylesheet", // CSS stylesheets use "stylesheet" as root
+        Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
+        Language::LUA => node_kind == "chunk", // Lua chunks use "chunk" as root
+        Language::Vimscript => node_kind == "script_file", // Vimscript files use "script_file" as root
+        Language::ShellScript => node_kind == "program", // Shell scripts use "program" as root
         // Add other languages as needed
         _ => false,
     }
