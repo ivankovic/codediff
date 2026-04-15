@@ -1,0 +1,5 @@
+object ZdravoSvijete {
+  def main(args: Array[String]): Unit = {
+    println("Zdravo, Svijete!")
+  }
+}

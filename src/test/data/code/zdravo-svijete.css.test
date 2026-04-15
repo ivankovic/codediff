@@ -1,0 +1,4 @@
+/* Zdravo Svijete in CSS */
+body::before {
+    content: "Zdravo, Svijete!";
+}
