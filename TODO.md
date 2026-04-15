@@ -1,9 +1,7 @@
 # Next features to implement
 
-*  Add more tests. Test all hello world translations in all languages.
-*  Add more tests, add a move block test.
+*  UI that shows the mapping
 *  Update doc-comments in diff.rs
-*  Add RTED
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
 
