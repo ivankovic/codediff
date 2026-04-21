@@ -22,7 +22,7 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
-use crate::code::Code;
+use crate::code::{Code, Language};
 
 /// A structure that holds node caches for both before and after Code objects.
 #[derive(Debug, Clone, Default)]
@@ -117,10 +117,21 @@ pub const COST_MOVE: u64 = 0;
 *
 * See code.rs for the Code struct.
 */
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Diff {
     /// Difference based on the ASTs.
     pub ast: Option<ASTDiff>,
+    /// The language used for this diff.
+    pub language: Language,
+}
+
+impl Default for Diff {
+    fn default() -> Self {
+        Self {
+            ast: None,
+            language: Language::Unknown,
+        }
+    }
 }
 
 /**
@@ -670,7 +681,10 @@ pub fn diff_code(before: &Code, after: &Code) -> Diff {
     match_structurally_identical_trees(before, after, &node_cache, &mut diff);
     let _ = optimal_iud::find(before, after, &node_cache, &mut diff);
 
-    Diff { ast: Some(diff) }
+    Diff { 
+        ast: Some(diff),
+        language: before.metadata.language.clone().unwrap_or(Language::Unknown) 
+    }
 }
 
 #[cfg(test)]
