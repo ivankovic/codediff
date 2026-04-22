@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+use std::io;
 use tree_sitter::Node; // Import tree-sitter Node for AST operations
 
 /// Theme for the application
@@ -90,6 +91,14 @@ pub struct App {
     pub show_legend: bool,
     // Token-level diff information: (start_byte, end_byte, status)
     pub token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>,
+    // Diff computation status
+    pub diff_status: DiffStatus,
+    pub diff_cost: Option<u64>,
+    // File selection state
+    pub show_file_selector: bool,
+    pub file_selector_path: String,
+    pub file_selector_entries: Vec<String>,
+    pub file_selector_selected: usize,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -106,11 +115,21 @@ pub enum LineDiffStatus {
     Changed,
 }
 
+#[derive(PartialEq, Clone, Debug)]
+pub enum DiffStatus {
+    Success,
+    Error(String),
+    NoAstDiff,
+}
+
 impl App {
-    pub fn new(before: String, after: String, _diff: codediff::diff::Diff) -> Self {
+    pub fn new(before: String, after: String, diff: codediff::diff::Diff) -> Self {
         let theme = Theme::Light;
         let colors = theme.get_colors();
-        let token_diff_ranges = Self::compute_token_diff_ranges(&before, &after, &_diff);
+        let token_diff_ranges = Self::compute_token_diff_ranges(&before, &after, &diff);
+
+        // Calculate diff status and cost
+        let (diff_status, diff_cost) = Self::calculate_diff_status_and_cost(&diff);
 
         Self {
             before_code: before,
@@ -126,7 +145,150 @@ impl App {
             show_help: false,
             show_legend: false,
             token_diff_ranges,
+            diff_status,
+            diff_cost,
+            show_file_selector: false,
+            file_selector_path: String::new(),
+            file_selector_entries: Vec::new(),
+            file_selector_selected: 0,
         }
+    }
+
+    /// Calculate diff status and total cost from the diff
+    fn calculate_diff_status_and_cost(diff: &codediff::diff::Diff) -> (DiffStatus, Option<u64>) {
+        match &diff.ast {
+            Some(ast_diff) => {
+                // Calculate total cost by summing up all mapping costs
+                let total_cost = ast_diff.mapping.values().map(|mapping| mapping.cost).sum();
+                (DiffStatus::Success, Some(total_cost))
+            }
+            None => (DiffStatus::NoAstDiff, None),
+        }
+    }
+
+    /// Open file selector for the current panel
+    pub fn open_file_selector(&mut self) {
+        // Start in the current directory
+        if let Ok(current_dir) = std::env::current_dir() {
+            self.file_selector_path = current_dir.to_string_lossy().into_owned();
+            self.load_directory_contents();
+            self.show_file_selector = true;
+        } else {
+            self.file_selector_path = "/".to_string();
+            self.load_directory_contents();
+            self.show_file_selector = true;
+        }
+    }
+
+    /// Load directory contents into file selector
+    fn load_directory_contents(&mut self) {
+        self.file_selector_entries.clear();
+        self.file_selector_selected = 0;
+
+        if let Ok(entries) = std::fs::read_dir(&self.file_selector_path) {
+            for entry in entries.flatten() {
+                let file_name = entry.file_name().to_string_lossy().into_owned();
+                self.file_selector_entries.push(file_name);
+            }
+            // Sort entries: directories first, then files
+            self.file_selector_entries.sort_by(|a, b| {
+                let a_is_dir =
+                    std::path::Path::new(&format!("{}/{}", self.file_selector_path, a)).is_dir();
+                let b_is_dir =
+                    std::path::Path::new(&format!("{}/{}", self.file_selector_path, b)).is_dir();
+                b_is_dir.cmp(&a_is_dir) // Directories come first
+            });
+        }
+    }
+
+    /// Move file selector selection up
+    pub fn file_selector_up(&mut self) {
+        if !self.file_selector_entries.is_empty() {
+            if self.file_selector_selected > 0 {
+                self.file_selector_selected -= 1;
+            }
+        }
+    }
+
+    /// Move file selector selection down
+    pub fn file_selector_down(&mut self) {
+        if !self.file_selector_entries.is_empty() {
+            if self.file_selector_selected < self.file_selector_entries.len() - 1 {
+                self.file_selector_selected += 1;
+            }
+        }
+    }
+
+    /// Enter selected directory or select file
+    pub fn file_selector_select(&mut self) -> io::Result<()> {
+        if self.file_selector_selected < self.file_selector_entries.len() {
+            let selected_entry = &self.file_selector_entries[self.file_selector_selected];
+            let full_path = format!("{}/{}", self.file_selector_path, selected_entry);
+
+            let path = std::path::Path::new(&full_path);
+            if path.is_dir() {
+                // Navigate into directory
+                self.file_selector_path = full_path;
+                self.load_directory_contents();
+                self.file_selector_selected = 0;
+            } else if path.is_file() {
+                // Load file into current panel
+                let content = std::fs::read_to_string(path)?;
+
+                // Detect language from file extension
+                let language = if let Some(ext) = path.extension() {
+                    if let Some(lang_str) = ext.to_str() {
+                        codediff::code::language::language_for_extension(lang_str)
+                            .unwrap_or(codediff::code::Language::Unknown)
+                    } else {
+                        codediff::code::Language::Unknown
+                    }
+                } else {
+                    codediff::code::Language::Unknown
+                };
+
+                // Update the appropriate panel
+                match self.active_panel {
+                    Panel::Before => {
+                        self.before_code = content;
+                    }
+                    Panel::After => {
+                        self.after_code = content;
+                    }
+                }
+
+                // Recompute diff with new file content
+                self.recompute_diff(&language);
+
+                self.show_file_selector = false;
+            }
+        }
+        Ok(())
+    }
+
+    /// Go up to parent directory
+    pub fn file_selector_up_dir(&mut self) {
+        let parent_path = std::path::Path::new(&self.file_selector_path).parent();
+        if let Some(parent) = parent_path {
+            self.file_selector_path = parent.to_string_lossy().into_owned();
+            self.load_directory_contents();
+            self.file_selector_selected = 0;
+        }
+    }
+
+    /// Close file selector
+    pub fn close_file_selector(&mut self) {
+        self.show_file_selector = false;
+    }
+
+    /// Recompute diff with current before/after code
+    pub fn recompute_diff(&mut self, language: &codediff::code::Language) {
+        let diff = codediff::diff_strings(&self.before_code, &self.after_code, language);
+        let (diff_status, diff_cost) = Self::calculate_diff_status_and_cost(&diff);
+        self.diff_status = diff_status;
+        self.diff_cost = diff_cost;
+        self.token_diff_ranges =
+            Self::compute_token_diff_ranges(&self.before_code, &self.after_code, &diff);
     }
 
     /// Compute token-based diff ranges using AST diff information
@@ -152,16 +314,15 @@ impl App {
             let before_parsed = before_code_obj.ensure_parsed().is_ok();
             let after_parsed = after_code_obj.ensure_parsed().is_ok();
 
-            if before_parsed && after_parsed
+            if before_parsed
+                && after_parsed
                 && let (Some(before_ast), Some(after_ast)) =
                     (before_code_obj.ast.as_ref(), after_code_obj.ast.as_ref())
             {
                 // Process mappings to create byte-level diff ranges
                 for ((before_id, after_id), mapping) in &ast_diff.mapping {
                     let status = match mapping.operation {
-                        codediff::diff::ASTMappingOperation::Identical => {
-                            LineDiffStatus::Unchanged
-                        }
+                        codediff::diff::ASTMappingOperation::Identical => LineDiffStatus::Unchanged,
                         codediff::diff::ASTMappingOperation::Insert => LineDiffStatus::Added,
                         codediff::diff::ASTMappingOperation::Delete => LineDiffStatus::Removed,
                         codediff::diff::ASTMappingOperation::Update => LineDiffStatus::Changed,
@@ -188,12 +349,15 @@ impl App {
                     // Handle InsertWithChildren operations specially
                     if *after_id != 0 {
                         // For InsertWithChildren, we need to handle the inserted nodes
-                        let status = if matches!(mapping.operation, codediff::diff::ASTMappingOperation::InsertWithChildren) {
+                        let status = if matches!(
+                            mapping.operation,
+                            codediff::diff::ASTMappingOperation::InsertWithChildren
+                        ) {
                             LineDiffStatus::Added
                         } else {
                             status
                         };
-                        
+
                         if let Some(node) = after_ast
                             .root_node()
                             .descendant_for_byte_range(*after_id, *after_id + 1)
@@ -206,7 +370,7 @@ impl App {
                             let mut cursor = after_ast.root_node().walk();
                             let mut found = false;
                             let mut stack = vec![after_ast.root_node()];
-                            
+
                             while let Some(node) = stack.pop() {
                                 if node.id() == *after_id {
                                     // eprintln!("After node found via search: {}..{}", node.start_byte(), node.end_byte());
@@ -214,13 +378,13 @@ impl App {
                                     found = true;
                                     break;
                                 }
-                                
+
                                 // Add children to stack
                                 for child in node.children(&mut cursor) {
                                     stack.push(child);
                                 }
                             }
-                            
+
                             if !found {
                                 // eprintln!("After node STILL NOT found for id {}", after_id);
                             }

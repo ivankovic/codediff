@@ -18,7 +18,7 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::app::{App, Panel, Theme};
+    use super::super::app::{App, DiffStatus, Panel, Theme};
     use codediff::diff_strings;
     use codediff::code::Language;
 
@@ -38,6 +38,164 @@ mod tests {
         assert!(app.ast_path.is_empty());
         assert_eq!(app.before_code, "fn main() {}");
         assert_eq!(app.after_code, "fn main() {}");
+    }
+
+    #[test]
+    fn test_diff_status_and_cost_calculation() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let app = App::new(before, after, diff);
+        
+        // For identical code, we should have Success status
+        match app.diff_status {
+            DiffStatus::Success => {
+                // Cost should be 0 for identical code
+                assert_eq!(app.diff_cost, Some(0));
+            }
+            DiffStatus::NoAstDiff => {
+                // This is also acceptable - no changes means no AST diff needed
+                assert_eq!(app.diff_cost, None);
+            }
+            DiffStatus::Error(_) => {
+                panic!("Should not have error status for identical code");
+            }
+        }
+    }
+
+    #[test]
+    fn test_diff_status_with_changes() {
+        let before = "fn main() {\n    println!(\"Hello\");\n}".to_string();
+        let after = "fn main() {\n    println!(\"World\");\n}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let app = App::new(before, after, diff);
+        
+        // For changed code, we should have Success status with non-zero cost
+        match app.diff_status {
+            DiffStatus::Success => {
+                assert!(app.diff_cost.is_some());
+                assert!(app.diff_cost.unwrap() > 0, "Cost should be greater than 0 for changed code");
+            }
+            DiffStatus::NoAstDiff => {
+                panic!("Should have AST diff for changed Rust code");
+            }
+            DiffStatus::Error(_) => {
+                panic!("Should not have error status for valid Rust code");
+            }
+        }
+    }
+
+    #[test]
+    fn test_file_selector_initialization() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let mut app = App::new(before, after, diff);
+        
+        // Initially file selector should be closed
+        assert!(!app.show_file_selector);
+        assert!(app.file_selector_path.is_empty());
+        assert!(app.file_selector_entries.is_empty());
+        assert_eq!(app.file_selector_selected, 0);
+        
+        // Open file selector
+        app.open_file_selector();
+        
+        // File selector should be open and path should be set
+        assert!(app.show_file_selector);
+        assert!(!app.file_selector_path.is_empty());
+        
+        // Close file selector
+        app.close_file_selector();
+        assert!(!app.show_file_selector);
+    }
+
+    #[test]
+    fn test_file_selector_navigation() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let mut app = App::new(before, after, diff);
+        app.open_file_selector();
+        
+        // Mock some entries for testing
+        app.file_selector_entries = vec!["file1.rs".to_string(), "file2.rs".to_string(), "dir1".to_string()];
+        
+        // Test initial selection
+        assert_eq!(app.file_selector_selected, 0);
+        
+        // Move down
+        app.file_selector_down();
+        assert_eq!(app.file_selector_selected, 1);
+        
+        // Move up
+        app.file_selector_up();
+        assert_eq!(app.file_selector_selected, 0);
+        
+        // Try to move up from top
+        app.file_selector_up();
+        assert_eq!(app.file_selector_selected, 0);
+        
+        // Move to bottom
+        app.file_selector_down();
+        app.file_selector_down();
+        assert_eq!(app.file_selector_selected, 2);
+        
+        // Try to move down from bottom
+        app.file_selector_down();
+        assert_eq!(app.file_selector_selected, 2);
+    }
+
+    #[test]
+    fn test_file_selector_up_dir() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let mut app = App::new(before, after, diff);
+        app.open_file_selector();
+        
+        // Set a path that has a parent
+        app.file_selector_path = "/home/user/project".to_string();
+        
+        // Go up to parent directory
+        app.file_selector_up_dir();
+        
+        // Should be in parent directory
+        assert_eq!(app.file_selector_path, "/home/user");
+        assert_eq!(app.file_selector_selected, 0);
+    }
+
+    #[test]
+    fn test_diff_recomputation() {
+        let before = "fn main() {\n    println!(\"Hello\");\n}".to_string();
+        let after = "fn main() {\n    println!(\"World\");\n}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+        
+        let mut app = App::new(before, after, diff);
+        
+        // Store original before code to verify change
+        let original_before_code = app.before_code.clone();
+        
+        // Change the after code significantly
+        app.after_code = "fn main() {\n    let x = 42;\n    println!(\"Completely different\");\n}".to_string();
+        
+        // Recompute diff
+        app.recompute_diff(&Language::Rust);
+        
+        // Verify diff was recomputed - the code should be different from original
+        assert_ne!(app.after_code, original_before_code);
+        assert!(app.token_diff_ranges.len() > 0); // Should have some diff ranges
+        
+        // Status should still be success
+        match app.diff_status {
+            DiffStatus::Success => {},
+            _ => panic!("Expected Success status after recomputation"),
+        }
     }
 
     #[test]

@@ -24,7 +24,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
-use crate::tui::app::{App, LineDiffStatus, Panel, Theme};
+use crate::tui::app::{App, DiffStatus, LineDiffStatus, Panel, Theme};
 
 /// Main UI rendering function
 pub fn ui(f: &mut Frame, app: &App) {
@@ -141,9 +141,18 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
         .wrap(Wrap { trim: true });
     f.render_widget(code_paragraph, chunks[1]);
 
-    // Footer
-    let footer_text =
-        "Arrow keys: Navigate | Space: Align | t: AST | q: Quit | Tab: Switch Before/After";
+    // Footer - show diff status instead of keyboard shortcuts
+    let footer_text = match &app.diff_status {
+        DiffStatus::Success => {
+            if let Some(cost) = app.diff_cost {
+                format!("Diff: cost {}", cost)
+            } else {
+                "Diff: computed".to_string()
+            }
+        }
+        DiffStatus::Error(err) => format!("Diff: error - {}", err),
+        DiffStatus::NoAstDiff => "Diff: no AST diff available".to_string(),
+    };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(app.colors.footer_fg))
         .block(Block::default().borders(Borders::NONE));
@@ -162,6 +171,11 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     // Legend
     if app.show_legend {
         render_legend(f, app);
+    }
+
+    // File Selector
+    if app.show_file_selector {
+        render_file_selector(f, app);
     }
 }
 
@@ -342,14 +356,24 @@ fn render_wide_mode(f: &mut Frame, app: &App) {
         .wrap(Wrap { trim: true });
     f.render_widget(after_paragraph, chunks[1]);
 
-    // Footer
+    // Footer - show diff status instead of keyboard shortcuts
     let footer_area = Rect {
         x: 0,
         y: f.size().height - 1,
         width: f.size().width,
         height: 1,
     };
-    let footer_text = "Arrow keys: Navigate | Tab: Switch panel | Space: Align | t: AST | q: Quit";
+    let footer_text = match &app.diff_status {
+        DiffStatus::Success => {
+            if let Some(cost) = app.diff_cost {
+                format!("Diff: cost {}", cost)
+            } else {
+                "Diff: computed".to_string()
+            }
+        }
+        DiffStatus::Error(err) => format!("Diff: error - {}", err),
+        DiffStatus::NoAstDiff => "Diff: no AST diff available".to_string(),
+    };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(app.colors.footer_fg))
         .block(Block::default().borders(Borders::NONE));
@@ -532,4 +556,75 @@ fn render_legend(f: &mut Frame, app: &App) {
 
     f.render_widget(Clear, legend_area);
     f.render_widget(legend, legend_area);
+}
+
+fn render_file_selector(f: &mut Frame, app: &App) {
+    // Calculate popup size and position
+    let margin = 2;
+    let popup_width = f.size().width.saturating_sub(2 * margin);
+    let popup_height = f.size().height.saturating_sub(2 * margin + 1);
+
+    let popup_area = Rect {
+        x: margin,
+        y: margin,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    // Create title with current path
+    let title = format!("File Selector - {}", app.file_selector_path);
+
+    // Create list of entries with selection highlight
+    let mut lines = Vec::new();
+    for (i, entry) in app.file_selector_entries.iter().enumerate() {
+        let mut line_content = entry.clone();
+        
+        // Add directory marker for directories
+        let full_path = format!("{}/{}", app.file_selector_path, entry);
+        if std::path::Path::new(&full_path).is_dir() {
+            line_content = format!("📁 {}", line_content);
+        }
+        
+        // Highlight selected entry
+        if i == app.file_selector_selected {
+            lines.push(Line::from(Span::styled(
+                line_content,
+                Style::default()
+                    .fg(app.colors.popup_bg)
+                    .bg(app.colors.popup_fg)
+                    .add_modifier(Modifier::BOLD),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                line_content,
+                Style::default().fg(app.colors.popup_fg),
+            )));
+        }
+    }
+
+    // Add instructions at bottom
+    if !app.file_selector_entries.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "↑/↓: Navigate | →: Select | ←: Up | ESC: Cancel",
+            Style::default().fg(app.colors.popup_fg).add_modifier(Modifier::ITALIC),
+        )));
+    }
+
+    let file_selector = Paragraph::new(Text::from(lines))
+        .block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .style(Style::default().fg(app.colors.popup_border)),
+        )
+        .style(
+            Style::default()
+                .fg(app.colors.popup_fg)
+                .bg(app.colors.popup_bg),
+        )
+        .alignment(Alignment::Left);
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(file_selector, popup_area);
 }

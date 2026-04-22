@@ -128,37 +128,61 @@ fn main() -> io::Result<()> {
         if let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
         {
-            match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Char('t') => app.toggle_ast_popup(),
-                KeyCode::Tab => app.toggle_panel(),
-                KeyCode::Char(' ') => {
-                    // Space bar - align both sides
-                    // TODO: Implement actual alignment logic
+            // Handle file selector first - it takes priority over other controls
+            if app.show_file_selector {
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => app.file_selector_up(),
+                    KeyCode::Down | KeyCode::Char('j') => app.file_selector_down(),
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        if let Err(e) = app.file_selector_select() {
+                            eprintln!("Error loading file: {}", e);
+                        }
+                    }
+                    KeyCode::Left | KeyCode::Char('h') => app.file_selector_up_dir(),
+                    KeyCode::Esc => {
+                        // Close file selector
+                        app.close_file_selector();
+                    }
+                    _ => {}
                 }
-                KeyCode::Up | KeyCode::Char('k') => app.move_cursor_up(),
-                KeyCode::Down | KeyCode::Char('j') => app.move_cursor_down(),
-                KeyCode::Left | KeyCode::Char('h') => app.move_cursor_left(),
-                KeyCode::Right | KeyCode::Char('l') => app.move_cursor_right(),
-                KeyCode::Char('c') => {
-                    // Toggle color theme
-                    app.toggle_theme();
+            } else {
+                // Normal key handling when file selector is not open
+                match key.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Char('t') => app.toggle_ast_popup(),
+                    KeyCode::Tab => app.toggle_panel(),
+                    KeyCode::Char(' ') => {
+                        // Space bar - align both sides
+                        // TODO: Implement actual alignment logic
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => app.move_cursor_up(),
+                    KeyCode::Down | KeyCode::Char('j') => app.move_cursor_down(),
+                    KeyCode::Left | KeyCode::Char('h') => app.move_cursor_left(),
+                    KeyCode::Right | KeyCode::Char('l') => app.move_cursor_right(),
+                    KeyCode::Char('c') => {
+                        // Toggle color theme
+                        app.toggle_theme();
+                    }
+                    KeyCode::Char('?') => {
+                        // Toggle help panel
+                        app.toggle_help();
+                    }
+                    KeyCode::Char('d') => {
+                        // Toggle legend
+                        app.toggle_legend();
+                    }
+                    KeyCode::Char('o') => {
+                        // Open file selector for current panel
+                        app.open_file_selector();
+                    }
+                    KeyCode::Esc => {
+                        // Close any popups
+                        app.show_help = false;
+                        app.show_ast_popup = false;
+                        app.show_legend = false;
+                    }
+                    _ => {}
                 }
-                KeyCode::Char('?') => {
-                    // Toggle help panel
-                    app.toggle_help();
-                }
-                KeyCode::Char('d') => {
-                    // Toggle legend
-                    app.toggle_legend();
-                }
-                KeyCode::Esc => {
-                    // Close any popups
-                    app.show_help = false;
-                    app.show_ast_popup = false;
-                    app.show_legend = false;
-                }
-                _ => {}
             }
         }
     }
