@@ -33,7 +33,7 @@ pub struct CodePanel {
     pub scroll_offset: usize,
     pub is_active: bool,
     pub colors: super::super::app::ThemeColors,
-    pub token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>
+    pub token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>,
 }
 
 impl CodePanel {
@@ -46,7 +46,7 @@ impl CodePanel {
         scroll_offset: usize,
         is_active: bool,
         colors: super::super::app::ThemeColors,
-        token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>
+        token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>,
     ) -> Self {
         Self {
             title,
@@ -57,12 +57,13 @@ impl CodePanel {
             scroll_offset,
             is_active,
             colors,
-            token_diff_ranges
+            token_diff_ranges,
         }
     }
 
     pub fn to_widget(&self, visible_lines: usize) -> Paragraph<'static> {
-        let lines: Vec<Line> = self.code
+        let lines: Vec<Line> = self
+            .code
             .lines()
             .enumerate()
             .skip(self.scroll_offset)
@@ -77,7 +78,8 @@ impl CodePanel {
                 ));
 
                 // Calculate byte position for this line
-                let line_start_byte = self.code[..self.code
+                let line_start_byte = self.code[..self
+                    .code
                     .lines()
                     .take(line_idx)
                     .map(|l| l.len() + 1)
@@ -87,7 +89,7 @@ impl CodePanel {
 
                 // Apply token-based coloring
                 let is_active_line = self.is_active && line_idx == self.cursor_line;
-                
+
                 // Find token ranges that overlap with this line
                 let line_ranges: Vec<_> = self
                     .token_diff_ranges
@@ -124,7 +126,8 @@ impl CodePanel {
                                     break;
                                 }
                             }
-                            spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
+                            spans
+                                .push(Span::styled(c.to_string(), Style::default().fg(char_color)));
                         }
                     }
                 } else {
@@ -154,7 +157,12 @@ impl CodePanel {
             .collect();
 
         Paragraph::new(Text::from(lines))
-            .block(Block::default().borders(Borders::ALL).title(self.title.clone()))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(self.title.clone()),
+            )
             .wrap(Wrap { trim: true })
     }
 }
+

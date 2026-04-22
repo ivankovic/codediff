@@ -21,10 +21,11 @@ use ratatui::{
     prelude::Alignment,
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 
-use crate::tui::app::{App, DiffStatus, LineDiffStatus, Panel, Theme};
+use crate::tui::app::{App, DiffStatus, Panel, Theme};
+use crate::tui::widgets::code_panel::CodePanel;
 
 /// Main UI rendering function
 pub fn ui(f: &mut Frame, app: &App) {
@@ -81,64 +82,31 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(header, chunks[0]);
 
-    // Code panel
+    // Create code panel using the CodePanel widget
     let code_text = match app.active_panel {
         Panel::Before => &app.before_code,
         Panel::After => &app.after_code,
     };
 
-    // Calculate visible lines based on scroll offset
+    let panel_title = match app.active_panel {
+        Panel::Before => "Before",
+        Panel::After => "After",
+    };
+
+    let code_panel = CodePanel::new(
+        panel_title.to_string(),
+        code_text.clone(),
+        0, // line_number starts from 0
+        app.cursor_line,
+        app.cursor_char,
+        app.scroll_offset,
+        true, // is_active - narrow mode only shows one panel
+        app.colors,
+        app.token_diff_ranges.clone(),
+    );
+
     let visible_lines = chunks[1].height as usize;
-
-    let lines: Vec<Line> = code_text
-        .lines()
-        .enumerate()
-        .skip(app.scroll_offset)
-        .take(visible_lines)
-        .map(|(line_idx, line)| {
-            let mut spans = Vec::new();
-
-            // Add line number prefix
-            spans.push(Span::styled(
-                format!("{:4} ", line_idx + 1),
-                Style::default().fg(app.colors.footer_fg),
-            ));
-
-            // Highlight individual characters
-            if line_idx == app.cursor_line {
-                for (char_idx, c) in line.chars().enumerate() {
-                    if char_idx == app.cursor_char {
-                        // Highlight current character
-                        spans.push(Span::styled(
-                            c.to_string(),
-                            Style::default()
-                                .fg(app.colors.cursor_fg)
-                                .bg(app.colors.cursor_bg)
-                                .add_modifier(Modifier::BOLD),
-                        ));
-                    } else {
-                        // Normal character
-                        spans.push(Span::styled(
-                            c.to_string(),
-                            Style::default().fg(app.colors.text),
-                        ));
-                    }
-                }
-            } else {
-                // Normal line
-                spans.push(Span::styled(
-                    line.to_string(),
-                    Style::default().fg(app.colors.text),
-                ));
-            }
-
-            Line::from(spans)
-        })
-        .collect();
-
-    let code_paragraph = Paragraph::new(Text::from(lines))
-        .block(Block::default().borders(Borders::ALL).title("Code"))
-        .wrap(Wrap { trim: true });
+    let code_paragraph = code_panel.to_widget(visible_lines);
     f.render_widget(code_paragraph, chunks[1]);
 
     // Footer - show diff status instead of keyboard shortcuts
@@ -179,77 +147,7 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     }
 }
 
-/// Helper function to apply token-based coloring to a line
-fn apply_token_coloring<'a>(
-    line: &'a str,
-    _line_idx: usize,
-    line_start_byte: usize,
-    all_ranges: &'a [(usize, usize, LineDiffStatus)],
-    app: &'a App,
-    is_active_line: bool,
-) -> Vec<Span<'a>> {
-    let mut spans = Vec::new();
 
-    // Find token ranges that overlap with this line
-    let line_ranges: Vec<_> = all_ranges
-        .iter()
-        .filter(|&&(start, end, _)| start < line_start_byte + line.len() && end > line_start_byte)
-        .collect();
-
-    if is_active_line {
-        for (byte_idx, c) in line.char_indices() {
-            let char_byte_pos = line_start_byte + byte_idx;
-
-            if byte_idx == app.cursor_char {
-                // Highlight current character
-                spans.push(Span::styled(
-                    c.to_string(),
-                    Style::default()
-                        .fg(app.colors.cursor_fg)
-                        .bg(app.colors.cursor_bg)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                // Find color based on token ranges
-                let mut char_color = app.colors.text;
-                for (start, end, status) in &line_ranges {
-                    if char_byte_pos >= *start && char_byte_pos < *end {
-                        char_color = match status {
-                            LineDiffStatus::Added => app.colors.diff_added,
-                            LineDiffStatus::Removed => app.colors.diff_removed,
-                            LineDiffStatus::Changed => app.colors.diff_changed,
-                            LineDiffStatus::Unchanged => app.colors.text,
-                        };
-                        break;
-                    }
-                }
-                spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-            }
-        }
-    } else {
-        // Apply token-based coloring for the entire line
-        for (byte_idx, c) in line.char_indices() {
-            let char_byte_pos = line_start_byte + byte_idx;
-
-            // Find color based on token ranges
-            let mut char_color = app.colors.text;
-            for (start, end, status) in &line_ranges {
-                if char_byte_pos >= *start && char_byte_pos < *end {
-                    char_color = match status {
-                        LineDiffStatus::Added => app.colors.diff_added,
-                        LineDiffStatus::Removed => app.colors.diff_removed,
-                        LineDiffStatus::Changed => app.colors.diff_changed,
-                        LineDiffStatus::Unchanged => app.colors.text,
-                    };
-                    break;
-                }
-            }
-            spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-        }
-    }
-
-    spans
-}
 
 fn render_wide_mode(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -260,100 +158,38 @@ fn render_wide_mode(f: &mut Frame, app: &App) {
         ])
         .split(f.size());
 
-    // Before panel - calculate visible lines based on scroll offset
+    // Before panel - use CodePanel widget
+    let before_panel = CodePanel::new(
+        "Before".to_string(),
+        app.before_code.clone(),
+        0, // line_number starts from 0
+        app.cursor_line,
+        app.cursor_char,
+        app.scroll_offset,
+        app.active_panel == Panel::Before,
+        app.colors,
+        app.token_diff_ranges.clone(),
+    );
+
     let before_visible_lines = chunks[0].height as usize;
-
-    let before_lines: Vec<Line> = app
-        .before_code
-        .lines()
-        .enumerate()
-        .skip(app.scroll_offset)
-        .take(before_visible_lines)
-        .map(|(line_idx, line)| {
-            let mut spans = Vec::new();
-
-            // Add line number prefix
-            spans.push(Span::styled(
-                format!("{:4} ", line_idx + 1),
-                Style::default().fg(app.colors.footer_fg),
-            ));
-
-            // Calculate byte position for this line
-            let line_start_byte = app.before_code[..app
-                .before_code
-                .lines()
-                .take(line_idx)
-                .map(|l| l.len() + 1)
-                .sum::<usize>()
-                .saturating_sub(1)]
-                .len();
-
-            // Apply token-based coloring
-            let is_active_line = app.active_panel == Panel::Before && line_idx == app.cursor_line;
-            spans.extend(apply_token_coloring(
-                line,
-                line_idx,
-                line_start_byte,
-                &app.token_diff_ranges,
-                app,
-                is_active_line,
-            ));
-
-            Line::from(spans)
-        })
-        .collect();
-
-    let before_paragraph = Paragraph::new(Text::from(before_lines))
-        .block(Block::default().borders(Borders::ALL).title("Before"))
-        .wrap(Wrap { trim: true });
+    let before_paragraph = before_panel.to_widget(before_visible_lines);
     f.render_widget(before_paragraph, chunks[0]);
 
-    // After panel - calculate visible lines based on scroll offset
+    // After panel - use CodePanel widget
+    let after_panel = CodePanel::new(
+        "After".to_string(),
+        app.after_code.clone(),
+        0, // line_number starts from 0
+        app.cursor_line,
+        app.cursor_char,
+        app.scroll_offset,
+        app.active_panel == Panel::After,
+        app.colors,
+        app.token_diff_ranges.clone(),
+    );
+
     let after_visible_lines = chunks[1].height as usize;
-
-    let after_lines: Vec<Line> = app
-        .after_code
-        .lines()
-        .enumerate()
-        .skip(app.scroll_offset)
-        .take(after_visible_lines)
-        .map(|(line_idx, line)| {
-            let mut spans = Vec::new();
-
-            // Add line number prefix
-            spans.push(Span::styled(
-                format!("{:4} ", line_idx + 1),
-                Style::default().fg(app.colors.footer_fg),
-            ));
-
-            // Calculate byte position for this line
-            let line_start_byte = app.after_code[..app
-                .after_code
-                .lines()
-                .take(line_idx)
-                .map(|l| l.len() + 1)
-                .sum::<usize>()
-                .saturating_sub(1)]
-                .len();
-
-            // Apply token-based coloring
-            let is_active_line = app.active_panel == Panel::After && line_idx == app.cursor_line;
-            spans.extend(apply_token_coloring(
-                line,
-                line_idx,
-                line_start_byte,
-                &app.token_diff_ranges,
-                app,
-                is_active_line,
-            ));
-
-            Line::from(spans)
-        })
-        .collect();
-
-    let after_paragraph = Paragraph::new(Text::from(after_lines))
-        .block(Block::default().borders(Borders::ALL).title("After"))
-        .wrap(Wrap { trim: true });
+    let after_paragraph = after_panel.to_widget(after_visible_lines);
     f.render_widget(after_paragraph, chunks[1]);
 
     // Footer - show diff status instead of keyboard shortcuts
