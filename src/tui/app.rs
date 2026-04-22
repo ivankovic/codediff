@@ -32,7 +32,7 @@ impl Theme {
                 cursor_bg: ratatui::style::Color::Blue,
                 cursor_fg: ratatui::style::Color::White,
                 header_fg: ratatui::style::Color::Yellow,
-                footer_fg: ratatui::style::Color::Gray,
+                footer_fg: ratatui::style::Color::Black,
                 popup_bg: ratatui::style::Color::Gray,
                 popup_fg: ratatui::style::Color::Black,
                 popup_border: ratatui::style::Color::Black,
@@ -138,8 +138,12 @@ impl App {
     ) -> Vec<(usize, usize, LineDiffStatus)> {
         let mut ranges = Vec::new();
 
+        // Debug: log if we have AST diff
+        // eprintln!("compute_token_diff_ranges: has_ast_diff = {}", diff.ast.is_some());
+
         // Use AST diff if available
         if let Some(ast_diff) = &diff.ast {
+            // eprintln!("AST diff has {} mappings", ast_diff.mapping.len());
             // Create temporary Code objects to access ASTs
             let mut before_code_obj = codediff::code::Code::from_string(before, &diff.language);
             let mut after_code_obj = codediff::code::Code::from_string(after, &diff.language);
@@ -165,22 +169,62 @@ impl App {
                         _ => LineDiffStatus::Unchanged,
                     };
 
+                    // Debug output for mapping
+                    // eprintln!("Mapping: before_id={}, after_id={}, operation={:?}", before_id, after_id, mapping.operation);
+
                     // Get node ranges for the before code (used when showing before panel)
                     if *before_id != 0
                         && let Some(node) = before_ast
                             .root_node()
                             .descendant_for_byte_range(*before_id, *before_id + 1)
                     {
+                        // eprintln!("Before node found: {}..{}", node.start_byte(), node.end_byte());
                         ranges.push((node.start_byte(), node.end_byte(), status));
+                    } else if *before_id != 0 {
+                        // eprintln!("Before node NOT found for id {}", before_id);
                     }
 
                     // Get node ranges for the after code (used when showing after panel)
-                    if *after_id != 0
-                        && let Some(node) = after_ast
+                    // Handle InsertWithChildren operations specially
+                    if *after_id != 0 {
+                        // For InsertWithChildren, we need to handle the inserted nodes
+                        let status = if matches!(mapping.operation, codediff::diff::ASTMappingOperation::InsertWithChildren) {
+                            LineDiffStatus::Added
+                        } else {
+                            status
+                        };
+                        
+                        if let Some(node) = after_ast
                             .root_node()
                             .descendant_for_byte_range(*after_id, *after_id + 1)
-                    {
-                        ranges.push((node.start_byte(), node.end_byte(), status));
+                        {
+                            // eprintln!("After node found: {}..{}", node.start_byte(), node.end_byte());
+                            ranges.push((node.start_byte(), node.end_byte(), status));
+                        } else {
+                            // Try to find the node by searching for nodes that contain this ID
+                            // eprintln!("After node NOT found for id {}, trying alternative search", after_id);
+                            let mut cursor = after_ast.root_node().walk();
+                            let mut found = false;
+                            let mut stack = vec![after_ast.root_node()];
+                            
+                            while let Some(node) = stack.pop() {
+                                if node.id() == *after_id {
+                                    // eprintln!("After node found via search: {}..{}", node.start_byte(), node.end_byte());
+                                    ranges.push((node.start_byte(), node.end_byte(), status));
+                                    found = true;
+                                    break;
+                                }
+                                
+                                // Add children to stack
+                                for child in node.children(&mut cursor) {
+                                    stack.push(child);
+                                }
+                            }
+                            
+                            if !found {
+                                // eprintln!("After node STILL NOT found for id {}", after_id);
+                            }
+                        }
                     }
                 }
             }

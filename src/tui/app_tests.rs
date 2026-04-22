@@ -49,7 +49,7 @@ mod tests {
         assert_eq!(colors.cursor_bg, ratatui::style::Color::Blue);
         assert_eq!(colors.cursor_fg, ratatui::style::Color::White);
         assert_eq!(colors.header_fg, ratatui::style::Color::Yellow);
-        assert_eq!(colors.footer_fg, ratatui::style::Color::Gray);
+        assert_eq!(colors.footer_fg, ratatui::style::Color::Black);
         assert_eq!(colors.popup_bg, ratatui::style::Color::Gray);
         assert_eq!(colors.popup_fg, ratatui::style::Color::Black);
         assert_eq!(colors.popup_border, ratatui::style::Color::Black);

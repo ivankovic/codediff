@@ -135,16 +135,10 @@ fn main() -> io::Result<()> {
                         // Space bar - align both sides
                         // TODO: Implement actual alignment logic
                     }
-                    KeyCode::Up => app.move_cursor_up(),
-                    KeyCode::Down => app.move_cursor_down(),
-                    KeyCode::Left => {
-                        // Vim h key
-                        app.move_cursor_left();
-                    }
-                    KeyCode::Right => {
-                        // Vim l key
-                        app.move_cursor_right();
-                    }
+                    KeyCode::Up | KeyCode::Char('k') => app.move_cursor_up(),
+                    KeyCode::Down | KeyCode::Char('j') => app.move_cursor_down(),
+                    KeyCode::Left | KeyCode::Char('h') => app.move_cursor_left(),
+                    KeyCode::Right | KeyCode::Char('l') => app.move_cursor_right(),
                     KeyCode::Char('c') => {
                         // Toggle color theme
                         app.toggle_theme();

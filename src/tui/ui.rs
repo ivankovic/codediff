@@ -51,12 +51,23 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
         .split(f.size());
 
     // Header
-    let header_text = match app.active_panel {
-        Panel::Before => "Before Code (Tab to switch to After)",
-        Panel::After => "After Code (Tab to switch to Before)",
+    let header_spans = match app.active_panel {
+        Panel::Before => vec![
+            Span::styled("[", Style::default().fg(ratatui::style::Color::Red)),
+            Span::styled("Before", Style::default().fg(ratatui::style::Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled("]", Style::default().fg(ratatui::style::Color::Red)),
+            Span::styled(" | ", Style::default().fg(app.colors.header_fg)),
+            Span::styled("After", Style::default().fg(ratatui::style::Color::Green)),
+        ],
+        Panel::After => vec![
+            Span::styled("Before", Style::default().fg(ratatui::style::Color::Red)),
+            Span::styled(" | ", Style::default().fg(app.colors.header_fg)),
+            Span::styled("[", Style::default().fg(ratatui::style::Color::Green)),
+            Span::styled("After", Style::default().fg(ratatui::style::Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("]", Style::default().fg(ratatui::style::Color::Green)),
+        ],
     };
-    let header = Paragraph::new(header_text)
-        .style(Style::default().fg(app.colors.header_fg))
+    let header = Paragraph::new(ratatui::text::Line::from(header_spans))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(header, chunks[0]);
 
@@ -435,7 +446,7 @@ fn render_help_popup(f: &mut Frame, app: &App) {
 CodeDiff Keyboard Shortcuts:
 
 Navigation:
-  ↑, ↓, ←, →  Navigate cursor
+  ↑, ↓, ←, →  Navigate cursor (or hjkl)
   Tab        Switch between Before/After panels
   Space      Align both panels (TODO)
 
