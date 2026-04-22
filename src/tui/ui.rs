@@ -16,15 +16,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use ratatui::{
-    Frame, 
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
+    prelude::Alignment,
     style::{Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
-    prelude::Alignment,
 };
 
-use crate::tui::app::{App, Panel, LineDiffStatus, Theme};
+use crate::tui::app::{App, LineDiffStatus, Panel, Theme};
 
 /// Main UI rendering function
 pub fn ui(f: &mut Frame, app: &App) {
@@ -54,7 +54,12 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     let header_spans = match app.active_panel {
         Panel::Before => vec![
             Span::styled("[", Style::default().fg(ratatui::style::Color::Red)),
-            Span::styled("Before", Style::default().fg(ratatui::style::Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "Before",
+                Style::default()
+                    .fg(ratatui::style::Color::Red)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("]", Style::default().fg(ratatui::style::Color::Red)),
             Span::styled(" | ", Style::default().fg(app.colors.header_fg)),
             Span::styled("After", Style::default().fg(ratatui::style::Color::Green)),
@@ -63,7 +68,12 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
             Span::styled("Before", Style::default().fg(ratatui::style::Color::Red)),
             Span::styled(" | ", Style::default().fg(app.colors.header_fg)),
             Span::styled("[", Style::default().fg(ratatui::style::Color::Green)),
-            Span::styled("After", Style::default().fg(ratatui::style::Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "After",
+                Style::default()
+                    .fg(ratatui::style::Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled("]", Style::default().fg(ratatui::style::Color::Green)),
         ],
     };
@@ -132,7 +142,8 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     f.render_widget(code_paragraph, chunks[1]);
 
     // Footer
-    let footer_text = "Arrow keys: Navigate | Space: Align | t: AST | q: Quit";
+    let footer_text =
+        "Arrow keys: Navigate | Space: Align | t: AST | q: Quit | Tab: Switch Before/After";
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(app.colors.footer_fg))
         .block(Block::default().borders(Borders::NONE));
@@ -152,6 +163,78 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     if app.show_legend {
         render_legend(f, app);
     }
+}
+
+/// Helper function to apply token-based coloring to a line
+fn apply_token_coloring<'a>(
+    line: &'a str,
+    _line_idx: usize,
+    line_start_byte: usize,
+    all_ranges: &'a [(usize, usize, LineDiffStatus)],
+    app: &'a App,
+    is_active_line: bool,
+) -> Vec<Span<'a>> {
+    let mut spans = Vec::new();
+
+    // Find token ranges that overlap with this line
+    let line_ranges: Vec<_> = all_ranges
+        .iter()
+        .filter(|&&(start, end, _)| start < line_start_byte + line.len() && end > line_start_byte)
+        .collect();
+
+    if is_active_line {
+        for (byte_idx, c) in line.char_indices() {
+            let char_byte_pos = line_start_byte + byte_idx;
+
+            if byte_idx == app.cursor_char {
+                // Highlight current character
+                spans.push(Span::styled(
+                    c.to_string(),
+                    Style::default()
+                        .fg(app.colors.cursor_fg)
+                        .bg(app.colors.cursor_bg)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                // Find color based on token ranges
+                let mut char_color = app.colors.text;
+                for (start, end, status) in &line_ranges {
+                    if char_byte_pos >= *start && char_byte_pos < *end {
+                        char_color = match status {
+                            LineDiffStatus::Added => app.colors.diff_added,
+                            LineDiffStatus::Removed => app.colors.diff_removed,
+                            LineDiffStatus::Changed => app.colors.diff_changed,
+                            LineDiffStatus::Unchanged => app.colors.text,
+                        };
+                        break;
+                    }
+                }
+                spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
+            }
+        }
+    } else {
+        // Apply token-based coloring for the entire line
+        for (byte_idx, c) in line.char_indices() {
+            let char_byte_pos = line_start_byte + byte_idx;
+
+            // Find color based on token ranges
+            let mut char_color = app.colors.text;
+            for (start, end, status) in &line_ranges {
+                if char_byte_pos >= *start && char_byte_pos < *end {
+                    char_color = match status {
+                        LineDiffStatus::Added => app.colors.diff_added,
+                        LineDiffStatus::Removed => app.colors.diff_removed,
+                        LineDiffStatus::Changed => app.colors.diff_changed,
+                        LineDiffStatus::Unchanged => app.colors.text,
+                    };
+                    break;
+                }
+            }
+            spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
+        }
+    }
+
+    spans
 }
 
 fn render_wide_mode(f: &mut Frame, app: &App) {
@@ -191,67 +274,16 @@ fn render_wide_mode(f: &mut Frame, app: &App) {
                 .saturating_sub(1)]
                 .len();
 
-            // Find token ranges that overlap with this line
-            let line_ranges: Vec<_> = app
-                .token_diff_ranges
-                .iter()
-                .filter(|&&(start, end, _)| {
-                    start < line_start_byte + line.len() && end > line_start_byte
-                })
-                .collect();
-
-            // Highlight individual characters with token-based coloring
-            if app.active_panel == Panel::Before && line_idx == app.cursor_line {
-                for (byte_idx, c) in line.char_indices() {
-                    let char_byte_pos = line_start_byte + byte_idx;
-
-                    if byte_idx == app.cursor_char {
-                        // Highlight current character
-                        spans.push(Span::styled(
-                            c.to_string(),
-                            Style::default()
-                                .fg(app.colors.cursor_fg)
-                                .bg(app.colors.cursor_bg)
-                                .add_modifier(Modifier::BOLD),
-                        ));
-                    } else {
-                        // Find color based on token ranges
-                        let mut char_color = app.colors.text;
-                        for (start, end, status) in &line_ranges {
-                            if char_byte_pos >= *start && char_byte_pos < *end {
-                                char_color = match status {
-                                    LineDiffStatus::Added => app.colors.diff_added,
-                                    LineDiffStatus::Removed => app.colors.diff_removed,
-                                    LineDiffStatus::Changed => app.colors.diff_changed,
-                                    LineDiffStatus::Unchanged => app.colors.text,
-                                };
-                                break;
-                            }
-                        }
-                        spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-                    }
-                }
-            } else {
-                // Apply token-based coloring for the entire line
-                for (byte_idx, c) in line.char_indices() {
-                    let char_byte_pos = line_start_byte + byte_idx;
-
-                    // Find color based on token ranges
-                    let mut char_color = app.colors.text;
-                    for (start, end, status) in &line_ranges {
-                        if char_byte_pos >= *start && char_byte_pos < *end {
-                            char_color = match status {
-                                LineDiffStatus::Added => app.colors.diff_added,
-                                LineDiffStatus::Removed => app.colors.diff_removed,
-                                LineDiffStatus::Changed => app.colors.diff_changed,
-                                LineDiffStatus::Unchanged => app.colors.text,
-                            };
-                            break;
-                        }
-                    }
-                    spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-                }
-            }
+            // Apply token-based coloring
+            let is_active_line = app.active_panel == Panel::Before && line_idx == app.cursor_line;
+            spans.extend(apply_token_coloring(
+                line,
+                line_idx,
+                line_start_byte,
+                &app.token_diff_ranges,
+                app,
+                is_active_line,
+            ));
 
             Line::from(spans)
         })
@@ -290,67 +322,16 @@ fn render_wide_mode(f: &mut Frame, app: &App) {
                 .saturating_sub(1)]
                 .len();
 
-            // Find token ranges that overlap with this line
-            let line_ranges: Vec<_> = app
-                .token_diff_ranges
-                .iter()
-                .filter(|&&(start, end, _)| {
-                    start < line_start_byte + line.len() && end > line_start_byte
-                })
-                .collect();
-
-            // Highlight individual characters with token-based coloring
-            if app.active_panel == Panel::After && line_idx == app.cursor_line {
-                for (byte_idx, c) in line.char_indices() {
-                    let char_byte_pos = line_start_byte + byte_idx;
-
-                    if byte_idx == app.cursor_char {
-                        // Highlight current character
-                        spans.push(Span::styled(
-                            c.to_string(),
-                            Style::default()
-                                .fg(app.colors.cursor_fg)
-                                .bg(app.colors.cursor_bg)
-                                .add_modifier(Modifier::BOLD),
-                        ));
-                    } else {
-                        // Find color based on token ranges
-                        let mut char_color = app.colors.text;
-                        for (start, end, status) in &line_ranges {
-                            if char_byte_pos >= *start && char_byte_pos < *end {
-                                char_color = match status {
-                                    LineDiffStatus::Added => app.colors.diff_added,
-                                    LineDiffStatus::Removed => app.colors.diff_removed,
-                                    LineDiffStatus::Changed => app.colors.diff_changed,
-                                    LineDiffStatus::Unchanged => app.colors.text,
-                                };
-                                break;
-                            }
-                        }
-                        spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-                    }
-                }
-            } else {
-                // Apply token-based coloring for the entire line
-                for (byte_idx, c) in line.char_indices() {
-                    let char_byte_pos = line_start_byte + byte_idx;
-
-                    // Find color based on token ranges
-                    let mut char_color = app.colors.text;
-                    for (start, end, status) in &line_ranges {
-                        if char_byte_pos >= *start && char_byte_pos < *end {
-                            char_color = match status {
-                                LineDiffStatus::Added => app.colors.diff_added,
-                                LineDiffStatus::Removed => app.colors.diff_removed,
-                                LineDiffStatus::Changed => app.colors.diff_changed,
-                                LineDiffStatus::Unchanged => app.colors.text,
-                            };
-                            break;
-                        }
-                    }
-                    spans.push(Span::styled(c.to_string(), Style::default().fg(char_color)));
-                }
-            }
+            // Apply token-based coloring
+            let is_active_line = app.active_panel == Panel::After && line_idx == app.cursor_line;
+            spans.extend(apply_token_coloring(
+                line,
+                line_idx,
+                line_start_byte,
+                &app.token_diff_ranges,
+                app,
+                is_active_line,
+            ));
 
             Line::from(spans)
         })
@@ -463,10 +444,12 @@ AST:
 Quit:
   q          Quit application
 
-Current Theme: ".to_string() + match app.theme {
-    Theme::Light => "Light",
-    Theme::Dark => "Dark",
-};
+Current Theme: "
+        .to_string()
+        + match app.theme {
+            Theme::Light => "Light",
+            Theme::Dark => "Dark",
+        };
 
     let popup = Paragraph::new(help_content)
         .block(
@@ -509,25 +492,28 @@ fn render_legend(f: &mut Frame, app: &App) {
     let legend_content = vec![
         ratatui::text::Line::from(vec![
             added_text,
-            Span::styled("    : New code", Style::default().fg(app.colors.popup_fg))
+            Span::styled("    : New code", Style::default().fg(app.colors.popup_fg)),
         ]),
         ratatui::text::Line::from(vec![
             removed_text,
-            Span::styled("  : Deleted code", Style::default().fg(app.colors.popup_fg))
+            Span::styled("  : Deleted code", Style::default().fg(app.colors.popup_fg)),
         ]),
         ratatui::text::Line::from(vec![
             changed_text,
-            Span::styled(" : Modified code", Style::default().fg(app.colors.popup_fg))
+            Span::styled(" : Modified code", Style::default().fg(app.colors.popup_fg)),
         ]),
         ratatui::text::Line::from(vec![
             unchanged_text,
-            Span::styled("  : Common code", Style::default().fg(app.colors.popup_fg))
+            Span::styled("  : Common code", Style::default().fg(app.colors.popup_fg)),
         ]),
         ratatui::text::Line::from(""),
-        ratatui::text::Line::from(format!("Theme: {}", match app.theme {
-            Theme::Light => "Light",
-            Theme::Dark => "Dark",
-        })),
+        ratatui::text::Line::from(format!(
+            "Theme: {}",
+            match app.theme {
+                Theme::Light => "Light",
+                Theme::Dark => "Dark",
+            }
+        )),
     ];
 
     let legend = Paragraph::new(legend_content)
@@ -547,4 +533,3 @@ fn render_legend(f: &mut Frame, app: &App) {
     f.render_widget(Clear, legend_area);
     f.render_widget(legend, legend_area);
 }
-

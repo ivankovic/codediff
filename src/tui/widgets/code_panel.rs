@@ -85,6 +85,9 @@ impl CodePanel {
                     .saturating_sub(1)]
                     .len();
 
+                // Apply token-based coloring
+                let is_active_line = self.is_active && line_idx == self.cursor_line;
+                
                 // Find token ranges that overlap with this line
                 let line_ranges: Vec<_> = self
                     .token_diff_ranges
@@ -94,8 +97,7 @@ impl CodePanel {
                     })
                     .collect();
 
-                // Highlight individual characters with token-based coloring
-                if self.is_active && line_idx == self.cursor_line {
+                if is_active_line {
                     for (byte_idx, c) in line.char_indices() {
                         let char_byte_pos = line_start_byte + byte_idx;
 

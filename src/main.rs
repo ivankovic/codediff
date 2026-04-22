@@ -126,39 +126,40 @@ fn main() -> io::Result<()> {
         tui.draw(&app)?;
 
         if let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Char('t') => app.toggle_ast_popup(),
-                    KeyCode::Tab => app.toggle_panel(),
-                    KeyCode::Char(' ') => {
-                        // Space bar - align both sides
-                        // TODO: Implement actual alignment logic
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => app.move_cursor_up(),
-                    KeyCode::Down | KeyCode::Char('j') => app.move_cursor_down(),
-                    KeyCode::Left | KeyCode::Char('h') => app.move_cursor_left(),
-                    KeyCode::Right | KeyCode::Char('l') => app.move_cursor_right(),
-                    KeyCode::Char('c') => {
-                        // Toggle color theme
-                        app.toggle_theme();
-                    }
-                    KeyCode::Char('?') => {
-                        // Toggle help panel
-                        app.toggle_help();
-                    }
-                    KeyCode::Char('l') => {
-                        // Toggle legend
-                        app.toggle_legend();
-                    }
-                    KeyCode::Esc => {
-                        // Close any popups
-                        app.show_help = false;
-                        app.show_ast_popup = false;
-                        app.show_legend = false;
-                    }
-                    _ => {}
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Char('t') => app.toggle_ast_popup(),
+                KeyCode::Tab => app.toggle_panel(),
+                KeyCode::Char(' ') => {
+                    // Space bar - align both sides
+                    // TODO: Implement actual alignment logic
                 }
+                KeyCode::Up | KeyCode::Char('k') => app.move_cursor_up(),
+                KeyCode::Down | KeyCode::Char('j') => app.move_cursor_down(),
+                KeyCode::Left | KeyCode::Char('h') => app.move_cursor_left(),
+                KeyCode::Right | KeyCode::Char('l') => app.move_cursor_right(),
+                KeyCode::Char('c') => {
+                    // Toggle color theme
+                    app.toggle_theme();
+                }
+                KeyCode::Char('?') => {
+                    // Toggle help panel
+                    app.toggle_help();
+                }
+                KeyCode::Char('d') => {
+                    // Toggle legend
+                    app.toggle_legend();
+                }
+                KeyCode::Esc => {
+                    // Close any popups
+                    app.show_help = false;
+                    app.show_ast_popup = false;
+                    app.show_legend = false;
+                }
+                _ => {}
+            }
         }
     }
 
@@ -711,3 +712,5 @@ mod tests {
         );
     }
 }
+
+
