@@ -496,8 +496,6 @@ fn render_legend(f: &mut Frame, app: &App) {
     let unchanged_text = Span::styled("Unchanged", Style::default().fg(app.colors.text));
 
     let legend_content = vec![
-        ratatui::text::Line::from("Colour Legend:"),
-        ratatui::text::Line::from(""),
         ratatui::text::Line::from(vec![
             added_text,
             Span::styled("    : New code", Style::default().fg(app.colors.popup_fg))
