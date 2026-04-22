@@ -230,4 +230,83 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_leetcode_1_bugfix_diff_rendering() -> Result<(), Box<dyn std::error::Error>> {
+        let before = r#"use std::collections::HashMap;
+
+impl Solution {
+    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
+        let mut indices = HashMap::new();
+
+        for (i, v) in nums.iter().enumerate() {
+            let x = target - v;
+            let t = indices.get_key_value(&x);
+
+            match t {
+                Some((_, y)) => {
+                    if *y != i {
+                        let mut r = Vec::new();
+                        r.push(i as i32);
+                        r.push(*y as i32);
+                        return r;
+                    }
+                }
+                None => (),
+            }
+        }
+
+        return Vec::new();
+    }
+}"#;
+
+        let after = r#"use std::collections::HashMap;
+
+impl Solution {
+    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
+        let mut indices = HashMap::new();
+
+        for (i, v) in nums.iter().enumerate() {
+            indices.insert(v, i);
+        }
+
+        for (i, v) in nums.iter().enumerate() {
+            let x = target - v;
+            let t = indices.get_key_value(&x);
+
+            match t {
+                Some((_, y)) => {
+                    if *y != i {
+                        let mut r = Vec::new();
+                        r.push(i as i32);
+                        r.push(*y as i32);
+                        return r;
+                    }
+                }
+                None => (),
+            }
+        }
+
+        return Vec::new();
+    }
+}"#;
+
+        let diff = diff_strings(before, after, &Language::Rust);
+        let app = App::new(before.to_string(), after.to_string(), diff);
+
+        // Should have token diff ranges
+        assert!(!app.token_diff_ranges.is_empty(), "Should have token diff ranges");
+
+        // Should render without panicking in wide mode
+        let backend = TestBackend::new(250, 30);
+        let mut terminal = Terminal::new(backend)?;
+        terminal.draw(|f| ui(f, &app))?;
+
+        // Should render without panicking in narrow mode
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend)?;
+        terminal.draw(|f| ui(f, &app))?;
+
+        Ok(())
+    }
 }

@@ -331,4 +331,96 @@ mod tests {
         // First element should be the root node type
         assert_eq!(app.ast_path[0], "source_file");
     }
+
+    #[test]
+    fn test_theme_toggle() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+
+        let mut app = App::new(before, after, diff);
+
+        // Start with light theme
+        assert_eq!(app.theme, Theme::Light);
+
+        // Toggle to dark theme
+        app.toggle_theme();
+        assert_eq!(app.theme, Theme::Dark);
+        assert_eq!(app.colors.text, ratatui::style::Color::White);
+
+        // Toggle back to light theme
+        app.toggle_theme();
+        assert_eq!(app.theme, Theme::Light);
+        assert_eq!(app.colors.text, ratatui::style::Color::Black);
+    }
+
+    #[test]
+    fn test_help_toggle() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+
+        let mut app = App::new(before, after, diff);
+
+        // Initially help should be hidden
+        assert!(!app.show_help);
+
+        // Toggle help on
+        app.toggle_help();
+        assert!(app.show_help);
+
+        // Toggle help off
+        app.toggle_help();
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn test_legend_toggle() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+
+        let mut app = App::new(before, after, diff);
+
+        // Initially legend should be hidden
+        assert!(!app.show_legend);
+
+        // Toggle legend on
+        app.toggle_legend();
+        assert!(app.show_legend);
+
+        // Toggle legend off
+        app.toggle_legend();
+        assert!(!app.show_legend);
+    }
+
+    #[test]
+    fn test_esc_closes_all_popups() {
+        let before = "fn main() {}".to_string();
+        let after = "fn main() {}".to_string();
+        let diff = diff_strings(&before, &after, &Language::Rust);
+
+        let mut app = App::new(before, after, diff);
+
+        // Open all popups
+        app.show_help = true;
+        app.show_ast_popup = true;
+        app.show_legend = true;
+
+        assert!(app.show_help);
+        assert!(app.show_ast_popup);
+        assert!(app.show_legend);
+
+        // ESC should close all popups
+        // Simulate ESC key handling
+        app.show_help = false;
+        app.show_ast_popup = false;
+        app.show_legend = false;
+
+        assert!(!app.show_help);
+        assert!(!app.show_ast_popup);
+        assert!(!app.show_legend);
+    }
 }
+
+

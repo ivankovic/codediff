@@ -21,22 +21,38 @@ use tree_sitter::Node; // Import tree-sitter Node for AST operations
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Theme {
     Light,
+    Dark,
 }
 
 impl Theme {
     pub fn get_colors(&self) -> ThemeColors {
-        ThemeColors {
-            text: ratatui::style::Color::Black,
-            cursor_bg: ratatui::style::Color::Blue,
-            cursor_fg: ratatui::style::Color::White,
-            header_fg: ratatui::style::Color::Yellow,
-            footer_fg: ratatui::style::Color::Gray,
-            popup_bg: ratatui::style::Color::Gray,
-            popup_fg: ratatui::style::Color::Black,
-            popup_border: ratatui::style::Color::Black,
-            diff_added: ratatui::style::Color::Green,
-            diff_removed: ratatui::style::Color::Red,
-            diff_changed: ratatui::style::Color::Yellow,
+        match self {
+            Theme::Light => ThemeColors {
+                text: ratatui::style::Color::Black,
+                cursor_bg: ratatui::style::Color::Blue,
+                cursor_fg: ratatui::style::Color::White,
+                header_fg: ratatui::style::Color::Yellow,
+                footer_fg: ratatui::style::Color::Gray,
+                popup_bg: ratatui::style::Color::Gray,
+                popup_fg: ratatui::style::Color::Black,
+                popup_border: ratatui::style::Color::Black,
+                diff_added: ratatui::style::Color::Green,
+                diff_removed: ratatui::style::Color::Red,
+                diff_changed: ratatui::style::Color::Yellow,
+            },
+            Theme::Dark => ThemeColors {
+                text: ratatui::style::Color::White,
+                cursor_bg: ratatui::style::Color::Blue,
+                cursor_fg: ratatui::style::Color::Black,
+                header_fg: ratatui::style::Color::LightYellow,
+                footer_fg: ratatui::style::Color::DarkGray,
+                popup_bg: ratatui::style::Color::DarkGray,
+                popup_fg: ratatui::style::Color::White,
+                popup_border: ratatui::style::Color::White,
+                diff_added: ratatui::style::Color::LightGreen,
+                diff_removed: ratatui::style::Color::LightRed,
+                diff_changed: ratatui::style::Color::LightYellow,
+            },
         }
     }
 }
@@ -68,7 +84,10 @@ pub struct App {
     pub active_panel: Panel,
     pub show_ast_popup: bool,
     pub ast_path: Vec<String>,
+    pub theme: Theme,
     pub colors: ThemeColors,
+    pub show_help: bool,
+    pub show_legend: bool,
     // Token-level diff information: (start_byte, end_byte, status)
     pub token_diff_ranges: Vec<(usize, usize, LineDiffStatus)>,
 }
@@ -102,7 +121,10 @@ impl App {
             active_panel: Panel::Before,
             show_ast_popup: false,
             ast_path: Vec::new(),
+            theme,
             colors,
+            show_help: false,
+            show_legend: false,
             token_diff_ranges,
         }
     }
@@ -391,5 +413,21 @@ impl App {
         if self.show_ast_popup {
             self.update_ast_path();
         }
+    }
+
+    pub fn toggle_theme(&mut self) {
+        self.theme = match self.theme {
+            Theme::Light => Theme::Dark,
+            Theme::Dark => Theme::Light,
+        };
+        self.colors = self.theme.get_colors();
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
+    }
+
+    pub fn toggle_legend(&mut self) {
+        self.show_legend = !self.show_legend;
     }
 }

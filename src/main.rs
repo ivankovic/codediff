@@ -145,6 +145,24 @@ fn main() -> io::Result<()> {
                         // Vim l key
                         app.move_cursor_right();
                     }
+                    KeyCode::Char('c') => {
+                        // Toggle color theme
+                        app.toggle_theme();
+                    }
+                    KeyCode::Char('?') => {
+                        // Toggle help panel
+                        app.toggle_help();
+                    }
+                    KeyCode::Char('l') => {
+                        // Toggle legend
+                        app.toggle_legend();
+                    }
+                    KeyCode::Esc => {
+                        // Close any popups
+                        app.show_help = false;
+                        app.show_ast_popup = false;
+                        app.show_legend = false;
+                    }
                     _ => {}
                 }
         }

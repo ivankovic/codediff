@@ -24,7 +24,7 @@ use ratatui::{
     prelude::Alignment,
 };
 
-use crate::tui::app::{App, Panel, LineDiffStatus};
+use crate::tui::app::{App, Panel, LineDiffStatus, Theme};
 
 /// Main UI rendering function
 pub fn ui(f: &mut Frame, app: &App) {
@@ -130,6 +130,16 @@ fn render_narrow_mode(f: &mut Frame, app: &App) {
     // AST Popup
     if app.show_ast_popup {
         render_ast_popup(f, app);
+    }
+
+    // Help Panel
+    if app.show_help {
+        render_help_popup(f, app);
+    }
+
+    // Legend
+    if app.show_legend {
+        render_legend(f, app);
     }
 }
 
@@ -407,3 +417,125 @@ fn render_ast_popup(f: &mut Frame, app: &App) {
     f.render_widget(Clear, popup_area); // Clear the area first
     f.render_widget(popup, popup_area);
 }
+
+fn render_help_popup(f: &mut Frame, app: &App) {
+    // Calculate popup size and position
+    let margin = 2;
+    let popup_width = f.size().width.saturating_sub(2 * margin);
+    let popup_height = f.size().height.saturating_sub(2 * margin + 1);
+
+    let popup_area = Rect {
+        x: margin,
+        y: margin,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    let help_content = "
+CodeDiff Keyboard Shortcuts:
+
+Navigation:
+  ↑, ↓, ←, →  Navigate cursor
+  Tab        Switch between Before/After panels
+  Space      Align both panels (TODO)
+
+View:
+  t          Toggle AST tree popup
+  ?          Toggle this help panel
+  l          Toggle color legend
+  c          Toggle light/dark theme
+  ESC        Close all popups
+
+AST:
+  t          Show AST tree at cursor position
+
+Quit:
+  q          Quit application
+
+Current Theme: ".to_string() + match app.theme {
+    Theme::Light => "Light",
+    Theme::Dark => "Dark",
+};
+
+    let popup = Paragraph::new(help_content)
+        .block(
+            Block::default()
+                .title("Help - Keyboard Shortcuts")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(app.colors.popup_border)),
+        )
+        .style(
+            Style::default()
+                .fg(app.colors.popup_fg)
+                .bg(app.colors.popup_bg),
+        )
+        .alignment(ratatui::prelude::Alignment::Left);
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(popup, popup_area);
+}
+
+fn render_legend(f: &mut Frame, app: &App) {
+    // Position legend in lower right corner
+    let legend_width = 35;
+    let legend_height = 12;
+    let legend_x = f.size().width.saturating_sub(legend_width + 2);
+    let legend_y = f.size().height.saturating_sub(legend_height + 1);
+
+    let legend_area = Rect {
+        x: legend_x,
+        y: legend_y,
+        width: legend_width,
+        height: legend_height,
+    };
+
+    // Create colored spans for each colour type
+    let added_text = Span::styled("Added", Style::default().fg(app.colors.diff_added));
+    let removed_text = Span::styled("Removed", Style::default().fg(app.colors.diff_removed));
+    let changed_text = Span::styled("Changed", Style::default().fg(app.colors.diff_changed));
+    let unchanged_text = Span::styled("Unchanged", Style::default().fg(app.colors.text));
+
+    let legend_content = vec![
+        ratatui::text::Line::from("Colour Legend:"),
+        ratatui::text::Line::from(""),
+        ratatui::text::Line::from(vec![
+            added_text,
+            Span::styled("    : New code", Style::default().fg(app.colors.popup_fg))
+        ]),
+        ratatui::text::Line::from(vec![
+            removed_text,
+            Span::styled("  : Deleted code", Style::default().fg(app.colors.popup_fg))
+        ]),
+        ratatui::text::Line::from(vec![
+            changed_text,
+            Span::styled(" : Modified code", Style::default().fg(app.colors.popup_fg))
+        ]),
+        ratatui::text::Line::from(vec![
+            unchanged_text,
+            Span::styled("  : Common code", Style::default().fg(app.colors.popup_fg))
+        ]),
+        ratatui::text::Line::from(""),
+        ratatui::text::Line::from(format!("Theme: {}", match app.theme {
+            Theme::Light => "Light",
+            Theme::Dark => "Dark",
+        })),
+    ];
+
+    let legend = Paragraph::new(legend_content)
+        .block(
+            Block::default()
+                .title("Colour Legend")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(app.colors.popup_border)),
+        )
+        .style(
+            Style::default()
+                .fg(app.colors.popup_fg)
+                .bg(app.colors.popup_bg),
+        )
+        .alignment(ratatui::prelude::Alignment::Left);
+
+    f.render_widget(Clear, legend_area);
+    f.render_widget(legend, legend_area);
+}
+
