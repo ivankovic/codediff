@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use crate::code::{Code, Language};
+use crate::diff::ts_points::TSPointDiff;
 
 /// A structure that holds node caches for both before and after Code objects.
 #[derive(Debug, Clone, Default)]
@@ -134,6 +135,39 @@ impl Default for Diff {
         Self {
             ast: None,
             language: Language::Unknown,
+            ts_points: None,
+        }
+    }
+}
+
+impl Diff {
+    /**
+     * Creates a new Diff from two Code objects.
+     *
+     * This is the main entry point in the AST diffing algorithm.
+     * The algorithm is encoded in the code and is intentionally not explained in the Doccomment to
+     * avoid it going stale. Please see the code.
+     */
+    pub fn from_code(before: &Code, after: &Code) -> Self {
+        // Build node cache for efficient lookup
+        let node_cache = NodeCache::build(before, after);
+
+        // Compute metadata fresh for the diff algorithm
+        let mut ast_diff = ASTDiff {
+            ..Default::default()
+        };
+
+        match_identical_trees(before, after, &node_cache, &mut ast_diff);
+        match_structurally_identical_trees(before, after, &node_cache, &mut ast_diff);
+        let _ = optimal_iud::find(before, after, &node_cache, &mut ast_diff);
+
+        Self {
+            ast: Some(ast_diff),
+            language: before
+                .metadata
+                .language
+                .clone()
+                .unwrap_or(Language::Unknown),
             ts_points: None,
         }
     }
@@ -668,32 +702,14 @@ fn match_structurally_identical_trees(
 }
 
 /**
-* This is the main entry point in the AST diffing algorithm.
+* Creates a Diff from two Code objects.
 *
+* This is a convenience wrapper around Diff::from_code for backwards compatibility.
 * The algorithm is encoded in the code and is intentionally not explained in the Doccomment to
 * avoid it going stale. Please see the code.
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
-    // Build node cache for efficient lookup
-    let node_cache = NodeCache::build(before, after);
-
-    // Compute metadata fresh for the diff algorithm
-    let mut diff = ASTDiff {
-        ..Default::default()
-    };
-
-    match_identical_trees(before, after, &node_cache, &mut diff);
-    match_structurally_identical_trees(before, after, &node_cache, &mut diff);
-    let _ = optimal_iud::find(before, after, &node_cache, &mut diff);
-
-    Diff {
-        ast: Some(diff),
-        language: before
-            .metadata
-            .language
-            .clone()
-            .unwrap_or(Language::Unknown),
-    }
+    Diff::from_code(before, after)
 }
 
 #[cfg(test)]
@@ -1127,11 +1143,11 @@ mod tests {
 
     #[test]
     fn test_is_valid_with_real_diff() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Test that all real diffs are valid
         for (diff_name, (before, after)) in test_diffs {
-            let diff = diff_code(&before, &after);
+            let diff = Diff::from_code(&before, &after);
             let diff_ast = diff.ast.unwrap();
 
             // The mapping from a real diff should always be valid

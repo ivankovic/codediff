@@ -37,29 +37,29 @@ impl TSPointDiff {
     ///
     /// An ASTDiff must exist to create the TSPointDiff. There is no algorithm currently
     /// implemented that can construct the TSPointDiff directly from code.
-    pub fn from(diff: ASTDiff) -> Self {}
+    pub fn from(_diff: ASTDiff) -> Self {
+        unimplemented!("TSPointDiff::from is not yet implemented")
+    }
 
     /// For a given TSPoint, return the diff information.
     ///
     /// Returns the operation, the range this point belongs to and the range of the nearest
     /// ancestor reference node.
-    pub fn for_point(point: TSPoint) -> (ASTMappingOperation, TSRange, TSRange) {}
+    pub fn for_point(_point: TSPoint) -> (ASTMappingOperation, TSRange, TSRange) {
+        unimplemented!("TSPointDiff::for_point is not yet implemented")
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        code::{Code, Language},
-        test,
-    };
+    use crate::test;
     use anyhow::Result;
-
-    use super::*;
 
     #[test]
     fn python_leetcode_1_added_if_block() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
-        let (before, after) = test_diffs.get("python-added-if-block").unwrap().clone();
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        let (_before, _after) = test_diffs.get("python-added-if-block").unwrap().clone();
 
         Ok(())
     }
+}

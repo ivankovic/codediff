@@ -217,7 +217,7 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 * Returns a HashMap where the key is the directory name and the value is the (before, after) Code
 * object pair.
 */
-pub fn handmade_test_diffs() -> Result<HashMap<String, (Code, Code)>> {
+pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
     let mut result = HashMap::new();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -293,6 +293,52 @@ pub fn handmade_test_diffs() -> Result<HashMap<String, (Code, Code)>> {
                 result.insert(dir_name, (before, after));
             }
         }
+    }
+
+    Ok(result)
+}
+
+/**
+* Returns handmade Diff objects from code pairs.
+*
+* This function creates actual Diff objects from the handmade test code pairs.
+* It accepts boolean parameters to control which parts of the diff are computed.
+*
+* Note that the actual files are stored with ".test" extension in "src/test/data/diffs/<dir>/".
+*
+* @param compute_ast If true, compute the AST-based diff
+* @param compute_ts_points If true, compute the TreeSitter points diff
+* @return A HashMap where the key is the directory name and the value is the Diff object
+*/
+pub fn handmade_test_diffs(
+    compute_ast: bool,
+    compute_ts_points: bool,
+) -> Result<HashMap<String, crate::diff::Diff>> {
+    let code_pairs = handmade_test_code_pairs()?;
+    let mut result = HashMap::new();
+
+    for (name, (before, after)) in code_pairs {
+        let mut diff = crate::diff::Diff::default();
+        diff.language = before
+            .metadata
+            .language
+            .clone()
+            .unwrap_or(crate::code::Language::Unknown);
+
+        if compute_ast {
+            // Use the new from_code method to compute AST diff
+            let ast_diff = crate::diff::Diff::from_code(&before, &after);
+            diff.ast = ast_diff.ast;
+        }
+
+        if compute_ts_points {
+            // Compute ts_points if requested
+            // For now, we'll leave this as a placeholder since the implementation
+            // would depend on the existing ts_points module
+            // diff.ts_points = Some(crate::diff::ts_points::compute(&antes, &after)?);
+        }
+
+        result.insert(name, diff);
     }
 
     Ok(result)
@@ -592,10 +638,10 @@ mod tests {
     }
 
     #[test]
-    fn test_handmade_test_diffs_returns_all_diffs() -> Result<()> {
-        let diffs = handmade_test_diffs()?;
+    fn test_handmade_test_code_pairs_returns_all_diffs() -> Result<()> {
+        let diffs = handmade_test_code_pairs()?;
 
-        println!("Found {} test diffs:", diffs.len());
+        println!("Found {} test code pairs:", diffs.len());
         for key in diffs.keys() {
             println!("  - {}", key);
         }
@@ -611,10 +657,10 @@ mod tests {
     }
 
     #[test]
-    fn test_handmade_test_diffs_no_change_diff() -> Result<()> {
-        let diffs = handmade_test_diffs()?;
+    fn test_handmade_test_code_pairs_no_change_diff() -> Result<()> {
+        let diffs = handmade_test_code_pairs()?;
 
-        assert!(!diffs.is_empty(), "Should have found some test diffs");
+        assert!(!diffs.is_empty(), "Should have found some test code pairs");
 
         assert!(diffs.contains_key("no-change"));
 
@@ -626,6 +672,25 @@ mod tests {
 
         assert!(before.metadata.language.is_some());
         assert_eq!(before.metadata.language, after.metadata.language);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_handmade_test_diffs_creates_diff_objects() -> Result<()> {
+        let diffs = handmade_test_diffs(true, false)?;
+
+        assert!(!diffs.is_empty(), "Should have found some test diffs");
+
+        assert!(diffs.contains_key("no-change"));
+
+        let diff = diffs.get("no-change").unwrap();
+
+        // The diff should have the AST computed since we passed true for compute_ast
+        assert!(diff.ast.is_some());
+
+        // The language should be set
+        assert_ne!(diff.language, crate::code::Language::Unknown);
 
         Ok(())
     }

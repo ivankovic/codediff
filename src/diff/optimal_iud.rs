@@ -743,7 +743,7 @@ mod tests {
 
     #[test]
     fn skip_matched_nodes_test() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (_, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
 
         let diff = ASTDiff {
@@ -801,7 +801,7 @@ mod tests {
 
     #[test]
     fn solve_for_hello_world_added_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
 
         let diff = ASTDiff {
@@ -913,7 +913,7 @@ mod tests {
 
     #[test]
     fn solve_for_hello_world_deleted_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
         let (after, before) = test_diffs.get("hello-world-added-message").unwrap().clone();
 
@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn solve_for_leetcode_1_bugfix() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
         let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
 
@@ -976,7 +976,7 @@ mod tests {
 
     #[test]
     fn is_always_valid() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         for (diff_name, (before, after)) in test_diffs {
             let mut diff = ASTDiff {
@@ -1003,7 +1003,7 @@ mod tests {
 
     #[test]
     fn hello_world_added_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
 
         let mut diff = ASTDiff {
@@ -1049,7 +1049,7 @@ mod tests {
 
     #[test]
     fn hello_world_deleted_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Note that we flipped after and before so the addition becomes a deletion.
         let (after, before) = test_diffs.get("hello-world-added-message").unwrap().clone();
@@ -1095,7 +1095,7 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // This test case is a common python edit: adding an if and identing a few lines after the
         // if.
@@ -1225,7 +1225,7 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block_reverse() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Note that we do a sneaky and flip (before, after) to get a delete instead of an add.
         let (after, before) = test_diffs.get("python-added-if-block").unwrap().clone();
@@ -1364,7 +1364,7 @@ mod tests {
 
     #[test]
     fn leetcode_1_bugfix() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
         let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
 
@@ -1399,7 +1399,7 @@ mod tests {
 
     #[test]
     fn no_change_skips_already_matched_nodes() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs.get("no-change").unwrap().clone();
 
         // First, run the full diff algorithm which should match all nodes
@@ -1439,7 +1439,7 @@ mod tests {
 
     #[test]
     fn all_handmade_diffs_have_expected_costs() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_diffs()?;
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Static map of expected costs for each diff
         let expected_costs: std::collections::HashMap<&str, u64> = [
