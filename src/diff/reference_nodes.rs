@@ -33,7 +33,9 @@ pub fn is_reference_node(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {
             node_kind == "source_file" ||  // The root node of any sopurce file
-            node_kind == "function_item"
+            node_kind == "function_item" ||
+            node_kind == "impl_item" ||
+            node_kind == "struct_item"
         }
         Language::Python => node_kind == "module", // Python modules/source files
         Language::Java => node_kind == "program", // Java source files are represented as "program" nodes

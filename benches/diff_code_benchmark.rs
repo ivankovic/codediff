@@ -23,7 +23,7 @@ use std::time::Duration;
 fn benchmark_diff_code(c: &mut Criterion) {
     // Load test diffs
     let test_diffs =
-        codediff::test::helper::handmade_test_diffs().expect("Failed to load test diffs");
+        codediff::test::helper::handmade_test_code_pairs().expect("Failed to load test diffs");
 
     let mut group = c.benchmark_group("diff_code");
     group.measurement_time(Duration::from_secs(60));
@@ -55,3 +55,4 @@ criterion_group! {
 }
 
 criterion_main!(benches);
+
