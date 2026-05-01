@@ -18,17 +18,19 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use tree_sitter::Node;
 
-use crate::diff::{ASTDiff, ASTMapping, COST_UPDATE};
-use crate::{code::Code, diff::ASTMappingOperation};
+use crate::code::{ASTMetadata, Code};
+use crate::diff::{ASTDiff, ASTMapping, COST_UPDATE, ASTMappingOperation};
 
-/// A hashable wrapper for subtree vectors to use as memoization keys
+/// A hashable wrapper for subtree vectors to use as memoization keys.
+/// Uses Arc<[usize]> to avoid cloning the subtree vector.
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct SubtreeKey {
     hash: u64,
     len: usize,
-    subtrees: Vec<usize>,
+    subtrees: Arc<[usize]>,
 }
 
 impl Hash for SubtreeKey {
@@ -47,7 +49,7 @@ impl SubtreeKey {
         SubtreeKey {
             hash: hasher.finish(),
             len: subtrees.len(),
-            subtrees: subtrees.to_vec(),
+            subtrees: Arc::from(subtrees),
         }
     }
 }
@@ -109,12 +111,32 @@ use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
 pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) -> Result<()> {
     let mut memoo = HashMap::new();
 
+    // Compute metadata once at the top level
+    let before_metadata = before
+        .metadata
+        .ast_metadata
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
+        });
+    let after_metadata = after
+        .metadata
+        .ast_metadata
+        .as_ref()
+        .cloned()
+        .unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
+        });
+
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
     let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
     solve(
         before,
         after,
+        &before_metadata,
+        &after_metadata,
         vec![before_root_id],
         vec![after_root_id],
         node_cache,
@@ -122,7 +144,7 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
         &mut memoo,
     )?;
 
-    update_diff(before, after, node_cache, &memoo, diff)?;
+    update_diff(before, after, &before_metadata, &after_metadata, node_cache, &memoo, diff)?;
 
     Ok(())
 }
@@ -251,17 +273,16 @@ fn choose_algorithm_branch(
 }
 
 /**
-* Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
-* operations.
-*
-* The function returns the cost, but the actual mapping can be reconstructed using the memoo
-* memooization map.
+* Internal solve function that works with slices to avoid allocation.
+* This is the main recursive function for the optimal IU diff algorithm.
 */
-fn solve(
+fn solve_with_slices(
     before: &Code,
     after: &Code,
-    before_subtrees: Vec<usize>,
-    after_subtrees: Vec<usize>,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    before_subtrees: &[usize],
+    after_subtrees: &[usize],
     node_cache: &NodeCache,
     diff: &ASTDiff,
     memoo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
@@ -272,8 +293,8 @@ fn solve(
     }
 
     // Check if memoo already has the solution for this input and return that.
-    let before_key = SubtreeKey::new(&before_subtrees);
-    let after_key = SubtreeKey::new(&after_subtrees);
+    let before_key = SubtreeKey::new(before_subtrees);
+    let after_key = SubtreeKey::new(after_subtrees);
     let key = (before_key.clone(), after_key.clone());
     if let Some(solution) = memoo.get(&key) {
         return Ok(solution.cost);
@@ -281,13 +302,13 @@ fn solve(
     let mut result = Solution::new();
 
     let (before_has_unmached_nodes, before_first_unmached_node_index) =
-        skip_matched_nodes(&before_subtrees, diff);
+        skip_matched_nodes(before_subtrees, diff);
     let (after_has_unmached_nodes, after_first_unmached_node_index) =
-        skip_matched_nodes(&after_subtrees, diff);
+        skip_matched_nodes(after_subtrees, diff);
 
     let algorithm_branch = choose_algorithm_branch(
-        &before_subtrees,
-        &after_subtrees,
+        before_subtrees,
+        after_subtrees,
         before_has_unmached_nodes,
         before_first_unmached_node_index,
         after_has_unmached_nodes,
@@ -300,11 +321,13 @@ fn solve(
             result.operation = ASTMappingOperation::DoNothing;
         }
         AlgorithmChoice::SkipMatchedNodes => {
-            result.cost = solve(
+            result.cost = solve_with_slices(
                 before,
                 after,
-                before_subtrees[before_first_unmached_node_index..].to_owned(),
-                after_subtrees[after_first_unmached_node_index..].to_owned(),
+                before_metadata,
+                after_metadata,
+                &before_subtrees[before_first_unmached_node_index..],
+                &after_subtrees[after_first_unmached_node_index..],
                 node_cache,
                 diff,
                 memoo,
@@ -313,7 +336,7 @@ fn solve(
         }
         AlgorithmChoice::InsertAll => {
             let mut total_cost = 0;
-            for &after_id in &after_subtrees {
+            for &after_id in after_subtrees {
                 let unmatched =
                     count_unmatched_nodes(after_id, &node_cache.after, &diff.after_node_map);
                 total_cost += unmatched as u64 * COST_INSERT;
@@ -323,7 +346,7 @@ fn solve(
         }
         AlgorithmChoice::DeleteAll => {
             let mut total_cost = 0;
-            for &before_id in &before_subtrees {
+            for &before_id in before_subtrees {
                 let unmatched =
                     count_unmatched_nodes(before_id, &node_cache.before, &diff.before_node_map);
                 total_cost += unmatched as u64 * COST_DELETE;
@@ -345,6 +368,20 @@ fn solve(
             let mut solution_if_match = Solution::new();
             solution_if_match.cost = u64::MAX;
 
+            // Check if the hashes of the root nodes match
+            let before_first_node_id = before_subtrees[0];
+            let after_first_node_id = after_subtrees[0];
+            let hashes_match = before_metadata
+                .node_to_full_hash
+                .get(&before_first_node_id)
+                .and_then(|before_hash| {
+                    after_metadata
+                        .node_to_full_hash
+                        .get(&after_first_node_id)
+                        .map(|after_hash| before_hash == after_hash)
+                })
+                .unwrap_or(false);
+
             if before_first_node.kind() == after_first_node.kind() {
                 let mut cost = 0;
 
@@ -361,19 +398,23 @@ fn solve(
                 } else {
                     solution_if_match.operation = ASTMappingOperation::Identical;
                 }
-                cost += solve(
+                cost += solve_with_slices(
                     before,
                     after,
-                    before_subtrees[1..].to_owned(),
-                    after_subtrees[1..].to_owned(),
+                    before_metadata,
+                    after_metadata,
+                    &before_subtrees[1..],
+                    &after_subtrees[1..],
                     node_cache,
                     diff,
                     memoo,
-                )? + solve(
+                )? + solve_with_slices(
                     before,
                     after,
-                    ids_of_children(before_first_node),
-                    ids_of_children(after_first_node),
+                    before_metadata,
+                    after_metadata,
+                    &ids_of_children(before_first_node),
+                    &ids_of_children(after_first_node),
                     node_cache,
                     diff,
                     memoo,
@@ -381,125 +422,137 @@ fn solve(
                 solution_if_match.cost = cost;
             }
 
-            // We use this to opportunisticaly skip entire branches of subproblems that cannot
-            // possibly result in a better solution.
-            let mut best_cost_so_far = solution_if_match.cost;
+            // Optimization: if hashes match and the kinds match, we know matching is optimal
+            // so we can skip exploring delete/insert alternatives
+            if hashes_match && before_first_node.kind() == after_first_node.kind() {
+                result = solution_if_match;
+            } else {
+                // We use this to opportunistically skip entire branches of subproblems that cannot
+                // possibly result in a better solution.
+                let mut best_cost_so_far = solution_if_match.cost;
 
-            // The cost if we delete the first root in before
-            // We need to check all possible subsequences of root nodes in after_subtrees, including
-            // the empty set, to check which is the optimal number of nodes in after_subtrees to match
-            // with the children of the first root node in before_subtrees.
-            let mut solution_if_delete = Solution::new();
-            solution_if_delete.operation = ASTMappingOperation::Delete;
-            solution_if_delete.cost = u64::MAX;
+                // The cost if we delete the first root in before
+                // We need to check all possible subsequences of root nodes in after_subtrees, including
+                // the empty set, to check which is the optimal number of nodes in after_subtrees to match
+                // with the children of the first root node in before_subtrees.
+                let mut solution_if_delete = Solution::new();
+                solution_if_delete.operation = ASTMappingOperation::Delete;
+                solution_if_delete.cost = u64::MAX;
 
-            // Pre-compute the common slice to avoid repeated allocation
-            let before_rest = before_subtrees[1..].to_vec();
-            let before_children = ids_of_children(before_first_node);
+                // Pre-compute children once
+                let before_children = ids_of_children(before_first_node);
 
-            for i in 0..=after_subtrees.len() {
-                let mut cost = COST_DELETE;
+                for i in 0..=after_subtrees.len() {
+                    let mut cost = COST_DELETE;
 
-                let cost_to_match_rest = solve(
-                    before,
-                    after,
-                    before_rest.clone(),
-                    after_subtrees[i..].to_vec(),
-                    node_cache,
-                    diff,
-                    memoo,
-                )?;
-
-                if cost + cost_to_match_rest >= best_cost_so_far {
-                    continue;
-                }
-
-                cost += cost_to_match_rest
-                    + solve(
+                    let cost_to_match_rest = solve_with_slices(
                         before,
                         after,
-                        before_children.clone(),
-                        after_subtrees[..i].to_vec(),
+                        before_metadata,
+                        after_metadata,
+                        &before_subtrees[1..],
+                        &after_subtrees[i..],
                         node_cache,
                         diff,
                         memoo,
                     )?;
 
-                if cost < solution_if_delete.cost {
-                    solution_if_delete.cost = cost;
-                    solution_if_delete.index = i;
-                }
-                if cost < best_cost_so_far {
-                    best_cost_so_far = cost;
-                }
-            }
+                    if cost + cost_to_match_rest >= best_cost_so_far {
+                        continue;
+                    }
 
-            // The cost if we insert the first root in after
-            // We need to check all possible subsequences of root nodes in before_subtrees, including
-            // the empty set, to check which is the optimal number of nodes in before_subtrees to match
-            // with the children of the first root node in after_subtrees.
-            let mut solution_if_insert = Solution::new();
-            solution_if_insert.operation = ASTMappingOperation::Insert;
-            solution_if_insert.cost = u64::MAX;
+                    cost += cost_to_match_rest
+                        + solve_with_slices(
+                            before,
+                            after,
+                            before_metadata,
+                            after_metadata,
+                            &before_children,
+                            &after_subtrees[..i],
+                            node_cache,
+                            diff,
+                            memoo,
+                        )?;
 
-            // Pre-compute the common slices to avoid repeated allocation
-            let after_rest = after_subtrees[1..].to_vec();
-            let after_children = ids_of_children(after_first_node);
-
-            for i in 0..=before_subtrees.len() {
-                let mut cost = COST_INSERT;
-
-                let cost_to_mach_rest = solve(
-                    before,
-                    after,
-                    before_subtrees[i..].to_vec(),
-                    after_rest.clone(),
-                    node_cache,
-                    diff,
-                    memoo,
-                )?;
-
-                if cost + cost_to_mach_rest >= best_cost_so_far {
-                    continue;
+                    if cost < solution_if_delete.cost {
+                        solution_if_delete.cost = cost;
+                        solution_if_delete.index = i;
+                    }
+                    if cost < best_cost_so_far {
+                        best_cost_so_far = cost;
+                    }
                 }
 
-                cost += cost_to_mach_rest
-                    + solve(
+                // The cost if we insert the first root in after
+                // We need to check all possible subsequences of root nodes in before_subtrees, including
+                // the empty set, to check which is the optimal number of nodes in before_subtrees to match
+                // with the children of the first root node in after_subtrees.
+                let mut solution_if_insert = Solution::new();
+                solution_if_insert.operation = ASTMappingOperation::Insert;
+                solution_if_insert.cost = u64::MAX;
+
+                // Pre-compute children once
+                let after_children = ids_of_children(after_first_node);
+
+                for i in 0..=before_subtrees.len() {
+                    let mut cost = COST_INSERT;
+
+                    let cost_to_mach_rest = solve_with_slices(
                         before,
                         after,
-                        before_subtrees[..i].to_vec(),
-                        after_children.clone(),
+                        before_metadata,
+                        after_metadata,
+                        &before_subtrees[i..],
+                        &after_subtrees[1..],
                         node_cache,
                         diff,
                         memoo,
                     )?;
 
-                if cost < solution_if_insert.cost {
-                    solution_if_insert.cost = cost;
-                    solution_if_insert.index = i;
-                }
-                if cost < best_cost_so_far {
-                    best_cost_so_far = cost;
-                }
-            }
+                    if cost + cost_to_mach_rest >= best_cost_so_far {
+                        continue;
+                    }
 
-            // Pick the cheapest of the tree costs, that is our final result.
-            //
-            // There is a subtle preference here, if the costs are exactly equal, we prefer matching
-            // and if delete and insert are both equal and cheaper than match, we prefer a delete.
-            //
-            // This is based on how the diff is displayed to humans and personal human preference of
-            // the author.
-            if solution_if_match.cost <= solution_if_delete.cost {
-                if solution_if_match.cost <= solution_if_insert.cost {
-                    result = solution_if_match;
+                    cost += cost_to_mach_rest
+                        + solve_with_slices(
+                            before,
+                            after,
+                            before_metadata,
+                            after_metadata,
+                            &before_subtrees[..i],
+                            &after_children,
+                            node_cache,
+                            diff,
+                            memoo,
+                        )?;
+
+                    if cost < solution_if_insert.cost {
+                        solution_if_insert.cost = cost;
+                        solution_if_insert.index = i;
+                    }
+                    if cost < best_cost_so_far {
+                        best_cost_so_far = cost;
+                    }
+                }
+
+                // Pick the cheapest of the tree costs, that is our final result.
+                //
+                // There is a subtle preference here, if the costs are exactly equal, we prefer matching
+                // and if delete and insert are both equal and cheaper than match, we prefer a delete.
+                //
+                // This is based on how the diff is displayed to humans and personal human preference of
+                // the author.
+                if solution_if_match.cost <= solution_if_delete.cost {
+                    if solution_if_match.cost <= solution_if_insert.cost {
+                        result = solution_if_match;
+                    } else {
+                        result = solution_if_insert;
+                    }
+                } else if solution_if_delete.cost <= solution_if_insert.cost {
+                    result = solution_if_delete;
                 } else {
                     result = solution_if_insert;
                 }
-            } else if solution_if_delete.cost <= solution_if_insert.cost {
-                result = solution_if_delete;
-            } else {
-                result = solution_if_insert;
             }
         }
     }
@@ -509,6 +562,37 @@ fn solve(
     let cost = result.cost;
     memoo.insert(key, result);
     Ok(cost)
+}
+
+/**
+* Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
+* operations.
+*
+* The function returns the cost, but the actual mapping can be reconstructed using the memoo
+* memooization map.
+*/
+fn solve(
+    before: &Code,
+    after: &Code,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    before_subtrees: Vec<usize>,
+    after_subtrees: Vec<usize>,
+    node_cache: &NodeCache,
+    diff: &ASTDiff,
+    memoo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
+) -> Result<u64> {
+    solve_with_slices(
+        before,
+        after,
+        before_metadata,
+        after_metadata,
+        &before_subtrees,
+        &after_subtrees,
+        node_cache,
+        diff,
+        memoo,
+    )
 }
 
 fn add_subtree_to_diff(
@@ -563,6 +647,8 @@ fn add_subtree_to_diff(
 fn update_diff(
     before: &Code,
     after: &Code,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
     node_cache: &NodeCache,
     memoo: &HashMap<(SubtreeKey, SubtreeKey), Solution>,
     diff: &mut ASTDiff,
@@ -644,6 +730,21 @@ fn update_diff(
                     .after
                     .get(&after_subtrees[0])
                     .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+                
+                // Check if hashes match for these nodes
+                let before_first_node_id = before_subtrees[0];
+                let after_first_node_id = after_subtrees[0];
+                let hashes_match = before_metadata
+                    .node_to_full_hash
+                    .get(&before_first_node_id)
+                    .and_then(|before_hash| {
+                        after_metadata
+                            .node_to_full_hash
+                            .get(&after_first_node_id)
+                            .map(|after_hash| before_hash == after_hash)
+                    })
+                    .unwrap_or(false);
+                
                 match solution.operation {
                     ASTMappingOperation::Identical | ASTMappingOperation::Update => {
                         diff.add_mapping(before_subtrees[0], after_subtrees[0], mapping);
@@ -654,10 +755,50 @@ fn update_diff(
                             ));
                         }
 
-                        stack.push((
-                            ids_of_children(before_first_node),
-                            ids_of_children(after_first_node),
-                        ));
+                        // If hashes match, the entire subtrees are identical
+                        // Add mappings for all children recursively without pushing to stack
+                        if hashes_match {
+                            // Build a stack of node ID pairs to process
+                            let mut node_id_pairs: Vec<(usize, usize)> = vec![(before_subtrees[0], after_subtrees[0])];
+                            while let Some((before_parent_id, after_parent_id)) = node_id_pairs.pop() {
+                                let before_parent = node_cache.before.get(&before_parent_id)
+                                    .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+                                let after_parent = node_cache.after.get(&after_parent_id)
+                                    .ok_or_else(|| anyhow::anyhow!("Node not found in cache"))?;
+                                
+                                let mut before_cursor = before_parent.walk();
+                                let mut after_cursor = after_parent.walk();
+                                
+                                let before_children: Vec<_> = before_parent
+                                    .children(&mut before_cursor)
+                                    .collect();
+                                let after_children: Vec<_> = after_parent
+                                    .children(&mut after_cursor)
+                                    .collect();
+                                
+                                // Match children by position
+                                for (before_child, after_child) in before_children.into_iter().zip(after_children.into_iter()) {
+                                    let before_child_id = before_child.id();
+                                    let after_child_id = after_child.id();
+                                    
+                                    // Only add mapping if not already mapped
+                                    if !diff.mapping.contains_key(&(before_child_id, after_child_id)) {
+                                        let child_mapping = ASTMapping {
+                                            cost: 0,
+                                            operation: ASTMappingOperation::Identical,
+                                            reason: super::ASTMappingReason::IdenticalHashOfAncestor,
+                                        };
+                                        diff.add_mapping(before_child_id, after_child_id, child_mapping);
+                                        node_id_pairs.push((before_child_id, after_child_id));
+                                    }
+                                }
+                            }
+                        } else {
+                            stack.push((
+                                ids_of_children(before_first_node),
+                                ids_of_children(after_first_node),
+                            ));
+                        }
                     }
                     ASTMappingOperation::Insert => {
                         diff.add_mapping(0, after_subtrees[0], mapping);
@@ -780,6 +921,24 @@ mod tests {
 
         let mut memoo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
+        
+        // Compute metadata for tests
+        let before_metadata = before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&before).unwrap_or_default()
+            });
+        let after_metadata = after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&after).unwrap_or_default()
+            });
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -787,6 +946,8 @@ mod tests {
         let total_cost = solve(
             &before,
             &after,
+            &before_metadata,
+            &after_metadata,
             vec![before_root_id],
             vec![after_root_id],
             &node_cache,
@@ -810,6 +971,24 @@ mod tests {
 
         let mut memoo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
+        
+        // Compute metadata for tests
+        let before_metadata = before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&before).unwrap_or_default()
+            });
+        let after_metadata = after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&after).unwrap_or_default()
+            });
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -855,6 +1034,8 @@ mod tests {
         let total_cost = solve(
             &before,
             &after,
+            &before_metadata,
+            &after_metadata,
             vec![before_root_id],
             vec![after_root_id],
             &node_cache,
@@ -874,7 +1055,11 @@ mod tests {
         let addedd_subtree_root_id = added_subtree.id();
 
         let old_memoo: HashMap<(Vec<usize>, Vec<usize>), Solution> = memoo.iter()
-            .map(|((before_key, after_key), solution)| ((before_key.subtrees.clone(), after_key.subtrees.clone()), solution.clone()))
+            .map(|((before_key, after_key), solution)| {
+                let before_vec = before_key.subtrees.to_vec();
+                let after_vec = after_key.subtrees.to_vec();
+                ((before_vec, after_vec), solution.clone())
+            })
             .collect();
         let solution = old_memoo
             .get(&(Vec::new(), vec![addedd_subtree_root_id]))
@@ -923,6 +1108,24 @@ mod tests {
 
         let mut memoo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
+        
+        // Compute metadata for tests
+        let before_metadata = before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&before).unwrap_or_default()
+            });
+        let after_metadata = after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&after).unwrap_or_default()
+            });
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -930,6 +1133,8 @@ mod tests {
         let total_cost = solve(
             &before,
             &after,
+            &before_metadata,
+            &after_metadata,
             vec![before_root_id],
             vec![after_root_id],
             &node_cache,
@@ -954,6 +1159,24 @@ mod tests {
 
         let mut memoo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
+        
+        // Compute metadata for tests
+        let before_metadata = before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&before).unwrap_or_default()
+            });
+        let after_metadata = after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::code::metadata::compute_ast_metadata(&after).unwrap_or_default()
+            });
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -961,6 +1184,8 @@ mod tests {
         let total_cost = solve(
             &before,
             &after,
+            &before_metadata,
+            &after_metadata,
             vec![before_root_id],
             vec![after_root_id],
             &node_cache,
@@ -1484,20 +1709,11 @@ mod tests {
             let before_root_id = before.ast.as_ref().unwrap().root_node().id();
             let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
-            let root_mapping = diff
-                .mapping
-                .get(&(before_root_id, after_root_id))
-                .expect("Root node should be mapped");
-
             // Get the expected cost for this diff
             let expected_cost = expected_costs
                 .get(diff_name.as_str())
                 .copied()
                 .unwrap_or_else(|| panic!("No expected cost defined for diff: {}", diff_name));
-
-            // Get the root node mapping to check the cost
-            let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-            let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
             let root_mapping = diff
                 .mapping

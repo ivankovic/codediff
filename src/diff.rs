@@ -382,22 +382,20 @@ pub enum ASTMappingReason {
 */
 fn match_identical_trees(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let _before_tree = before.ast.as_ref().expect("Before code must be parsed");
-    let after_tree = after.ast.as_ref().expect("After code must be parsed");
-    let after_root = after_tree.root_node();
+    let _after_tree = after.ast.as_ref().expect("After code must be parsed");
 
-    // Compute metadata if not already available
+    // Use existing metadata or compute if not available
+    // Note: We clone to avoid lifetime issues, but in practice metadata is usually already computed
     let before_metadata = before
         .metadata
         .ast_metadata
-        .as_ref()
-        .cloned()
+        .clone()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
 
     let after_metadata = after
         .metadata
         .ast_metadata
-        .as_ref()
-        .cloned()
+        .clone()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
@@ -433,23 +431,13 @@ fn match_identical_trees(before: &Code, after: &Code, node_cache: &NodeCache, di
             //
             // TODO: Implement better matching strategy for multiple nodes with same hash
             if let Some(&after_node_id) = after_node_ids.iter().next() {
-                // Find the actual node with the matching ID
-                let mut found_after_node = None;
-                let mut after_cursor = after_root.walk();
-                let mut after_stack = vec![after_root];
+                // Find the actual node with the matching ID - use cache for O(1) lookup
+                let matching_after_node = node_cache.after.get(&after_node_id).cloned();
+                let Some(matching_after_node) = matching_after_node else {
+                    continue;
+                };
 
-                while let Some(current_after_node) = after_stack.pop() {
-                    if current_after_node.id() == after_node_id {
-                        found_after_node = Some(current_after_node);
-                        break;
-                    }
-
-                    for child in current_after_node.children(&mut after_cursor) {
-                        after_stack.push(child);
-                    }
-                }
-
-                if let Some(matching_after_node) = found_after_node {
+                {
                     let after_node_id = matching_after_node.id();
 
                     // Add this mapping
@@ -530,22 +518,20 @@ fn match_structurally_identical_trees(
     diff: &mut ASTDiff,
 ) {
     let _before_tree = before.ast.as_ref().expect("Before code must be parsed");
-    let after_tree = after.ast.as_ref().expect("After code must be parsed");
-    let after_root = after_tree.root_node();
+    let _after_tree = after.ast.as_ref().expect("After code must be parsed");
 
-    // Compute metadata if not already available
+    // Use existing metadata or compute if not available
+    // Note: We clone to avoid lifetime issues, but in practice metadata is usually already computed
     let before_metadata = before
         .metadata
         .ast_metadata
-        .as_ref()
-        .cloned()
+        .clone()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
 
     let after_metadata = after
         .metadata
         .ast_metadata
-        .as_ref()
-        .cloned()
+        .clone()
         .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
@@ -584,23 +570,13 @@ fn match_structurally_identical_trees(
             // there is simply duplicated code in the file with the same structure.
             // For now, we take the first node and match to that.
             if let Some(&after_node_id) = after_node_ids.iter().next() {
-                // Find the actual node with the matching ID
-                let mut found_after_node = None;
-                let mut after_cursor = after_root.walk();
-                let mut after_stack = vec![after_root];
+                // Find the actual node with the matching ID - use cache for O(1) lookup
+                let matching_after_node = node_cache.after.get(&after_node_id).cloned();
+                let Some(matching_after_node) = matching_after_node else {
+                    continue;
+                };
 
-                while let Some(current_after_node) = after_stack.pop() {
-                    if current_after_node.id() == after_node_id {
-                        found_after_node = Some(current_after_node);
-                        break;
-                    }
-
-                    for child in current_after_node.children(&mut after_cursor) {
-                        after_stack.push(child);
-                    }
-                }
-
-                if let Some(matching_after_node) = found_after_node {
+                {
                     let after_node_id = matching_after_node.id();
 
                     // Check if the nodes have the same value

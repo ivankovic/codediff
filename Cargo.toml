@@ -69,6 +69,10 @@ harness = false
 name = "diff_code_benchmark"
 harness = false
 
+[[bench]]
+name = "quick_benchmark"
+harness = false
+
 [dev-dependencies.criterion]
 version = "0.5"
 features = ["html_reports"]
