@@ -17,14 +17,14 @@
  */
 pub mod optimal_iud;
 pub mod reference_nodes;
-pub mod ts_points;
+pub mod text;
 
 use std::collections::HashMap;
 
 use tree_sitter::Node;
 
 use crate::code::{Code, Language};
-use crate::diff::ts_points::TSPointDiff;
+use crate::diff::text::TextDiff;
 
 /// A structure that holds node caches for both before and after Code objects.
 #[derive(Debug, Clone, Default)]
@@ -127,7 +127,7 @@ pub struct Diff {
     pub language: Language,
     /// The difference, provided as a data structure of TreeSitter points.
     /// Very useful when the code is viewed as text, for example in editors.
-    pub ts_points: Option<TSPointDiff>,
+    pub text: Option<TextDiff>,
 }
 
 impl Default for Diff {
@@ -135,7 +135,7 @@ impl Default for Diff {
         Self {
             ast: None,
             language: Language::Unknown,
-            ts_points: None,
+            text: None,
         }
     }
 }
@@ -168,7 +168,7 @@ impl Diff {
                 .language
                 .clone()
                 .unwrap_or(Language::Unknown),
-            ts_points: None,
+            text: None,
         }
     }
 }
@@ -386,17 +386,15 @@ fn match_identical_trees(before: &Code, after: &Code, node_cache: &NodeCache, di
 
     // Use existing metadata or compute if not available
     // Note: We clone to avoid lifetime issues, but in practice metadata is usually already computed
-    let before_metadata = before
-        .metadata
-        .ast_metadata
-        .clone()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
+    let before_metadata =
+        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
+        });
 
-    let after_metadata = after
-        .metadata
-        .ast_metadata
-        .clone()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
+    let after_metadata =
+        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
+        });
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
     let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
@@ -522,17 +520,15 @@ fn match_structurally_identical_trees(
 
     // Use existing metadata or compute if not available
     // Note: We clone to avoid lifetime issues, but in practice metadata is usually already computed
-    let before_metadata = before
-        .metadata
-        .ast_metadata
-        .clone()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
+    let before_metadata =
+        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
+        });
 
-    let after_metadata = after
-        .metadata
-        .ast_metadata
-        .clone()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
+    let after_metadata =
+        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
+        });
 
     // Get the pre-computed reference nodes ordered by subtree size (largest first)
     let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
