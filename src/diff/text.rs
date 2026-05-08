@@ -16,10 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    code::Code,
-    diff::ASTDiff,
-};
+use crate::{code::Code, diff::ASTDiff};
 
 /**
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
@@ -40,12 +37,12 @@ pub struct TextDiff {
 }
 
 impl TextDiff {
-    /// Construct the PointDiff from an ASTDiff.
+    /// Construct the TextDiff from an ASTDiff.
     ///
-    /// An ASTDiff must exist to create the PointDiff. There is no algorithm currently
-    /// implemented that can construct the PointDiff directly from code.
+    /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
+    /// implemented that can construct the TextDiff directly from code.
     pub fn from(_before: &Code, _after: &Code, _diff: &ASTDiff) -> Self {
-        unimplemented!("PointDiff::from is not yet implemented")
+        unimplemented!("TextDiff::from is not yet implemented")
     }
 
     /// For the given side of the diff, return all Ranges.
@@ -62,20 +59,20 @@ impl TextDiff {
     /// be bigger than the input range. In other words, we will not return partial ranges, but
     /// rather the biggest range possible for the first and last operation in the result.
     pub fn for_range(&self, _range: &TextRange, _side: usize) -> Vec<RangeMatch> {
-        /// First, check the cache to find any already computed ranges that intersect with
-        /// the input range.
+        // First, check the cache to find any already computed ranges that intersect with
+        // the input range.
 
-        /// Then, visit the AST in-order and check the TreeSitter ranges of nodes. If the
-        /// nodes intersect with the input range, add them to the cache and then add them
-        /// to the output.
-        ///
-        /// Note that when we traverse the tree, some operations allow us to know the
-        /// answer already in mid-tree nodes, but for some we have to descend all the way
-        /// to the leaf nodes. In particular, is the reason is IdenticalHash, the entire
-        /// range can be mapped.
-        ///
-        /// The traversal is using a stack to avoid blowing up the stack frame when
-        /// recursing over particulalry abhorent files.
+        // Then, visit the AST in-order and check the TreeSitter ranges of nodes. If the
+        // nodes intersect with the input range, add them to the cache and then add them
+        // to the output.
+        //
+        // Note that when we traverse the tree, some operations allow us to know the
+        // answer already in mid-tree nodes, but for some we have to descend all the way
+        // to the leaf nodes. In particular, is the reason is IdenticalHash, the entire
+        // range can be mapped.
+        //
+        // The traversal is using a stack to avoid blowing up the stack frame when
+        // recursing over particulalry abhorent files.
         unimplemented!("To be vibecoded")
     }
 }
@@ -128,6 +125,7 @@ pub enum TextOperation {
 *     printed character.
 *   - We could refer to the next row (which could also be non-existing in case of end of file) and
 *     always refer to column 0.
+*
 * Note that either way, we need to support refering to technically non-existing rows or columns.
 * With this in mind, all algorithms should ideally be implemented in such way that they support
 * either of the two. However, in this codebase, all code should actually use the second approach
@@ -274,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn no_change() -> Result<()> {
+    fn no_change_all_ranges() -> Result<()> {
         let code_pairs = test::helper::handmade_test_code_pairs()?;
         let diffs = test::helper::handmade_test_diffs(true, false)?;
         let (before, after) = code_pairs.get("no-change").unwrap().clone();
@@ -312,7 +310,86 @@ mod tests {
     }
 
     #[test]
-    fn python_leetcode_1_added_if_block() -> Result<()> {
+    fn hellow_world_added_message_all_ranges() -> Result<()> {
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let diffs = test::helper::handmade_test_diffs(true, false)?;
+
+        let (before, after) = code_pairs.get("hello-world-added-message").unwrap().clone();
+        let diff = diffs.get("hello-world-added-message").unwrap().clone();
+
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+
+        let before_ranges = text_diff.all(0);
+        assert_eq!(before_ranges.len(), 3);
+
+        assert_eq!(before_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(before_ranges[0].source.start_row, 0);
+        assert_eq!(before_ranges[0].source.start_column, 0);
+        assert_eq!(before_ranges[0].source.end_row, 2);
+        assert_eq!(before_ranges[0].source.end_column, 0);
+        assert_eq!(before_ranges[0].destination.start_row, 0);
+        assert_eq!(before_ranges[0].destination.start_column, 0);
+        assert_eq!(before_ranges[0].destination.end_row, 2);
+        assert_eq!(before_ranges[0].destination.end_column, 0);
+
+        assert_eq!(before_ranges[1].operation, TextOperation::Delete);
+        assert_eq!(before_ranges[1].source.start_row, 2);
+        assert_eq!(before_ranges[1].source.start_column, 0);
+        assert_eq!(before_ranges[1].source.end_row, 2);
+        assert_eq!(before_ranges[1].source.end_column, 0);
+        assert_eq!(before_ranges[1].destination.start_row, 2);
+        assert_eq!(before_ranges[1].destination.start_column, 0);
+        assert_eq!(before_ranges[1].destination.end_row, 3);
+        assert_eq!(before_ranges[1].destination.end_column, 0);
+
+        assert_eq!(before_ranges[2].operation, TextOperation::Identical);
+        assert_eq!(before_ranges[2].source.start_row, 2);
+        assert_eq!(before_ranges[2].source.start_column, 0);
+        assert_eq!(before_ranges[2].source.end_row, 3);
+        assert_eq!(before_ranges[2].source.end_column, 0);
+        assert_eq!(before_ranges[2].destination.start_row, 3);
+        assert_eq!(before_ranges[2].destination.start_column, 0);
+        assert_eq!(before_ranges[2].destination.end_row, 4);
+        assert_eq!(before_ranges[2].destination.end_column, 0);
+
+        let after_ranges = text_diff.all(1);
+        assert_eq!(after_ranges.len(), 3);
+
+        assert_eq!(after_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(after_ranges[0].source.start_row, 0);
+        assert_eq!(after_ranges[0].source.start_column, 0);
+        assert_eq!(after_ranges[0].source.end_row, 2);
+        assert_eq!(after_ranges[0].source.end_column, 0);
+        assert_eq!(after_ranges[0].destination.start_row, 0);
+        assert_eq!(after_ranges[0].destination.start_column, 0);
+        assert_eq!(after_ranges[0].destination.end_row, 2);
+        assert_eq!(after_ranges[0].destination.end_column, 0);
+
+        assert_eq!(after_ranges[1].operation, TextOperation::Insert);
+        assert_eq!(after_ranges[1].source.start_row, 2);
+        assert_eq!(after_ranges[1].source.start_column, 0);
+        assert_eq!(after_ranges[1].source.end_row, 3);
+        assert_eq!(after_ranges[1].source.end_column, 0);
+        assert_eq!(after_ranges[1].destination.start_row, 2);
+        assert_eq!(after_ranges[1].destination.start_column, 0);
+        assert_eq!(after_ranges[1].destination.end_row, 2);
+        assert_eq!(after_ranges[1].destination.end_column, 0);
+
+        assert_eq!(after_ranges[2].operation, TextOperation::Identical);
+        assert_eq!(after_ranges[2].source.start_row, 3);
+        assert_eq!(after_ranges[2].source.start_column, 0);
+        assert_eq!(after_ranges[2].source.end_row, 4);
+        assert_eq!(after_ranges[2].source.end_column, 0);
+        assert_eq!(after_ranges[2].destination.start_row, 3);
+        assert_eq!(after_ranges[2].destination.start_column, 0);
+        assert_eq!(after_ranges[2].destination.end_row, 3);
+        assert_eq!(after_ranges[2].destination.end_column, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
         let code_pairs = test::helper::handmade_test_code_pairs()?;
         let diffs = test::helper::handmade_test_diffs(true, false)?;
 
