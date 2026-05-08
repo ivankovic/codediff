@@ -299,7 +299,7 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
 }
 
 /**
-* Returns handmade Diff objects from code pairs.
+* Returns handmade Diff objects from code pairs, along with the before and after Code objects.
 *
 * This function creates actual Diff objects from the handmade test code pairs.
 * It accepts boolean parameters to control which parts of the diff are computed.
@@ -308,12 +308,13 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
 *
 * @param compute_ast If true, compute the AST-based diff
 * @param compute_ts_points If true, compute the TreeSitter points diff
-* @return A HashMap where the key is the directory name and the value is the Diff object
+* @return A HashMap where the key is the directory name and the value is a tuple of
+*         (before Code, after Code, Diff object)
 */
 pub fn handmade_test_diffs(
     compute_ast: bool,
     compute_ts_points: bool,
-) -> Result<HashMap<String, crate::diff::Diff>> {
+) -> Result<HashMap<String, (Code, Code, crate::diff::Diff)>> {
     let code_pairs = handmade_test_code_pairs()?;
     let mut result = HashMap::new();
 
@@ -338,7 +339,7 @@ pub fn handmade_test_diffs(
             // diff.ts_points = Some(crate::diff::ts_points::compute(&antes, &after)?);
         }
 
-        result.insert(name, diff);
+        result.insert(name, (before, after, diff));
     }
 
     Ok(result)
@@ -684,13 +685,17 @@ mod tests {
 
         assert!(diffs.contains_key("no-change"));
 
-        let diff = diffs.get("no-change").unwrap();
+        let (before, after, diff) = diffs.get("no-change").unwrap();
 
         // The diff should have the AST computed since we passed true for compute_ast
         assert!(diff.ast.is_some());
 
         // The language should be set
         assert_ne!(diff.language, crate::code::Language::Unknown);
+
+        // Check that code objects are returned
+        assert_ne!(before.contents, "");
+        assert_ne!(after.contents, "");
 
         Ok(())
     }

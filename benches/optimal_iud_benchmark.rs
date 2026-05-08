@@ -25,15 +25,15 @@ fn benchmark_optimal_iud_find(c: &mut Criterion) {
     // Load test code files and diffs
     let test_codes =
         codediff::test::helper::handmade_test_code().expect("Failed to load test codes");
-    let test_diffs =
-        codediff::test::helper::handmade_test_diffs().expect("Failed to load test diffs");
+    let test_code_pairs =
+        codediff::test::helper::handmade_test_code_pairs().expect("Failed to load test code pairs");
 
     let mut group = c.benchmark_group("optimal_iud_find");
     group.measurement_time(Duration::from_secs(60));
     group.warm_up_time(Duration::from_secs(2));
 
-    // Automatically create benchmarks for all test diffs
-    for (test_name, (before, after)) in &test_diffs {
+    // Automatically create benchmarks for all test code pairs
+    for (test_name, (before, after)) in &test_code_pairs {
         // Create a safe benchmark name by replacing non-alphanumeric characters
         let benchmark_name = test_name
             .replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_")
