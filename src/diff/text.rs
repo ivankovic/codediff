@@ -18,7 +18,7 @@
 
 use crate::{
     code::Code,
-    diff::{ASTDiff, ASTMappingOperation},
+    diff::ASTDiff,
 };
 
 /**
@@ -273,47 +273,172 @@ mod tests {
         assert!(b.intersects(&a));
     }
 
-    // Temporarily commented out - existing tests have issues with TextDiff::from signature
-    // and accessing .operation on TextRange
-    
-    // #[test]
-    // fn no_change() -> Result<()> {
-    //     let test_diffs = test::helper::handmade_test_diffs(true, false)?;
-    //     let diff = test_diffs.get("no-change").unwrap().clone();
-    //     let text_diff = TextDiff::from(&diff.before, &diff.after, &diff.ast.unwrap());
-    //     let before_ranges = text_diff.all(0);
-    //     assert_eq!(before_ranges.len(), 1);
-    //     let after_ranges = text_diff.all(1);
-    //     assert_eq!(after_ranges.len(), 1);
-    //     assert_eq!(before_ranges[0].operation, TextOperation::Identical);
-    //     assert_eq!(before_ranges[0].source.start_row, 0);
-    //     assert_eq!(before_ranges[0].source.start_column, 0);
-    //     assert_eq!(before_ranges[0].source.end_row, 50);
-    //     assert_eq!(before_ranges[0].source.end_column, 0);
-    //     assert_eq!(before_ranges[0].destination.start_row, 0);
-    //     assert_eq!(before_ranges[0].destination.start_column, 0);
-    //     assert_eq!(before_ranges[0].destination.end_row, 50);
-    //     assert_eq!(before_ranges[0].destination.end_column, 0);
-    //     assert_eq!(after_ranges[0].operation, TextOperation::Identical);
-    //     assert_eq!(after_ranges[0].source.start_row, 0);
-    //     assert_eq!(after_ranges[0].source.start_column, 0);
-    //     assert_eq!(after_ranges[0].source.end_row, 50);
-    //     assert_eq!(after_ranges[0].source.end_column, 0);
-    //     assert_eq!(after_ranges[0].destination.start_row, 0);
-    //     assert_eq!(after_ranges[0].destination.start_column, 0);
-    //     assert_eq!(after_ranges[0].destination.end_row, 50);
-    //     assert_eq!(after_ranges[0].destination.end_column, 0);
-    //     Ok(())
-    // }
+    #[test]
+    fn no_change() -> Result<()> {
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let diffs = test::helper::handmade_test_diffs(true, false)?;
+        let (before, after) = code_pairs.get("no-change").unwrap().clone();
+        let diff = diffs.get("no-change").unwrap().clone();
 
-    // #[test]
-    // fn python_leetcode_1_added_if_block() -> Result<()> {
-    //     let test_diffs = test::helper::handmade_test_diffs(true, false)?;
-    //     let diff = test_diffs.get("python-added-if-block").unwrap().clone();
-    //     let text_diff = TextDiff::from(&diff.before, &diff.after, &diff.ast.unwrap());
-    //     let before_ranges = text_diff.all(0);
-    //     assert_eq!(before_ranges.len(), 5);
-    //     assert_eq!(before_ranges[0].operation, TextOperation::Identical);
-    //     Ok(())
-    // }
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+
+        let before_ranges = text_diff.all(0);
+        assert_eq!(before_ranges.len(), 1);
+
+        let after_ranges = text_diff.all(1);
+        assert_eq!(after_ranges.len(), 1);
+
+        assert_eq!(before_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(before_ranges[0].source.start_row, 0);
+        assert_eq!(before_ranges[0].source.start_column, 0);
+        assert_eq!(before_ranges[0].source.end_row, 50);
+        assert_eq!(before_ranges[0].source.end_column, 0);
+        assert_eq!(before_ranges[0].destination.start_row, 0);
+        assert_eq!(before_ranges[0].destination.start_column, 0);
+        assert_eq!(before_ranges[0].destination.end_row, 50);
+        assert_eq!(before_ranges[0].destination.end_column, 0);
+
+        assert_eq!(after_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(after_ranges[0].source.start_row, 0);
+        assert_eq!(after_ranges[0].source.start_column, 0);
+        assert_eq!(after_ranges[0].source.end_row, 50);
+        assert_eq!(after_ranges[0].source.end_column, 0);
+        assert_eq!(after_ranges[0].destination.start_row, 0);
+        assert_eq!(after_ranges[0].destination.start_column, 0);
+        assert_eq!(after_ranges[0].destination.end_row, 50);
+        assert_eq!(after_ranges[0].destination.end_column, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn python_leetcode_1_added_if_block() -> Result<()> {
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let diffs = test::helper::handmade_test_diffs(true, false)?;
+
+        let (before, after) = code_pairs.get("python-added-if-block").unwrap().clone();
+        let diff = diffs.get("python-added-if-block").unwrap().clone();
+
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+
+        let before_ranges = text_diff.all(0);
+        assert_eq!(before_ranges.len(), 5);
+
+        assert_eq!(before_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(before_ranges[0].source.start_row, 0);
+        assert_eq!(before_ranges[0].source.start_column, 0);
+        assert_eq!(before_ranges[0].source.end_row, 21);
+        assert_eq!(before_ranges[0].source.end_column, 0);
+        assert_eq!(before_ranges[0].destination.start_row, 0);
+        assert_eq!(before_ranges[0].destination.start_column, 0);
+        assert_eq!(before_ranges[0].destination.end_row, 21);
+        assert_eq!(before_ranges[0].destination.end_column, 0);
+
+        // This is a "empty range" that indicates something exists here in the other side.
+        assert_eq!(before_ranges[1].operation, TextOperation::Delete);
+        assert_eq!(before_ranges[1].source.start_row, 21);
+        assert_eq!(before_ranges[1].source.start_column, 0);
+        assert_eq!(before_ranges[1].source.end_row, 21);
+        assert_eq!(before_ranges[1].source.end_column, 0);
+        assert_eq!(before_ranges[1].destination.start_row, 21);
+        assert_eq!(before_ranges[1].destination.start_column, 0);
+        assert_eq!(before_ranges[1].destination.end_row, 22);
+        assert_eq!(before_ranges[1].destination.end_column, 0);
+
+        // Note the order between the empty range and the actual range that exists. The empty range
+        // must always be before an actual existing range, even if their start point is equal.
+        assert_eq!(before_ranges[2].operation, TextOperation::Identical);
+        assert_eq!(before_ranges[2].source.start_row, 21);
+        assert_eq!(before_ranges[2].source.start_column, 0);
+        assert_eq!(before_ranges[2].source.end_row, 21);
+        assert_eq!(before_ranges[2].source.end_column, 5);
+        assert_eq!(before_ranges[2].destination.start_row, 22);
+        assert_eq!(before_ranges[2].destination.start_column, 0);
+        assert_eq!(before_ranges[2].destination.end_row, 22);
+        assert_eq!(before_ranges[2].destination.end_column, 5);
+
+        // Another empty range for the added whitespace.
+        assert_eq!(before_ranges[3].operation, TextOperation::Delete);
+        assert_eq!(before_ranges[3].source.start_row, 21);
+        assert_eq!(before_ranges[3].source.start_column, 5);
+        assert_eq!(before_ranges[3].source.end_row, 21);
+        assert_eq!(before_ranges[3].source.end_column, 5);
+        assert_eq!(before_ranges[3].destination.start_row, 22);
+        assert_eq!(before_ranges[3].destination.start_column, 5);
+        assert_eq!(before_ranges[3].destination.end_row, 22);
+        assert_eq!(before_ranges[3].destination.end_column, 10);
+
+        // Again, the ordering is well defined and mandatory.
+        // This is the line that was idented, so it is moved but otherwise identical.
+        assert_eq!(before_ranges[4].operation, TextOperation::Move);
+        assert_eq!(before_ranges[4].source.start_row, 21);
+        assert_eq!(before_ranges[4].source.start_column, 5);
+        assert_eq!(before_ranges[4].source.end_row, 22);
+        assert_eq!(before_ranges[4].source.end_column, 0);
+        assert_eq!(before_ranges[4].destination.start_row, 22);
+        assert_eq!(before_ranges[4].destination.start_column, 5);
+        assert_eq!(before_ranges[4].destination.end_row, 23);
+        assert_eq!(before_ranges[4].destination.end_column, 0);
+
+        let after_ranges = text_diff.all(1);
+        // Note the symetric relationships between source and destination ranges in the
+        // before_ranges and after_ranges vectors.
+        assert_eq!(after_ranges.len(), 5);
+
+        assert_eq!(after_ranges[0].operation, TextOperation::Identical);
+        assert_eq!(after_ranges[0].source.start_row, 0);
+        assert_eq!(after_ranges[0].source.start_column, 0);
+        assert_eq!(after_ranges[0].source.end_row, 21);
+        assert_eq!(after_ranges[0].source.end_column, 0);
+        assert_eq!(after_ranges[0].destination.start_row, 0);
+        assert_eq!(after_ranges[0].destination.start_column, 0);
+        assert_eq!(after_ranges[0].destination.end_row, 21);
+        assert_eq!(after_ranges[0].destination.end_column, 0);
+
+        // The added "if" conditional.
+        assert_eq!(after_ranges[1].operation, TextOperation::Insert);
+        assert_eq!(after_ranges[1].source.start_row, 21);
+        assert_eq!(after_ranges[1].source.start_column, 0);
+        assert_eq!(after_ranges[1].source.end_row, 22);
+        assert_eq!(after_ranges[1].source.end_column, 0);
+        assert_eq!(after_ranges[1].destination.start_row, 21);
+        assert_eq!(after_ranges[1].destination.start_column, 0);
+        assert_eq!(after_ranges[1].destination.end_row, 21);
+        assert_eq!(after_ranges[1].destination.end_column, 0);
+
+        // The spaces that are the same on both sides.
+        assert_eq!(after_ranges[2].operation, TextOperation::Identical);
+        assert_eq!(after_ranges[2].source.start_row, 22);
+        assert_eq!(after_ranges[2].source.start_column, 0);
+        assert_eq!(after_ranges[2].source.end_row, 22);
+        assert_eq!(after_ranges[2].source.end_column, 5);
+        assert_eq!(after_ranges[2].destination.start_row, 21);
+        assert_eq!(after_ranges[2].destination.start_column, 0);
+        assert_eq!(after_ranges[2].destination.end_row, 21);
+        assert_eq!(after_ranges[2].destination.end_column, 5);
+
+        // The added identation.
+        assert_eq!(after_ranges[3].operation, TextOperation::Insert);
+        assert_eq!(after_ranges[3].source.start_row, 22);
+        assert_eq!(after_ranges[3].source.start_column, 5);
+        assert_eq!(after_ranges[3].source.end_row, 22);
+        assert_eq!(after_ranges[3].source.end_column, 10);
+        assert_eq!(after_ranges[3].destination.start_row, 21);
+        assert_eq!(after_ranges[3].destination.start_column, 5);
+        assert_eq!(after_ranges[3].destination.end_row, 21);
+        assert_eq!(after_ranges[3].destination.end_column, 5);
+
+        // The matched existing implementation.
+        assert_eq!(after_ranges[4].operation, TextOperation::Move);
+        assert_eq!(after_ranges[4].source.start_row, 22);
+        assert_eq!(after_ranges[4].source.start_column, 5);
+        assert_eq!(after_ranges[4].source.end_row, 23);
+        assert_eq!(after_ranges[4].source.end_column, 0);
+        assert_eq!(after_ranges[4].destination.start_row, 21);
+        assert_eq!(after_ranges[4].destination.start_column, 5);
+        assert_eq!(after_ranges[4].destination.end_row, 22);
+        assert_eq!(after_ranges[4].destination.end_column, 0);
+
+        Ok(())
+    }
 }
