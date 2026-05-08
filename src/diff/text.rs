@@ -16,7 +16,10 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::diff::{ASTDiff, ASTMappingOperation};
+use crate::{
+    code::Code,
+    diff::{ASTDiff, ASTMappingOperation},
+};
 
 /**
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
@@ -31,14 +34,17 @@ use crate::diff::{ASTDiff, ASTMappingOperation};
 * ranges should complete in 1 ms or less.
 */
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct TextDiff {}
+pub struct TextDiff {
+    /// Cache of already computed ranges.
+    cache: Vec<RangeMatch>,
+}
 
 impl TextDiff {
     /// Construct the PointDiff from an ASTDiff.
     ///
     /// An ASTDiff must exist to create the PointDiff. There is no algorithm currently
     /// implemented that can construct the PointDiff directly from code.
-    pub fn from(_diff: &ASTDiff) -> Self {
+    pub fn from(_before: &Code, _after: &Code, _diff: &ASTDiff) -> Self {
         unimplemented!("PointDiff::from is not yet implemented")
     }
 
@@ -46,6 +52,30 @@ impl TextDiff {
     ///
     /// The result is a vector of (Range, Operation, Option<Range>) tuples.
     pub fn all(&self, _side: usize) -> Vec<RangeMatch> {
+        // Simply calling the ranged version for the entire file will do.
+        unimplemented!("To be vibecoded")
+    }
+
+    /// For the given range and side of the diff, return all RangeMatches.
+    ///
+    /// Note that the union of the resulting matches will cover the input range, but it **can**
+    /// be bigger than the input range. In other words, we will not return partial ranges, but
+    /// rather the biggest range possible for the first and last operation in the result.
+    pub fn for_range(&self, _range: &TextRange, _side: usize) -> Vec<RangeMatch> {
+        /// First, check the cache to find any already computed ranges that intersect with
+        /// the input range.
+
+        /// Then, visit the AST in-order and check the TreeSitter ranges of nodes. If the
+        /// nodes intersect with the input range, add them to the cache and then add them
+        /// to the output.
+        ///
+        /// Note that when we traverse the tree, some operations allow us to know the
+        /// answer already in mid-tree nodes, but for some we have to descend all the way
+        /// to the leaf nodes. In particular, is the reason is IdenticalHash, the entire
+        /// range can be mapped.
+        ///
+        /// The traversal is using a stack to avoid blowing up the stack frame when
+        /// recursing over particulalry abhorent files.
         unimplemented!("To be vibecoded")
     }
 }
