@@ -16,6 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+use tree_sitter::{Node, Range, Tree};
+
 use crate::{code::Code, diff::ASTDiff};
 
 /**
@@ -30,10 +32,24 @@ use crate::{code::Code, diff::ASTDiff};
 * complete in 5 ms, and subsequent queries that ask for ranges that overlap with already computed
 * ranges should complete in 1 ms or less.
 */
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct TextDiff {
     /// Cache of already computed ranges.
     cache: Vec<RangeMatch>,
+    /// The before AST tree.
+    before_tree: Option<Tree>,
+    /// The after AST tree.
+    after_tree: Option<Tree>,
+}
+
+impl Default for TextDiff {
+    fn default() -> Self {
+        Self {
+            cache: Vec::new(),
+            before_tree: None,
+            after_tree: None,
+        }
+    }
 }
 
 impl TextDiff {
@@ -41,8 +57,12 @@ impl TextDiff {
     ///
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
-    pub fn from(_before: &Code, _after: &Code, _diff: &ASTDiff) -> Self {
-        unimplemented!("TextDiff::from is not yet implemented")
+    pub fn from(before: &Code, after: &Code, _diff: &ASTDiff) -> Self {
+        Self {
+            cache: Vec::new(),
+            before_tree: before.ast.clone(),
+            after_tree: after.ast.clone(),
+        }
     }
 
     /// For the given side of the diff, return all Ranges.
@@ -58,22 +78,52 @@ impl TextDiff {
     /// Note that the union of the resulting matches will cover the input range, but it **can**
     /// be bigger than the input range. In other words, we will not return partial ranges, but
     /// rather the biggest range possible for the first and last operation in the result.
-    pub fn for_range(&self, _range: &TextRange, _side: usize) -> Vec<RangeMatch> {
-        // First, check the cache to find any already computed ranges that intersect with
-        // the input range.
+    pub fn for_range(&self, range: &TextRange, side: usize) -> Vec<RangeMatch> {
+        // Get the tree for the specified side
+        let tree = match side {
+            0 => self.before_tree.as_ref(),
+            1 => self.after_tree.as_ref(),
+            _ => return Vec::new(),
+        };
 
-        // Then, visit the AST in-order and check the TreeSitter ranges of nodes. If the
-        // nodes intersect with the input range, add them to the cache and then add them
-        // to the output.
-        //
-        // Note that when we traverse the tree, some operations allow us to know the
-        // answer already in mid-tree nodes, but for some we have to descend all the way
-        // to the leaf nodes. In particular, is the reason is IdenticalHash, the entire
-        // range can be mapped.
-        //
-        // The traversal is using a stack to avoid blowing up the stack frame when
-        // recursing over particulalry abhorent files.
-        unimplemented!("To be vibecoded")
+        let Some(tree) = tree else {
+            return Vec::new();
+        };
+
+        let root_node = tree.root_node();
+
+        // Stack-based pre-order traversal for n-ary trees.
+        // Pre-order for n-ary: visit node, then child[0..n] subtrees left to right.
+        let mut stack: Vec<Node> = Vec::new();
+        let mut result: Vec<RangeMatch> = Vec::new();
+
+        // Start with root node
+        stack.push(root_node);
+
+        while let Some(node) = stack.pop() {
+            // Check if this node has children
+            let mut cursor = node.walk();
+            let children: Vec<Node> = node.children(&mut cursor).collect();
+
+            if children.is_empty() {
+                // Leaf node - create a range and check intersection
+                let node_range = TextRange::from_treesitter_range(node.range());
+                if node_range.intersects(range) {
+                    result.push(RangeMatch {
+                        source: node_range,
+                        operation: TextOperation::NotYetSet,
+                        destination: TextRange::new(0, 0, 0, 0),
+                    });
+                }
+            } else {
+                // Push children in reverse order so leftmost is processed first
+                for child in children.into_iter().rev() {
+                    stack.push(child);
+                }
+            }
+        }
+
+        result
     }
 }
 
@@ -163,6 +213,16 @@ impl TextRange {
             start_column,
             end_row,
             end_column,
+        }
+    }
+
+    /// Create a new TextRange from a TreeSitter Range.
+    pub fn from_treesitter_range(ts_range: Range) -> Self {
+        Self {
+            start_row: ts_range.start_point.row,
+            start_column: ts_range.start_point.column,
+            end_row: ts_range.end_point.row,
+            end_column: ts_range.end_point.column,
         }
     }
 
@@ -429,6 +489,9 @@ mod tests {
         assert_eq!(before_ranges[2].destination.end_column, 5);
 
         // Another empty range for the added whitespace.
+        // Note that this is a very interesting use case, since whitespace "disappears" from the AST
+        // in some sense, but in Python whitespace is extremely important and highlighting it in the
+        // textual diff is very important.
         assert_eq!(before_ranges[3].operation, TextOperation::Delete);
         assert_eq!(before_ranges[3].source.start_row, 21);
         assert_eq!(before_ranges[3].source.start_column, 5);
