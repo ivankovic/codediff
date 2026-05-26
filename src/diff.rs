@@ -18,6 +18,7 @@
 pub mod optimal_iud;
 pub mod reference_nodes;
 pub mod text;
+pub mod text_range;
 
 use std::collections::HashMap;
 

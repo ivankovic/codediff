@@ -16,9 +16,9 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use tree_sitter::{Node, Range, Tree};
+use tree_sitter::{Node, Tree};
 
-use crate::{code::Code, diff::ASTDiff};
+use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 
 /**
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
@@ -163,173 +163,12 @@ pub enum TextOperation {
     Delete,
 }
 
-/**
-* A range of text. The range is a right-open interval, i.e. the end point is NOT part of the range.
-* Each point in the range is a (row, column) pair.
-*
-* Note that there are some interesting corner cases when dealing with non-printable characters and
-* text ranges. Each textual row, unless the file is completely empty, ends with a newline
-* character, or two in case of '\r\n'. This raises the interesting question of how to refer to a
-* full row:
-*   - We could refer to the row, but refer to a non-existing column one column after the last
-*     printed character.
-*   - We could refer to the next row (which could also be non-existing in case of end of file) and
-*     always refer to column 0.
-*
-* Note that either way, we need to support refering to technically non-existing rows or columns.
-* With this in mind, all algorithms should ideally be implemented in such way that they support
-* either of the two. However, in this codebase, all code should actually use the second approach
-* and use the (row + 1, 0) pair. This is based on engineering intuition that this leads to fewer
-* potential off-by-one errors.
-*
-* Another interesting corner case are ranges with no size. If the start and end point are exactly
-* the same, we could interpret this either as "only start" or "empty range that doesn't actually
-* select anything". We choose the second, because "only start" can already be represented as
-* [start, start+1> right-open interval. This gives us an interesting ability to represent
-* "infinitely small ranges" that are still strictly well ordered. This is useful because it allows
-* us a neat property: when code is inserted or deleted, the other side of the comparison will not
-* have a matching range at all. However, if we insert a null-range in the appropriate place, we can
-* allow the editor to display a red/green line indicating that something exists on the other side
-* in this place. This also leads to symetric diffs: both sides will always have the same number of
-* ranges, or in case of multi file diffs the sum total of ranges will always be an even number and
-* each range will always have a matching range somewhere.
-*
-* One-side open intervals have the useful property that they can easily implement union,
-* subtraction and intersection with not corner cases.
-*/
-#[derive(Debug, Clone, PartialEq)]
-pub struct TextRange {
-    start_row: usize,
-    start_column: usize,
-    end_row: usize,
-    end_column: usize,
-}
-
-impl TextRange {
-    /// Create a new TextRange from start and end points.
-    pub fn new(start_row: usize, start_column: usize, end_row: usize, end_column: usize) -> Self {
-        Self {
-            start_row,
-            start_column,
-            end_row,
-            end_column,
-        }
-    }
-
-    /// Create a new TextRange from a TreeSitter Range.
-    pub fn from_treesitter_range(ts_range: Range) -> Self {
-        Self {
-            start_row: ts_range.start_point.row,
-            start_column: ts_range.start_point.column,
-            end_row: ts_range.end_point.row,
-            end_column: ts_range.end_point.column,
-        }
-    }
-
-    /// Check if this range intersects with another range.
-    /// Two ranges intersect if they overlap (as right-open intervals).
-    /// Empty ranges (start == end) at the same point are considered to intersect.
-    pub fn intersects(&self, other: &TextRange) -> bool {
-        let self_start = (self.start_row, self.start_column);
-        let self_end = (self.end_row, self.end_column);
-        let other_start = (other.start_row, other.start_column);
-        let other_end = (other.end_row, other.end_column);
-
-        // Right-open interval intersection: self starts before other ends AND other starts before self ends
-        // Special case: both are empty ranges at the same point
-        (self_start == self_end && other_start == other_end && self_start == other_start)
-            || (self_start < other_end && other_start < self_end)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::test;
     use anyhow::Result;
 
     use super::*;
-
-    // Tests for TextRange::intersects()
-    #[test]
-    fn text_range_intersects_overlapping() {
-        let a = TextRange::new(0, 0, 5, 0);
-        let b = TextRange::new(3, 0, 8, 0);
-        assert!(a.intersects(&b));
-        assert!(b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_touching() {
-        // Right-open intervals: [0,5) and [5,10) do NOT intersect
-        let a = TextRange::new(0, 0, 5, 0);
-        let b = TextRange::new(5, 0, 10, 0);
-        assert!(!a.intersects(&b));
-        assert!(!b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_identical() {
-        let a = TextRange::new(0, 0, 5, 0);
-        let b = TextRange::new(0, 0, 5, 0);
-        assert!(a.intersects(&b));
-    }
-
-    #[test]
-    fn text_range_intersects_contains() {
-        let a = TextRange::new(0, 0, 10, 0);
-        let b = TextRange::new(2, 0, 5, 0);
-        assert!(a.intersects(&b));
-        assert!(b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_disjoint() {
-        let a = TextRange::new(0, 0, 2, 0);
-        let b = TextRange::new(5, 0, 8, 0);
-        assert!(!a.intersects(&b));
-        assert!(!b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_same_row_different_columns() {
-        let a = TextRange::new(0, 0, 0, 10);
-        let b = TextRange::new(0, 5, 0, 15);
-        assert!(a.intersects(&b));
-        assert!(b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_same_row_touching_columns() {
-        // [0,10) and [10,20) do NOT intersect
-        let a = TextRange::new(0, 0, 0, 10);
-        let b = TextRange::new(0, 10, 0, 20);
-        assert!(!a.intersects(&b));
-        assert!(!b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_empty_range() {
-        // Empty ranges (start == end) still intersect with ranges that contain them
-        let a = TextRange::new(0, 0, 5, 0);
-        let b = TextRange::new(2, 0, 2, 0);
-        assert!(a.intersects(&b));
-        assert!(b.intersects(&a));
-    }
-
-    #[test]
-    fn text_range_intersects_empty_ranges_same_point() {
-        let a = TextRange::new(0, 0, 0, 0);
-        let b = TextRange::new(0, 0, 0, 0);
-        assert!(a.intersects(&b));
-    }
-
-    #[test]
-    fn text_range_intersects_crossing_rows() {
-        let a = TextRange::new(0, 5, 2, 5);
-        let b = TextRange::new(1, 0, 3, 0);
-        assert!(a.intersects(&b));
-        assert!(b.intersects(&a));
-    }
 
     #[test]
     fn no_change_all_ranges() -> Result<()> {
