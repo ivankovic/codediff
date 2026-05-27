@@ -337,6 +337,8 @@ pub enum ASTMappingOperation {
     /// The node and all it's children are deleted. Same as InsertWithChildren, this is a more
     /// complex operation that results in more efficient code.
     DeleteWithChildren,
+    /// The node maps to a different node, but not all of their children are identical.
+    MatchButNotIdentical,
 }
 
 /**
