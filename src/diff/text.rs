@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use tree_sitter::{Node, Tree};
+use tree_sitter::Node;
 
 use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 
@@ -34,22 +34,53 @@ use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 */
 #[derive(Debug, Clone)]
 pub struct TextDiff {
-    /// Cache of already computed ranges.
-    cache: Vec<RangeMatch>,
-    /// The before AST tree.
-    before_tree: Option<Tree>,
-    /// The after AST tree.
-    after_tree: Option<Tree>,
+    // TODO: A much more complex tree-based structure for very large files.
+    before_ranges: Vec<RangeMatch>,
+    after_ranges: Vec<RangeMatch>,
 }
 
 impl Default for TextDiff {
     fn default() -> Self {
         Self {
-            cache: Vec::new(),
-            before_tree: None,
-            after_tree: None,
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
         }
     }
+}
+
+/// Returns the RangeMatches from source to destination.
+fn ranges(source: &Code, destination: &Code, diff: &ASTDiff) -> Vec<RangeMatch> {
+    let mut ranges = Vec::new();
+
+    match (&source.ast, &destination.ast) {
+        (None, None) => {
+            // If there is no code on either side, there is no diff.
+            // We simply leave ranges empty and let the match complete.
+        }
+        (Some(source_tree), None) => {
+            let source_root = source_tree.root_node();
+            let source_range = TextRange::from_treesitter_range(source_root.range());
+
+            ranges.push(RangeMatch {
+                source: source_range.clone(),
+                destination: TextRange::zero(),
+                operation: TextOperation::Delete,
+            });
+        }
+        (None, Some(destination_tree)) => {
+            let destination_root = destination_tree.root_node();
+            let destination_range = TextRange::from_treesitter_range(destination_root.range());
+
+            ranges.push(RangeMatch {
+                source: TextRange::zero(),
+                destination: destination_range.clone(),
+                operation: TextOperation::Insert,
+            });
+        }
+        (Some(source_tree), Some(destination_tree)) => {}
+    }
+
+    ranges
 }
 
 impl TextDiff {
@@ -57,20 +88,21 @@ impl TextDiff {
     ///
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
-    pub fn from(before: &Code, after: &Code, _diff: &ASTDiff) -> Self {
+    pub fn from(before: &Code, after: &Code, diff: &ASTDiff) -> Self {
         Self {
-            cache: Vec::new(),
-            before_tree: before.ast.clone(),
-            after_tree: after.ast.clone(),
+            before_ranges: ranges(before, after, diff),
+            after_ranges: ranges(after, before, diff),
         }
     }
 
     /// For the given side of the diff, return all Ranges.
     ///
     /// The result is a vector of (Range, Operation, Option<Range>) tuples.
-    pub fn all(&self, _side: usize) -> Vec<RangeMatch> {
-        // Simply calling the ranged version for the entire file will do.
-        unimplemented!("To be vibecoded")
+    pub fn all(&self, side: usize) -> Vec<RangeMatch> {
+        if side == 0 {
+            return self.before_ranges.clone();
+        }
+        self.after_ranges.clone()
     }
 
     /// For the given range and side of the diff, return all RangeMatches.
@@ -78,52 +110,8 @@ impl TextDiff {
     /// Note that the union of the resulting matches will cover the input range, but it **can**
     /// be bigger than the input range. In other words, we will not return partial ranges, but
     /// rather the biggest range possible for the first and last operation in the result.
-    pub fn for_range(&self, range: &TextRange, side: usize) -> Vec<RangeMatch> {
-        // Get the tree for the specified side
-        let tree = match side {
-            0 => self.before_tree.as_ref(),
-            1 => self.after_tree.as_ref(),
-            _ => return Vec::new(),
-        };
-
-        let Some(tree) = tree else {
-            return Vec::new();
-        };
-
-        let root_node = tree.root_node();
-
-        // Stack-based pre-order traversal for n-ary trees.
-        // Pre-order for n-ary: visit node, then child[0..n] subtrees left to right.
-        let mut stack: Vec<Node> = Vec::new();
-        let mut result: Vec<RangeMatch> = Vec::new();
-
-        // Start with root node
-        stack.push(root_node);
-
-        while let Some(node) = stack.pop() {
-            // Check if this node has children
-            let mut cursor = node.walk();
-            let children: Vec<Node> = node.children(&mut cursor).collect();
-
-            if children.is_empty() {
-                // Leaf node - create a range and check intersection
-                let node_range = TextRange::from_treesitter_range(node.range());
-                if node_range.intersects(range) {
-                    result.push(RangeMatch {
-                        source: node_range,
-                        operation: TextOperation::NotYetSet,
-                        destination: TextRange::new(0, 0, 0, 0),
-                    });
-                }
-            } else {
-                // Push children in reverse order so leftmost is processed first
-                for child in children.into_iter().rev() {
-                    stack.push(child);
-                }
-            }
-        }
-
-        result
+    pub fn for_range(&self, _range: &TextRange, _side: usize) -> Vec<RangeMatch> {
+        unimplemented!("TODO: Implement fast, tree based storage and implement this method")
     }
 }
 
@@ -131,13 +119,14 @@ impl TextDiff {
 * A textual range match. For a given source match, it provides the operation for that range and
 * optionally the matching range on the destination side.
 *
-* Note that it doesn't use before or after terms on purpose.
+* Note that it doesn't use before or after terms on purpose, because it is used for both
+* before-to-after and after-to-before ranges.
 */
 #[derive(Debug, Clone, PartialEq)]
 pub struct RangeMatch {
     pub source: TextRange,
-    pub operation: TextOperation,
     pub destination: TextRange,
+    pub operation: TextOperation,
 }
 
 /**

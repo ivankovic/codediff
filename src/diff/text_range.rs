@@ -70,6 +70,16 @@ impl TextRange {
         }
     }
 
+    /// Creats a "zero" range. An empty range starting at (0,0) and ending at (0, 0).
+    pub fn zero() -> Self {
+        Self {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 0,
+        }
+    }
+
     /// Create a new TextRange from a TreeSitter Range.
     pub fn from_treesitter_range(ts_range: Range) -> Self {
         Self {
