@@ -52,6 +52,9 @@ tree-sitter-xml = "0.7.0"
 tree-sitter-yaml = "0.7"
 walkdir = "2"
 metrohash = "1.0.7"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"]}
+tracing-error = "0.2.1"
 
 [dev-dependencies]
 tempfile = "3.10.1"

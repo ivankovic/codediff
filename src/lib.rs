@@ -19,10 +19,15 @@ pub mod code;
 pub mod diff;
 pub mod metadata;
 pub mod stats;
+pub mod tui;
 
 pub mod test;
 
-use crate::{code::{Language, Code}, diff::Diff, diff::diff_code};
+use crate::{
+    code::{Code, Language},
+    diff::Diff,
+    diff::diff_code,
+};
 
 /**
 * Compute the difference between two programms, given as strings in a given language.
