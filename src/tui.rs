@@ -15,8 +15,11 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod actions;
 pub mod app;
+pub mod components;
 pub mod events;
+pub mod ui;
 
 use anyhow::Result;
 use std::path::Path;
@@ -24,6 +27,7 @@ use tracing_subscriber::{EnvFilter, Layer, fmt, prelude::*};
 
 /// Log to a file since the terminal is used by the TUI.
 pub fn initialize_logging() -> Result<()> {
+    std::fs::create_dir_all("/tmp/codediff")?;
     let path = Path::new("/tmp/codediff/log.txt");
     let log_file = std::fs::File::create(path)?;
 

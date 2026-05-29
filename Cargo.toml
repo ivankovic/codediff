@@ -22,8 +22,8 @@ tempfile = "3.10.1"
 futures = "0.3"
 tokio = { version = "1.0", features = ["full"] }
 tree-sitter = "0.25"
-ratatui = "0.26.3"
-crossterm = "0.27.0"
+ratatui = { version = "0.26.3", features = ["serde", "macros"]}
+crossterm = { version = "0.27.0", features = ["serde", "event-stream"]}
 tree-sitter-bash = "0.25"
 tree-sitter-c = "0.24"
 tree-sitter-c-sharp = "0.23"
@@ -55,6 +55,9 @@ metrohash = "1.0.7"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"]}
 tracing-error = "0.2.1"
+strum = { version = "0.28.0", features = ["derive"] }
+tokio-util = "0.7.18"
+signal-hook = "0.4.4"
 
 [dev-dependencies]
 tempfile = "3.10.1"

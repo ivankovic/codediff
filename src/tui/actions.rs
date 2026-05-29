@@ -15,22 +15,18 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use crossterm::event::{KeyEvent, MouseEvent};
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
-/// Terminal events the app can respond to.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Event {
-    Init,
-    Quit,
-    Error,
-    Closed,
+#[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
+pub enum Action {
     Tick,
     Render,
-    FocusGained,
-    FocusLost,
-    Paste(String),
-    Key(KeyEvent),
-    Mouse(MouseEvent),
     Resize(u16, u16),
+    Suspend,
+    Resume,
+    Quit,
+    ClearScreen,
+    Error(String),
+    Help,
 }

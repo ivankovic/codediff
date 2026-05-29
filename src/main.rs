@@ -39,8 +39,11 @@ struct Args {
     tui_frame_rate: f64,
 }
 
-async fn tui_main() -> Result<()> {
+async fn tui_main(args: &Args) -> Result<()> {
     tui::initialize_logging()?;
+
+    let mut app = tui::app::App::new(args.tui_tick_rate, args.tui_frame_rate)?;
+    app.run().await?;
 
     Ok(())
 }
@@ -51,7 +54,7 @@ async fn main() -> Result<()> {
 
     if args.headless || args.mode.to_lowercase() == "headless" {
         unimplemented!("TODO: implement headless mode");
-    } else if let Err(e) = tui_main().await {
+    } else if let Err(e) = tui_main(&args).await {
         eprintln!("something went wrong");
         return Err(e);
     }
