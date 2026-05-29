@@ -18,9 +18,9 @@
 use anyhow::{Result, bail};
 use git2::{Repository, Signature};
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
+use std::{fs, string};
 use tempfile::tempdir;
 use tree_sitter::Node;
 
@@ -314,17 +314,23 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
 pub fn handmade_test_diffs(
     compute_ast: bool,
     compute_ts_points: bool,
+    filename_filter: &str,
 ) -> Result<HashMap<String, (Code, Code, crate::diff::Diff)>> {
     let code_pairs = handmade_test_code_pairs()?;
     let mut result = HashMap::new();
 
     for (name, (before, after)) in code_pairs {
-        let mut diff = crate::diff::Diff::default();
-        diff.language = before
-            .metadata
-            .language
-            .clone()
-            .unwrap_or(crate::code::Language::Unknown);
+        if !filename_filter.is_empty() && !name.contains(filename_filter) {
+            continue;
+        }
+        let mut diff = crate::diff::Diff {
+            language: before
+                .metadata
+                .language
+                .clone()
+                .unwrap_or(crate::code::Language::Unknown),
+            ..Default::default()
+        };
 
         if compute_ast {
             // Use the new from_code method to compute AST diff
@@ -679,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_handmade_test_diffs_creates_diff_objects() -> Result<()> {
-        let diffs = handmade_test_diffs(true, false)?;
+        let diffs = handmade_test_diffs(true, false, "")?;
 
         assert!(!diffs.is_empty(), "Should have found some test diffs");
 

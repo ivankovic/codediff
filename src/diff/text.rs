@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn no_change_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false)?;
+        let diffs = test::helper::handmade_test_diffs(true, false, "no-change")?;
         let (before, after, diff) = diffs.get("no-change").unwrap().clone();
 
         let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn hellow_world_added_message_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false)?;
+        let diffs = test::helper::handmade_test_diffs(true, false, "hello-world-added-message")?;
 
         let (before, after, diff) = diffs.get("hello-world-added-message").unwrap().clone();
 
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false)?;
+        let diffs = test::helper::handmade_test_diffs(true, false, "python-added-if-block")?;
 
         let (before, after, diff) = diffs.get("python-added-if-block").unwrap().clone();
 
