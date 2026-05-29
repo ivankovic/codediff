@@ -52,8 +52,14 @@ impl Component for Overview {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        frame.render_widget(Paragraph::new("hello world"), area);
+    fn draw(&mut self, frame: &mut Frame, rect: Rect) -> Result<()> {
+        frame.render_widget(
+            Block::default()
+                .borders(Borders::ALL)
+                .title_alignment(Alignment::Center)
+                .title_bottom(" [Esc / q] - Exit screen | d - Open file pair"),
+            rect,
+        );
         Ok(())
     }
 }
