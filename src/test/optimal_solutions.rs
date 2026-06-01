@@ -24,6 +24,28 @@ mod tests {
     use anyhow::Result;
 
     #[test]
+    fn no_change() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("no-change").unwrap().clone();
+
+        let diff = diff::diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+
+        let diff_ast = diff.ast.unwrap();
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let mapping = diff_ast
+            .mapping
+            .get(&(before_ast.root_node().id(), after_ast.root_node().id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        Ok(())
+    }
+
+    #[test]
     fn rust_hash_optimization() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();

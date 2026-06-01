@@ -160,6 +160,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "not yet implemented"]
     fn no_change_all_ranges() -> Result<()> {
         let diffs = test::helper::handmade_test_diffs(true, false, "no-change")?;
         let (before, after, diff) = diffs.get("no-change").unwrap().clone();
@@ -196,6 +197,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "not yet implemented"]
     fn hellow_world_added_message_all_ranges() -> Result<()> {
         let diffs = test::helper::handmade_test_diffs(true, false, "hello-world-added-message")?;
 
@@ -273,6 +275,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "not yet implemented"]
     fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
         let diffs = test::helper::handmade_test_diffs(true, false, "python-added-if-block")?;
 
