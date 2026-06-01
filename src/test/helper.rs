@@ -25,6 +25,7 @@ use tempfile::tempdir;
 use tree_sitter::Node;
 
 use crate::code::{Code, metadata};
+use crate::diff::{ASTDiff, ASTMapping};
 
 /**
 * Follows path from the root node and returns the resulting node, if the path is valid.
@@ -39,7 +40,7 @@ use crate::code::{Code, metadata};
 *
 * If the path is invalid, an error is returned.
 */
-pub fn node_for_path<'a>(root: Node<'a>, path: Vec<&str>) -> Result<Node<'a>> {
+pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     let mut current_node = root;
 
     for path_segment in path {
@@ -82,6 +83,76 @@ pub fn node_for_path<'a>(root: Node<'a>, path: Vec<&str>) -> Result<Node<'a>> {
     }
 
     Ok(current_node)
+}
+
+pub fn mapping_for_path<'a>(
+    path_before: &[&str],
+    path_after: &[&str],
+    before_root: Node<'a>,
+    after_root: Node<'a>,
+    diff: &ASTDiff,
+) -> Result<ASTMapping> {
+    let node_before = node_for_path(before_root, path_before)?;
+    let node_after = node_for_path(after_root, path_after)?;
+    let mapping = diff.mapping.get(&(node_before.id(), node_after.id()));
+
+    if mapping.is_none() {
+        bail!(
+            "Mapping not found for paths {:?} and {:?}",
+            path_before,
+            path_after
+        );
+    }
+
+    let mapping = mapping.unwrap();
+
+    Ok(mapping.clone())
+}
+
+pub fn was_node_added<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Result<bool> {
+    let node = node_for_path(root, path)?;
+    Ok(diff.mapping.contains_key(&(0, node.id())))
+}
+
+pub fn was_node_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Result<bool> {
+    let node = node_for_path(root, path)?;
+    Ok(diff.mapping.contains_key(&(node.id(), 0)))
+}
+
+pub fn was_tree_added<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Result<bool> {
+    let node = node_for_path(root, path)?;
+    let mut stack = vec![node];
+
+    while let Some(node) = stack.pop() {
+        if !diff.mapping.contains_key(&(0, node.id())) {
+            return Ok(false);
+        }
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    Ok(true)
+}
+
+pub fn was_tree_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Result<bool> {
+    let node = node_for_path(root, path)?;
+    let mut stack = vec![node];
+
+    while let Some(node) = stack.pop() {
+        if !diff.mapping.contains_key(&(node.id(), 0)) {
+            return Ok(false);
+        }
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+
+    Ok(true)
 }
 
 /**
@@ -553,13 +624,13 @@ mod tests {
 
         let t = node_for_path(
             ast.root_node(),
-            vec!["function_item", "block", "expression_statement"],
+            &vec!["function_item", "block", "expression_statement"],
         )?;
         assert_eq!(t.kind(), "expression_statement");
 
         let t = node_for_path(
             ast.root_node(),
-            vec![
+            &vec![
                 "function_item:1",
                 "block:1",
                 "expression_statement",
@@ -569,7 +640,7 @@ mod tests {
         assert_eq!(t.kind(), "macro_invocation");
 
         // Invalid paths
-        assert!(node_for_path(ast.root_node(), vec!["no such node"]).is_err());
+        assert!(node_for_path(ast.root_node(), &vec!["no such node"]).is_err());
 
         Ok(())
     }

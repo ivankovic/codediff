@@ -844,7 +844,7 @@ mod tests {
 
         let before_string_node = test::helper::node_for_path(
             before_ast.root_node(),
-            vec![
+            &[
                 "function_item",
                 "block",
                 "expression_statement",
@@ -856,7 +856,7 @@ mod tests {
         )?;
         let after_string_node = test::helper::node_for_path(
             after_ast.root_node(),
-            vec![
+            &[
                 "function_item",
                 "block",
                 "expression_statement",

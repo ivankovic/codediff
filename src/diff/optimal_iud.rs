@@ -399,8 +399,10 @@ fn solve_with_slices(
                         solution_if_match.operation = ASTMappingOperation::Update;
                         cost += COST_UPDATE;
                     }
-                } else {
+                } else if hashes_match {
                     solution_if_match.operation = ASTMappingOperation::Identical;
+                } else {
+                    solution_if_match.operation = ASTMappingOperation::MatchButNotIdentical;
                 }
 
                 // We always need to solve the remaining nodes at the same level as the two first
@@ -759,7 +761,9 @@ fn update_diff(
                     .unwrap_or(false);
 
                 match solution.operation {
-                    ASTMappingOperation::Identical | ASTMappingOperation::Update => {
+                    ASTMappingOperation::Identical
+                    | ASTMappingOperation::MatchButNotIdentical
+                    | ASTMappingOperation::Update => {
                         diff.add_mapping(before_subtrees[0], after_subtrees[0], mapping);
                         if before_subtrees.len() > 1 || after_subtrees.len() > 1 {
                             stack.push((
@@ -923,7 +927,7 @@ mod tests {
 
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["function_item", "block", "expression_statement:2"],
+            &vec!["function_item", "block", "expression_statement:2"],
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
@@ -1078,7 +1082,7 @@ mod tests {
         // expression_statement node that as added, and it's subtree, was solved
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["function_item", "block", "expression_statement:2"],
+            &vec!["function_item", "block", "expression_statement:2"],
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
@@ -1099,13 +1103,13 @@ mod tests {
         // Now we work backwards as explained in the comment above...
         let before_closing_bracket = test::helper::node_for_path(
             before_ast.root_node(),
-            vec!["function_item", "block", "}"],
+            &vec!["function_item", "block", "}"],
         )?;
         let before_closing_bracket_id = before_closing_bracket.id();
 
         let after_closing_bracket = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["function_item", "block", "}"],
+            &vec!["function_item", "block", "}"],
         )?;
         let after_closing_bracket_id = after_closing_bracket.id();
 
@@ -1280,7 +1284,7 @@ mod tests {
 
         let added_expression_node = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["function_item", "block", "expression_statement:2"],
+            &vec!["function_item", "block", "expression_statement:2"],
         )?;
 
         let added_expression_node_mapping = diff.mapping.get(&(0, added_expression_node.id()));
@@ -1328,7 +1332,7 @@ mod tests {
 
         let deleted_expression_node = test::helper::node_for_path(
             before_ast.root_node(),
-            vec!["function_item", "block", "expression_statement:2"],
+            &vec!["function_item", "block", "expression_statement:2"],
         )?;
 
         let deleted_expression_node_mapping = diff.mapping.get(&(deleted_expression_node.id(), 0));
@@ -1433,7 +1437,7 @@ mod tests {
 
         let added_if_node = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["if_statement", "block", "if_statement"],
+            &vec!["if_statement", "block", "if_statement"],
         )?;
 
         let added_if_node_mapping = diff.mapping.get(&(0, added_if_node.id()));
@@ -1451,7 +1455,7 @@ mod tests {
 
         let existing_expression_node = test::helper::node_for_path(
             before_ast.root_node(),
-            vec!["if_statement", "block", "expression_statement:4"],
+            &vec!["if_statement", "block", "expression_statement:4"],
         )?;
 
         let expression_node_in_after_id = diff
@@ -1505,7 +1509,7 @@ mod tests {
 
         let deleted_if_node = test::helper::node_for_path(
             before_ast.root_node(),
-            vec!["if_statement", "block", "if_statement"],
+            &vec!["if_statement", "block", "if_statement"],
         )?;
 
         let deleted_if_node_mapping = diff.mapping.get(&(deleted_if_node.id(), 0));
@@ -1523,7 +1527,7 @@ mod tests {
 
         let existing_expression_node = test::helper::node_for_path(
             after_ast.root_node(),
-            vec!["if_statement", "block", "expression_statement:4"],
+            &vec!["if_statement", "block", "expression_statement:4"],
         )?;
 
         let expression_node_in_before_id = diff
@@ -1574,7 +1578,7 @@ mod tests {
 
         let before_string_node = test::helper::node_for_path(
             before_ast.root_node(),
-            vec![
+            &vec![
                 "function_item",
                 "block",
                 "expression_statement",
@@ -1586,7 +1590,7 @@ mod tests {
         )?;
         let after_string_node = test::helper::node_for_path(
             after_ast.root_node(),
-            vec![
+            &vec![
                 "function_item",
                 "block",
                 "expression_statement",
