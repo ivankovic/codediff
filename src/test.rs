@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod helper;
+pub mod optimal_solutions;
 
 #[cfg(test)]
 mod tests {
