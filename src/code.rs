@@ -232,9 +232,10 @@ pub struct ASTMetadata {
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
     /// declaration will hash to the same structural hash. Therefor, the map value is a set.
     pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// node.id() -> subtree size
+    pub node_to_subtree_size: HashMap<usize, usize>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
-    // TODO: Add a node-id -> node cache
 }
 
 /**

@@ -18,10 +18,11 @@
 use anyhow::Result;
 use std::collections::HashMap;
 
-use crate::code::{Code, ASTMetadata, Metadata};
 use crate::code::language;
 use crate::code::tip;
+use crate::code::{ASTMetadata, Code, Metadata};
 use crate::diff::reference_nodes;
+use crate::metadata;
 
 /**
 * Compute all metadata fileds, that can be computed without reading any new information.
@@ -50,9 +51,48 @@ pub fn hermetic_expand(m: &mut Metadata) {
 pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     crate::code::hash::hash_code(code, &mut metadata)?;
-    // Discover all reference nodes and order them by subtree size
+    compute_subtree_sizes(code, &mut metadata)?;
     discover_reference_nodes(code, &mut metadata)?;
     Ok(metadata)
+}
+
+fn compute_subtree_sizes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    let ast = code.ast.as_ref().expect("AST must be parsed");
+    let root_node = ast.root_node();
+
+    // Perform post-order traversal to compute subtree sizes efficiently
+    let mut stack = Vec::new();
+    stack.push((root_node, false)); // (node, processed)
+
+    while let Some((node, processed)) = stack.pop() {
+        if processed {
+            // Post-order processing: compute subtree size
+            let node_id = node.id();
+            let mut size = 1; // Count this node itself
+
+            // Add sizes of all children
+            let mut child_cursor = node.walk();
+            for child in node.children(&mut child_cursor) {
+                if let Some(&child_size) = metadata.node_to_subtree_size.get(&child.id()) {
+                    size += child_size;
+                }
+            }
+
+            metadata.node_to_subtree_size.insert(node_id, size);
+        } else {
+            // Pre-order: push back as processed, then push children
+            stack.push((node, true));
+
+            // Push children in reverse order for proper traversal
+            let mut child_cursor = node.walk();
+            let children: Vec<_> = node.children(&mut child_cursor).collect();
+            for child in children.into_iter().rev() {
+                stack.push((child, false));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /**
@@ -71,45 +111,9 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         .as_ref()
         .expect("Language must be set");
 
-    // Map to store subtree sizes for all nodes
-    let mut node_to_subtree_size = HashMap::new();
-
-    // Perform post-order traversal to compute subtree sizes efficiently
-    let mut stack = Vec::new();
-    stack.push((root_node, false)); // (node, processed)
-
-    while let Some((node, processed)) = stack.pop() {
-        if processed {
-            // Post-order processing: compute subtree size
-            let node_id = node.id();
-            let mut size = 1; // Count this node itself
-
-            // Add sizes of all children
-            let mut child_cursor = node.walk();
-            for child in node.children(&mut child_cursor) {
-                if let Some(&child_size) = node_to_subtree_size.get(&child.id()) {
-                    size += child_size;
-                }
-            }
-
-            node_to_subtree_size.insert(node_id, size);
-        } else {
-            // Pre-order: push back as processed, then push children
-            stack.push((node, true));
-
-            // Push children in reverse order for proper traversal
-            let mut child_cursor = node.walk();
-            let children: Vec<_> = node.children(&mut child_cursor).collect();
-            for child in children.into_iter().rev() {
-                stack.push((child, false));
-            }
-        }
-    }
-
     // Collect reference nodes with their subtree sizes
     let mut reference_nodes_with_sizes = Vec::new();
 
-    // Traverse again to find reference nodes
     let mut stack = Vec::new();
     stack.push(root_node);
 
@@ -118,7 +122,7 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
 
         // Check if this node is a reference node
         if reference_nodes::is_reference_node(node.kind(), language)
-            && let Some(&subtree_size) = node_to_subtree_size.get(&node_id)
+            && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
         {
             reference_nodes_with_sizes.push((node_id, subtree_size));
         }
@@ -164,26 +168,28 @@ mod tests {
     #[test]
     fn compute_ast_metadata_works() -> Result<()> {
         use crate::test::helper;
-        
+
         let codes = helper::handmade_test_code()?;
-        let code = codes.get("hello-world.rs").expect("hello-world.rs should exist");
-        
+        let code = codes
+            .get("hello-world.rs")
+            .expect("hello-world.rs should exist");
+
         let ast_metadata = compute_ast_metadata(code)?;
-        
+
         // Test that all metadata fields are populated
         assert!(!ast_metadata.node_to_full_hash.is_empty());
         assert!(!ast_metadata.full_hash_to_node.is_empty());
         assert!(!ast_metadata.node_to_structural_hash.is_empty());
         assert!(!ast_metadata.structural_hash_to_node.is_empty());
         assert!(!ast_metadata.reference_nodes_ordered.is_empty());
-        
+
         // Test that the reference nodes are actually ordered by size (descending)
         // We can't test the exact ordering without knowing the tree structure,
         // but we can test that it's not empty and contains valid node IDs
         for &node_id in &ast_metadata.reference_nodes_ordered {
             assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
         }
-        
+
         Ok(())
     }
 }
