@@ -16,12 +16,12 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use codediff::diff::optimal_iud::find;
+use codediff::diff::optimal_iud::for_roots;
 use codediff::diff::{ASTDiff, NodeCache};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::time::Duration;
 
-fn benchmark_optimal_iud_find(c: &mut Criterion) {
+fn benchmark_optimal_iud_for_roots(c: &mut Criterion) {
     // Load test code files and diffs
     let test_codes =
         codediff::test::helper::handmade_test_code().expect("Failed to load test codes");
@@ -45,7 +45,7 @@ fn benchmark_optimal_iud_find(c: &mut Criterion) {
             b.iter(|| {
                 let mut diff = ASTDiff::default();
                 let node_cache = NodeCache::build(black_box(&before), black_box(&after));
-                find(
+                for_roots(
                     black_box(&before),
                     black_box(&after),
                     black_box(&node_cache),
@@ -67,7 +67,7 @@ fn benchmark_optimal_iud_find(c: &mut Criterion) {
             b.iter(|| {
                 let mut diff = ASTDiff::default();
                 let node_cache = NodeCache::build(black_box(&before_hello), black_box(&after_hello));
-                find(
+                for_roots(
                     black_box(&before_hello),
                     black_box(&after_hello),
                     black_box(&node_cache),

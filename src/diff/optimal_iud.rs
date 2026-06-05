@@ -108,9 +108,49 @@ impl SubtreeKey {
 */
 use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
 
-pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) -> Result<()> {
+pub fn for_nodes(
+    before: &Code,
+    after: &Code,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    before_node_ids: Vec<usize>,
+    after_node_ids: Vec<usize>,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+) -> Result<()> {
     let mut memoo = HashMap::new();
 
+    solve(
+        before,
+        after,
+        before_metadata,
+        after_metadata,
+        before_node_ids,
+        after_node_ids,
+        node_cache,
+        diff,
+        &mut memoo,
+    )?;
+
+    update_diff(
+        before,
+        after,
+        before_metadata,
+        after_metadata,
+        node_cache,
+        &memoo,
+        diff,
+    )?;
+
+    Ok(())
+}
+
+pub fn for_roots(
+    before: &Code,
+    after: &Code,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+) -> Result<()> {
     // Compute metadata once at the top level
     let before_metadata = before
         .metadata
@@ -128,7 +168,7 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
     let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
-    solve(
+    for_nodes(
         before,
         after,
         &before_metadata,
@@ -137,20 +177,7 @@ pub fn find(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTD
         vec![after_root_id],
         node_cache,
         diff,
-        &mut memoo,
-    )?;
-
-    update_diff(
-        before,
-        after,
-        &before_metadata,
-        &after_metadata,
-        node_cache,
-        &memoo,
-        diff,
-    )?;
-
-    Ok(())
+    )
 }
 
 /**
@@ -1242,7 +1269,7 @@ mod tests {
             };
 
             let node_cache = NodeCache::build(&before, &after);
-            find(&before, &after, &node_cache, &mut diff)?;
+            for_roots(&before, &after, &node_cache, &mut diff)?;
 
             assert!(
                 diff.is_valid(&before, &after, &node_cache),
@@ -1269,7 +1296,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
@@ -1317,7 +1344,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
@@ -1421,7 +1448,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
@@ -1493,7 +1520,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(
             diff.is_valid(&before, &after, &node_cache),
@@ -1565,7 +1592,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(diff.is_valid(&before, &after, &node_cache));
         assert!(diff.is_complete(&before, &after, &node_cache));
@@ -1631,7 +1658,7 @@ mod tests {
         };
 
         let node_cache = NodeCache::build(&before, &after);
-        find(&before, &after, &node_cache, &mut diff)?;
+        for_roots(&before, &after, &node_cache, &mut diff)?;
 
         assert!(diff.is_valid(&before, &after, &node_cache));
         assert!(diff.is_complete(&before, &after, &node_cache));
@@ -1675,16 +1702,16 @@ mod tests {
 
         assert!(diff.mapping.contains_key(&(before_root_id, after_root_id)));
 
-        // Now test that find() correctly skips over already matched nodes
+        // Now test that for_roots() correctly skips over already matched nodes
         // by measuring execution time - it should be very fast (< 30ms)
         let start_time = std::time::Instant::now();
-        let result = find(&before, &after, &node_cache, &mut diff);
+        let result = for_roots(&before, &after, &node_cache, &mut diff);
         let duration = start_time.elapsed();
 
-        assert!(result.is_ok(), "find() should succeed");
+        assert!(result.is_ok(), "for_roots() should succeed");
         assert!(
             duration.as_millis() < 30,
-            "find() should complete in < 30ms when all nodes are already matched, but took {}ms",
+            "for_roots() should complete in < 30ms when all nodes are already matched, but took {}ms",
             duration.as_millis()
         );
 
@@ -1725,7 +1752,7 @@ mod tests {
             };
 
             let node_cache = NodeCache::build(&before, &after);
-            find(&before, &after, &node_cache, &mut diff)?;
+            for_roots(&before, &after, &node_cache, &mut diff)?;
 
             assert!(
                 diff.is_valid(&before, &after, &node_cache),

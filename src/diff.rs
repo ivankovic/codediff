@@ -19,6 +19,7 @@ pub mod optimal_iud;
 pub mod reference_nodes;
 pub mod semantic_structure_nodes;
 pub mod solve_identical_trees;
+pub mod solve_semantically_structural_nodes;
 pub mod solve_structurally_identical_trees;
 pub mod text;
 pub mod text_range;
@@ -166,10 +167,13 @@ impl Diff {
         solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
         solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
 
+        // These speed up the diff, but don't guaranteed an optimal solution
+        solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
+
         // This is the final, extremely slow algorithm.
         // It finds the optimal solution, but only for Insert/Update/Delete operations. The
         // more nodes are already matched, the faster and better this step is.
-        let _ = optimal_iud::find(before, after, &node_cache, &mut ast_diff);
+        let _ = optimal_iud::for_roots(before, after, &node_cache, &mut ast_diff);
 
         Self {
             ast: Some(ast_diff),
