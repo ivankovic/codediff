@@ -23,6 +23,7 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, COST_UPDATE};
+use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
 
 /// A hashable wrapper for subtree vectors to use as memoization keys.
 /// Uses Arc<[usize]> to avoid cloning the subtree vector.
@@ -106,8 +107,6 @@ impl SubtreeKey {
 * what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
 * optimal index for the operation.
 */
-use crate::diff::{COST_DELETE, COST_INSERT, NodeCache};
-
 pub fn for_nodes(
     before: &Code,
     after: &Code,
@@ -125,18 +124,18 @@ pub fn for_nodes(
         after,
         before_metadata,
         after_metadata,
-        before_node_ids,
-        after_node_ids,
+        before_node_ids.clone(),
+        after_node_ids.clone(),
         node_cache,
         diff,
         &mut memoo,
     )?;
 
     update_diff(
-        before,
-        after,
         before_metadata,
         after_metadata,
+        &before_node_ids,
+        &after_node_ids,
         node_cache,
         &memoo,
         diff,
@@ -687,20 +686,17 @@ fn add_subtree_to_diff(
 * choose because of the already computed memoo map.
 */
 fn update_diff(
-    before: &Code,
-    after: &Code,
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
+    before_node_ids: &[usize],
+    after_node_ids: &[usize],
     node_cache: &NodeCache,
     memoo: &HashMap<(SubtreeKey, SubtreeKey), Solution>,
     diff: &mut ASTDiff,
 ) -> Result<()> {
     let mut stack = Vec::new();
 
-    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
-
-    stack.push((vec![before_root_id], vec![after_root_id]));
+    stack.push((before_node_ids.to_vec(), after_node_ids.to_vec()));
 
     while let Some((before_subtrees, after_subtrees)) = stack.pop() {
         if before_subtrees.is_empty() && after_subtrees.is_empty() {
