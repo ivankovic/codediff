@@ -59,22 +59,43 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::diff::ASTDiff;
+    use crate::diff::{ASTDiff, ASTMappingOperation};
     use crate::test;
 
     #[test]
     fn rust_hash_optimization() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
+        let (mut before, mut after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
+
+        // Ensure both codes have their metadata computed
+        before.ensure_parsed()?;
+        after.ensure_parsed()?;
 
         // Null mappings should be considered valid
         let node_cache = NodeCache::build(&before, &after);
+
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
         solve(&before, &after, &node_cache, &mut diff);
+
+        // The root nodes must NOT be mapped
+        assert!(
+            !diff
+                .mapping
+                .contains_key(&(before_ast.root_node().id(), after_ast.root_node().id()))
+        );
+
+        // fn main() should be mapped now.
+        let path = vec!["function_item"];
+        let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
         Ok(())
     }
