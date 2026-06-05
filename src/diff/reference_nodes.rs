@@ -35,7 +35,8 @@ pub fn node_matches(node_kind: &str, language: &Language) -> bool {
             node_kind == "source_file" ||  // The root node of any sopurce file
             node_kind == "function_item" ||
             node_kind == "impl_item" ||
-            node_kind == "struct_item"
+            node_kind == "struct_item" ||
+            node_kind == "use_declaration"
         }
         Language::Python => node_kind == "module", // Python modules/source files
         Language::Java => node_kind == "program", // Java source files are represented as "program" nodes
