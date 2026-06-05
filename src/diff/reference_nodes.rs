@@ -28,7 +28,7 @@ use crate::code::Language;
 * about a specific semicolon in a C++ file, but they do think about entire functions as whole
 * entities.
 */
-pub fn is_reference_node(node_kind: &str, language: &Language) -> bool {
+pub fn node_matches(node_kind: &str, language: &Language) -> bool {
     // Language-specific reference nodes
     match language {
         Language::Rust => {
@@ -90,7 +90,7 @@ mod tests {
 
             // Check if the root node is a reference node
             assert!(
-                is_reference_node(root_node_kind, language),
+                node_matches(root_node_kind, language),
                 "Root node '{}' should be a reference node for language {:?} in file {}",
                 root_node_kind,
                 language,

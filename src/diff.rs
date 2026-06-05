@@ -17,6 +17,7 @@
  */
 pub mod optimal_iud;
 pub mod reference_nodes;
+pub mod semantic_structure_nodes;
 pub mod solve_identical_trees;
 pub mod solve_structurally_identical_trees;
 pub mod text;

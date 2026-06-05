@@ -16,13 +16,12 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use anyhow::Result;
-use std::collections::HashMap;
 
 use crate::code::language;
 use crate::code::tip;
 use crate::code::{ASTMetadata, Code, Metadata};
 use crate::diff::reference_nodes;
-use crate::metadata;
+use crate::diff::semantic_structure_nodes;
 
 /**
 * Compute all metadata fileds, that can be computed without reading any new information.
@@ -53,6 +52,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     crate::code::hash::hash_code(code, &mut metadata)?;
     compute_subtree_sizes(code, &mut metadata)?;
     discover_reference_nodes(code, &mut metadata)?;
+    discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
 }
 
@@ -98,9 +98,10 @@ fn compute_subtree_sizes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> 
 /**
 * Discover all reference nodes in the AST and order them by subtree size.
 *
-* This function traverses the AST to find all nodes that are considered reference nodes
-* (as defined by is_reference_node), calculates their subtree sizes, and stores them
-* in the metadata.reference_nodes_ordered vector, sorted by size in descending order.
+* Reference nodes are nodes that humans use to "think about code". Prioritizing matching reference
+* nodes results in diffs that "make sense" to humans.
+*
+* To speed up the algorithm, we sort the nodes by tree size.
 */
 fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     let ast = code.ast.as_ref().expect("AST must be parsed");
@@ -121,7 +122,7 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         let node_id = node.id();
 
         // Check if this node is a reference node
-        if reference_nodes::is_reference_node(node.kind(), language)
+        if reference_nodes::node_matches(node.kind(), language)
             && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
         {
             reference_nodes_with_sizes.push((node_id, subtree_size));
@@ -142,6 +143,44 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         .into_iter()
         .map(|(node_id, _)| node_id)
         .collect();
+
+    Ok(())
+}
+
+/**
+* Discover all semantically structural nodes in the AST.
+*
+* semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
+* typically enforced by the compiler in some way. For example, there can only ever be ONE
+* 'fn main()' in main.rs in a Rust project. It is sensible for the algorithm to match such nodes
+* immediately.
+*/
+fn discover_semantic_structure_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    let ast = code.ast.as_ref().expect("AST must be parsed");
+    let root_node = ast.root_node();
+    let language = code
+        .metadata
+        .language
+        .as_ref()
+        .expect("Language must be set");
+
+    let mut stack = Vec::new();
+    stack.push(root_node);
+
+    while let Some(node) = stack.pop() {
+        let node_id = node.id();
+
+        // Check if this node is a reference node
+        if let Some(t) = semantic_structure_nodes::node_matches(&node, language, code) {
+            metadata.semantically_structural_nodes.insert(t, node_id);
+        }
+
+        // Continue traversal - add children to stack
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
 
     Ok(())
 }

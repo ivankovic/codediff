@@ -236,6 +236,8 @@ pub struct ASTMetadata {
     pub node_to_subtree_size: HashMap<usize, usize>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
+    /// Maps a (kind, identifier) pair, for example ('function_item', 'main') to a node_id.
+    pub semantically_structural_nodes: HashMap<(String, String), usize>,
 }
 
 /**

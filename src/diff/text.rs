@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use tree_sitter::Node;
-
 use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 
 /**
@@ -49,7 +47,7 @@ impl Default for TextDiff {
 }
 
 /// Returns the RangeMatches from source to destination.
-fn ranges(source: &Code, destination: &Code, diff: &ASTDiff) -> Vec<RangeMatch> {
+fn ranges(source: &Code, destination: &Code, _diff: &ASTDiff) -> Vec<RangeMatch> {
     let mut ranges = Vec::new();
 
     match (&source.ast, &destination.ast) {
@@ -77,7 +75,7 @@ fn ranges(source: &Code, destination: &Code, diff: &ASTDiff) -> Vec<RangeMatch> 
                 operation: TextOperation::Insert,
             });
         }
-        (Some(source_tree), Some(destination_tree)) => {}
+        (Some(_source_tree), Some(_destination_tree)) => {}
     }
 
     ranges

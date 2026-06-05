@@ -59,15 +59,21 @@ fn get_ast(code: &Code) -> Result<tree_sitter::Tree> {
 }
 
 /// Print the ASCII tree representation of the AST
-fn print_ast_tree(node: tree_sitter::Node, indent: usize) -> usize {
+fn print_ast_tree(node: tree_sitter::Node, indent: usize, code: &Code) -> usize {
     let indent_str = "  ".repeat(indent);
 
-    println!("{}{} - {}", indent_str, node.kind(), node.id());
+    println!(
+        "{}{} - {} - {:?}",
+        indent_str,
+        node.kind(),
+        node.id(),
+        node.utf8_text(code.contents.as_bytes())
+    );
 
     let mut cursor = node.walk();
     let mut child_count = 0;
     for child in node.children(&mut cursor) {
-        child_count += print_ast_tree(child, indent + 1);
+        child_count += print_ast_tree(child, indent + 1, code);
     }
 
     child_count + 1
@@ -117,7 +123,7 @@ fn main() -> Result<()> {
     // Get AST and print tree
     let tree = get_ast(&code)?;
     let root_node = tree.root_node();
-    let total_nodes = print_ast_tree(root_node, 0);
+    let total_nodes = print_ast_tree(root_node, 0, &code);
 
     println!("\nTotal nodes: {}", total_nodes);
 
