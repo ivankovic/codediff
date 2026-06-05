@@ -15,11 +15,9 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::HashMap;
-
-use crate::code::{ASTMetadata, Code};
+use crate::code::Code;
 use crate::diff::optimal_iud;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, NodeCache};
 
 /**
 * Match semantically structural nodes and solve their subtrees.
@@ -39,16 +37,8 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             .semantically_structural_nodes
             .get(&(kind.clone(), identifier.clone()))
         {
-            let before_node = match node_cache.before.get(&before_node_id) {
-                Some(n) => n,
-                None => continue,
-            };
-            let after_node = match node_cache.after.get(&after_node_id) {
-                Some(n) => n,
-                None => continue,
-            };
-
-            // Call for_nodes to solve the subtrees
+            // TODO: Consider checking the cost and reject the solution if it is too
+            // expensive?
             let _ = optimal_iud::for_nodes(
                 before,
                 after,
@@ -60,5 +50,32 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
                 diff,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use anyhow::Result;
+
+    use crate::diff::ASTDiff;
+    use crate::test;
+
+    #[test]
+    fn rust_hash_optimization() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
+
+        // Null mappings should be considered valid
+        let node_cache = NodeCache::build(&before, &after);
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        solve(&before, &after, &node_cache, &mut diff);
+
+        Ok(())
     }
 }

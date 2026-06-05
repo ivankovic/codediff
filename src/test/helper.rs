@@ -18,9 +18,9 @@
 use anyhow::{Result, bail};
 use git2::{Repository, Signature};
 use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
-use std::{fs, string};
 use tempfile::tempdir;
 use tree_sitter::Node;
 
