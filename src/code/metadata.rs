@@ -221,13 +221,21 @@ mod tests {
         assert!(!ast_metadata.node_to_structural_hash.is_empty());
         assert!(!ast_metadata.structural_hash_to_node.is_empty());
         assert!(!ast_metadata.reference_nodes_ordered.is_empty());
+        assert!(!ast_metadata.semantically_structural_nodes.is_empty());
 
         // Test that the reference nodes are actually ordered by size (descending)
         // We can't test the exact ordering without knowing the tree structure,
         // but we can test that it's not empty and contains valid node IDs
+        // TODO: Make this test actually check that the nodes are ordered by size.
         for &node_id in &ast_metadata.reference_nodes_ordered {
             assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
         }
+
+        assert!(
+            ast_metadata
+                .semantically_structural_nodes
+                .contains_key(&(String::from("function_item"), String::from("main")))
+        );
 
         Ok(())
     }
