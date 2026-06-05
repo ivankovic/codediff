@@ -51,6 +51,20 @@ pub fn node_matches<'a>(
                     None
                 }
             }
+            "struct_item" => {
+                if let Some(identifier_node) = node.child(1)
+                    && identifier_node.kind() == "type_identifier"
+                    && let identifier = identifier_node.utf8_text(code.contents.as_bytes())
+                    && identifier.is_ok()
+                {
+                    Some((
+                        String::from(node_kind),
+                        String::from(identifier.unwrap_or("This should not happen")),
+                    ))
+                } else {
+                    None
+                }
+            }
             _ => None,
         },
         _ => None,
