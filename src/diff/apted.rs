@@ -186,14 +186,14 @@ impl APTEDIndexer {
             // Set parent for children
             for &child_id in &children {
                 if let Some(&child_pre_l_idx) = node_id_to_pre_l.get(&child_id) {
-                    parents[child_pre_l_idx] = Some(i); // This is wrong, need to fix
+                    parents[child_pre_l_idx] = Some(i);
                 }
             }
 
             // Build node info
-            if let Some(_node) = node_cache.get(&node_id) {
-                let kind = _node.kind().to_string();
-                let text = _node
+            if let Some(node) = node_cache.get(&node_id) {
+                let kind = node.kind().to_string();
+                let text = node
                     .utf8_text(code.contents.as_bytes())
                     .unwrap_or("")
                     .to_string();
@@ -261,11 +261,9 @@ impl APTEDIndexer {
         // Count lchl and rchl
         let mut lchl = 0usize;
         let rchl = 0usize;
-
         #[allow(clippy::needless_range_loop)]
         for i in 0..tree_size {
             if sizes[i] == 1 {
-                #[allow(clippy::collapsible_if)]
                 if let Some(parent_idx) = parents_fixed[i] {
                     #[allow(clippy::collapsible_if)]
                     if parent_idx + 1 == i {
@@ -397,8 +395,421 @@ impl UnitCostModel {
     }
 }
 
-/// Compute the tree edit distance between two subtrees using APTED algorithm
-/// This is the main O(n^2) algorithm based on the paper "Efficient Computation of the Tree Edit Distance"
+/// Compute the tree edit distance between two subtrees and return the mapping
+fn tree_edit_distance_with_mapping(
+    before_root_id: usize,
+    after_root_id: usize,
+    before_indexer: &APTEDIndexer,
+    after_indexer: &APTEDIndexer,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    diff: &mut ASTDiff,
+) -> u64 {
+    let before_root_pre_l = before_indexer.get_pre_l(before_root_id).unwrap_or(0);
+    let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
+
+    // Get the subtree sizes
+    let size1 = before_indexer.sizes[before_root_pre_l];
+    let size2 = after_indexer.sizes[after_root_pre_l];
+
+    // If either subtree is size 0 (empty), handle edge cases
+    if size1 == 0 && size2 == 0 {
+        return 0;
+    }
+
+    if size1 == 0 {
+        // Insert all after nodes
+        let mut total_cost = 0u64;
+        for j in 0..size2 {
+            let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l + j];
+            let cost = subtree_ins_cost(after_node_id, after_indexer, cost_model);
+            total_cost += cost;
+
+            // Add insert mapping
+            let mapping = ASTMapping {
+                cost: COST_INSERT,
+                operation: ASTMappingOperation::Insert,
+                ..Default::default()
+            };
+            diff.add_mapping(0, after_node_id, mapping);
+        }
+        return total_cost;
+    }
+
+    if size2 == 0 {
+        // Delete all before nodes
+        let mut total_cost = 0u64;
+        for i in 0..size1 {
+            let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l + i];
+            let cost = subtree_del_cost(before_node_id, before_indexer, cost_model);
+            total_cost += cost;
+
+            // Add delete mapping
+            let mapping = ASTMapping {
+                cost: COST_DELETE,
+                operation: ASTMappingOperation::Delete,
+                ..Default::default()
+            };
+            diff.add_mapping(before_node_id, 0, mapping);
+        }
+        return total_cost;
+    }
+
+    // For single node matching, use the cost model directly
+    if size1 == 1 && size2 == 1 {
+        let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l];
+        let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l];
+
+        let before_info = before_indexer.get_node_info(before_node_id).unwrap();
+        let after_info = after_indexer.get_node_info(after_node_id).unwrap();
+
+        let ren_cost = cost_model.ren(before_info, after_info);
+
+        // Check if hashes match to determine if truly identical
+        let hashes_match = before_metadata
+            .node_to_full_hash
+            .get(&before_node_id)
+            .and_then(|before_hash| {
+                after_metadata
+                    .node_to_full_hash
+                    .get(&after_node_id)
+                    .map(|after_hash| before_hash == after_hash)
+            })
+            .unwrap_or(false);
+
+        let operation = if before_info.kind == after_info.kind {
+            if before_info.children.is_empty() && after_info.children.is_empty() {
+                // Both are leaves
+                if before_info.text == after_info.text {
+                    ASTMappingOperation::Identical
+                } else {
+                    ASTMappingOperation::Update
+                }
+            } else {
+                // Internal nodes with same kind
+                if hashes_match {
+                    ASTMappingOperation::Identical
+                } else {
+                    ASTMappingOperation::MatchButNotIdentical
+                }
+            }
+        } else {
+            ASTMappingOperation::Update
+        };
+
+        let mapping = ASTMapping {
+            cost: ren_cost,
+            operation,
+            ..Default::default()
+        };
+        diff.add_mapping(before_node_id, after_node_id, mapping);
+
+        return ren_cost;
+    }
+
+    // For larger subtrees, use forest distance with mapping reconstruction
+    forest_distance_with_mapping(
+        &[before_root_id],
+        &[after_root_id],
+        before_indexer,
+        after_indexer,
+        before_metadata,
+        after_metadata,
+        cost_model,
+        diff,
+    )
+}
+
+/// Compute forest distance with proper mapping reconstruction
+fn forest_distance_with_mapping(
+    before_nodes: &[usize],
+    after_nodes: &[usize],
+    before_indexer: &APTEDIndexer,
+    after_indexer: &APTEDIndexer,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    diff: &mut ASTDiff,
+) -> u64 {
+    let m = before_nodes.len();
+    let n = after_nodes.len();
+
+    if m == 0 && n == 0 {
+        return 0;
+    }
+
+    // If all nodes are from one tree, handle as insertions or deletions
+    if m == 0 {
+        let mut total_cost = 0u64;
+        for &after_id in after_nodes {
+            let cost = subtree_ins_cost(after_id, after_indexer, cost_model);
+            total_cost += cost;
+
+            // Add insert mappings for the entire subtree
+            add_insert_mappings(after_id, after_indexer, diff);
+        }
+        return total_cost;
+    }
+
+    if n == 0 {
+        let mut total_cost = 0u64;
+        for &before_id in before_nodes {
+            let cost = subtree_del_cost(before_id, before_indexer, cost_model);
+            total_cost += cost;
+
+            // Add delete mappings for the entire subtree
+            add_delete_mappings(before_id, before_indexer, diff);
+        }
+        return total_cost;
+    }
+
+    // Create DP tables for forest matching with operation tracking
+    let mut dp = vec![vec![0u64; n + 1]; m + 1];
+    let mut operation = vec![vec![ASTMappingOperation::Identical; n + 1]; m + 1];
+
+    // Initialize: cost of deleting all before nodes
+    for i in 1..=m {
+        let before_id = before_nodes[i - 1];
+        dp[i][0] = dp[i - 1][0] + subtree_del_cost(before_id, before_indexer, cost_model);
+        operation[i][0] = ASTMappingOperation::Delete;
+    }
+
+    // Initialize: cost of inserting all after nodes
+    for j in 1..=n {
+        let after_id = after_nodes[j - 1];
+        dp[0][j] = dp[0][j - 1] + subtree_ins_cost(after_id, after_indexer, cost_model);
+        operation[0][j] = ASTMappingOperation::Insert;
+    }
+
+    // Fill DP table and track operations
+    for i in 1..=m {
+        for j in 1..=n {
+            let before_id = before_nodes[i - 1];
+            let after_id = after_nodes[j - 1];
+
+            // Option 1: Match the two subtrees
+            let cost_match = dp[i - 1][j - 1]
+                + tree_edit_distance(
+                    before_id,
+                    after_id,
+                    before_indexer,
+                    after_indexer,
+                    cost_model,
+                );
+
+            // Option 2: Delete before subtree
+            let cost_delete =
+                dp[i - 1][j] + subtree_del_cost(before_id, before_indexer, cost_model);
+
+            // Option 3: Insert after subtree
+            let cost_insert = dp[i][j - 1] + subtree_ins_cost(after_id, after_indexer, cost_model);
+
+            // Find the minimum cost and corresponding operation
+            if cost_match <= cost_delete && cost_match <= cost_insert {
+                dp[i][j] = cost_match;
+                operation[i][j] = ASTMappingOperation::MatchButNotIdentical; // Will be refined later
+            } else if cost_delete <= cost_insert {
+                dp[i][j] = cost_delete;
+                operation[i][j] = ASTMappingOperation::Delete;
+            } else {
+                dp[i][j] = cost_insert;
+                operation[i][j] = ASTMappingOperation::Insert;
+            }
+        }
+    }
+
+    // Reconstruct the mapping from the operation table
+    reconstruct_forest_mapping(
+        before_nodes,
+        after_nodes,
+        &operation,
+        &dp,
+        before_indexer,
+        after_indexer,
+        before_metadata,
+        after_metadata,
+        cost_model,
+        diff,
+    );
+
+    dp[m][n]
+}
+
+/// Reconstruct mappings from forest DP operation table
+fn reconstruct_forest_mapping(
+    before_nodes: &[usize],
+    after_nodes: &[usize],
+    operation: &Vec<Vec<ASTMappingOperation>>,
+    _dp: &Vec<Vec<u64>>,
+    before_indexer: &APTEDIndexer,
+    after_indexer: &APTEDIndexer,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    diff: &mut ASTDiff,
+) {
+    let m = before_nodes.len();
+    let n = after_nodes.len();
+
+    let mut i = m;
+    let mut j = n;
+
+    while i > 0 || j > 0 {
+        if i > 0 && j > 0 {
+            match operation[i][j] {
+                ASTMappingOperation::MatchButNotIdentical
+                | ASTMappingOperation::Identical
+                | ASTMappingOperation::Update => {
+                    let before_id = before_nodes[i - 1];
+                    let after_id = after_nodes[j - 1];
+
+                    let before_info = before_indexer.get_node_info(before_id).unwrap();
+                    let after_info = after_indexer.get_node_info(after_id).unwrap();
+
+                    let ren_cost = cost_model.ren(before_info, after_info);
+
+                    // Check if hashes match to determine if truly identical
+                    let hashes_match = before_metadata
+                        .node_to_full_hash
+                        .get(&before_id)
+                        .and_then(|before_hash| {
+                            after_metadata
+                                .node_to_full_hash
+                                .get(&after_id)
+                                .map(|after_hash| before_hash == after_hash)
+                        })
+                        .unwrap_or(false);
+
+                    let op = if before_info.kind == after_info.kind {
+                        if before_info.children.is_empty() && after_info.children.is_empty() {
+                            // Both are leaves
+                            if before_info.text == after_info.text {
+                                ASTMappingOperation::Identical
+                            } else {
+                                ASTMappingOperation::Update
+                            }
+                        } else {
+                            // Internal nodes with same kind
+                            if hashes_match {
+                                ASTMappingOperation::Identical
+                            } else {
+                                ASTMappingOperation::MatchButNotIdentical
+                            }
+                        }
+                    } else {
+                        ASTMappingOperation::Update
+                    };
+
+                    let mapping = ASTMapping {
+                        cost: ren_cost,
+                        operation: op,
+                        ..Default::default()
+                    };
+                    diff.add_mapping(before_id, after_id, mapping);
+
+                    // Recursively map children
+                    forest_distance_with_mapping(
+                        &before_info.children,
+                        &after_info.children,
+                        before_indexer,
+                        after_indexer,
+                        before_metadata,
+                        after_metadata,
+                        cost_model,
+                        diff,
+                    );
+
+                    i -= 1;
+                    j -= 1;
+                }
+                ASTMappingOperation::Delete => {
+                    let before_id = before_nodes[i - 1];
+                    let mapping = ASTMapping {
+                        cost: COST_DELETE,
+                        operation: ASTMappingOperation::Delete,
+                        ..Default::default()
+                    };
+                    diff.add_mapping(before_id, 0, mapping);
+
+                    // Add delete mappings for children
+                    add_delete_mappings(before_id, before_indexer, diff);
+
+                    i -= 1;
+                }
+                ASTMappingOperation::Insert => {
+                    let after_id = after_nodes[j - 1];
+                    let mapping = ASTMapping {
+                        cost: COST_INSERT,
+                        operation: ASTMappingOperation::Insert,
+                        ..Default::default()
+                    };
+                    diff.add_mapping(0, after_id, mapping);
+
+                    // Add insert mappings for children
+                    add_insert_mappings(after_id, after_indexer, diff);
+
+                    j -= 1;
+                }
+                _ => {
+                    // Default: try to match
+                    let before_id = before_nodes[i - 1];
+                    let after_id = after_nodes[j - 1];
+
+                    let before_info = before_indexer.get_node_info(before_id).unwrap();
+                    let after_info = after_indexer.get_node_info(after_id).unwrap();
+
+                    let ren_cost = cost_model.ren(before_info, after_info);
+                    let op = if ren_cost == 0 {
+                        ASTMappingOperation::Identical
+                    } else if before_info.kind == after_info.kind {
+                        ASTMappingOperation::MatchButNotIdentical
+                    } else {
+                        ASTMappingOperation::Update
+                    };
+
+                    let mapping = ASTMapping {
+                        cost: ren_cost,
+                        operation: op,
+                        ..Default::default()
+                    };
+                    diff.add_mapping(before_id, after_id, mapping);
+
+                    i -= 1;
+                    j -= 1;
+                }
+            }
+        } else if i > 0 {
+            // Delete remaining before nodes
+            let before_id = before_nodes[i - 1];
+            let mapping = ASTMapping {
+                cost: COST_DELETE,
+                operation: ASTMappingOperation::Delete,
+                ..Default::default()
+            };
+            diff.add_mapping(before_id, 0, mapping);
+
+            add_delete_mappings(before_id, before_indexer, diff);
+
+            i -= 1;
+        } else if j > 0 {
+            // Insert remaining after nodes
+            let after_id = after_nodes[j - 1];
+            let mapping = ASTMapping {
+                cost: COST_INSERT,
+                operation: ASTMappingOperation::Insert,
+                ..Default::default()
+            };
+            diff.add_mapping(0, after_id, mapping);
+
+            add_insert_mappings(after_id, after_indexer, diff);
+
+            j -= 1;
+        }
+    }
+}
+
+/// Compute the tree edit distance between two subtrees (without mapping reconstruction)
 fn tree_edit_distance(
     before_root_id: usize,
     after_root_id: usize,
@@ -409,114 +820,84 @@ fn tree_edit_distance(
     let before_root_pre_l = before_indexer.get_pre_l(before_root_id).unwrap_or(0);
     let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
 
-    // Create DP table for the full tree edit distance
+    // Get the subtree sizes
     let size1 = before_indexer.sizes[before_root_pre_l];
     let size2 = after_indexer.sizes[after_root_pre_l];
 
-    // Initialize DP table for forest distance between the two subtrees
-    // We'll use the standard tree edit distance approach
-    let mut dp = vec![vec![0u64; size2 + 1]; size1 + 1];
+    // For single node matching, use the cost model directly
+    if size1 == 1 && size2 == 1 {
+        let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l];
+        let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l];
 
-    // Initialize: cost of deleting all before nodes
-    for i in 1..=size1 {
-        let node_id = before_indexer.pre_l_node_ids[before_root_pre_l + i - 1];
-        dp[i][0] = dp[i - 1][0] + cost_model.del(before_indexer.node_info.get(&node_id).unwrap());
+        let before_info = before_indexer.get_node_info(before_node_id).unwrap();
+        let after_info = after_indexer.get_node_info(after_node_id).unwrap();
+
+        return cost_model.ren(before_info, after_info);
     }
 
-    // Initialize: cost of inserting all after nodes
-    for j in 1..=size2 {
-        let node_id = after_indexer.pre_l_node_ids[after_root_pre_l + j - 1];
-        dp[0][j] = dp[0][j - 1] + cost_model.ins(after_indexer.node_info.get(&node_id).unwrap());
-    }
+    // For larger subtrees, compute directly using children's forest distance
+    let before_info = before_indexer.get_node_info(before_root_id).unwrap();
+    let after_info = after_indexer.get_node_info(after_root_id).unwrap();
 
-    // Fill DP table - this is the O(n^2) part
-    for i in 1..=size1 {
-        for j in 1..=size2 {
-            let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l + i - 1];
-            let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l + j - 1];
+    let ren_cost = cost_model.ren(before_info, after_info);
+    let children_distance = forest_distance(
+        &before_info.children,
+        &after_info.children,
+        before_indexer,
+        after_indexer,
+        cost_model,
+    );
 
-            let before_info = before_indexer.node_info.get(&before_node_id).unwrap();
-            let after_info = after_indexer.node_info.get(&after_node_id).unwrap();
-
-            // Option 1: Match the two nodes and recursively match children
-            let ren_cost = cost_model.ren(before_info, after_info);
-
-            // For now, we'll use a simplified approach: match the nodes and add forest distance for children
-            // This is where the full APTED would use the optimal strategy, but for O(n^2) we use this
-            let children_cost = forest_distance_simple(
-                &before_info.children,
-                &after_info.children,
-                before_indexer,
-                after_indexer,
-                cost_model,
-            );
-
-            let match_cost = ren_cost + children_cost;
-
-            // Option 2: Delete before node/subtree
-            let delete_cost =
-                dp[i - 1][j] + subtree_del_cost(before_node_id, before_indexer, cost_model);
-
-            // Option 3: Insert after node/subtree
-            let insert_cost =
-                dp[i][j - 1] + subtree_ins_cost(after_node_id, after_indexer, cost_model);
-
-            dp[i][j] = match_cost.min(delete_cost).min(insert_cost);
-        }
-    }
-
-    dp[size1][size2]
+    ren_cost + children_distance
 }
 
-/// Simple forest distance computation for children
-fn forest_distance_simple(
-    before_children: &[usize],
-    after_children: &[usize],
+/// Compute forest distance between two lists of root nodes
+fn forest_distance(
+    before_nodes: &[usize],
+    after_nodes: &[usize],
     before_indexer: &APTEDIndexer,
     after_indexer: &APTEDIndexer,
     cost_model: &UnitCostModel,
 ) -> u64 {
-    let m = before_children.len();
-    let n = after_children.len();
+    let m = before_nodes.len();
+    let n = after_nodes.len();
 
     if m == 0 && n == 0 {
         return 0;
     }
 
     if m == 0 {
-        return after_children
+        return after_nodes
             .iter()
-            .map(|&child_id| subtree_ins_cost(child_id, after_indexer, cost_model))
+            .map(|&after_id| subtree_ins_cost(after_id, after_indexer, cost_model))
             .sum();
     }
 
     if n == 0 {
-        return before_children
+        return before_nodes
             .iter()
-            .map(|&child_id| subtree_del_cost(child_id, before_indexer, cost_model))
+            .map(|&before_id| subtree_del_cost(before_id, before_indexer, cost_model))
             .sum();
     }
 
     // Create DP table for forest matching
     let mut fp = vec![vec![0u64; n + 1]; m + 1];
 
-    // Initialize: cost of deleting all before children
+    // Initialize: cost of deleting all before nodes
     for i in 1..=m {
-        fp[i][0] =
-            fp[i - 1][0] + subtree_del_cost(before_children[i - 1], before_indexer, cost_model);
+        fp[i][0] = fp[i - 1][0] + subtree_del_cost(before_nodes[i - 1], before_indexer, cost_model);
     }
 
-    // Initialize: cost of inserting all after children
+    // Initialize: cost of inserting all after nodes
     for j in 1..=n {
-        fp[0][j] =
-            fp[0][j - 1] + subtree_ins_cost(after_children[j - 1], after_indexer, cost_model);
+        fp[0][j] = fp[0][j - 1] + subtree_ins_cost(after_nodes[j - 1], after_indexer, cost_model);
     }
 
-    // Fill DP table - O(n^2) forest distance
+    // Fill DP table
     for i in 1..=m {
         for j in 1..=n {
-            let before_id = before_children[i - 1];
-            let after_id = after_children[j - 1];
+            let before_id = before_nodes[i - 1];
+            let after_id = after_nodes[j - 1];
 
             // Option 1: Match the two subtrees
             let cost_match = fp[i - 1][j - 1]
@@ -540,6 +921,50 @@ fn forest_distance_simple(
     }
 
     fp[m][n]
+}
+
+/// Add delete mappings for a subtree
+fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDiff) {
+    if node_id == 0 {
+        return;
+    }
+
+    // Add delete for this node
+    let mapping = ASTMapping {
+        cost: COST_DELETE,
+        operation: ASTMappingOperation::Delete,
+        ..Default::default()
+    };
+    diff.add_mapping(node_id, 0, mapping);
+
+    // Add delete mappings for children
+    if let Some(info) = indexer.get_node_info(node_id) {
+        for &child_id in &info.children {
+            add_delete_mappings(child_id, indexer, diff);
+        }
+    }
+}
+
+/// Add insert mappings for a subtree
+fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDiff) {
+    if node_id == 0 {
+        return;
+    }
+
+    // Add insert for this node
+    let mapping = ASTMapping {
+        cost: COST_INSERT,
+        operation: ASTMappingOperation::Insert,
+        ..Default::default()
+    };
+    diff.add_mapping(0, node_id, mapping);
+
+    // Add insert mappings for children
+    if let Some(info) = indexer.get_node_info(node_id) {
+        for &child_id in &info.children {
+            add_insert_mappings(child_id, indexer, diff);
+        }
+    }
 }
 
 /// Compute the cost of deleting an entire subtree
@@ -597,8 +1022,8 @@ fn subtree_ins_cost(node_id: usize, indexer: &APTEDIndexer, cost_model: &UnitCos
 pub fn for_nodes(
     before: &Code,
     after: &Code,
-    _before_metadata: &ASTMetadata,
-    _after_metadata: &ASTMetadata,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
     before_node_ids: Vec<usize>,
     after_node_ids: Vec<usize>,
     node_cache: &NodeCache,
@@ -610,353 +1035,33 @@ pub fn for_nodes(
 
     let cost_model = UnitCostModel;
 
-    // For each pair of nodes, compute the tree edit distance and create mappings
-    // This is where we would normally use the full APTED algorithm with strategy computation
-    // For now, we'll use a greedy approach to create mappings based on the computed distances
-
-    // If we have single nodes, compute the distance directly
+    // If we have single nodes, compute the distance and mapping directly
     if before_node_ids.len() == 1 && after_node_ids.len() == 1 {
-        let before_id = before_node_ids[0];
-        let after_id = after_node_ids[0];
-
-        let before_info = before_indexer.get_node_info(before_id);
-        let after_info = after_indexer.get_node_info(after_id);
-
-        if let (Some(before_info), Some(after_info)) = (before_info, after_info) {
-            let ren_cost = cost_model.ren(before_info, after_info);
-
-            let operation = if ren_cost == 0 {
-                ASTMappingOperation::Identical
-            } else if before_info.kind == after_info.kind {
-                if before_info.children.is_empty() && after_info.children.is_empty() {
-                    ASTMappingOperation::Update
-                } else {
-                    ASTMappingOperation::MatchButNotIdentical
-                }
-            } else {
-                ASTMappingOperation::Update
-            };
-
-            let mapping = ASTMapping {
-                cost: ren_cost,
-                operation,
-                ..Default::default()
-            };
-
-            diff.add_mapping(before_id, after_id, mapping);
-
-            // Recursively map children
-            map_children_recursive(
-                &before_info.children,
-                &after_info.children,
-                &before_indexer,
-                &after_indexer,
-                &cost_model,
-                diff,
-            );
-        }
-    } else {
-        // For multiple nodes, use forest distance
-        // This is a simplified approach - the full APTED would use the optimal strategy
-        let _total_cost = forest_distance(
-            &before_node_ids,
-            &after_node_ids,
+        tree_edit_distance_with_mapping(
+            before_node_ids[0],
+            after_node_ids[0],
             &before_indexer,
             &after_indexer,
+            before_metadata,
+            after_metadata,
             &cost_model,
+            diff,
         );
-
-        // Create mappings using a greedy approach
-        reconstruct_mapping(
+    } else {
+        // For multiple nodes, use forest distance with mapping
+        forest_distance_with_mapping(
             &before_node_ids,
             &after_node_ids,
             &before_indexer,
             &after_indexer,
+            before_metadata,
+            after_metadata,
             &cost_model,
             diff,
         );
     }
 
     Ok(())
-}
-
-/// Compute forest distance between two lists of root nodes
-fn forest_distance(
-    before_nodes: &[usize],
-    after_nodes: &[usize],
-    before_indexer: &APTEDIndexer,
-    after_indexer: &APTEDIndexer,
-    cost_model: &UnitCostModel,
-) -> u64 {
-    let m = before_nodes.len();
-    let n = after_nodes.len();
-
-    if m == 0 && n == 0 {
-        return 0;
-    }
-
-    // Create DP table for forest matching
-    let mut fp = vec![vec![0u64; n + 1]; m + 1];
-
-    // Initialize: cost of deleting all before nodes
-    for i in 1..=m {
-        fp[i][0] = fp[i - 1][0] + subtree_del_cost(before_nodes[i - 1], before_indexer, cost_model);
-    }
-
-    // Initialize: cost of inserting all after nodes
-    for j in 1..=n {
-        fp[0][j] = fp[0][j - 1] + subtree_ins_cost(after_nodes[j - 1], after_indexer, cost_model);
-    }
-
-    // Fill DP table - O(n^2) forest distance
-    for i in 1..=m {
-        for j in 1..=n {
-            let before_id = before_nodes[i - 1];
-            let after_id = after_nodes[j - 1];
-
-            // Option 1: Match the two subtrees
-            let cost_match = fp[i - 1][j - 1]
-                + tree_edit_distance(
-                    before_id,
-                    after_id,
-                    before_indexer,
-                    after_indexer,
-                    cost_model,
-                );
-
-            // Option 2: Delete before subtree
-            let cost_delete =
-                fp[i - 1][j] + subtree_del_cost(before_id, before_indexer, cost_model);
-
-            // Option 3: Insert after subtree
-            let cost_insert = fp[i][j - 1] + subtree_ins_cost(after_id, after_indexer, cost_model);
-
-            fp[i][j] = cost_match.min(cost_delete).min(cost_insert);
-        }
-    }
-
-    fp[m][n]
-}
-
-/// Recursively map children of matched nodes
-fn map_children_recursive(
-    before_children: &[usize],
-    after_children: &[usize],
-    before_indexer: &APTEDIndexer,
-    after_indexer: &APTEDIndexer,
-    cost_model: &UnitCostModel,
-    diff: &mut ASTDiff,
-) {
-    // For now, use a simple greedy matching based on node kinds
-    let mut remaining_before: Vec<usize> = before_children.to_vec();
-    let mut remaining_after: Vec<usize> = after_children.to_vec();
-
-    while !remaining_before.is_empty() || !remaining_after.is_empty() {
-        let mut matched = false;
-        let mut match_i = 0;
-        let mut match_j = 0;
-
-        // Try to find a match
-        for (i, &before_id) in remaining_before.iter().enumerate() {
-            for (j, &after_id) in remaining_after.iter().enumerate() {
-                let info_before = match before_indexer.get_node_info(before_id) {
-                    Some(info) => info,
-                    None => continue,
-                };
-
-                let info_after = match after_indexer.get_node_info(after_id) {
-                    Some(info) => info,
-                    None => continue,
-                };
-
-                // Match nodes with the same kind
-                if info_before.kind == info_after.kind {
-                    match_i = i;
-                    match_j = j;
-                    matched = true;
-                    break;
-                }
-            }
-            if matched {
-                break;
-            }
-        }
-
-        if matched {
-            let before_id = remaining_before[match_i];
-            let after_id = remaining_after[match_j];
-
-            let before_info = before_indexer.get_node_info(before_id).unwrap();
-            let after_info = after_indexer.get_node_info(after_id).unwrap();
-
-            // Determine operation based on whether nodes are identical
-            let ren_cost = cost_model.ren(before_info, after_info);
-            let operation = if ren_cost == 0 {
-                ASTMappingOperation::Identical
-            } else if before_info.kind == after_info.kind {
-                if before_info.children.is_empty() && after_info.children.is_empty() {
-                    ASTMappingOperation::Update
-                } else {
-                    ASTMappingOperation::MatchButNotIdentical
-                }
-            } else {
-                ASTMappingOperation::Update
-            };
-
-            let mapping = ASTMapping {
-                cost: ren_cost,
-                operation,
-                ..Default::default()
-            };
-            diff.add_mapping(before_id, after_id, mapping);
-
-            // Recursively map children
-            map_children_recursive(
-                &before_info.children,
-                &after_info.children,
-                before_indexer,
-                after_indexer,
-                cost_model,
-                diff,
-            );
-
-            // Remove matched nodes
-            remaining_before.remove(match_i);
-            remaining_after.remove(match_j);
-        } else {
-            // No more matches found, handle remaining nodes
-            if !remaining_before.is_empty() {
-                let before_id = remaining_before.remove(0);
-                let mapping = ASTMapping {
-                    cost: COST_DELETE,
-                    operation: ASTMappingOperation::Delete,
-                    ..Default::default()
-                };
-                diff.add_mapping(before_id, 0, mapping);
-            } else if !remaining_after.is_empty() {
-                let after_id = remaining_after.remove(0);
-                let mapping = ASTMapping {
-                    cost: COST_INSERT,
-                    operation: ASTMappingOperation::Insert,
-                    ..Default::default()
-                };
-                diff.add_mapping(0, after_id, mapping);
-            }
-        }
-    }
-}
-
-/// Reconstruct the mapping from the computed distances using a greedy approach
-fn reconstruct_mapping(
-    before_node_ids: &[usize],
-    after_node_ids: &[usize],
-    before_indexer: &APTEDIndexer,
-    after_indexer: &APTEDIndexer,
-    cost_model: &UnitCostModel,
-    diff: &mut ASTDiff,
-) {
-    let mut remaining_before: Vec<usize> = before_node_ids.to_vec();
-    let mut remaining_after: Vec<usize> = after_node_ids.to_vec();
-
-    while !remaining_before.is_empty() || !remaining_after.is_empty() {
-        let mut matched = false;
-        let mut match_i = 0;
-        let mut match_j = 0;
-        let mut best_cost = u64::MAX;
-
-        // Try to find the best match based on tree edit distance
-        for (i, &before_id) in remaining_before.iter().enumerate() {
-            for (j, &after_id) in remaining_after.iter().enumerate() {
-                let _before_info = match before_indexer.get_node_info(before_id) {
-                    Some(info) => info,
-                    None => continue,
-                };
-
-                let _after_info = match after_indexer.get_node_info(after_id) {
-                    Some(info) => info,
-                    None => continue,
-                };
-
-                // Compute tree edit distance for this pair
-                let distance = tree_edit_distance(
-                    before_id,
-                    after_id,
-                    before_indexer,
-                    after_indexer,
-                    cost_model,
-                );
-
-                if distance < best_cost {
-                    best_cost = distance;
-                    match_i = i;
-                    match_j = j;
-                    matched = true;
-                }
-            }
-        }
-
-        if matched && best_cost < COST_DELETE + COST_INSERT {
-            let before_id = remaining_before[match_i];
-            let after_id = remaining_after[match_j];
-
-            let info_before = before_indexer.get_node_info(before_id).unwrap();
-            let info_after = after_indexer.get_node_info(after_id).unwrap();
-
-            // Determine operation based on whether nodes are identical
-            let ren_cost = cost_model.ren(info_before, info_after);
-            let operation = if ren_cost == 0 {
-                ASTMappingOperation::Identical
-            } else if info_before.kind == info_after.kind {
-                if info_before.children.is_empty() && info_after.children.is_empty() {
-                    ASTMappingOperation::Update
-                } else {
-                    ASTMappingOperation::MatchButNotIdentical
-                }
-            } else {
-                ASTMappingOperation::Update
-            };
-
-            let mapping = ASTMapping {
-                cost: best_cost,
-                operation,
-                ..Default::default()
-            };
-            diff.add_mapping(before_id, after_id, mapping);
-
-            // Recursively map children
-            map_children_recursive(
-                &info_before.children,
-                &info_after.children,
-                before_indexer,
-                after_indexer,
-                cost_model,
-                diff,
-            );
-
-            // Remove matched nodes
-            remaining_before.remove(match_i);
-            remaining_after.remove(match_j);
-        } else {
-            // No good match found, handle remaining nodes
-            if !remaining_before.is_empty() {
-                let before_id = remaining_before.remove(0);
-                let mapping = ASTMapping {
-                    cost: COST_DELETE,
-                    operation: ASTMappingOperation::Delete,
-                    ..Default::default()
-                };
-                diff.add_mapping(before_id, 0, mapping);
-            } else if !remaining_after.is_empty() {
-                let after_id = remaining_after.remove(0);
-                let mapping = ASTMapping {
-                    cost: COST_INSERT,
-                    operation: ASTMappingOperation::Insert,
-                    ..Default::default()
-                };
-                diff.add_mapping(0, after_id, mapping);
-            }
-        }
-    }
 }
 
 /// Compute APTED for root nodes
