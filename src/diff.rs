@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod apted;
 pub mod optimal_iud;
 pub mod reference_nodes;
 pub mod semantic_structure_nodes;
