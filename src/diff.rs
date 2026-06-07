@@ -174,7 +174,8 @@ impl Diff {
         // This is the final, extremely slow algorithm.
         // It finds the optimal solution, but only for Insert/Update/Delete operations. The
         // more nodes are already matched, the faster and better this step is.
-        let _ = optimal_iud::for_roots(before, after, &node_cache, &mut ast_diff);
+        // let _ = optimal_iud::for_roots(before, after, &node_cache, &mut ast_diff);
+        let _ = apted::for_roots(before, after, &node_cache, &mut ast_diff);
 
         Self {
             ast: Some(ast_diff),

@@ -59,14 +59,15 @@ fn benchmark_optimal_iud_for_roots(c: &mut Criterion) {
     // Also benchmark the hello-world translation case which is in test_codes but not test_diffs
     if let (Some(before_hello), Some(after_hello)) = (
         test_codes.get("hello-world.rs"),
-        test_codes.get("zdravo-svijete.rs")
+        test_codes.get("zdravo-svijete.rs"),
     ) {
         group.bench_function("hello_world_translation", |b| {
             let before_hello = before_hello.clone();
             let after_hello = after_hello.clone();
             b.iter(|| {
                 let mut diff = ASTDiff::default();
-                let node_cache = NodeCache::build(black_box(&before_hello), black_box(&after_hello));
+                let node_cache =
+                    NodeCache::build(black_box(&before_hello), black_box(&after_hello));
                 for_roots(
                     black_box(&before_hello),
                     black_box(&after_hello),
