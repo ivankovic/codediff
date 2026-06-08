@@ -502,8 +502,11 @@ fn tree_edit_distance_with_mapping(
             ASTMappingOperation::Update
         };
 
-        // Only add mapping if not already mapped
-        if !diff.mapping.contains_key(&(before_node_id, after_node_id)) {
+        // Only add mapping if nodes are not already mapped to different partners
+        if !diff.mapping.contains_key(&(before_node_id, after_node_id))
+            && !diff.before_node_map.contains_key(&before_node_id)
+            && !diff.after_node_map.contains_key(&after_node_id)
+        {
             let mapping = ASTMapping {
                 cost: ren_cost,
                 operation,
@@ -708,9 +711,11 @@ fn reconstruct_forest_mapping(
                         ASTMappingOperation::Update
                     };
 
-                    // Only add mapping if nodes have the same kind and not already mapped
+                    // Only add mapping if nodes have the same kind and not already mapped to different partners
                     if before_info.kind == after_info.kind
                         && !diff.mapping.contains_key(&(before_id, after_id))
+                        && !diff.before_node_map.contains_key(&before_id)
+                        && !diff.after_node_map.contains_key(&after_id)
                     {
                         let mapping = ASTMapping {
                             cost: ren_cost,
@@ -720,17 +725,22 @@ fn reconstruct_forest_mapping(
                         diff.add_mapping(before_id, after_id, mapping);
                     }
 
-                    // Recursively map children
-                    forest_distance_with_mapping(
-                        &before_info.children,
-                        &after_info.children,
-                        before_indexer,
-                        after_indexer,
-                        before_metadata,
-                        after_metadata,
-                        cost_model,
-                        diff,
-                    );
+                    // Recursively map children - filter out already mapped ones
+                    let before_children = filter_before_nodes(before_info.children.clone(), diff);
+                    let after_children = filter_after_nodes(after_info.children.clone(), diff);
+                    
+                    if !before_children.is_empty() || !after_children.is_empty() {
+                        forest_distance_with_mapping(
+                            &before_children,
+                            &after_children,
+                            before_indexer,
+                            after_indexer,
+                            before_metadata,
+                            after_metadata,
+                            cost_model,
+                            diff,
+                        );
+                    }
 
                     i -= 1;
                     j -= 1;
@@ -784,9 +794,11 @@ fn reconstruct_forest_mapping(
                         ASTMappingOperation::Update
                     };
 
-                    // Only add mapping if nodes have the same kind and not already mapped
+                    // Only add mapping if nodes have the same kind and not already mapped to different partners
                     if before_info.kind == after_info.kind
                         && !diff.mapping.contains_key(&(before_id, after_id))
+                        && !diff.before_node_map.contains_key(&before_id)
+                        && !diff.after_node_map.contains_key(&after_id)
                     {
                         let mapping = ASTMapping {
                             cost: ren_cost,
@@ -954,6 +966,13 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
         return;
     }
 
+    // Skip if already mapped to a non-zero node (already matched to an after node)
+    if let Some(&mapped_after_id) = diff.before_node_map.get(&node_id) {
+        if mapped_after_id != 0 {
+            return;
+        }
+    }
+
     // Add delete for this node
     if !diff.mapping.contains_key(&(node_id, 0)) {
         let mapping = ASTMapping {
@@ -976,6 +995,13 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
 fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDiff) {
     if node_id == 0 {
         return;
+    }
+
+    // Skip if already mapped to a non-zero node (already matched from a before node)
+    if let Some(&mapped_before_id) = diff.after_node_map.get(&node_id) {
+        if mapped_before_id != 0 {
+            return;
+        }
     }
 
     // Add insert for this node
@@ -1042,6 +1068,22 @@ fn subtree_ins_cost(node_id: usize, indexer: &APTEDIndexer, cost_model: &UnitCos
     }
 
     cost
+}
+
+/// Filter out before nodes that are already mapped in the diff
+fn filter_before_nodes(node_ids: Vec<usize>, diff: &ASTDiff) -> Vec<usize> {
+    node_ids
+        .into_iter()
+        .filter(|&node_id| !diff.before_node_map.contains_key(&node_id))
+        .collect()
+}
+
+/// Filter out after nodes that are already mapped in the diff
+fn filter_after_nodes(node_ids: Vec<usize>, diff: &ASTDiff) -> Vec<usize> {
+    node_ids
+        .into_iter()
+        .filter(|&node_id| !diff.after_node_map.contains_key(&node_id))
+        .collect()
 }
 
 /// Compute the optimal tree edit distance using APTED algorithm
@@ -1271,36 +1313,8 @@ mod tests {
     }
 
     #[test]
-    fn test_update_node() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        // Check that we have update operations or non-identical mappings (the bug fix changed some code)
-        let has_updates = diff
-            .mapping
-            .values()
-            .any(|m| m.operation == ASTMappingOperation::Update);
-        let has_non_identical = diff
-            .mapping
-            .values()
-            .any(|m| m.operation == ASTMappingOperation::MatchButNotIdentical);
-        let has_mappings = !diff.mapping.is_empty();
-        assert!(
-            has_updates || has_non_identical || has_mappings,
-            "Should have update operations or non-identical mappings for changed nodes"
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn test_already_matched_nodes_are_skipped() -> Result<()> {
-        // This test exposes a bug where APTED doesn't properly skip nodes
+        // This test verifies that APTED properly skips nodes
         // that are already matched in the diff.
         // 
         // Strategy: Use a code pair where nodes change, pre-populate the diff with
@@ -1380,14 +1394,45 @@ mod tests {
             .map(|(&node_id, &count)| (node_id, count))
             .collect();
 
-        // If either list is non-empty, we have the bug
-        if !before_nodes_with_multiple_mappings.is_empty() || !after_nodes_with_multiple_mappings.is_empty() {
-            panic!(
-                "BUG FOUND: Nodes are mapped multiple times! \n\n                Before nodes with multiple mappings: {:?}\n                After nodes with multiple mappings: {:?}\n                \n                This means APTED is not properly skipping already-matched nodes.",
-                before_nodes_with_multiple_mappings,
-                after_nodes_with_multiple_mappings
-            );
-        }
+        // Assert that no nodes are mapped multiple times
+        assert!(
+            before_nodes_with_multiple_mappings.is_empty(),
+            "Nodes should not be mapped multiple times. Found before nodes with multiple mappings: {:?}",
+            before_nodes_with_multiple_mappings
+        );
+        assert!(
+            after_nodes_with_multiple_mappings.is_empty(),
+            "Nodes should not be mapped multiple times. Found after nodes with multiple mappings: {:?}",
+            after_nodes_with_multiple_mappings
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_node() -> Result<()> {
+        let test_diffs = helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        // Check that we have update operations or non-identical mappings (the bug fix changed some code)
+        let has_updates = diff
+            .mapping
+            .values()
+            .any(|m| m.operation == ASTMappingOperation::Update);
+        let has_non_identical = diff
+            .mapping
+            .values()
+            .any(|m| m.operation == ASTMappingOperation::MatchButNotIdentical);
+        let has_mappings = !diff.mapping.is_empty();
+        assert!(
+            has_updates || has_non_identical || has_mappings,
+            "Should have update operations or non-identical mappings for changed nodes"
+        );
 
         Ok(())
     }
