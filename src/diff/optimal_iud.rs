@@ -1729,6 +1729,7 @@ mod tests {
             ("leet-code-1-bugfix", 41),
             ("python-added-if-block", 13),
             ("rust-error-handling", 63),
+            ("hello-world-removed-message", 12),
             ("python-api-change", 230),
             ("rust-cost-optimization", 16),
             ("python-bugfix-loop", 43),

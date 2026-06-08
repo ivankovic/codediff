@@ -427,12 +427,14 @@ fn tree_edit_distance_with_mapping(
             total_cost += cost;
 
             // Add insert mapping
-            let mapping = ASTMapping {
-                cost: COST_INSERT,
-                operation: ASTMappingOperation::Insert,
-                ..Default::default()
-            };
-            diff.add_mapping(0, after_node_id, mapping);
+            if !diff.mapping.contains_key(&(0, after_node_id)) {
+                let mapping = ASTMapping {
+                    cost: COST_INSERT,
+                    operation: ASTMappingOperation::Insert,
+                    reason: super::ASTMappingReason::OptimalIDU,
+                };
+                diff.add_mapping(0, after_node_id, mapping);
+            }
         }
         return total_cost;
     }
@@ -446,12 +448,14 @@ fn tree_edit_distance_with_mapping(
             total_cost += cost;
 
             // Add delete mapping
-            let mapping = ASTMapping {
-                cost: COST_DELETE,
-                operation: ASTMappingOperation::Delete,
-                ..Default::default()
-            };
-            diff.add_mapping(before_node_id, 0, mapping);
+            if !diff.mapping.contains_key(&(before_node_id, 0)) {
+                let mapping = ASTMapping {
+                    cost: COST_DELETE,
+                    operation: ASTMappingOperation::Delete,
+                    reason: super::ASTMappingReason::OptimalIDU,
+                };
+                diff.add_mapping(before_node_id, 0, mapping);
+            }
         }
         return total_cost;
     }
@@ -498,12 +502,15 @@ fn tree_edit_distance_with_mapping(
             ASTMappingOperation::Update
         };
 
-        let mapping = ASTMapping {
-            cost: ren_cost,
-            operation,
-            ..Default::default()
-        };
-        diff.add_mapping(before_node_id, after_node_id, mapping);
+        // Only add mapping if not already mapped
+        if !diff.mapping.contains_key(&(before_node_id, after_node_id)) {
+            let mapping = ASTMapping {
+                cost: ren_cost,
+                operation,
+                reason: super::ASTMappingReason::OptimalIDU,
+            };
+            diff.add_mapping(before_node_id, after_node_id, mapping);
+        }
 
         return ren_cost;
     }
@@ -701,12 +708,15 @@ fn reconstruct_forest_mapping(
                         ASTMappingOperation::Update
                     };
 
-                    let mapping = ASTMapping {
-                        cost: ren_cost,
-                        operation: op,
-                        ..Default::default()
-                    };
-                    diff.add_mapping(before_id, after_id, mapping);
+                    // Only add mapping if nodes have the same kind and not already mapped
+                    if before_info.kind == after_info.kind && !diff.mapping.contains_key(&(before_id, after_id)) {
+                        let mapping = ASTMapping {
+                            cost: ren_cost,
+                            operation: op,
+                            reason: super::ASTMappingReason::OptimalIDU,
+                        };
+                        diff.add_mapping(before_id, after_id, mapping);
+                    }
 
                     // Recursively map children
                     forest_distance_with_mapping(
@@ -725,12 +735,14 @@ fn reconstruct_forest_mapping(
                 }
                 ASTMappingOperation::Delete => {
                     let before_id = before_nodes[i - 1];
-                    let mapping = ASTMapping {
-                        cost: COST_DELETE,
-                        operation: ASTMappingOperation::Delete,
-                        ..Default::default()
-                    };
-                    diff.add_mapping(before_id, 0, mapping);
+                    if !diff.mapping.contains_key(&(before_id, 0)) {
+                        let mapping = ASTMapping {
+                            cost: COST_DELETE,
+                            operation: ASTMappingOperation::Delete,
+                            reason: super::ASTMappingReason::OptimalIDU,
+                        };
+                        diff.add_mapping(before_id, 0, mapping);
+                    }
 
                     // Add delete mappings for children
                     add_delete_mappings(before_id, before_indexer, diff);
@@ -739,12 +751,14 @@ fn reconstruct_forest_mapping(
                 }
                 ASTMappingOperation::Insert => {
                     let after_id = after_nodes[j - 1];
-                    let mapping = ASTMapping {
-                        cost: COST_INSERT,
-                        operation: ASTMappingOperation::Insert,
-                        ..Default::default()
-                    };
-                    diff.add_mapping(0, after_id, mapping);
+                    if !diff.mapping.contains_key(&(0, after_id)) {
+                        let mapping = ASTMapping {
+                            cost: COST_INSERT,
+                            operation: ASTMappingOperation::Insert,
+                            reason: super::ASTMappingReason::OptimalIDU,
+                        };
+                        diff.add_mapping(0, after_id, mapping);
+                    }
 
                     // Add insert mappings for children
                     add_insert_mappings(after_id, after_indexer, diff);
@@ -768,12 +782,15 @@ fn reconstruct_forest_mapping(
                         ASTMappingOperation::Update
                     };
 
-                    let mapping = ASTMapping {
-                        cost: ren_cost,
-                        operation: op,
-                        ..Default::default()
-                    };
-                    diff.add_mapping(before_id, after_id, mapping);
+                    // Only add mapping if nodes have the same kind and not already mapped
+                    if before_info.kind == after_info.kind && !diff.mapping.contains_key(&(before_id, after_id)) {
+                        let mapping = ASTMapping {
+                            cost: ren_cost,
+                            operation: op,
+                            reason: super::ASTMappingReason::OptimalIDU,
+                        };
+                        diff.add_mapping(before_id, after_id, mapping);
+                    }
 
                     i -= 1;
                     j -= 1;
@@ -782,12 +799,14 @@ fn reconstruct_forest_mapping(
         } else if i > 0 {
             // Delete remaining before nodes
             let before_id = before_nodes[i - 1];
-            let mapping = ASTMapping {
-                cost: COST_DELETE,
-                operation: ASTMappingOperation::Delete,
-                ..Default::default()
-            };
-            diff.add_mapping(before_id, 0, mapping);
+            if !diff.mapping.contains_key(&(before_id, 0)) {
+                let mapping = ASTMapping {
+                    cost: COST_DELETE,
+                    operation: ASTMappingOperation::Delete,
+                    reason: super::ASTMappingReason::OptimalIDU,
+                };
+                diff.add_mapping(before_id, 0, mapping);
+            }
 
             add_delete_mappings(before_id, before_indexer, diff);
 
@@ -795,12 +814,14 @@ fn reconstruct_forest_mapping(
         } else if j > 0 {
             // Insert remaining after nodes
             let after_id = after_nodes[j - 1];
-            let mapping = ASTMapping {
-                cost: COST_INSERT,
-                operation: ASTMappingOperation::Insert,
-                ..Default::default()
-            };
-            diff.add_mapping(0, after_id, mapping);
+            if !diff.mapping.contains_key(&(0, after_id)) {
+                let mapping = ASTMapping {
+                    cost: COST_INSERT,
+                    operation: ASTMappingOperation::Insert,
+                    reason: super::ASTMappingReason::OptimalIDU,
+                };
+                diff.add_mapping(0, after_id, mapping);
+            }
 
             add_insert_mappings(after_id, after_indexer, diff);
 
@@ -930,12 +951,14 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
     }
 
     // Add delete for this node
-    let mapping = ASTMapping {
-        cost: COST_DELETE,
-        operation: ASTMappingOperation::Delete,
-        ..Default::default()
-    };
-    diff.add_mapping(node_id, 0, mapping);
+    if !diff.mapping.contains_key(&(node_id, 0)) {
+        let mapping = ASTMapping {
+            cost: COST_DELETE,
+            operation: ASTMappingOperation::Delete,
+            reason: super::ASTMappingReason::OptimalIDU,
+        };
+        diff.add_mapping(node_id, 0, mapping);
+    }
 
     // Add delete mappings for children
     if let Some(info) = indexer.get_node_info(node_id) {
@@ -952,12 +975,14 @@ fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
     }
 
     // Add insert for this node
-    let mapping = ASTMapping {
-        cost: COST_INSERT,
-        operation: ASTMappingOperation::Insert,
-        ..Default::default()
-    };
-    diff.add_mapping(0, node_id, mapping);
+    if !diff.mapping.contains_key(&(0, node_id)) {
+        let mapping = ASTMapping {
+            cost: COST_INSERT,
+            operation: ASTMappingOperation::Insert,
+            reason: super::ASTMappingReason::OptimalIDU,
+        };
+        diff.add_mapping(0, node_id, mapping);
+    }
 
     // Add insert mappings for children
     if let Some(info) = indexer.get_node_info(node_id) {
