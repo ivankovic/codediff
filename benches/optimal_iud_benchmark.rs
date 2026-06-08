@@ -85,7 +85,7 @@ fn benchmark_optimal_iud_for_roots(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().configure_from_args();
-    targets = benchmark_optimal_iud_find
+    targets = benchmark_optimal_iud_for_roots
 }
 
 criterion_main!(benches);

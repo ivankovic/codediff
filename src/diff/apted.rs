@@ -21,7 +21,7 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code};
 use crate::diff::{
-    ASTDiff, ASTMapping, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE, NodeCache,
+    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT, COST_UPDATE, NodeCache,
 };
 
 /// Node information for APTED algorithm
@@ -709,7 +709,9 @@ fn reconstruct_forest_mapping(
                     };
 
                     // Only add mapping if nodes have the same kind and not already mapped
-                    if before_info.kind == after_info.kind && !diff.mapping.contains_key(&(before_id, after_id)) {
+                    if before_info.kind == after_info.kind
+                        && !diff.mapping.contains_key(&(before_id, after_id))
+                    {
                         let mapping = ASTMapping {
                             cost: ren_cost,
                             operation: op,
@@ -783,7 +785,9 @@ fn reconstruct_forest_mapping(
                     };
 
                     // Only add mapping if nodes have the same kind and not already mapped
-                    if before_info.kind == after_info.kind && !diff.mapping.contains_key(&(before_id, after_id)) {
+                    if before_info.kind == after_info.kind
+                        && !diff.mapping.contains_key(&(before_id, after_id))
+                    {
                         let mapping = ASTMapping {
                             cost: ren_cost,
                             operation: op,
@@ -1290,6 +1294,100 @@ mod tests {
             has_updates || has_non_identical || has_mappings,
             "Should have update operations or non-identical mappings for changed nodes"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_already_matched_nodes_are_skipped() -> Result<()> {
+        // This test exposes a bug where APTED doesn't properly skip nodes
+        // that are already matched in the diff.
+        // 
+        // Strategy: Use a code pair where nodes change, pre-populate the diff with
+        // a mapping that matches a node to a DIFFERENT node than what APTED would
+        // naturally choose, then verify that APTED doesn't create a second mapping
+        // for the same node.
+        let test_diffs = helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        // Get some child nodes to create an artificial mapping
+        let mut before_cursor = before_root.walk();
+        let before_children: Vec<_> = before_root.children(&mut before_cursor).collect();
+        
+        let mut after_cursor = after_root.walk();
+        let after_children: Vec<_> = after_root.children(&mut after_cursor).collect();
+
+        // If we have at least 2 children in both trees, create a cross-mapping
+        // that APTED would not naturally choose
+        if before_children.len() >= 2 && after_children.len() >= 2 {
+            let before_node_1 = before_children[0];
+            let before_node_2 = before_children[1];
+            let after_node_1 = after_children[0];
+            let after_node_2 = after_children[1];
+
+            // Create a mapping that swaps the natural order
+            // Map before_node_1 to after_node_2 (wrong partner)
+            // and before_node_2 to after_node_1 (wrong partner)
+            // This forces APTED to potentially create additional correct mappings
+            let wrong_mapping_1 = ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::OptimalIDU,
+            };
+            diff.add_mapping(before_node_1.id(), after_node_2.id(), wrong_mapping_1);
+
+            let wrong_mapping_2 = ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::OptimalIDU,
+            };
+            diff.add_mapping(before_node_2.id(), after_node_1.id(), wrong_mapping_2);
+        }
+
+        // Now call APTED with the diff that already has these artificial mappings
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        // Check if any before node appears in multiple mappings
+        let mut before_node_counts = std::collections::HashMap::new();
+        for (before_id, _) in diff.mapping.keys() {
+            *before_node_counts.entry(*before_id).or_insert(0) += 1;
+        }
+
+        // Check if any after node appears in multiple mappings  
+        let mut after_node_counts = std::collections::HashMap::new();
+        for (_, after_id) in diff.mapping.keys() {
+            *after_node_counts.entry(*after_id).or_insert(0) += 1;
+        }
+
+        // Find nodes that are mapped multiple times
+        let before_nodes_with_multiple_mappings: Vec<_> = before_node_counts
+            .iter()
+            .filter(|&(_, count)| *count > 1)
+            .map(|(&node_id, &count)| (node_id, count))
+            .collect();
+
+        let after_nodes_with_multiple_mappings: Vec<_> = after_node_counts
+            .iter()
+            .filter(|&(_, count)| *count > 1)
+            .map(|(&node_id, &count)| (node_id, count))
+            .collect();
+
+        // If either list is non-empty, we have the bug
+        if !before_nodes_with_multiple_mappings.is_empty() || !after_nodes_with_multiple_mappings.is_empty() {
+            panic!(
+                "BUG FOUND: Nodes are mapped multiple times! \n\n                Before nodes with multiple mappings: {:?}\n                After nodes with multiple mappings: {:?}\n                \n                This means APTED is not properly skipping already-matched nodes.",
+                before_nodes_with_multiple_mappings,
+                after_nodes_with_multiple_mappings
+            );
+        }
 
         Ok(())
     }
