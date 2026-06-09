@@ -171,10 +171,8 @@ impl Diff {
         // These speed up the diff, but don't guaranteed an optimal solution
         solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
 
-        // This is the final, extremely slow algorithm.
-        // It finds the optimal solution, but only for Insert/Update/Delete operations. The
-        // more nodes are already matched, the faster and better this step is.
-        // let _ = optimal_iud::for_roots(before, after, &node_cache, &mut ast_diff);
+        // This is the final, slow algorithm.
+        // The more nodes are already matched, the faster APTED is.
         let _ = apted::for_roots(before, after, &node_cache, &mut ast_diff);
 
         Self {

@@ -21,7 +21,8 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code};
 use crate::diff::{
-    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT, COST_UPDATE, NodeCache,
+    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
+    COST_UPDATE, NodeCache,
 };
 
 /// Node information for APTED algorithm
@@ -36,9 +37,6 @@ struct TreeNodeInfo {
 }
 
 /// APTED tree indexer - indexes nodes for efficient access
-///
-/// This follows the structure of the Java APTED NodeIndexer, which precomputes
-/// various tree traversals and indices for efficient distance computation.
 struct APTEDIndexer {
     /// Map from node ID to node info
     node_info: HashMap<usize, TreeNodeInfo>,
@@ -728,7 +726,7 @@ fn reconstruct_forest_mapping(
                     // Recursively map children - filter out already mapped ones
                     let before_children = filter_before_nodes(before_info.children.clone(), diff);
                     let after_children = filter_after_nodes(after_info.children.clone(), diff);
-                    
+
                     if !before_children.is_empty() || !after_children.is_empty() {
                         forest_distance_with_mapping(
                             &before_children,
@@ -1316,7 +1314,7 @@ mod tests {
     fn test_already_matched_nodes_are_skipped() -> Result<()> {
         // This test verifies that APTED properly skips nodes
         // that are already matched in the diff.
-        // 
+        //
         // Strategy: Use a code pair where nodes change, pre-populate the diff with
         // a mapping that matches a node to a DIFFERENT node than what APTED would
         // naturally choose, then verify that APTED doesn't create a second mapping
@@ -1335,7 +1333,7 @@ mod tests {
         // Get some child nodes to create an artificial mapping
         let mut before_cursor = before_root.walk();
         let before_children: Vec<_> = before_root.children(&mut before_cursor).collect();
-        
+
         let mut after_cursor = after_root.walk();
         let after_children: Vec<_> = after_root.children(&mut after_cursor).collect();
 
@@ -1375,7 +1373,7 @@ mod tests {
             *before_node_counts.entry(*before_id).or_insert(0) += 1;
         }
 
-        // Check if any after node appears in multiple mappings  
+        // Check if any after node appears in multiple mappings
         let mut after_node_counts = std::collections::HashMap::new();
         for (_, after_id) in diff.mapping.keys() {
             *after_node_counts.entry(*after_id).or_insert(0) += 1;
