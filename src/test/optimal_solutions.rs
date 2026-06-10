@@ -81,6 +81,259 @@ mod tests {
     }
 
     #[test]
+    fn python_refactoring() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("python-refactoring").unwrap().clone();
+
+        let diff = diff::diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+
+        let diff_ast = diff.ast.unwrap();
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        let path = vec!["function_definition"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec!["function_definition", "parameters"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec!["function_definition", "block"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec!["function_definition", "block", "expression_statement:1"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec!["function_definition", "block", "if_statement"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec!["function_definition", "block", "expression_statement:2"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "expression_statement:2",
+            "assignment",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "expression_statement:2",
+            "assignment",
+            "identifier",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        assert!(test::helper::was_tree_deleted(
+            &[
+                "function_definition",
+                "block",
+                "expression_statement:2",
+                "assignment",
+                "integer"
+            ],
+            before_root,
+            &diff_ast
+        )?);
+
+        assert!(test::helper::was_tree_added(
+            &[
+                "function_definition",
+                "block",
+                "expression_statement:2",
+                "assignment",
+                "call"
+            ],
+            after_root,
+            &diff_ast
+        )?);
+
+        let path = vec!["function_definition", "block", "expression_statement:3"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec!["function_definition", "block", "expression_statement:4"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        assert!(test::helper::was_tree_deleted(
+            &["function_definition", "block", "for_statement:1"],
+            before_root,
+            &diff_ast
+        )?);
+
+        assert!(test::helper::was_tree_deleted(
+            &["function_definition", "block", "for_statement:2"],
+            before_root,
+            &diff_ast
+        )?);
+
+        let path = vec!["function_definition", "block", "return_statement"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "return_statement",
+            "dictionary",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "return_statement",
+            "dictionary",
+            "pair:1",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "return_statement",
+            "dictionary",
+            "pair:2",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "return_statement",
+            "dictionary",
+            "pair:3",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec![
+            "function_definition",
+            "block",
+            "return_statement",
+            "dictionary",
+            "pair:4",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        assert!(test::helper::was_tree_added(
+            &[
+                "function_definition",
+                "block",
+                "return_statement",
+                "dictionary",
+                "pair:5",
+            ],
+            after_root,
+            &diff_ast
+        )?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn leet_code_1_bugfix() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+
+        let diff = diff::diff_code(&before, &after);
+
+        assert!(diff.ast.is_some());
+
+        let diff_ast = diff.ast.unwrap();
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        let path = vec!["use_declaration"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec!["impl_item"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec!["impl_item", "type_identifier"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        let path = vec!["impl_item", "declaration_list"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec!["impl_item", "declaration_list", "function_item"];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        let path = vec![
+            "impl_item",
+            "declaration_list",
+            "function_item",
+            "parameters",
+        ];
+        let mapping =
+            test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+        assert!(test::helper::was_tree_added(
+            &[
+                "impl_item",
+                "declaration_list",
+                "function_item",
+                "block",
+                "expression_statement:1"
+            ],
+            after_root,
+            &diff_ast
+        )?);
+
+        Ok(())
+    }
+
+    #[test]
     fn hello_world_removed_message() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs
