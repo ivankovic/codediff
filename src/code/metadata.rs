@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::code::language;
 use crate::code::tip;
-use crate::code::{ASTMetadata, Code, Metadata};
+use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Metadata};
 use crate::diff::reference_nodes;
 use crate::diff::semantic_structure_nodes;
 
@@ -51,6 +51,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     crate::code::hash::hash_code(code, &mut metadata)?;
     compute_subtree_sizes(code, &mut metadata)?;
+    compute_node_info(code, &mut metadata)?;
     discover_reference_nodes(code, &mut metadata)?;
     discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
@@ -89,6 +90,44 @@ fn compute_subtree_sizes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> 
             for child in children.into_iter().rev() {
                 stack.push((child, false));
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Compute node information (kind, text, children) for all nodes
+fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    let ast = code.ast.as_ref().expect("AST must be parsed");
+    let root_node = ast.root_node();
+
+    let mut stack = Vec::new();
+    stack.push(root_node);
+
+    while let Some(node) = stack.pop() {
+        let node_id = node.id();
+        let kind = node.kind().to_string();
+        let text = node
+            .utf8_text(code.contents.as_bytes())
+            .unwrap_or("")
+            .to_string();
+
+        // Get children IDs
+        let mut child_cursor = node.walk();
+        let children: Vec<usize> = node.children(&mut child_cursor).map(|c| c.id()).collect();
+
+        metadata.node_info.insert(
+            node_id,
+            ASTNodeMetadata {
+                kind,
+                text,
+                children,
+            },
+        );
+
+        // Push children to stack
+        for child in node.children(&mut node.walk()) {
+            stack.push(child);
         }
     }
 

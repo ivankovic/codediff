@@ -19,30 +19,16 @@ use anyhow::Result;
 use std::collections::HashMap;
 use tree_sitter::Node;
 
-use crate::code::{ASTMetadata, Code};
+use crate::code::{ASTMetadata, ASTNodeMetadata, Code};
 use crate::diff::{
-    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
+    ASTDiff, ASTMapping, ASTMappingOperation, COST_DELETE, COST_INSERT,
     COST_UPDATE, NodeCache,
 };
 
-/// Node information for APTED algorithm
-#[derive(Debug, Clone)]
-struct TreeNodeInfo {
-    /// Node kind (type)
-    kind: String,
-    /// Node text content (for leaf nodes)
-    text: String,
-    /// Children IDs
-    children: Vec<usize>,
-}
-
 /// APTED tree indexer - indexes nodes for efficient access
-struct APTEDIndexer {
-    /// Map from node ID to node info
-    node_info: HashMap<usize, TreeNodeInfo>,
-    #[allow(dead_code)]
-    /// Tree size (number of nodes)
-    tree_size: usize,
+struct APTEDIndexer<'a> {
+    /// Reference to AST metadata containing node info
+    metadata: &'a ASTMetadata,
 
     // Preorder traversal (left-to-right)
     /// Node IDs in left-to-right preorder
@@ -50,78 +36,27 @@ struct APTEDIndexer {
     /// Map from node ID to left-to-right preorder index
     node_id_to_pre_l: HashMap<usize, usize>,
 
-    // Subtree sizes indexed by preorder LR index
-    /// sizes[pre_l[i]] = size of subtree rooted at node i
-    sizes: Vec<usize>,
-    #[allow(dead_code)]
-    /// Parents indexed by preorder LR index
-    parents: Vec<Option<usize>>,
-
-    // Keyroot sums for strategy computation
-    #[allow(dead_code)]
-    /// Sum of keyroot sizes for left path
-    pre_l_to_kr_sum: Vec<usize>,
-    #[allow(dead_code)]
-    /// Sum of keyroot sizes for right path (reversed)
-    pre_l_to_rev_kr_sum: Vec<usize>,
-    #[allow(dead_code)]
-    /// Sum of all descendant sizes
-    pre_l_to_desc_sum: Vec<usize>,
-
     // Cost sums
     /// Sum of deletion costs for subtree
     pre_l_to_sum_del_cost: Vec<u64>,
     /// Sum of insertion costs for subtree
     pre_l_to_sum_ins_cost: Vec<u64>,
-
-    // Node type flags for strategy
-    #[allow(dead_code)]
-    /// Whether node lies on leftmost path from its parent
-    node_type_l: Vec<bool>,
-    #[allow(dead_code)]
-    /// Whether node lies on rightmost path from its parent
-    node_type_r: Vec<bool>,
-
-    // Count of leftmost/rightmost child leaf nodes
-    #[allow(dead_code)]
-    lchl: usize,
-    #[allow(dead_code)]
-    rchl: usize,
-
-    // Postorder traversal indices
-    #[allow(dead_code)]
-    /// Map from node ID to postorder index (left-to-right)
-    node_id_to_post_l: HashMap<usize, usize>,
-    #[allow(dead_code)]
-    /// Node IDs in postorder (left-to-right)
-    post_l_node_ids: Vec<usize>,
-    #[allow(dead_code)]
-    /// Map from postorder index to preorder index
-    post_l_to_pre_l: Vec<usize>,
-    #[allow(dead_code)]
-    /// Map from preorder index to postorder index
-    pre_l_to_post_l: Vec<usize>,
 }
 
-impl APTEDIndexer {
-    fn new(code: &Code, node_cache: &HashMap<usize, Node<'static>>) -> Self {
+impl<'a> APTEDIndexer<'a> {
+    fn new(code: &Code, metadata: &'a ASTMetadata, node_cache: &HashMap<usize, Node<'static>>) -> Self {
         let ast = code.ast.as_ref().unwrap();
         let root_id = ast.root_node().id();
 
         // Collect all node IDs in left-to-right preorder traversal
         let mut pre_l_node_ids: Vec<usize> = Vec::new();
         let mut node_id_to_pre_l: HashMap<usize, usize> = HashMap::new();
-        let mut post_l_node_ids: Vec<usize> = Vec::new();
-        let mut node_id_to_post_l: HashMap<usize, usize> = HashMap::new();
 
         {
             let mut stack = vec![(root_id, false)]; // (node_id, visited)
             while let Some((node_id, visited)) = stack.pop() {
                 if visited {
-                    // Postorder visit
-                    let post_l_idx = post_l_node_ids.len();
-                    post_l_node_ids.push(node_id);
-                    node_id_to_post_l.insert(node_id, post_l_idx);
+                    // Postorder visit - nothing needed for preorder
                 } else {
                     // Preorder visit
                     let pre_l_idx = pre_l_node_ids.len();
@@ -144,81 +79,12 @@ impl APTEDIndexer {
 
         let tree_size = pre_l_node_ids.len();
 
-        // Build node info and compute sizes bottom-up (postorder traversal)
-        let mut node_info: HashMap<usize, TreeNodeInfo> = HashMap::new();
-        let mut sizes = vec![0; tree_size];
-        let mut parents = vec![None; tree_size];
-        let mut children_map: HashMap<usize, Vec<usize>> = HashMap::new();
-
-        // First pass: collect children
-        for &node_id in &pre_l_node_ids {
-            if let Some(node) = node_cache.get(&node_id) {
-                let mut cursor = node.walk();
-                let children: Vec<usize> = node.children(&mut cursor).map(|c| c.id()).collect();
-                children_map.insert(node_id, children.clone());
-            }
-        }
-
-        // Second pass: compute sizes in postorder
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..tree_size {
-            let node_id = post_l_node_ids[i];
-            let children = children_map.get(&node_id).cloned().unwrap_or_default();
-
-            // Size is 1 + sum of children sizes
-            let size = 1 + children
-                .iter()
-                .map(|&child_id| {
-                    if let Some(&child_idx) = node_id_to_pre_l.get(&child_id) {
-                        sizes[child_idx]
-                    } else {
-                        0
-                    }
-                })
-                .sum::<usize>();
-
-            if let Some(&pre_l_idx) = node_id_to_pre_l.get(&node_id) {
-                sizes[pre_l_idx] = size;
-            }
-
-            // Set parent for children
-            for &child_id in &children {
-                if let Some(&child_pre_l_idx) = node_id_to_pre_l.get(&child_id) {
-                    parents[child_pre_l_idx] = Some(i);
-                }
-            }
-
-            // Build node info
-            if let Some(node) = node_cache.get(&node_id) {
-                let kind = node.kind().to_string();
-                let text = node
-                    .utf8_text(code.contents.as_bytes())
-                    .unwrap_or("")
-                    .to_string();
-
-                let node_info_entry = TreeNodeInfo {
-                    kind,
-                    text,
-                    children,
-                };
-
-                node_info.insert(node_id, node_info_entry);
-            }
-        }
-
-        // Fix parents - need to map properly
-        let mut parents_fixed = vec![None; tree_size];
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..tree_size {
-            let node_id = pre_l_node_ids[i];
-            if let Some(children) = children_map.get(&node_id) {
-                for &child_id in children {
-                    if let Some(&child_idx) = node_id_to_pre_l.get(&child_id) {
-                        parents_fixed[child_idx] = Some(i);
-                    }
-                }
-            }
-        }
+        // Build children map from metadata
+        let children_map: HashMap<usize, Vec<usize>> = metadata
+            .node_info
+            .iter()
+            .map(|(node_id, info)| (*node_id, info.children.clone()))
+            .collect();
 
         // Compute cost sums
         let mut pre_l_to_sum_del_cost = vec![0u64; tree_size];
@@ -229,136 +95,35 @@ impl APTEDIndexer {
         for i in (0..tree_size).rev() {
             let node_id = pre_l_node_ids[i];
 
-            if let Some(_node) = node_cache.get(&node_id) {
-                pre_l_to_sum_del_cost[i] = COST_DELETE;
-                pre_l_to_sum_ins_cost[i] = COST_INSERT;
+            pre_l_to_sum_del_cost[i] = COST_DELETE;
+            pre_l_to_sum_ins_cost[i] = COST_INSERT;
 
-                if let Some(children) = children_map.get(&node_id) {
-                    for &child_id in children {
-                        if let Some(&child_idx) = node_id_to_pre_l.get(&child_id) {
-                            pre_l_to_sum_del_cost[i] += pre_l_to_sum_del_cost[child_idx];
-                            pre_l_to_sum_ins_cost[i] += pre_l_to_sum_ins_cost[child_idx];
-                        }
+            if let Some(children) = children_map.get(&node_id) {
+                for &child_id in children {
+                    if let Some(&child_idx) = node_id_to_pre_l.get(&child_id) {
+                        pre_l_to_sum_del_cost[i] += pre_l_to_sum_del_cost[child_idx];
+                        pre_l_to_sum_ins_cost[i] += pre_l_to_sum_ins_cost[child_idx];
                     }
                 }
-            }
-        }
-
-        // Compute keyroot and desc sums (simplified for now)
-        let mut pre_l_to_kr_sum = vec![0usize; tree_size];
-        let mut pre_l_to_rev_kr_sum = vec![0usize; tree_size];
-        let mut pre_l_to_desc_sum = vec![0usize; tree_size];
-
-        for i in 0..tree_size {
-            let size = sizes[i];
-            pre_l_to_kr_sum[i] = size;
-            pre_l_to_rev_kr_sum[i] = size;
-            pre_l_to_desc_sum[i] = ((size + 1) * (size + 1 + 3)) / 2 - size;
-        }
-
-        // Count lchl and rchl
-        let mut lchl = 0usize;
-        let rchl = 0usize;
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..tree_size {
-            if sizes[i] == 1 {
-                if let Some(parent_idx) = parents_fixed[i] {
-                    #[allow(clippy::collapsible_if)]
-                    if parent_idx + 1 == i {
-                        lchl += 1;
-                    }
-                }
-            }
-        }
-
-        // Set node types (simplified)
-        let mut node_type_l = vec![false; tree_size];
-        let mut node_type_r = vec![false; tree_size];
-
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..tree_size {
-            if let Some(children) = children_map.get(&pre_l_node_ids[i]) {
-                #[allow(clippy::collapsible_if)]
-                if !children.is_empty() {
-                    if let Some(&first_child_id) = children.first() {
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(&first_child_idx) = node_id_to_pre_l.get(&first_child_id) {
-                            node_type_l[first_child_idx] = true;
-                        }
-                    }
-                    if let Some(&last_child_id) = children.last() {
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(&last_child_idx) = node_id_to_pre_l.get(&last_child_id) {
-                            node_type_r[last_child_idx] = true;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Build postorder to preorder mappings
-        let mut post_l_to_pre_l = vec![0; tree_size];
-        let mut pre_l_to_post_l = vec![0; tree_size];
-
-        for i in 0..tree_size {
-            let node_id = post_l_node_ids[i];
-            if let Some(&pre_l_idx) = node_id_to_pre_l.get(&node_id) {
-                post_l_to_pre_l[i] = pre_l_idx;
-                pre_l_to_post_l[pre_l_idx] = i;
             }
         }
 
         APTEDIndexer {
-            node_info,
-            tree_size,
+            metadata,
             pre_l_node_ids,
             node_id_to_pre_l,
-            sizes,
-            parents: parents_fixed,
-            pre_l_to_kr_sum,
-            pre_l_to_rev_kr_sum,
-            pre_l_to_desc_sum,
             pre_l_to_sum_del_cost,
             pre_l_to_sum_ins_cost,
-            node_type_l,
-            node_type_r,
-            lchl,
-            rchl,
-            node_id_to_post_l,
-            post_l_node_ids,
-            post_l_to_pre_l,
-            pre_l_to_post_l,
         }
     }
 
-    fn get_node_info(&self, node_id: usize) -> Option<&TreeNodeInfo> {
-        self.node_info.get(&node_id)
-    }
-
-    #[allow(dead_code)]
-    fn get_size(&self) -> usize {
-        self.tree_size
+    fn get_node_info(&self, node_id: usize) -> Option<&ASTNodeMetadata> {
+        self.metadata.node_info.get(&node_id)
     }
 
     /// Get the left-to-right preorder index for a node ID
-    #[allow(dead_code)]
     fn get_pre_l(&self, node_id: usize) -> Option<usize> {
         self.node_id_to_pre_l.get(&node_id).copied()
-    }
-
-    /// Get the postorder index for a node ID
-    #[allow(dead_code)]
-    fn get_post_l(&self, node_id: usize) -> Option<usize> {
-        self.node_id_to_post_l.get(&node_id).copied()
-    }
-
-    #[allow(dead_code)]
-    fn is_leaf(&self, node_id: usize) -> bool {
-        if let Some(info) = self.node_info.get(&node_id) {
-            info.children.is_empty()
-        } else {
-            false
-        }
     }
 }
 
@@ -366,15 +131,15 @@ impl APTEDIndexer {
 struct UnitCostModel;
 
 impl UnitCostModel {
-    fn del(&self, _node: &TreeNodeInfo) -> u64 {
+    fn del(&self, _node: &ASTNodeMetadata) -> u64 {
         COST_DELETE
     }
 
-    fn ins(&self, _node: &TreeNodeInfo) -> u64 {
+    fn ins(&self, _node: &ASTNodeMetadata) -> u64 {
         COST_INSERT
     }
 
-    fn ren(&self, node1: &TreeNodeInfo, node2: &TreeNodeInfo) -> u64 {
+    fn ren(&self, node1: &ASTNodeMetadata, node2: &ASTNodeMetadata) -> u64 {
         if node1.kind == node2.kind {
             if node1.children.is_empty() && node2.children.is_empty() {
                 // Both are leaves
@@ -407,9 +172,17 @@ fn tree_edit_distance_with_mapping(
     let before_root_pre_l = before_indexer.get_pre_l(before_root_id).unwrap_or(0);
     let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
 
-    // Get the subtree sizes
-    let size1 = before_indexer.sizes[before_root_pre_l];
-    let size2 = after_indexer.sizes[after_root_pre_l];
+    // Get the subtree sizes from metadata
+    let size1 = before_metadata
+        .node_to_subtree_size
+        .get(&before_root_id)
+        .copied()
+        .unwrap_or(0);
+    let size2 = after_metadata
+        .node_to_subtree_size
+        .get(&after_root_id)
+        .copied()
+        .unwrap_or(0);
 
     // If either subtree is size 0 (empty), handle edge cases
     if size1 == 0 && size2 == 0 {
@@ -603,6 +376,8 @@ fn forest_distance_with_mapping(
                     after_id,
                     before_indexer,
                     after_indexer,
+                    before_metadata,
+                    after_metadata,
                     cost_model,
                 );
 
@@ -850,14 +625,24 @@ fn tree_edit_distance(
     after_root_id: usize,
     before_indexer: &APTEDIndexer,
     after_indexer: &APTEDIndexer,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
     cost_model: &UnitCostModel,
 ) -> u64 {
     let before_root_pre_l = before_indexer.get_pre_l(before_root_id).unwrap_or(0);
     let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
 
-    // Get the subtree sizes
-    let size1 = before_indexer.sizes[before_root_pre_l];
-    let size2 = after_indexer.sizes[after_root_pre_l];
+    // Get the subtree sizes from metadata
+    let size1 = before_metadata
+        .node_to_subtree_size
+        .get(&before_root_id)
+        .copied()
+        .unwrap_or(0);
+    let size2 = after_metadata
+        .node_to_subtree_size
+        .get(&after_root_id)
+        .copied()
+        .unwrap_or(0);
 
     // For single node matching, use the cost model directly
     if size1 == 1 && size2 == 1 {
@@ -880,6 +665,8 @@ fn tree_edit_distance(
         &after_info.children,
         before_indexer,
         after_indexer,
+        before_metadata,
+        after_metadata,
         cost_model,
     );
 
@@ -892,6 +679,8 @@ fn forest_distance(
     after_nodes: &[usize],
     before_indexer: &APTEDIndexer,
     after_indexer: &APTEDIndexer,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
     cost_model: &UnitCostModel,
 ) -> u64 {
     let m = before_nodes.len();
@@ -941,6 +730,8 @@ fn forest_distance(
                     after_id,
                     before_indexer,
                     after_indexer,
+                    before_metadata,
+                    after_metadata,
                     cost_model,
                 );
 
@@ -1099,8 +890,8 @@ pub fn for_nodes(
     diff: &mut ASTDiff,
 ) -> Result<()> {
     // Build indexers for both trees
-    let before_indexer = APTEDIndexer::new(before, &node_cache.before);
-    let after_indexer = APTEDIndexer::new(after, &node_cache.after);
+    let before_indexer = APTEDIndexer::new(before, before_metadata, &node_cache.before);
+    let after_indexer = APTEDIndexer::new(after, after_metadata, &node_cache.after);
 
     let cost_model = UnitCostModel;
 
@@ -1172,7 +963,7 @@ pub fn for_roots(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diff::ASTMappingOperation;
+    use crate::diff::{ASTMappingOperation, ASTMappingReason};
     use crate::test::helper;
 
     #[test]

@@ -206,6 +206,17 @@ pub struct Metadata {
     pub ast_metadata: Option<ASTMetadata>,
 }
 
+/// Node information for AST nodes
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ASTNodeMetadata {
+    /// Node kind (type)
+    pub kind: String,
+    /// Node text content (for leaf nodes)
+    pub text: String,
+    /// Children IDs
+    pub children: Vec<usize>,
+}
+
 /**
 * Metadata about the AST.
 *
@@ -238,6 +249,8 @@ pub struct ASTMetadata {
     pub reference_nodes_ordered: Vec<usize>,
     /// Maps a (kind, identifier) pair, for example ('function_item', 'main') to a node_id.
     pub semantically_structural_nodes: HashMap<(String, String), usize>,
+    /// Node information for each node, indexed by node_id.
+    pub node_info: HashMap<usize, ASTNodeMetadata>,
 }
 
 /**
