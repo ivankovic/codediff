@@ -173,26 +173,26 @@ fn tree_edit_distance_with_mapping(
     let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
 
     // Get the subtree sizes from metadata
-    let size1 = before_metadata
+    let before_size = before_metadata
         .node_to_subtree_size
         .get(&before_root_id)
         .copied()
         .unwrap_or(0);
-    let size2 = after_metadata
+    let after_size = after_metadata
         .node_to_subtree_size
         .get(&after_root_id)
         .copied()
         .unwrap_or(0);
 
-    // If either subtree is size 0 (empty), handle edge cases
-    if size1 == 0 && size2 == 0 {
+    // If both subtrees are size 0 (empty), handle edge cases
+    if before_size == 0 && after_size == 0 {
         return 0;
     }
 
-    if size1 == 0 {
+    if before_size == 0 {
         // Insert all after nodes
         let mut total_cost = 0u64;
-        for j in 0..size2 {
+        for j in 0..after_size {
             let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l + j];
             let cost = subtree_ins_cost(after_node_id, after_indexer, cost_model);
             total_cost += cost;
@@ -202,7 +202,7 @@ fn tree_edit_distance_with_mapping(
                 let mapping = ASTMapping {
                     cost: COST_INSERT,
                     operation: ASTMappingOperation::Insert,
-                    reason: super::ASTMappingReason::OptimalIDU,
+                    reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(0, after_node_id, mapping);
             }
@@ -210,10 +210,10 @@ fn tree_edit_distance_with_mapping(
         return total_cost;
     }
 
-    if size2 == 0 {
+    if after_size == 0 {
         // Delete all before nodes
         let mut total_cost = 0u64;
-        for i in 0..size1 {
+        for i in 0..before_size {
             let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l + i];
             let cost = subtree_del_cost(before_node_id, before_indexer, cost_model);
             total_cost += cost;
@@ -223,7 +223,7 @@ fn tree_edit_distance_with_mapping(
                 let mapping = ASTMapping {
                     cost: COST_DELETE,
                     operation: ASTMappingOperation::Delete,
-                    reason: super::ASTMappingReason::OptimalIDU,
+                    reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(before_node_id, 0, mapping);
             }
@@ -232,7 +232,7 @@ fn tree_edit_distance_with_mapping(
     }
 
     // For single node matching, use the cost model directly
-    if size1 == 1 && size2 == 1 {
+    if before_size == 1 && after_size == 1 {
         let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l];
         let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l];
 
@@ -281,7 +281,7 @@ fn tree_edit_distance_with_mapping(
             let mapping = ASTMapping {
                 cost: ren_cost,
                 operation,
-                reason: super::ASTMappingReason::OptimalIDU,
+                reason: super::ASTMappingReason::APTED,
             };
             diff.add_mapping(before_node_id, after_node_id, mapping);
         }
@@ -313,15 +313,15 @@ fn forest_distance_with_mapping(
     cost_model: &UnitCostModel,
     diff: &mut ASTDiff,
 ) -> u64 {
-    let m = before_nodes.len();
-    let n = after_nodes.len();
+    let before_nodes_count = before_nodes.len();
+    let after_nodes_count = after_nodes.len();
 
-    if m == 0 && n == 0 {
+    if before_nodes_count == 0 && after_nodes_count == 0 {
         return 0;
     }
 
     // If all nodes are from one tree, handle as insertions or deletions
-    if m == 0 {
+    if before_nodes_count == 0 {
         let mut total_cost = 0u64;
         for &after_id in after_nodes {
             let cost = subtree_ins_cost(after_id, after_indexer, cost_model);
@@ -333,7 +333,7 @@ fn forest_distance_with_mapping(
         return total_cost;
     }
 
-    if n == 0 {
+    if after_nodes_count == 0 {
         let mut total_cost = 0u64;
         for &before_id in before_nodes {
             let cost = subtree_del_cost(before_id, before_indexer, cost_model);
@@ -346,26 +346,26 @@ fn forest_distance_with_mapping(
     }
 
     // Create DP tables for forest matching with operation tracking
-    let mut dp = vec![vec![0u64; n + 1]; m + 1];
-    let mut operation = vec![vec![ASTMappingOperation::Identical; n + 1]; m + 1];
+    let mut dp = vec![vec![0u64; after_nodes_count + 1]; before_nodes_count + 1];
+    let mut operation = vec![vec![ASTMappingOperation::Identical; after_nodes_count + 1]; before_nodes_count + 1];
 
     // Initialize: cost of deleting all before nodes
-    for i in 1..=m {
+    for i in 1..=before_nodes_count {
         let before_id = before_nodes[i - 1];
         dp[i][0] = dp[i - 1][0] + subtree_del_cost(before_id, before_indexer, cost_model);
         operation[i][0] = ASTMappingOperation::Delete;
     }
 
     // Initialize: cost of inserting all after nodes
-    for j in 1..=n {
+    for j in 1..=after_nodes_count {
         let after_id = after_nodes[j - 1];
         dp[0][j] = dp[0][j - 1] + subtree_ins_cost(after_id, after_indexer, cost_model);
         operation[0][j] = ASTMappingOperation::Insert;
     }
 
     // Fill DP table and track operations
-    for i in 1..=m {
-        for j in 1..=n {
+    for i in 1..=before_nodes_count {
+        for j in 1..=after_nodes_count {
             let before_id = before_nodes[i - 1];
             let after_id = after_nodes[j - 1];
 
@@ -391,7 +391,7 @@ fn forest_distance_with_mapping(
             // Find the minimum cost and corresponding operation
             if cost_match <= cost_delete && cost_match <= cost_insert {
                 dp[i][j] = cost_match;
-                operation[i][j] = ASTMappingOperation::MatchButNotIdentical; // Will be refined later
+                operation[i][j] = ASTMappingOperation::MatchButNotIdentical;
             } else if cost_delete <= cost_insert {
                 dp[i][j] = cost_delete;
                 operation[i][j] = ASTMappingOperation::Delete;
@@ -416,7 +416,7 @@ fn forest_distance_with_mapping(
         diff,
     );
 
-    dp[m][n]
+    dp[before_nodes_count][after_nodes_count]
 }
 
 /// Reconstruct mappings from forest DP operation table
@@ -432,11 +432,11 @@ fn reconstruct_forest_mapping(
     cost_model: &UnitCostModel,
     diff: &mut ASTDiff,
 ) {
-    let m = before_nodes.len();
-    let n = after_nodes.len();
+    let before_nodes_count = before_nodes.len();
+    let after_nodes_count = after_nodes.len();
 
-    let mut i = m;
-    let mut j = n;
+    let mut i = before_nodes_count;
+    let mut j = after_nodes_count;
 
     while i > 0 || j > 0 {
         if i > 0 && j > 0 {
@@ -493,7 +493,7 @@ fn reconstruct_forest_mapping(
                         let mapping = ASTMapping {
                             cost: ren_cost,
                             operation: op,
-                            reason: super::ASTMappingReason::OptimalIDU,
+                            reason: super::ASTMappingReason::APTED,
                         };
                         diff.add_mapping(before_id, after_id, mapping);
                     }
@@ -524,7 +524,7 @@ fn reconstruct_forest_mapping(
                         let mapping = ASTMapping {
                             cost: COST_DELETE,
                             operation: ASTMappingOperation::Delete,
-                            reason: super::ASTMappingReason::OptimalIDU,
+                            reason: super::ASTMappingReason::APTED,
                         };
                         diff.add_mapping(before_id, 0, mapping);
                     }
@@ -540,7 +540,7 @@ fn reconstruct_forest_mapping(
                         let mapping = ASTMapping {
                             cost: COST_INSERT,
                             operation: ASTMappingOperation::Insert,
-                            reason: super::ASTMappingReason::OptimalIDU,
+                            reason: super::ASTMappingReason::APTED,
                         };
                         diff.add_mapping(0, after_id, mapping);
                     }
@@ -576,7 +576,7 @@ fn reconstruct_forest_mapping(
                         let mapping = ASTMapping {
                             cost: ren_cost,
                             operation: op,
-                            reason: super::ASTMappingReason::OptimalIDU,
+                            reason: super::ASTMappingReason::APTED,
                         };
                         diff.add_mapping(before_id, after_id, mapping);
                     }
@@ -592,7 +592,7 @@ fn reconstruct_forest_mapping(
                 let mapping = ASTMapping {
                     cost: COST_DELETE,
                     operation: ASTMappingOperation::Delete,
-                    reason: super::ASTMappingReason::OptimalIDU,
+                    reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(before_id, 0, mapping);
             }
@@ -607,7 +607,7 @@ fn reconstruct_forest_mapping(
                 let mapping = ASTMapping {
                     cost: COST_INSERT,
                     operation: ASTMappingOperation::Insert,
-                    reason: super::ASTMappingReason::OptimalIDU,
+                    reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(0, after_id, mapping);
             }
@@ -633,19 +633,19 @@ fn tree_edit_distance(
     let after_root_pre_l = after_indexer.get_pre_l(after_root_id).unwrap_or(0);
 
     // Get the subtree sizes from metadata
-    let size1 = before_metadata
+    let before_size = before_metadata
         .node_to_subtree_size
         .get(&before_root_id)
         .copied()
         .unwrap_or(0);
-    let size2 = after_metadata
+    let after_size = after_metadata
         .node_to_subtree_size
         .get(&after_root_id)
         .copied()
         .unwrap_or(0);
 
     // For single node matching, use the cost model directly
-    if size1 == 1 && size2 == 1 {
+    if before_size == 1 && after_size == 1 {
         let before_node_id = before_indexer.pre_l_node_ids[before_root_pre_l];
         let after_node_id = after_indexer.pre_l_node_ids[after_root_pre_l];
 
@@ -683,21 +683,21 @@ fn forest_distance(
     after_metadata: &ASTMetadata,
     cost_model: &UnitCostModel,
 ) -> u64 {
-    let m = before_nodes.len();
-    let n = after_nodes.len();
+    let before_nodes_count = before_nodes.len();
+    let after_nodes_count = after_nodes.len();
 
-    if m == 0 && n == 0 {
+    if before_nodes_count == 0 && after_nodes_count == 0 {
         return 0;
     }
 
-    if m == 0 {
+    if before_nodes_count == 0 {
         return after_nodes
             .iter()
             .map(|&after_id| subtree_ins_cost(after_id, after_indexer, cost_model))
             .sum();
     }
 
-    if n == 0 {
+    if after_nodes_count == 0 {
         return before_nodes
             .iter()
             .map(|&before_id| subtree_del_cost(before_id, before_indexer, cost_model))
@@ -705,21 +705,21 @@ fn forest_distance(
     }
 
     // Create DP table for forest matching
-    let mut fp = vec![vec![0u64; n + 1]; m + 1];
+    let mut fp = vec![vec![0u64; after_nodes_count + 1]; before_nodes_count + 1];
 
     // Initialize: cost of deleting all before nodes
-    for i in 1..=m {
+    for i in 1..=before_nodes_count {
         fp[i][0] = fp[i - 1][0] + subtree_del_cost(before_nodes[i - 1], before_indexer, cost_model);
     }
 
     // Initialize: cost of inserting all after nodes
-    for j in 1..=n {
+    for j in 1..=after_nodes_count {
         fp[0][j] = fp[0][j - 1] + subtree_ins_cost(after_nodes[j - 1], after_indexer, cost_model);
     }
 
     // Fill DP table
-    for i in 1..=m {
-        for j in 1..=n {
+    for i in 1..=before_nodes_count {
+        for j in 1..=after_nodes_count {
             let before_id = before_nodes[i - 1];
             let after_id = after_nodes[j - 1];
 
@@ -746,7 +746,7 @@ fn forest_distance(
         }
     }
 
-    fp[m][n]
+    fp[before_nodes_count][after_nodes_count]
 }
 
 /// Add delete mappings for a subtree
@@ -756,10 +756,8 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
     }
 
     // Skip if already mapped to a non-zero node (already matched to an after node)
-    if let Some(&mapped_after_id) = diff.before_node_map.get(&node_id) {
-        if mapped_after_id != 0 {
-            return;
-        }
+    if diff.before_node_map.get(&node_id).is_some_and(|&x| x != 0) {
+        return;
     }
 
     // Add delete for this node
@@ -767,7 +765,7 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
         let mapping = ASTMapping {
             cost: COST_DELETE,
             operation: ASTMappingOperation::Delete,
-            reason: super::ASTMappingReason::OptimalIDU,
+            reason: super::ASTMappingReason::APTED,
         };
         diff.add_mapping(node_id, 0, mapping);
     }
@@ -787,10 +785,8 @@ fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
     }
 
     // Skip if already mapped to a non-zero node (already matched from a before node)
-    if let Some(&mapped_before_id) = diff.after_node_map.get(&node_id) {
-        if mapped_before_id != 0 {
-            return;
-        }
+    if diff.after_node_map.get(&node_id).is_some_and(|&x| x != 0) {
+        return;
     }
 
     // Add insert for this node
@@ -798,7 +794,7 @@ fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
         let mapping = ASTMapping {
             cost: COST_INSERT,
             operation: ASTMappingOperation::Insert,
-            reason: super::ASTMappingReason::OptimalIDU,
+            reason: super::ASTMappingReason::APTED,
         };
         diff.add_mapping(0, node_id, mapping);
     }

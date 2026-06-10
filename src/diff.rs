@@ -385,6 +385,8 @@ pub enum ASTMappingReason {
     /// Using highly modified edit distance algorithm it was determined that this is the optimal
     /// mapping if only Insert, Delete, Update and Identical operations are allowed.
     OptimalIDU,
+    /// Mapping determined by the APTED (A Preorder Tree Edit Distance) algorithm.
+    APTED,
 }
 
 /**
