@@ -126,6 +126,45 @@ mod tests {
             test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
         assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
+        // Here, we examine:
+        //
+        // total = 0
+        //
+        // changing to
+        //
+        // total = sum(numbers)
+        //
+        // This is the core of this diff, where AST diffing performs much better than text based
+        // diff. nvim -d detect this as a delete and then an update of the for loop, which is
+        // perhaps reasonable for text based diffing, but is obviously suboptimal. A much better
+        // diff that more closely follows the logic of code and what the human has actually done is
+        // to say that the for loop was deleted, and that the assignment was changed.
+        //
+        // Here's how the AST looks like if we focus on the assignment:
+        //
+        // Before:
+        //
+        // assignment
+        //   |- identifier
+        //   |- =
+        //   |- integer
+        //
+        // After:
+        //
+        // assignment
+        //   |- identifier
+        //   |- =
+        //   |- call
+        //       |- identifier
+        //       |- argument_list
+        //            |- (
+        //            |- identifier
+        //            |- )
+        //
+        //  With the AST visible, it's clear that the optimal solution is that the identifier and
+        //  equals signs are an Identical match, the integer is a delete and the call with it's
+        //  subtree is an add.
+
         let path = vec![
             "function_definition",
             "block",
