@@ -22,13 +22,11 @@ use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
 * textual 2D visualization, commonly used in IDEs to show textual code.
 *
+* One big difference between the TextDiff and the ASTDiff is that the TextDiff is aware of
+* whitespace which the ASTDiff ignores.
+*
 * This is a datastructure with an API instead of simply being a vector of ranges because we want
-* the ability to partially look up ranges for large files efficiently. To enable this, most
-* information in this datastructure is lazy loaded on demand. Only very efficient computations are
-* pre-computed. The goal is to be able to generate this datastructure from a complete AST Diff of
-* twenty thousand nodes for a file of about two thousands lines in 20 ms. Each cold query should
-* complete in 5 ms, and subsequent queries that ask for ranges that overlap with already computed
-* ranges should complete in 1 ms or less.
+* the ability to partially look up ranges for large files efficiently.
 */
 #[derive(Debug, Clone)]
 pub struct TextDiff {
@@ -75,7 +73,9 @@ fn ranges(source: &Code, destination: &Code, _diff: &ASTDiff) -> Vec<RangeMatch>
                 operation: TextOperation::Insert,
             });
         }
-        (Some(_source_tree), Some(_destination_tree)) => {}
+        (Some(_source_tree), Some(_destination_tree)) => {
+            unimplemented!("TODO: implement")
+        }
     }
 
     ranges
