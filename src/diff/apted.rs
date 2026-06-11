@@ -153,7 +153,9 @@ impl UnitCostModel {
                 0
             }
         } else {
-            COST_UPDATE // Different kinds
+            // Different kinds - matching is more expensive than delete + insert
+            // to ensure that nodes with different kinds are not matched
+            COST_DELETE + COST_INSERT + 1 // Make it strictly more expensive
         }
     }
 }
