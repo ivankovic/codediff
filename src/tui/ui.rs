@@ -26,11 +26,11 @@ use crossterm::{
     cursor,
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, EventStream, KeyEventKind,
+        Event as CrosstermEvent, KeyEventKind, poll, read,
     },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use futures::{FutureExt, StreamExt};
+
 use ratatui::backend::CrosstermBackend as Backend;
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -91,7 +91,6 @@ impl UI {
         tick_rate: f64,
         frame_rate: f64,
     ) {
-        let mut event_stream = EventStream::new();
         let mut tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
         let mut render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
 
@@ -99,6 +98,41 @@ impl UI {
         event_tx
             .send(Event::Init)
             .expect("failed to send init event");
+
+        // Spawn a blocking task for input that won't block the async runtime
+        let event_tx_input = event_tx.clone();
+        let input_cancellation = cancellation_token.clone();
+        tokio::task::spawn_blocking(move || {
+            let event_tx = event_tx_input;
+            loop {
+                if input_cancellation.is_cancelled() {
+                    break;
+                }
+                // Use non-blocking poll (zero timeout) for immediate keypress detection
+                if poll(Duration::from_millis(0)).unwrap_or(false) {
+                    if let Ok(crossterm_event) = read() {
+                        let event = match crossterm_event {
+                            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
+                                Event::Key(key)
+                            }
+                            CrosstermEvent::Mouse(mouse) => Event::Mouse(mouse),
+                            CrosstermEvent::Resize(x, y) => Event::Resize(x, y),
+                            CrosstermEvent::FocusLost => Event::FocusLost,
+                            CrosstermEvent::FocusGained => Event::FocusGained,
+                            CrosstermEvent::Paste(s) => Event::Paste(s),
+                            _ => continue,
+                        };
+                        if event_tx.send(event).is_err() {
+                            break;
+                        }
+                    }
+                } else {
+                    // No event available, yield to avoid busy looping but stay responsive
+                    std::thread::sleep(Duration::from_micros(100));
+                }
+            }
+        });
+
         loop {
             let event = tokio::select! {
                 _ = cancellation_token.cancelled() => {
@@ -106,22 +140,8 @@ impl UI {
                 }
                 _ = tick_interval.tick() => Event::Tick,
                 _ = render_interval.tick() => Event::Render,
-                crossterm_event = event_stream.next().fuse() => match crossterm_event {
-                    Some(Ok(event)) => match event {
-                        CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => Event::Key(key),
-                        CrosstermEvent::Mouse(mouse) => Event::Mouse(mouse),
-                        CrosstermEvent::Resize(x, y) => Event::Resize(x, y),
-                        CrosstermEvent::FocusLost => Event::FocusLost,
-                        CrosstermEvent::FocusGained => Event::FocusGained,
-                        CrosstermEvent::Paste(s) => Event::Paste(s),
-                        _ => continue, // ignore other events
-                    }
-                    Some(Err(_)) => Event::Error,
-                    None => break, // the event stream has stopped and will not produce any more events
-                },
             };
             if event_tx.send(event).is_err() {
-                // the receiver has been dropped, so there's no point in continuing the loop
                 break;
             }
         }

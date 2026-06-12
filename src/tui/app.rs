@@ -16,14 +16,16 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::debug;
 
+use std::path::PathBuf;
+
 use crate::tui::actions::Action;
-use crate::tui::components::{Component, overview::Overview};
+use crate::tui::components::{Component, diff_viewer::DiffViewer, overview::Overview};
 use crate::tui::events::Event;
 use crate::tui::ui::UI;
 
@@ -31,6 +33,7 @@ use crate::tui::ui::UI;
 pub enum Mode {
     #[default]
     Overview,
+    Diff,
 }
 
 /// The codediff application. The state, but not the state machine or the UI, of the TUI.
@@ -42,7 +45,6 @@ pub struct App {
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
-    last_tick_key_events: Vec<KeyCode>,
 
     mode: Mode,
 
@@ -54,14 +56,20 @@ impl App {
     /// Construct the App.
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+
+        // Create a DiffViewer with python refactoring test files
+        let mut diff_viewer = DiffViewer::new();
+        let before_file = PathBuf::from("src/test/data/diffs/python-refactoring/before.py.test");
+        let after_file = PathBuf::from("src/test/data/diffs/python-refactoring/after.py.test");
+        let _ = diff_viewer.load_files(before_file, after_file);
+
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(Overview::new())],
+            components: vec![Box::new(Overview::new()), Box::new(diff_viewer)],
             action_tx,
             action_rx,
-            last_tick_key_events: Vec::new(),
-            mode: Mode::Overview,
+            mode: Mode::Diff,
             should_exit: false,
             should_suspend: false,
         })
@@ -103,12 +111,31 @@ impl App {
             return Ok(());
         };
         let action_tx = self.action_tx.clone();
+
+        // Process key events for mode switching immediately
+        if let Event::Key(key) = &event {
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    action_tx.send(Action::Quit)?;
+                }
+                KeyCode::Char('o') => {
+                    self.mode = Mode::Overview;
+                    action_tx.send(Action::Render)?;
+                }
+                KeyCode::Char('d') => {
+                    self.mode = Mode::Diff;
+                    action_tx.send(Action::Render)?;
+                }
+                _ => {}
+            }
+        }
+
         match event {
             Event::Quit => action_tx.send(Action::Quit)?,
             Event::Tick => action_tx.send(Action::Tick)?,
             Event::Render => action_tx.send(Action::Render)?,
             Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
-            Event::Key(key) => self.handle_key_event(key)?,
+            Event::Key(_) => {}
             _ => {}
         }
         for component in self.components.iter_mut() {
@@ -119,31 +146,13 @@ impl App {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
-        let action_tx = self.action_tx.clone();
-        self.last_tick_key_events.push(key.code);
-
-        match &self.last_tick_key_events[..] {
-            [KeyCode::Esc] | [KeyCode::Char('q')] => {
-                action_tx.send(Action::Quit)?;
-            }
-            _ => {
-                // Combo might be incomplete...
-            }
-        }
-
-        Ok(())
-    }
-
     fn handle_actions(&mut self, ui: &mut UI) -> Result<()> {
         while let Ok(action) = self.action_rx.try_recv() {
             if action != Action::Tick && action != Action::Render {
                 debug!("{action:?}");
             }
             match action {
-                Action::Tick => {
-                    self.last_tick_key_events.drain(..);
-                }
+                Action::Tick => {}
                 Action::Quit => self.should_exit = true,
                 Action::Suspend => self.should_suspend = true,
                 Action::Resume => self.should_suspend = false,
@@ -169,12 +178,18 @@ impl App {
 
     fn render(&mut self, ui: &mut UI) -> Result<()> {
         ui.draw(|frame| {
-            for component in self.components.iter_mut() {
-                if let Err(err) = component.draw(frame, frame.size()) {
-                    let _ = self
-                        .action_tx
-                        .send(Action::Error(format!("Failed to draw: {:?}", err)));
-                }
+            // Only render the active component based on mode
+            let active_index = match self.mode {
+                Mode::Overview => 0,
+                Mode::Diff => 1,
+            };
+
+            if let Some(component) = self.components.get_mut(active_index)
+                && let Err(err) = component.draw(frame, frame.size())
+            {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
             }
         })?;
         Ok(())

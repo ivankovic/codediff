@@ -15,6 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod code_viewer;
+pub mod diff_viewer;
 pub mod overview;
 
 use anyhow::Result;

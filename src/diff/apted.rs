@@ -21,8 +21,7 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code};
 use crate::diff::{
-    ASTDiff, ASTMapping, ASTMappingOperation, COST_DELETE, COST_INSERT,
-    COST_UPDATE, NodeCache,
+    ASTDiff, ASTMapping, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE, NodeCache,
 };
 
 /// APTED tree indexer - indexes nodes for efficient access
@@ -44,7 +43,11 @@ struct APTEDIndexer<'a> {
 }
 
 impl<'a> APTEDIndexer<'a> {
-    fn new(code: &Code, metadata: &'a ASTMetadata, node_cache: &HashMap<usize, Node<'static>>) -> Self {
+    fn new(
+        code: &Code,
+        metadata: &'a ASTMetadata,
+        node_cache: &HashMap<usize, Node<'static>>,
+    ) -> Self {
         let ast = code.ast.as_ref().unwrap();
         let root_id = ast.root_node().id();
 
@@ -349,7 +352,8 @@ fn forest_distance_with_mapping(
 
     // Create DP tables for forest matching with operation tracking
     let mut dp = vec![vec![0u64; after_nodes_count + 1]; before_nodes_count + 1];
-    let mut operation = vec![vec![ASTMappingOperation::Identical; after_nodes_count + 1]; before_nodes_count + 1];
+    let mut operation =
+        vec![vec![ASTMappingOperation::Identical; after_nodes_count + 1]; before_nodes_count + 1];
 
     // Initialize: cost of deleting all before nodes
     for i in 1..=before_nodes_count {
