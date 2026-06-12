@@ -74,7 +74,9 @@ fn ranges(source: &Code, destination: &Code, _diff: &ASTDiff) -> Vec<RangeMatch>
             });
         }
         (Some(_source_tree), Some(_destination_tree)) => {
-            unimplemented!("TODO: implement")
+            unimplemented!(
+                "TODO: implement post-order processing of nodes and range generation using a stack"
+            );
         }
     }
 
