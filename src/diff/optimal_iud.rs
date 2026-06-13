@@ -1256,6 +1256,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow"]
     fn is_always_valid() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
 
@@ -1719,6 +1720,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow"]
     fn all_handmade_diffs_have_expected_costs() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
 

@@ -221,8 +221,10 @@ mod tests {
         assert_eq!(before_ranges[1].source.start_column, 0);
         assert_eq!(before_ranges[1].source.end_row, 2);
         assert_eq!(before_ranges[1].source.end_column, 0);
+        // Note that because we ignore whitespace, the [(2, 0), (2, 2)> range is simply missing from
+        // the result.
         assert_eq!(before_ranges[1].destination.start_row, 2);
-        assert_eq!(before_ranges[1].destination.start_column, 0);
+        assert_eq!(before_ranges[1].destination.start_column, 2);
         assert_eq!(before_ranges[1].destination.end_row, 3);
         assert_eq!(before_ranges[1].destination.end_column, 0);
 
@@ -251,7 +253,7 @@ mod tests {
 
         assert_eq!(after_ranges[1].operation, TextOperation::Insert);
         assert_eq!(after_ranges[1].source.start_row, 2);
-        assert_eq!(after_ranges[1].source.start_column, 0);
+        assert_eq!(after_ranges[1].source.start_column, 2);
         assert_eq!(after_ranges[1].source.end_row, 3);
         assert_eq!(after_ranges[1].source.end_column, 0);
         assert_eq!(after_ranges[1].destination.start_row, 2);
@@ -281,7 +283,7 @@ mod tests {
         let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
 
         let before_ranges = text_diff.all(0);
-        assert_eq!(before_ranges.len(), 5);
+        assert_eq!(before_ranges.len(), 4);
 
         assert_eq!(before_ranges[0].operation, TextOperation::Identical);
         assert_eq!(before_ranges[0].source.start_row, 0);
@@ -316,36 +318,33 @@ mod tests {
         assert_eq!(before_ranges[2].destination.end_row, 22);
         assert_eq!(before_ranges[2].destination.end_column, 5);
 
-        // Another empty range for the added whitespace.
-        // Note that this is a very interesting use case, since whitespace "disappears" from the AST
-        // in some sense, but in Python whitespace is extremely important and highlighting it in the
-        // textual diff is very important.
-        assert_eq!(before_ranges[3].operation, TextOperation::Delete);
-        assert_eq!(before_ranges[3].source.start_row, 21);
-        assert_eq!(before_ranges[3].source.start_column, 5);
-        assert_eq!(before_ranges[3].source.end_row, 21);
-        assert_eq!(before_ranges[3].source.end_column, 5);
-        assert_eq!(before_ranges[3].destination.start_row, 22);
-        assert_eq!(before_ranges[3].destination.start_column, 5);
-        assert_eq!(before_ranges[3].destination.end_row, 22);
-        assert_eq!(before_ranges[3].destination.end_column, 10);
+        // This is where whitespace WOULD be, but we ignore it on purpose.
+        // assert_eq!(before_ranges[X].operation, TextOperation::Delete);
+        // assert_eq!(before_ranges[X].source.start_row, 21);
+        // assert_eq!(before_ranges[X].source.start_column, 5);
+        // assert_eq!(before_ranges[X].source.end_row, 21);
+        // assert_eq!(before_ranges[X].source.end_column, 5);
+        // assert_eq!(before_ranges[X].destination.start_row, 22);
+        // assert_eq!(before_ranges[X].destination.start_column, 5);
+        // assert_eq!(before_ranges[X].destination.end_row, 22);
+        // assert_eq!(before_ranges[X].destination.end_column, 10);
 
         // Again, the ordering is well defined and mandatory.
         // This is the line that was idented, so it is moved but otherwise identical.
-        assert_eq!(before_ranges[4].operation, TextOperation::Move);
-        assert_eq!(before_ranges[4].source.start_row, 21);
-        assert_eq!(before_ranges[4].source.start_column, 5);
-        assert_eq!(before_ranges[4].source.end_row, 22);
-        assert_eq!(before_ranges[4].source.end_column, 0);
-        assert_eq!(before_ranges[4].destination.start_row, 22);
-        assert_eq!(before_ranges[4].destination.start_column, 5);
-        assert_eq!(before_ranges[4].destination.end_row, 23);
-        assert_eq!(before_ranges[4].destination.end_column, 0);
+        assert_eq!(before_ranges[3].operation, TextOperation::Move);
+        assert_eq!(before_ranges[3].source.start_row, 21);
+        assert_eq!(before_ranges[3].source.start_column, 5);
+        assert_eq!(before_ranges[3].source.end_row, 22);
+        assert_eq!(before_ranges[3].source.end_column, 0);
+        assert_eq!(before_ranges[3].destination.start_row, 22);
+        assert_eq!(before_ranges[3].destination.start_column, 5);
+        assert_eq!(before_ranges[3].destination.end_row, 23);
+        assert_eq!(before_ranges[3].destination.end_column, 0);
 
         let after_ranges = text_diff.all(1);
         // Note the symetric relationships between source and destination ranges in the
         // before_ranges and after_ranges vectors.
-        assert_eq!(after_ranges.len(), 5);
+        assert_eq!(after_ranges.len(), before_ranges.len());
 
         assert_eq!(after_ranges[0].operation, TextOperation::Identical);
         assert_eq!(after_ranges[0].source.start_row, 0);
@@ -379,27 +378,27 @@ mod tests {
         assert_eq!(after_ranges[2].destination.end_row, 21);
         assert_eq!(after_ranges[2].destination.end_column, 5);
 
-        // The added identation.
-        assert_eq!(after_ranges[3].operation, TextOperation::Insert);
-        assert_eq!(after_ranges[3].source.start_row, 22);
-        assert_eq!(after_ranges[3].source.start_column, 5);
-        assert_eq!(after_ranges[3].source.end_row, 22);
-        assert_eq!(after_ranges[3].source.end_column, 10);
-        assert_eq!(after_ranges[3].destination.start_row, 21);
-        assert_eq!(after_ranges[3].destination.start_column, 5);
-        assert_eq!(after_ranges[3].destination.end_row, 21);
-        assert_eq!(after_ranges[3].destination.end_column, 5);
+        // This is where whitespace WOULD be, but we ignore it on purpose.
+        // assert_eq!(after_ranges[X].operation, TextOperation::Insert);
+        // assert_eq!(after_ranges[X].source.start_row, 22);
+        // assert_eq!(after_ranges[X].source.start_column, 5);
+        // assert_eq!(after_ranges[X].source.end_row, 22);
+        // assert_eq!(after_ranges[X].source.end_column, 10);
+        // assert_eq!(after_ranges[X].destination.start_row, 21);
+        // assert_eq!(after_ranges[X].destination.start_column, 5);
+        // assert_eq!(after_ranges[X].destination.end_row, 21);
+        // assert_eq!(after_ranges[X].destination.end_column, 5);
 
         // The matched existing implementation.
-        assert_eq!(after_ranges[4].operation, TextOperation::Move);
-        assert_eq!(after_ranges[4].source.start_row, 22);
-        assert_eq!(after_ranges[4].source.start_column, 5);
-        assert_eq!(after_ranges[4].source.end_row, 23);
-        assert_eq!(after_ranges[4].source.end_column, 0);
-        assert_eq!(after_ranges[4].destination.start_row, 21);
-        assert_eq!(after_ranges[4].destination.start_column, 5);
-        assert_eq!(after_ranges[4].destination.end_row, 22);
-        assert_eq!(after_ranges[4].destination.end_column, 0);
+        assert_eq!(after_ranges[3].operation, TextOperation::Move);
+        assert_eq!(after_ranges[3].source.start_row, 22);
+        assert_eq!(after_ranges[3].source.start_column, 5);
+        assert_eq!(after_ranges[3].source.end_row, 23);
+        assert_eq!(after_ranges[3].source.end_column, 0);
+        assert_eq!(after_ranges[3].destination.start_row, 21);
+        assert_eq!(after_ranges[3].destination.start_column, 5);
+        assert_eq!(after_ranges[3].destination.end_row, 22);
+        assert_eq!(after_ranges[3].destination.end_column, 0);
 
         Ok(())
     }
