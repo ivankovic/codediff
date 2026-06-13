@@ -22,8 +22,9 @@ use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
 * textual 2D visualization, commonly used in IDEs to show textual code.
 *
-* One big difference between the TextDiff and the ASTDiff is that the TextDiff is aware of
-* whitespace which the ASTDiff ignores.
+* One crucial design choice with TextDiff is how it handles whitespace. In principle, whitespace is
+* completely ignored, except when it causes differences in the parsed AST, notably as part of
+* constants.
 *
 * This is a datastructure with an API instead of simply being a vector of ranges because we want
 * the ability to partially look up ranges for large files efficiently.
