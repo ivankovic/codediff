@@ -16,7 +16,10 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{code::Code, diff::ASTDiff, diff::text_range::TextRange};
+use crate::{
+    code::Code,
+    diff::{ASTDiff, ASTMappingOperation, NodeCache, text_range::TextRange},
+};
 
 /**
 * The API that can be used to transform the AST Diff, which has no inherent visualization, into a
@@ -46,7 +49,12 @@ impl Default for TextDiff {
 }
 
 /// Returns the RangeMatches from source to destination.
-fn ranges(source: &Code, destination: &Code, _diff: &ASTDiff) -> Vec<RangeMatch> {
+fn ranges(
+    source: &Code,
+    destination: &Code,
+    diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> Vec<RangeMatch> {
     let mut ranges = Vec::new();
 
     match (&source.ast, &destination.ast) {
@@ -74,10 +82,42 @@ fn ranges(source: &Code, destination: &Code, _diff: &ASTDiff) -> Vec<RangeMatch>
                 operation: TextOperation::Insert,
             });
         }
-        (Some(_source_tree), Some(_destination_tree)) => {
-            unimplemented!(
-                "TODO: implement post-order processing of nodes and range generation using a stack"
-            );
+        (Some(source_tree), Some(_)) => {
+            let root_node = source_tree.root_node();
+
+            // We perform a pre-order traversal of the source tree and look for nodes with known
+            // TextRanges.
+            let mut stack = Vec::new();
+            stack.push(root_node);
+
+            while let Some(node) = stack.pop() {
+                if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
+                    match mapping.operation {
+                        ASTMappingOperation::Identical => {
+                            if let Some(destination_node) = node_cache.get_in_any(&mapped_id) {
+                                ranges.push(RangeMatch {
+                                    source: TextRange::from_treesitter_range(node.range()),
+                                    destination: TextRange::from_treesitter_range(
+                                        destination_node.range(),
+                                    ),
+                                    operation: TextOperation::Identical,
+                                });
+
+                                // Don't descend
+                                continue;
+                            }
+                        }
+                        _ => {
+                            // For other operations, just allow the descent into the tree
+                        }
+                    }
+                }
+
+                let mut child_cursor = node.walk();
+                for child in node.children(&mut child_cursor) {
+                    stack.push(child);
+                }
+            }
         }
     }
 
@@ -89,10 +129,10 @@ impl TextDiff {
     ///
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
-    pub fn from(before: &Code, after: &Code, diff: &ASTDiff) -> Self {
+    pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
         Self {
-            before_ranges: ranges(before, after, diff),
-            after_ranges: ranges(after, before, diff),
+            before_ranges: ranges(before, after, diff, node_cache),
+            after_ranges: ranges(after, before, diff, node_cache),
         }
     }
 

@@ -296,6 +296,23 @@ impl ASTDiff {
         }
         false
     }
+
+    /**
+     * Returns the mapping for a given node, either side of the diff.
+     */
+    pub fn mapping_for_node(&self, node_id: &usize) -> Option<(usize, ASTMapping)> {
+        if let Some(mapped_id) = self.before_node_map.get(node_id)
+            && let Some(mapping) = self.mapping.get(&(*node_id, *mapped_id))
+        {
+            return Some((*mapped_id, mapping.clone()));
+        }
+        if let Some(mapped_id) = self.after_node_map.get(node_id)
+            && let Some(mapping) = self.mapping.get(&(*mapped_id, *node_id))
+        {
+            return Some((*mapped_id, mapping.clone()));
+        }
+        None
+    }
 }
 
 /**
