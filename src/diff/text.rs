@@ -202,10 +202,12 @@ mod tests {
 
     #[test]
     fn no_change_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false, "no-change")?;
-        let (before, after, diff) = diffs.get("no-change").unwrap().clone();
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = code_pairs.get("no-change").unwrap().clone();
+        let node_cache = NodeCache::build(&before, &after);
+        let diff = crate::diff::Diff::from_code(&before, &after);
 
-        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
         assert_eq!(before_ranges.len(), 1);
@@ -238,11 +240,12 @@ mod tests {
 
     #[test]
     fn hellow_world_added_message_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false, "hello-world-added-message")?;
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = code_pairs.get("hello-world-added-message").unwrap().clone();
+        let node_cache = NodeCache::build(&before, &after);
+        let diff = crate::diff::Diff::from_code(&before, &after);
 
-        let (before, after, diff) = diffs.get("hello-world-added-message").unwrap().clone();
-
-        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
         assert_eq!(before_ranges.len(), 3);
@@ -317,11 +320,12 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
-        let diffs = test::helper::handmade_test_diffs(true, false, "python-added-if-block")?;
+        let code_pairs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = code_pairs.get("python-added-if-block").unwrap().clone();
+        let node_cache = NodeCache::build(&before, &after);
+        let diff = crate::diff::Diff::from_code(&before, &after);
 
-        let (before, after, diff) = diffs.get("python-added-if-block").unwrap().clone();
-
-        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap());
+        let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
         assert_eq!(before_ranges.len(), 4);

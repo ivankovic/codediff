@@ -142,6 +142,7 @@ impl Code {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(language.clone()),
+                columns_for_row: None,
                 ast_metadata: None,
             },
             ..Default::default()
@@ -202,6 +203,8 @@ pub struct Metadata {
     pub tip: Option<Type>,
     /// The language.
     pub language: Option<Language>,
+    /// The number of columns in each row.
+    pub columns_for_row: Option<Vec<usize>>,
     /// AST metadata including hashes and reference nodes.
     pub ast_metadata: Option<ASTMetadata>,
 }
@@ -496,6 +499,7 @@ mod tests {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(Language::Rust),
+                columns_for_row: None,
                 ast_metadata: None, // Metadata not set
             },
             ..Default::default()
@@ -532,6 +536,7 @@ mod tests {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(Language::Rust),
+                columns_for_row: None,
                 ast_metadata: None,
             },
             ..Default::default()
@@ -564,6 +569,7 @@ mod tests {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: None, // No language set
+                columns_for_row: None,
                 ast_metadata: None,
             },
             ..Default::default()
@@ -595,6 +601,7 @@ mod tests {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(Language::Bazel), // Bazel is not supported by tree-sitter
+                columns_for_row: None,
                 ast_metadata: None,
             },
             ..Default::default()

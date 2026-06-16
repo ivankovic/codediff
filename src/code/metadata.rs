@@ -23,6 +23,43 @@ use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Metadata};
 use crate::diff::reference_nodes;
 use crate::diff::semantic_structure_nodes;
 
+/// Compute the number of columns (characters) in each row of the given code.
+///
+/// For each line in the code, this function counts the number of characters before each newline.
+/// The last line (which may not end with a newline) is also included.
+///
+/// # Arguments
+///
+/// * `contents` - The code contents as a string slice
+///
+/// # Returns
+///
+/// A vector where each element represents the number of columns (characters) in the corresponding row.
+pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
+    let mut result = Vec::new();
+    let mut start = 0;
+    
+    for (idx, ch) in contents.char_indices() {
+        if ch == '\n' {
+            // Count characters from start to this newline
+            let count = contents[start..idx].chars().count();
+            result.push(count);
+            start = idx + 1;
+        }
+    }
+    
+    // Handle the last line (which may not end with a newline)
+    if start < contents.len() {
+        let count = contents[start..].chars().count();
+        result.push(count);
+    } else if result.is_empty() {
+        // Handle empty string case
+        result.push(0);
+    }
+    
+    result
+}
+
 /**
 * Compute all metadata fileds, that can be computed without reading any new information.
 */
@@ -241,6 +278,50 @@ mod tests {
 
         assert!(m.tip.is_some());
         assert!(m.language.is_some());
+    }
+
+    #[test]
+    fn compute_columns_per_row_empty_string() {
+        let result = compute_columns_per_row("");
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_single_line() {
+        let result = compute_columns_per_row("hello");
+        assert_eq!(result, vec![5]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_single_line_with_newline() {
+        let result = compute_columns_per_row("hello\n");
+        assert_eq!(result, vec![5]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_multiple_lines() {
+        let result = compute_columns_per_row("abc\ndef\nghi");
+        assert_eq!(result, vec![3, 3, 3]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_varying_lengths() {
+        let result = compute_columns_per_row("a\nbb\nccc\n");
+        assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_with_empty_lines() {
+        let result = compute_columns_per_row("abc\n\ndef");
+        assert_eq!(result, vec![3, 0, 3]);
+    }
+
+    #[test]
+    fn compute_columns_per_row_multibyte_characters() {
+        // Test with multi-byte UTF-8 characters (emojis)
+        let result = compute_columns_per_row("a🎉b\nc🎉d");
+        // Each line has 3 characters: a, emoji, b (or c, emoji, d)
+        assert_eq!(result, vec![3, 3]);
     }
 
     #[test]
