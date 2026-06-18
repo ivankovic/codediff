@@ -101,39 +101,18 @@ impl TextRange {
 
     /// Create a new TextRange from a TreeSitter Range.
     ///
-    /// This method adjusts the end position to follow the TextRange convention:
-    /// - If the end_row is within the columns_per_row array and end_column equals the last column of that row, it moves to (row+1, 0)
-    /// - Otherwise, it increments the column by 1
+    /// TreeSitter ranges are already right-open, so no adjustment is needed.
     ///
     /// # Arguments
     ///
     /// * `ts_range` - The TreeSitter Range to convert
-    /// * `columns_per_row` - A slice where each element represents the number of columns in that row
-    pub fn from_treesitter_range(ts_range: Range, columns_per_row: &[usize]) -> Self {
-        let start_row = ts_range.start_point.row;
-        let start_column = ts_range.start_point.column;
-
-        let end_row = ts_range.end_point.row;
-        let end_column = ts_range.end_point.column;
-
-        // Adjust the end position
-        let (adjusted_end_row, adjusted_end_column) =
-            if end_row < columns_per_row.len() && end_column == columns_per_row[end_row] {
-                // If end_column is exactly at the end of the row, move to next row, column 0
-                (end_row + 1, 0)
-            } else if end_row >= columns_per_row.len() && end_column == 0 {
-                // If we're past the end of known rows and at column 0, move to next row
-                (end_row + 1, 0)
-            } else {
-                // Otherwise, increment the column
-                (end_row, end_column + 1)
-            };
-
+    /// * `columns_per_row` - A slice where each element represents the number of columns in that row (not used currently, kept for API compatibility)
+    pub fn from_treesitter_range(ts_range: Range, _columns_per_row: &[usize]) -> Self {
         Self {
-            start_row,
-            start_column,
-            end_row: adjusted_end_row,
-            end_column: adjusted_end_column,
+            start_row: ts_range.start_point.row,
+            start_column: ts_range.start_point.column,
+            end_row: ts_range.end_point.row,
+            end_column: ts_range.end_point.column,
         }
     }
 
@@ -256,34 +235,34 @@ mod tests {
     // Tests for TextRange::from_treesitter_range()
     #[test]
     fn from_treesitter_range_end_at_line_end() {
-        // When end_column equals the last column of the row, move to next row, column 0
+        // TreeSitter ranges are already right-open, so no adjustment needed
         use tree_sitter::Point;
         use tree_sitter::Range;
 
         let ts_range = Range {
             start_point: Point { row: 0, column: 0 },
-            end_point: Point { row: 0, column: 5 }, // End at column 5 (last column of row 0)
+            end_point: Point { row: 0, column: 5 },
             start_byte: 0,
             end_byte: 5,
         };
-        let columns_per_row = vec![5]; // Row 0 has 5 columns
+        let columns_per_row = vec![5];
 
         let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
-        assert_eq!(result.end_row, 1);
-        assert_eq!(result.end_column, 0);
+        assert_eq!(result.end_row, 0);
+        assert_eq!(result.end_column, 5);
     }
 
     #[test]
     fn from_treesitter_range_end_not_at_line_end() {
-        // When end_column is NOT at the last column, increment column
+        // TreeSitter ranges are already right-open, so no adjustment needed
         use tree_sitter::Point;
         use tree_sitter::Range;
 
         let ts_range = Range {
             start_point: Point { row: 0, column: 0 },
-            end_point: Point { row: 0, column: 3 }, // End at column 3 (not last column)
+            end_point: Point { row: 0, column: 3 },
             start_byte: 0,
             end_byte: 3,
         };
@@ -293,7 +272,7 @@ mod tests {
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
         assert_eq!(result.end_row, 0);
-        assert_eq!(result.end_column, 4); // 3 + 1
+        assert_eq!(result.end_column, 3);
     }
 
     #[test]
@@ -314,7 +293,7 @@ mod tests {
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
         assert_eq!(result.end_row, 1);
-        assert_eq!(result.end_column, 4); // 3 + 1
+        assert_eq!(result.end_column, 3);
     }
 
     #[test]
@@ -334,8 +313,8 @@ mod tests {
         let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
-        assert_eq!(result.end_row, 2); // row + 1
-        assert_eq!(result.end_column, 0);
+        assert_eq!(result.end_row, 1);
+        assert_eq!(result.end_column, 5);
     }
 
     #[test]
@@ -356,7 +335,7 @@ mod tests {
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 2);
         assert_eq!(result.end_row, 0);
-        assert_eq!(result.end_column, 3); // 2 + 1
+        assert_eq!(result.end_column, 2);
     }
 
     #[test]
@@ -376,7 +355,7 @@ mod tests {
         let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
-        assert_eq!(result.end_row, 3); // row + 1 because end_row >= len and end_column == 0
+        assert_eq!(result.end_row, 2);
         assert_eq!(result.end_column, 0);
     }
 
@@ -398,6 +377,6 @@ mod tests {
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
         assert_eq!(result.end_row, 2);
-        assert_eq!(result.end_column, 4); // column + 1
+        assert_eq!(result.end_column, 3);
     }
 }
