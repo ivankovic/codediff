@@ -15,8 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::VecDeque;
-
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
     diff::{ASTDiff, ASTMappingOperation, NodeCache, text_range::TextRange},
@@ -95,14 +93,14 @@ fn ranges(
 
             // We perform a pre-order traversal of the source tree and look for nodes with known
             // TextRanges.
-            let mut stack = VecDeque::new();
-            stack.push_back(root_node);
+            let mut stack = Vec::new();
+            stack.push(root_node);
 
             let mut last_non_move_range = TextRange::zero();
 
             let mut current_range = RangeMatch::zero();
 
-            while let Some(node) = stack.pop_front() {
+            while let Some(node) = stack.pop() {
                 println!("Nodus: {} {:?}", node.kind(), node.range());
 
                 if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
@@ -112,11 +110,7 @@ fn ranges(
                     match mapping.operation {
                         ASTMappingOperation::Identical => {
                             if let Some(destination_node) = node_cache.get_in_any(&mapped_id) {
-                                println!(
-                                    "  ^- IDENTICAL to {} {:?}",
-                                    destination_node.kind(),
-                                    destination_node.range()
-                                );
+                                println!("  ^- IDENTICAL");
                                 let d = TextRange::from_treesitter_range(
                                     destination_node.range(),
                                     &destination_columns,
@@ -137,6 +131,7 @@ fn ranges(
                             }
                         }
                         ASTMappingOperation::DeleteWithChildren => {
+                            println!("  ^- TREE DELETION",);
                             // We are adding to the "end" of the last used range, so move it to the
                             // right limit.
                             last_non_move_range = last_non_move_range.right_limit();
@@ -152,13 +147,80 @@ fn ranges(
 
                             descend = false;
                         }
+                        ASTMappingOperation::InsertWithChildren => {
+                            println!("  ^- TREE INSERTION",);
+                            // We are adding to the "end" of the last used range, so move it to the
+                            // right limit.
+                            last_non_move_range = last_non_move_range.right_limit();
+
+                            new_range = Some(RangeMatch {
+                                source: TextRange::from_treesitter_range(
+                                    node.range(),
+                                    &source_columns,
+                                ),
+                                destination: last_non_move_range.clone(),
+                                operation: TextOperation::Insert,
+                            });
+
+                            descend = false;
+                        }
+                        ASTMappingOperation::Delete => {
+                            if node.child_count() == 0 {
+                                println!("  ^- LEAF NODE DELETION",);
+                                last_non_move_range = last_non_move_range.right_limit();
+
+                                new_range = Some(RangeMatch {
+                                    source: TextRange::from_treesitter_range(
+                                        node.range(),
+                                        &source_columns,
+                                    ),
+                                    destination: last_non_move_range.clone(),
+                                    operation: TextOperation::Delete,
+                                });
+                            }
+                        }
+                        ASTMappingOperation::Insert => {
+                            if node.child_count() == 0 {
+                                println!("  ^- LEAF NODE INSERTION",);
+                                last_non_move_range = last_non_move_range.right_limit();
+
+                                new_range = Some(RangeMatch {
+                                    source: TextRange::from_treesitter_range(
+                                        node.range(),
+                                        &source_columns,
+                                    ),
+                                    destination: last_non_move_range.clone(),
+                                    operation: TextOperation::Insert,
+                                });
+                            }
+                        }
+                        ASTMappingOperation::Update => {
+                            println!("  ^- UPDATE",);
+                            // We are adding to the "end" of the last used range, so move it to the
+                            // right limit.
+                            last_non_move_range = last_non_move_range.right_limit();
+
+                            new_range = Some(RangeMatch {
+                                source: TextRange::from_treesitter_range(
+                                    node.range(),
+                                    &source_columns,
+                                ),
+                                destination: last_non_move_range.clone(),
+                                operation: TextOperation::Update,
+                            });
+                        }
                         _ => {
                             // For other operations, just allow the descent into the tree
+                            println!("  ^ No idea what {:?} is", mapping.operation);
                         }
                     }
 
                     if let Some(new_range) = new_range {
-                        if new_range.extends(&current_range) {
+                        if new_range.extends(
+                            &current_range,
+                            &source.contents,
+                            &destination.contents,
+                        ) {
                             println!("  |- Range merge");
                             current_range.extend_into(&new_range);
                         } else {
@@ -175,9 +237,11 @@ fn ranges(
                     }
                 }
 
+                // Reverse order to ensure the stack is in tree pre-order.
                 let mut child_cursor = node.walk();
-                for child in node.children(&mut child_cursor) {
-                    stack.push_back(child);
+                let children: Vec<_> = node.children(&mut child_cursor).collect();
+                for child in children.into_iter().rev() {
+                    stack.push(child);
                 }
             }
 
@@ -190,15 +254,55 @@ fn ranges(
     ranges
 }
 
+/// Take the destination range, and merge it into the source range to recover insertions/deletions.
+///
+/// Inserted node in the destination are invisible in the source AST. This function restores their
+/// ranges and makes the range vectors symetric.
+fn merge_ranges(
+    source_ranges: &[RangeMatch],
+    destination_ranges: &[RangeMatch],
+) -> Vec<RangeMatch> {
+    let mut result = Vec::new();
+
+    let mut i = 0;
+    let mut j = 0;
+
+    while i < source_ranges.len() {
+        while j < destination_ranges.len()
+            && destination_ranges[j].operation == TextOperation::Insert
+        {
+            result.push(RangeMatch {
+                source: destination_ranges[j].destination.clone(),
+                destination: destination_ranges[j].source.clone(),
+                operation: TextOperation::Delete,
+            });
+            j += 1;
+        }
+
+        result.push(source_ranges[i].clone());
+
+        i += 1;
+        j += 1;
+    }
+
+    result
+}
+
 impl TextDiff {
     /// Construct the TextDiff from an ASTDiff.
     ///
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
+        let before_ranges_plain = ranges(before, after, diff, node_cache);
+        let after_ranges_plain = ranges(after, before, diff, node_cache);
+
+        let before_ranges = merge_ranges(&before_ranges_plain, &after_ranges_plain);
+        let after_ranges = merge_ranges(&after_ranges_plain, &before_ranges_plain);
+
         Self {
-            before_ranges: ranges(before, after, diff, node_cache),
-            after_ranges: ranges(after, before, diff, node_cache),
+            before_ranges,
+            after_ranges,
         }
     }
 
@@ -251,11 +355,15 @@ impl RangeMatch {
             && self.operation == TextOperation::NotYetSet
     }
 
-    pub fn extends(&self, other: &RangeMatch) -> bool {
+    pub fn extends(&self, other: &RangeMatch, source_code: &str, dest_code: &str) -> bool {
         if self.operation != other.operation {
             return false;
         }
-        self.source.extends(&other.source) && self.destination.extends(&other.destination)
+        self.source
+            .can_extend_with_whitespace(&other.source, source_code)
+            && self
+                .destination
+                .can_extend_with_whitespace(&other.destination, dest_code)
     }
 
     pub fn extend_into(&mut self, other: &RangeMatch) {
@@ -304,30 +412,86 @@ mod tests {
         let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
-        assert_eq!(before_ranges.len(), 1);
+        assert_eq!(before_ranges.len(), 1, "Wrong number of before ranges");
 
         let after_ranges = text_diff.all(1);
-        assert_eq!(after_ranges.len(), 1);
+        assert_eq!(after_ranges.len(), 1, "Wrong number of after ranges");
 
-        assert_eq!(before_ranges[0].operation, TextOperation::Identical);
-        assert_eq!(before_ranges[0].source.start_row, 0);
-        assert_eq!(before_ranges[0].source.start_column, 0);
-        assert_eq!(before_ranges[0].source.end_row, 50);
-        assert_eq!(before_ranges[0].source.end_column, 0);
-        assert_eq!(before_ranges[0].destination.start_row, 0);
-        assert_eq!(before_ranges[0].destination.start_column, 0);
-        assert_eq!(before_ranges[0].destination.end_row, 50);
-        assert_eq!(before_ranges[0].destination.end_column, 0);
+        assert_eq!(
+            before_ranges[0].operation,
+            TextOperation::Identical,
+            "The identical part has wrong operation"
+        );
+        assert_eq!(
+            before_ranges[0].source.start_row, 0,
+            "The identical part has wrong source start row"
+        );
+        assert_eq!(
+            before_ranges[0].source.start_column, 0,
+            "The identical part has wrong source start column"
+        );
+        assert_eq!(
+            before_ranges[0].source.end_row, 49,
+            "The identical part has wrong source end row"
+        );
+        assert_eq!(
+            before_ranges[0].source.end_column, 0,
+            "The identical part has wrong source end column"
+        );
+        assert_eq!(
+            before_ranges[0].destination.start_row, 0,
+            "The identical part has wrong destination start row"
+        );
+        assert_eq!(
+            before_ranges[0].destination.start_column, 0,
+            "The identical part has wrong destination start column"
+        );
+        assert_eq!(
+            before_ranges[0].destination.end_row, 49,
+            "The identical part has wrong destination end row"
+        );
+        assert_eq!(
+            before_ranges[0].destination.end_column, 0,
+            "The identical part has wrong destination end column"
+        );
 
-        assert_eq!(after_ranges[0].operation, TextOperation::Identical);
-        assert_eq!(after_ranges[0].source.start_row, 0);
-        assert_eq!(after_ranges[0].source.start_column, 0);
-        assert_eq!(after_ranges[0].source.end_row, 50);
-        assert_eq!(after_ranges[0].source.end_column, 0);
-        assert_eq!(after_ranges[0].destination.start_row, 0);
-        assert_eq!(after_ranges[0].destination.start_column, 0);
-        assert_eq!(after_ranges[0].destination.end_row, 50);
-        assert_eq!(after_ranges[0].destination.end_column, 0);
+        assert_eq!(
+            after_ranges[0].operation,
+            TextOperation::Identical,
+            "When looking from after to before: The identical part has wrong operation"
+        );
+        assert_eq!(
+            after_ranges[0].source.start_row, 0,
+            "When looking from after to before: The identical part has wrong source start row"
+        );
+        assert_eq!(
+            after_ranges[0].source.start_column, 0,
+            "When looking from after to before: The identical part has wrong source start column"
+        );
+        assert_eq!(
+            after_ranges[0].source.end_row, 49,
+            "When looking from after to before: The identical part has wrong source end row"
+        );
+        assert_eq!(
+            after_ranges[0].source.end_column, 0,
+            "When looking from after to before: The identical part has wrong source end column"
+        );
+        assert_eq!(
+            after_ranges[0].destination.start_row, 0,
+            "When looking from after to before: The identical part has wrong destination start row"
+        );
+        assert_eq!(
+            after_ranges[0].destination.start_column, 0,
+            "When looking from after to before: The identical part has wrong destination start column"
+        );
+        assert_eq!(
+            after_ranges[0].destination.end_row, 49,
+            "When looking from after to before: The identical part has wrong destination end row"
+        );
+        assert_eq!(
+            after_ranges[0].destination.end_column, 0,
+            "When looking from after to before: The identical part has wrong destination end column"
+        );
 
         Ok(())
     }
@@ -342,9 +506,6 @@ mod tests {
         let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
-        for range in before_ranges.iter() {
-            println!("{:?}", range);
-        }
         assert_eq!(before_ranges.len(), 3, "Wrong number of before ranges");
 
         assert_eq!(
@@ -568,7 +729,7 @@ mod tests {
             "When looking from after to before: The final identical part has wrong source end column"
         );
         assert_eq!(
-            after_ranges[2].destination.start_row, 3,
+            after_ranges[2].destination.start_row, 2,
             "When looking from after to before: The final identical part has wrong destination start row"
         );
         assert_eq!(

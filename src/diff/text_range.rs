@@ -107,12 +107,20 @@ impl TextRange {
     ///
     /// * `ts_range` - The TreeSitter Range to convert
     /// * `columns_per_row` - A slice where each element represents the number of columns in that row (not used currently, kept for API compatibility)
-    pub fn from_treesitter_range(ts_range: Range, _columns_per_row: &[usize]) -> Self {
+    pub fn from_treesitter_range(ts_range: Range, columns_per_row: &[usize]) -> Self {
+        let mut end_row = ts_range.end_point.row;
+        let mut end_column = ts_range.end_point.column;
+
+        if end_row < columns_per_row.len() && columns_per_row[end_row] == end_column {
+            end_row += 1;
+            end_column = 0;
+        }
+
         Self {
             start_row: ts_range.start_point.row,
             start_column: ts_range.start_point.column,
-            end_row: ts_range.end_point.row,
-            end_column: ts_range.end_point.column,
+            end_row,
+            end_column,
         }
     }
 
@@ -144,6 +152,93 @@ impl TextRange {
         self.end_row = other.end_row;
         self.end_column = other.end_column;
     }
+
+    /// Check if this range can extend the other range, allowing for whitespace-only gaps.
+    ///
+    /// Returns true if the ranges touch exactly (see `extends`) OR if all text between
+    /// the end of this range and the start of the other range consists of whitespace characters.
+    pub fn can_extend_with_whitespace(&self, other: &TextRange, code: &str) -> bool {
+        is_whitespace_between(self, other, code)
+    }
+}
+
+/// Helper function to check if all characters between the end of range `a` and start of range `b` are whitespace.
+/// Returns true if the ranges touch exactly (a.end == b.start or b.end == a.start),
+/// or if there is a gap containing only whitespace.
+/// Returns false if the ranges overlap or are in the wrong order for extension.
+fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
+    // Check if a extends b exactly (a.end touches b.start)
+    if a.extends(b) {
+        return true;
+    }
+
+    // Check if b extends a exactly (b.end touches a.start)
+    if b.extends(a) {
+        return true;
+    }
+
+    // Determine which range comes first
+    // a comes before b if a.end < b.start (in row-major order)
+    let a_end_pos = (a.end_row, a.end_column);
+    let b_start_pos = (b.start_row, b.start_column);
+    let b_end_pos = (b.end_row, b.end_column);
+    let a_start_pos = (a.start_row, a.start_column);
+
+    let (first, second) = if a_end_pos <= b_start_pos {
+        // a ends at or before b starts, so a comes first
+        (a, b)
+    } else if b_end_pos <= a_start_pos {
+        // b ends at or before a starts, so b comes first
+        (b, a)
+    } else {
+        // Ranges overlap or are otherwise incomparable - cannot extend
+        return false;
+    };
+
+    // Convert positions to character indices
+    let first_end_idx = row_col_to_char_index(first.end_row, first.end_column, code);
+    let second_start_idx = row_col_to_char_index(second.start_row, second.start_column, code);
+
+    if first_end_idx >= second_start_idx {
+        // No gap or overlapping
+        return true;
+    }
+
+    // Extract the gap text and check if all characters are whitespace
+    let gap_text = &code[first_end_idx..second_start_idx];
+    gap_text.chars().all(|c| c.is_whitespace())
+}
+
+/// Convert a (row, column) position to a character index in the code string.
+/// This counts characters (not bytes) from the start of the string.
+fn row_col_to_char_index(row: usize, col: usize, code: &str) -> usize {
+    let mut current_row = 0;
+    let mut current_col = 0;
+    let mut char_index = 0;
+
+    for ch in code.chars() {
+        // Check if we've reached the target position
+        if current_row == row && current_col == col {
+            return char_index;
+        }
+
+        if ch == '\n' {
+            current_row += 1;
+            current_col = 0;
+        } else {
+            current_col += 1;
+        }
+
+        char_index += 1;
+    }
+
+    // If we reach the end of the string, check if the position is at the end
+    if current_row == row && current_col <= col {
+        return char_index;
+    }
+
+    // Position is beyond the string - return the string length
+    char_index
 }
 
 #[cfg(test)]
@@ -235,7 +330,6 @@ mod tests {
     // Tests for TextRange::from_treesitter_range()
     #[test]
     fn from_treesitter_range_end_at_line_end() {
-        // TreeSitter ranges are already right-open, so no adjustment needed
         use tree_sitter::Point;
         use tree_sitter::Range;
 
@@ -250,8 +344,8 @@ mod tests {
         let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
-        assert_eq!(result.end_row, 0);
-        assert_eq!(result.end_column, 5);
+        assert_eq!(result.end_row, 1);
+        assert_eq!(result.end_column, 0);
     }
 
     #[test]
@@ -298,7 +392,6 @@ mod tests {
 
     #[test]
     fn from_treesitter_range_end_at_last_line_end() {
-        // Test when end is at the last column of the last line
         use tree_sitter::Point;
         use tree_sitter::Range;
 
@@ -313,8 +406,8 @@ mod tests {
         let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
         assert_eq!(result.start_row, 0);
         assert_eq!(result.start_column, 0);
-        assert_eq!(result.end_row, 1);
-        assert_eq!(result.end_column, 5);
+        assert_eq!(result.end_row, 2);
+        assert_eq!(result.end_column, 0);
     }
 
     #[test]
@@ -378,5 +471,60 @@ mod tests {
         assert_eq!(result.start_column, 0);
         assert_eq!(result.end_row, 2);
         assert_eq!(result.end_column, 3);
+    }
+
+    // Tests for TextRange::can_extend_with_whitespace()
+    #[test]
+    fn text_range_can_extend_exact_touch() {
+        let a = TextRange::new(0, 0, 1, 0);
+        let b = TextRange::new(1, 0, 2, 0);
+        let code = "line1\nline2\nline3";
+
+        assert!(a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn text_range_can_extend_with_whitespace_only() {
+        let a = TextRange::new(0, 0, 1, 0);
+        let b = TextRange::new(1, 0, 2, 0);
+        let code = "line1\n   \nline3"; // Two newlines with spaces in between
+
+        assert!(a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn text_range_cannot_extend_with_non_whitespace() {
+        let a = TextRange::new(0, 0, 0, 5);
+        let b = TextRange::new(0, 7, 0, 10);
+        let code = "helloXworld"; // Non-whitespace between
+
+        assert!(!a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn text_range_can_extend_same_line_with_spaces() {
+        let a = TextRange::new(0, 0, 0, 5);
+        let b = TextRange::new(0, 7, 0, 10);
+        let code = "hello   world"; // spaces between
+
+        assert!(a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn text_range_cannot_extend_same_line_with_text() {
+        let a = TextRange::new(0, 0, 0, 5);
+        let b = TextRange::new(0, 7, 0, 10);
+        let code = "helloXworld"; // 'X' is non-whitespace between
+
+        assert!(!a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn text_range_cannot_extend_multi_line_with_non_whitespace() {
+        let a = TextRange::new(0, 0, 1, 0);
+        let b = TextRange::new(2, 0, 3, 0);
+        let code = "line1\ntext\nline3"; // Non-whitespace line between
+
+        assert!(!a.can_extend_with_whitespace(&b, code));
     }
 }

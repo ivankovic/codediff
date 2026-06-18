@@ -38,7 +38,7 @@ use crate::diff::semantic_structure_nodes;
 pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
     let mut result = Vec::new();
     let mut start = 0;
-    
+
     for (idx, ch) in contents.char_indices() {
         if ch == '\n' {
             // Count characters from start to this newline
@@ -47,7 +47,7 @@ pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
             start = idx + 1;
         }
     }
-    
+
     // Handle the last line (which may not end with a newline)
     if start < contents.len() {
         let count = contents[start..].chars().count();
@@ -56,7 +56,7 @@ pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
         // Handle empty string case
         result.push(0);
     }
-    
+
     result
 }
 
