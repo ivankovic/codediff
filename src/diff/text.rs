@@ -300,6 +300,15 @@ impl TextDiff {
         let before_ranges = merge_ranges(&before_ranges_plain, &after_ranges_plain);
         let after_ranges = merge_ranges(&after_ranges_plain, &before_ranges_plain);
 
+        println!("BEFORE RANGES:");
+        for range in before_ranges.iter() {
+            println!("{:?}", range);
+        }
+        println!("AFTER RANGES:");
+        for range in after_ranges.iter() {
+            println!("{:?}", range);
+        }
+
         Self {
             before_ranges,
             after_ranges,
