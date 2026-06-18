@@ -70,6 +70,20 @@ impl TextRange {
         }
     }
 
+    /// Returns a new empty range that starts and ends exactly at the right-open limit of the
+    /// current range.
+    ///
+    /// Useful when you want to add a "non existing" thing like a delete to the end of the current
+    /// range.
+    pub fn right_limit(&self) -> Self {
+        Self {
+            start_row: self.end_row,
+            start_column: self.end_column,
+            end_row: self.end_row,
+            end_column: self.end_column,
+        }
+    }
+
     /// Creats a "zero" range. An empty range starting at (0,0) and ending at (0, 0).
     pub fn zero() -> Self {
         Self {
@@ -80,13 +94,46 @@ impl TextRange {
         }
     }
 
+    /// Returns true if the range is a zero range.
+    pub fn is_zero(&self) -> bool {
+        self.start_row == 0 && self.start_column == 0 && self.end_row == 0 && self.end_column == 0
+    }
+
     /// Create a new TextRange from a TreeSitter Range.
-    pub fn from_treesitter_range(ts_range: Range) -> Self {
+    ///
+    /// This method adjusts the end position to follow the TextRange convention:
+    /// - If the end_row is within the columns_per_row array and end_column equals the last column of that row, it moves to (row+1, 0)
+    /// - Otherwise, it increments the column by 1
+    ///
+    /// # Arguments
+    ///
+    /// * `ts_range` - The TreeSitter Range to convert
+    /// * `columns_per_row` - A slice where each element represents the number of columns in that row
+    pub fn from_treesitter_range(ts_range: Range, columns_per_row: &[usize]) -> Self {
+        let start_row = ts_range.start_point.row;
+        let start_column = ts_range.start_point.column;
+
+        let end_row = ts_range.end_point.row;
+        let end_column = ts_range.end_point.column;
+
+        // Adjust the end position
+        let (adjusted_end_row, adjusted_end_column) =
+            if end_row < columns_per_row.len() && end_column == columns_per_row[end_row] {
+                // If end_column is exactly at the end of the row, move to next row, column 0
+                (end_row + 1, 0)
+            } else if end_row >= columns_per_row.len() && end_column == 0 {
+                // If we're past the end of known rows and at column 0, move to next row
+                (end_row + 1, 0)
+            } else {
+                // Otherwise, increment the column
+                (end_row, end_column + 1)
+            };
+
         Self {
-            start_row: ts_range.start_point.row,
-            start_column: ts_range.start_point.column,
-            end_row: ts_range.end_point.row,
-            end_column: ts_range.end_point.column,
+            start_row,
+            start_column,
+            end_row: adjusted_end_row,
+            end_column: adjusted_end_column,
         }
     }
 
@@ -103,6 +150,20 @@ impl TextRange {
         // Special case: both are empty ranges at the same point
         (self_start == self_end && other_start == other_end && self_start == other_start)
             || (self_start < other_end && other_start < self_end)
+    }
+
+    /// Check if this range exactly extends the other range.
+    ///
+    /// A range exactly extends another range if the end of one is exactly the start of the other.
+    /// I.e., if they do NOT intersect but there are no elements between the two.
+    pub fn extends(&self, other: &TextRange) -> bool {
+        self.start_row == other.end_row && self.start_column == other.end_column
+    }
+
+    /// Extend the end to match the end of the other range.
+    pub fn extend_to_end(&mut self, other: &TextRange) {
+        self.end_row = other.end_row;
+        self.end_column = other.end_column;
     }
 }
 
@@ -190,5 +251,153 @@ mod tests {
         let b = TextRange::new(1, 0, 3, 0);
         assert!(a.intersects(&b));
         assert!(b.intersects(&a));
+    }
+
+    // Tests for TextRange::from_treesitter_range()
+    #[test]
+    fn from_treesitter_range_end_at_line_end() {
+        // When end_column equals the last column of the row, move to next row, column 0
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 0, column: 5 }, // End at column 5 (last column of row 0)
+            start_byte: 0,
+            end_byte: 5,
+        };
+        let columns_per_row = vec![5]; // Row 0 has 5 columns
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 1);
+        assert_eq!(result.end_column, 0);
+    }
+
+    #[test]
+    fn from_treesitter_range_end_not_at_line_end() {
+        // When end_column is NOT at the last column, increment column
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 0, column: 3 }, // End at column 3 (not last column)
+            start_byte: 0,
+            end_byte: 3,
+        };
+        let columns_per_row = vec![5]; // Row 0 has 5 columns
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 0);
+        assert_eq!(result.end_column, 4); // 3 + 1
+    }
+
+    #[test]
+    fn from_treesitter_range_multiline() {
+        // Test with multiple lines
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 1, column: 3 }, // End at row 1, column 3
+            start_byte: 0,
+            end_byte: 7,
+        };
+        let columns_per_row = vec![5, 5]; // Both rows have 5 columns
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 1);
+        assert_eq!(result.end_column, 4); // 3 + 1
+    }
+
+    #[test]
+    fn from_treesitter_range_end_at_last_line_end() {
+        // Test when end is at the last column of the last line
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 1, column: 5 }, // End at last column of row 1
+            start_byte: 0,
+            end_byte: 11,
+        };
+        let columns_per_row = vec![5, 5];
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 2); // row + 1
+        assert_eq!(result.end_column, 0);
+    }
+
+    #[test]
+    fn from_treesitter_range_empty_range() {
+        // Test with an empty range (start == end)
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 2 },
+            end_point: Point { row: 0, column: 2 },
+            start_byte: 2,
+            end_byte: 2,
+        };
+        let columns_per_row = vec![5];
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 2);
+        assert_eq!(result.end_row, 0);
+        assert_eq!(result.end_column, 3); // 2 + 1
+    }
+
+    #[test]
+    fn from_treesitter_range_end_row_beyond_columns() {
+        // Test when end_row is beyond the columns_per_row array with end_column = 0
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 2, column: 0 }, // Row 2 doesn't exist in columns_per_row
+            start_byte: 0,
+            end_byte: 0,
+        };
+        let columns_per_row = vec![5, 5];
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 3); // row + 1 because end_row >= len and end_column == 0
+        assert_eq!(result.end_column, 0);
+    }
+
+    #[test]
+    fn from_treesitter_range_end_row_beyond_columns_nonzero_column() {
+        // Test when end_row is beyond the columns_per_row array with end_column != 0
+        use tree_sitter::Point;
+        use tree_sitter::Range;
+
+        let ts_range = Range {
+            start_point: Point { row: 0, column: 0 },
+            end_point: Point { row: 2, column: 3 }, // Row 2 doesn't exist in columns_per_row
+            start_byte: 0,
+            end_byte: 0,
+        };
+        let columns_per_row = vec![5, 5];
+
+        let result = TextRange::from_treesitter_range(ts_range, &columns_per_row);
+        assert_eq!(result.start_row, 0);
+        assert_eq!(result.start_column, 0);
+        assert_eq!(result.end_row, 2);
+        assert_eq!(result.end_column, 4); // column + 1
     }
 }

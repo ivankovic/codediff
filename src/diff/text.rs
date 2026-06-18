@@ -15,9 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use std::collections::VecDeque;
 
 use crate::{
-    code::Code,
+    code::{Code, metadata::compute_columns_per_row},
     diff::{ASTDiff, ASTMappingOperation, NodeCache, text_range::TextRange},
 };
 
@@ -55,7 +56,12 @@ fn ranges(
     diff: &ASTDiff,
     node_cache: &NodeCache,
 ) -> Vec<RangeMatch> {
+    println!("**************************************************************");
     let mut ranges = Vec::new();
+
+    // Compute columns per row for source and destination
+    let source_columns = compute_columns_per_row(&source.contents);
+    let destination_columns = compute_columns_per_row(&destination.contents);
 
     match (&source.ast, &destination.ast) {
         (None, None) => {
@@ -64,7 +70,8 @@ fn ranges(
         }
         (Some(source_tree), None) => {
             let source_root = source_tree.root_node();
-            let source_range = TextRange::from_treesitter_range(source_root.range());
+            let source_range =
+                TextRange::from_treesitter_range(source_root.range(), &source_columns);
 
             ranges.push(RangeMatch {
                 source: source_range.clone(),
@@ -74,7 +81,8 @@ fn ranges(
         }
         (None, Some(destination_tree)) => {
             let destination_root = destination_tree.root_node();
-            let destination_range = TextRange::from_treesitter_range(destination_root.range());
+            let destination_range =
+                TextRange::from_treesitter_range(destination_root.range(), &destination_columns);
 
             ranges.push(RangeMatch {
                 source: TextRange::zero(),
@@ -82,41 +90,99 @@ fn ranges(
                 operation: TextOperation::Insert,
             });
         }
-        (Some(source_tree), Some(_)) => {
+        (Some(source_tree), Some(_destination_tree)) => {
             let root_node = source_tree.root_node();
 
             // We perform a pre-order traversal of the source tree and look for nodes with known
             // TextRanges.
-            let mut stack = Vec::new();
-            stack.push(root_node);
+            let mut stack = VecDeque::new();
+            stack.push_back(root_node);
 
-            while let Some(node) = stack.pop() {
+            let mut last_non_move_range = TextRange::zero();
+
+            let mut current_range = RangeMatch::zero();
+
+            while let Some(node) = stack.pop_front() {
+                println!("Nodus: {} {:?}", node.kind(), node.range());
+
                 if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
+                    let mut new_range = None;
+                    let mut descend = true;
+
                     match mapping.operation {
                         ASTMappingOperation::Identical => {
                             if let Some(destination_node) = node_cache.get_in_any(&mapped_id) {
-                                ranges.push(RangeMatch {
-                                    source: TextRange::from_treesitter_range(node.range()),
-                                    destination: TextRange::from_treesitter_range(
-                                        destination_node.range(),
+                                println!(
+                                    "  ^- IDENTICAL to {} {:?}",
+                                    destination_node.kind(),
+                                    destination_node.range()
+                                );
+                                let d = TextRange::from_treesitter_range(
+                                    destination_node.range(),
+                                    &destination_columns,
+                                );
+
+                                last_non_move_range = d.clone();
+
+                                new_range = Some(RangeMatch {
+                                    source: TextRange::from_treesitter_range(
+                                        node.range(),
+                                        &source_columns,
                                     ),
+                                    destination: d,
                                     operation: TextOperation::Identical,
                                 });
 
-                                // Don't descend
-                                continue;
+                                descend = false;
                             }
+                        }
+                        ASTMappingOperation::DeleteWithChildren => {
+                            // We are adding to the "end" of the last used range, so move it to the
+                            // right limit.
+                            last_non_move_range = last_non_move_range.right_limit();
+
+                            new_range = Some(RangeMatch {
+                                source: TextRange::from_treesitter_range(
+                                    node.range(),
+                                    &source_columns,
+                                ),
+                                destination: last_non_move_range.clone(),
+                                operation: TextOperation::Delete,
+                            });
+
+                            descend = false;
                         }
                         _ => {
                             // For other operations, just allow the descent into the tree
+                        }
+                    }
+
+                    if let Some(new_range) = new_range {
+                        if new_range.extends(&current_range) {
+                            println!("  |- Range merge");
+                            current_range.extend_into(&new_range);
+                        } else {
+                            if !current_range.is_zero() {
+                                println!("  |- Range pushed: {:?}", current_range);
+                                ranges.push(current_range);
+                            }
+                            current_range = new_range;
+                        }
+
+                        if !descend {
+                            continue;
                         }
                     }
                 }
 
                 let mut child_cursor = node.walk();
                 for child in node.children(&mut child_cursor) {
-                    stack.push(child);
+                    stack.push_back(child);
                 }
+            }
+
+            if !current_range.is_zero() {
+                ranges.push(current_range);
             }
         }
     }
@@ -168,6 +234,34 @@ pub struct RangeMatch {
     pub source: TextRange,
     pub destination: TextRange,
     pub operation: TextOperation,
+}
+
+impl RangeMatch {
+    pub fn zero() -> Self {
+        RangeMatch {
+            source: TextRange::zero(),
+            destination: TextRange::zero(),
+            operation: TextOperation::NotYetSet,
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.source.is_zero()
+            && self.destination.is_zero()
+            && self.operation == TextOperation::NotYetSet
+    }
+
+    pub fn extends(&self, other: &RangeMatch) -> bool {
+        if self.operation != other.operation {
+            return false;
+        }
+        self.source.extends(&other.source) && self.destination.extends(&other.destination)
+    }
+
+    pub fn extend_into(&mut self, other: &RangeMatch) {
+        self.source.extend_to_end(&other.source);
+        self.destination.extend_to_end(&other.destination);
+    }
 }
 
 /**
@@ -239,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn hellow_world_added_message_all_ranges() -> Result<()> {
+    fn hello_world_added_message_all_ranges() -> Result<()> {
         let code_pairs = test::helper::handmade_test_code_pairs()?;
         let (before, after) = code_pairs.get("hello-world-added-message").unwrap().clone();
         let node_cache = NodeCache::build(&before, &after);
@@ -248,72 +342,247 @@ mod tests {
         let text_diff = TextDiff::from(&before, &after, &diff.ast.unwrap(), &node_cache);
 
         let before_ranges = text_diff.all(0);
-        assert_eq!(before_ranges.len(), 3);
+        for range in before_ranges.iter() {
+            println!("{:?}", range);
+        }
+        assert_eq!(before_ranges.len(), 3, "Wrong number of before ranges");
 
-        assert_eq!(before_ranges[0].operation, TextOperation::Identical);
-        assert_eq!(before_ranges[0].source.start_row, 0);
-        assert_eq!(before_ranges[0].source.start_column, 0);
-        assert_eq!(before_ranges[0].source.end_row, 2);
-        assert_eq!(before_ranges[0].source.end_column, 0);
-        assert_eq!(before_ranges[0].destination.start_row, 0);
-        assert_eq!(before_ranges[0].destination.start_column, 0);
-        assert_eq!(before_ranges[0].destination.end_row, 2);
-        assert_eq!(before_ranges[0].destination.end_column, 0);
+        assert_eq!(
+            before_ranges[0].operation,
+            TextOperation::Identical,
+            "The initial identical part has wrong operation"
+        );
+        assert_eq!(
+            before_ranges[0].source.start_row, 0,
+            "The initial identical part has wrong source start row"
+        );
+        assert_eq!(
+            before_ranges[0].source.start_column, 0,
+            "The initial identical part has wrong source start column"
+        );
+        assert_eq!(
+            before_ranges[0].source.end_row, 2,
+            "The initial identical part has wrong source end row"
+        );
+        assert_eq!(
+            before_ranges[0].source.end_column, 0,
+            "The initial identical part has wrong source end column"
+        );
+        assert_eq!(
+            before_ranges[0].destination.start_row, 0,
+            "The initial identical part has wrong destination start row"
+        );
+        assert_eq!(
+            before_ranges[0].destination.start_column, 0,
+            "The initial identical part has wrong destination start column"
+        );
+        assert_eq!(
+            before_ranges[0].destination.end_row, 2,
+            "The initial identical part has wrong destination end row"
+        );
+        assert_eq!(
+            before_ranges[0].destination.end_column, 0,
+            "The initial identical part has wrong destination end column"
+        );
 
-        assert_eq!(before_ranges[1].operation, TextOperation::Delete);
-        assert_eq!(before_ranges[1].source.start_row, 2);
-        assert_eq!(before_ranges[1].source.start_column, 0);
-        assert_eq!(before_ranges[1].source.end_row, 2);
-        assert_eq!(before_ranges[1].source.end_column, 0);
+        assert_eq!(
+            before_ranges[1].operation,
+            TextOperation::Delete,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong operation"
+        );
+        assert_eq!(
+            before_ranges[1].source.start_row, 2,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong source start row"
+        );
+        assert_eq!(
+            before_ranges[1].source.start_column, 0,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong source start column"
+        );
+        assert_eq!(
+            before_ranges[1].source.end_row, 2,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong source end row"
+        );
+        assert_eq!(
+            before_ranges[1].source.end_column, 0,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong source end column"
+        );
         // Note that because we ignore whitespace, the [(2, 0), (2, 2)> range is simply missing from
         // the result.
-        assert_eq!(before_ranges[1].destination.start_row, 2);
-        assert_eq!(before_ranges[1].destination.start_column, 2);
-        assert_eq!(before_ranges[1].destination.end_row, 3);
-        assert_eq!(before_ranges[1].destination.end_column, 0);
+        assert_eq!(
+            before_ranges[1].destination.start_row, 2,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong destination start row"
+        );
+        assert_eq!(
+            before_ranges[1].destination.start_column, 2,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong destination start column"
+        );
+        assert_eq!(
+            before_ranges[1].destination.end_row, 3,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong destination end row"
+        );
+        assert_eq!(
+            before_ranges[1].destination.end_column, 0,
+            "The virtual delete, that marks the 'insert' on the after side, has wrong destination end column"
+        );
 
-        assert_eq!(before_ranges[2].operation, TextOperation::Identical);
-        assert_eq!(before_ranges[2].source.start_row, 2);
-        assert_eq!(before_ranges[2].source.start_column, 0);
-        assert_eq!(before_ranges[2].source.end_row, 3);
-        assert_eq!(before_ranges[2].source.end_column, 0);
-        assert_eq!(before_ranges[2].destination.start_row, 3);
-        assert_eq!(before_ranges[2].destination.start_column, 0);
-        assert_eq!(before_ranges[2].destination.end_row, 4);
-        assert_eq!(before_ranges[2].destination.end_column, 0);
+        assert_eq!(
+            before_ranges[2].operation,
+            TextOperation::Identical,
+            "The final identical part has wrong operation"
+        );
+        assert_eq!(
+            before_ranges[2].source.start_row, 2,
+            "The final identical part has wrong source start row"
+        );
+        assert_eq!(
+            before_ranges[2].source.start_column, 0,
+            "The final identical part has wrong source start column"
+        );
+        assert_eq!(
+            before_ranges[2].source.end_row, 3,
+            "The final identical part has wrong source end row"
+        );
+        assert_eq!(
+            before_ranges[2].source.end_column, 0,
+            "The final identical part has wrong source end column"
+        );
+        assert_eq!(
+            before_ranges[2].destination.start_row, 3,
+            "The final identical part has wrong destination start row"
+        );
+        assert_eq!(
+            before_ranges[2].destination.start_column, 0,
+            "The final identical part has wrong destination start column"
+        );
+        assert_eq!(
+            before_ranges[2].destination.end_row, 4,
+            "The final identical part has wrong destination end row"
+        );
+        assert_eq!(
+            before_ranges[2].destination.end_column, 0,
+            "The final identical part has wrong destination end column"
+        );
 
         let after_ranges = text_diff.all(1);
-        assert_eq!(after_ranges.len(), 3);
+        assert_eq!(
+            after_ranges.len(),
+            3,
+            "When looking from after to before: Wrong number of after ranges"
+        );
 
-        assert_eq!(after_ranges[0].operation, TextOperation::Identical);
-        assert_eq!(after_ranges[0].source.start_row, 0);
-        assert_eq!(after_ranges[0].source.start_column, 0);
-        assert_eq!(after_ranges[0].source.end_row, 2);
-        assert_eq!(after_ranges[0].source.end_column, 0);
-        assert_eq!(after_ranges[0].destination.start_row, 0);
-        assert_eq!(after_ranges[0].destination.start_column, 0);
-        assert_eq!(after_ranges[0].destination.end_row, 2);
-        assert_eq!(after_ranges[0].destination.end_column, 0);
+        assert_eq!(
+            after_ranges[0].operation,
+            TextOperation::Identical,
+            "When looking from after to before: The initial identical part has wrong operation"
+        );
+        assert_eq!(
+            after_ranges[0].source.start_row, 0,
+            "When looking from after to before: The initial identical part has wrong source start row"
+        );
+        assert_eq!(
+            after_ranges[0].source.start_column, 0,
+            "When looking from after to before: The initial identical part has wrong source start column"
+        );
+        assert_eq!(
+            after_ranges[0].source.end_row, 2,
+            "When looking from after to before: The initial identical part has wrong source end row"
+        );
+        assert_eq!(
+            after_ranges[0].source.end_column, 0,
+            "When looking from after to before: The initial identical part has wrong source end column"
+        );
+        assert_eq!(
+            after_ranges[0].destination.start_row, 0,
+            "When looking from after to before: The initial identical part has wrong destination start row"
+        );
+        assert_eq!(
+            after_ranges[0].destination.start_column, 0,
+            "When looking from after to before: The initial identical part has wrong destination start column"
+        );
+        assert_eq!(
+            after_ranges[0].destination.end_row, 2,
+            "When looking from after to before: The initial identical part has wrong destination end row"
+        );
+        assert_eq!(
+            after_ranges[0].destination.end_column, 0,
+            "When looking from after to before: The initial identical part has wrong destination end column"
+        );
 
-        assert_eq!(after_ranges[1].operation, TextOperation::Insert);
-        assert_eq!(after_ranges[1].source.start_row, 2);
-        assert_eq!(after_ranges[1].source.start_column, 2);
-        assert_eq!(after_ranges[1].source.end_row, 3);
-        assert_eq!(after_ranges[1].source.end_column, 0);
-        assert_eq!(after_ranges[1].destination.start_row, 2);
-        assert_eq!(after_ranges[1].destination.start_column, 0);
-        assert_eq!(after_ranges[1].destination.end_row, 2);
-        assert_eq!(after_ranges[1].destination.end_column, 0);
+        assert_eq!(
+            after_ranges[1].operation,
+            TextOperation::Insert,
+            "When looking from after to before: The insert has the wrong operation"
+        );
+        assert_eq!(
+            after_ranges[1].source.start_row, 2,
+            "When looking from after to before: The insert has wrong source start row"
+        );
+        assert_eq!(
+            after_ranges[1].source.start_column, 2,
+            "When looking from after to before: The insert has wrong source start column"
+        );
+        assert_eq!(
+            after_ranges[1].source.end_row, 3,
+            "When looking from after to before: The insert has wrong source end row"
+        );
+        assert_eq!(
+            after_ranges[1].source.end_column, 0,
+            "When looking from after to before: The insert has wrong source end column"
+        );
+        assert_eq!(
+            after_ranges[1].destination.start_row, 2,
+            "When looking from after to before: The insert has wrong destination start row"
+        );
+        assert_eq!(
+            after_ranges[1].destination.start_column, 0,
+            "When looking from after to before: The insert has wrong destination start column"
+        );
+        assert_eq!(
+            after_ranges[1].destination.end_row, 2,
+            "When looking from after to before: The insert has wrong destination end row"
+        );
+        assert_eq!(
+            after_ranges[1].destination.end_column, 0,
+            "When looking from after to before: The insert has wrong destination end column"
+        );
 
-        assert_eq!(after_ranges[2].operation, TextOperation::Identical);
-        assert_eq!(after_ranges[2].source.start_row, 3);
-        assert_eq!(after_ranges[2].source.start_column, 0);
-        assert_eq!(after_ranges[2].source.end_row, 4);
-        assert_eq!(after_ranges[2].source.end_column, 0);
-        assert_eq!(after_ranges[2].destination.start_row, 3);
-        assert_eq!(after_ranges[2].destination.start_column, 0);
-        assert_eq!(after_ranges[2].destination.end_row, 3);
-        assert_eq!(after_ranges[2].destination.end_column, 0);
+        assert_eq!(
+            after_ranges[2].operation,
+            TextOperation::Identical,
+            "When looking from after to before: The final identical part has wrong operation"
+        );
+        assert_eq!(
+            after_ranges[2].source.start_row, 3,
+            "When looking from after to before: The final identical part has wrong source start row"
+        );
+        assert_eq!(
+            after_ranges[2].source.start_column, 0,
+            "When looking from after to before: The final identical part has wrong source start column"
+        );
+        assert_eq!(
+            after_ranges[2].source.end_row, 4,
+            "When looking from after to before: The final identical part has wrong source end row"
+        );
+        assert_eq!(
+            after_ranges[2].source.end_column, 0,
+            "When looking from after to before: The final identical part has wrong source end column"
+        );
+        assert_eq!(
+            after_ranges[2].destination.start_row, 3,
+            "When looking from after to before: The final identical part has wrong destination start row"
+        );
+        assert_eq!(
+            after_ranges[2].destination.start_column, 0,
+            "When looking from after to before: The final identical part has wrong destination start column"
+        );
+        assert_eq!(
+            after_ranges[2].destination.end_row, 3,
+            "When looking from after to before: The final identical part has wrong destination end row"
+        );
+        assert_eq!(
+            after_ranges[2].destination.end_column, 0,
+            "When looking from after to before: The final identical part has wrong destination end column"
+        );
 
         Ok(())
     }
