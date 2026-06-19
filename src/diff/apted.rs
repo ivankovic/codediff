@@ -1161,11 +1161,19 @@ mod tests {
         let before_root = before_ast.root_node();
         let after_root = after_ast.root_node();
 
-        // Root nodes should be mapped
         assert!(
             diff.mapping
-                .contains_key(&(before_root.id(), after_root.id()))
+                .contains_key(&(before_root.id(), after_root.id())),
+            "Root nodes must be mapped"
         );
+
+        let mapping = diff
+            .mapping
+            .get(&(before_ast.root_node().id(), after_ast.root_node().id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+        // 22 nodes are added
+        assert_eq!(mapping.cost, 22);
 
         // This test case starts with an "if-else" code, and adds a new condition to the *start* of
         // the if, going to "if-else if-else" code. In the Rust AST, what happens is that the entire
