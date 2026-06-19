@@ -1129,9 +1129,9 @@ mod tests {
     }
 
     #[test]
-    fn test_leet_code_bugfix() -> Result<()> {
+    fn test_rust_add_if() -> Result<()> {
         let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+        let (before, after) = test_diffs.get("rust-add-if").unwrap().clone();
 
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
@@ -1149,6 +1149,49 @@ mod tests {
             diff.mapping
                 .contains_key(&(before_root.id(), after_root.id()))
         );
+
+        // This test case starts with an "if-else" code, and adds a new condition to the *start* of
+        // the if, going to "if-else if-else" code. In the Rust AST, what happens is that the entire
+        // before if_expression block becomes the child of the else node of the newly added
+        // if_expression block.
+
+        let if_expression_before = helper::node_for_path(
+            before_root,
+            &[
+                "function_item",
+                "block",
+                "expression_statement",
+                "if_expression",
+            ],
+        )?;
+
+        let path = vec![
+            "function_item",
+            "block",
+            "expression_statement",
+            "if_expression",
+        ];
+        assert!(
+            helper::was_node_added(&path, after_root, &diff)?,
+            "The added if_expression is not mapped as added"
+        );
+
+        let outer_if_expression_after = helper::node_for_path(after_root, &path)?;
+
+        let inner_if_expression_after =
+            helper::node_for_path(outer_if_expression_after, &["else_clause", "if_expression"])?;
+
+        assert!(
+            diff.mapping
+                .contains_key(&(if_expression_before.id(), inner_if_expression_after.id())),
+            "The if_expression from before is not correctly mapped as the child of the else_clause of the added if"
+        );
+
+        let mapping = diff
+            .mapping
+            .get(&(if_expression_before.id(), inner_if_expression_after.id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
         Ok(())
     }
