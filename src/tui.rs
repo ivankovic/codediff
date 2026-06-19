@@ -20,6 +20,7 @@ pub mod app;
 pub mod components;
 pub mod events;
 pub mod ui;
+pub mod widgets;
 
 use anyhow::Result;
 use std::path::Path;

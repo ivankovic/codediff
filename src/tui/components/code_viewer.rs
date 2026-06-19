@@ -15,35 +15,25 @@
  *  You should have received a copy of the GNU Affero General License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
-use ratatui::{
-    prelude::*,
-    symbols::border,
-    text::Line,
-    widgets::{Block, Borders, Paragraph},
-};
+use anyhow::Result;
+use ratatui::{Frame, layout::Rect};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::code::language::language_for_path;
 use crate::tui::actions::Action;
 
 /// A component that displays source code
+///
+/// This component wraps the CodeViewerWidget and manages its state.
+/// It implements the Component trait for integration with the TUI architecture.
 #[derive(Default)]
 pub struct CodeViewer {
-    /// The path to the file being displayed
-    file_path: Option<PathBuf>,
-    /// The file contents
-    contents: String,
-    /// The language of the file
-    language: Option<crate::code::Language>,
-    /// Scroll position (line number)
-    scroll: usize,
-    /// Viewport height in lines
-    pub viewport_height: usize,
+    /// The underlying widget
+    widget: crate::tui::widgets::code_viewer::CodeViewerWidget,
+    /// The widget state (scroll position and viewport)
+    state: crate::tui::widgets::code_viewer::CodeViewerState,
     /// Action sender
     command_tx: Option<UnboundedSender<Action>>,
 }
@@ -57,93 +47,100 @@ impl CodeViewer {
     /// Create a CodeViewer for a specific file
     pub fn with_file(path: PathBuf) -> Self {
         Self {
-            file_path: Some(path),
+            widget: crate::tui::widgets::code_viewer::CodeViewerWidget::with_file(path),
             ..Default::default()
         }
     }
 
     /// Load a file into the viewer
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
-        self.file_path = Some(path.clone());
-
-        // Determine language from file extension
-        self.language = language_for_path(&path);
-
-        // Read file contents
-        self.contents = fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read file: {:?}", path))?;
-
+        self.widget.load_file(path)?;
         // Reset scroll position
-        self.scroll = 0;
-
+        self.state.scroll = 0;
         Ok(())
     }
 
     /// Get the total number of lines
     pub fn line_count(&self) -> usize {
-        self.contents.lines().count()
-    }
-
-    /// Get visible lines based on scroll position
-    fn visible_lines(&self) -> Vec<Line<'static>> {
-        let lines: Vec<&str> = self.contents.lines().collect();
-        let total_lines = lines.len();
-
-        if total_lines == 0 {
-            return vec![Line::from("")];
-        }
-
-        // Clamp scroll position
-        let scroll = self.scroll.min(total_lines.saturating_sub(1));
-
-        // Get visible lines
-        let start = scroll;
-        let end = std::cmp::min(start + self.viewport_height, total_lines);
-
-        lines[start..end]
-            .iter()
-            .map(|&line| Line::from(line.to_string()))
-            .collect()
+        self.widget.line_count()
     }
 
     /// Scroll up by one line
     pub fn scroll_up(&mut self) {
-        if self.scroll > 0 {
-            self.scroll = self.scroll.saturating_sub(1);
+        if self.state.scroll > 0 {
+            self.state.scroll = self.state.scroll.saturating_sub(1);
         }
     }
 
     /// Scroll down by one line
     pub fn scroll_down(&mut self) {
         let total = self.line_count();
-        if self.scroll < total.saturating_sub(1) {
-            self.scroll = self.scroll.saturating_add(1);
+        if self.state.scroll < total.saturating_sub(1) {
+            self.state.scroll = self.state.scroll.saturating_add(1);
         }
     }
 
     /// Scroll to a specific line
     pub fn scroll_to(&mut self, line: usize) {
-        self.scroll = line.min(self.line_count().saturating_sub(1));
+        self.state.scroll = line.min(self.line_count().saturating_sub(1));
     }
 
     /// Get the filename for display
     pub fn filename(&self) -> String {
-        self.file_path
-            .as_ref()
-            .map(|p| {
-                p.file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default()
-            })
-            .unwrap_or_else(|| "Untitled".to_string())
+        self.widget.filename()
     }
 
     /// Get the language name for display
     pub fn language_name(&self) -> String {
-        self.language
-            .as_ref()
-            .map(|l| format!("{:?}", l))
-            .unwrap_or_else(|| "Plain Text".to_string())
+        self.widget.language_name()
+    }
+
+    /// Get the viewport height
+    pub fn viewport_height(&self) -> usize {
+        self.state.viewport_height
+    }
+
+    /// Set the viewport height
+    pub fn set_viewport_height(&mut self, height: usize) {
+        self.state.viewport_height = height;
+    }
+
+    /// Enable syntax highlighting with optional theme
+    pub fn enable_syntax_highlighting(&mut self, theme: Option<String>) {
+        self.widget.enable_syntax_highlighting();
+        if let Some(t) = theme {
+            self.widget.set_theme(t);
+        }
+    }
+
+    /// Disable syntax highlighting
+    pub fn disable_syntax_highlighting(&mut self) {
+        self.widget.disable_syntax_highlighting();
+    }
+
+    /// Check if syntax highlighting is enabled
+    pub fn is_syntax_highlighting_enabled(&self) -> bool {
+        self.widget.is_syntax_highlighting_enabled()
+    }
+
+    /// Get mutable reference to the widget for customization
+    pub fn widget_mut(&mut self) -> &mut crate::tui::widgets::code_viewer::CodeViewerWidget {
+        &mut self.widget
+    }
+
+    /// Get reference to the widget
+    pub fn widget(&self) -> &crate::tui::widgets::code_viewer::CodeViewerWidget {
+        &self.widget
+    }
+
+    /// Get mutable reference to the state
+    pub fn state_mut(&mut self) -> &mut crate::tui::widgets::code_viewer::CodeViewerState {
+        &mut self.state
+    }
+
+    /// Get reference to the state
+    pub fn state(&self) -> &crate::tui::widgets::code_viewer::CodeViewerState {
+        &self.state
     }
 }
 
@@ -154,7 +151,7 @@ impl Component for CodeViewer {
     }
 
     fn init(&mut self, area: Rect) -> Result<()> {
-        self.viewport_height = area.height.saturating_sub(2) as usize; // -2 for borders
+        self.state.viewport_height = area.height.saturating_sub(2) as usize; // -2 for borders
         Ok(())
     }
 
@@ -169,19 +166,19 @@ impl Component for CodeViewer {
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {
-                self.scroll = self.scroll.saturating_sub(self.viewport_height);
+                self.state.scroll = self.state.scroll.saturating_sub(self.state.viewport_height);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageDown => {
-                self.scroll = self.scroll.saturating_add(self.viewport_height);
+                self.state.scroll = self.state.scroll.saturating_add(self.state.viewport_height);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::Home => {
-                self.scroll = 0;
+                self.state.scroll = 0;
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::End => {
-                self.scroll = self.line_count().saturating_sub(1);
+                self.state.scroll = self.line_count().saturating_sub(1);
                 Ok(Some(Action::Render))
             }
             _ => Ok(None),
@@ -194,7 +191,7 @@ impl Component for CodeViewer {
             Action::Render => {}
             Action::Resize(_w, h) => {
                 // Update viewport height
-                self.viewport_height = h.saturating_sub(2) as usize;
+                self.state.viewport_height = h.saturating_sub(2) as usize;
             }
             _ => {}
         }
@@ -202,27 +199,10 @@ impl Component for CodeViewer {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(self.filename(), Style::new().bold().fg(Color::Cyan)),
-                Span::raw(" - "),
-                Span::styled(self.language_name(), Style::new().fg(Color::Gray)),
-            ]))
-            .borders(Borders::ALL)
-            .border_set(border::ROUNDED)
-            .border_style(Style::new().fg(Color::Gray));
-
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        // Draw the code
-        let lines = self.visible_lines();
-        let paragraph = Paragraph::new(lines)
-            .block(Block::default())
-            .scroll((self.scroll as u16, 0));
-
-        frame.render_widget(paragraph, inner);
-
+        // Use the StatefulWidget render method via frame.render_stateful_widget
+        // We need to pass self.widget by value, but we can't move out of self
+        // So we use a reference and implement StatefulWidget for &CodeViewerWidget
+        frame.render_stateful_widget(&self.widget, area, &mut self.state);
         Ok(())
     }
 }

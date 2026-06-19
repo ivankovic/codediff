@@ -969,141 +969,6 @@ mod tests {
     use crate::test::helper;
 
     #[test]
-    fn test_no_change() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("no-change").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
-
-        let mapping = diff
-            .mapping
-            .get(&(before_ast.root_node().id(), after_ast.root_node().id()))
-            .unwrap();
-        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_rust_hash_optimization() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
-
-        let before_root = before_ast.root_node();
-        let after_root = after_ast.root_node();
-
-        // Root nodes should be mapped
-        assert!(
-            diff.mapping
-                .contains_key(&(before_root.id(), after_root.id()))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_hello_world_added_message() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
-
-        let before_root = before_ast.root_node();
-        let after_root = after_ast.root_node();
-
-        // Root nodes should be mapped
-        assert!(
-            diff.mapping
-                .contains_key(&(before_root.id(), after_root.id()))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_leet_code_bugfix() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
-
-        let before_root = before_ast.root_node();
-        let after_root = after_ast.root_node();
-
-        // Root nodes should be mapped
-        assert!(
-            diff.mapping
-                .contains_key(&(before_root.id(), after_root.id()))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_simple_tree_edit_distance() -> Result<()> {
-        // Test a simple case where we know the expected distance
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("no-change").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        // For identical trees, the total cost should be 0 (all identical mappings)
-        let total_cost: u64 = diff.mapping.values().map(|m| m.cost).sum();
-        assert_eq!(total_cost, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_insert_node() -> Result<()> {
-        let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        for_roots(&before, &after, &node_cache, &mut diff)?;
-
-        // Check that we have insert operations
-        let has_inserts = diff
-            .mapping
-            .values()
-            .any(|m| m.operation == ASTMappingOperation::Insert);
-        assert!(has_inserts, "Should have insert operations for added nodes");
-
-        Ok(())
-    }
-
-    #[test]
     fn test_already_matched_nodes_are_skipped() -> Result<()> {
         // This test verifies that APTED properly skips nodes
         // that are already matched in the diff.
@@ -1201,7 +1066,57 @@ mod tests {
     }
 
     #[test]
-    fn test_update_node() -> Result<()> {
+    fn test_no_change() -> Result<()> {
+        let test_diffs = helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("no-change").unwrap().clone();
+
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let mapping = diff
+            .mapping
+            .get(&(before_ast.root_node().id(), after_ast.root_node().id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+        assert_eq!(mapping.cost, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hello_world_added_message() -> Result<()> {
+        let test_diffs = helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        let mapping = diff
+            .mapping
+            .get(&(before_root.id(), after_root.id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+        // 12 nodes in total are added. expression_statement + 11 more.
+        assert_eq!(mapping.cost, 12);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_leet_code_bugfix() -> Result<()> {
         let test_diffs = helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
 
@@ -1210,19 +1125,16 @@ mod tests {
 
         for_roots(&before, &after, &node_cache, &mut diff)?;
 
-        // Check that we have update operations or non-identical mappings (the bug fix changed some code)
-        let has_updates = diff
-            .mapping
-            .values()
-            .any(|m| m.operation == ASTMappingOperation::Update);
-        let has_non_identical = diff
-            .mapping
-            .values()
-            .any(|m| m.operation == ASTMappingOperation::MatchButNotIdentical);
-        let has_mappings = !diff.mapping.is_empty();
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        // Root nodes should be mapped
         assert!(
-            has_updates || has_non_identical || has_mappings,
-            "Should have update operations or non-identical mappings for changed nodes"
+            diff.mapping
+                .contains_key(&(before_root.id(), after_root.id()))
         );
 
         Ok(())

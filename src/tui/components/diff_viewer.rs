@@ -220,10 +220,10 @@ impl Component for DiffViewer {
             }
             crossterm::event::KeyCode::PageUp => {
                 if self.display_mode == DisplayMode::Dual {
-                    let lines = self.left_viewer.viewport_height as i32;
+                    let lines = self.left_viewer.viewport_height() as i32;
                     self.scroll_both(-lines);
                 } else {
-                    let lines = self.active_viewer().viewport_height as i32;
+                    let lines = self.active_viewer().viewport_height() as i32;
                     for _ in 0..lines {
                         self.active_viewer().scroll_up();
                     }
@@ -232,10 +232,10 @@ impl Component for DiffViewer {
             }
             crossterm::event::KeyCode::PageDown => {
                 if self.display_mode == DisplayMode::Dual {
-                    let lines = self.left_viewer.viewport_height as i32;
+                    let lines = self.left_viewer.viewport_height() as i32;
                     self.scroll_both(lines);
                 } else {
-                    let lines = self.active_viewer().viewport_height as i32;
+                    let lines = self.active_viewer().viewport_height() as i32;
                     for _ in 0..lines {
                         self.active_viewer().scroll_down();
                     }
@@ -298,8 +298,8 @@ impl Component for DiffViewer {
 
         // Update viewport heights based on current area
         let viewport_height = area.height.saturating_sub(4) as usize; // -4 for borders and padding
-        self.left_viewer.viewport_height = viewport_height;
-        self.right_viewer.viewport_height = viewport_height;
+        self.left_viewer.set_viewport_height(viewport_height);
+        self.right_viewer.set_viewport_height(viewport_height);
 
         if self.display_mode == DisplayMode::Dual {
             // Dual panel mode: show both side by side
