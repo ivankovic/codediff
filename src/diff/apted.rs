@@ -1104,12 +1104,25 @@ mod tests {
         let before_root = before_ast.root_node();
         let after_root = after_ast.root_node();
 
+        let path = vec!["function_item", "block", "expression_statement:2"];
+
+        assert!(
+            helper::was_tree_added(&path, after_root, &diff)?,
+            "The inserted line is not correctly marked as Insert"
+        );
+
+        let added_node = helper::node_for_path(after_root, &path)?;
+        let mapping = diff.mapping.get(&(0, added_node.id())).unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::Insert);
+        // 12 nodes in total are added. expression_statement + 11 more.
+        assert_eq!(mapping.cost, 12);
+
         let mapping = diff
             .mapping
             .get(&(before_root.id(), after_root.id()))
             .unwrap();
         assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-        // 12 nodes in total are added. expression_statement + 11 more.
+        // The cost should correctly transfer upwards to the root node.
         assert_eq!(mapping.cost, 12);
 
         Ok(())
