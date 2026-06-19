@@ -1,9 +1,6 @@
 # Next features to implement
 
-*  Diff format: edit script
-*  Diff format: byte-range
 *  UI that shows the mapping
-*  Update doc-comments in diff.rs
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
 
@@ -13,9 +10,9 @@
 
 # Possible code health improvements
 
-*  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code in
+*  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code
    diff.rs
+*  Make all handmade test diff directories in src/test/data/diffs start with the language name, e.g.
+   not "hello-world-added-message" but "rust-hello-world-added-message" etc.
 
 # Ideas
-
-*  Stats show huge clusters of "add-only" commits. Make adds super fast.
