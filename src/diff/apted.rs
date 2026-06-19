@@ -205,7 +205,7 @@ fn tree_edit_distance_with_mapping(
             // Add insert mapping
             if !diff.mapping.contains_key(&(0, after_node_id)) {
                 let mapping = ASTMapping {
-                    cost: COST_INSERT,
+                    cost,
                     operation: ASTMappingOperation::Insert,
                     reason: super::ASTMappingReason::APTED,
                 };
@@ -226,7 +226,7 @@ fn tree_edit_distance_with_mapping(
             // Add delete mapping
             if !diff.mapping.contains_key(&(before_node_id, 0)) {
                 let mapping = ASTMapping {
-                    cost: COST_DELETE,
+                    cost,
                     operation: ASTMappingOperation::Delete,
                     reason: super::ASTMappingReason::APTED,
                 };
@@ -430,7 +430,7 @@ fn reconstruct_forest_mapping(
     before_nodes: &[usize],
     after_nodes: &[usize],
     operation: &Vec<Vec<ASTMappingOperation>>,
-    _dp: &Vec<Vec<u64>>,
+    dp: &Vec<Vec<u64>>,
     before_indexer: &APTEDIndexer,
     after_indexer: &APTEDIndexer,
     before_metadata: &ASTMetadata,
@@ -456,7 +456,8 @@ fn reconstruct_forest_mapping(
                     let before_info = before_indexer.get_node_info(before_id).unwrap();
                     let after_info = after_indexer.get_node_info(after_id).unwrap();
 
-                    let ren_cost = cost_model.ren(before_info, after_info);
+                    // We compute ren_cost but don't use it directly - the operation cost comes from the DP table
+                    let _ren_cost = cost_model.ren(before_info, after_info);
 
                     // Check if hashes match to determine if truly identical
                     let hashes_match = before_metadata
@@ -490,6 +491,11 @@ fn reconstruct_forest_mapping(
                         ASTMappingOperation::Update
                     };
 
+                    // Compute the operation cost from DP table
+                    // The cost for matching this node includes the rename cost and the cost of all
+                    // operations in the subtree
+                    let operation_cost = dp[i][j] - dp[i - 1][j - 1];
+
                     // Only add mapping if nodes have the same kind and not already mapped to different partners
                     if before_info.kind == after_info.kind
                         && !diff.mapping.contains_key(&(before_id, after_id))
@@ -497,7 +503,7 @@ fn reconstruct_forest_mapping(
                         && !diff.after_node_map.contains_key(&after_id)
                     {
                         let mapping = ASTMapping {
-                            cost: ren_cost,
+                            cost: operation_cost,
                             operation: op,
                             reason: super::ASTMappingReason::APTED,
                         };
@@ -527,8 +533,9 @@ fn reconstruct_forest_mapping(
                 ASTMappingOperation::Delete => {
                     let before_id = before_nodes[i - 1];
                     if !diff.mapping.contains_key(&(before_id, 0)) {
+                        let cost = subtree_del_cost(before_id, before_indexer, cost_model);
                         let mapping = ASTMapping {
-                            cost: COST_DELETE,
+                            cost,
                             operation: ASTMappingOperation::Delete,
                             reason: super::ASTMappingReason::APTED,
                         };
@@ -543,8 +550,9 @@ fn reconstruct_forest_mapping(
                 ASTMappingOperation::Insert => {
                     let after_id = after_nodes[j - 1];
                     if !diff.mapping.contains_key(&(0, after_id)) {
+                        let cost = subtree_ins_cost(after_id, after_indexer, cost_model);
                         let mapping = ASTMapping {
-                            cost: COST_INSERT,
+                            cost,
                             operation: ASTMappingOperation::Insert,
                             reason: super::ASTMappingReason::APTED,
                         };
@@ -552,6 +560,9 @@ fn reconstruct_forest_mapping(
                     }
 
                     // Add insert mappings for children
+                    // Note: We call add_insert_mappings to recursively add mappings for the entire subtree
+                    // This is necessary because the DP table only considers the current level,
+                    // not the children of the inserted node
                     add_insert_mappings(after_id, after_indexer, diff);
 
                     j -= 1;
@@ -595,14 +606,16 @@ fn reconstruct_forest_mapping(
             // Delete remaining before nodes
             let before_id = before_nodes[i - 1];
             if !diff.mapping.contains_key(&(before_id, 0)) {
+                let cost = subtree_del_cost(before_id, before_indexer, cost_model);
                 let mapping = ASTMapping {
-                    cost: COST_DELETE,
+                    cost,
                     operation: ASTMappingOperation::Delete,
                     reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(before_id, 0, mapping);
             }
 
+            // Add delete mappings for children
             add_delete_mappings(before_id, before_indexer, diff);
 
             i -= 1;
@@ -610,14 +623,16 @@ fn reconstruct_forest_mapping(
             // Insert remaining after nodes
             let after_id = after_nodes[j - 1];
             if !diff.mapping.contains_key(&(0, after_id)) {
+                let cost = subtree_ins_cost(after_id, after_indexer, cost_model);
                 let mapping = ASTMapping {
-                    cost: COST_INSERT,
+                    cost,
                     operation: ASTMappingOperation::Insert,
                     reason: super::ASTMappingReason::APTED,
                 };
                 diff.add_mapping(0, after_id, mapping);
             }
 
+            // Add insert mappings for children
             add_insert_mappings(after_id, after_indexer, diff);
 
             j -= 1;
@@ -768,8 +783,9 @@ fn add_delete_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
 
     // Add delete for this node
     if !diff.mapping.contains_key(&(node_id, 0)) {
+        let cost = subtree_del_cost(node_id, indexer, &UnitCostModel);
         let mapping = ASTMapping {
-            cost: COST_DELETE,
+            cost,
             operation: ASTMappingOperation::Delete,
             reason: super::ASTMappingReason::APTED,
         };
@@ -797,8 +813,9 @@ fn add_insert_mappings(node_id: usize, indexer: &APTEDIndexer, diff: &mut ASTDif
 
     // Add insert for this node
     if !diff.mapping.contains_key(&(0, node_id)) {
+        let cost = subtree_ins_cost(node_id, indexer, &UnitCostModel);
         let mapping = ASTMapping {
-            cost: COST_INSERT,
+            cost,
             operation: ASTMappingOperation::Insert,
             reason: super::ASTMappingReason::APTED,
         };
