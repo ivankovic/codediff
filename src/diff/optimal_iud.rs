@@ -1461,7 +1461,7 @@ mod tests {
 
         let added_if_node = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec!["if_statement", "block", "if_statement"],
+            &["if_statement", "block", "if_statement"],
         )?;
 
         let added_if_node_mapping = diff.mapping.get(&(0, added_if_node.id()));
@@ -1479,7 +1479,7 @@ mod tests {
 
         let existing_expression_node = test::helper::node_for_path(
             before_ast.root_node(),
-            &vec!["if_statement", "block", "expression_statement:4"],
+            &["if_statement", "block", "expression_statement:4"],
         )?;
 
         let expression_node_in_after_id = diff
@@ -1533,7 +1533,7 @@ mod tests {
 
         let deleted_if_node = test::helper::node_for_path(
             before_ast.root_node(),
-            &vec!["if_statement", "block", "if_statement"],
+            &["if_statement", "block", "if_statement"],
         )?;
 
         let deleted_if_node_mapping = diff.mapping.get(&(deleted_if_node.id(), 0));
@@ -1551,7 +1551,7 @@ mod tests {
 
         let existing_expression_node = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec!["if_statement", "block", "expression_statement:4"],
+            &["if_statement", "block", "expression_statement:4"],
         )?;
 
         let expression_node_in_before_id = diff
@@ -1602,7 +1602,7 @@ mod tests {
 
         let before_string_node = test::helper::node_for_path(
             before_ast.root_node(),
-            &vec![
+            &[
                 "function_item",
                 "block",
                 "expression_statement",
@@ -1614,7 +1614,7 @@ mod tests {
         )?;
         let after_string_node = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec![
+            &[
                 "function_item",
                 "block",
                 "expression_statement",
@@ -1785,6 +1785,46 @@ mod tests {
                 expected_cost, diff_name, root_mapping.cost
             );
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn python_added_if_block_small() -> Result<()> {
+        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        // Swap before and after around to turn an add into a delete.
+        let (after, before) = test_diffs
+            .get("python-added-if-block-small")
+            .unwrap()
+            .clone();
+
+        let mut diff = ASTDiff {
+            ..Default::default()
+        };
+
+        let node_cache = NodeCache::build(&before, &after);
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        assert!(diff.is_valid(&before, &after, &node_cache));
+        assert!(diff.is_complete(&before, &after, &node_cache));
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root_id = before_ast.root_node().id();
+        let after_root_id = after_ast.root_node().id();
+
+        // Check that root node has IdenticalHash reason
+        let root_mapping = diff
+            .mapping
+            .get(&(before_root_id, after_root_id))
+            .expect("Root node should be mapped");
+        assert_eq!(
+            root_mapping.operation,
+            ASTMappingOperation::MatchButNotIdentical
+        );
+        assert_eq!(root_mapping.reason, ASTMappingReason::OptimalIDU);
+        assert_eq!(root_mapping.cost, 8);
 
         Ok(())
     }

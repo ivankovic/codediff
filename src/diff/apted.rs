@@ -1144,4 +1144,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_python_added_if_block_small() -> Result<()> {
+        let test_diffs = helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs
+            .get("python-added-if-block-small")
+            .unwrap()
+            .clone();
+
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        for_roots(&before, &after, &node_cache, &mut diff)?;
+
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        let mapping = diff
+            .mapping
+            .get(&(before_root.id(), after_root.id()))
+            .unwrap();
+        assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+        // The best solution is to simply insert the 8 if_expression nodes in the tree.
+        assert_eq!(mapping.cost, 8);
+
+        Ok(())
+    }
 }
