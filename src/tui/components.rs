@@ -21,11 +21,11 @@ pub mod file_dialog;
 pub mod overview;
 
 use anyhow::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::event::{Event, KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{tui::actions::Action, tui::events::Event};
+use crate::tui::actions::Action;
 
 /// A visual and interactive element of the TUI.
 pub trait Component {
@@ -55,19 +55,19 @@ pub trait Component {
         Ok(())
     }
 
-    /// Handle incoming events and produce actions if necessary.
+    /// Handle an incoming terminal event and produce an action if necessary.
     ///
     /// # Arguments
     ///
-    /// * `event` - An optional event to be processed.
+    /// * `event` - The event to be processed.
     ///
     /// # Returns
     ///
     /// * [`Result<Option<Action>>`] - An action to be processed or none.
-    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
         let action = match event {
-            Some(Event::Key(key_event)) => self.handle_key_event(key_event)?,
-            Some(Event::Mouse(mouse_event)) => self.handle_mouse_event(mouse_event)?,
+            Event::Key(key_event) => self.handle_key_event(key_event)?,
+            Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event)?,
             _ => None,
         };
         Ok(action)

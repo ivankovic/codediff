@@ -18,37 +18,24 @@
 use std::{
     io::{Stdout, stdout},
     ops::{Deref, DerefMut},
-    time::Duration,
 };
 
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{
-        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, EventStream, KeyEventKind,
-    },
+    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use futures::StreamExt;
 
 use ratatui::backend::CrosstermBackend as Backend;
-use tokio::{
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    task::JoinHandle,
-    time::interval,
-};
-use tokio_util::sync::CancellationToken;
-use tracing::error;
 
-use crate::tui::events::Event;
-
+/// Owns the terminal and its raw-mode/alternate-screen lifecycle.
+///
+/// Ticking, rendering and input are driven directly by `App::run`'s own `tokio::select!` loop
+/// (see `app.rs`) rather than by a background task here, so that input is never stuck behind a
+/// backlog of unrelated timer events.
 pub struct UI {
     pub terminal: ratatui::Terminal<Backend<Stdout>>,
-    pub task: JoinHandle<()>,
-    pub cancellation_token: CancellationToken,
-    pub event_rx: UnboundedReceiver<Event>,
-    pub event_tx: UnboundedSender<Event>,
 
     pub tick_rate: f64,
     pub frame_rate: f64,
@@ -59,14 +46,8 @@ pub struct UI {
 
 impl UI {
     pub fn new() -> Result<Self> {
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
-
         Ok(Self {
             terminal: ratatui::Terminal::new(Backend::new(stdout()))?,
-            task: tokio::spawn(async {}),
-            cancellation_token: CancellationToken::new(),
-            event_rx,
-            event_tx,
 
             tick_rate: 4.0,
             frame_rate: 60.0,
@@ -86,59 +67,6 @@ impl UI {
         self
     }
 
-    async fn event_loop(
-        event_tx: UnboundedSender<Event>,
-        cancellation_token: CancellationToken,
-        tick_rate: f64,
-        frame_rate: f64,
-    ) {
-        let mut tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
-        let mut render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
-        let mut crossterm_events = EventStream::new();
-
-        // if this fails, then it's likely a bug in the calling code
-        event_tx
-            .send(Event::Init)
-            .expect("failed to send init event");
-
-        loop {
-            let event = tokio::select! {
-                _ = cancellation_token.cancelled() => {
-                    break;
-                }
-                _ = tick_interval.tick() => Event::Tick,
-                _ = render_interval.tick() => Event::Render,
-                maybe_crossterm_event = crossterm_events.next() => {
-                    match maybe_crossterm_event {
-                        Some(Ok(crossterm_event)) => match Self::map_crossterm_event(crossterm_event) {
-                            Some(event) => event,
-                            None => continue,
-                        },
-                        Some(Err(_)) | None => break,
-                    }
-                }
-            };
-            if event_tx.send(event).is_err() {
-                break;
-            }
-        }
-        cancellation_token.cancel();
-    }
-
-    /// Map a raw crossterm event onto our own [`Event`] enum, dropping the ones we don't care
-    /// about (e.g. key release events, which crossterm only emits on some platforms).
-    fn map_crossterm_event(crossterm_event: CrosstermEvent) -> Option<Event> {
-        match crossterm_event {
-            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => Some(Event::Key(key)),
-            CrosstermEvent::Key(_) => None,
-            CrosstermEvent::Mouse(mouse) => Some(Event::Mouse(mouse)),
-            CrosstermEvent::Resize(x, y) => Some(Event::Resize(x, y)),
-            CrosstermEvent::FocusLost => Some(Event::FocusLost),
-            CrosstermEvent::FocusGained => Some(Event::FocusGained),
-            CrosstermEvent::Paste(s) => Some(Event::Paste(s)),
-        }
-    }
-
     pub fn enter(&mut self) -> Result<()> {
         crossterm::terminal::enable_raw_mode()?;
         crossterm::execute!(stdout(), EnterAlternateScreen, cursor::Hide)?;
@@ -148,12 +76,10 @@ impl UI {
         if self.paste {
             crossterm::execute!(stdout(), EnableBracketedPaste)?;
         }
-        self.start();
         Ok(())
     }
 
     pub fn exit(&mut self) -> Result<()> {
-        self.stop()?;
         if crossterm::terminal::is_raw_mode_enabled()? {
             self.flush()?;
             if self.paste {
@@ -168,41 +94,6 @@ impl UI {
         Ok(())
     }
 
-    pub fn start(&mut self) {
-        self.cancel(); // Cancel any existing task
-        self.cancellation_token = CancellationToken::new();
-        let event_loop = Self::event_loop(
-            self.event_tx.clone(),
-            self.cancellation_token.clone(),
-            self.tick_rate,
-            self.frame_rate,
-        );
-        self.task = tokio::spawn(async {
-            event_loop.await;
-        });
-    }
-
-    pub fn stop(&self) -> Result<()> {
-        self.cancel();
-        let mut counter = 0;
-        while !self.task.is_finished() {
-            std::thread::sleep(Duration::from_millis(1));
-            counter += 1;
-            if counter > 50 {
-                self.task.abort();
-            }
-            if counter > 100 {
-                error!("Failed to abort task in 100 milliseconds for unknown reason");
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn cancel(&self) {
-        self.cancellation_token.cancel();
-    }
-
     pub fn suspend(&mut self) -> Result<()> {
         self.exit()?;
         #[cfg(not(windows))]
@@ -213,10 +104,6 @@ impl UI {
     pub fn resume(&mut self) -> Result<()> {
         self.enter()?;
         Ok(())
-    }
-
-    pub async fn next_event(&mut self) -> Option<Event> {
-        self.event_rx.recv().await
     }
 }
 
