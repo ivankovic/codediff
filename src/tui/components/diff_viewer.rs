@@ -27,7 +27,7 @@ use ratatui::{
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
-use crate::tui::actions::Action;
+use crate::tui::actions::{Action, DiffSessionData};
 
 /// A component that displays two files side by side for diffing
 #[derive(Default)]
@@ -54,13 +54,14 @@ enum DisplayMode {
     Single,
 }
 
-/// Which panel is active in single panel mode
+/// Which panel is active in single panel mode, and which panel's cursor drives navigation
+/// (and the other panel's cross-highlight) in dual panel mode.
 #[derive(Default, Clone, Copy, PartialEq)]
 enum ActivePanel {
     /// Showing the left (before) panel
+    #[default]
     Left,
     /// Showing the right (after) panel
-    #[default]
     Right,
 }
 
@@ -86,6 +87,49 @@ impl DiffViewer {
         Ok(())
     }
 
+    /// Load a completed diff: the file contents (already read, no further disk I/O here) plus
+    /// the before/after diff ranges, and reset the cursor/cross-highlight to the start.
+    pub fn load_diff(&mut self, data: &DiffSessionData) {
+        self.left_viewer
+            .load_contents(data.before_path.clone(), data.before_contents.clone());
+        self.right_viewer
+            .load_contents(data.after_path.clone(), data.after_contents.clone());
+        self.left_viewer.set_ranges(data.before_ranges.clone());
+        self.right_viewer.set_ranges(data.after_ranges.clone());
+        self.active_panel = ActivePanel::Left;
+        self.sync_cross_highlight();
+    }
+
+    /// Move the focused panel's cursor and push the resulting matched node onto the other
+    /// panel's cross-highlight.
+    pub fn move_cursor(&mut self, direction: i32) {
+        self.focused_viewer().move_cursor(direction);
+        self.sync_cross_highlight();
+    }
+
+    /// Push the focused panel's current cursor destination onto the other panel's
+    /// cross-highlight; call after anything that can change the cursor or the focused panel.
+    fn sync_cross_highlight(&mut self) {
+        let destination = self.focused_viewer().cursor_destination();
+        self.other_viewer().set_highlight_destination(destination);
+    }
+
+    /// The panel whose cursor currently drives navigation.
+    fn focused_viewer(&mut self) -> &mut CodeViewer {
+        match self.active_panel {
+            ActivePanel::Left => &mut self.left_viewer,
+            ActivePanel::Right => &mut self.right_viewer,
+        }
+    }
+
+    /// The panel that is cross-highlighted from the focused panel's cursor.
+    fn other_viewer(&mut self) -> &mut CodeViewer {
+        match self.active_panel {
+            ActivePanel::Left => &mut self.right_viewer,
+            ActivePanel::Right => &mut self.left_viewer,
+        }
+    }
+
     /// Set the file for the left viewer
     pub fn set_left_file(&mut self, path: PathBuf) -> Result<()> {
         self.left_viewer.load_file(path)
@@ -96,25 +140,10 @@ impl DiffViewer {
         self.right_viewer.load_file(path)
     }
 
-    /// Scroll both viewers synchronously
-    pub fn scroll_both(&mut self, lines: i32) {
-        if lines > 0 {
-            for _ in 0..lines {
-                self.left_viewer.scroll_down();
-                self.right_viewer.scroll_down();
-            }
-        } else if lines < 0 {
-            for _ in 0..(-lines) {
-                self.left_viewer.scroll_up();
-                self.right_viewer.scroll_up();
-            }
-        }
-    }
-
     /// Update display mode based on available width
     pub fn update_display_mode(&mut self, width: u16) {
-        // Threshold: if width < 200, switch to single panel mode
-        const SINGLE_PANEL_THRESHOLD: u16 = 200;
+        // Below this width, two side-by-side panels would each be too narrow to read code in.
+        const SINGLE_PANEL_THRESHOLD: u16 = 120;
         self.display_mode = if width < SINGLE_PANEL_THRESHOLD {
             DisplayMode::Single
         } else {
@@ -128,14 +157,6 @@ impl DiffViewer {
             ActivePanel::Left => ActivePanel::Right,
             ActivePanel::Right => ActivePanel::Left,
         };
-    }
-
-    /// Get the currently active viewer for single panel mode
-    fn active_viewer(&mut self) -> &mut CodeViewer {
-        match self.active_panel {
-            ActivePanel::Left => &mut self.left_viewer,
-            ActivePanel::Right => &mut self.right_viewer,
-        }
     }
 
     /// Get the filename of the active viewer
@@ -193,51 +214,53 @@ impl Component for DiffViewer {
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
         // Handle key events
         match key.code {
-            // Tab key toggles between panels in single panel mode
+            // Tab switches which panel's cursor drives navigation (and, in single panel mode,
+            // which panel is shown).
             crossterm::event::KeyCode::Tab => {
-                if self.display_mode == DisplayMode::Single {
-                    self.toggle_active_panel();
-                    Ok(Some(Action::Render))
-                } else {
-                    Ok(None)
-                }
+                self.toggle_active_panel();
+                self.sync_cross_highlight();
+                Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::Up => {
-                if self.display_mode == DisplayMode::Dual {
-                    self.scroll_both(-1);
-                } else {
-                    self.active_viewer().scroll_up();
-                }
+                self.move_cursor(-1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::Down => {
-                if self.display_mode == DisplayMode::Dual {
-                    self.scroll_both(1);
-                } else {
-                    self.active_viewer().scroll_down();
-                }
+                self.move_cursor(1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {
                 if self.display_mode == DisplayMode::Dual {
-                    let lines = self.left_viewer.viewport_height() as i32;
-                    self.scroll_both(-lines);
+                    let left_lines = self.left_viewer.viewport_height();
+                    let right_lines = self.right_viewer.viewport_height();
+                    for _ in 0..left_lines {
+                        self.left_viewer.scroll_up();
+                    }
+                    for _ in 0..right_lines {
+                        self.right_viewer.scroll_up();
+                    }
                 } else {
-                    let lines = self.active_viewer().viewport_height() as i32;
+                    let lines = self.focused_viewer().viewport_height();
                     for _ in 0..lines {
-                        self.active_viewer().scroll_up();
+                        self.focused_viewer().scroll_up();
                     }
                 }
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageDown => {
                 if self.display_mode == DisplayMode::Dual {
-                    let lines = self.left_viewer.viewport_height() as i32;
-                    self.scroll_both(lines);
+                    let left_lines = self.left_viewer.viewport_height();
+                    let right_lines = self.right_viewer.viewport_height();
+                    for _ in 0..left_lines {
+                        self.left_viewer.scroll_down();
+                    }
+                    for _ in 0..right_lines {
+                        self.right_viewer.scroll_down();
+                    }
                 } else {
-                    let lines = self.active_viewer().viewport_height() as i32;
+                    let lines = self.focused_viewer().viewport_height();
                     for _ in 0..lines {
-                        self.active_viewer().scroll_down();
+                        self.focused_viewer().scroll_down();
                     }
                 }
                 Ok(Some(Action::Render))
@@ -247,7 +270,7 @@ impl Component for DiffViewer {
                     self.left_viewer.scroll_to(0);
                     self.right_viewer.scroll_to(0);
                 } else {
-                    self.active_viewer().scroll_to(0);
+                    self.focused_viewer().scroll_to(0);
                 }
                 Ok(Some(Action::Render))
             }
@@ -259,8 +282,8 @@ impl Component for DiffViewer {
                     self.left_viewer.scroll_to(max_lines.saturating_sub(1));
                     self.right_viewer.scroll_to(max_lines.saturating_sub(1));
                 } else {
-                    let lines = self.active_viewer().line_count();
-                    self.active_viewer().scroll_to(lines.saturating_sub(1));
+                    let lines = self.focused_viewer().line_count();
+                    self.focused_viewer().scroll_to(lines.saturating_sub(1));
                 }
                 Ok(Some(Action::Render))
             }
@@ -275,13 +298,12 @@ impl Component for DiffViewer {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {}
-            Action::Render => {}
+        match &action {
             Action::Resize(w, _h) => {
                 // Update display mode based on new width
-                self.update_display_mode(w);
+                self.update_display_mode(*w);
             }
+            Action::DiffReady(data) => self.load_diff(data),
             _ => {}
         }
 
@@ -371,7 +393,7 @@ impl Component for DiffViewer {
 
             let inner = block.inner(area);
             frame.render_widget(block, area);
-            self.active_viewer().draw(frame, inner)?;
+            self.focused_viewer().draw(frame, inner)?;
         }
 
         Ok(())

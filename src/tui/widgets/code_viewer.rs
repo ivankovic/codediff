@@ -23,14 +23,17 @@ use anyhow::{Context, Result};
 use ratatui::{
     buffer::Buffer,
     prelude::*,
+    style::Modifier,
     symbols::border,
     text::Line,
-    widgets::{Block, Borders, StatefulWidget, Widget},
+    widgets::{Block, Borders, StatefulWidget},
 };
 use syntect::highlighting::{Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
 
 use crate::code::language::language_for_path;
+use crate::diff::text::{RangeMatch, TextOperation};
+use crate::diff::text_range::TextRange;
 
 /// Static syntax set loaded once
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
@@ -51,7 +54,7 @@ fn theme_set() -> &'static ThemeSet {
 /// Map our internal Language enum to syntect syntax name
 fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
     use crate::code::Language::*;
-    
+
     match lang {
         Bazel => Some("Bazel"),
         C => Some("C"),
@@ -88,27 +91,115 @@ fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
 }
 
 /// Convert syntect Color to ratatui Color
-/// In syntect 5.x, Color is a struct with r, g, b, a fields
 fn syntect_color_to_ratatui(color: syntect::highlighting::Color) -> ratatui::style::Color {
-    // Syntect 5.x uses RGBA color struct
-    // We'll convert to ratatui's color enum
-    // For simplicity, we just use the RGB values directly
     ratatui::style::Color::Rgb(color.r, color.g, color.b)
 }
 
-/// The state for the CodeViewer widget (scroll position and viewport)
+/// Background color used to paint a given diff operation, or `None` for `Identical`/`NotYetSet`
+/// ranges which keep plain syntax highlighting.
+fn background_for_operation(operation: &TextOperation) -> Option<Color> {
+    match operation {
+        TextOperation::Insert => Some(Color::Rgb(20, 60, 20)),
+        TextOperation::Delete => Some(Color::Rgb(70, 20, 20)),
+        TextOperation::Move => Some(Color::Rgb(70, 60, 10)),
+        TextOperation::Update => Some(Color::Rgb(60, 20, 60)),
+        TextOperation::Identical | TextOperation::NotYetSet => None,
+    }
+}
+
+/// Background color used to cross-highlight the node matched to the cursor on the other panel.
+const CROSS_HIGHLIGHT_BG: Color = Color::Rgb(20, 40, 80);
+
+/// A range is a pure alignment marker (no real text on this side) when it has no width.
+pub fn is_empty_range(range: &TextRange) -> bool {
+    range.start_row == range.end_row && range.start_column == range.end_column
+}
+
+/// Returns the `[start_column, end_column)` portion of `range` that falls on `row`, given the
+/// number of characters on that row, or `None` if `range` doesn't cover any part of `row`.
+fn columns_on_row(range: &TextRange, row: usize, row_len: usize) -> Option<(usize, usize)> {
+    if row < range.start_row || row > range.end_row {
+        return None;
+    }
+    let start_col = if row == range.start_row {
+        range.start_column
+    } else {
+        0
+    };
+    let end_col = if row == range.end_row {
+        range.end_column
+    } else {
+        row_len
+    };
+    if start_col >= end_col {
+        return None;
+    }
+    Some((start_col, end_col))
+}
+
+/// Paint `style` onto the `[start_col, end_col)` character range of `line`, preserving the
+/// existing styling (e.g. syntax-highlight foreground colors) outside of and underneath it.
+fn paint_columns(
+    line: &Line<'static>,
+    start_col: usize,
+    end_col: usize,
+    style: Style,
+) -> Line<'static> {
+    let mut spans = Vec::with_capacity(line.spans.len() + 2);
+    let mut col = 0usize;
+
+    for span in &line.spans {
+        let text: Vec<char> = span.content.chars().collect();
+        let span_len = text.len();
+        let span_start = col;
+        let span_end = col + span_len;
+        col = span_end;
+
+        if span_end <= start_col || span_start >= end_col {
+            spans.push(span.clone());
+            continue;
+        }
+
+        let local_start = start_col.saturating_sub(span_start).min(span_len);
+        let local_end = end_col.saturating_sub(span_start).min(span_len);
+
+        if local_start > 0 {
+            let before: String = text[0..local_start].iter().collect();
+            spans.push(Span::styled(before, span.style));
+        }
+        if local_end > local_start {
+            let painted: String = text[local_start..local_end].iter().collect();
+            spans.push(Span::styled(painted, span.style.patch(style)));
+        }
+        if local_end < span_len {
+            let after: String = text[local_end..].iter().collect();
+            spans.push(Span::styled(after, span.style));
+        }
+    }
+
+    Line::from(spans)
+}
+
+/// The state for the CodeViewer widget: scroll position, viewport, and the diff/cursor overlay.
 #[derive(Default, Clone)]
 pub struct CodeViewerState {
     /// Scroll position (line number)
     pub scroll: usize,
     /// Viewport height in lines
     pub viewport_height: usize,
+    /// The diff ranges for this side, as returned by `TextDiff::all`.
+    pub ranges: Vec<RangeMatch>,
+    /// Index into `ranges` of the range the cursor is currently on.
+    pub cursor: usize,
+    /// The range to cross-highlight in blue, set from the matched node on the other panel.
+    pub highlight_destination: Option<TextRange>,
 }
 
 /// A widget that displays source code
 ///
-/// This is a stateful widget that displays file contents with syntax highlighting.
-/// It can be reused in multiple components.
+/// This is a stateful widget that displays file contents with syntax highlighting plus an
+/// optional diff/cursor overlay. Syntax highlighting is computed once per loaded file and
+/// cached, since re-highlighting on every render frame is too slow for real-time scrolling.
 #[derive(Default, Clone)]
 pub struct CodeViewerWidget {
     /// The path to the file being displayed
@@ -123,6 +214,9 @@ pub struct CodeViewerWidget {
     theme_name: Option<String>,
     /// Whether syntax highlighting is enabled
     syntax_highlighting: bool,
+    /// The full file, syntax-highlighted once and cached; rebuilt whenever the content, language,
+    /// theme, or highlighting toggle changes.
+    highlighted_lines: Vec<Line<'static>>,
 }
 
 impl CodeViewerWidget {
@@ -133,29 +227,40 @@ impl CodeViewerWidget {
 
     /// Create a CodeViewerWidget for a specific file
     pub fn with_file(path: PathBuf) -> Self {
-        Self {
+        let mut widget = Self {
             file_path: Some(path),
             ..Default::default()
-        }
+        };
+        widget.rebuild_highlight_cache();
+        widget
     }
 
     /// Load a file into the viewer
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
-        self.file_path = Some(path.clone());
-
-        // Determine language from file extension
-        self.language = language_for_path(&path);
-
-        // Read file contents
-        self.contents = fs::read_to_string(&path)
+        let contents = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read file: {:?}", path))?;
-
+        self.language = language_for_path(&path);
+        self.file_path = Some(path);
+        self.contents = contents;
+        self.rebuild_highlight_cache();
         Ok(())
+    }
+
+    /// Load already-read contents into the viewer without touching the filesystem.
+    ///
+    /// Used when the content was already read elsewhere (e.g. by a background diff
+    /// computation), so the UI thread doesn't redo a blocking file read.
+    pub fn load_contents(&mut self, path: PathBuf, contents: String) {
+        self.language = language_for_path(&path);
+        self.file_path = Some(path);
+        self.contents = contents;
+        self.rebuild_highlight_cache();
     }
 
     /// Set the contents directly (for testing or custom content)
     pub fn with_contents(mut self, contents: String) -> Self {
         self.contents = contents;
+        self.rebuild_highlight_cache();
         self
     }
 
@@ -163,6 +268,7 @@ impl CodeViewerWidget {
     pub fn with_path(mut self, path: PathBuf) -> Self {
         self.file_path = Some(path.clone());
         self.language = language_for_path(&path);
+        self.rebuild_highlight_cache();
         self
     }
 
@@ -175,23 +281,27 @@ impl CodeViewerWidget {
     /// Set the theme for syntax highlighting
     pub fn with_theme(mut self, theme_name: String) -> Self {
         self.theme_name = Some(theme_name);
+        self.rebuild_highlight_cache();
         self
     }
 
     /// Enable or disable syntax highlighting
     pub fn with_syntax_highlighting(mut self, enabled: bool) -> Self {
         self.syntax_highlighting = enabled;
+        self.rebuild_highlight_cache();
         self
     }
 
     /// Enable syntax highlighting
     pub fn enable_syntax_highlighting(&mut self) {
         self.syntax_highlighting = true;
+        self.rebuild_highlight_cache();
     }
 
     /// Disable syntax highlighting
     pub fn disable_syntax_highlighting(&mut self) {
         self.syntax_highlighting = false;
+        self.rebuild_highlight_cache();
     }
 
     /// Check if syntax highlighting is enabled
@@ -202,11 +312,12 @@ impl CodeViewerWidget {
     /// Set the theme for syntax highlighting
     pub fn set_theme(&mut self, theme_name: String) {
         self.theme_name = Some(theme_name);
+        self.rebuild_highlight_cache();
     }
 
     /// Get the total number of lines
     pub fn line_count(&self) -> usize {
-        self.contents.lines().count()
+        self.highlighted_lines.len()
     }
 
     /// Get the syntax for highlighting based on language
@@ -223,64 +334,116 @@ impl CodeViewerWidget {
         theme_set.themes[theme_name].clone()
     }
 
-    /// Get visible lines based on scroll position with optional syntax highlighting
-    pub fn visible_lines(&self, state: &CodeViewerState) -> Vec<Line<'static>> {
+    /// Recompute the cached, syntax-highlighted representation of the whole file.
+    ///
+    /// This is the only place syntax highlighting actually runs; it must only be called when
+    /// `contents`/`language`/`theme_name`/`syntax_highlighting` change, never per-frame.
+    fn rebuild_highlight_cache(&mut self) {
         let lines: Vec<&str> = self.contents.lines().collect();
-        let total_lines = lines.len();
 
-        if total_lines == 0 {
-            return vec![Line::from("")];
-        }
-
-        // Clamp scroll position
-        let scroll = state.scroll.min(total_lines.saturating_sub(1));
-
-        // Get visible lines
-        let start = scroll;
-        let end = std::cmp::min(start + state.viewport_height, total_lines);
-
-        // Try to highlight the lines if syntax highlighting is enabled
-        if self.syntax_highlighting {
-            if let Ok(highlighted) = self.highlight_lines(&lines[start..end]) {
-                return highlighted;
-            }
-        }
-
-        // Fallback to plain text (either syntax highlighting disabled or failed)
-        lines[start..end]
-            .iter()
-            .map(|&line| Line::from(line.to_string()))
-            .collect()
+        self.highlighted_lines = if self.syntax_highlighting {
+            self.highlight_lines(&lines).unwrap_or_else(|_| {
+                lines
+                    .iter()
+                    .map(|&line| Line::from(line.to_string()))
+                    .collect()
+            })
+        } else {
+            lines
+                .iter()
+                .map(|&line| Line::from(line.to_string()))
+                .collect()
+        };
     }
 
     /// Highlight lines using syntect directly
     fn highlight_lines(&self, lines: &[&str]) -> Result<Vec<Line<'static>>> {
         let syntax = match self.get_syntax() {
             Some(s) => s,
-            None => return Ok(lines.iter().map(|&line| Line::from(line.to_string())).collect()),
+            None => {
+                return Ok(lines
+                    .iter()
+                    .map(|&line| Line::from(line.to_string()))
+                    .collect());
+            }
         };
-        
+
         let theme = self.get_theme();
-        
-        // Create a highlighter
         let mut highlighter = syntect::easy::HighlightLines::new(syntax, &theme);
-        
-        // Highlight each line individually
         let mut result = Vec::with_capacity(lines.len());
-        
+
         for &line in lines {
-            let regions: Vec<(syntect::highlighting::Style, &str)> = highlighter.highlight_line(line, syntax_set())?;
-            
-            // Build a Line from the highlighted regions
-            let spans: Vec<Span> = regions.into_iter().map(|(style, text)| {
-                let color = syntect_color_to_ratatui(style.foreground);
-                Span::styled(text.to_string(), Style::new().fg(color))
-            }).collect();
-            
+            let regions: Vec<(syntect::highlighting::Style, &str)> =
+                highlighter.highlight_line(line, syntax_set())?;
+
+            let spans: Vec<Span> = regions
+                .into_iter()
+                .map(|(style, text)| {
+                    let color = syntect_color_to_ratatui(style.foreground);
+                    Span::styled(text.to_string(), Style::new().fg(color))
+                })
+                .collect();
+
             result.push(Line::from(spans));
         }
-        
+
         Ok(result)
+    }
+
+    /// Get visible lines based on scroll position, with the diff/cursor overlay applied.
+    pub fn visible_lines(&self, state: &CodeViewerState) -> Vec<Line<'static>> {
+        let total_lines = self.highlighted_lines.len();
+
+        if total_lines == 0 {
+            return vec![Line::from("")];
+        }
+
+        let scroll = state.scroll.min(total_lines.saturating_sub(1));
+        let start = scroll;
+        let end = std::cmp::min(start + state.viewport_height, total_lines);
+
+        (start..end)
+            .map(|row| self.overlay_row(row, state))
+            .collect()
+    }
+
+    /// Apply diff coloring, the cross-panel highlight, and the cursor marker to one row.
+    fn overlay_row(&self, row: usize, state: &CodeViewerState) -> Line<'static> {
+        let mut line = self.highlighted_lines[row].clone();
+        let row_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+
+        for (index, range_match) in state.ranges.iter().enumerate() {
+            let Some((start_col, end_col)) = columns_on_row(&range_match.source, row, row_len)
+            else {
+                continue;
+            };
+
+            if let Some(bg) = background_for_operation(&range_match.operation) {
+                line = paint_columns(&line, start_col, end_col, Style::new().bg(bg));
+            }
+
+            if index == state.cursor {
+                line = paint_columns(
+                    &line,
+                    start_col,
+                    end_col,
+                    Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                );
+            }
+        }
+
+        if let Some(destination) = &state.highlight_destination
+            && let Some((start_col, end_col)) = columns_on_row(destination, row, row_len)
+        {
+            line = paint_columns(
+                &line,
+                start_col,
+                end_col,
+                Style::new().bg(CROSS_HIGHLIGHT_BG),
+            );
+        }
+
+        line
     }
 
     /// Get the filename for display
@@ -309,57 +472,7 @@ impl CodeViewerWidget {
     }
 }
 
-impl Widget for &CodeViewerWidget {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(self.display_title(), Style::new().bold().fg(Color::Cyan)),
-                Span::raw(" - "),
-                Span::styled(self.language_name(), Style::new().fg(Color::Gray)),
-            ]))
-            .borders(Borders::ALL)
-            .border_set(border::ROUNDED)
-            .border_style(Style::new().fg(Color::Gray));
-
-        let inner = block.inner(area);
-        block.render(area, buf);
-
-        // For widget rendering, we just show all lines
-        // The scroll state is managed by the component
-        let lines: Vec<&str> = self.contents.lines().collect();
-
-        if lines.is_empty() {
-            buf.set_line(inner.x, inner.y, &Line::from(""), inner.width);
-        } else {
-            // Render all lines that fit in the area
-            let max_lines = inner.height as usize;
-            let lines_to_render = &lines[..max_lines.min(lines.len())];
-            
-            // Try to highlight if syntax highlighting is enabled
-            if self.syntax_highlighting {
-                if let Ok(highlighted) = self.highlight_lines(lines_to_render) {
-                    for (i, line) in highlighted.iter().enumerate() {
-                        let y = inner.y + i as u16;
-                        if y < inner.y + inner.height {
-                            buf.set_line(inner.x, y, line, inner.width);
-                        }
-                    }
-                    return;
-                }
-            }
-
-            // Fallback to plain text
-            for (i, &line) in lines_to_render.iter().enumerate() {
-                let y = inner.y + i as u16;
-                if y < inner.y + inner.height {
-                    buf.set_line(inner.x, y, &Line::from(line.to_string()), inner.width);
-                }
-            }
-        }
-    }
-}
-
-impl StatefulWidget for CodeViewerWidget {
+impl StatefulWidget for &CodeViewerWidget {
     type State = CodeViewerState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
@@ -376,13 +489,11 @@ impl StatefulWidget for CodeViewerWidget {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        // Get visible lines based on scroll state with syntax highlighting
         let lines = self.visible_lines(state);
 
         if lines.is_empty() {
             buf.set_line(inner.x, inner.y, &Line::from(""), inner.width);
         } else {
-            // Render visible lines
             for (i, line) in lines.iter().enumerate() {
                 let y = inner.y + i as u16;
                 if y < inner.y + inner.height {
@@ -390,14 +501,5 @@ impl StatefulWidget for CodeViewerWidget {
                 }
             }
         }
-    }
-}
-
-impl StatefulWidget for &CodeViewerWidget {
-    type State = CodeViewerState;
-
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        // Clone and delegate to the owned version
-        self.clone().render(area, buf, state)
     }
 }

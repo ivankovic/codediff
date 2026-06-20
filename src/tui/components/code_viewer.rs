@@ -22,7 +22,10 @@ use ratatui::{Frame, layout::Rect};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
+use crate::diff::text::RangeMatch;
+use crate::diff::text_range::TextRange;
 use crate::tui::actions::Action;
+use crate::tui::widgets::code_viewer::is_empty_range;
 
 /// A component that displays source code
 ///
@@ -55,9 +58,22 @@ impl CodeViewer {
     /// Load a file into the viewer
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
         self.widget.load_file(path)?;
-        // Reset scroll position
-        self.state.scroll = 0;
+        self.reset_state();
         Ok(())
+    }
+
+    /// Load already-read contents into the viewer (no filesystem access).
+    pub fn load_contents(&mut self, path: PathBuf, contents: String) {
+        self.widget.load_contents(path, contents);
+        self.reset_state();
+    }
+
+    /// Reset scroll/diff/cursor state, e.g. after loading a new file.
+    fn reset_state(&mut self) {
+        self.state.scroll = 0;
+        self.state.ranges.clear();
+        self.state.cursor = 0;
+        self.state.highlight_destination = None;
     }
 
     /// Get the total number of lines
@@ -83,6 +99,71 @@ impl CodeViewer {
     /// Scroll to a specific line
     pub fn scroll_to(&mut self, line: usize) {
         self.state.scroll = line.min(self.line_count().saturating_sub(1));
+    }
+
+    /// Set the diff ranges for this side (as returned by `TextDiff::all`), and place the cursor
+    /// on the first navigable (non zero-width) range.
+    pub fn set_ranges(&mut self, ranges: Vec<RangeMatch>) {
+        self.state.ranges = ranges;
+        self.state.cursor = self
+            .state
+            .ranges
+            .iter()
+            .position(|range_match| !is_empty_range(&range_match.source))
+            .unwrap_or(0);
+        self.state.highlight_destination = None;
+        self.scroll_to_cursor();
+    }
+
+    /// The destination range of the range the cursor currently sits on, i.e. the range to
+    /// cross-highlight on the other panel.
+    pub fn cursor_destination(&self) -> Option<TextRange> {
+        self.state
+            .ranges
+            .get(self.state.cursor)
+            .map(|range_match| range_match.destination.clone())
+    }
+
+    /// Set (or clear) the cross-highlighted range coming from the other panel's cursor.
+    pub fn set_highlight_destination(&mut self, destination: Option<TextRange>) {
+        self.state.highlight_destination = destination;
+    }
+
+    /// Move the cursor to the previous (`direction < 0`) or next (`direction > 0`) navigable
+    /// range, skipping zero-width alignment markers, and scroll to keep it visible.
+    pub fn move_cursor(&mut self, direction: i32) {
+        if self.state.ranges.is_empty() || direction == 0 {
+            return;
+        }
+
+        let len = self.state.ranges.len() as isize;
+        let mut index = self.state.cursor as isize;
+        loop {
+            index += direction.signum() as isize;
+            if index < 0 || index >= len {
+                return;
+            }
+            if !is_empty_range(&self.state.ranges[index as usize].source) {
+                self.state.cursor = index as usize;
+                self.scroll_to_cursor();
+                return;
+            }
+        }
+    }
+
+    /// Scroll the viewport so the cursor's range is visible.
+    fn scroll_to_cursor(&mut self) {
+        let Some(range_match) = self.state.ranges.get(self.state.cursor) else {
+            return;
+        };
+        let row = range_match.source.start_row;
+        if row < self.state.scroll {
+            self.state.scroll = row;
+        } else if self.state.viewport_height > 0
+            && row >= self.state.scroll + self.state.viewport_height
+        {
+            self.state.scroll = row.saturating_sub(self.state.viewport_height - 1);
+        }
     }
 
     /// Get the filename for display
@@ -158,11 +239,11 @@ impl Component for CodeViewer {
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
         match key.code {
             crossterm::event::KeyCode::Up => {
-                self.scroll_up();
+                self.move_cursor(-1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::Down => {
-                self.scroll_down();
+                self.move_cursor(1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {

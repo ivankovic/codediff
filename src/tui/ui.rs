@@ -26,10 +26,11 @@ use crossterm::{
     cursor,
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, KeyEventKind, poll, read,
+        Event as CrosstermEvent, EventStream, KeyEventKind,
     },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
+use futures::StreamExt;
 
 use ratatui::backend::CrosstermBackend as Backend;
 use tokio::{
@@ -93,45 +94,12 @@ impl UI {
     ) {
         let mut tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
         let mut render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
+        let mut crossterm_events = EventStream::new();
 
         // if this fails, then it's likely a bug in the calling code
         event_tx
             .send(Event::Init)
             .expect("failed to send init event");
-
-        // Spawn a blocking task for input that won't block the async runtime
-        let event_tx_input = event_tx.clone();
-        let input_cancellation = cancellation_token.clone();
-        tokio::task::spawn_blocking(move || {
-            let event_tx = event_tx_input;
-            loop {
-                if input_cancellation.is_cancelled() {
-                    break;
-                }
-                // Use non-blocking poll (zero timeout) for immediate keypress detection
-                if poll(Duration::from_millis(0)).unwrap_or(false) {
-                    if let Ok(crossterm_event) = read() {
-                        let event = match crossterm_event {
-                            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
-                                Event::Key(key)
-                            }
-                            CrosstermEvent::Mouse(mouse) => Event::Mouse(mouse),
-                            CrosstermEvent::Resize(x, y) => Event::Resize(x, y),
-                            CrosstermEvent::FocusLost => Event::FocusLost,
-                            CrosstermEvent::FocusGained => Event::FocusGained,
-                            CrosstermEvent::Paste(s) => Event::Paste(s),
-                            _ => continue,
-                        };
-                        if event_tx.send(event).is_err() {
-                            break;
-                        }
-                    }
-                } else {
-                    // No event available, yield to avoid busy looping but stay responsive
-                    std::thread::sleep(Duration::from_micros(100));
-                }
-            }
-        });
 
         loop {
             let event = tokio::select! {
@@ -140,12 +108,35 @@ impl UI {
                 }
                 _ = tick_interval.tick() => Event::Tick,
                 _ = render_interval.tick() => Event::Render,
+                maybe_crossterm_event = crossterm_events.next() => {
+                    match maybe_crossterm_event {
+                        Some(Ok(crossterm_event)) => match Self::map_crossterm_event(crossterm_event) {
+                            Some(event) => event,
+                            None => continue,
+                        },
+                        Some(Err(_)) | None => break,
+                    }
+                }
             };
             if event_tx.send(event).is_err() {
                 break;
             }
         }
         cancellation_token.cancel();
+    }
+
+    /// Map a raw crossterm event onto our own [`Event`] enum, dropping the ones we don't care
+    /// about (e.g. key release events, which crossterm only emits on some platforms).
+    fn map_crossterm_event(crossterm_event: CrosstermEvent) -> Option<Event> {
+        match crossterm_event {
+            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => Some(Event::Key(key)),
+            CrosstermEvent::Key(_) => None,
+            CrosstermEvent::Mouse(mouse) => Some(Event::Mouse(mouse)),
+            CrosstermEvent::Resize(x, y) => Some(Event::Resize(x, y)),
+            CrosstermEvent::FocusLost => Some(Event::FocusLost),
+            CrosstermEvent::FocusGained => Some(Event::FocusGained),
+            CrosstermEvent::Paste(s) => Some(Event::Paste(s)),
+        }
     }
 
     pub fn enter(&mut self) -> Result<()> {

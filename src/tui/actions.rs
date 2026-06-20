@@ -15,10 +15,35 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
 use strum::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
+use crate::diff::text::RangeMatch;
+
+/// One entry in a directory listing shown by the file dialog.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DirEntryInfo {
+    pub name: String,
+    pub path: PathBuf,
+    pub is_dir: bool,
+}
+
+/// Everything the diff viewer needs to display a completed before/after diff.
+///
+/// Holds the already-read file contents (not just paths) so the UI thread never has to do a
+/// blocking filesystem read after the background diff computation completes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiffSessionData {
+    pub before_path: PathBuf,
+    pub after_path: PathBuf,
+    pub before_contents: String,
+    pub after_contents: String,
+    pub before_ranges: Vec<RangeMatch>,
+    pub after_ranges: Vec<RangeMatch>,
+}
+
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum Action {
     Tick,
     Render,
@@ -29,4 +54,16 @@ pub enum Action {
     ClearScreen,
     Error(String),
     Help,
+    /// A directory listing for the file dialog finished loading.
+    DirectoryListed(PathBuf, Vec<DirEntryInfo>),
+    /// The user confirmed a file selection in the file dialog.
+    FileSelected(PathBuf),
+    /// The user cancelled the file dialog.
+    DialogCancelled,
+    /// Both before/after files are known; kick off the (background) diff computation.
+    StartDiff(PathBuf, PathBuf),
+    /// The background diff computation finished successfully.
+    DiffReady(DiffSessionData),
+    /// The background diff computation failed.
+    DiffFailed(String),
 }

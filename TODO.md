@@ -1,8 +1,14 @@
 # Next features to implement
 
-*  UI that shows the mapping
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
+
+# TUI follow-ups
+
+*  Mouse support and bracketed paste handling in the TUI.
+*  Re-review TUI suspend/resume (Ctrl-Z) behavior, not touched since the async event loop rewrite.
+*  Headless mode (`--headless`) is still unimplemented.
+*  Revisit the `Update` diff color (currently magenta) once seen against more real diffs.
 
 # Benchmarking
 

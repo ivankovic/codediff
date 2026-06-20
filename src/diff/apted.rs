@@ -184,7 +184,8 @@ impl PostorderIndexer {
             }
         }
 
-        let post_to_node_id: Vec<usize> = post_to_pre.iter().map(|&pre| pre_to_node_id[pre]).collect();
+        let post_to_node_id: Vec<usize> =
+            post_to_pre.iter().map(|&pre| pre_to_node_id[pre]).collect();
 
         PostorderIndexer {
             size,
@@ -446,7 +447,14 @@ fn compute_edit_mapping(
     while let Some((last_row, last_col)) = tree_pairs.pop() {
         if !root_node_pair {
             forest_dist(
-                before, after, before_meta, after_meta, cost_model, delta, last_row, last_col,
+                before,
+                after,
+                before_meta,
+                after_meta,
+                cost_model,
+                delta,
+                last_row,
+                last_col,
                 &mut forestdist,
             );
         }
@@ -572,7 +580,10 @@ fn classify_match(
     if before_info.kind != after_info.kind {
         // Should not happen in practice: UnitCostModel::ren makes this strictly more expensive
         // than a separate delete + insert, so compute_edit_mapping should never choose it.
-        return (ASTMappingOperation::Update, cost_model.ren(before_info, after_info));
+        return (
+            ASTMappingOperation::Update,
+            cost_model.ren(before_info, after_info),
+        );
     }
 
     if before_info.children.is_empty() && after_info.children.is_empty() {
@@ -601,8 +612,13 @@ fn emit_match(before_id: usize, after_id: usize, ctx: &ResolveCtx, diff: &mut AS
         return mapping.cost;
     }
 
-    let (operation, root_cost) =
-        classify_match(before_id, after_id, ctx.before_meta, ctx.after_meta, &UnitCostModel);
+    let (operation, root_cost) = classify_match(
+        before_id,
+        after_id,
+        ctx.before_meta,
+        ctx.after_meta,
+        &UnitCostModel,
+    );
     let mut total = root_cost;
 
     if let Some(info) = ctx.before_meta.node_info.get(&before_id) {
@@ -637,7 +653,12 @@ fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -
         return emit_match(before_id, *after_id, ctx, diff);
     }
 
-    if !ctx.before_has_match_below.get(&before_id).copied().unwrap_or(false) {
+    if !ctx
+        .before_has_match_below
+        .get(&before_id)
+        .copied()
+        .unwrap_or(false)
+    {
         add_delete_mappings(before_id, ctx.before_meta, diff);
         return subtree_del_cost(before_id, ctx.before_meta, &UnitCostModel);
     }
@@ -667,7 +688,12 @@ fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> 
         return emit_match(*before_id, after_id, ctx, diff);
     }
 
-    if !ctx.after_has_match_below.get(&after_id).copied().unwrap_or(false) {
+    if !ctx
+        .after_has_match_below
+        .get(&after_id)
+        .copied()
+        .unwrap_or(false)
+    {
         add_insert_mappings(after_id, ctx.after_meta, diff);
         return subtree_ins_cost(after_id, ctx.after_meta, &UnitCostModel);
     }
@@ -1151,7 +1177,9 @@ mod tests {
             &["if_statement", "block", "expression_statement:2"],
         )?;
         assert!(
-            diff.before_node_map.get(&print_call_before.id()).is_none_or(|&id| id != 0),
+            diff.before_node_map
+                .get(&print_call_before.id())
+                .is_none_or(|&id| id != 0),
             "the reused print(...) call should be matched, not deleted"
         );
 
@@ -1329,7 +1357,9 @@ mod tests {
             &["if_statement", "block", "expression_statement:4"],
         )?;
         assert!(
-            diff.before_node_map.get(&print_call_before.id()).is_none_or(|&id| id != 0),
+            diff.before_node_map
+                .get(&print_call_before.id())
+                .is_none_or(|&id| id != 0),
             "the reused print(...) call should be matched, not deleted"
         );
 
@@ -1371,10 +1401,17 @@ mod tests {
         // as the new `else if`'s content, not deleted and rebuilt.
         let original_if = helper::node_for_path(
             before_root,
-            &["function_item", "block", "expression_statement", "if_expression"],
+            &[
+                "function_item",
+                "block",
+                "expression_statement",
+                "if_expression",
+            ],
         )?;
         assert!(
-            diff.before_node_map.get(&original_if.id()).is_none_or(|&id| id != 0),
+            diff.before_node_map
+                .get(&original_if.id())
+                .is_none_or(|&id| id != 0),
             "the reused if/else should be matched, not deleted"
         );
 

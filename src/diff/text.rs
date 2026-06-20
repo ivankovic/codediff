@@ -54,7 +54,6 @@ fn ranges(
     diff: &ASTDiff,
     node_cache: &NodeCache,
 ) -> Vec<RangeMatch> {
-    println!("**************************************************************");
     let mut ranges = Vec::new();
 
     // Compute columns per row for source and destination
@@ -101,8 +100,6 @@ fn ranges(
             let mut current_range = RangeMatch::zero();
 
             while let Some(node) = stack.pop() {
-                println!("Nodus: {} {:?}", node.kind(), node.range());
-
                 if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
                     let mut new_range = None;
                     let mut descend = true;
@@ -110,10 +107,8 @@ fn ranges(
                     match mapping.operation {
                         ASTMappingOperation::Identical => {
                             if let Some(destination_node) = node_cache.get_in_any(&mapped_id) {
-                                let s = TextRange::from_treesitter_range(
-                                    node.range(),
-                                    &source_columns,
-                                );
+                                let s =
+                                    TextRange::from_treesitter_range(node.range(), &source_columns);
                                 let d = TextRange::from_treesitter_range(
                                     destination_node.range(),
                                     &destination_columns,
@@ -127,7 +122,6 @@ fn ranges(
                                 // become the new `last_non_move_range` anchor since its position
                                 // is out of the normal sequential flow.
                                 if s.start_column == d.start_column {
-                                    println!("  ^- IDENTICAL");
                                     last_non_move_range = d.clone();
 
                                     new_range = Some(RangeMatch {
@@ -136,7 +130,6 @@ fn ranges(
                                         operation: TextOperation::Identical,
                                     });
                                 } else {
-                                    println!("  ^- MOVE");
                                     new_range = Some(RangeMatch {
                                         source: s,
                                         destination: d,
@@ -148,7 +141,6 @@ fn ranges(
                             }
                         }
                         ASTMappingOperation::DeleteWithChildren => {
-                            println!("  ^- TREE DELETION",);
                             // We are adding to the "end" of the last used range, so move it to the
                             // right limit.
                             last_non_move_range = last_non_move_range.right_limit();
@@ -165,7 +157,6 @@ fn ranges(
                             descend = false;
                         }
                         ASTMappingOperation::InsertWithChildren => {
-                            println!("  ^- TREE INSERTION",);
                             // We are adding to the "end" of the last used range, so move it to the
                             // right limit.
                             last_non_move_range = last_non_move_range.right_limit();
@@ -183,7 +174,6 @@ fn ranges(
                         }
                         ASTMappingOperation::Delete => {
                             if node.child_count() == 0 {
-                                println!("  ^- LEAF NODE DELETION",);
                                 last_non_move_range = last_non_move_range.right_limit();
 
                                 new_range = Some(RangeMatch {
@@ -198,7 +188,6 @@ fn ranges(
                         }
                         ASTMappingOperation::Insert => {
                             if node.child_count() == 0 {
-                                println!("  ^- LEAF NODE INSERTION",);
                                 last_non_move_range = last_non_move_range.right_limit();
 
                                 new_range = Some(RangeMatch {
@@ -212,7 +201,6 @@ fn ranges(
                             }
                         }
                         ASTMappingOperation::Update => {
-                            println!("  ^- UPDATE",);
                             // We are adding to the "end" of the last used range, so move it to the
                             // right limit.
                             last_non_move_range = last_non_move_range.right_limit();
@@ -228,7 +216,6 @@ fn ranges(
                         }
                         _ => {
                             // For other operations, just allow the descent into the tree
-                            println!("  ^ No idea what {:?} is", mapping.operation);
                         }
                     }
 
@@ -238,11 +225,9 @@ fn ranges(
                             &source.contents,
                             &destination.contents,
                         ) {
-                            println!("  |- Range merge");
                             current_range.extend_into(&new_range);
                         } else {
                             if !current_range.is_zero() {
-                                println!("  |- Range pushed: {:?}", current_range);
                                 ranges.push(current_range);
                             }
                             current_range = new_range;
@@ -316,15 +301,6 @@ impl TextDiff {
 
         let before_ranges = merge_ranges(&before_ranges_plain, &after_ranges_plain);
         let after_ranges = merge_ranges(&after_ranges_plain, &before_ranges_plain);
-
-        println!("BEFORE RANGES:");
-        for range in before_ranges.iter() {
-            println!("{:?}", range);
-        }
-        println!("AFTER RANGES:");
-        for range in after_ranges.iter() {
-            println!("{:?}", range);
-        }
 
         Self {
             before_ranges,
