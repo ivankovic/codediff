@@ -33,4 +33,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# AI stuff
 .serena
+.claude

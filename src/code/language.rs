@@ -23,6 +23,12 @@ use crate::code::Language;
 */
 pub fn language_for_path(path: &std::path::Path) -> Option<Language> {
     let ext = path.extension()?.to_string_lossy().to_ascii_lowercase();
+    if ext == "test" {
+        // Test fixtures are named e.g. `before.py.test` so the test harness can strip the
+        // `.test` suffix before treating them as real source; recognize the inner extension too,
+        // so opening one directly (e.g. in the TUI) still detects its real language.
+        return language_for_path(std::path::Path::new(path.file_stem()?));
+    }
     language_for_extension(ext.as_str())
 }
 
@@ -119,5 +125,21 @@ mod tests {
         // C and C++ share header file extensions. We default to C.
         assert_eq!(language_for_extension("h"), Some(Language::C));
         assert_eq!(language_for_extension("hpp"), Some(Language::CPP));
+    }
+
+    #[test]
+    fn language_for_path_strips_test_suffix() {
+        // Test fixtures are named e.g. `before.py.test`; opening one directly should still
+        // detect the real (inner) language rather than failing on the literal `.test` extension.
+        assert_eq!(
+            language_for_path(std::path::Path::new("before.py.test")),
+            Some(Language::Python)
+        );
+        assert_eq!(
+            language_for_path(std::path::Path::new("foo.rs.test")),
+            Some(Language::Rust)
+        );
+        // No inner extension to fall back to.
+        assert_eq!(language_for_path(std::path::Path::new("foo.test")), None);
     }
 }
