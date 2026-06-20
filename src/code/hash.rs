@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use anyhow::Result;
+use anyhow::{Context, Result};
 use metrohash::MetroHash64;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hasher;
@@ -64,7 +64,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     let ast = code
         .ast
         .as_ref()
-        .expect("AST must be parsed before hashing");
+        .context("AST must be parsed before hashing")?;
     let root_node = ast.root_node();
 
     let mut cursor = root_node.walk();
