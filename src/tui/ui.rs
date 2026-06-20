@@ -18,22 +18,30 @@
 use std::{
     io::{Stdout, stdout},
     ops::{Deref, DerefMut},
+    time::Duration,
 };
 
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
+    event::{
+        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        Event as CrosstermEvent, EventStream,
+    },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
+use futures::StreamExt;
+use ratatui::{backend::CrosstermBackend as Backend, layout::Rect};
+use tokio::time::{Interval, interval};
 
-use ratatui::backend::CrosstermBackend as Backend;
+use crate::tui::events::Event;
 
-/// Owns the terminal and its raw-mode/alternate-screen lifecycle.
+/// Owns the terminal and its raw-mode/alternate-screen lifecycle, plus the merged input/tick/
+/// render event source.
 ///
-/// Ticking, rendering and input are driven directly by `App::run`'s own `tokio::select!` loop
-/// (see `app.rs`) rather than by a background task here, so that input is never stuck behind a
-/// backlog of unrelated timer events.
+/// Terminal input comes from `crossterm::event::EventStream`, an async epoll-driven stream, not
+/// from a dedicated polling thread: see `next_event` below and the "Async event loop" entry in
+/// `SPECS.md` for why a background thread/task was deliberately avoided.
 pub struct UI {
     pub terminal: ratatui::Terminal<Backend<Stdout>>,
 
@@ -42,29 +50,72 @@ pub struct UI {
 
     pub mouse: bool,
     pub paste: bool,
+
+    tick_interval: Interval,
+    render_interval: Interval,
+    crossterm_events: EventStream,
 }
 
 impl UI {
     pub fn new() -> Result<Self> {
+        let tick_rate = 4.0;
+        let frame_rate = 60.0;
         Ok(Self {
             terminal: ratatui::Terminal::new(Backend::new(stdout()))?,
 
-            tick_rate: 4.0,
-            frame_rate: 60.0,
+            tick_rate,
+            frame_rate,
 
             mouse: false,
             paste: false,
+
+            tick_interval: interval(Duration::from_secs_f64(1.0 / tick_rate)),
+            render_interval: interval(Duration::from_secs_f64(1.0 / frame_rate)),
+            crossterm_events: EventStream::new(),
         })
     }
 
     pub fn tick_rate(mut self, tick_rate: f64) -> Self {
         self.tick_rate = tick_rate;
+        self.tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
         self
     }
 
     pub fn frame_rate(mut self, frame_rate: f64) -> Self {
         self.frame_rate = frame_rate;
+        self.render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
         self
+    }
+
+    /// The current terminal size.
+    pub fn size(&self) -> Result<Rect> {
+        Ok(self.terminal.size()?)
+    }
+
+    /// Resize the terminal's internal buffers to match a new size (call after a resize event).
+    pub fn resize(&mut self, area: Rect) -> Result<()> {
+        self.terminal.resize(area)?;
+        Ok(())
+    }
+
+    /// Wait for the next tick, render timer, or terminal input event, merging all three into a
+    /// single source. Returns `None` only once the input stream itself has closed (e.g. stdin
+    /// was closed), since that means there will never be another event.
+    pub async fn next_event(&mut self) -> Option<Event> {
+        loop {
+            let event = tokio::select! {
+                _ = self.tick_interval.tick() => Some(Event::Tick),
+                _ = self.render_interval.tick() => Some(Event::Render),
+                maybe_event = self.crossterm_events.next() => match maybe_event {
+                    Some(Ok(event)) => map_crossterm_event(event),
+                    Some(Err(_)) => None,
+                    None => return None,
+                },
+            };
+            if let Some(event) = event {
+                return Some(event);
+            }
+        }
     }
 
     pub fn enter(&mut self) -> Result<()> {
@@ -124,5 +175,16 @@ impl DerefMut for UI {
 impl Drop for UI {
     fn drop(&mut self) {
         self.exit().unwrap();
+    }
+}
+
+/// Map a raw crossterm event onto our own `Event`, dropping the kinds the app has no use for
+/// (focus gained/lost, bracketed paste) rather than threading them through everywhere.
+fn map_crossterm_event(event: CrosstermEvent) -> Option<Event> {
+    match event {
+        CrosstermEvent::Key(key) => Some(Event::Key(key)),
+        CrosstermEvent::Mouse(mouse) => Some(Event::Mouse(mouse)),
+        CrosstermEvent::Resize(w, h) => Some(Event::Resize(w, h)),
+        _ => None,
     }
 }

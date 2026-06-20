@@ -18,14 +18,14 @@
 pub mod code_viewer;
 pub mod diff_viewer;
 pub mod file_dialog;
-pub mod overview;
 
 use anyhow::Result;
-use crossterm::event::{Event, KeyEvent, MouseEvent};
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::tui::actions::Action;
+use crate::tui::events::Event;
 
 /// A visual and interactive element of the TUI.
 pub trait Component {
@@ -59,12 +59,16 @@ pub trait Component {
     ///
     /// # Arguments
     ///
-    /// * `event` - The event to be processed.
+    /// * `event` - The event to be processed, or `None` if the caller has nothing for this
+    ///   component this tick.
     ///
     /// # Returns
     ///
     /// * [`Result<Option<Action>>`] - An action to be processed or none.
-    fn handle_events(&mut self, event: Event) -> Result<Option<Action>> {
+    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
+        let Some(event) = event else {
+            return Ok(None);
+        };
         let action = match event {
             Event::Key(key_event) => self.handle_key_event(key_event)?,
             Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event)?,

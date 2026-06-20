@@ -29,19 +29,20 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, code_viewer::CodeViewer};
 use crate::tui::actions::{Action, DiffSessionData};
 
-/// A component that displays two files side by side for diffing
+/// A component that displays the before/after files side by side for diffing
 #[derive(Default)]
 pub struct DiffViewer {
-    /// The left (before) code viewer
+    /// The "Before" code viewer
     left_viewer: CodeViewer,
-    /// The right (after) code viewer
+    /// The "After" code viewer
     right_viewer: CodeViewer,
     /// Action sender
     command_tx: Option<UnboundedSender<Action>>,
     /// Current display mode: dual panel or single panel
     display_mode: DisplayMode,
-    /// Which panel is shown in single panel mode
-    active_panel: ActivePanel,
+    /// Which panel is shown in single panel mode, and which panel's cursor drives navigation
+    /// (and which panel `o` opens a file selector for) in dual panel mode.
+    active_panel: Panel,
 }
 
 /// Display mode for the diff viewer
@@ -54,15 +55,12 @@ enum DisplayMode {
     Single,
 }
 
-/// Which panel is active in single panel mode, and which panel's cursor drives navigation
-/// (and the other panel's cross-highlight) in dual panel mode.
-#[derive(Default, Clone, Copy, PartialEq)]
-enum ActivePanel {
-    /// Showing the left (before) panel
+/// Which of the two panels is active.
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum Panel {
     #[default]
-    Left,
-    /// Showing the right (after) panel
-    Right,
+    Before,
+    After,
 }
 
 impl DiffViewer {
@@ -96,7 +94,7 @@ impl DiffViewer {
             .load_contents(data.after_path.clone(), data.after_contents.clone());
         self.left_viewer.set_ranges(data.before_ranges.clone());
         self.right_viewer.set_ranges(data.after_ranges.clone());
-        self.active_panel = ActivePanel::Left;
+        self.active_panel = Panel::Before;
         self.sync_cross_highlight();
     }
 
@@ -117,33 +115,38 @@ impl DiffViewer {
     /// The panel whose cursor currently drives navigation.
     fn focused_viewer(&mut self) -> &mut CodeViewer {
         match self.active_panel {
-            ActivePanel::Left => &mut self.left_viewer,
-            ActivePanel::Right => &mut self.right_viewer,
+            Panel::Before => &mut self.left_viewer,
+            Panel::After => &mut self.right_viewer,
         }
     }
 
     /// The panel that is cross-highlighted from the focused panel's cursor.
     fn other_viewer(&mut self) -> &mut CodeViewer {
         match self.active_panel {
-            ActivePanel::Left => &mut self.right_viewer,
-            ActivePanel::Right => &mut self.left_viewer,
+            Panel::Before => &mut self.right_viewer,
+            Panel::After => &mut self.left_viewer,
         }
     }
 
-    /// Set the file for the left viewer
-    pub fn set_left_file(&mut self, path: PathBuf) -> Result<()> {
+    /// Which panel is currently active, i.e. which one `Tab` last selected.
+    pub fn active_panel(&self) -> Panel {
+        self.active_panel
+    }
+
+    /// Load a single file (no diff overlay yet) into the "Before" panel.
+    pub fn set_before_file(&mut self, path: PathBuf) -> Result<()> {
         self.left_viewer.load_file(path)
     }
 
-    /// Set the file for the right viewer
-    pub fn set_right_file(&mut self, path: PathBuf) -> Result<()> {
+    /// Load a single file (no diff overlay yet) into the "After" panel.
+    pub fn set_after_file(&mut self, path: PathBuf) -> Result<()> {
         self.right_viewer.load_file(path)
     }
 
     /// Update display mode based on available width
     pub fn update_display_mode(&mut self, width: u16) {
         // Below this width, two side-by-side panels would each be too narrow to read code in.
-        const SINGLE_PANEL_THRESHOLD: u16 = 120;
+        const SINGLE_PANEL_THRESHOLD: u16 = 220;
         self.display_mode = if width < SINGLE_PANEL_THRESHOLD {
             DisplayMode::Single
         } else {
@@ -151,27 +154,27 @@ impl DiffViewer {
         };
     }
 
-    /// Toggle between left and right panel in single panel mode
+    /// Toggle between the "Before" and "After" panel.
     pub fn toggle_active_panel(&mut self) {
         self.active_panel = match self.active_panel {
-            ActivePanel::Left => ActivePanel::Right,
-            ActivePanel::Right => ActivePanel::Left,
+            Panel::Before => Panel::After,
+            Panel::After => Panel::Before,
         };
     }
 
     /// Get the filename of the active viewer
     fn active_filename(&self) -> String {
         match self.active_panel {
-            ActivePanel::Left => self.left_viewer.filename(),
-            ActivePanel::Right => self.right_viewer.filename(),
+            Panel::Before => self.left_viewer.filename(),
+            Panel::After => self.right_viewer.filename(),
         }
     }
 
     /// Get the language name of the active viewer
     fn active_language(&self) -> String {
         match self.active_panel {
-            ActivePanel::Left => self.left_viewer.language_name(),
-            ActivePanel::Right => self.right_viewer.language_name(),
+            Panel::Before => self.left_viewer.language_name(),
+            Panel::After => self.right_viewer.language_name(),
         }
     }
 }
@@ -221,11 +224,14 @@ impl Component for DiffViewer {
                 self.sync_cross_highlight();
                 Ok(Some(Action::Render))
             }
-            crossterm::event::KeyCode::Up => {
+            // The cursor is an index into a flat, document-ordered list of leaf ranges (see
+            // SPECS.md), not a 2D grid, so h/k and j/l are deliberately redundant pairs rather
+            // than distinct "left/right" vs "up/down" movements.
+            crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k' | 'h') => {
                 self.move_cursor(-1);
                 Ok(Some(Action::Render))
             }
-            crossterm::event::KeyCode::Down => {
+            crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j' | 'l') => {
                 self.move_cursor(1);
                 Ok(Some(Action::Render))
             }
@@ -334,30 +340,24 @@ impl Component for DiffViewer {
                 area.height,
             );
 
-            // Draw left viewer (before)
-            let left_block = Block::default()
-                .title(Line::from(vec![Span::styled(
-                    " Before ",
-                    Style::new().bold().fg(Color::Red),
-                )]))
-                .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::new().fg(Color::Red));
-
+            let left_filename = self.left_viewer.filename_or_hint();
+            let left_block = panel_block(
+                " Before ",
+                Color::Red,
+                &left_filename,
+                self.active_panel == Panel::Before,
+            );
             let left_inner = left_block.inner(left_area);
             frame.render_widget(left_block, left_area);
             self.left_viewer.draw(frame, left_inner)?;
 
-            // Draw right viewer (after)
-            let right_block = Block::default()
-                .title(Line::from(vec![Span::styled(
-                    " After ",
-                    Style::new().bold().fg(Color::Green),
-                )]))
-                .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::new().fg(Color::Green));
-
+            let right_filename = self.right_viewer.filename_or_hint();
+            let right_block = panel_block(
+                " After ",
+                Color::Green,
+                &right_filename,
+                self.active_panel == Panel::After,
+            );
             let right_inner = right_block.inner(right_area);
             frame.render_widget(right_block, right_area);
             self.right_viewer.draw(frame, right_inner)?;
@@ -365,13 +365,13 @@ impl Component for DiffViewer {
             // Single panel mode: show only one panel at a time
             // Determine border color based on active panel
             let border_color = match self.active_panel {
-                ActivePanel::Left => Color::Red,
-                ActivePanel::Right => Color::Green,
+                Panel::Before => Color::Red,
+                Panel::After => Color::Green,
             };
 
             let panel_name = match self.active_panel {
-                ActivePanel::Left => " Before ",
-                ActivePanel::Right => " After ",
+                Panel::Before => " Before ",
+                Panel::After => " After ",
             };
 
             let filename = self.active_filename();
@@ -398,4 +398,22 @@ impl Component for DiffViewer {
 
         Ok(())
     }
+}
+
+/// Build a dual-mode panel's border block, showing a thicker border and a bold title on
+/// whichever side is active so `Tab` (and therefore `o`'s file-selector target) is visible.
+fn panel_block<'a>(name: &'static str, color: Color, filename: &str, active: bool) -> Block<'a> {
+    let title_style = if active {
+        Style::new().bold().fg(Color::Black).bg(color)
+    } else {
+        Style::new().bold().fg(color)
+    };
+    Block::default()
+        .title(Line::from(vec![
+            Span::styled(name, title_style),
+            Span::raw(format!(" {filename}")),
+        ]))
+        .borders(Borders::ALL)
+        .border_set(if active { border::THICK } else { border::ROUNDED })
+        .border_style(Style::new().fg(color))
 }

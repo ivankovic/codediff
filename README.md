@@ -23,6 +23,19 @@ In code, I accept less readable, more complex code if it is faster.
 
 Benchmarks are used to make sure performance doesn't regress.
 
+# Using the TUI
+
+`cargo run` opens a terminal UI with two panels, "Before" and "After". Terminals 220 columns or
+wider show both panels side by side; narrower terminals show one panel at a time.
+
+* `Tab` — switch the active panel.
+* `o` — open a file selector for the active panel. Once both panels have a file, the diff between
+  them is computed and drawn automatically (green = inserted, red = deleted, dark green = updated,
+  yellow = moved).
+* Arrow keys or `h`/`j`/`k`/`l` — move the cursor between changed ranges. The range under the
+  cursor, and the matching range on the other panel, are highlighted in blue.
+* `q` or `Esc` — quit (`Esc` cancels an open file selector instead, while one is open).
+
 # License
 
 Copyright (C) 2026 Marko Ivankovic

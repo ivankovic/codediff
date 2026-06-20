@@ -18,7 +18,8 @@
 use anyhow::{Context, Result};
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
     widgets::Paragraph,
 };
 use tokio::sync::mpsc;
@@ -30,7 +31,9 @@ use crate::code::Code;
 use crate::diff::{Diff, NodeCache, text::TextDiff};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
-    Component, diff_viewer::DiffViewer, file_dialog::FileDialog, overview::Overview,
+    Component,
+    diff_viewer::{DiffViewer, Panel},
+    file_dialog::FileDialog,
 };
 use crate::tui::events::Event;
 use crate::tui::ui::UI;
@@ -38,12 +41,13 @@ use crate::tui::ui::UI;
 /// Which top-level screen is currently shown.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AppScreen {
+    /// The Before/After panels, populated or not, with the normal diff-viewer key bindings live.
     #[default]
-    Overview,
-    SelectBeforeFile,
-    SelectAfterFile,
+    Viewer,
+    /// A file dialog is open, picking a file for `dialog_target`.
+    SelectFile,
+    /// The background diff computation is running.
     Diffing,
-    ShowDiff,
 }
 
 /// The codediff application. The state, but not the state machine or the UI, of the TUI.
@@ -51,7 +55,6 @@ pub struct App {
     tick_rate: f64,
     frame_rate: f64,
 
-    overview: Overview,
     diff_viewer: DiffViewer,
     file_dialog: Option<FileDialog>,
 
@@ -59,11 +62,14 @@ pub struct App {
     action_rx: mpsc::UnboundedReceiver<Action>,
 
     screen: AppScreen,
-    /// The before-file path, set once the first file dialog confirms a selection.
+    /// Which panel the open file dialog is selecting a file for.
+    dialog_target: Option<Panel>,
+    /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
-    /// Whether a diff has ever successfully completed, so cancelling a re-diff returns to
-    /// `ShowDiff` instead of `Overview`.
-    has_diff: bool,
+    /// The "After" file path, once a file has been picked for that panel.
+    after_path: Option<PathBuf>,
+    /// The most recent diff failure, shown as a one-line banner until the next file pick.
+    last_error: Option<String>,
 
     should_exit: bool,
     should_suspend: bool,
@@ -77,14 +83,15 @@ impl App {
         Ok(Self {
             tick_rate,
             frame_rate,
-            overview: Overview::new(),
             diff_viewer: DiffViewer::new(),
             file_dialog: None,
             action_tx,
             action_rx,
             screen: AppScreen::default(),
+            dialog_target: None,
             before_path: None,
-            has_diff: false,
+            after_path: None,
+            last_error: None,
             should_exit: false,
             should_suspend: false,
         })
@@ -96,11 +103,8 @@ impl App {
             .frame_rate(self.frame_rate);
         ui.enter()?;
 
-        self.overview
-            .register_action_handler(self.action_tx.clone())?;
         self.diff_viewer
             .register_action_handler(self.action_tx.clone())?;
-        self.overview.init(ui.size()?)?;
         self.diff_viewer.init(ui.size()?)?;
 
         let action_tx = self.action_tx.clone();
@@ -113,7 +117,6 @@ impl App {
                 action_tx.send(Action::ClearScreen)?;
                 ui.enter()?;
             } else if self.should_exit {
-                ui.stop()?;
                 break;
             }
         }
@@ -136,23 +139,20 @@ impl App {
                 KeyCode::Esc => {
                     // Inside a file dialog, Esc cancels the dialog (handled by the dialog
                     // itself via Action::DialogCancelled) rather than quitting the app.
-                    if !matches!(
-                        self.screen,
-                        AppScreen::SelectBeforeFile | AppScreen::SelectAfterFile
-                    ) {
+                    if self.screen != AppScreen::SelectFile {
                         action_tx.send(Action::Quit)?;
                     }
                 }
-                KeyCode::Char('o') if self.screen == AppScreen::ShowDiff => {
-                    self.screen = AppScreen::Overview;
-                    action_tx.send(Action::Render)?;
-                }
-                KeyCode::Char('d')
-                    if matches!(self.screen, AppScreen::Overview | AppScreen::ShowDiff) =>
-                {
-                    self.before_path = None;
-                    self.screen = AppScreen::SelectBeforeFile;
-                    self.open_file_dialog("Select the BEFORE file", ui)?;
+                KeyCode::Char('o') if self.screen == AppScreen::Viewer => {
+                    let panel = self.diff_viewer.active_panel();
+                    self.dialog_target = Some(panel);
+                    self.last_error = None;
+                    self.screen = AppScreen::SelectFile;
+                    let title = match panel {
+                        Panel::Before => "Select the BEFORE file",
+                        Panel::After => "Select the AFTER file",
+                    };
+                    self.open_file_dialog(title, ui)?;
                     action_tx.send(Action::Render)?;
                 }
                 _ => {}
@@ -160,12 +160,10 @@ impl App {
         }
 
         match event {
-            Event::Quit => action_tx.send(Action::Quit)?,
             Event::Tick => action_tx.send(Action::Tick)?,
             Event::Render => action_tx.send(Action::Render)?,
             Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
-            Event::Key(_) => {}
-            _ => {}
+            Event::Key(_) | Event::Mouse(_) => {}
         }
 
         if let Some(action) = self.dispatch_event_to_active_screen(event)? {
@@ -178,15 +176,12 @@ impl App {
     /// file dialog being open doesn't also feed arrow keys into the (hidden) diff viewer.
     fn dispatch_event_to_active_screen(&mut self, event: Event) -> Result<Option<Action>> {
         match self.screen {
-            AppScreen::Overview => self.overview.handle_events(Some(event)),
-            AppScreen::SelectBeforeFile | AppScreen::SelectAfterFile => {
-                match self.file_dialog.as_mut() {
-                    Some(dialog) => dialog.handle_events(Some(event)),
-                    None => Ok(None),
-                }
-            }
+            AppScreen::Viewer => self.diff_viewer.handle_events(Some(event)),
+            AppScreen::SelectFile => match self.file_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
             AppScreen::Diffing => Ok(None),
-            AppScreen::ShowDiff => self.diff_viewer.handle_events(Some(event)),
         }
     }
 
@@ -212,30 +207,26 @@ impl App {
                 Action::ClearScreen => ui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
-                Action::FileSelected(path) => self.handle_file_selected(path.clone(), ui)?,
+                Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
                 Action::DialogCancelled => self.handle_dialog_cancelled(),
                 Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
                     self.start_diff(before.clone(), after.clone());
                 }
                 Action::DiffReady(_) => {
-                    self.screen = AppScreen::ShowDiff;
-                    self.has_diff = true;
+                    self.screen = AppScreen::Viewer;
+                    self.last_error = None;
                     self.file_dialog = None;
                 }
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");
-                    self.screen = if self.has_diff {
-                        AppScreen::ShowDiff
-                    } else {
-                        AppScreen::Overview
-                    };
+                    self.last_error = Some(message.clone());
+                    self.screen = AppScreen::Viewer;
                     self.file_dialog = None;
                 }
                 _ => {}
             }
 
-            self.overview.update(action.clone())?;
             self.diff_viewer.update(action.clone())?;
             if let Some(dialog) = self.file_dialog.as_mut() {
                 dialog.update(action)?;
@@ -244,33 +235,33 @@ impl App {
         Ok(())
     }
 
-    /// A file was confirmed in the dialog: advance from before->after->kick off the diff.
-    fn handle_file_selected(&mut self, path: PathBuf, ui: &mut UI) -> Result<()> {
-        match self.screen {
-            AppScreen::SelectBeforeFile => {
-                self.before_path = Some(path);
-                self.screen = AppScreen::SelectAfterFile;
-                self.open_file_dialog("Select the AFTER file", ui)?;
+    /// A file was confirmed in the dialog: load it into the panel that was active when `o` was
+    /// pressed, then kick off the diff once both panels have a file.
+    fn handle_file_selected(&mut self, path: PathBuf) -> Result<()> {
+        match self.dialog_target.take() {
+            Some(Panel::Before) => {
+                self.before_path = Some(path.clone());
+                self.diff_viewer.set_before_file(path)?;
             }
-            AppScreen::SelectAfterFile => {
-                if let Some(before) = self.before_path.take() {
-                    self.file_dialog = None;
-                    self.action_tx.send(Action::StartDiff(before, path))?;
-                }
+            Some(Panel::After) => {
+                self.after_path = Some(path.clone());
+                self.diff_viewer.set_after_file(path)?;
             }
-            _ => {}
+            None => {}
+        }
+        self.file_dialog = None;
+        self.screen = AppScreen::Viewer;
+
+        if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
+            self.action_tx.send(Action::StartDiff(before, after))?;
         }
         Ok(())
     }
 
     fn handle_dialog_cancelled(&mut self) {
         self.file_dialog = None;
-        self.before_path = None;
-        self.screen = if self.has_diff {
-            AppScreen::ShowDiff
-        } else {
-            AppScreen::Overview
-        };
+        self.dialog_target = None;
+        self.screen = AppScreen::Viewer;
     }
 
     /// Run the (CPU-bound) parse+diff pipeline on a blocking thread so it never stalls the
@@ -309,19 +300,16 @@ impl App {
         ui.draw(|frame| {
             let area = frame.size();
             let result = match self.screen {
-                AppScreen::Overview => self.overview.draw(frame, area),
-                AppScreen::SelectBeforeFile | AppScreen::SelectAfterFile => {
-                    match self.file_dialog.as_mut() {
-                        Some(dialog) => dialog.draw(frame, area),
-                        None => Ok(()),
-                    }
-                }
+                AppScreen::Viewer => self.draw_viewer(frame, area),
+                AppScreen::SelectFile => match self.file_dialog.as_mut() {
+                    Some(dialog) => dialog.draw(frame, area),
+                    None => Ok(()),
+                },
                 AppScreen::Diffing => {
                     let status = Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center);
                     frame.render_widget(status, area);
                     Ok(())
                 }
-                AppScreen::ShowDiff => self.diff_viewer.draw(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -329,6 +317,24 @@ impl App {
                     .send(Action::Error(format!("Failed to draw: {:?}", err)));
             }
         })?;
+        Ok(())
+    }
+
+    /// Draw the Before/After panels, plus a one-line error banner under them if the most recent
+    /// file pick failed to diff (e.g. an unsupported file type).
+    fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        let Some(message) = &self.last_error else {
+            return self.diff_viewer.draw(frame, area);
+        };
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .split(area);
+        self.diff_viewer.draw(frame, layout[0])?;
+        frame.render_widget(
+            Paragraph::new(message.as_str()).style(Style::new().fg(Color::Red)),
+            layout[1],
+        );
         Ok(())
     }
 }

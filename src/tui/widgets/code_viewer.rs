@@ -23,7 +23,6 @@ use anyhow::{Context, Result};
 use ratatui::{
     buffer::Buffer,
     prelude::*,
-    style::Modifier,
     symbols::border,
     text::Line,
     widgets::{Block, Borders, StatefulWidget},
@@ -422,13 +421,11 @@ impl CodeViewerWidget {
                 line = paint_columns(&line, start_col, end_col, Style::new().bg(bg));
             }
 
+            // The cursor's own leaf range, and the matching range on the other panel (below),
+            // both render in the same blue: they're the same visual signal ("this is the node
+            // under/matched to the cursor"), just on different panels.
             if index == state.cursor {
-                line = paint_columns(
-                    &line,
-                    start_col,
-                    end_col,
-                    Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                );
+                line = paint_columns(&line, start_col, end_col, Style::new().bg(CROSS_HIGHLIGHT_BG));
             }
         }
 
@@ -444,6 +441,11 @@ impl CodeViewerWidget {
         }
 
         line
+    }
+
+    /// Whether a file has been loaded into this viewer yet.
+    pub fn has_file(&self) -> bool {
+        self.file_path.is_some()
     }
 
     /// Get the filename for display

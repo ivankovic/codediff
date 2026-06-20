@@ -171,6 +171,15 @@ impl CodeViewer {
         self.widget.filename()
     }
 
+    /// The filename, or a hint to press `o` if no file is loaded into this panel yet.
+    pub fn filename_or_hint(&self) -> String {
+        if self.widget.has_file() {
+            self.widget.filename()
+        } else {
+            "(press 'o' to open a file)".to_string()
+        }
+    }
+
     /// Get the language name for display
     pub fn language_name(&self) -> String {
         self.widget.language_name()
