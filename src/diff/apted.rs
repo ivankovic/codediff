@@ -427,6 +427,9 @@ struct AptedIndexer {
     pre_to_pre_r: Vec<usize>,
     /// 0-based right-to-left preorder index -> 0-based (left-to-right) preorder index.
     pre_r_to_pre_l: Vec<usize>,
+    /// 0-based right-to-left postorder index -> right-to-left postorder index of the rightmost
+    /// leaf descendant.
+    post_r_to_rld: Vec<usize>,
     /// `true` iff the node is its parent's first child (`false` for the root).
     node_type_l: Vec<bool>,
     /// `true` iff the node is its parent's last child (`false` for the root).
@@ -582,6 +585,20 @@ impl AptedIndexer {
             pre_r_to_pre_l[pre_r] = pre;
         }
 
+        // Right-to-left postorder index of a node's rightmost leaf descendant. Right-to-left
+        // postorder of preorder index `pre` is the trivial `size - 1 - pre` (see
+        // `pre_to_post_r`/`post_r_to_pre_l`), so processing preorder indices high-to-low visits
+        // nodes in ascending right-to-left-postorder order - i.e. children (always a higher
+        // preorder than their parent) are finalized before the parent that needs them.
+        let mut post_r_to_rld = vec![0usize; size];
+        for pre in (0..size).rev() {
+            let post_r = size - 1 - pre;
+            post_r_to_rld[post_r] = match children[pre].last() {
+                None => post_r,
+                Some(&last_child) => post_r_to_rld[size - 1 - last_child],
+            };
+        }
+
         let sum_del_cost = vec![0u64; size];
         let sum_ins_cost = vec![0u64; size];
 
@@ -596,6 +613,7 @@ impl AptedIndexer {
             post_l_to_lld,
             pre_to_pre_r,
             pre_r_to_pre_l,
+            post_r_to_rld,
             node_type_l,
             node_type_r,
             kr_sum,
@@ -627,6 +645,24 @@ impl AptedIndexer {
     /// leaf).
     fn pre_l_to_lld(&self, pre: usize) -> usize {
         self.post_l_to_pre_l[self.post_l_to_lld[self.pre_to_post_l[pre]]]
+    }
+
+    /// 0-based right-to-left postorder index of `pre`. Trivially `size - 1 - pre`: the
+    /// right-to-left-postorder rank of any node equals `size - 1` minus its left-to-right-
+    /// preorder rank, for any tree shape (mirrors Java's `preL_to_postR`).
+    fn pre_to_post_r(&self, pre: usize) -> usize {
+        self.size - 1 - pre
+    }
+
+    /// Inverse of `pre_to_post_r` - also self-inverse, by the same identity.
+    fn post_r_to_pre_l(&self, post_r: usize) -> usize {
+        self.size - 1 - post_r
+    }
+
+    /// Left-to-right preorder id of the rightmost leaf descendant of `pre` (itself if `pre` is a
+    /// leaf).
+    fn pre_l_to_rld(&self, pre: usize) -> usize {
+        self.post_r_to_pre_l(self.post_r_to_rld[self.pre_to_post_r(pre)])
     }
 }
 
@@ -738,6 +774,29 @@ fn compute_left_keyroots(
         for &child in &idx.children[parent] {
             if child != path_node {
                 compute_left_keyroots(idx, child, idx.pre_l_to_lld(child), keyroots);
+            }
+        }
+        path_node = parent;
+    }
+}
+
+/// Direct port of APTED.java's `computeRevKeyRoots` (right-path variant): the mirror image of
+/// `compute_left_keyroots` - every node that has a *right* sibling is its own keyroot (rather
+/// than every node that has a left sibling), reached by walking up from `subtree_root`'s
+/// *rightmost* leaf descendant instead of its leftmost.
+fn compute_right_keyroots(
+    idx: &AptedIndexer,
+    subtree_root: usize,
+    path_id: usize,
+    keyroots: &mut Vec<usize>,
+) {
+    keyroots.push(subtree_root);
+    let mut path_node = path_id;
+    while path_node > subtree_root {
+        let parent = idx.parents[path_node] as usize;
+        for &child in &idx.children[parent] {
+            if child != path_node {
+                compute_right_keyroots(idx, child, idx.pre_l_to_rld(child), keyroots);
             }
         }
         path_node = parent;
@@ -913,6 +972,150 @@ fn spf_l(
     )]
 }
 
+/// Mirror image of `apted_tree_edit_dist`, walking right-to-left postorder (`pre_to_post_r`/
+/// `post_r_to_rld`) instead of left-to-right - the core of `spfR`. Boundary/index conventions and
+/// the `path_is_before` direction logic are otherwise identical; see that function's comment.
+#[allow(clippy::too_many_arguments)]
+fn apted_tree_edit_dist_r(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    path_is_before: bool,
+    path_subtree: usize,
+    other_subtree: usize,
+    forestdist: &mut ForestDist,
+) {
+    let (path_idx, other_idx) = if path_is_before {
+        (ctx.before_idx, ctx.after_idx)
+    } else {
+        (ctx.after_idx, ctx.before_idx)
+    };
+    let (path_meta, other_meta) = if path_is_before {
+        (ctx.before_meta, ctx.after_meta)
+    } else {
+        (ctx.after_meta, ctx.before_meta)
+    };
+
+    let i = path_idx.pre_to_post_r(path_subtree) + 1;
+    let j = other_idx.pre_to_post_r(other_subtree) + 1;
+    let rld_i = path_idx.post_r_to_rld[i - 1];
+    let rld_j = other_idx.post_r_to_rld[j - 1];
+
+    forestdist[(rld_i, rld_j)] = 0;
+    for di in (rld_i + 1)..=i {
+        let pre = path_idx.post_r_to_pre_l(di - 1);
+        let cost = if path_is_before {
+            vdel(ctx.cost_model, vnode(path_idx, path_meta, pre))
+        } else {
+            vins(ctx.cost_model, vnode(path_idx, path_meta, pre))
+        };
+        forestdist[(di, rld_j)] = forestdist[(di - 1, rld_j)] + cost;
+    }
+    for dj in (rld_j + 1)..=j {
+        let pre = other_idx.post_r_to_pre_l(dj - 1);
+        let cost = if path_is_before {
+            vins(ctx.cost_model, vnode(other_idx, other_meta, pre))
+        } else {
+            vdel(ctx.cost_model, vnode(other_idx, other_meta, pre))
+        };
+        forestdist[(rld_i, dj)] = forestdist[(rld_i, dj - 1)] + cost;
+    }
+
+    for di in (rld_i + 1)..=i {
+        let path_pre = path_idx.post_r_to_pre_l(di - 1);
+        let path_node = vnode(path_idx, path_meta, path_pre);
+        let path_rld = path_idx.post_r_to_rld[di - 1];
+        let del_cost = if path_is_before {
+            vdel(ctx.cost_model, path_node)
+        } else {
+            vins(ctx.cost_model, path_node)
+        };
+        for dj in (rld_j + 1)..=j {
+            let other_pre = other_idx.post_r_to_pre_l(dj - 1);
+            let other_node = vnode(other_idx, other_meta, other_pre);
+            let other_rld = other_idx.post_r_to_rld[dj - 1];
+            let ins_cost = if path_is_before {
+                vins(ctx.cost_model, other_node)
+            } else {
+                vdel(ctx.cost_model, other_node)
+            };
+            let (before_node, after_node) = if path_is_before {
+                (path_node, other_node)
+            } else {
+                (other_node, path_node)
+            };
+            let ren_cost = vren(ctx.cost_model, before_node, after_node);
+
+            let da = forestdist[(di - 1, dj)] + del_cost;
+            let db = forestdist[(di, dj - 1)] + ins_cost;
+            let (before_pre, after_pre) = if path_is_before {
+                (path_pre, other_pre)
+            } else {
+                (other_pre, path_pre)
+            };
+
+            let aligned = path_rld == rld_i && other_rld == rld_j;
+            let dc = if aligned {
+                let v = forestdist[(di - 1, dj - 1)];
+                delta.set(before_pre, after_pre, v);
+                v + ren_cost
+            } else {
+                forestdist[(path_rld, other_rld)] + delta.get(before_pre, after_pre) + ren_cost
+            };
+
+            forestdist[(di, dj)] = da.min(db).min(dc);
+        }
+    }
+}
+
+/// Direct port of APTED.java's `spfR`: the mirror image of `spf_l`, decomposing the other side
+/// via its *right*-path keyroots instead of its left-path ones.
+fn spf_r(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    path_is_before: bool,
+    path_subtree: usize,
+    other_subtree: usize,
+) -> u64 {
+    let (path_idx, other_idx) = if path_is_before {
+        (ctx.before_idx, ctx.after_idx)
+    } else {
+        (ctx.after_idx, ctx.before_idx)
+    };
+
+    let mut keyroots = Vec::new();
+    if other_subtree == 0 {
+        // Same fix as `spf_l`'s `other_subtree == 0` case, mirrored: the virtual root's children
+        // are the forest's own roots and must each get their own keyroot/aligned boundary.
+        for &root in &other_idx.children[0] {
+            compute_right_keyroots(other_idx, root, other_idx.pre_l_to_rld(root), &mut keyroots);
+        }
+    } else {
+        compute_right_keyroots(
+            other_idx,
+            other_subtree,
+            other_idx.pre_l_to_rld(other_subtree),
+            &mut keyroots,
+        );
+    }
+    keyroots.sort_by_key(|&pre| other_idx.pre_to_post_r(pre));
+
+    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1);
+    for &kr in &keyroots {
+        apted_tree_edit_dist_r(
+            ctx,
+            delta,
+            path_is_before,
+            path_subtree,
+            kr,
+            &mut forestdist,
+        );
+    }
+    forestdist[(
+        path_idx.pre_to_post_r(path_subtree) + 1,
+        other_idx.pre_to_post_r(other_subtree) + 1,
+    )]
+}
+
 /// Recursive tree-decomposition driver, forcing the "always decompose `before`'s leftmost path"
 /// strategy (i.e. always `spfL`, exactly like the classic Zhang-Shasha keyroot loop above always
 /// does) rather than APTED's real per-subtree-optimal strategy choice
@@ -950,6 +1153,31 @@ fn gted_forced_left(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, cu
     spf_l(ctx, delta, true, current1, current2)
 }
 
+/// Mirror image of `gted_forced_left`, forcing APTED's RIGHT strategy instead - always
+/// decomposes `before`'s *rightmost* path, recursing into off-path (non-last) children, then
+/// `spf_r` for the resolved path. A `#[cfg(test)]`-only validator: pins `spf_r`/
+/// `compute_right_keyroots`/`apted_tree_edit_dist_r` against the oracle in isolation, the same
+/// way `gted_forced_left` pinned the left-side machinery.
+#[cfg(test)]
+fn gted_forced_right(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, current2: usize) -> u64 {
+    let mut current_path_node = ctx.before_idx.pre_l_to_rld(current1);
+    loop {
+        let parent = ctx.before_idx.parents[current_path_node];
+        if parent < 0 || (parent as usize) < current1 {
+            break;
+        }
+        let parent = parent as usize;
+        for &child in &ctx.before_idx.children[parent] {
+            if child != current_path_node {
+                gted_forced_right(ctx, delta, child, current2);
+            }
+        }
+        current_path_node = parent;
+    }
+
+    spf_r(ctx, delta, true, current1, current2)
+}
+
 /// Computes the tree edit distance and populates `delta` for a forest pair, using the real
 /// APTED engine instead of classic Zhang-Shasha keyroot decomposition. Each side's forest is
 /// wrapped under a virtual root (see `AptedIndexer`) so the single-rooted APTED recursion can
@@ -965,6 +1193,36 @@ fn compute_delta(
     after_root_ids: &[usize],
     before_node_map: &HashMap<usize, usize>,
     after_node_map: &HashMap<usize, usize>,
+) -> DeltaTable {
+    compute_delta_with_driver(
+        before,
+        after,
+        before_meta,
+        after_meta,
+        cost_model,
+        before_root_ids,
+        after_root_ids,
+        before_node_map,
+        after_node_map,
+        gted_forced_left,
+    )
+}
+
+/// Shared by `compute_delta` and the `#[cfg(test)]`-only forced-right driver: builds both sides'
+/// `AptedIndexer`s, runs `drive` once per top-level real root (see the comment on the loop
+/// below), and translates the resulting virtual-space `delta` back into real preorder ids.
+#[allow(clippy::too_many_arguments)]
+fn compute_delta_with_driver(
+    before: &PostorderIndexer,
+    after: &PostorderIndexer,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    before_root_ids: &[usize],
+    after_root_ids: &[usize],
+    before_node_map: &HashMap<usize, usize>,
+    after_node_map: &HashMap<usize, usize>,
+    drive: impl Fn(&EngineCtx, &mut DeltaTable, usize, usize) -> u64,
 ) -> DeltaTable {
     let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
     if before.size == 0 || after.size == 0 {
@@ -984,13 +1242,13 @@ fn compute_delta(
         cost_model,
     };
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
-    // Drive `gted_forced_left` once per top-level real root (the virtual root's children) -
-    // exactly the `other_subtree == 0` fix in `spf_l` above, mirrored on the before/T1 axis:
-    // starting from the virtual root itself would walk its leftmost path all the way down to
-    // the forest's overall leftmost leaf, silently absorbing the first real root into that path
-    // instead of giving it (and every sibling root) its own aligned boundary.
+    // Drive once per top-level real root (the virtual root's children) - exactly the
+    // `other_subtree == 0` fix in `spf_l`/`spf_r` above, mirrored on the before/T1 axis:
+    // starting from the virtual root itself would walk its leftmost/rightmost path all the way
+    // down to the forest's overall extreme leaf, silently absorbing the first real root into
+    // that path instead of giving it (and every sibling root) its own aligned boundary.
     for &before_root in &before_idx.children[0] {
-        gted_forced_left(&ctx, &mut virtual_delta, before_root, 0);
+        drive(&ctx, &mut virtual_delta, before_root, 0);
     }
 
     // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
@@ -1005,6 +1263,33 @@ fn compute_delta(
     }
 
     real_delta
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn compute_delta_forced_right(
+    before: &PostorderIndexer,
+    after: &PostorderIndexer,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    before_root_ids: &[usize],
+    after_root_ids: &[usize],
+    before_node_map: &HashMap<usize, usize>,
+    after_node_map: &HashMap<usize, usize>,
+) -> DeltaTable {
+    compute_delta_with_driver(
+        before,
+        after,
+        before_meta,
+        after_meta,
+        cost_model,
+        before_root_ids,
+        after_root_ids,
+        before_node_map,
+        after_node_map,
+        gted_forced_right,
+    )
 }
 
 /// A single, single-node-granularity decision produced by `compute_edit_mapping`.
@@ -1766,6 +2051,99 @@ mod tests {
             new_cost, oracle_cost,
             "new engine cost {new_cost} != oracle cost {oracle_cost}\nbefore_roots={before_root_ids:?} after_roots={after_root_ids:?}"
         );
+    }
+
+    /// Same as `assert_distance_matches_oracle_pruned`, but pins the forced-RIGHT driver
+    /// instead of the live (forced-left) engine - validates `spf_r`/`compute_right_keyroots`/
+    /// `apted_tree_edit_dist_r` in isolation, the same way the forced-left tests above pin `spf_l`.
+    fn assert_distance_matches_oracle_forced_right(
+        before_meta: &ASTMetadata,
+        after_meta: &ASTMetadata,
+        before_root_ids: &[usize],
+        after_root_ids: &[usize],
+    ) {
+        let cost_model = UnitCostModel;
+        let empty_map = HashMap::new();
+
+        let before_idx = PostorderIndexer::build(before_meta, before_root_ids, &empty_map);
+        let after_idx = PostorderIndexer::build(after_meta, after_root_ids, &empty_map);
+
+        let mut oracle_delta = compute_delta_zhang_shasha(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+        );
+        let oracle_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            &mut oracle_delta,
+        );
+        let oracle_cost =
+            mapping_total_cost(&oracle_decisions, before_meta, after_meta, &cost_model);
+
+        let mut new_delta = compute_delta_forced_right(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            before_root_ids,
+            after_root_ids,
+            &empty_map,
+            &empty_map,
+        );
+        let new_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            &mut new_delta,
+        );
+        let new_cost = mapping_total_cost(&new_decisions, before_meta, after_meta, &cost_model);
+
+        assert_eq!(
+            new_cost, oracle_cost,
+            "forced-right cost {new_cost} != oracle cost {oracle_cost}\nbefore_roots={before_root_ids:?} after_roots={after_root_ids:?}"
+        );
+    }
+
+    #[test]
+    fn test_apted_engine_forced_right_matches_oracle_fuzz() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        for seed in 0..3000u64 {
+            let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(7));
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut before_nodes);
+            let mut after_nodes = Vec::new();
+            let after_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut after_nodes);
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+
+            let result = std::panic::catch_unwind(|| {
+                assert_distance_matches_oracle_forced_right(
+                    &before_meta,
+                    &after_meta,
+                    &[before_root],
+                    &[after_root],
+                );
+            });
+            if result.is_err() {
+                panic!(
+                    "forced-right fuzz failure at seed {seed}\nbefore_nodes={before_nodes:?}\nafter_nodes={after_nodes:?}"
+                );
+            }
+        }
     }
 
     #[test]
