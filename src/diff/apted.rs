@@ -349,7 +349,8 @@ fn forest_dist(
 /// that any `delta` lookup `forest_dist` performs for a given keyroot pair was already computed
 /// in an earlier iteration (any interior point requiring a lookup is itself a keyroot pair with
 /// strictly smaller postorder ids on both sides).
-fn compute_delta(
+#[cfg(test)]
+fn compute_delta_zhang_shasha(
     before: &PostorderIndexer,
     after: &PostorderIndexer,
     before_meta: &ASTMetadata,
@@ -387,6 +388,623 @@ fn compute_delta(
     }
 
     delta
+}
+
+/// Indexes a forest of (possibly multiple) sibling roots on one side, wrapped under a single
+/// synthetic virtual root (preorder id `0`, no backing node, zero del/ins/rename cost). The
+/// virtual root lets the APTED recursion (`gted`/`spfL`/`spfR`/`spfA`), which is only defined for
+/// a single rooted tree, run unmodified over a multi-root residual forest: matching the two
+/// virtual roots is always free, so `treedist(vrootedT1, vrootedT2) == forestdist(F1, F2)`
+/// exactly, which is what callers actually want for a forest of unmatched siblings.
+///
+/// Real node `pre` therefore sits at index `pre` here (vroot owns index `0`); left-to-right
+/// postorder is unaffected by the wrapping (vroot, having every other node as a descendant, is
+/// simply the last postorder index, `size - 1`).
+///
+/// Field names and the formulas that derive them mirror Java APTED's `NodeIndexer` (indexNodes /
+/// postTraversalIndexing), with one deviation: `kr_sum`/`rev_kr_sum`/`desc_sum` are computed via
+/// closed-form bottom-up recurrences instead of replicating Java's single-pass-with-mutable-
+/// "Tmp"-fields threading - both compute the exact same values, but the recurrence form doesn't
+/// require smuggling a child's partial state through instance fields across recursive calls.
+struct AptedIndexer {
+    /// Number of nodes including the virtual root.
+    size: usize,
+    /// 0-based preorder index -> real node id, or `None` for the virtual root (index `0`).
+    pre_to_node_id: Vec<Option<usize>>,
+    /// 0-based preorder index -> 0-based preorder index of the parent, or `-1` for the root.
+    parents: Vec<i64>,
+    /// 0-based preorder index -> left-to-right ordered list of children's preorder indices.
+    children: Vec<Vec<usize>>,
+    /// 0-based preorder index -> size of the subtree rooted there (including the virtual root).
+    sizes: Vec<usize>,
+    /// 0-based preorder index -> 0-based left-to-right postorder index.
+    pre_to_post_l: Vec<usize>,
+    /// 0-based left-to-right postorder index -> 0-based preorder index.
+    post_l_to_pre_l: Vec<usize>,
+    /// 0-based left-to-right postorder index -> postorder index of the leftmost leaf descendant.
+    post_l_to_lld: Vec<usize>,
+    /// 0-based preorder index -> 0-based right-to-left preorder index.
+    pre_to_pre_r: Vec<usize>,
+    /// 0-based right-to-left preorder index -> 0-based (left-to-right) preorder index.
+    pre_r_to_pre_l: Vec<usize>,
+    /// `true` iff the node is its parent's first child (`false` for the root).
+    node_type_l: Vec<bool>,
+    /// `true` iff the node is its parent's last child (`false` for the root).
+    node_type_r: Vec<bool>,
+    /// Cost of `spfL` for the subtree rooted at this node [APTED paper, Section 5.2].
+    kr_sum: Vec<u64>,
+    /// Cost of `spfR` for the subtree rooted at this node.
+    rev_kr_sum: Vec<u64>,
+    /// Cost of `spfA` for the subtree rooted at this node.
+    desc_sum: Vec<u64>,
+    /// 0-based preorder index -> total delete cost of every node in its subtree.
+    sum_del_cost: Vec<u64>,
+    /// 0-based preorder index -> total insert cost of every node in its subtree.
+    sum_ins_cost: Vec<u64>,
+}
+
+impl AptedIndexer {
+    fn build(metadata: &ASTMetadata, root_ids: &[usize], node_map: &HashMap<usize, usize>) -> Self {
+        fn visit(
+            node_id: usize,
+            parent_pre: usize,
+            metadata: &ASTMetadata,
+            node_map: &HashMap<usize, usize>,
+            pre_to_node_id: &mut Vec<Option<usize>>,
+            parents: &mut Vec<i64>,
+            children: &mut Vec<Vec<usize>>,
+        ) -> Option<usize> {
+            if node_map.contains_key(&node_id) {
+                return None;
+            }
+            let info = metadata.node_info.get(&node_id)?;
+            let my_pre = pre_to_node_id.len();
+            pre_to_node_id.push(Some(node_id));
+            parents.push(parent_pre as i64);
+            children.push(Vec::new());
+            for &child_id in &info.children {
+                if let Some(child_pre) = visit(
+                    child_id,
+                    my_pre,
+                    metadata,
+                    node_map,
+                    pre_to_node_id,
+                    parents,
+                    children,
+                ) {
+                    children[my_pre].push(child_pre);
+                }
+            }
+            Some(my_pre)
+        }
+
+        // Virtual root owns preorder index 0; its parent (`-1`) is never read since `gted`'s
+        // walk-up always stops once it reaches the root of the subtree it started decomposing.
+        let mut pre_to_node_id: Vec<Option<usize>> = vec![None];
+        let mut parents: Vec<i64> = vec![-1];
+        let mut children: Vec<Vec<usize>> = vec![Vec::new()];
+
+        for &root_id in root_ids {
+            if let Some(root_pre) = visit(
+                root_id,
+                0,
+                metadata,
+                node_map,
+                &mut pre_to_node_id,
+                &mut parents,
+                &mut children,
+            ) {
+                children[0].push(root_pre);
+            }
+        }
+
+        let size = pre_to_node_id.len();
+
+        // Left-to-right postorder, computed iteratively (children finalized before parent).
+        let mut pre_to_post_l = vec![0usize; size];
+        let mut post_l_to_pre_l = vec![0usize; size];
+        {
+            let mut stack: Vec<(usize, bool)> = vec![(0, false)];
+            let mut post = 0usize;
+            while let Some((pre, visited)) = stack.pop() {
+                if visited {
+                    post_l_to_pre_l[post] = pre;
+                    pre_to_post_l[pre] = post;
+                    post += 1;
+                } else {
+                    stack.push((pre, true));
+                    for &child in children[pre].iter().rev() {
+                        stack.push((child, false));
+                    }
+                }
+            }
+        }
+
+        // Bottom-up (postorder) pass: sizes, kr_sum/rev_kr_sum/desc_sum, node_type_l/r.
+        let mut sizes = vec![1usize; size];
+        let mut kr_sum = vec![0u64; size];
+        let mut rev_kr_sum = vec![0u64; size];
+        let mut desc_sum_total = vec![0u64; size]; // sum of sizes of every node in the subtree
+        let mut node_type_l = vec![false; size];
+        let mut node_type_r = vec![false; size];
+        for &pre in &post_l_to_pre_l {
+            let n = children[pre].len();
+            let mut size_v = 1usize;
+            let mut kr = 0u64;
+            let mut rkr = 0u64;
+            let mut dsum = 0u64;
+            for (i, &child) in children[pre].iter().enumerate() {
+                size_v += sizes[child];
+                dsum += desc_sum_total[child];
+                kr += if i == 0 {
+                    kr_sum[child] - sizes[child] as u64
+                } else {
+                    kr_sum[child]
+                };
+                rkr += if i + 1 == n {
+                    rev_kr_sum[child] - sizes[child] as u64
+                } else {
+                    rev_kr_sum[child]
+                };
+            }
+            sizes[pre] = size_v;
+            kr_sum[pre] = kr + size_v as u64;
+            rev_kr_sum[pre] = rkr + size_v as u64;
+            desc_sum_total[pre] = dsum + size_v as u64;
+            if let Some(&first) = children[pre].first() {
+                node_type_l[first] = true;
+            }
+            if let Some(&last) = children[pre].last() {
+                node_type_r[last] = true;
+            }
+        }
+        let desc_sum: Vec<u64> = (0..size)
+            .map(|pre| {
+                let sz = sizes[pre] as u64;
+                sz * (sz + 3) / 2 - desc_sum_total[pre]
+            })
+            .collect();
+
+        let mut post_l_to_lld = vec![0usize; size];
+        for post in 0..size {
+            let pre = post_l_to_pre_l[post];
+            post_l_to_lld[post] = match children[pre].first() {
+                None => post,
+                Some(&first_child) => post_l_to_lld[pre_to_post_l[first_child]],
+            };
+        }
+
+        let mut pre_to_pre_r = vec![0usize; size];
+        let mut pre_r_to_pre_l = vec![0usize; size];
+        for pre in 0..size {
+            let pre_r = size - 1 - pre_to_post_l[pre];
+            pre_to_pre_r[pre] = pre_r;
+            pre_r_to_pre_l[pre_r] = pre;
+        }
+
+        let sum_del_cost = vec![0u64; size];
+        let sum_ins_cost = vec![0u64; size];
+
+        AptedIndexer {
+            size,
+            pre_to_node_id,
+            parents,
+            children,
+            sizes,
+            pre_to_post_l,
+            post_l_to_pre_l,
+            post_l_to_lld,
+            pre_to_pre_r,
+            pre_r_to_pre_l,
+            node_type_l,
+            node_type_r,
+            kr_sum,
+            rev_kr_sum,
+            desc_sum,
+            sum_del_cost,
+            sum_ins_cost,
+        }
+    }
+
+    /// Fills `sum_del_cost`/`sum_ins_cost` bottom-up. Split out of `build` because it needs the
+    /// cost model (the virtual root and any pruned-away node contribute `0`).
+    fn fill_subtree_costs(&mut self, meta: &ASTMetadata, cost_model: &UnitCostModel) {
+        for &pre in &self.post_l_to_pre_l {
+            let own_del = vdel(cost_model, vnode(self, meta, pre));
+            let own_ins = vins(cost_model, vnode(self, meta, pre));
+            let mut del = own_del;
+            let mut ins = own_ins;
+            for &child in &self.children[pre] {
+                del += self.sum_del_cost[child];
+                ins += self.sum_ins_cost[child];
+            }
+            self.sum_del_cost[pre] = del;
+            self.sum_ins_cost[pre] = ins;
+        }
+    }
+
+    /// Left-to-right preorder id of the leftmost leaf descendant of `pre` (itself if `pre` is a
+    /// leaf).
+    fn pre_l_to_lld(&self, pre: usize) -> usize {
+        self.post_l_to_pre_l[self.post_l_to_lld[self.pre_to_post_l[pre]]]
+    }
+}
+
+/// `node.del`/`.ins`/`.ren`, but `None` (the virtual root, or any node pruned because it's
+/// already matched) always costs `0` - this is the whole trick that lets `gted` run on a
+/// virtual-rooted *forest* and still compute exactly the forest-to-forest distance: matching the
+/// two virtual roots is always free, so it's always at least as good as any alternative.
+fn vnode<'a>(idx: &AptedIndexer, meta: &'a ASTMetadata, pre: usize) -> Option<&'a ASTNodeMetadata> {
+    idx.pre_to_node_id[pre].map(|id| {
+        meta.node_info
+            .get(&id)
+            .expect("indexed node must have metadata")
+    })
+}
+
+fn vdel(cost_model: &UnitCostModel, node: Option<&ASTNodeMetadata>) -> u64 {
+    node.map(|n| cost_model.del(n)).unwrap_or(0)
+}
+
+fn vins(cost_model: &UnitCostModel, node: Option<&ASTNodeMetadata>) -> u64 {
+    node.map(|n| cost_model.ins(n)).unwrap_or(0)
+}
+
+/// The forced-everything-through-the-vroot-subtree-boundary single-path sweeps (`spf1`,
+/// `apted_tree_edit_dist`) range over a subtree's *entire* preorder span, root included - correct
+/// for a real subtree root, but the virtual root's own span is the entire forest, so these sweeps
+/// do, legitimately, end up asking "what would it cost to rename this real node into the virtual
+/// root" at every position along the boundary. Rather than special-casing those ranges to carve
+/// the root out, give the (real, virtual) pairing a cost no real alternative could ever exceed:
+/// the del/insert alternatives computed alongside it are always within the real forest's total
+/// size, which is the only thing this sentinel needs to dominate.
+const FORBIDDEN_PAIRING_COST: u64 = 1_000_000_000;
+
+fn vren(
+    cost_model: &UnitCostModel,
+    a: Option<&ASTNodeMetadata>,
+    b: Option<&ASTNodeMetadata>,
+) -> u64 {
+    match (a, b) {
+        (Some(x), Some(y)) => cost_model.ren(x, y),
+        (None, None) => 0,
+        _ => FORBIDDEN_PAIRING_COST,
+    }
+}
+
+/// Bundles everything `gted`/`spfL`/`spfR`/`spf1` need, in the fixed global "before/after"
+/// orientation - `delta` is always written and read as `delta[before_pre][after_pre]`,
+/// regardless of which side a given single-path function happens to be decomposing.
+struct EngineCtx<'a> {
+    before_idx: &'a AptedIndexer,
+    after_idx: &'a AptedIndexer,
+    before_meta: &'a ASTMetadata,
+    after_meta: &'a ASTMetadata,
+    cost_model: &'a UnitCostModel,
+}
+
+/// Direct port of APTED.java's `spf1`: closed-form tree edit distance when at least one of the
+/// two subtrees is a single node, avoiding the overhead of the general single-path machinery.
+fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
+    let size1 = ctx.before_idx.sizes[root1];
+    let size2 = ctx.after_idx.sizes[root2];
+    let n1 = vnode(ctx.before_idx, ctx.before_meta, root1);
+    let n2 = vnode(ctx.after_idx, ctx.after_meta, root2);
+
+    if size1 == 1 && size2 == 1 {
+        let max_cost = vdel(ctx.cost_model, n1) + vins(ctx.cost_model, n2);
+        let ren_cost = vren(ctx.cost_model, n1, n2);
+        return ren_cost.min(max_cost);
+    }
+    if size1 == 1 {
+        let cost = ctx.after_idx.sum_ins_cost[root2];
+        let max_cost = cost + vdel(ctx.cost_model, n1);
+        let mut min_ren_minus_ins: i64 = cost as i64;
+        for pre in root2..root2 + size2 {
+            let n2i = vnode(ctx.after_idx, ctx.after_meta, pre);
+            let delta_v = vren(ctx.cost_model, n1, n2i) as i64 - vins(ctx.cost_model, n2i) as i64;
+            min_ren_minus_ins = min_ren_minus_ins.min(delta_v);
+        }
+        let cost = (cost as i64 + min_ren_minus_ins) as u64;
+        return cost.min(max_cost);
+    }
+    // size2 == 1
+    let cost = ctx.before_idx.sum_del_cost[root1];
+    let max_cost = cost + vins(ctx.cost_model, n2);
+    let mut min_ren_minus_del: i64 = cost as i64;
+    for pre in root1..root1 + size1 {
+        let n1i = vnode(ctx.before_idx, ctx.before_meta, pre);
+        let delta_v = vren(ctx.cost_model, n1i, n2) as i64 - vdel(ctx.cost_model, n1i) as i64;
+        min_ren_minus_del = min_ren_minus_del.min(delta_v);
+    }
+    let cost = (cost as i64 + min_ren_minus_del) as u64;
+    cost.min(max_cost)
+}
+
+/// Direct port of APTED.java's `computeKeyRoots` (left-path variant): collects, into `keyroots`,
+/// every node that is a keyroot of `subtree_root`'s *leftmost* path decomposition - i.e.
+/// `subtree_root` itself, plus (recursively) every right-sibling encountered while walking up
+/// from `path_id` (the leftmost leaf descendant of `subtree_root`) back to `subtree_root`.
+fn compute_left_keyroots(
+    idx: &AptedIndexer,
+    subtree_root: usize,
+    path_id: usize,
+    keyroots: &mut Vec<usize>,
+) {
+    keyroots.push(subtree_root);
+    let mut path_node = path_id;
+    while path_node > subtree_root {
+        let parent = idx.parents[path_node] as usize;
+        for &child in &idx.children[parent] {
+            if child != path_node {
+                compute_left_keyroots(idx, child, idx.pre_l_to_lld(child), keyroots);
+            }
+        }
+        path_node = parent;
+    }
+}
+
+/// Direct port of APTED.java's `treeEditDist` (the core of `spfL`): fills `forestdist` with the
+/// distances between every subforest pair spanning `[lld(path_subtree), path_subtree]` on the
+/// path side against `[lld(other_subtree), other_subtree]` on the other side, and - as a side
+/// effect, exactly like `forest_dist` above - writes `delta` for every aligned (tree-vs-tree)
+/// position encountered along the way.
+///
+/// `path_is_before` says whether the path side is `before` (the "T1" of the global
+/// before/after orientation) or `after`; this alone determines both the delete/insert cost
+/// direction and which axis of `delta` each side's preorder id belongs on - see Java's
+/// `treesSwapped` parameter, which this replaces (it served exactly the same purpose, just
+/// re-derived here from the orientation that's already implied by `path_is_before`).
+#[allow(clippy::too_many_arguments)]
+fn apted_tree_edit_dist(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    path_is_before: bool,
+    path_subtree: usize,
+    other_subtree: usize,
+    forestdist: &mut ForestDist,
+) {
+    let (path_idx, other_idx) = if path_is_before {
+        (ctx.before_idx, ctx.after_idx)
+    } else {
+        (ctx.after_idx, ctx.before_idx)
+    };
+    let (path_meta, other_meta) = if path_is_before {
+        (ctx.before_meta, ctx.after_meta)
+    } else {
+        (ctx.after_meta, ctx.before_meta)
+    };
+
+    // `i`/`j`/`di`/`dj` are 1-based boundaries exactly like `forest_dist`'s (boundary `b`
+    // corresponds to the node at 0-based postorder `b - 1`) - `forestdist`'s array index *is*
+    // this same boundary value directly, so `lld_i`/`lld_j` (0-based postorder of the `lld`,
+    // which numerically equals the boundary of the node *before* the `lld`) double as the base-
+    // case index without any extra shift. Mirrors `forest_dist` precisely; only the cost
+    // direction (`path_is_before`) and the indexer/cost-model plumbing differ.
+    let i = path_idx.pre_to_post_l[path_subtree] + 1;
+    let j = other_idx.pre_to_post_l[other_subtree] + 1;
+    let lld_i = path_idx.post_l_to_lld[i - 1];
+    let lld_j = other_idx.post_l_to_lld[j - 1];
+
+    forestdist[(lld_i, lld_j)] = 0;
+    for di in (lld_i + 1)..=i {
+        let pre = path_idx.post_l_to_pre_l[di - 1];
+        let cost = if path_is_before {
+            vdel(ctx.cost_model, vnode(path_idx, path_meta, pre))
+        } else {
+            vins(ctx.cost_model, vnode(path_idx, path_meta, pre))
+        };
+        forestdist[(di, lld_j)] = forestdist[(di - 1, lld_j)] + cost;
+    }
+    for dj in (lld_j + 1)..=j {
+        let pre = other_idx.post_l_to_pre_l[dj - 1];
+        let cost = if path_is_before {
+            vins(ctx.cost_model, vnode(other_idx, other_meta, pre))
+        } else {
+            vdel(ctx.cost_model, vnode(other_idx, other_meta, pre))
+        };
+        forestdist[(lld_i, dj)] = forestdist[(lld_i, dj - 1)] + cost;
+    }
+
+    for di in (lld_i + 1)..=i {
+        let path_pre = path_idx.post_l_to_pre_l[di - 1];
+        let path_node = vnode(path_idx, path_meta, path_pre);
+        let path_lld = path_idx.post_l_to_lld[di - 1];
+        let del_cost = if path_is_before {
+            vdel(ctx.cost_model, path_node)
+        } else {
+            vins(ctx.cost_model, path_node)
+        };
+        for dj in (lld_j + 1)..=j {
+            let other_pre = other_idx.post_l_to_pre_l[dj - 1];
+            let other_node = vnode(other_idx, other_meta, other_pre);
+            let other_lld = other_idx.post_l_to_lld[dj - 1];
+            let ins_cost = if path_is_before {
+                vins(ctx.cost_model, other_node)
+            } else {
+                vdel(ctx.cost_model, other_node)
+            };
+            let (before_node, after_node) = if path_is_before {
+                (path_node, other_node)
+            } else {
+                (other_node, path_node)
+            };
+            let ren_cost = vren(ctx.cost_model, before_node, after_node);
+
+            let da = forestdist[(di - 1, dj)] + del_cost;
+            let db = forestdist[(di, dj - 1)] + ins_cost;
+            let (before_pre, after_pre) = if path_is_before {
+                (path_pre, other_pre)
+            } else {
+                (other_pre, path_pre)
+            };
+
+            let aligned = path_lld == lld_i && other_lld == lld_j;
+            let dc = if aligned {
+                let v = forestdist[(di - 1, dj - 1)];
+                delta.set(before_pre, after_pre, v);
+                v + ren_cost
+            } else {
+                forestdist[(path_lld, other_lld)] + delta.get(before_pre, after_pre) + ren_cost
+            };
+
+            forestdist[(di, dj)] = da.min(db).min(dc);
+        }
+    }
+}
+
+/// Direct port of APTED.java's `spfL`: the path side (`path_subtree`, already reduced to a
+/// single remaining path by `gted`'s caller) against the *entire* other side, decomposed via its
+/// own left-path keyroots in one combined sweep - this single combined sweep across all of
+/// `other_subtree`'s keyroots, rather than one call per (keyroot, keyroot) pair, is what makes
+/// APTED asymptotically cheaper than the classic Zhang-Shasha keyroot loop.
+fn spf_l(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    path_is_before: bool,
+    path_subtree: usize,
+    other_subtree: usize,
+) -> u64 {
+    let (path_idx, other_idx) = if path_is_before {
+        (ctx.before_idx, ctx.after_idx)
+    } else {
+        (ctx.after_idx, ctx.before_idx)
+    };
+
+    let mut keyroots = Vec::new();
+    if other_subtree == 0 {
+        // The virtual root's children are the *forest's own roots* - each is its own keyroot
+        // regardless of left-sibling status (mirroring `PostorderIndexer`'s `root_pres`), since
+        // there is no real ancestor whose own leftmost path could ever cover more than one of
+        // them. Treating the virtual root itself as an ordinary node here would silently absorb
+        // its first child into a path that runs all the way down to the forest's overall
+        // leftmost leaf - that child would then never get its own aligned (tree-vs-tree)
+        // boundary, exactly the boundary `compute_edit_mapping`'s backtrace later depends on.
+        for &root in &other_idx.children[0] {
+            compute_left_keyroots(other_idx, root, other_idx.pre_l_to_lld(root), &mut keyroots);
+        }
+    } else {
+        compute_left_keyroots(
+            other_idx,
+            other_subtree,
+            other_idx.pre_l_to_lld(other_subtree),
+            &mut keyroots,
+        );
+    }
+    keyroots.sort_by_key(|&pre| other_idx.pre_to_post_l[pre]);
+
+    // Sized and indexed by the same 1-based-boundary convention as `apted_tree_edit_dist`
+    // (absolute, not relative to any one call's own `lld`), and reused across the whole keyroot
+    // sweep below - see the comment there for why a relative scheme would be unsound here.
+    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1);
+    for &kr in &keyroots {
+        apted_tree_edit_dist(
+            ctx,
+            delta,
+            path_is_before,
+            path_subtree,
+            kr,
+            &mut forestdist,
+        );
+    }
+    forestdist[(
+        path_idx.pre_to_post_l[path_subtree] + 1,
+        other_idx.pre_to_post_l[other_subtree] + 1,
+    )]
+}
+
+/// Recursive tree-decomposition driver, forcing the "always decompose `before`'s leftmost path"
+/// strategy (i.e. always `spfL`, exactly like the classic Zhang-Shasha keyroot loop above always
+/// does) rather than APTED's real per-subtree-optimal strategy choice
+/// (`computeOptStrategy_postL/postR`, not yet ported). Forcing the strategy this way means this
+/// is *not yet* the asymptotic improvement the Java reference provides - it's a stepping stone
+/// that validates the indexing/virtual-root plumbing against the Zhang-Shasha oracle before the
+/// real strategy (and `spfR`/`spfA`) are layered on top.
+///
+/// Direct port of APTED.java's `gted`, restricted to the `strategyPathType == LEFT` branch on
+/// the `before` side.
+fn gted_forced_left(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, current2: usize) -> u64 {
+    // Deliberately *not* Java's `if subtreeSize1 == 1 || subtreeSize2 == 1: return spf1(...)`
+    // shortcut: `current2` never moves off the virtual root in this forced-left milestone (real
+    // APTED's strategy normally narrows both sides in lockstep, which is what makes that
+    // shortcut safe there), so a `spf1`-only leaf comparison would only ever get written against
+    // the *whole* other forest, never against the individual after-keyroots an ancestor's own
+    // sweep later needs to look up. `spf_l` below already handles a single-node `path_subtree`
+    // correctly - its own outermost row trivially satisfies the "aligned" check - so every node,
+    // leaf or not, goes through the same per-after-keyroot sweep.
+    let mut current_path_node = ctx.before_idx.pre_l_to_lld(current1);
+    loop {
+        let parent = ctx.before_idx.parents[current_path_node];
+        if parent < 0 || (parent as usize) < current1 {
+            break;
+        }
+        let parent = parent as usize;
+        for &child in &ctx.before_idx.children[parent] {
+            if child != current_path_node {
+                gted_forced_left(ctx, delta, child, current2);
+            }
+        }
+        current_path_node = parent;
+    }
+
+    spf_l(ctx, delta, true, current1, current2)
+}
+
+/// Computes the tree edit distance and populates `delta` for a forest pair, using the real
+/// APTED engine instead of classic Zhang-Shasha keyroot decomposition. Each side's forest is
+/// wrapped under a virtual root (see `AptedIndexer`) so the single-rooted APTED recursion can
+/// run unmodified; the resulting virtual-space `delta` is then translated back into a `DeltaTable`
+/// indexed by the real (non-virtual) preorder ids that `compute_edit_mapping` expects.
+fn compute_delta(
+    before: &PostorderIndexer,
+    after: &PostorderIndexer,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    before_root_ids: &[usize],
+    after_root_ids: &[usize],
+    before_node_map: &HashMap<usize, usize>,
+    after_node_map: &HashMap<usize, usize>,
+) -> DeltaTable {
+    let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
+    if before.size == 0 || after.size == 0 {
+        return real_delta;
+    }
+
+    let mut before_idx = AptedIndexer::build(before_meta, before_root_ids, before_node_map);
+    let mut after_idx = AptedIndexer::build(after_meta, after_root_ids, after_node_map);
+    before_idx.fill_subtree_costs(before_meta, cost_model);
+    after_idx.fill_subtree_costs(after_meta, cost_model);
+
+    let ctx = EngineCtx {
+        before_idx: &before_idx,
+        after_idx: &after_idx,
+        before_meta,
+        after_meta,
+        cost_model,
+    };
+    let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
+    // Drive `gted_forced_left` once per top-level real root (the virtual root's children) -
+    // exactly the `other_subtree == 0` fix in `spf_l` above, mirrored on the before/T1 axis:
+    // starting from the virtual root itself would walk its leftmost path all the way down to
+    // the forest's overall leftmost leaf, silently absorbing the first real root into that path
+    // instead of giving it (and every sibling root) its own aligned boundary.
+    for &before_root in &before_idx.children[0] {
+        gted_forced_left(&ctx, &mut virtual_delta, before_root, 0);
+    }
+
+    // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
+    // sits at virtual index `0`, real node `pre` sits at virtual index `pre + 1`, on both sides.
+    for before_pre in 0..before.size {
+        for after_pre in 0..after.size {
+            let v = virtual_delta.get(before_pre + 1, after_pre + 1);
+            if v != 0 {
+                real_delta.set(before_pre, after_pre, v);
+            }
+        }
+    }
+
+    real_delta
 }
 
 /// A single, single-node-granularity decision produced by `compute_edit_mapping`.
@@ -902,7 +1520,17 @@ fn resolve_forest(
     let before_idx = PostorderIndexer::build(before_meta, &before_root_ids, &diff.before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, &after_root_ids, &diff.after_node_map);
 
-    let mut delta = compute_delta(&before_idx, &after_idx, before_meta, after_meta, cost_model);
+    let mut delta = compute_delta(
+        &before_idx,
+        &after_idx,
+        before_meta,
+        after_meta,
+        cost_model,
+        &before_root_ids,
+        &after_root_ids,
+        &diff.before_node_map,
+        &diff.after_node_map,
+    );
     let decisions = compute_edit_mapping(
         &before_idx,
         &after_idx,
@@ -1027,6 +1655,407 @@ mod tests {
     use super::*;
     use crate::diff::{ASTMappingOperation, ASTMappingReason};
     use crate::test::helper;
+
+    fn synthetic_meta(nodes: &[(usize, &str, &str, &[usize])]) -> ASTMetadata {
+        let mut node_info = HashMap::new();
+        for &(id, kind, text, children) in nodes {
+            node_info.insert(
+                id,
+                ASTNodeMetadata {
+                    kind: kind.to_string(),
+                    text: text.to_string(),
+                    children: children.to_vec(),
+                },
+            );
+        }
+        ASTMetadata {
+            node_info,
+            ..Default::default()
+        }
+    }
+
+    fn mapping_total_cost(
+        decisions: &[RawDecision],
+        before_meta: &ASTMetadata,
+        after_meta: &ASTMetadata,
+        cost_model: &UnitCostModel,
+    ) -> u64 {
+        decisions
+            .iter()
+            .map(|d| match *d {
+                RawDecision::Match(b, a) => {
+                    cost_model.ren(&before_meta.node_info[&b], &after_meta.node_info[&a])
+                }
+                RawDecision::Delete(b) => cost_model.del(&before_meta.node_info[&b]),
+                RawDecision::Insert(a) => cost_model.ins(&after_meta.node_info[&a]),
+            })
+            .sum()
+    }
+
+    /// Differential check: the new APTED-engine-backed `compute_delta` must produce a mapping
+    /// with the exact same total cost as the classic Zhang-Shasha oracle, for the given forests.
+    fn assert_distance_matches_oracle(
+        before_meta: &ASTMetadata,
+        after_meta: &ASTMetadata,
+        before_root_ids: &[usize],
+        after_root_ids: &[usize],
+    ) {
+        assert_distance_matches_oracle_pruned(
+            before_meta,
+            after_meta,
+            before_root_ids,
+            after_root_ids,
+            &HashMap::new(),
+            &HashMap::new(),
+        );
+    }
+
+    fn assert_distance_matches_oracle_pruned(
+        before_meta: &ASTMetadata,
+        after_meta: &ASTMetadata,
+        before_root_ids: &[usize],
+        after_root_ids: &[usize],
+        before_node_map: &HashMap<usize, usize>,
+        after_node_map: &HashMap<usize, usize>,
+    ) {
+        let cost_model = UnitCostModel;
+
+        let before_idx = PostorderIndexer::build(before_meta, before_root_ids, before_node_map);
+        let after_idx = PostorderIndexer::build(after_meta, after_root_ids, after_node_map);
+
+        let mut oracle_delta = compute_delta_zhang_shasha(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+        );
+        let oracle_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            &mut oracle_delta,
+        );
+        let oracle_cost =
+            mapping_total_cost(&oracle_decisions, before_meta, after_meta, &cost_model);
+
+        let mut new_delta = compute_delta(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            before_root_ids,
+            after_root_ids,
+            before_node_map,
+            after_node_map,
+        );
+        let new_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            &cost_model,
+            &mut new_delta,
+        );
+        let new_cost = mapping_total_cost(&new_decisions, before_meta, after_meta, &cost_model);
+
+        assert_eq!(
+            new_cost, oracle_cost,
+            "new engine cost {new_cost} != oracle cost {oracle_cost}\nbefore_roots={before_root_ids:?} after_roots={after_root_ids:?}"
+        );
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_single_leaf() {
+        let before = synthetic_meta(&[(0, "leaf", "a", &[])]);
+        let after = synthetic_meta(&[(0, "leaf", "b", &[])]);
+        assert_distance_matches_oracle(&before, &after, &[0], &[0]);
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_small_trees() {
+        // before: root(a, b)   after: root(a, b, c)
+        let before = synthetic_meta(&[
+            (0, "root", "", &[1, 2]),
+            (1, "leaf", "a", &[]),
+            (2, "leaf", "b", &[]),
+        ]);
+        let after = synthetic_meta(&[
+            (10, "root", "", &[11, 12, 13]),
+            (11, "leaf", "a", &[]),
+            (12, "leaf", "b", &[]),
+            (13, "leaf", "c", &[]),
+        ]);
+        assert_distance_matches_oracle(&before, &after, &[0], &[10]);
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_multi_root_forest() {
+        // before forest: leaf(a), leaf(b), inner(c -> leaf(d))
+        let before = synthetic_meta(&[
+            (0, "leaf", "a", &[]),
+            (1, "leaf", "b", &[]),
+            (2, "inner", "", &[3]),
+            (3, "leaf", "d", &[]),
+        ]);
+        // after forest: leaf(a), inner(c -> leaf(d), leaf(e)), leaf(z)
+        let after = synthetic_meta(&[
+            (10, "leaf", "a", &[]),
+            (11, "inner", "", &[12, 13]),
+            (12, "leaf", "d", &[]),
+            (13, "leaf", "e", &[]),
+            (14, "leaf", "z", &[]),
+        ]);
+        assert_distance_matches_oracle(&before, &after, &[0, 1, 2], &[10, 11, 14]);
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_deep_unbalanced() {
+        // before: a deep left chain with a branchy right side.
+        let before = synthetic_meta(&[
+            (0, "root", "", &[1, 6]),
+            (1, "chain", "", &[2]),
+            (2, "chain", "", &[3]),
+            (3, "chain", "", &[4]),
+            (4, "leaf", "x", &[]),
+            (6, "branch", "", &[7, 8, 9]),
+            (7, "leaf", "p", &[]),
+            (8, "leaf", "q", &[]),
+            (9, "leaf", "r", &[]),
+        ]);
+        let after = synthetic_meta(&[
+            (100, "root", "", &[101, 106]),
+            (101, "chain", "", &[102]),
+            (102, "chain", "", &[104]),
+            (104, "leaf", "x", &[]),
+            (106, "branch", "", &[107, 109, 108]),
+            (107, "leaf", "p", &[]),
+            (108, "leaf", "q", &[]),
+            (109, "leaf", "s", &[]),
+        ]);
+        assert_distance_matches_oracle(&before, &after, &[0], &[100]);
+    }
+
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+        fn range(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    fn gen_random_tree(
+        rng: &mut Rng,
+        next_id: &mut usize,
+        depth: usize,
+        max_depth: usize,
+        kinds: &[&str],
+        texts: &[&str],
+        nodes: &mut Vec<(usize, String, String, Vec<usize>)>,
+    ) -> usize {
+        let id = *next_id;
+        *next_id += 1;
+        let kind = kinds[rng.range(kinds.len())];
+        let is_leaf = depth >= max_depth || rng.range(3) == 0;
+        if is_leaf {
+            let text = texts[rng.range(texts.len())];
+            nodes.push((id, kind.to_string(), text.to_string(), Vec::new()));
+        } else {
+            let nchildren = 1 + rng.range(3);
+            let mut child_ids = Vec::new();
+            for _ in 0..nchildren {
+                child_ids.push(gen_random_tree(
+                    rng, next_id, depth + 1, max_depth, kinds, texts, nodes,
+                ));
+            }
+            nodes.push((id, kind.to_string(), String::new(), child_ids));
+        }
+        id
+    }
+
+    fn meta_from_owned(nodes: &[(usize, String, String, Vec<usize>)]) -> ASTMetadata {
+        let mut node_info = HashMap::new();
+        for (id, kind, text, children) in nodes {
+            node_info.insert(
+                *id,
+                ASTNodeMetadata {
+                    kind: kind.clone(),
+                    text: text.clone(),
+                    children: children.clone(),
+                },
+            );
+        }
+        ASTMetadata {
+            node_info,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_fuzz_minimal_repro() {
+        let before = meta_from_owned(&[
+            (2, "a".into(), "x".into(), vec![]),
+            (5, "a".into(), "z".into(), vec![]),
+            (4, "c".into(), "".into(), vec![5]),
+            (6, "a".into(), "x".into(), vec![]),
+            (3, "c".into(), "".into(), vec![4, 6]),
+            (1, "c".into(), "".into(), vec![2, 3]),
+            (0, "a".into(), "".into(), vec![1]),
+        ]);
+        let after = meta_from_owned(&[
+            (9, "b".into(), "z".into(), vec![]),
+            (8, "b".into(), "".into(), vec![9]),
+            (11, "b".into(), "z".into(), vec![]),
+            (12, "a".into(), "x".into(), vec![]),
+            (10, "a".into(), "".into(), vec![11, 12]),
+            (14, "b".into(), "y".into(), vec![]),
+            (13, "b".into(), "".into(), vec![14]),
+            (7, "b".into(), "".into(), vec![8, 10, 13]),
+        ]);
+        assert_distance_matches_oracle(&before, &after, &[0], &[7]);
+    }
+
+    #[test]
+    fn debug_dump_minimal_repro() {
+        let before = meta_from_owned(&[
+            (2, "a".into(), "x".into(), vec![]),
+            (5, "a".into(), "z".into(), vec![]),
+            (4, "c".into(), "".into(), vec![5]),
+            (6, "a".into(), "x".into(), vec![]),
+            (3, "c".into(), "".into(), vec![4, 6]),
+            (1, "c".into(), "".into(), vec![2, 3]),
+            (0, "a".into(), "".into(), vec![1]),
+        ]);
+        let after = meta_from_owned(&[
+            (9, "b".into(), "z".into(), vec![]),
+            (8, "b".into(), "".into(), vec![9]),
+            (11, "b".into(), "z".into(), vec![]),
+            (12, "a".into(), "x".into(), vec![]),
+            (10, "a".into(), "".into(), vec![11, 12]),
+            (14, "b".into(), "y".into(), vec![]),
+            (13, "b".into(), "".into(), vec![14]),
+            (7, "b".into(), "".into(), vec![8, 10, 13]),
+        ]);
+        let cost_model = UnitCostModel;
+        let empty_map = HashMap::new();
+        let before_idx = PostorderIndexer::build(&before, &[0], &empty_map);
+        let after_idx = PostorderIndexer::build(&after, &[7], &empty_map);
+
+        let mut oracle_delta =
+            compute_delta_zhang_shasha(&before_idx, &after_idx, &before, &after, &cost_model);
+        let oracle_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            &before,
+            &after,
+            &cost_model,
+            &mut oracle_delta,
+        );
+        eprintln!("ORACLE decisions: {oracle_decisions:?}");
+
+        let mut new_delta = compute_delta(
+            &before_idx,
+            &after_idx,
+            &before,
+            &after,
+            &cost_model,
+            &[0],
+            &[7],
+            &empty_map,
+            &empty_map,
+        );
+        let new_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            &before,
+            &after,
+            &cost_model,
+            &mut new_delta,
+        );
+        eprintln!("NEW decisions: {new_decisions:?}");
+
+        for b in 0..before_idx.size {
+            for a in 0..after_idx.size {
+                let ov = oracle_delta.get(b, a);
+                let nv = new_delta.get(b, a);
+                if ov != nv {
+                    let bn = before_idx.node_id_at(before_idx.pre_to_post[b] + 1);
+                    let an = after_idx.node_id_at(after_idx.pre_to_post[a] + 1);
+                    eprintln!(
+                        "delta mismatch: before_pre={b}(id={bn}) after_pre={a}(id={an}) oracle={ov} new={nv}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_fuzz() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        for seed in 0..3000u64 {
+            let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(1));
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root = gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut before_nodes);
+            let mut after_nodes = Vec::new();
+            let after_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut after_nodes);
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+
+            let result = std::panic::catch_unwind(|| {
+                assert_distance_matches_oracle(&before_meta, &after_meta, &[before_root], &[after_root]);
+            });
+            if result.is_err() {
+                panic!(
+                    "fuzz failure at seed {seed}\nbefore_nodes={before_nodes:?}\nafter_nodes={after_nodes:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_with_pruned_descendants() {
+        // root(a, b, c, d) vs root(a, x, c, y) - but `b`/`d` (before) and `x`/`y` (after) are
+        // already matched elsewhere, so only `root`+`a`+`c` survive pruning into a forest of
+        // multiple unmatched roots per side (since the pruned nodes break contiguity).
+        let before = synthetic_meta(&[
+            (0, "root", "", &[1, 2, 3, 4]),
+            (1, "leaf", "a", &[]),
+            (2, "leaf", "b", &[]),
+            (3, "leaf", "c", &[]),
+            (4, "leaf", "d", &[]),
+        ]);
+        let after = synthetic_meta(&[
+            (10, "root", "", &[11, 12, 13, 14]),
+            (11, "leaf", "a", &[]),
+            (12, "leaf", "x", &[]),
+            (13, "leaf", "c", &[]),
+            (14, "leaf", "y", &[]),
+        ]);
+        let before_map: HashMap<usize, usize> = [(2, 12), (4, 14)].into_iter().collect();
+        let after_map: HashMap<usize, usize> = [(12, 2), (14, 4)].into_iter().collect();
+        assert_distance_matches_oracle_pruned(
+            &before,
+            &after,
+            &[0],
+            &[10],
+            &before_map,
+            &after_map,
+        );
+    }
 
     #[test]
     fn test_already_matched_nodes_are_skipped() -> Result<()> {
