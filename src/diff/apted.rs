@@ -457,6 +457,12 @@ struct AptedIndexer {
     /// 0-based right-to-left postorder index -> right-to-left postorder index of the rightmost
     /// leaf descendant.
     post_r_to_rld: Vec<usize>,
+    /// 0-based preorder index -> preorder index of the nearest leaf strictly to its left, or
+    /// `-1` if none.
+    pre_to_ln: Vec<i64>,
+    /// 0-based right-to-left preorder index -> right-to-left preorder index of the nearest leaf
+    /// strictly to its right (in left-to-right terms), or `-1` if none.
+    pre_r_to_ln: Vec<i64>,
     /// `true` iff the node is its parent's first child (`false` for the root).
     node_type_l: Vec<bool>,
     /// `true` iff the node is its parent's last child (`false` for the root).
@@ -626,6 +632,30 @@ impl AptedIndexer {
             };
         }
 
+        // Nearest leaf strictly to the left (in preorder)/right (in right-to-left preorder),
+        // `-1` if none - needed by `spf_a`'s `updateFnArray` to seed its "next forest member"
+        // linked list. A single forward scan each, mirroring Java's `postTraversalIndexing`.
+        let mut pre_to_ln = vec![-1i64; size];
+        {
+            let mut current_leaf: i64 = -1;
+            for pre in 0..size {
+                pre_to_ln[pre] = current_leaf;
+                if sizes[pre] == 1 {
+                    current_leaf = pre as i64;
+                }
+            }
+        }
+        let mut pre_r_to_ln = vec![-1i64; size];
+        {
+            let mut current_leaf: i64 = -1;
+            for pre_r in 0..size {
+                pre_r_to_ln[pre_r] = current_leaf;
+                if sizes[pre_r_to_pre_l[pre_r]] == 1 {
+                    current_leaf = pre_r as i64;
+                }
+            }
+        }
+
         let sum_del_cost = vec![0u64; size];
         let sum_ins_cost = vec![0u64; size];
 
@@ -641,6 +671,8 @@ impl AptedIndexer {
             pre_to_pre_r,
             pre_r_to_pre_l,
             post_r_to_rld,
+            pre_to_ln,
+            pre_r_to_ln,
             node_type_l,
             node_type_r,
             kr_sum,
@@ -744,6 +776,623 @@ struct EngineCtx<'a> {
     before_meta: &'a ASTMetadata,
     after_meta: &'a ASTMetadata,
     cost_model: &'a UnitCostModel,
+}
+
+/// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables (the role Java's `float[][]`
+/// plays there). A flat `Vec` (rather than `Vec<Vec<i64>>`) avoids one allocation per row.
+struct Mat {
+    cols: usize,
+    data: Vec<i64>,
+}
+
+impl Mat {
+    fn new(rows: usize, cols: usize) -> Self {
+        Mat {
+            cols,
+            data: vec![0i64; rows * cols],
+        }
+    }
+}
+
+impl std::ops::Index<(i64, i64)> for Mat {
+    type Output = i64;
+    fn index(&self, (row, col): (i64, i64)) -> &i64 {
+        &self.data[row as usize * self.cols + col as usize]
+    }
+}
+
+impl std::ops::IndexMut<(i64, i64)> for Mat {
+    fn index_mut(&mut self, (row, col): (i64, i64)) -> &mut i64 {
+        &mut self.data[row as usize * self.cols + col as usize]
+    }
+}
+
+/// Direct port of APTED.java's `spfA` (the general "inner path" single-path function -
+/// Algorithm 3 in the APTED paper), **specialized to `pathType == INNER`**: `gted` only ever
+/// calls this once it has already routed `pathType == LEFT`/`RIGHT` to `spf_l`/`spf_r`
+/// directly, so Java's `pathType == 0`/`pathType == 1` branches (handling this function as a
+/// hypothetically general LEFT/RIGHT/INNER entry point) are dead code from that call site and
+/// are omitted; every conditional that depended on them is simplified accordingly (e.g. the
+/// "deal with nodes to the left of the path" guard becomes plain `leftPart`).
+///
+/// Variable names mirror Java's as closely as possible (`lF`/`rF` range over `path_idx`'s
+/// subtree, `lG`/`rG` over `other_idx`'s) to keep this checkable line-by-line against the
+/// original; `treesSwapped` is replaced by `path_is_before` throughout, same as `spf_l`/`spf_r`.
+/// Costs are `i64` (never negative in practice for a metric cost model, but several
+/// intermediate `sp3` terms are differences, so `i64` avoids an underflow panic `u64` would risk
+/// on the way to a non-negative result) and cast to `u64` only at the `DeltaTable`/return
+/// boundary.
+#[allow(clippy::too_many_arguments)]
+fn spf_a(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    path_is_before: bool,
+    path_subtree: usize,
+    other_subtree: usize,
+    path_id: usize,
+) -> u64 {
+    let (path_idx, other_idx) = if path_is_before {
+        (ctx.before_idx, ctx.after_idx)
+    } else {
+        (ctx.after_idx, ctx.before_idx)
+    };
+    let (path_meta, other_meta) = if path_is_before {
+        (ctx.before_meta, ctx.after_meta)
+    } else {
+        (ctx.after_meta, ctx.before_meta)
+    };
+    // `(before, after)`, in that order - the fixed global orientation `delta` is always read and
+    // written in, regardless of which side `path_idx`/`other_idx` happen to be (see `spf_l`).
+    let delta_order = |path_pre: i64, other_pre: i64| -> (usize, usize) {
+        if path_is_before {
+            (path_pre as usize, other_pre as usize)
+        } else {
+            (other_pre as usize, path_pre as usize)
+        }
+    };
+
+    let path_del_cost = |pre: i64| -> i64 {
+        let n = vnode(path_idx, path_meta, pre as usize);
+        (if path_is_before {
+            vdel(ctx.cost_model, n)
+        } else {
+            vins(ctx.cost_model, n)
+        }) as i64
+    };
+    let other_ins_cost = |pre: i64| -> i64 {
+        let n = vnode(other_idx, other_meta, pre as usize);
+        (if path_is_before {
+            vins(ctx.cost_model, n)
+        } else {
+            vdel(ctx.cost_model, n)
+        }) as i64
+    };
+    let ren_cost = |path_pre: i64, other_pre: i64| -> i64 {
+        let pn = vnode(path_idx, path_meta, path_pre as usize);
+        let on = vnode(other_idx, other_meta, other_pre as usize);
+        let (b, a) = if path_is_before { (pn, on) } else { (on, pn) };
+        vren(ctx.cost_model, b, a) as i64
+    };
+    let path_subtree_del_cost = |pre: i64| -> i64 {
+        (if path_is_before {
+            path_idx.sum_del_cost[pre as usize]
+        } else {
+            path_idx.sum_ins_cost[pre as usize]
+        }) as i64
+    };
+    let other_subtree_ins_cost = |pre: i64| -> i64 {
+        (if path_is_before {
+            other_idx.sum_ins_cost[pre as usize]
+        } else {
+            other_idx.sum_del_cost[pre as usize]
+        }) as i64
+    };
+
+    let current_subtree_pre_l1 = path_subtree as i64;
+    let current_subtree_pre_l2 = other_subtree as i64;
+    let subtree_size1 = path_idx.sizes[path_subtree] as i64;
+    let subtree_size2 = other_idx.sizes[other_subtree] as i64;
+
+    let mut t = Mat::new(subtree_size2 as usize + 1, subtree_size2 as usize + 1);
+    let mut s = Mat::new(subtree_size1 as usize + 1, subtree_size2 as usize + 1);
+    let mut min_cost: i64 = -1;
+    let max_size = (path_idx.size.max(other_idx.size)) as i64;
+    let mut fna = vec![-1i64; max_size as usize + 1];
+    let mut fta = vec![-1i64; max_size as usize + 1];
+    let mut q = vec![0i64; max_size as usize + 1];
+    // Incrementally summed forest size/cost - F is `path_idx`'s side, G is `other_idx`'s.
+    let mut current_forest_size1: i64 = 0;
+    let mut current_forest_size2: i64 = 0;
+    let mut current_forest_cost1: i64 = 0;
+    let mut current_forest_cost2: i64 = 0;
+
+    fn update_fn_array(fna: &mut [i64], ln_for_node: i64, node: i64, current_subtree_pre_l: i64) {
+        let last = fna.len() - 1;
+        if ln_for_node >= current_subtree_pre_l {
+            fna[node as usize] = fna[ln_for_node as usize];
+            fna[ln_for_node as usize] = node;
+        } else {
+            fna[node as usize] = fna[last];
+            fna[last] = node;
+        }
+    }
+    fn update_ft_array(fna: &[i64], fta: &mut [i64], ln_for_node: i64, node: i64) {
+        fta[node as usize] = ln_for_node;
+        if fna[node as usize] > -1 {
+            fta[fna[node as usize] as usize] = node;
+        }
+    }
+
+    let mut start_path_node: i64 = -1;
+    let mut end_path_node = path_id as i64;
+    let mut it1_pre_l_off;
+    let it2_pre_l_off = current_subtree_pre_l2;
+    let mut it1_pre_r_off;
+    let it2_pre_r_off = other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64;
+
+    // Loop A [1, Algorithm 3] - walk up the path.
+    while end_path_node >= current_subtree_pre_l1 {
+        it1_pre_l_off = end_path_node;
+        it1_pre_r_off = path_idx.pre_to_pre_r[end_path_node as usize] as i64;
+        let mut r_f_last: i64 = -1;
+        let mut l_f_last: i64 = -1;
+        let end_path_node_in_pre_r = path_idx.pre_to_pre_r[end_path_node as usize] as i64;
+        let start_path_node_in_pre_r = if start_path_node == -1 {
+            i64::MAX / 4
+        } else {
+            path_idx.pre_to_pre_r[start_path_node as usize] as i64
+        };
+        let parent_of_end_path_node = path_idx.parents[end_path_node as usize];
+        let parent_of_end_path_node_in_pre_r = if parent_of_end_path_node == -1 {
+            i64::MAX / 4
+        } else {
+            path_idx.pre_to_pre_r[parent_of_end_path_node as usize] as i64
+        };
+
+        let left_part = start_path_node - end_path_node > 1;
+        let right_part =
+            start_path_node >= 0 && start_path_node_in_pre_r - end_path_node_in_pre_r > 1;
+
+        // Deal with nodes to the left of the path. Java: `pathType == 1 || pathType == 2 &&
+        // leftPart`; simplified to `leftPart` per this function's INNER-only specialization.
+        if left_part {
+            let (r_f_first, l_f_first);
+            if start_path_node == -1 {
+                r_f_first = end_path_node_in_pre_r;
+                l_f_first = end_path_node;
+            } else {
+                r_f_first = start_path_node_in_pre_r;
+                l_f_first = start_path_node - 1;
+            }
+            if !right_part {
+                r_f_last = end_path_node_in_pre_r;
+            }
+            let r_g_last = other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64;
+            let r_g_first = r_g_last + subtree_size2 - 1;
+            l_f_last = if right_part {
+                end_path_node + 1
+            } else {
+                end_path_node
+            };
+            let fna_last = fna.len() - 1;
+            fna[fna_last] = -1;
+            for i in current_subtree_pre_l2..(current_subtree_pre_l2 + subtree_size2) {
+                fna[i as usize] = -1;
+                fta[i as usize] = -1;
+            }
+            // Store the current size and cost of forest in F.
+            let tmp_forest_size1 = current_forest_size1;
+            let tmp_forest_cost1 = current_forest_cost1;
+            // Loop B [1, Algorithm 3] - for all nodes in G (right-hand input tree).
+            let mut r_g = r_g_first;
+            while r_g >= r_g_last {
+                let l_g_first = other_idx.pre_r_to_pre_l[r_g as usize] as i64;
+                let r_g_in_pre_l = l_g_first;
+                let r_g_minus1_in_pre_l = if r_g <= other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64 {
+                    i64::MAX / 4
+                } else {
+                    other_idx.pre_r_to_pre_l[(r_g - 1) as usize] as i64
+                };
+                let parent_of_r_g_in_pre_l = other_idx.parents[r_g_in_pre_l as usize];
+                // Decides on the last lG node for Loop D - INNER-only, so always the `else`
+                // branch of Java's `if (pathType == 1)`.
+                let l_g_last = if l_g_first == current_subtree_pre_l2 {
+                    l_g_first
+                } else {
+                    current_subtree_pre_l2 + 1
+                };
+                update_fn_array(
+                    &mut fna,
+                    other_idx.pre_to_ln[l_g_first as usize],
+                    l_g_first,
+                    current_subtree_pre_l2,
+                );
+                update_ft_array(
+                    &fna,
+                    &mut fta,
+                    other_idx.pre_to_ln[l_g_first as usize],
+                    l_g_first,
+                );
+                let mut r_f = r_f_first;
+                current_forest_size1 = tmp_forest_size1;
+                current_forest_cost1 = tmp_forest_cost1;
+                // Loop C [1, Algorithm 3] - for all nodes to the left of the path node.
+                let mut l_f = l_f_first;
+                while l_f >= l_f_last {
+                    if l_f == l_f_last && !right_part {
+                        r_f = r_f_last;
+                    }
+                    let l_f_node = l_f;
+                    current_forest_size1 += 1;
+                    current_forest_cost1 += path_del_cost(l_f_node);
+                    current_forest_size2 = other_idx.sizes[l_g_first as usize] as i64;
+                    current_forest_cost2 = other_subtree_ins_cost(l_g_first);
+                    let l_f_in_pre_r = path_idx.pre_to_pre_r[l_f as usize] as i64;
+                    let f_forest_is_tree = l_f_in_pre_r == r_f;
+                    let l_f_subtree_size = path_idx.sizes[l_f as usize] as i64;
+                    let l_f_is_consecutive_node_of_current_path_node = start_path_node - l_f == 1;
+                    let l_f_is_left_sibling_of_current_path_node =
+                        l_f + l_f_subtree_size == start_path_node;
+                    let sp1s_row = (l_f + 1) - it1_pre_l_off;
+                    let sp2s_row = l_f - it1_pre_l_off;
+                    let mut sp3s_row = 0i64;
+                    let swrite_row = l_f - it1_pre_l_off;
+                    let mut sp1source = 1u8;
+                    let mut sp3source = 1u8;
+                    let mut sp3 = 0i64;
+                    if f_forest_is_tree {
+                        if l_f_subtree_size == 1 {
+                            sp1source = 3;
+                        } else if l_f_is_consecutive_node_of_current_path_node {
+                            sp1source = 2;
+                        }
+                        sp3 = 0;
+                        sp3source = 2;
+                    } else {
+                        if l_f_is_consecutive_node_of_current_path_node {
+                            sp1source = 2;
+                        }
+                        sp3 = current_forest_cost1 - path_subtree_del_cost(l_f);
+                        if l_f_is_left_sibling_of_current_path_node {
+                            sp3source = 3;
+                        }
+                    }
+                    if sp3source == 1 {
+                        sp3s_row = (l_f + l_f_subtree_size) - it1_pre_l_off;
+                    }
+
+                    let mut l_g = l_g_first;
+                    let mut sp1 = match sp1source {
+                        1 => s[(sp1s_row, l_g - it2_pre_l_off)],
+                        2 => t[(l_g - it2_pre_l_off, r_g - it2_pre_r_off)],
+                        _ => current_forest_cost2,
+                    };
+                    sp1 += path_del_cost(l_f_node);
+                    min_cost = sp1;
+                    let mut sp2 = if current_forest_size2 == 1 {
+                        current_forest_cost1
+                    } else {
+                        q[l_f as usize]
+                    };
+                    sp2 += other_ins_cost(l_g);
+                    if sp2 < min_cost {
+                        min_cost = sp2;
+                    }
+                    if sp3 < min_cost {
+                        let (b, a) = delta_order(l_f_node, l_g);
+                        sp3 += delta.get(b, a) as i64;
+                        if sp3 < min_cost {
+                            sp3 += ren_cost(l_f_node, l_g);
+                            if sp3 < min_cost {
+                                min_cost = sp3;
+                            }
+                        }
+                    }
+                    s[(swrite_row, l_g - it2_pre_l_off)] = min_cost;
+                    l_g = fta[l_g as usize];
+
+                    // Loop D [1, Algorithm 3] - for all nodes to the left of rG.
+                    while l_g >= l_g_last {
+                        current_forest_size2 += 1;
+                        current_forest_cost2 += other_ins_cost(l_g);
+                        sp1 = match sp1source {
+                            1 => s[(sp1s_row, l_g - it2_pre_l_off)] + path_del_cost(l_f_node),
+                            2 => {
+                                t[(l_g - it2_pre_l_off, r_g - it2_pre_r_off)] + path_del_cost(l_f_node)
+                            }
+                            _ => current_forest_cost2 + path_del_cost(l_f_node),
+                        };
+                        let sp2_row_col = fna[l_g as usize] - it2_pre_l_off;
+                        sp2 = s[(sp2s_row, sp2_row_col)] + other_ins_cost(l_g);
+                        min_cost = sp1;
+                        if sp2 < min_cost {
+                            min_cost = sp2;
+                        }
+                        let (b, a) = delta_order(l_f_node, l_g);
+                        sp3 = delta.get(b, a) as i64;
+                        if sp3 < min_cost {
+                            let fna_target = fna[(l_g + other_idx.sizes[l_g as usize] as i64 - 1) as usize];
+                            sp3 += match sp3source {
+                                1 => s[(sp3s_row, fna_target - it2_pre_l_off)],
+                                2 => current_forest_cost2 - other_subtree_ins_cost(l_g),
+                                _ => t[(fna_target - it2_pre_l_off, r_g - it2_pre_r_off)],
+                            };
+                            if sp3 < min_cost {
+                                sp3 += ren_cost(l_f_node, l_g);
+                                if sp3 < min_cost {
+                                    min_cost = sp3;
+                                }
+                            }
+                        }
+                        s[(swrite_row, l_g - it2_pre_l_off)] = min_cost;
+                        l_g = fta[l_g as usize];
+                    }
+                    l_f -= 1;
+                }
+                if r_g_minus1_in_pre_l == parent_of_r_g_in_pre_l {
+                    if !right_part {
+                        if left_part {
+                            let (b, a) = delta_order(end_path_node, r_g_minus1_in_pre_l + 1);
+                            let v = s[(l_f_last + 1 - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
+                            if std::env::var("APTED_DEBUG").is_ok() {
+                                eprintln!("spfA write-A: delta[{b}][{a}] = {v}");
+                            }
+                            delta.set(b, a, v);
+                        }
+                        if end_path_node > 0
+                            && end_path_node == parent_of_end_path_node + 1
+                            && end_path_node_in_pre_r == parent_of_end_path_node_in_pre_r + 1
+                        {
+                            let (b, a) = delta_order(parent_of_end_path_node, r_g_minus1_in_pre_l + 1);
+                            let v = s[(l_f_last - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
+                            if std::env::var("APTED_DEBUG").is_ok() {
+                                eprintln!("spfA write-B: delta[{b}][{a}] = {v}");
+                            }
+                            delta.set(b, a, v);
+                        }
+                    }
+                    let mut l_f2 = l_f_first;
+                    while l_f2 >= l_f_last {
+                        q[l_f2 as usize] = s[(l_f2 - it1_pre_l_off, parent_of_r_g_in_pre_l + 1 - it2_pre_l_off)];
+                        l_f2 -= 1;
+                    }
+                }
+                // TODO: first pointers can be precomputed
+                let mut l_g_iter = l_g_first;
+                while l_g_iter >= l_g_last {
+                    t[(l_g_iter - it2_pre_l_off, r_g - it2_pre_r_off)] =
+                        s[(l_f_last - it1_pre_l_off, l_g_iter - it2_pre_l_off)];
+                    l_g_iter = fta[l_g_iter as usize];
+                }
+                r_g -= 1;
+            }
+        }
+
+        // Deal with nodes to the right of the path. Java: `pathType == 0 || pathType == 2 &&
+        // rightPart || pathType == 2 && !leftPart && !rightPart`; simplified to `rightPart ||
+        // !leftPart` per this function's INNER-only specialization.
+        if right_part || !left_part {
+            let (l_f_first, r_f_first);
+            if start_path_node == -1 {
+                l_f_first = end_path_node;
+                r_f_first = end_path_node_in_pre_r;
+            } else {
+                r_f_first = start_path_node_in_pre_r - 1;
+                l_f_first = end_path_node + 1;
+            }
+            l_f_last = end_path_node;
+            let l_g_last = current_subtree_pre_l2;
+            let l_g_first = l_g_last + subtree_size2 - 1;
+            r_f_last = end_path_node_in_pre_r;
+            let fna_last = fna.len() - 1;
+            fna[fna_last] = -1;
+            for i in current_subtree_pre_l2..(current_subtree_pre_l2 + subtree_size2) {
+                fna[i as usize] = -1;
+                fta[i as usize] = -1;
+            }
+            let tmp_forest_size1 = current_forest_size1;
+            let tmp_forest_cost1 = current_forest_cost1;
+            // Loop B' [1, Algorithm 3] - for all nodes in G.
+            let mut l_g = l_g_first;
+            while l_g >= l_g_last {
+                let r_g_first2 = other_idx.pre_to_pre_r[l_g as usize] as i64;
+                update_fn_array(
+                    &mut fna,
+                    other_idx.pre_r_to_ln[r_g_first2 as usize],
+                    r_g_first2,
+                    other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64,
+                );
+                update_ft_array(
+                    &fna,
+                    &mut fta,
+                    other_idx.pre_r_to_ln[r_g_first2 as usize],
+                    r_g_first2,
+                );
+                let mut l_f = l_f_first;
+                let l_g_minus1_in_pre_r = if l_g <= current_subtree_pre_l2 {
+                    i64::MAX / 4
+                } else {
+                    other_idx.pre_to_pre_r[(l_g - 1) as usize] as i64
+                };
+                let parent_of_l_g = other_idx.parents[l_g as usize];
+                let parent_of_l_g_in_pre_r = if parent_of_l_g == -1 {
+                    -1
+                } else {
+                    other_idx.pre_to_pre_r[parent_of_l_g as usize] as i64
+                };
+                current_forest_size1 = tmp_forest_size1;
+                current_forest_cost1 = tmp_forest_cost1;
+                let r_g_last2 = if r_g_first2 == other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64 {
+                    r_g_first2
+                } else {
+                    other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64
+                };
+                // Loop C' [1, Algorithm 3] - for all nodes to the right of the path node.
+                let mut r_f = r_f_first;
+                while r_f >= r_f_last {
+                    if r_f == r_f_last {
+                        l_f = l_f_last;
+                    }
+                    let r_f_in_pre_l = path_idx.pre_r_to_pre_l[r_f as usize] as i64;
+                    current_forest_size1 += 1;
+                    current_forest_cost1 += path_del_cost(r_f_in_pre_l);
+                    current_forest_size2 = other_idx.sizes[l_g as usize] as i64;
+                    current_forest_cost2 = other_subtree_ins_cost(l_g);
+                    let r_f_subtree_size = path_idx.sizes[r_f_in_pre_l as usize] as i64;
+                    let (r_f_is_consecutive_node_of_current_path_node, r_f_is_right_sibling_of_current_path_node) =
+                        if start_path_node > 0 {
+                            (
+                                start_path_node_in_pre_r - r_f == 1,
+                                r_f + r_f_subtree_size == start_path_node_in_pre_r,
+                            )
+                        } else {
+                            (false, false)
+                        };
+                    let f_forest_is_tree = r_f_in_pre_l == l_f;
+                    let r_f_node = r_f_in_pre_l;
+                    let sp1s_row = (r_f + 1) - it1_pre_r_off;
+                    let sp2s_row = r_f - it1_pre_r_off;
+                    let mut sp3s_row = 0i64;
+                    let swrite_row = r_f - it1_pre_r_off;
+                    let sp1t_row = l_g - it2_pre_l_off;
+                    let sp3t_row = l_g - it2_pre_l_off;
+                    let mut sp1source = 1u8;
+                    let mut sp3source = 1u8;
+                    let mut sp3;
+                    if f_forest_is_tree {
+                        if r_f_subtree_size == 1 {
+                            sp1source = 3;
+                        } else if r_f_is_consecutive_node_of_current_path_node {
+                            sp1source = 2;
+                        }
+                        sp3 = 0;
+                        sp3source = 2;
+                    } else {
+                        if r_f_is_consecutive_node_of_current_path_node {
+                            sp1source = 2;
+                        }
+                        sp3 = current_forest_cost1 - path_subtree_del_cost(r_f_in_pre_l);
+                        if r_f_is_right_sibling_of_current_path_node {
+                            sp3source = 3;
+                        }
+                    }
+                    if sp3source == 1 {
+                        sp3s_row = (r_f + r_f_subtree_size) - it1_pre_r_off;
+                    }
+                    let mut sp2 = if current_forest_size2 == 1 {
+                        current_forest_cost1
+                    } else {
+                        q[r_f as usize]
+                    };
+
+                    let mut r_g = r_g_first2;
+                    let r_g_first_in_pre_l = other_idx.pre_r_to_pre_l[r_g_first2 as usize] as i64;
+                    current_forest_size2 += 1;
+                    let mut sp1 = match sp1source {
+                        1 => s[(sp1s_row, r_g - it2_pre_r_off)],
+                        2 => t[(sp1t_row, r_g - it2_pre_r_off)],
+                        _ => current_forest_cost2,
+                    };
+                    sp1 += path_del_cost(r_f_node);
+                    min_cost = sp1;
+                    sp2 += other_ins_cost(r_g_first_in_pre_l);
+                    if sp2 < min_cost {
+                        min_cost = sp2;
+                    }
+                    if sp3 < min_cost {
+                        let (b, a) = delta_order(r_f_node, r_g_first_in_pre_l);
+                        sp3 += delta.get(b, a) as i64;
+                        if sp3 < min_cost {
+                            sp3 += ren_cost(r_f_node, r_g_first_in_pre_l);
+                            if sp3 < min_cost {
+                                min_cost = sp3;
+                            }
+                        }
+                    }
+                    s[(swrite_row, r_g - it2_pre_r_off)] = min_cost;
+                    r_g = fta[r_g as usize];
+
+                    // Loop D' [1, Algorithm 3] - for all nodes to the right of lG.
+                    while r_g >= r_g_last2 {
+                        let r_g_in_pre_l = other_idx.pre_r_to_pre_l[r_g as usize] as i64;
+                        current_forest_size2 += 1;
+                        current_forest_cost2 += other_ins_cost(r_g_in_pre_l);
+                        sp1 = match sp1source {
+                            1 => s[(sp1s_row, r_g - it2_pre_r_off)] + path_del_cost(r_f_node),
+                            2 => t[(sp1t_row, r_g - it2_pre_r_off)] + path_del_cost(r_f_node),
+                            _ => current_forest_cost2 + path_del_cost(r_f_node),
+                        };
+                        let sp2_row_col = fna[r_g as usize] - it2_pre_r_off;
+                        sp2 = s[(sp2s_row, sp2_row_col)] + other_ins_cost(r_g_in_pre_l);
+                        min_cost = sp1;
+                        if sp2 < min_cost {
+                            min_cost = sp2;
+                        }
+                        let (b, a) = delta_order(r_f_node, r_g_in_pre_l);
+                        sp3 = delta.get(b, a) as i64;
+                        if sp3 < min_cost {
+                            let fna_target =
+                                fna[(r_g + other_idx.sizes[r_g_in_pre_l as usize] as i64 - 1) as usize];
+                            sp3 += match sp3source {
+                                1 => s[(sp3s_row, fna_target - it2_pre_r_off)],
+                                2 => current_forest_cost2 - other_subtree_ins_cost(r_g_in_pre_l),
+                                _ => t[(sp3t_row, fna_target - it2_pre_r_off)],
+                            };
+                            if sp3 < min_cost {
+                                sp3 += ren_cost(r_f_node, r_g_in_pre_l);
+                                if sp3 < min_cost {
+                                    min_cost = sp3;
+                                }
+                            }
+                        }
+                        s[(swrite_row, r_g - it2_pre_r_off)] = min_cost;
+                        r_g = fta[r_g as usize];
+                    }
+                    r_f -= 1;
+                }
+                if l_g > current_subtree_pre_l2 && l_g - 1 == parent_of_l_g {
+                    if right_part {
+                        let (b, a) = delta_order(end_path_node, parent_of_l_g);
+                        let v = s[(r_f_last + 1 - it1_pre_r_off, l_g_minus1_in_pre_r + 1 - it2_pre_r_off)] as u64;
+                        if std::env::var("APTED_DEBUG").is_ok() {
+                            eprintln!("spfA write-C: delta[{b}][{a}] = {v}");
+                        }
+                        delta.set(b, a, v);
+                    }
+                    if end_path_node > 0
+                        && end_path_node == parent_of_end_path_node + 1
+                        && end_path_node_in_pre_r == parent_of_end_path_node_in_pre_r + 1
+                    {
+                        let (b, a) = delta_order(parent_of_end_path_node, parent_of_l_g);
+                        let v = s[(r_f_last - it1_pre_r_off, l_g_minus1_in_pre_r + 1 - it2_pre_r_off)] as u64;
+                        if std::env::var("APTED_DEBUG").is_ok() {
+                            eprintln!("spfA write-D: delta[{b}][{a}] = {v}");
+                        }
+                        delta.set(b, a, v);
+                    }
+                    let mut r_f2 = r_f_first;
+                    while r_f2 >= r_f_last {
+                        q[r_f2 as usize] = s[(r_f2 - it1_pre_r_off, parent_of_l_g_in_pre_r + 1 - it2_pre_r_off)];
+                        r_f2 -= 1;
+                    }
+                }
+                // TODO: first pointers can be precomputed
+                let mut r_g_iter = r_g_first2;
+                while r_g_iter >= r_g_last2 {
+                    t[(l_g - it2_pre_l_off, r_g_iter - it2_pre_r_off)] =
+                        s[(r_f_last - it1_pre_r_off, r_g_iter - it2_pre_r_off)];
+                    r_g_iter = fta[r_g_iter as usize];
+                }
+                l_g -= 1;
+            }
+        }
+
+        // Walk up the path by one node.
+        start_path_node = end_path_node;
+        end_path_node = path_idx.parents[end_path_node as usize];
+    }
+
+    min_cost as u64
 }
 
 /// Direct port of APTED.java's `spf1`: closed-form tree edit distance when at least one of the
@@ -1219,6 +1868,14 @@ fn compute_opt_strategy_post_l(
             }
         }
 
+        // Reset for every `v` - `cost2_*` accumulate `w`'s contributions *within this v's own
+        // sweep* (mirrors Java's per-`v` `Arrays.fill`); carrying values over from a previous
+        // `v` would both be wrong and accumulate unboundedly across the outer loop.
+        cost2_l.fill(0);
+        cost2_r.fill(0);
+        cost2_i.fill(0);
+        cost2_path.fill(0);
+
         for w in 0..size2 {
             let w_in_pre_l = after_idx.post_l_to_pre_l[w];
             let parent_w_pre_l = after_idx.parents[w_in_pre_l];
@@ -1237,7 +1894,16 @@ fn compute_opt_strategy_post_l(
             }
 
             let mut min_cost = INNER_DISABLED;
-            let mut strategy_path: i64 = -1;
+            // Java leaves this `-1` (a sentinel `gted` never decodes, since it short-circuits to
+            // `spf1` whenever either side is this small) - we don't have that shortcut (see
+            // `gted`'s doc comment), so this pair's `gted` call still needs a *real* path to
+            // walk. `left_path_v` is always safe here: if `v` itself is the size-1 side, its
+            // "leftmost path" is just itself, degenerating to exactly the same single-node
+            // comparison `gted` would have special-cased; if `w` is the small side, this
+            // correctly still decomposes `v`'s own structure, which is the case the missing
+            // shortcut would otherwise have skipped entirely (losing per-subtree `delta` entries
+            // an ancestor's own sweep may need - see `gted`'s comment on the size-1 check).
+            let mut strategy_path: i64 = left_path_v;
 
             if size_v <= 1 || size_w <= 1 {
                 min_cost = size_v.max(size_w);
@@ -1380,9 +2046,38 @@ fn gted(
     current1: usize,
     current2: usize,
 ) -> u64 {
+    // Expand virtual-root axes *before* ever reading the strategy or calling a single-path
+    // function - on *either* axis, not just whichever one the strategy ends up choosing to
+    // decompose. `spf_l`/`spf_r` tolerate a vroot-sized *other_subtree* (their own
+    // `other_subtree == 0` fix), but `spf_a` does not: its size-based shortcuts (e.g. "G is a
+    // single node") key off the *raw* subtree size, which the virtual root inflates by one
+    // without representing anything real, so it doesn't get to see vroot as a boundary at all.
+    if current1 == 0 {
+        let mut total = 0;
+        for &child in &ctx.before_idx.children[0] {
+            total += gted(ctx, delta, strategy, path_id_offset, child, current2);
+        }
+        return total;
+    }
+    if current2 == 0 {
+        let mut total = 0;
+        for &child in &ctx.after_idx.children[0] {
+            total += gted(ctx, delta, strategy, path_id_offset, current1, child);
+        }
+        return total;
+    }
+
     let size1 = ctx.before_idx.sizes[current1];
     let size2 = ctx.after_idx.sizes[current2];
-    if size1 <= 1 || size2 <= 1 {
+    // Only the *truly* trivial case (both sides already down to a single node) shortcuts
+    // straight to `spf_l` here. When only one side is size-1, the *other* side's internal
+    // structure still needs its own decomposition - e.g. a non-leftmost child several levels
+    // down still needs its own dedicated, aligned `delta` entry, which only coming from its own
+    // `gted` recursion (not from being swept as a non-aligned interior position by an ancestor's
+    // single `spf_l` call) can give it. `compute_opt_strategy_post_l` already guarantees a valid
+    // (if not cost-optimal) path for the `size1 <= 1 || size2 <= 1` case via its `left_path_v`
+    // fallback, so falling through to the normal strategy read below is always safe.
+    if size1 <= 1 && size2 <= 1 {
         return spf_l(ctx, delta, true, current1, current2);
     }
 
@@ -1391,13 +2086,6 @@ fn gted(
 
     if current_path_node_global < path_id_offset {
         // Path lives on the `before` side.
-        if current1 == 0 {
-            let mut total = 0;
-            for &child in &ctx.before_idx.children[0] {
-                total += gted(ctx, delta, strategy, path_id_offset, child, current2);
-            }
-            return total;
-        }
         let strategy_path_type =
             get_strategy_path_type(strategy_path_id, path_id_offset, current1, size1);
         let mut current_path_node = current_path_node_global as usize;
@@ -1414,22 +2102,19 @@ fn gted(
             }
             current_path_node = parent;
         }
+        if std::env::var("APTED_DEBUG").is_ok() {
+            eprintln!("gted T1-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}");
+        }
         return match strategy_path_type {
             0 => spf_l(ctx, delta, true, current1, current2),
             1 => spf_r(ctx, delta, true, current1, current2),
-            _ => unreachable!("spfA not wired yet - strategy is clamped to LEFT/RIGHT"),
+            _ => spf_a(ctx, delta, true, current1, current2, current_path_node_global as usize),
         };
     }
 
-    // Path lives on the `after` side.
+    // Path lives on the `after` side. (`current2 == 0` is impossible here - handled at the top
+    // of this function, before the strategy was ever read.)
     let current_path_node_global = current_path_node_global - path_id_offset;
-    if current2 == 0 {
-        let mut total = 0;
-        for &child in &ctx.after_idx.children[0] {
-            total += gted(ctx, delta, strategy, path_id_offset, current1, child);
-        }
-        return total;
-    }
     let strategy_path_type = get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
     let mut current_path_node = current_path_node_global as usize;
     loop {
@@ -1445,10 +2130,13 @@ fn gted(
         }
         current_path_node = parent;
     }
+    if std::env::var("APTED_DEBUG").is_ok() {
+        eprintln!("gted T2-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}");
+    }
     match strategy_path_type {
         0 => spf_l(ctx, delta, false, current2, current1),
         1 => spf_r(ctx, delta, false, current2, current1),
-        _ => unreachable!("spfA not wired yet - strategy is clamped to LEFT/RIGHT"),
+        _ => spf_a(ctx, delta, false, current2, current1, current_path_node_global as usize),
     }
 }
 
@@ -1539,7 +2227,18 @@ fn compute_delta(
 
     // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3] - not yet wired
     // (milestone staging, per the comment on `compute_opt_strategy_post_l`): always use postL
-    // for now, with the strategy clamped to LEFT/RIGHT (no spfA yet).
+    // for now.
+    //
+    // Re-clamped to LEFT/RIGHT (`true`): unclamping (enabling INNER/spfA) surfaced a real
+    // correctness bug - delta entries for nodes absorbed into an INNER path's own contiguous
+    // sweep (never given an independent gted() recursion, and never matching spfA's narrow
+    // post-loop boundary-write conditions either) can come up missing, corrupting later
+    // forest_dist cells that need them. Confirmed via a 7-node repro (debug_dump_n7_repro);
+    // the gap matches the Java source's own write conditions line-for-line, so it is not (yet
+    // identified as) a transcription error - see the milestone-4c/4d session notes. Clamped
+    // L/R is correct (validated by the full fuzz suite) but is a measured ~3x regression vs the
+    // original Zhang-Shasha engine on bushy/balanced trees; see
+    // bench_compute_delta_large_balanced_trees.
     let strategy = compute_opt_strategy_post_l(&before_idx, &after_idx, true);
     let path_id_offset = before_idx.size as i64;
 
@@ -2642,6 +3341,170 @@ mod tests {
         }
     }
 
+    /// Perfectly balanced binary tree: `2^depth - 1` nodes, the adversarial shape for an
+    /// L/R-only (no spfA/INNER) decomposition strategy per the APTED papers.
+    fn gen_balanced_binary_tree(
+        next_id: &mut usize,
+        depth: usize,
+        kinds: &[&str],
+        texts: &[&str],
+        nodes: &mut Vec<(usize, String, String, Vec<usize>)>,
+    ) -> usize {
+        let id = *next_id;
+        *next_id += 1;
+        let kind = kinds[id % kinds.len()];
+        if depth == 0 {
+            let text = texts[id % texts.len()];
+            nodes.push((id, kind.to_string(), text.to_string(), Vec::new()));
+        } else {
+            let left = gen_balanced_binary_tree(next_id, depth - 1, kinds, texts, nodes);
+            let right = gen_balanced_binary_tree(next_id, depth - 1, kinds, texts, nodes);
+            nodes.push((id, kind.to_string(), String::new(), vec![left, right]));
+        }
+        id
+    }
+
+    #[test]
+    #[ignore = "ad hoc timing measurement, not a correctness check"]
+    fn bench_compute_delta_large_balanced_trees() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        let cost_model = UnitCostModel;
+        let empty_map = HashMap::new();
+
+        for depth in [9usize, 10, 11, 12, 14] {
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root =
+                gen_balanced_binary_tree(&mut next_id, depth, &kinds, &texts, &mut before_nodes);
+            let mut after_nodes = Vec::new();
+            // A different balanced tree of the same shape/size, so nothing trivially matches by
+            // id and the engine has to do real work, like an unmatched-residual diff would.
+            let after_root =
+                gen_balanced_binary_tree(&mut next_id, depth, &kinds, &texts, &mut after_nodes);
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+            let before_idx = PostorderIndexer::build(&before_meta, &[before_root], &empty_map);
+            let after_idx = PostorderIndexer::build(&after_meta, &[after_root], &empty_map);
+            let n = before_nodes.len();
+
+            let t0 = std::time::Instant::now();
+            let mut new_delta = compute_delta(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &[before_root],
+                &[after_root],
+                &empty_map,
+                &empty_map,
+            );
+            let _ = compute_edit_mapping(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &mut new_delta,
+            );
+            let new_elapsed = t0.elapsed();
+
+            let t0 = std::time::Instant::now();
+            let mut oracle_delta = compute_delta_zhang_shasha(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+            );
+            let _ = compute_edit_mapping(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &mut oracle_delta,
+            );
+            let oracle_elapsed = t0.elapsed();
+
+            eprintln!(
+                "depth={depth} n={n}: new_engine={new_elapsed:?} zhang_shasha_oracle={oracle_elapsed:?}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "ad hoc timing measurement, not a correctness check"]
+    fn bench_compute_delta_typical_random_trees() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        let cost_model = UnitCostModel;
+        let empty_map = HashMap::new();
+
+        for depth in [8usize, 9, 10] {
+            let mut rng = Rng(depth as u64 * 7919 + 1);
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, depth, &kinds, &texts, &mut before_nodes);
+            let mut after_nodes = Vec::new();
+            let after_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, depth, &kinds, &texts, &mut after_nodes);
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+            let before_idx = PostorderIndexer::build(&before_meta, &[before_root], &empty_map);
+            let after_idx = PostorderIndexer::build(&after_meta, &[after_root], &empty_map);
+            let n = before_nodes.len() + after_nodes.len();
+
+            let t0 = std::time::Instant::now();
+            let mut new_delta = compute_delta(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &[before_root],
+                &[after_root],
+                &empty_map,
+                &empty_map,
+            );
+            let _ = compute_edit_mapping(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &mut new_delta,
+            );
+            let new_elapsed = t0.elapsed();
+
+            let t0 = std::time::Instant::now();
+            let mut oracle_delta = compute_delta_zhang_shasha(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+            );
+            let _ = compute_edit_mapping(
+                &before_idx,
+                &after_idx,
+                &before_meta,
+                &after_meta,
+                &cost_model,
+                &mut oracle_delta,
+            );
+            let oracle_elapsed = t0.elapsed();
+
+            eprintln!(
+                "depth={depth} n={n}: new_engine={new_elapsed:?} zhang_shasha_oracle={oracle_elapsed:?}"
+            );
+        }
+    }
+
     #[test]
     fn test_apted_engine_matches_oracle_fuzz_minimal_repro() {
         let before = meta_from_owned(&[
@@ -2664,6 +3527,149 @@ mod tests {
             (7, "b".into(), "".into(), vec![8, 10, 13]),
         ]);
         assert_distance_matches_oracle(&before, &after, &[0], &[7]);
+    }
+
+    #[test]
+    fn test_apted_engine_matches_oracle_tiny_repro() {
+        let before = meta_from_owned(&[
+            (1, "c".into(), "z".into(), vec![]),
+            (4, "c".into(), "x".into(), vec![]),
+            (3, "b".into(), "".into(), vec![4]),
+            (5, "a".into(), "z".into(), vec![]),
+            (2, "a".into(), "".into(), vec![3, 5]),
+            (0, "c".into(), "".into(), vec![1, 2]),
+        ]);
+        let after = meta_from_owned(&[(6, "c".into(), "y".into(), vec![])]);
+        assert_distance_matches_oracle(&before, &after, &[0], &[6]);
+    }
+
+    fn debug_dump_case(
+        before: &ASTMetadata,
+        after: &ASTMetadata,
+        before_root: usize,
+        after_root: usize,
+    ) {
+        let cost_model = UnitCostModel;
+        let empty_map = HashMap::new();
+        let before_idx = PostorderIndexer::build(before, &[before_root], &empty_map);
+        let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
+
+        let mut oracle_delta =
+            compute_delta_zhang_shasha(&before_idx, &after_idx, &before, &after, &cost_model);
+        // Snapshot *before* compute_edit_mapping, which mutates delta in place as it recomputes
+        // forest_dist - comparing post-mutation tables would compare the wrong thing.
+        let oracle_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
+            .map(|b| (0..after_idx.size).map(|a| oracle_delta.get(b, a)).collect())
+            .collect();
+        let oracle_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            &before,
+            &after,
+            &cost_model,
+            &mut oracle_delta,
+        );
+        eprintln!("ORACLE decisions: {oracle_decisions:?}");
+
+        let mut new_delta = compute_delta(
+            &before_idx,
+            &after_idx,
+            before,
+            after,
+            &cost_model,
+            &[before_root],
+            &[after_root],
+            &empty_map,
+            &empty_map,
+        );
+        let new_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
+            .map(|b| (0..after_idx.size).map(|a| new_delta.get(b, a)).collect())
+            .collect();
+        let new_decisions = compute_edit_mapping(
+            &before_idx,
+            &after_idx,
+            &before,
+            &after,
+            &cost_model,
+            &mut new_delta,
+        );
+        eprintln!("NEW decisions: {new_decisions:?}");
+
+        for b in 0..before_idx.size {
+            for a in 0..after_idx.size {
+                let bn = before_idx.node_id_at(before_idx.pre_to_post[b] + 1);
+                let an = after_idx.node_id_at(after_idx.pre_to_post[a] + 1);
+                let ov = oracle_snapshot[b][a];
+                let nv = new_snapshot[b][a];
+                eprintln!("delta[{b}(id={bn})][{a}(id={an})]: oracle={ov} new={nv}");
+            }
+        }
+
+        // Recompute the top-level forest_dist table fresh from each snapshot, to find exactly
+        // where the two diverge (since compute_edit_mapping mutates delta as it runs).
+        let rebuild = |snap: &[Vec<u64>]| {
+            let mut d = DeltaTable::new(before_idx.size.max(1), after_idx.size.max(1));
+            for (b, row) in snap.iter().enumerate() {
+                for (a, &v) in row.iter().enumerate() {
+                    if v != 0 {
+                        d.set(b, a, v);
+                    }
+                }
+            }
+            d
+        };
+        let mut oracle_d2 = rebuild(&oracle_snapshot);
+        let mut new_d2 = rebuild(&new_snapshot);
+        let mut oracle_fd = ForestDist::new(before_idx.size + 1, after_idx.size + 1);
+        let mut new_fd = ForestDist::new(before_idx.size + 1, after_idx.size + 1);
+        forest_dist(
+            &before_idx, &after_idx, &before, &after, &cost_model, &mut oracle_d2,
+            before_idx.size, after_idx.size, &mut oracle_fd,
+        );
+        forest_dist(
+            &before_idx, &after_idx, &before, &after, &cost_model, &mut new_d2,
+            before_idx.size, after_idx.size, &mut new_fd,
+        );
+        for di in 0..=before_idx.size {
+            for dj in 0..=after_idx.size {
+                let ov = oracle_fd[(di, dj)];
+                let nv = new_fd[(di, dj)];
+                eprintln!(
+                    "forestdist[{di}][{dj}]: oracle={ov} new={nv}{}",
+                    if ov != nv { " <<<" } else { "" }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn debug_dump_tiny_repro() {
+        let before = meta_from_owned(&[
+            (1, "c".into(), "z".into(), vec![]),
+            (4, "c".into(), "x".into(), vec![]),
+            (3, "b".into(), "".into(), vec![4]),
+            (5, "a".into(), "z".into(), vec![]),
+            (2, "a".into(), "".into(), vec![3, 5]),
+            (0, "c".into(), "".into(), vec![1, 2]),
+        ]);
+        let after = meta_from_owned(&[(6, "c".into(), "y".into(), vec![])]);
+        debug_dump_case(&before, &after, 0, 6);
+    }
+
+    #[test]
+    fn debug_dump_n7_repro() {
+        let before = meta_from_owned(&[
+            (1, "c".into(), "z".into(), vec![]),
+            (3, "a".into(), "z".into(), vec![]),
+            (2, "a".into(), "".into(), vec![3]),
+            (4, "a".into(), "y".into(), vec![]),
+            (0, "a".into(), "".into(), vec![1, 2, 4]),
+        ]);
+        let after = meta_from_owned(&[
+            (6, "c".into(), "x".into(), vec![]),
+            (5, "a".into(), "".into(), vec![6]),
+        ]);
+        debug_dump_case(&before, &after, 0, 5);
     }
 
     #[test]
@@ -2737,6 +3743,73 @@ mod tests {
                     );
                 }
             }
+        }
+
+        // Dump the strategy table's choices (virtual-space, vroot included) to see which
+        // (v, w) pairs picked INNER (the new, previously-unexercised path).
+        let mut bidx = AptedIndexer::build(&before, &[0], &empty_map);
+        let mut aidx = AptedIndexer::build(&after, &[7], &empty_map);
+        bidx.fill_subtree_costs(&before, &cost_model);
+        aidx.fill_subtree_costs(&after, &cost_model);
+        let strategy = compute_opt_strategy_post_l(&bidx, &aidx, false);
+        let path_id_offset = bidx.size as i64;
+        for v in 0..bidx.size {
+            for w in 0..aidx.size {
+                if bidx.sizes[v] <= 1 || aidx.sizes[w] <= 1 {
+                    continue;
+                }
+                let sp = strategy.get(v, w);
+                let node = sp.abs() - 1;
+                let is_t1 = node < path_id_offset;
+                let (idx, root, sz) = if is_t1 { (&bidx, v, bidx.sizes[v]) } else { (&aidx, w, aidx.sizes[w]) };
+                let local_node = if is_t1 { node } else { node - path_id_offset };
+                let ty = get_strategy_path_type(sp, path_id_offset, root, sz);
+                if ty == 2 {
+                    eprintln!(
+                        "INNER: v={v} w={w} sp={sp} is_t1={is_t1} local_node={local_node} (idx size={})",
+                        idx.size
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "shrinker for the spfA bug hunt, not a correctness check"]
+    fn shrink_apted_engine_fuzz_failure() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        let mut smallest: Option<(usize, u64, Vec<_>, Vec<_>)> = None;
+        for seed in 0..20000u64 {
+            let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(1));
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, 3, &kinds, &texts, &mut before_nodes);
+            let mut after_nodes = Vec::new();
+            let after_root =
+                gen_random_tree(&mut rng, &mut next_id, 0, 3, &kinds, &texts, &mut after_nodes);
+            let n = before_nodes.len() + after_nodes.len();
+            if let Some((best_n, ..)) = &smallest {
+                if n >= *best_n {
+                    continue;
+                }
+            }
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+            let result = std::panic::catch_unwind(|| {
+                assert_distance_matches_oracle(&before_meta, &after_meta, &[before_root], &[after_root]);
+            });
+            if result.is_err() {
+                smallest = Some((n, seed, before_nodes, after_nodes));
+            }
+        }
+        match smallest {
+            Some((n, seed, before_nodes, after_nodes)) => panic!(
+                "smallest failure: n={n} seed={seed}\nbefore_nodes={before_nodes:?}\nafter_nodes={after_nodes:?}"
+            ),
+            None => eprintln!("no failures found"),
         }
     }
 
