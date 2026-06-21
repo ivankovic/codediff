@@ -262,6 +262,33 @@ impl DeltaTable {
     }
 }
 
+/// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
+/// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
+/// the way Java does - Java's `delta`/`strategy` are the same `float[][]`, reused in place once
+/// `gted` starts consuming a cell (it never needs the strategy value again after routing).
+/// Keeping them apart avoids relying on that consumption order, at the cost of one extra buffer.
+struct StrategyTable {
+    cols: usize,
+    data: Vec<i64>,
+}
+
+impl StrategyTable {
+    fn new(rows: usize, cols: usize) -> Self {
+        StrategyTable {
+            cols,
+            data: vec![0i64; rows * cols],
+        }
+    }
+
+    fn get(&self, pre_v: usize, pre_w: usize) -> i64 {
+        self.data[pre_v * self.cols + pre_w]
+    }
+
+    fn set(&mut self, pre_v: usize, pre_w: usize, value: i64) {
+        self.data[pre_v * self.cols + pre_w] = value;
+    }
+}
+
 /// Generic forest-distance recurrence: a direct port of APTED.java's `forestDist`.
 ///
 /// Fills `forestdist[(di, dj)]` for every `lld(i) <= di <= i`, `lld(j) <= dj <= j`, where deleting
@@ -721,6 +748,7 @@ struct EngineCtx<'a> {
 
 /// Direct port of APTED.java's `spf1`: closed-form tree edit distance when at least one of the
 /// two subtrees is a single node, avoiding the overhead of the general single-path machinery.
+#[allow(dead_code)] // wired up once spfA (milestone 4c) needs its size-1 base case
 fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     let size1 = ctx.before_idx.sizes[root1];
     let size2 = ctx.after_idx.sizes[root2];
@@ -1116,16 +1144,320 @@ fn spf_r(
     )]
 }
 
-/// Recursive tree-decomposition driver, forcing the "always decompose `before`'s leftmost path"
-/// strategy (i.e. always `spfL`, exactly like the classic Zhang-Shasha keyroot loop above always
-/// does) rather than APTED's real per-subtree-optimal strategy choice
-/// (`computeOptStrategy_postL/postR`, not yet ported). Forcing the strategy this way means this
-/// is *not yet* the asymptotic improvement the Java reference provides - it's a stepping stone
-/// that validates the indexing/virtual-root plumbing against the Zhang-Shasha oracle before the
-/// real strategy (and `spfR`/`spfA`) are layered on top.
+/// Direct port of APTED.java's `computeOptStrategy_postL`: for every `(v, w)` pair, picks
+/// whichever of v's LEFT/RIGHT/INNER path or w's LEFT/RIGHT/INNER path minimizes the cost of the
+/// single-path sweep `gted` would have to run, and encodes that choice as a signed path id (see
+/// `getStrategyPathType`/`gted`'s decode). Costs are `i64` here rather than Java's `float` - the
+/// products involved (`size * krSum`) are well within `i64` range for any real input, and exact
+/// integers sidestep the precision loss `float` would have on a "subtree size" scale; the
+/// `INNER_DISABLED` sentinel keeps the same comparison structure as a plain `i64::MAX` would,
+/// with enough headroom below `i64::MAX` that summing several of them (the `cost1_I`/`cost2_I`
+/// propagation below) can't overflow.
 ///
-/// Direct port of APTED.java's `gted`, restricted to the `strategyPathType == LEFT` branch on
-/// the `before` side.
+/// `clamp_to_left_right`, *not* in the Java original, disables the two INNER candidates at
+/// selection time only (the `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally) -
+/// used to validate the bidirectional `gted` plus this function's L/R candidates in isolation,
+/// before `spfA` exists to handle an INNER choice. Forcing L/R instead of the truly optimal path
+/// only affects efficiency, never correctness: `gted`/`spfL`/`spfR` compute the exact distance
+/// for *any* valid strategy, optimal or not - which is exactly why the oracle (a distance
+/// comparison) can validate this clamped strategy on its own before INNER is enabled.
+///
+/// Skips Java's `rowsToReuse_L/R/I` stacks (which only recycle `cost1_*` row allocations across
+/// nodes that have already been fully consumed - a pure allocation-count optimization with no
+/// effect on the values computed); `cost1_L/R/I` are instead `Vec<Option<Vec<i64>>>`, each row
+/// allocated fresh the first time a node needs one.
+fn compute_opt_strategy_post_l(
+    before_idx: &AptedIndexer,
+    after_idx: &AptedIndexer,
+    clamp_to_left_right: bool,
+) -> StrategyTable {
+    const INNER_DISABLED: i64 = i64::MAX / 4;
+
+    let size1 = before_idx.size;
+    let size2 = after_idx.size;
+    let mut strategy = StrategyTable::new(size1, size2);
+    let mut cost1_l: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost1_r: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost1_i: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost2_l = vec![0i64; size2];
+    let mut cost2_r = vec![0i64; size2];
+    let mut cost2_i = vec![0i64; size2];
+    let mut cost2_path = vec![0usize; size2];
+    let path_id_offset = size1 as i64;
+
+    for v in 0..size1 {
+        let v_in_pre_l = before_idx.post_l_to_pre_l[v];
+        let is_v_leaf = before_idx.sizes[v_in_pre_l] == 1;
+        let parent_v_pre_l = before_idx.parents[v_in_pre_l];
+        let parent_v_post_l = if parent_v_pre_l >= 0 {
+            Some(before_idx.pre_to_post_l[parent_v_pre_l as usize])
+        } else {
+            None
+        };
+
+        let size_v = before_idx.sizes[v_in_pre_l] as i64;
+        let left_path_v = -(before_idx.pre_l_to_lld(v_in_pre_l) as i64 + 1);
+        let right_path_v = v_in_pre_l as i64 + size_v;
+        let kr_sum_v = before_idx.kr_sum[v_in_pre_l] as i64;
+        let revkr_sum_v = before_idx.rev_kr_sum[v_in_pre_l] as i64;
+        let desc_sum_v = before_idx.desc_sum[v_in_pre_l] as i64;
+
+        if is_v_leaf {
+            cost1_l[v] = Some(vec![0i64; size2]);
+            cost1_r[v] = Some(vec![0i64; size2]);
+            cost1_i[v] = Some(vec![0i64; size2]);
+            for w_pre in 0..size2 {
+                strategy.set(v_in_pre_l, w_pre, v_in_pre_l as i64);
+            }
+        }
+
+        if let Some(parent_post_l) = parent_v_post_l {
+            if cost1_l[parent_post_l].is_none() {
+                cost1_l[parent_post_l] = Some(vec![0i64; size2]);
+                cost1_r[parent_post_l] = Some(vec![0i64; size2]);
+                cost1_i[parent_post_l] = Some(vec![0i64; size2]);
+            }
+        }
+
+        for w in 0..size2 {
+            let w_in_pre_l = after_idx.post_l_to_pre_l[w];
+            let parent_w_pre_l = after_idx.parents[w_in_pre_l];
+            let parent_w_post_l = if parent_w_pre_l >= 0 {
+                Some(after_idx.pre_to_post_l[parent_w_pre_l as usize])
+            } else {
+                None
+            };
+
+            let size_w = after_idx.sizes[w_in_pre_l] as i64;
+            if after_idx.sizes[w_in_pre_l] == 1 {
+                cost2_l[w] = 0;
+                cost2_r[w] = 0;
+                cost2_i[w] = 0;
+                cost2_path[w] = w_in_pre_l;
+            }
+
+            let mut min_cost = INNER_DISABLED;
+            let mut strategy_path: i64 = -1;
+
+            if size_v <= 1 || size_w <= 1 {
+                min_cost = size_v.max(size_w);
+            } else {
+                let cost_l_v = cost1_l[v].as_ref().unwrap()[w];
+                let cost_r_v = cost1_r[v].as_ref().unwrap()[w];
+                let cost_i_v = cost1_i[v].as_ref().unwrap()[w];
+
+                let kr_sum_w = after_idx.kr_sum[w_in_pre_l] as i64;
+                let tmp_cost = size_v * kr_sum_w + cost_l_v;
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = left_path_v;
+                }
+                let revkr_sum_w = after_idx.rev_kr_sum[w_in_pre_l] as i64;
+                let tmp_cost = size_v * revkr_sum_w + cost_r_v;
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = right_path_v;
+                }
+                if !clamp_to_left_right {
+                    let desc_sum_w = after_idx.desc_sum[w_in_pre_l] as i64;
+                    let tmp_cost = size_v * desc_sum_w + cost_i_v;
+                    if tmp_cost < min_cost {
+                        min_cost = tmp_cost;
+                        strategy_path = strategy.get(v_in_pre_l, w_in_pre_l) + 1;
+                    }
+                }
+                let tmp_cost = size_w * kr_sum_v + cost2_l[w];
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path =
+                        -(after_idx.pre_l_to_lld(w_in_pre_l) as i64 + path_id_offset + 1);
+                }
+                let tmp_cost = size_w * revkr_sum_v + cost2_r[w];
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = w_in_pre_l as i64 + size_w + path_id_offset;
+                }
+                if !clamp_to_left_right {
+                    let tmp_cost = size_w * desc_sum_v + cost2_i[w];
+                    if tmp_cost < min_cost {
+                        min_cost = tmp_cost;
+                        strategy_path = cost2_path[w] as i64 + path_id_offset + 1;
+                    }
+                }
+            }
+
+            if let Some(parent_post_l) = parent_v_post_l {
+                let cost_r_v = cost1_r[v].as_ref().unwrap()[w];
+                cost1_r[parent_post_l].as_mut().unwrap()[w] += min_cost;
+                let cost_i_v = cost1_i[v].as_ref().unwrap()[w];
+                let tmp_cost = -min_cost + cost_i_v;
+                if tmp_cost < cost1_i[parent_post_l].as_ref().unwrap()[w] {
+                    cost1_i[parent_post_l].as_mut().unwrap()[w] = tmp_cost;
+                    let inherited = strategy.get(v_in_pre_l, w_in_pre_l);
+                    strategy.set(parent_v_pre_l as usize, w_in_pre_l, inherited);
+                }
+                if before_idx.node_type_r[v_in_pre_l] {
+                    let cost_r_parent = cost1_r[parent_post_l].as_ref().unwrap()[w];
+                    cost1_i[parent_post_l].as_mut().unwrap()[w] += cost_r_parent;
+                    cost1_r[parent_post_l].as_mut().unwrap()[w] += cost_r_v - min_cost;
+                }
+                if before_idx.node_type_l[v_in_pre_l] {
+                    let cost_l_v = cost1_l[v].as_ref().unwrap()[w];
+                    cost1_l[parent_post_l].as_mut().unwrap()[w] += cost_l_v;
+                } else {
+                    cost1_l[parent_post_l].as_mut().unwrap()[w] += min_cost;
+                }
+            }
+            if let Some(parent_post_l) = parent_w_post_l {
+                cost2_r[parent_post_l] += min_cost;
+                let tmp_cost = -min_cost + cost2_i[w];
+                if tmp_cost < cost2_i[parent_post_l] {
+                    cost2_i[parent_post_l] = tmp_cost;
+                    cost2_path[parent_post_l] = cost2_path[w];
+                }
+                if after_idx.node_type_r[w_in_pre_l] {
+                    cost2_i[parent_post_l] += cost2_r[parent_post_l];
+                    cost2_r[parent_post_l] += cost2_r[w] - min_cost;
+                }
+                if after_idx.node_type_l[w_in_pre_l] {
+                    cost2_l[parent_post_l] += cost2_l[w];
+                } else {
+                    cost2_l[parent_post_l] += min_cost;
+                }
+            }
+
+            strategy.set(v_in_pre_l, w_in_pre_l, strategy_path);
+        }
+    }
+
+    strategy
+}
+
+/// Direct port of APTED.java's `getStrategyPathType`: decodes a signed, offset-encoded path id
+/// (see `compute_opt_strategy_post_l`) into which kind of path it is. Java's `it` parameter is
+/// unused in the original (dead code) and is dropped here.
+fn get_strategy_path_type(
+    path_id_with_offset: i64,
+    path_id_offset: i64,
+    current_root_node_pre_l: usize,
+    current_subtree_size: usize,
+) -> u8 {
+    if path_id_with_offset.is_negative() {
+        return 0; // LEFT
+    }
+    let mut path_id = path_id_with_offset.abs() - 1;
+    if path_id >= path_id_offset {
+        path_id -= path_id_offset;
+    }
+    if path_id == (current_root_node_pre_l as i64 + current_subtree_size as i64) - 1 {
+        return 1; // RIGHT
+    }
+    2 // INNER
+}
+
+/// Direct port of APTED.java's `gted`: reads the strategy chosen for `(current1, current2)`,
+/// walks the indicated path on whichever side it lives on (recursing into every off-path
+/// sibling first), then dispatches to the matching single-path function for the resolved path.
+///
+/// Two deliberate deviations from the Java original:
+/// - No `spf1` shortcut for `size <= 1` (see `gted_forced_left`'s comment - `current2`/`current1`
+///   can sit at a much larger node than the strategy "expects" mid-recursion here exactly the way
+///   it could in the forced-left/-right drivers, for the same structural reason: the virtual
+///   root makes one side's subtree larger than any single real node, and only `spfL`/`spfR`'s own
+///   per-keyroot sweep - not a single aggregate `spf1` comparison - leaves every delta entry an
+///   ancestor's sweep might need behind).
+/// - The virtual root (preorder `0`) is never path-walked on whichever axis it appears on: unlike
+///   every other node, it does not have a single "leftmost child on the path" - *all* of its
+///   children are independent forest roots, so each gets its own fully independent `gted` call
+///   instead of being silently absorbed into a path that runs past it. This mirrors the
+///   `other_subtree == 0` fix in `spf_l`/`spf_r`, just applied to `gted`'s own recursion instead
+///   of the keyroot-seeding helpers.
+fn gted(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    strategy: &StrategyTable,
+    path_id_offset: i64,
+    current1: usize,
+    current2: usize,
+) -> u64 {
+    let size1 = ctx.before_idx.sizes[current1];
+    let size2 = ctx.after_idx.sizes[current2];
+    if size1 <= 1 || size2 <= 1 {
+        return spf_l(ctx, delta, true, current1, current2);
+    }
+
+    let strategy_path_id = strategy.get(current1, current2);
+    let current_path_node_global = strategy_path_id.abs() - 1;
+
+    if current_path_node_global < path_id_offset {
+        // Path lives on the `before` side.
+        if current1 == 0 {
+            let mut total = 0;
+            for &child in &ctx.before_idx.children[0] {
+                total += gted(ctx, delta, strategy, path_id_offset, child, current2);
+            }
+            return total;
+        }
+        let strategy_path_type =
+            get_strategy_path_type(strategy_path_id, path_id_offset, current1, size1);
+        let mut current_path_node = current_path_node_global as usize;
+        loop {
+            let parent = ctx.before_idx.parents[current_path_node];
+            if parent < 0 || (parent as usize) < current1 {
+                break;
+            }
+            let parent = parent as usize;
+            for &child in &ctx.before_idx.children[parent] {
+                if child != current_path_node {
+                    gted(ctx, delta, strategy, path_id_offset, child, current2);
+                }
+            }
+            current_path_node = parent;
+        }
+        return match strategy_path_type {
+            0 => spf_l(ctx, delta, true, current1, current2),
+            1 => spf_r(ctx, delta, true, current1, current2),
+            _ => unreachable!("spfA not wired yet - strategy is clamped to LEFT/RIGHT"),
+        };
+    }
+
+    // Path lives on the `after` side.
+    let current_path_node_global = current_path_node_global - path_id_offset;
+    if current2 == 0 {
+        let mut total = 0;
+        for &child in &ctx.after_idx.children[0] {
+            total += gted(ctx, delta, strategy, path_id_offset, current1, child);
+        }
+        return total;
+    }
+    let strategy_path_type = get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
+    let mut current_path_node = current_path_node_global as usize;
+    loop {
+        let parent = ctx.after_idx.parents[current_path_node];
+        if parent < 0 || (parent as usize) < current2 {
+            break;
+        }
+        let parent = parent as usize;
+        for &child in &ctx.after_idx.children[parent] {
+            if child != current_path_node {
+                gted(ctx, delta, strategy, path_id_offset, current1, child);
+            }
+        }
+        current_path_node = parent;
+    }
+    match strategy_path_type {
+        0 => spf_l(ctx, delta, false, current2, current1),
+        1 => spf_r(ctx, delta, false, current2, current1),
+        _ => unreachable!("spfA not wired yet - strategy is clamped to LEFT/RIGHT"),
+    }
+}
+
+/// Recursive tree-decomposition driver, forcing the "always decompose `before`'s leftmost path"
+/// strategy rather than the real per-subtree-optimal strategy choice (`gted` below). No longer
+/// used by the live engine - kept as a `#[cfg(test)]`-only oracle validator, the first stepping
+/// stone that pinned the indexing/virtual-root plumbing (and `spf_l`) in isolation before the
+/// real bidirectional `gted`/`compute_opt_strategy_post_l` existed to validate against.
+#[cfg(test)]
 fn gted_forced_left(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, current2: usize) -> u64 {
     // Deliberately *not* Java's `if subtreeSize1 == 1 || subtreeSize2 == 1: return spf1(...)`
     // shortcut: `current2` never moves off the virtual root in this forced-left milestone (real
@@ -1183,6 +1515,7 @@ fn gted_forced_right(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, c
 /// wrapped under a virtual root (see `AptedIndexer`) so the single-rooted APTED recursion can
 /// run unmodified; the resulting virtual-space `delta` is then translated back into a `DeltaTable`
 /// indexed by the real (non-virtual) preorder ids that `compute_edit_mapping` expects.
+#[allow(clippy::too_many_arguments)]
 fn compute_delta(
     before: &PostorderIndexer,
     after: &PostorderIndexer,
@@ -1194,23 +1527,53 @@ fn compute_delta(
     before_node_map: &HashMap<usize, usize>,
     after_node_map: &HashMap<usize, usize>,
 ) -> DeltaTable {
-    compute_delta_with_driver(
-        before,
-        after,
+    let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
+    if before.size == 0 || after.size == 0 {
+        return real_delta;
+    }
+
+    let mut before_idx = AptedIndexer::build(before_meta, before_root_ids, before_node_map);
+    let mut after_idx = AptedIndexer::build(after_meta, after_root_ids, after_node_map);
+    before_idx.fill_subtree_costs(before_meta, cost_model);
+    after_idx.fill_subtree_costs(after_meta, cost_model);
+
+    // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3] - not yet wired
+    // (milestone staging, per the comment on `compute_opt_strategy_post_l`): always use postL
+    // for now, with the strategy clamped to LEFT/RIGHT (no spfA yet).
+    let strategy = compute_opt_strategy_post_l(&before_idx, &after_idx, true);
+    let path_id_offset = before_idx.size as i64;
+
+    let ctx = EngineCtx {
+        before_idx: &before_idx,
+        after_idx: &after_idx,
         before_meta,
         after_meta,
         cost_model,
-        before_root_ids,
-        after_root_ids,
-        before_node_map,
-        after_node_map,
-        gted_forced_left,
-    )
+    };
+    let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
+    gted(&ctx, &mut virtual_delta, &strategy, path_id_offset, 0, 0);
+
+    // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
+    // sits at virtual index `0`, real node `pre` sits at virtual index `pre + 1`, on both sides.
+    for before_pre in 0..before.size {
+        for after_pre in 0..after.size {
+            let v = virtual_delta.get(before_pre + 1, after_pre + 1);
+            if v != 0 {
+                real_delta.set(before_pre, after_pre, v);
+            }
+        }
+    }
+
+    real_delta
 }
 
-/// Shared by `compute_delta` and the `#[cfg(test)]`-only forced-right driver: builds both sides'
-/// `AptedIndexer`s, runs `drive` once per top-level real root (see the comment on the loop
-/// below), and translates the resulting virtual-space `delta` back into real preorder ids.
+/// Shared by the `#[cfg(test)]`-only forced-left/forced-right oracle validators: builds both
+/// sides' `AptedIndexer`s, runs `drive` once per top-level real root (see the comment on the loop
+/// below), and translates the resulting virtual-space `delta` back into real preorder ids. The
+/// live `compute_delta` no longer uses this - the real bidirectional `gted` handles the virtual
+/// root's children inside its own recursion (see its doc comment), so it only needs a single
+/// `gted(0, 0)` call, not a per-before-root loop.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn compute_delta_with_driver(
     before: &PostorderIndexer,
