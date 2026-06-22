@@ -39,6 +39,10 @@ file-stats: build
 commit-stats: build
 	./target/release/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
 
+# Sample real (repository, commit, path) code pairs for benchmark test data, per language.
+sample-pairs: build
+	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs.csv
+
 # Analysis target that respects current mode
 analyze: file-stats
 
