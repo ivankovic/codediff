@@ -172,8 +172,15 @@ impl Diff {
         solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
 
         // This is the final, slow algorithm.
-        // The more nodes are already matched, the faster APTED is.
-        let _ = apted::for_roots(before, after, &node_cache, &mut ast_diff);
+        // The more nodes are already matched, the faster it is.
+        // TODO: switch to Algorithm::Apted once its performance gap vs Zhang-Shasha is resolved.
+        let _ = apted::for_roots(
+            before,
+            after,
+            &node_cache,
+            apted::Algorithm::ZhangShasha,
+            &mut ast_diff,
+        );
 
         Self {
             ast: Some(ast_diff),
