@@ -317,6 +317,7 @@ fn forest_dist(
     i: usize,
     j: usize,
     forestdist: &mut ForestDist,
+    write_delta_on_aligned: bool,
 ) {
     let lld_i = before.post_to_lld[i - 1];
     let lld_j = after.post_to_lld[j - 1];
@@ -355,7 +356,15 @@ fn forest_dist(
                 forestdist[(di, dj)] = (forestdist[(di - 1, dj)] + cost_model.del(node1))
                     .min(forestdist[(di, dj - 1)] + cost_model.ins(node2))
                     .min(forestdist[(di - 1, dj - 1)] + cost_ren);
-                delta.set(pre_di, pre_dj, forestdist[(di - 1, dj - 1)]);
+                // Java's `forestDist` deliberately never writes `delta` here (the equivalent
+                // line is commented out in APTED.java): overwriting it would clobber the sparse,
+                // already-correct values spfL/spfR/spfA wrote during the forward pass with this
+                // call's local (possibly different) forestdist value at the same cell. Only the
+                // Zhang-Shasha oracle's own keyroot-sweep construction (which has no pre-existing
+                // delta to protect - it's building delta from scratch) needs this side effect.
+                if write_delta_on_aligned {
+                    delta.set(pre_di, pre_dj, forestdist[(di - 1, dj - 1)]);
+                }
             } else {
                 let delta_val = delta.get(pre_di, pre_dj);
                 forestdist[(di, dj)] = (forestdist[(di - 1, dj)] + cost_model.del(node1))
@@ -410,6 +419,7 @@ fn compute_delta_zhang_shasha(
                 kr1_boundary,
                 kr2_boundary,
                 &mut forestdist,
+                true,
             );
         }
     }
@@ -1132,7 +1142,11 @@ fn spf_a(
                 if r_g_minus1_in_pre_l == parent_of_r_g_in_pre_l {
                     if !right_part {
                         if left_part {
-                            let (b, a) = delta_order(end_path_node, r_g_minus1_in_pre_l + 1);
+                            // `other`-axis index is `parent_of_r_g_in_pre_l` (== `r_g_minus1_in_pre_l`
+                            // per the gate above) - *not* `+ 1`. The `+1` belongs only to the
+                            // s-table's own relative-offset lookup on the line below; Java's
+                            // `delta[endPathNode][parent_of_rG_in_preL]` uses the bare value.
+                            let (b, a) = delta_order(end_path_node, parent_of_r_g_in_pre_l);
                             let v = s[(l_f_last + 1 - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
                             if std::env::var("APTED_DEBUG").is_ok() {
                                 eprintln!("spfA write-A: delta[{b}][{a}] = {v}");
@@ -1143,7 +1157,7 @@ fn spf_a(
                             && end_path_node == parent_of_end_path_node + 1
                             && end_path_node_in_pre_r == parent_of_end_path_node_in_pre_r + 1
                         {
-                            let (b, a) = delta_order(parent_of_end_path_node, r_g_minus1_in_pre_l + 1);
+                            let (b, a) = delta_order(parent_of_end_path_node, parent_of_r_g_in_pre_l);
                             let v = s[(l_f_last - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
                             if std::env::var("APTED_DEBUG").is_ok() {
                                 eprintln!("spfA write-B: delta[{b}][{a}] = {v}");
@@ -1397,7 +1411,8 @@ fn spf_a(
 
 /// Direct port of APTED.java's `spf1`: closed-form tree edit distance when at least one of the
 /// two subtrees is a single node, avoiding the overhead of the general single-path machinery.
-#[allow(dead_code)] // wired up once spfA (milestone 4c) needs its size-1 base case
+/// Writes nothing into `delta` - the size-1-side cells it would otherwise touch are already
+/// covered by `ted_init`.
 fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     let size1 = ctx.before_idx.sizes[root1];
     let size2 = ctx.after_idx.sizes[root2];
@@ -1894,16 +1909,9 @@ fn compute_opt_strategy_post_l(
             }
 
             let mut min_cost = INNER_DISABLED;
-            // Java leaves this `-1` (a sentinel `gted` never decodes, since it short-circuits to
-            // `spf1` whenever either side is this small) - we don't have that shortcut (see
-            // `gted`'s doc comment), so this pair's `gted` call still needs a *real* path to
-            // walk. `left_path_v` is always safe here: if `v` itself is the size-1 side, its
-            // "leftmost path" is just itself, degenerating to exactly the same single-node
-            // comparison `gted` would have special-cased; if `w` is the small side, this
-            // correctly still decomposes `v`'s own structure, which is the case the missing
-            // shortcut would otherwise have skipped entirely (losing per-subtree `delta` entries
-            // an ancestor's own sweep may need - see `gted`'s comment on the size-1 check).
-            let mut strategy_path: i64 = left_path_v;
+            // Java leaves this `-1`: it's never decoded, since `gted` short-circuits straight to
+            // `spf1` (writing no `delta`) whenever either side is this small.
+            let mut strategy_path: i64 = -1;
 
             if size_v <= 1 || size_w <= 1 {
                 min_cost = size_v.max(size_w);
@@ -2021,6 +2029,36 @@ fn get_strategy_path_type(
     2 // INNER
 }
 
+/// Direct port of APTED.java's `tedInit`: densely pre-fills `delta[x][y]` for every (x, y) pair
+/// where at least one side's subtree has size 1 - the "subtree distance without the root nodes"
+/// in that case is just the cost to insert/delete everything except the size-1 side's own root,
+/// computed directly from the subtree cost sums (no recursion needed). `gted`'s own spfL/spfR/spfA
+/// write conditions are sparse by design and never populate these size-1-side cells themselves
+/// (Java's `gted` bypasses them entirely via the `spf1` shortcut whenever one side has size 1);
+/// without this pre-fill, any (x, y) pair absorbed into a path's own contiguous sweep - rather
+/// than being given an independent recursive `gted` call - is silently left at delta=0, corrupting
+/// later `forest_dist` reads that need the true value. Must run after the strategy is computed
+/// (matching Java's `delta = computeOptStrategy_postL(...)` followed immediately by `tedInit()`)
+/// and before `gted` starts, since `gted`'s own writes for both-size>1 pairs are disjoint from
+/// (and must not be clobbered by) this pre-fill.
+fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
+    for x in 1..ctx.before_idx.size {
+        let size_x = ctx.before_idx.sizes[x];
+        for y in 1..ctx.after_idx.size {
+            let size_y = ctx.after_idx.sizes[y];
+            if size_x == 1 && size_y == 1 {
+                delta.set(x, y, 0);
+            } else if size_x == 1 {
+                let own_ins = vins(ctx.cost_model, vnode(ctx.after_idx, ctx.after_meta, y));
+                delta.set(x, y, ctx.after_idx.sum_ins_cost[y] - own_ins);
+            } else if size_y == 1 {
+                let own_del = vdel(ctx.cost_model, vnode(ctx.before_idx, ctx.before_meta, x));
+                delta.set(x, y, ctx.before_idx.sum_del_cost[x] - own_del);
+            }
+        }
+    }
+}
+
 /// Direct port of APTED.java's `gted`: reads the strategy chosen for `(current1, current2)`,
 /// walks the indicated path on whichever side it lives on (recursing into every off-path
 /// sibling first), then dispatches to the matching single-path function for the resolved path.
@@ -2069,16 +2107,18 @@ fn gted(
 
     let size1 = ctx.before_idx.sizes[current1];
     let size2 = ctx.after_idx.sizes[current2];
-    // Only the *truly* trivial case (both sides already down to a single node) shortcuts
-    // straight to `spf_l` here. When only one side is size-1, the *other* side's internal
-    // structure still needs its own decomposition - e.g. a non-leftmost child several levels
-    // down still needs its own dedicated, aligned `delta` entry, which only coming from its own
-    // `gted` recursion (not from being swept as a non-aligned interior position by an ancestor's
-    // single `spf_l` call) can give it. `compute_opt_strategy_post_l` already guarantees a valid
-    // (if not cost-optimal) path for the `size1 <= 1 || size2 <= 1` case via its `left_path_v`
-    // fallback, so falling through to the normal strategy read below is always safe.
-    if size1 <= 1 && size2 <= 1 {
-        return spf_l(ctx, delta, true, current1, current2);
+    // Direct port of Java's `gted`: whenever EITHER side has size 1, shortcut to `spf1` - a pure
+    // scalar computation that writes nothing into `delta`. This must be `||`, not `&&`: any
+    // size-1-side pair that instead falls through to spf_l/spf_r/spf_a gets its boundary cells
+    // *written* by that call's keyroot sweep, clobbering the values `ted_init` already deposited
+    // for exactly these size-1-side pairs (confirmed via a 10-node repro,
+    // debug_check_gted_return_n10 - `&&` let an off-path `gted(id3-alone, id8-subtree)` call run
+    // spf_l, which overwrote `ted_init`'s delta[id3][id9]=0 mid-computation, corrupting a sibling
+    // spf_a call's read of that same cell even though the final delta value looked correct again
+    // by the time `gted` returned). Since `ted_init` already covers every size-1-side cell
+    // spf_l/spf_r could otherwise write, this loses no coverage.
+    if size1 <= 1 || size2 <= 1 {
+        return spf1(ctx, current1, current2);
     }
 
     let strategy_path_id = strategy.get(current1, current2);
@@ -2227,19 +2267,28 @@ fn compute_delta(
 
     // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3] - not yet wired
     // (milestone staging, per the comment on `compute_opt_strategy_post_l`): always use postL
-    // for now.
+    // for now. This is a known perf gap: benchmarking shows the unclamped engine still ~2.7x
+    // slower than the Zhang-Shasha oracle on both balanced and typical random trees (see
+    // bench_compute_delta_large_balanced_trees / bench_compute_delta_typical_random_trees),
+    // likely because always-postL forces the asymptotically-worse decomposition direction on
+    // trees where postR would be cheaper. Wiring the heuristic (and/or porting postR + a
+    // bidirectional gted dispatch) is required follow-up before this is a net perf win.
     //
-    // Re-clamped to LEFT/RIGHT (`true`): unclamping (enabling INNER/spfA) surfaced a real
-    // correctness bug - delta entries for nodes absorbed into an INNER path's own contiguous
-    // sweep (never given an independent gted() recursion, and never matching spfA's narrow
-    // post-loop boundary-write conditions either) can come up missing, corrupting later
-    // forest_dist cells that need them. Confirmed via a 7-node repro (debug_dump_n7_repro);
-    // the gap matches the Java source's own write conditions line-for-line, so it is not (yet
-    // identified as) a transcription error - see the milestone-4c/4d session notes. Clamped
-    // L/R is correct (validated by the full fuzz suite) but is a measured ~3x regression vs the
-    // original Zhang-Shasha engine on bushy/balanced trees; see
-    // bench_compute_delta_large_balanced_trees.
-    let strategy = compute_opt_strategy_post_l(&before_idx, &after_idx, true);
+    // Unclamped (INNER/spfA enabled) is correctness-verified: full fuzz suite
+    // (test_apted_engine_matches_oracle_fuzz) and a 20,000-seed shrinker sweep
+    // (shrink_apted_engine_fuzz_failure) both pass. Getting here required three real, ground-
+    // truthed fixes against the actual Java APTED.java source (built and instrumented under
+    // tmp/apted):
+    //   1. `ted_init` was missing entirely - Java's `tedInit()` densely pre-fills `delta[x][y]`
+    //      for every pair where one side's subtree has size 1, computed directly from subtree
+    //      cost sums; gted's spfL/spfR/spfA write conditions never cover these cells themselves.
+    //   2. spfA's write-A/B used a stray `+ 1` on the delta write's "other"-axis index (copied
+    //      from the adjacent s-table lookup, which legitimately needs the offset; the delta
+    //      write does not).
+    //   3. gted's spf1 shortcut required `size1 <= 1 && size2 <= 1`; Java uses `||`. With `&&`,
+    //      a size-1-side pair fell through to spf_l/spf_r, whose keyroot sweep overwrote cells
+    //      `ted_init` had already correctly populated.
+    let strategy = compute_opt_strategy_post_l(&before_idx, &after_idx, false);
     let path_id_offset = before_idx.size as i64;
 
     let ctx = EngineCtx {
@@ -2250,6 +2299,7 @@ fn compute_delta(
         cost_model,
     };
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
+    ted_init(&ctx, &mut virtual_delta);
     gted(&ctx, &mut virtual_delta, &strategy, path_id_offset, 0, 0);
 
     // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
@@ -2404,6 +2454,7 @@ fn compute_edit_mapping(
         size1,
         size2,
         &mut forestdist,
+        false,
     );
 
     let mut root_node_pair = true;
@@ -2421,6 +2472,7 @@ fn compute_edit_mapping(
                 last_row,
                 last_col,
                 &mut forestdist,
+                false,
             );
         }
         root_node_pair = false;
@@ -3624,11 +3676,11 @@ mod tests {
         let mut new_fd = ForestDist::new(before_idx.size + 1, after_idx.size + 1);
         forest_dist(
             &before_idx, &after_idx, &before, &after, &cost_model, &mut oracle_d2,
-            before_idx.size, after_idx.size, &mut oracle_fd,
+            before_idx.size, after_idx.size, &mut oracle_fd, false,
         );
         forest_dist(
             &before_idx, &after_idx, &before, &after, &cost_model, &mut new_d2,
-            before_idx.size, after_idx.size, &mut new_fd,
+            before_idx.size, after_idx.size, &mut new_fd, false,
         );
         for di in 0..=before_idx.size {
             for dj in 0..=after_idx.size {
