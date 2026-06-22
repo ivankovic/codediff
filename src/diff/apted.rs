@@ -487,6 +487,10 @@ struct AptedIndexer {
     sum_del_cost: Vec<u64>,
     /// 0-based preorder index -> total insert cost of every node in its subtree.
     sum_ins_cost: Vec<u64>,
+    /// Count of leaf nodes that are their parent's first (leftmost) child [2, Section 5.3].
+    lchl: usize,
+    /// Count of leaf nodes that are their parent's last (rightmost) child [2, Section 5.3].
+    rchl: usize,
 }
 
 impl AptedIndexer {
@@ -669,6 +673,22 @@ impl AptedIndexer {
         let sum_del_cost = vec![0u64; size];
         let sum_ins_cost = vec![0u64; size];
 
+        // `lchl`/`rchl` [2, Section 5.3]: count of leaf nodes that are their parent's first/last
+        // child, used by `compute_delta` to pick whichever of postL/postR's preorder direction is
+        // cheaper for this tree's shape.
+        let mut lchl = 0usize;
+        let mut rchl = 0usize;
+        for pre in 0..size {
+            if sizes[pre] == 1 {
+                if node_type_l[pre] {
+                    lchl += 1;
+                }
+                if node_type_r[pre] {
+                    rchl += 1;
+                }
+            }
+        }
+
         AptedIndexer {
             size,
             pre_to_node_id,
@@ -690,6 +710,8 @@ impl AptedIndexer {
             desc_sum,
             sum_del_cost,
             sum_ins_cost,
+            lchl,
+            rchl,
         }
     }
 
@@ -2007,6 +2029,181 @@ fn compute_opt_strategy_post_l(
     strategy
 }
 
+/// Mirror of `compute_opt_strategy_post_l`, using right-to-left preorder (equivalently: a single
+/// pass over the *plain* (left-to-right) preorder indices from `size-1` down to `0`, since a
+/// node's preorder index is always smaller than every one of its descendants') instead of
+/// left-to-right postorder, with the parent-propagation step's L/R roles swapped to match - this
+/// is a direct port of APTED.java's `computeOptStrategy_postR`. Unlike `compute_opt_strategy_post_l`
+/// this needs no `post_l_to_pre_l`/`pre_to_post_l` translation at all: `v`/`w` already *are*
+/// preorder indices throughout, simplifying every lookup. The (kr_sum/revkr_sum/desc_sum)
+/// candidate-comparison section is unchanged from postL - only the post-`min_cost`
+/// parent-propagation swaps which of L/R absorbs `cost_*_v - min_cost` (gated by
+/// `node_type_l`/`node_type_r` respectively) versus which one unconditionally adds `min_cost`.
+fn compute_opt_strategy_post_r(
+    before_idx: &AptedIndexer,
+    after_idx: &AptedIndexer,
+    clamp_to_left_right: bool,
+) -> StrategyTable {
+    const INNER_DISABLED: i64 = i64::MAX / 4;
+
+    let size1 = before_idx.size;
+    let size2 = after_idx.size;
+    let mut strategy = StrategyTable::new(size1, size2);
+    let path_id_offset = size1 as i64;
+
+    let mut cost1_l: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost1_r: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost1_i: Vec<Option<Vec<i64>>> = vec![None; size1];
+    let mut cost2_l = vec![0i64; size2];
+    let mut cost2_r = vec![0i64; size2];
+    let mut cost2_i = vec![0i64; size2];
+    let mut cost2_path = vec![0usize; size2];
+
+    for v in (0..size1).rev() {
+        let is_v_leaf = before_idx.sizes[v] == 1;
+        let parent_v_pre_l = before_idx.parents[v];
+
+        let size_v = before_idx.sizes[v] as i64;
+        let left_path_v = -(before_idx.pre_l_to_lld(v) as i64 + 1);
+        let right_path_v = v as i64 + size_v;
+        let kr_sum_v = before_idx.kr_sum[v] as i64;
+        let revkr_sum_v = before_idx.rev_kr_sum[v] as i64;
+        let desc_sum_v = before_idx.desc_sum[v] as i64;
+
+        if is_v_leaf {
+            cost1_l[v] = Some(vec![0i64; size2]);
+            cost1_r[v] = Some(vec![0i64; size2]);
+            cost1_i[v] = Some(vec![0i64; size2]);
+            for w_pre in 0..size2 {
+                strategy.set(v, w_pre, v as i64);
+            }
+        }
+
+        if parent_v_pre_l >= 0 {
+            let parent_pre_l = parent_v_pre_l as usize;
+            if cost1_l[parent_pre_l].is_none() {
+                cost1_l[parent_pre_l] = Some(vec![0i64; size2]);
+                cost1_r[parent_pre_l] = Some(vec![0i64; size2]);
+                cost1_i[parent_pre_l] = Some(vec![0i64; size2]);
+            }
+        }
+
+        // Reset for every `v`, mirroring `compute_opt_strategy_post_l`'s same per-`v` reset:
+        // `cost2_*` accumulate `w`'s contributions *within this v's own sweep*.
+        cost2_l.fill(0);
+        cost2_r.fill(0);
+        cost2_i.fill(0);
+        cost2_path.fill(0);
+
+        for w in (0..size2).rev() {
+            let size_w = after_idx.sizes[w] as i64;
+            if after_idx.sizes[w] == 1 {
+                cost2_l[w] = 0;
+                cost2_r[w] = 0;
+                cost2_i[w] = 0;
+                cost2_path[w] = w;
+            }
+
+            let mut min_cost = INNER_DISABLED;
+            let mut strategy_path: i64 = -1;
+
+            if size_v <= 1 || size_w <= 1 {
+                min_cost = size_v.max(size_w);
+            } else {
+                let cost_l_v = cost1_l[v].as_ref().unwrap()[w];
+                let cost_r_v = cost1_r[v].as_ref().unwrap()[w];
+                let cost_i_v = cost1_i[v].as_ref().unwrap()[w];
+
+                let kr_sum_w = after_idx.kr_sum[w] as i64;
+                let tmp_cost = size_v * kr_sum_w + cost_l_v;
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = left_path_v;
+                }
+                let revkr_sum_w = after_idx.rev_kr_sum[w] as i64;
+                let tmp_cost = size_v * revkr_sum_w + cost_r_v;
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = right_path_v;
+                }
+                if !clamp_to_left_right {
+                    let desc_sum_w = after_idx.desc_sum[w] as i64;
+                    let tmp_cost = size_v * desc_sum_w + cost_i_v;
+                    if tmp_cost < min_cost {
+                        min_cost = tmp_cost;
+                        strategy_path = strategy.get(v, w) + 1;
+                    }
+                }
+                let tmp_cost = size_w * kr_sum_v + cost2_l[w];
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = -(after_idx.pre_l_to_lld(w) as i64 + path_id_offset + 1);
+                }
+                let tmp_cost = size_w * revkr_sum_v + cost2_r[w];
+                if tmp_cost < min_cost {
+                    min_cost = tmp_cost;
+                    strategy_path = w as i64 + size_w + path_id_offset;
+                }
+                if !clamp_to_left_right {
+                    let tmp_cost = size_w * desc_sum_v + cost2_i[w];
+                    if tmp_cost < min_cost {
+                        min_cost = tmp_cost;
+                        strategy_path = cost2_path[w] as i64 + path_id_offset + 1;
+                    }
+                }
+            }
+
+            if parent_v_pre_l >= 0 {
+                let parent_pre_l = parent_v_pre_l as usize;
+                let cost_l_v = cost1_l[v].as_ref().unwrap()[w];
+                cost1_l[parent_pre_l].as_mut().unwrap()[w] += min_cost;
+                let cost_i_v = cost1_i[v].as_ref().unwrap()[w];
+                let tmp_cost = -min_cost + cost_i_v;
+                if tmp_cost < cost1_i[parent_pre_l].as_ref().unwrap()[w] {
+                    cost1_i[parent_pre_l].as_mut().unwrap()[w] = tmp_cost;
+                    let inherited = strategy.get(v, w);
+                    strategy.set(parent_pre_l, w, inherited);
+                }
+                if before_idx.node_type_l[v] {
+                    let cost_l_parent = cost1_l[parent_pre_l].as_ref().unwrap()[w];
+                    cost1_i[parent_pre_l].as_mut().unwrap()[w] += cost_l_parent;
+                    cost1_l[parent_pre_l].as_mut().unwrap()[w] += cost_l_v - min_cost;
+                }
+                if before_idx.node_type_r[v] {
+                    let cost_r_v = cost1_r[v].as_ref().unwrap()[w];
+                    cost1_r[parent_pre_l].as_mut().unwrap()[w] += cost_r_v;
+                } else {
+                    cost1_r[parent_pre_l].as_mut().unwrap()[w] += min_cost;
+                }
+            }
+
+            let parent_w_pre_l = after_idx.parents[w];
+            if parent_w_pre_l >= 0 {
+                let parent_pre_l = parent_w_pre_l as usize;
+                cost2_l[parent_pre_l] += min_cost;
+                let tmp_cost = -min_cost + cost2_i[w];
+                if tmp_cost < cost2_i[parent_pre_l] {
+                    cost2_i[parent_pre_l] = tmp_cost;
+                    cost2_path[parent_pre_l] = cost2_path[w];
+                }
+                if after_idx.node_type_l[w] {
+                    cost2_i[parent_pre_l] += cost2_l[parent_pre_l];
+                    cost2_l[parent_pre_l] += cost2_l[w] - min_cost;
+                }
+                if after_idx.node_type_r[w] {
+                    cost2_r[parent_pre_l] += cost2_r[w];
+                } else {
+                    cost2_r[parent_pre_l] += min_cost;
+                }
+            }
+
+            strategy.set(v, w, strategy_path);
+        }
+    }
+
+    strategy
+}
+
 /// Direct port of APTED.java's `getStrategyPathType`: decodes a signed, offset-encoded path id
 /// (see `compute_opt_strategy_post_l`) into which kind of path it is. Java's `it` parameter is
 /// unused in the original (dead code) and is dropped here.
@@ -2265,14 +2462,12 @@ fn compute_delta(
     before_idx.fill_subtree_costs(before_meta, cost_model);
     after_idx.fill_subtree_costs(after_meta, cost_model);
 
-    // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3] - not yet wired
-    // (milestone staging, per the comment on `compute_opt_strategy_post_l`): always use postL
-    // for now. This is a known perf gap: benchmarking shows the unclamped engine still ~2.7x
-    // slower than the Zhang-Shasha oracle on both balanced and typical random trees (see
-    // bench_compute_delta_large_balanced_trees / bench_compute_delta_typical_random_trees),
-    // likely because always-postL forces the asymptotically-worse decomposition direction on
-    // trees where postR would be cheaper. Wiring the heuristic (and/or porting postR + a
-    // bidirectional gted dispatch) is required follow-up before this is a net perf win.
+    // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3]: pick whichever of
+    // postL/postR's preorder direction is cheaper for this tree's shape (counted via `lchl`/
+    // `rchl` on `before_idx` - matching Java, which only ever looks at `it1`, the source tree).
+    // The strategy table's *contents* (signed, offset-encoded path ids) mean the same thing
+    // regardless of which function computed them, so `gted`/`spf_l`/`spf_r`/`spf_a` don't need to
+    // know or care which branch ran.
     //
     // Unclamped (INNER/spfA enabled) is correctness-verified: full fuzz suite
     // (test_apted_engine_matches_oracle_fuzz) and a 20,000-seed shrinker sweep
@@ -2288,7 +2483,11 @@ fn compute_delta(
     //   3. gted's spf1 shortcut required `size1 <= 1 && size2 <= 1`; Java uses `||`. With `&&`,
     //      a size-1-side pair fell through to spf_l/spf_r, whose keyroot sweep overwrote cells
     //      `ted_init` had already correctly populated.
-    let strategy = compute_opt_strategy_post_l(&before_idx, &after_idx, false);
+    let strategy = if before_idx.lchl < before_idx.rchl {
+        compute_opt_strategy_post_l(&before_idx, &after_idx, false)
+    } else {
+        compute_opt_strategy_post_r(&before_idx, &after_idx, false)
+    };
     let path_id_offset = before_idx.size as i64;
 
     let ctx = EngineCtx {
