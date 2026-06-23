@@ -22,6 +22,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
@@ -68,6 +69,18 @@ struct Args {
     /// RNG seed. Fixed by default so re-running against the same checkouts is reproducible.
     #[arg(long, default_value_t = 42)]
     seed: u64,
+
+    /// Restrict sampling to this language (e.g. "Rust"), matching `Language`'s Debug name.
+    /// Default samples every tree-sitter-supported language found.
+    #[arg(long)]
+    language: Option<String>,
+
+    /// Stop after walking this many commits per repository (most-recent-first). Repos cloned
+    /// with `git fetch --depth=N` repeatedly can accumulate far more local history than N as
+    /// fetches deepen them over time, so an unbounded walk can take effectively forever on a
+    /// long-lived project; this keeps each repo's contribution bounded.
+    #[arg(long, default_value_t = 1000)]
+    max_commits_per_repo: usize,
 }
 
 /// A pointer to a (before, after) code pair: the actual content lives in the repository
@@ -147,16 +160,22 @@ fn main() -> Result<()> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
 
-        println!("Scanning {}", repository_name);
+        print!("Scanning {}... ", repository_name);
+        let _ = std::io::stdout().flush();
         if let Err(e) = sample_repository(
             repo_path,
             &repository_name,
             bucket_capacity,
+            args.language.as_deref(),
+            args.max_commits_per_repo,
             &mut reservoirs,
             &mut rng,
         ) {
             eprintln!("Failed to process {:?}: {:?}", repo_path, e);
+        } else {
+            println!("done");
         }
+        let _ = std::io::stdout().flush();
     }
 
     write_csv(&args.output, &reservoirs)?;
@@ -180,15 +199,23 @@ fn sample_repository(
     repo_path: &Path,
     repository_name: &str,
     bucket_capacity: usize,
+    language_filter: Option<&str>,
+    max_commits: usize,
     reservoirs: &mut HashMap<(String, &'static str), Reservoir>,
     rng: &mut StdRng,
 ) -> Result<()> {
     let repo = Repository::open(repo_path)?;
     let mut walk = repo.revwalk()?;
-    walk.set_sorting(Sort::TOPOLOGICAL)?;
+    // Most-recent-first: repeated shallow fetches can leave a checkout with far more local
+    // history than its nominal depth, so walking "all reachable commits" can mean walking the
+    // entire project history. Time order lets `max_commits` reliably mean "the N most recent".
+    walk.set_sorting(Sort::TIME)?;
     walk.push_head()?;
 
-    for id in walk {
+    for (visited, id) in walk.enumerate() {
+        if visited >= max_commits {
+            break;
+        }
         let Ok(id) = id else { continue };
         let Ok(commit) = repo.find_commit(id) else {
             continue;
@@ -232,6 +259,11 @@ fn sample_repository(
             };
             // Only sample languages diff_code can actually parse.
             if to_treesitter(&language).is_none() {
+                continue;
+            }
+            if let Some(filter) = language_filter
+                && language.to_string() != filter
+            {
                 continue;
             }
 
@@ -279,7 +311,14 @@ fn text_pair_size(repo: &Repository, delta: &DiffDelta) -> Option<usize> {
 
 fn write_csv(path: &Path, reservoirs: &HashMap<(String, &'static str), Reservoir>) -> Result<()> {
     let mut writer = csv::Writer::from_path(path)?;
-    writer.write_record(["language", "size_bucket", "repository", "commit", "path", "old_path"])?;
+    writer.write_record([
+        "language",
+        "size_bucket",
+        "repository",
+        "commit",
+        "path",
+        "old_path",
+    ])?;
 
     let mut keys: Vec<&(String, &'static str)> = reservoirs.keys().collect();
     keys.sort();
@@ -318,7 +357,15 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1);
         let mut reservoirs: HashMap<(String, &'static str), Reservoir> = HashMap::new();
 
-        sample_repository(&repo_path, "handmade", 10, &mut reservoirs, &mut rng)?;
+        sample_repository(
+            &repo_path,
+            "handmade",
+            10,
+            None,
+            1000,
+            &mut reservoirs,
+            &mut rng,
+        )?;
 
         let rust = reservoirs
             .get(&("Rust".to_string(), "small"))

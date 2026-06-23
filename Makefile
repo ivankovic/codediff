@@ -43,6 +43,10 @@ commit-stats: build
 sample-pairs: build
 	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs.csv
 
+# Measure diff_code's speed, memory, AST size and mapping operation count across a sampled CSV.
+benchmark-pairs: build
+	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark.csv
+
 # Analysis target that respects current mode
 analyze: file-stats
 
