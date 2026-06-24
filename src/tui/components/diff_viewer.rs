@@ -98,10 +98,17 @@ impl DiffViewer {
         self.sync_cross_highlight();
     }
 
-    /// Move the focused panel's cursor and push the resulting matched node onto the other
-    /// panel's cross-highlight.
-    pub fn move_cursor(&mut self, direction: i32) {
-        self.focused_viewer().move_cursor(direction);
+    /// Move the focused panel's cursor vertically (by one line) and push the resulting matched
+    /// node onto the other panel's cross-highlight.
+    pub fn move_cursor_vertical(&mut self, direction: i32) {
+        self.focused_viewer().move_cursor_vertical(direction);
+        self.sync_cross_highlight();
+    }
+
+    /// Move the focused panel's cursor horizontally (by one character) and push the resulting
+    /// matched node onto the other panel's cross-highlight.
+    pub fn move_cursor_horizontal(&mut self, direction: i32) {
+        self.focused_viewer().move_cursor_horizontal(direction);
         self.sync_cross_highlight();
     }
 
@@ -224,15 +231,22 @@ impl Component for DiffViewer {
                 self.sync_cross_highlight();
                 Ok(Some(Action::Render))
             }
-            // The cursor is an index into a flat, document-ordered list of leaf ranges (see
-            // SPECS.md), not a 2D grid, so h/k and j/l are deliberately redundant pairs rather
-            // than distinct "left/right" vs "up/down" movements.
-            crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k' | 'h') => {
-                self.move_cursor(-1);
+            // The cursor is a real (row, column) position (see SPECS.md), so arrows and vim
+            // h/j/k/l map to literal left/down/up/right movement, same as any text editor.
+            crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k') => {
+                self.move_cursor_vertical(-1);
                 Ok(Some(Action::Render))
             }
-            crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j' | 'l') => {
-                self.move_cursor(1);
+            crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j') => {
+                self.move_cursor_vertical(1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Char('h') => {
+                self.move_cursor_horizontal(-1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Right | crossterm::event::KeyCode::Char('l') => {
+                self.move_cursor_horizontal(1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {
@@ -361,6 +375,14 @@ impl Component for DiffViewer {
             let right_inner = right_block.inner(right_area);
             frame.render_widget(right_block, right_area);
             self.right_viewer.draw(frame, right_inner)?;
+
+            let focused_inner = match self.active_panel {
+                Panel::Before => left_inner,
+                Panel::After => right_inner,
+            };
+            if let Some((x, y)) = self.focused_viewer().cursor_screen_position(focused_inner) {
+                frame.set_cursor(x, y);
+            }
         } else {
             // Single panel mode: show only one panel at a time
             // Determine border color based on active panel
@@ -394,6 +416,10 @@ impl Component for DiffViewer {
             let inner = block.inner(area);
             frame.render_widget(block, area);
             self.focused_viewer().draw(frame, inner)?;
+
+            if let Some((x, y)) = self.focused_viewer().cursor_screen_position(inner) {
+                frame.set_cursor(x, y);
+            }
         }
 
         Ok(())
@@ -414,6 +440,10 @@ fn panel_block<'a>(name: &'static str, color: Color, filename: &str, active: boo
             Span::raw(format!(" {filename}")),
         ]))
         .borders(Borders::ALL)
-        .border_set(if active { border::THICK } else { border::ROUNDED })
+        .border_set(if active {
+            border::THICK
+        } else {
+            border::ROUNDED
+        })
         .border_style(Style::new().fg(color))
 }

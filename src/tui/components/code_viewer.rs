@@ -25,7 +25,6 @@ use super::Component;
 use crate::diff::text::RangeMatch;
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::Action;
-use crate::tui::widgets::code_viewer::is_empty_range;
 
 /// A component that displays source code
 ///
@@ -71,9 +70,7 @@ impl CodeViewer {
     /// Reset scroll/diff/cursor state, e.g. after loading a new file.
     fn reset_state(&mut self) {
         self.state.scroll = 0;
-        self.state.ranges.clear();
-        self.state.cursor = 0;
-        self.state.highlight_destination = None;
+        self.state.load_ranges(Vec::new());
     }
 
     /// Get the total number of lines
@@ -104,24 +101,14 @@ impl CodeViewer {
     /// Set the diff ranges for this side (as returned by `TextDiff::all`), and place the cursor
     /// on the first navigable (non zero-width) range.
     pub fn set_ranges(&mut self, ranges: Vec<RangeMatch>) {
-        self.state.ranges = ranges;
-        self.state.cursor = self
-            .state
-            .ranges
-            .iter()
-            .position(|range_match| !is_empty_range(&range_match.source))
-            .unwrap_or(0);
-        self.state.highlight_destination = None;
+        self.state.load_ranges(ranges);
         self.scroll_to_cursor();
     }
 
-    /// The destination range of the range the cursor currently sits on, i.e. the range to
+    /// The destination range matched to wherever the cursor currently sits, i.e. the range to
     /// cross-highlight on the other panel.
     pub fn cursor_destination(&self) -> Option<TextRange> {
-        self.state
-            .ranges
-            .get(self.state.cursor)
-            .map(|range_match| range_match.destination.clone())
+        self.state.cursor_destination()
     }
 
     /// Set (or clear) the cross-highlighted range coming from the other panel's cursor.
@@ -129,34 +116,66 @@ impl CodeViewer {
         self.state.highlight_destination = destination;
     }
 
-    /// Move the cursor to the previous (`direction < 0`) or next (`direction > 0`) navigable
-    /// range, skipping zero-width alignment markers, and scroll to keep it visible.
-    pub fn move_cursor(&mut self, direction: i32) {
-        if self.state.ranges.is_empty() || direction == 0 {
+    /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, clamping the
+    /// column to the new line's length, and scroll to keep it visible.
+    pub fn move_cursor_vertical(&mut self, direction: i32) {
+        let total_lines = self.line_count();
+        if total_lines == 0 || direction == 0 {
             return;
         }
-
-        let len = self.state.ranges.len() as isize;
-        let mut index = self.state.cursor as isize;
-        loop {
-            index += direction.signum() as isize;
-            if index < 0 || index >= len {
-                return;
-            }
-            if !is_empty_range(&self.state.ranges[index as usize].source) {
-                self.state.cursor = index as usize;
-                self.scroll_to_cursor();
-                return;
-            }
-        }
+        let new_row = (self.state.cursor_row as isize + direction.signum() as isize)
+            .clamp(0, total_lines as isize - 1) as usize;
+        self.state.cursor_row = new_row;
+        self.state.cursor_col = self.state.cursor_col.min(self.widget.line_len(new_row));
+        self.scroll_to_cursor();
     }
 
-    /// Scroll the viewport so the cursor's range is visible.
-    fn scroll_to_cursor(&mut self) {
-        let Some(range_match) = self.state.ranges.get(self.state.cursor) else {
+    /// Move the cursor left (`direction < 0`) or right (`direction > 0`) by one character,
+    /// wrapping to the end of the previous line / start of the next line at row boundaries, like
+    /// a normal text cursor.
+    pub fn move_cursor_horizontal(&mut self, direction: i32) {
+        if direction == 0 {
             return;
-        };
-        let row = range_match.source.start_row;
+        }
+        if direction < 0 {
+            if self.state.cursor_col > 0 {
+                self.state.cursor_col -= 1;
+            } else if self.state.cursor_row > 0 {
+                self.state.cursor_row -= 1;
+                self.state.cursor_col = self.widget.line_len(self.state.cursor_row);
+            }
+        } else {
+            let line_len = self.widget.line_len(self.state.cursor_row);
+            if self.state.cursor_col < line_len {
+                self.state.cursor_col += 1;
+            } else if self.state.cursor_row + 1 < self.line_count() {
+                self.state.cursor_row += 1;
+                self.state.cursor_col = 0;
+            }
+        }
+        self.scroll_to_cursor();
+    }
+
+    /// Where the cursor should be drawn on screen within `area` (the same area passed to
+    /// `draw`), accounting for the widget's own border and the current scroll position. `None`
+    /// if the cursor's row is scrolled out of view, or its column is past the (not horizontally
+    /// scrollable) visible width.
+    pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
+        let inner = crate::tui::widgets::code_viewer::CodeViewerWidget::inner_area(area);
+        let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
+        if row_in_viewport >= inner.height as usize || self.state.cursor_col >= inner.width as usize
+        {
+            return None;
+        }
+        Some((
+            inner.x + self.state.cursor_col as u16,
+            inner.y + row_in_viewport as u16,
+        ))
+    }
+
+    /// Scroll the viewport so the cursor's row is visible.
+    fn scroll_to_cursor(&mut self) {
+        let row = self.state.cursor_row;
         if row < self.state.scroll {
             self.state.scroll = row;
         } else if self.state.viewport_height > 0
@@ -248,11 +267,19 @@ impl Component for CodeViewer {
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
         match key.code {
             crossterm::event::KeyCode::Up => {
-                self.move_cursor(-1);
+                self.move_cursor_vertical(-1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::Down => {
-                self.move_cursor(1);
+                self.move_cursor_vertical(1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Left => {
+                self.move_cursor_horizontal(-1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Right => {
+                self.move_cursor_horizontal(1);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {

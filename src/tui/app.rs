@@ -238,19 +238,33 @@ impl App {
     /// A file was confirmed in the dialog: load it into the panel that was active when `o` was
     /// pressed, then kick off the diff once both panels have a file.
     fn handle_file_selected(&mut self, path: PathBuf) -> Result<()> {
-        match self.dialog_target.take() {
-            Some(Panel::Before) => {
-                self.before_path = Some(path.clone());
-                self.diff_viewer.set_before_file(path)?;
-            }
-            Some(Panel::After) => {
-                self.after_path = Some(path.clone());
-                self.diff_viewer.set_after_file(path)?;
-            }
-            None => {}
+        if let Some(panel) = self.dialog_target.take() {
+            self.select_file_for_panel(panel, path)?;
         }
         self.file_dialog = None;
         self.screen = AppScreen::Viewer;
+        Ok(())
+    }
+
+    /// Load `before` and `after` straight into their panels, bypassing the file dialog. Used to
+    /// support starting the TUI with both file paths already given on the command line.
+    pub fn open_files(&mut self, before: PathBuf, after: PathBuf) -> Result<()> {
+        self.select_file_for_panel(Panel::Before, before)?;
+        self.select_file_for_panel(Panel::After, after)
+    }
+
+    /// Load `path` into `panel`, remember it, and kick off the diff once both panels have a file.
+    fn select_file_for_panel(&mut self, panel: Panel, path: PathBuf) -> Result<()> {
+        match panel {
+            Panel::Before => {
+                self.before_path = Some(path.clone());
+                self.diff_viewer.set_before_file(path)?;
+            }
+            Panel::After => {
+                self.after_path = Some(path.clone());
+                self.diff_viewer.set_after_file(path)?;
+            }
+        }
 
         if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
             self.action_tx.send(Action::StartDiff(before, after))?;

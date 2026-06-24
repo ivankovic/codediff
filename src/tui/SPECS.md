@@ -41,22 +41,43 @@ this side and `destination` is the matching range on the other side (this pairin
 in the diff/text module; the TUI does not invent any new matching logic). The TUI reuses this
 directly:
 
-- The cursor is an index into the focused panel's `Vec<RangeMatch>`. Movement keys move it to the
-  previous/next entry, skipping zero-width entries (these are pure alignment markers with no real
-  text on this side, used to keep both panels' range counts symmetric; they are not visually
-  rendered). Since this is a flat, document-ordered list rather than a 2D grid, arrow Up/Down and
-  vim `k`/`j` both mean "previous/next entry" — and `h`/`l` are deliberately mapped the same way
-  (`h` = previous, `l` = next) rather than invented as some kind of horizontal motion that doesn't
-  correspond to anything in this model.
-- Moving the cursor recomputes `ranges[cursor].destination` and pushes it onto the *other* panel as
-  its cross-highlight target. This is the only data needed to highlight "the matched node" on the
-  other side: there is no separate node-matching search at the TUI layer.
+- The cursor is a literal `(row, column)` position (`CodeViewerState::cursor_row`/`cursor_col` in
+  `widgets/code_viewer.rs`), like a normal text cursor, and is rendered as the *real* terminal
+  cursor (`Frame::set_cursor`, called from `DiffViewer::draw` for whichever panel is focused) —
+  not a synthetic highlight, so it's visible by construction regardless of color scheme. Arrow
+  Up/Down and vim `k`/`j` move the row by one line, clamping the column to the new line's length;
+  Left/Right and `h`/`l` move the column by one character, wrapping to the previous/next line at
+  row boundaries. An earlier version modeled the cursor as an index into the flat, document-ordered
+  `Vec<RangeMatch>`, which made `h`/`l` meaningless (mapped the same as `k`/`j`) and the cursor's
+  only visual signal a (sometimes hard-to-spot) background color; a real `(row, column)` cursor
+  reads like any other editor and the terminal's own cursor rendering is guaranteed visible.
+- Mapping `(row, column)` to the `RangeMatch` it falls in (needed for the cross-highlight, below)
+  is a binary search, not a scan: `CodeViewerState::load_ranges` builds `range_order`, a `Vec<usize>`
+  of indices into `ranges` sorted by source start position (end position as a secondary key, so a
+  zero-width alignment marker sharing a start with a real range sorts before it and never wins the
+  lookup). `range_at` (`widgets/code_viewer.rs`) then finds the covering range in O(log n) via
+  `partition_point`, run once per cursor movement (and once per visible row at render time, to know
+  which row needs the blue overlay) rather than once per range.
+- The range under the cursor's `(row, column)` recomputes its `destination` and pushes it onto the
+  *other* panel as its cross-highlight target. This is the only data needed to highlight "the
+  matched node" on the other side: there is no separate node-matching search at the TUI layer.
 - Background colors per `TextOperation`: `Insert` green, `Delete` red, `Move` yellow/olive,
-  `Update` magenta (dark), `Identical` left as plain syntax highlighting. Both the cursor's own
-  range on the focused panel *and* the cross-highlighted matched range on the other panel use the
+  `Update` magenta (dark), `Identical` left as plain syntax highlighting. Both the range under the
+  cursor on the focused panel *and* the cross-highlighted matched range on the other panel use the
   same blue background, which takes priority over whatever diff-operation color that range would
   otherwise have, since it is a more specific, momentary signal than the static diff coloring (and
-  using the same blue on both sides makes it visually obvious they're the same node).
+  using the same blue on both sides makes it visually obvious they're the same node). This range
+  highlight is in addition to, not instead of, the real terminal cursor described above: the blue
+  shows the matched AST node's full extent, while the cursor pinpoints the exact character. The
+  blue is deliberately brighter/more saturated than the four diff colors so it doesn't blend in
+  with similarly-dark diff backgrounds.
+- Every diff/cursor overlay background is paired with an explicit light foreground (`OVERLAY_FG`
+  in `widgets/code_viewer.rs`), rather than leaving the foreground at whatever it already was.
+  Plain, non-overlaid text relies on the terminal's own default foreground (fine, since it's then
+  paired with the terminal's own default background too), but the overlay backgrounds are
+  hardcoded dark colors; without an explicit foreground they'd render as dark-on-dark on a
+  light-themed terminal, since syntax highlighting is off by default and the terminal's default
+  foreground for a light theme is itself dark.
 - Diff colors and cross-highlighting are painted onto the cached, already-highlighted lines as a
   second pass at render time (splitting/recoloring the relevant character spans), so the syntax
   foreground colors are preserved underneath.

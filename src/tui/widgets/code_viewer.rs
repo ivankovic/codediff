@@ -106,12 +106,47 @@ fn background_for_operation(operation: &TextOperation) -> Option<Color> {
     }
 }
 
+/// Foreground paired with every overlay background below. Plain (un-highlighted) text relies on
+/// the terminal's own default foreground, which is fine since it's paired with the terminal's own
+/// default background too. But these overlay backgrounds are hardcoded dark colors, so on a
+/// light-themed terminal (dark default foreground) they'd render as dark-on-dark; an explicit
+/// light foreground keeps them readable regardless of the terminal's color scheme.
+const OVERLAY_FG: Color = Color::Rgb(225, 225, 225);
+
 /// Background color used to cross-highlight the node matched to the cursor on the other panel.
-const CROSS_HIGHLIGHT_BG: Color = Color::Rgb(20, 40, 80);
+/// Deliberately brighter/more saturated than the diff colors above so the cursor stands out
+/// against any of them rather than blending in at similar dark luminance.
+const CROSS_HIGHLIGHT_BG: Color = Color::Rgb(40, 90, 200);
 
 /// A range is a pure alignment marker (no real text on this side) when it has no width.
 pub fn is_empty_range(range: &TextRange) -> bool {
     range.start_row == range.end_row && range.start_column == range.end_column
+}
+
+/// Build indices into `ranges`, sorted by source start position (end position as a secondary
+/// key, so a zero-width marker sharing a start with a real range sorts *before* it). This is
+/// what lets `range_at` binary search instead of scanning every range on every cursor move.
+fn build_range_order(ranges: &[RangeMatch]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..ranges.len()).collect();
+    order.sort_by_key(|&i| {
+        let r = &ranges[i].source;
+        (r.start_row, r.start_column, r.end_row, r.end_column)
+    });
+    order
+}
+
+/// Find the range whose source covers `(row, col)`, in O(log n) via binary search over `order`
+/// rather than a linear scan over `ranges`. At most one range can cover any given point, since
+/// ranges on one side are non-overlapping by construction (see `text_range.rs`); zero-width
+/// ranges never match, since `point < point` is never true.
+fn range_at(ranges: &[RangeMatch], order: &[usize], row: usize, col: usize) -> Option<usize> {
+    let split = order.partition_point(|&i| {
+        let r = &ranges[i].source;
+        (r.start_row, r.start_column) <= (row, col)
+    });
+    let candidate = *order[..split].last()?;
+    let r = &ranges[candidate].source;
+    ((row, col) < (r.end_row, r.end_column)).then_some(candidate)
 }
 
 /// Returns the `[start_column, end_column)` portion of `range` that falls on `row`, given the
@@ -188,10 +223,58 @@ pub struct CodeViewerState {
     pub viewport_height: usize,
     /// The diff ranges for this side, as returned by `TextDiff::all`.
     pub ranges: Vec<RangeMatch>,
-    /// Index into `ranges` of the range the cursor is currently on.
-    pub cursor: usize,
+    /// Indices into `ranges`, sorted by source start position; rebuilt by `load_ranges`. Backs
+    /// the O(log n) (row, column) -> range lookup in `cursor_destination`/`range_at_cursor`.
+    range_order: Vec<usize>,
+    /// The cursor's row in the file (0-indexed), like a normal text cursor.
+    pub cursor_row: usize,
+    /// The cursor's column on `cursor_row` (0-indexed, in characters).
+    pub cursor_col: usize,
     /// The range to cross-highlight in blue, set from the matched node on the other panel.
     pub highlight_destination: Option<TextRange>,
+}
+
+impl CodeViewerState {
+    /// Replace the diff ranges for this side, rebuild the point-lookup index, and place the
+    /// cursor on the first navigable (non-zero-width) position.
+    pub fn load_ranges(&mut self, ranges: Vec<RangeMatch>) {
+        self.ranges = ranges;
+        self.range_order = build_range_order(&self.ranges);
+        let first_navigable = self
+            .range_order
+            .iter()
+            .map(|&i| &self.ranges[i])
+            .find(|range_match| !is_empty_range(&range_match.source));
+        let (row, col) = first_navigable
+            .map(|range_match| {
+                (
+                    range_match.source.start_row,
+                    range_match.source.start_column,
+                )
+            })
+            .unwrap_or((0, 0));
+        self.cursor_row = row;
+        self.cursor_col = col;
+        self.highlight_destination = None;
+    }
+
+    /// The index into `ranges` of the range covering the cursor's current position, if any (the
+    /// cursor can sit in a gap with no range under it, e.g. on blank/unmapped text).
+    fn range_at_cursor(&self) -> Option<usize> {
+        range_at(
+            &self.ranges,
+            &self.range_order,
+            self.cursor_row,
+            self.cursor_col,
+        )
+    }
+
+    /// The destination range matched to whatever the cursor is currently on, i.e. the range to
+    /// cross-highlight on the other panel.
+    pub fn cursor_destination(&self) -> Option<TextRange> {
+        self.range_at_cursor()
+            .map(|i| self.ranges[i].destination.clone())
+    }
 }
 
 /// A widget that displays source code
@@ -319,6 +402,22 @@ impl CodeViewerWidget {
         self.highlighted_lines.len()
     }
 
+    /// Number of characters on `row`, or 0 if `row` is out of bounds. Used to clamp the cursor's
+    /// column so it never lands past the end of a (possibly shorter) line.
+    pub fn line_len(&self, row: usize) -> usize {
+        self.highlighted_lines
+            .get(row)
+            .map(|line| line.spans.iter().map(|s| s.content.chars().count()).sum())
+            .unwrap_or(0)
+    }
+
+    /// The area inside this widget's own border, given the full area it would be rendered into.
+    /// Exposed so callers (e.g. terminal-cursor placement in `CodeViewer`) can compute screen
+    /// coordinates without duplicating the border's inset.
+    pub fn inner_area(area: Rect) -> Rect {
+        Block::default().borders(Borders::ALL).inner(area)
+    }
+
     /// Get the syntax for highlighting based on language
     fn get_syntax(&self) -> Option<&'static SyntaxReference> {
         let lang_name = self.language.as_ref()?;
@@ -410,6 +509,12 @@ impl CodeViewerWidget {
     fn overlay_row(&self, row: usize, state: &CodeViewerState) -> Line<'static> {
         let mut line = self.highlighted_lines[row].clone();
         let row_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+        let cursor_range = range_at(
+            &state.ranges,
+            &state.range_order,
+            state.cursor_row,
+            state.cursor_col,
+        );
 
         for (index, range_match) in state.ranges.iter().enumerate() {
             let Some((start_col, end_col)) = columns_on_row(&range_match.source, row, row_len)
@@ -418,14 +523,26 @@ impl CodeViewerWidget {
             };
 
             if let Some(bg) = background_for_operation(&range_match.operation) {
-                line = paint_columns(&line, start_col, end_col, Style::new().bg(bg));
+                line = paint_columns(
+                    &line,
+                    start_col,
+                    end_col,
+                    Style::new().fg(OVERLAY_FG).bg(bg),
+                );
             }
 
-            // The cursor's own leaf range, and the matching range on the other panel (below),
-            // both render in the same blue: they're the same visual signal ("this is the node
-            // under/matched to the cursor"), just on different panels.
-            if index == state.cursor {
-                line = paint_columns(&line, start_col, end_col, Style::new().bg(CROSS_HIGHLIGHT_BG));
+            // The leaf range under the cursor's exact (row, column) position, and the matching
+            // range on the other panel (below), both render in the same blue: they're the same
+            // visual signal ("this is the node under/matched to the cursor"), just on different
+            // panels. The literal cursor position itself is drawn as the real terminal cursor
+            // (see `CodeViewer::cursor_screen_position`), not by this overlay.
+            if cursor_range == Some(index) {
+                line = paint_columns(
+                    &line,
+                    start_col,
+                    end_col,
+                    Style::new().fg(OVERLAY_FG).bg(CROSS_HIGHLIGHT_BG),
+                );
             }
         }
 
@@ -436,7 +553,7 @@ impl CodeViewerWidget {
                 &line,
                 start_col,
                 end_col,
-                Style::new().bg(CROSS_HIGHLIGHT_BG),
+                Style::new().fg(OVERLAY_FG).bg(CROSS_HIGHLIGHT_BG),
             );
         }
 
@@ -503,5 +620,149 @@ impl StatefulWidget for &CodeViewerWidget {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::text::RangeMatch;
+
+    fn widget_with_line(text: &str) -> CodeViewerWidget {
+        CodeViewerWidget::default().with_contents(text.to_string())
+    }
+
+    fn range_match(operation: TextOperation, start_col: usize, end_col: usize) -> RangeMatch {
+        RangeMatch {
+            source: TextRange::new(0, start_col, 0, end_col),
+            destination: TextRange::zero(),
+            operation,
+        }
+    }
+
+    /// A diff-colored span must carry an explicit foreground, not just a background: plain text
+    /// has no fg override (syntax highlighting is off by default) and relies on the terminal's
+    /// own default, which is unreadable against a hardcoded dark diff background on a
+    /// light-themed terminal.
+    #[test]
+    fn diff_overlay_pairs_explicit_foreground_with_background() {
+        let widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            // Far outside the only range, so it's never also treated as the cursor's range.
+            cursor_row: 0,
+            cursor_col: 99,
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let span = &line.spans[0];
+        assert_eq!(span.content, "hello");
+        assert_eq!(span.style.fg, Some(OVERLAY_FG));
+        assert_eq!(
+            span.style.bg,
+            background_for_operation(&TextOperation::Insert)
+        );
+    }
+
+    /// The range under the cursor's exact (row, column) position likewise needs the explicit
+    /// foreground, and its background must be the brighter cross-highlight blue rather than the
+    /// (dimmer) diff color underneath it.
+    #[test]
+    fn cursor_overlay_uses_bright_blue_with_explicit_foreground() {
+        let widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 0,
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let span = &line.spans[0];
+        assert_eq!(span.content, "hello");
+        assert_eq!(span.style.fg, Some(OVERLAY_FG));
+        assert_eq!(span.style.bg, Some(CROSS_HIGHLIGHT_BG));
+    }
+
+    /// Binary-search lookup: finds the covering range, picks the real range over a zero-width
+    /// marker that shares its start position, and returns `None` in gaps and on other rows.
+    #[test]
+    fn range_at_finds_covering_range_and_resolves_ties_and_gaps() {
+        let ranges = vec![
+            range_match(TextOperation::Delete, 0, 3),
+            RangeMatch {
+                source: TextRange::new(0, 3, 0, 3),
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+            range_match(TextOperation::Identical, 3, 7),
+        ];
+        let order = build_range_order(&ranges);
+
+        assert_eq!(range_at(&ranges, &order, 0, 1), Some(0));
+        assert_eq!(range_at(&ranges, &order, 0, 3), Some(2));
+        assert_eq!(range_at(&ranges, &order, 0, 6), Some(2));
+        assert_eq!(range_at(&ranges, &order, 0, 7), None);
+        assert_eq!(range_at(&ranges, &order, 1, 0), None);
+    }
+
+    /// Loading ranges places the cursor on the first navigable position, skipping any leading
+    /// zero-width marker.
+    #[test]
+    fn load_ranges_places_cursor_on_first_navigable_position() {
+        let mut state = CodeViewerState::default();
+        state.load_ranges(vec![
+            RangeMatch {
+                source: TextRange::new(0, 0, 0, 0),
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+            range_match(TextOperation::Delete, 2, 4),
+        ]);
+        assert_eq!((state.cursor_row, state.cursor_col), (0, 2));
+    }
+
+    /// `cursor_destination` resolves the cursor's current position to the matched range's
+    /// destination, which is what drives the other panel's cross-highlight.
+    #[test]
+    fn cursor_destination_returns_matched_range_for_current_position() {
+        let mut state = CodeViewerState::default();
+        let dest = TextRange::new(5, 1, 5, 9);
+        state.load_ranges(vec![RangeMatch {
+            source: TextRange::new(0, 2, 0, 4),
+            destination: dest.clone(),
+            operation: TextOperation::Update,
+        }]);
+        assert_eq!(state.cursor_destination(), Some(dest));
+    }
+
+    /// The cross-highlighted destination on the *other* panel gets the same treatment, even when
+    /// that range isn't a diff (e.g. an `Identical` range with no background of its own).
+    #[test]
+    fn cross_highlight_destination_uses_bright_blue_with_explicit_foreground() {
+        let widget = widget_with_line("hello world");
+        let state = CodeViewerState {
+            highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let span = line
+            .spans
+            .iter()
+            .find(|span| span.content == "world")
+            .expect("highlighted span");
+        assert_eq!(span.style.fg, Some(OVERLAY_FG));
+        assert_eq!(span.style.bg, Some(CROSS_HIGHLIGHT_BG));
     }
 }

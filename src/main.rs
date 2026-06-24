@@ -16,12 +16,21 @@ use anyhow::Result;
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use std::path::PathBuf;
+
 use clap::Parser;
 
 use codediff::tui;
 
 #[derive(Parser)]
 struct Args {
+    /// The "before" file to diff. Must be given together with AFTER; if both are given, the diff
+    /// is computed immediately instead of starting on an empty viewer.
+    before: Option<PathBuf>,
+
+    /// The "after" file to diff. Must be given together with BEFORE.
+    after: Option<PathBuf>,
+
     /// Mode (TUI/tui or Headless/headless)
     #[arg(long, default_value = "TUI")]
     mode: String,
@@ -43,6 +52,9 @@ async fn tui_main(args: &Args) -> Result<()> {
     tui::initialize_logging()?;
 
     let mut app = tui::app::App::new(args.tui_tick_rate, args.tui_frame_rate)?;
+    if let (Some(before), Some(after)) = (&args.before, &args.after) {
+        app.open_files(before.clone(), after.clone())?;
+    }
     app.run().await?;
 
     Ok(())
@@ -51,6 +63,10 @@ async fn tui_main(args: &Args) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+
+    if args.before.is_some() != args.after.is_some() {
+        anyhow::bail!("BEFORE and AFTER must be given together");
+    }
 
     if args.headless || args.mode.to_lowercase() == "headless" {
         unimplemented!("TODO: implement headless mode");
