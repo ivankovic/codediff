@@ -579,8 +579,6 @@ fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> R
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
     use crate::code::Language;
 
     use super::*;
@@ -624,13 +622,13 @@ mod tests {
 
         let t = node_for_path(
             ast.root_node(),
-            &vec!["function_item", "block", "expression_statement"],
+            &["function_item", "block", "expression_statement"],
         )?;
         assert_eq!(t.kind(), "expression_statement");
 
         let t = node_for_path(
             ast.root_node(),
-            &vec![
+            &[
                 "function_item:1",
                 "block:1",
                 "expression_statement",
@@ -640,7 +638,7 @@ mod tests {
         assert_eq!(t.kind(), "macro_invocation");
 
         // Invalid paths
-        assert!(node_for_path(ast.root_node(), &vec!["no such node"]).is_err());
+        assert!(node_for_path(ast.root_node(), &["no such node"]).is_err());
 
         Ok(())
     }

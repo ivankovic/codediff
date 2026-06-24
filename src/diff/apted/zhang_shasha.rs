@@ -18,7 +18,7 @@
 
 use crate::code::ASTMetadata;
 
-use super::common::{forest_dist, DeltaTable, ForestDist, PostorderIndexer, UnitCostModel};
+use super::common::{DeltaTable, ForestDist, PostorderIndexer, UnitCostModel, forest_dist};
 
 /// Populates `delta[(pre_before, pre_after)]` - the fully-resolved tree edit distance between the
 /// subtree rooted at `pre_before` and the subtree rooted at `pre_after` - for every keyroot pair.
@@ -70,4 +70,3 @@ pub(crate) fn compute_delta_zhang_shasha(
 
     delta
 }
-

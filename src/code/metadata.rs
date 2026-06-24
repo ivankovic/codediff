@@ -343,13 +343,27 @@ mod tests {
         assert!(!ast_metadata.reference_nodes_ordered.is_empty());
         assert!(!ast_metadata.semantically_structural_nodes.is_empty());
 
-        // Test that the reference nodes are actually ordered by size (descending)
-        // We can't test the exact ordering without knowing the tree structure,
-        // but we can test that it's not empty and contains valid node IDs
-        // TODO: Make this test actually check that the nodes are ordered by size.
         for &node_id in &ast_metadata.reference_nodes_ordered {
             assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
         }
+
+        // Reference nodes must be ordered by subtree size, descending (largest first) - this is
+        // what lets `solve_identical_trees` process the biggest duplicated subtrees before their
+        // descendants, so the descendants' own matches don't need to be decided independently.
+        let sizes: Vec<usize> = ast_metadata
+            .reference_nodes_ordered
+            .iter()
+            .map(|node_id| {
+                *ast_metadata
+                    .node_to_subtree_size
+                    .get(node_id)
+                    .expect("every reference node must have a recorded subtree size")
+            })
+            .collect();
+        assert!(
+            sizes.is_sorted_by(|a, b| a >= b),
+            "reference_nodes_ordered must be sorted by subtree size descending, got {sizes:?}"
+        );
 
         assert!(
             ast_metadata

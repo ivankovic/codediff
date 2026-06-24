@@ -188,3 +188,51 @@ fn map_crossterm_event(event: CrosstermEvent) -> Option<Event> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    #[test]
+    fn maps_key_event() {
+        let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Key(key)),
+            Some(Event::Key(key))
+        );
+    }
+
+    #[test]
+    fn maps_resize_event() {
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Resize(80, 24)),
+            Some(Event::Resize(80, 24))
+        );
+    }
+
+    /// Focus and bracketed-paste events are deliberately dropped: the app has no use for them.
+    #[test]
+    fn drops_focus_and_paste_events() {
+        assert_eq!(map_crossterm_event(CrosstermEvent::FocusGained), None);
+        assert_eq!(map_crossterm_event(CrosstermEvent::FocusLost), None);
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Paste("hi".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn maps_mouse_event() {
+        let mouse = crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Moved,
+            column: 1,
+            row: 2,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Mouse(mouse)),
+            Some(Event::Mouse(mouse))
+        );
+    }
+}

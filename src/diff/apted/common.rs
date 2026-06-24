@@ -90,7 +90,11 @@ pub(crate) struct PostorderIndexer {
 }
 
 impl PostorderIndexer {
-    pub(crate) fn build(metadata: &ASTMetadata, root_ids: &[usize], node_map: &HashMap<usize, usize>) -> Self {
+    pub(crate) fn build(
+        metadata: &ASTMetadata,
+        root_ids: &[usize],
+        node_map: &HashMap<usize, usize>,
+    ) -> Self {
         fn visit(
             node_id: usize,
             metadata: &ASTMetadata,
@@ -572,7 +576,12 @@ pub(crate) fn classify_match(
     }
 }
 
-pub(crate) fn emit_match(before_id: usize, after_id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> u64 {
+pub(crate) fn emit_match(
+    before_id: usize,
+    after_id: usize,
+    ctx: &ResolveCtx,
+    diff: &mut ASTDiff,
+) -> u64 {
     if let Some(mapping) = diff.mapping.get(&(before_id, after_id)) {
         return mapping.cost;
     }
@@ -768,7 +777,11 @@ pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut
 }
 
 /// Compute the cost of deleting an entire subtree.
-pub(crate) fn subtree_del_cost(node_id: usize, meta: &ASTMetadata, cost_model: &UnitCostModel) -> u64 {
+pub(crate) fn subtree_del_cost(
+    node_id: usize,
+    meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+) -> u64 {
     if node_id == 0 {
         return 0;
     }
@@ -783,7 +796,11 @@ pub(crate) fn subtree_del_cost(node_id: usize, meta: &ASTMetadata, cost_model: &
 }
 
 /// Compute the cost of inserting an entire subtree.
-pub(crate) fn subtree_ins_cost(node_id: usize, meta: &ASTMetadata, cost_model: &UnitCostModel) -> u64 {
+pub(crate) fn subtree_ins_cost(
+    node_id: usize,
+    meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+) -> u64 {
     if node_id == 0 {
         return 0;
     }
@@ -1016,11 +1033,10 @@ pub fn for_roots(
     )
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::engine::*;
+    use super::*;
     use crate::diff::{ASTMappingOperation, ASTMappingReason};
     use crate::test::helper;
 
@@ -1204,11 +1220,25 @@ mod tests {
             let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(7));
             let mut before_nodes = Vec::new();
             let mut next_id = 0usize;
-            let before_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut before_nodes);
+            let before_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut before_nodes,
+            );
             let mut after_nodes = Vec::new();
-            let after_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut after_nodes);
+            let after_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut after_nodes,
+            );
 
             let before_meta = meta_from_owned(&before_nodes);
             let after_meta = meta_from_owned(&after_nodes);
@@ -1336,7 +1366,13 @@ mod tests {
             let mut child_ids = Vec::new();
             for _ in 0..nchildren {
                 child_ids.push(gen_random_tree(
-                    rng, next_id, depth + 1, max_depth, kinds, texts, nodes,
+                    rng,
+                    next_id,
+                    depth + 1,
+                    max_depth,
+                    kinds,
+                    texts,
+                    nodes,
                 ));
             }
             nodes.push((id, kind.to_string(), String::new(), child_ids));
@@ -1468,11 +1504,25 @@ mod tests {
             let mut rng = Rng(depth as u64 * 7919 + 1);
             let mut before_nodes = Vec::new();
             let mut next_id = 0usize;
-            let before_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, depth, &kinds, &texts, &mut before_nodes);
+            let before_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                depth,
+                &kinds,
+                &texts,
+                &mut before_nodes,
+            );
             let mut after_nodes = Vec::new();
-            let after_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, depth, &kinds, &texts, &mut after_nodes);
+            let after_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                depth,
+                &kinds,
+                &texts,
+                &mut after_nodes,
+            );
 
             let before_meta = meta_from_owned(&before_nodes);
             let after_meta = meta_from_owned(&after_nodes);
@@ -1576,17 +1626,21 @@ mod tests {
         let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
 
         let mut oracle_delta =
-            compute_delta_zhang_shasha(&before_idx, &after_idx, &before, &after, &cost_model);
+            compute_delta_zhang_shasha(&before_idx, &after_idx, before, after, &cost_model);
         // Snapshot *before* compute_edit_mapping, which mutates delta in place as it recomputes
         // forest_dist - comparing post-mutation tables would compare the wrong thing.
         let oracle_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
-            .map(|b| (0..after_idx.size).map(|a| oracle_delta.get(b, a)).collect())
+            .map(|b| {
+                (0..after_idx.size)
+                    .map(|a| oracle_delta.get(b, a))
+                    .collect()
+            })
             .collect();
         let oracle_decisions = compute_edit_mapping(
             &before_idx,
             &after_idx,
-            &before,
-            &after,
+            before,
+            after,
             &cost_model,
             &mut oracle_delta,
         );
@@ -1609,8 +1663,8 @@ mod tests {
         let new_decisions = compute_edit_mapping(
             &before_idx,
             &after_idx,
-            &before,
-            &after,
+            before,
+            after,
             &cost_model,
             &mut new_delta,
         );
@@ -1644,12 +1698,28 @@ mod tests {
         let mut oracle_fd = ForestDist::new(before_idx.size + 1, after_idx.size + 1);
         let mut new_fd = ForestDist::new(before_idx.size + 1, after_idx.size + 1);
         forest_dist(
-            &before_idx, &after_idx, &before, &after, &cost_model, &mut oracle_d2,
-            before_idx.size, after_idx.size, &mut oracle_fd, false,
+            &before_idx,
+            &after_idx,
+            before,
+            after,
+            &cost_model,
+            &mut oracle_d2,
+            before_idx.size,
+            after_idx.size,
+            &mut oracle_fd,
+            false,
         );
         forest_dist(
-            &before_idx, &after_idx, &before, &after, &cost_model, &mut new_d2,
-            before_idx.size, after_idx.size, &mut new_fd, false,
+            &before_idx,
+            &after_idx,
+            before,
+            after,
+            &cost_model,
+            &mut new_d2,
+            before_idx.size,
+            after_idx.size,
+            &mut new_fd,
+            false,
         );
         for di in 0..=before_idx.size {
             for dj in 0..=after_idx.size {
@@ -1782,7 +1852,11 @@ mod tests {
                 let sp = strategy.get(v, w);
                 let node = sp.abs() - 1;
                 let is_t1 = node < path_id_offset;
-                let (idx, root, sz) = if is_t1 { (&bidx, v, bidx.sizes[v]) } else { (&aidx, w, aidx.sizes[w]) };
+                let (idx, root, sz) = if is_t1 {
+                    (&bidx, v, bidx.sizes[v])
+                } else {
+                    (&aidx, w, aidx.sizes[w])
+                };
                 let local_node = if is_t1 { node } else { node - path_id_offset };
                 let ty = get_strategy_path_type(sp, path_id_offset, root, sz);
                 if ty == 2 {
@@ -1805,22 +1879,41 @@ mod tests {
             let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(1));
             let mut before_nodes = Vec::new();
             let mut next_id = 0usize;
-            let before_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, 3, &kinds, &texts, &mut before_nodes);
+            let before_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                3,
+                &kinds,
+                &texts,
+                &mut before_nodes,
+            );
             let mut after_nodes = Vec::new();
-            let after_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, 3, &kinds, &texts, &mut after_nodes);
+            let after_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                3,
+                &kinds,
+                &texts,
+                &mut after_nodes,
+            );
             let n = before_nodes.len() + after_nodes.len();
-            if let Some((best_n, ..)) = &smallest {
-                if n >= *best_n {
-                    continue;
-                }
+            if let Some((best_n, ..)) = &smallest
+                && n >= *best_n
+            {
+                continue;
             }
 
             let before_meta = meta_from_owned(&before_nodes);
             let after_meta = meta_from_owned(&after_nodes);
             let result = std::panic::catch_unwind(|| {
-                assert_distance_matches_oracle(&before_meta, &after_meta, &[before_root], &[after_root]);
+                assert_distance_matches_oracle(
+                    &before_meta,
+                    &after_meta,
+                    &[before_root],
+                    &[after_root],
+                );
             });
             if result.is_err() {
                 smallest = Some((n, seed, before_nodes, after_nodes));
@@ -1842,16 +1935,36 @@ mod tests {
             let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(1));
             let mut before_nodes = Vec::new();
             let mut next_id = 0usize;
-            let before_root = gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut before_nodes);
+            let before_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut before_nodes,
+            );
             let mut after_nodes = Vec::new();
-            let after_root =
-                gen_random_tree(&mut rng, &mut next_id, 0, 4, &kinds, &texts, &mut after_nodes);
+            let after_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut after_nodes,
+            );
 
             let before_meta = meta_from_owned(&before_nodes);
             let after_meta = meta_from_owned(&after_nodes);
 
             let result = std::panic::catch_unwind(|| {
-                assert_distance_matches_oracle(&before_meta, &after_meta, &[before_root], &[after_root]);
+                assert_distance_matches_oracle(
+                    &before_meta,
+                    &after_meta,
+                    &[before_root],
+                    &[after_root],
+                );
             });
             if result.is_err() {
                 panic!(
@@ -1947,7 +2060,13 @@ mod tests {
         }
 
         // Now call APTED with the diff that already has these artificial mappings
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         // Check if any before node appears in multiple mappings
         let mut before_node_counts = std::collections::HashMap::new();
@@ -2024,7 +2143,13 @@ mod tests {
             },
         );
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         // The pre-existing match must survive untouched.
         assert_eq!(
@@ -2067,7 +2192,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -2090,7 +2221,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -2133,7 +2270,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -2176,7 +2319,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -2206,7 +2355,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -2253,7 +2408,13 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        for_roots(&before, &after, &node_cache, Algorithm::ZhangShasha, &mut diff)?;
+        for_roots(
+            &before,
+            &after,
+            &node_cache,
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();

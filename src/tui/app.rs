@@ -391,3 +391,104 @@ fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
         "unknown panic".to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn write_temp_file(contents: &str) -> NamedTempFile {
+        let mut file = NamedTempFile::new().expect("create temp file");
+        file.write_all(contents.as_bytes())
+            .expect("write temp file");
+        file
+    }
+
+    #[test]
+    fn panic_message_extracts_str_payload() {
+        let panic: Box<dyn std::any::Any + Send> = Box::new("boom");
+        assert_eq!(panic_message(&panic), "boom");
+    }
+
+    #[test]
+    fn panic_message_extracts_string_payload() {
+        let panic: Box<dyn std::any::Any + Send> = Box::new("boom".to_string());
+        assert_eq!(panic_message(&panic), "boom");
+    }
+
+    #[test]
+    fn panic_message_falls_back_for_unknown_payload_type() {
+        let panic: Box<dyn std::any::Any + Send> = Box::new(42i32);
+        assert_eq!(panic_message(&panic), "unknown panic");
+    }
+
+    /// The diff must not start until *both* panels have a file, even if one panel is reselected
+    /// after the other was already set.
+    #[test]
+    fn select_file_for_panel_only_starts_diff_once_both_sides_are_set() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        let before = write_temp_file("before contents");
+        let after = write_temp_file("after contents");
+
+        app.select_file_for_panel(Panel::Before, before.path().to_path_buf())?;
+        assert_eq!(app.before_path, Some(before.path().to_path_buf()));
+        assert!(
+            app.action_rx.try_recv().is_err(),
+            "StartDiff must not fire with only one side set"
+        );
+
+        app.select_file_for_panel(Panel::After, after.path().to_path_buf())?;
+        assert_eq!(app.after_path, Some(after.path().to_path_buf()));
+        let action = app
+            .action_rx
+            .try_recv()
+            .expect("StartDiff must fire once both sides are set");
+        assert_eq!(
+            action,
+            Action::StartDiff(before.path().to_path_buf(), after.path().to_path_buf())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn open_files_loads_both_panels_and_starts_diff() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        let before = write_temp_file("before contents");
+        let after = write_temp_file("after contents");
+
+        app.open_files(before.path().to_path_buf(), after.path().to_path_buf())?;
+
+        assert_eq!(app.before_path, Some(before.path().to_path_buf()));
+        assert_eq!(app.after_path, Some(after.path().to_path_buf()));
+        assert!(app.action_rx.try_recv().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn handle_dialog_cancelled_resets_dialog_state() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.screen = AppScreen::SelectFile;
+        app.dialog_target = Some(Panel::Before);
+
+        app.handle_dialog_cancelled();
+
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert_eq!(app.dialog_target, None);
+        assert!(app.file_dialog.is_none());
+    }
+
+    #[test]
+    fn handle_file_selected_loads_into_the_dialogs_target_panel() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        let before = write_temp_file("before contents");
+        app.dialog_target = Some(Panel::Before);
+
+        app.handle_file_selected(before.path().to_path_buf())?;
+
+        assert_eq!(app.before_path, Some(before.path().to_path_buf()));
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.dialog_target.is_none());
+        Ok(())
+    }
+}

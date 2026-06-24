@@ -116,7 +116,11 @@ pub(crate) struct AptedIndexer {
 }
 
 impl AptedIndexer {
-    pub(crate) fn build(metadata: &ASTMetadata, root_ids: &[usize], node_map: &HashMap<usize, usize>) -> Self {
+    pub(crate) fn build(
+        metadata: &ASTMetadata,
+        root_ids: &[usize],
+        node_map: &HashMap<usize, usize>,
+    ) -> Self {
         fn visit(
             node_id: usize,
             parent_pre: usize,
@@ -383,7 +387,11 @@ impl AptedIndexer {
 /// already matched) always costs `0` - this is the whole trick that lets `gted` run on a
 /// virtual-rooted *forest* and still compute exactly the forest-to-forest distance: matching the
 /// two virtual roots is always free, so it's always at least as good as any alternative.
-pub(crate) fn vnode<'a>(idx: &AptedIndexer, meta: &'a ASTMetadata, pre: usize) -> Option<&'a ASTNodeMetadata> {
+pub(crate) fn vnode<'a>(
+    idx: &AptedIndexer,
+    meta: &'a ASTMetadata,
+    pre: usize,
+) -> Option<&'a ASTNodeMetadata> {
     idx.pre_to_node_id[pre].map(|id| {
         meta.node_info
             .get(&id)
@@ -468,6 +476,24 @@ impl std::ops::IndexMut<(i64, i64)> for Mat {
 /// intermediate `sp3` terms are differences, so `i64` avoids an underflow panic `u64` would risk
 /// on the way to a non-negative result) and cast to `u64` only at the `DeltaTable`/return
 /// boundary.
+fn update_fn_array(fna: &mut [i64], ln_for_node: i64, node: i64, current_subtree_pre_l: i64) {
+    let last = fna.len() - 1;
+    if ln_for_node >= current_subtree_pre_l {
+        fna[node as usize] = fna[ln_for_node as usize];
+        fna[ln_for_node as usize] = node;
+    } else {
+        fna[node as usize] = fna[last];
+        fna[last] = node;
+    }
+}
+
+fn update_ft_array(fna: &[i64], fta: &mut [i64], ln_for_node: i64, node: i64) {
+    fta[node as usize] = ln_for_node;
+    if fna[node as usize] > -1 {
+        fta[fna[node as usize] as usize] = node;
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spf_a(
     ctx: &EngineCtx,
@@ -552,23 +578,6 @@ pub(crate) fn spf_a(
     let mut current_forest_cost1: i64 = 0;
     let mut current_forest_cost2: i64 = 0;
 
-    pub(crate) fn update_fn_array(fna: &mut [i64], ln_for_node: i64, node: i64, current_subtree_pre_l: i64) {
-        let last = fna.len() - 1;
-        if ln_for_node >= current_subtree_pre_l {
-            fna[node as usize] = fna[ln_for_node as usize];
-            fna[ln_for_node as usize] = node;
-        } else {
-            fna[node as usize] = fna[last];
-            fna[last] = node;
-        }
-    }
-    pub(crate) fn update_ft_array(fna: &[i64], fta: &mut [i64], ln_for_node: i64, node: i64) {
-        fta[node as usize] = ln_for_node;
-        if fna[node as usize] > -1 {
-            fta[fna[node as usize] as usize] = node;
-        }
-    }
-
     let mut start_path_node: i64 = -1;
     let mut end_path_node = path_id as i64;
     let mut it1_pre_l_off;
@@ -634,11 +643,12 @@ pub(crate) fn spf_a(
             while r_g >= r_g_last {
                 let l_g_first = other_idx.pre_r_to_pre_l[r_g as usize] as i64;
                 let r_g_in_pre_l = l_g_first;
-                let r_g_minus1_in_pre_l = if r_g <= other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64 {
-                    i64::MAX / 4
-                } else {
-                    other_idx.pre_r_to_pre_l[(r_g - 1) as usize] as i64
-                };
+                let r_g_minus1_in_pre_l =
+                    if r_g <= other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64 {
+                        i64::MAX / 4
+                    } else {
+                        other_idx.pre_r_to_pre_l[(r_g - 1) as usize] as i64
+                    };
                 let parent_of_r_g_in_pre_l = other_idx.parents[r_g_in_pre_l as usize];
                 // Decides on the last lG node for Loop D - INNER-only, so always the `else`
                 // branch of Java's `if (pathType == 1)`.
@@ -744,7 +754,8 @@ pub(crate) fn spf_a(
                         sp1 = match sp1source {
                             1 => s[(sp1s_row, l_g - it2_pre_l_off)] + path_del_cost(l_f_node),
                             2 => {
-                                t[(l_g - it2_pre_l_off, r_g - it2_pre_r_off)] + path_del_cost(l_f_node)
+                                t[(l_g - it2_pre_l_off, r_g - it2_pre_r_off)]
+                                    + path_del_cost(l_f_node)
                             }
                             _ => current_forest_cost2 + path_del_cost(l_f_node),
                         };
@@ -757,7 +768,8 @@ pub(crate) fn spf_a(
                         let (b, a) = delta_order(l_f_node, l_g);
                         sp3 = delta.get(b, a) as i64;
                         if sp3 < min_cost {
-                            let fna_target = fna[(l_g + other_idx.sizes[l_g as usize] as i64 - 1) as usize];
+                            let fna_target =
+                                fna[(l_g + other_idx.sizes[l_g as usize] as i64 - 1) as usize];
                             sp3 += match sp3source {
                                 1 => s[(sp3s_row, fna_target - it2_pre_l_off)],
                                 2 => current_forest_cost2 - other_subtree_ins_cost(l_g),
@@ -783,7 +795,10 @@ pub(crate) fn spf_a(
                             // s-table's own relative-offset lookup on the line below; Java's
                             // `delta[endPathNode][parent_of_rG_in_preL]` uses the bare value.
                             let (b, a) = delta_order(end_path_node, parent_of_r_g_in_pre_l);
-                            let v = s[(l_f_last + 1 - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
+                            let v = s[(
+                                l_f_last + 1 - it1_pre_l_off,
+                                r_g_minus1_in_pre_l + 1 - it2_pre_l_off,
+                            )] as u64;
                             if std::env::var("APTED_DEBUG").is_ok() {
                                 eprintln!("spfA write-A: delta[{b}][{a}] = {v}");
                             }
@@ -793,8 +808,12 @@ pub(crate) fn spf_a(
                             && end_path_node == parent_of_end_path_node + 1
                             && end_path_node_in_pre_r == parent_of_end_path_node_in_pre_r + 1
                         {
-                            let (b, a) = delta_order(parent_of_end_path_node, parent_of_r_g_in_pre_l);
-                            let v = s[(l_f_last - it1_pre_l_off, r_g_minus1_in_pre_l + 1 - it2_pre_l_off)] as u64;
+                            let (b, a) =
+                                delta_order(parent_of_end_path_node, parent_of_r_g_in_pre_l);
+                            let v = s[(
+                                l_f_last - it1_pre_l_off,
+                                r_g_minus1_in_pre_l + 1 - it2_pre_l_off,
+                            )] as u64;
                             if std::env::var("APTED_DEBUG").is_ok() {
                                 eprintln!("spfA write-B: delta[{b}][{a}] = {v}");
                             }
@@ -803,7 +822,10 @@ pub(crate) fn spf_a(
                     }
                     let mut l_f2 = l_f_first;
                     while l_f2 >= l_f_last {
-                        q[l_f2 as usize] = s[(l_f2 - it1_pre_l_off, parent_of_r_g_in_pre_l + 1 - it2_pre_l_off)];
+                        q[l_f2 as usize] = s[(
+                            l_f2 - it1_pre_l_off,
+                            parent_of_r_g_in_pre_l + 1 - it2_pre_l_off,
+                        )];
                         l_f2 -= 1;
                     }
                 }
@@ -872,7 +894,9 @@ pub(crate) fn spf_a(
                 };
                 current_forest_size1 = tmp_forest_size1;
                 current_forest_cost1 = tmp_forest_cost1;
-                let r_g_last2 = if r_g_first2 == other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64 {
+                let r_g_last2 = if r_g_first2
+                    == other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64
+                {
                     r_g_first2
                 } else {
                     other_idx.pre_to_pre_r[current_subtree_pre_l2 as usize] as i64
@@ -889,15 +913,17 @@ pub(crate) fn spf_a(
                     current_forest_size2 = other_idx.sizes[l_g as usize] as i64;
                     current_forest_cost2 = other_subtree_ins_cost(l_g);
                     let r_f_subtree_size = path_idx.sizes[r_f_in_pre_l as usize] as i64;
-                    let (r_f_is_consecutive_node_of_current_path_node, r_f_is_right_sibling_of_current_path_node) =
-                        if start_path_node > 0 {
-                            (
-                                start_path_node_in_pre_r - r_f == 1,
-                                r_f + r_f_subtree_size == start_path_node_in_pre_r,
-                            )
-                        } else {
-                            (false, false)
-                        };
+                    let (
+                        r_f_is_consecutive_node_of_current_path_node,
+                        r_f_is_right_sibling_of_current_path_node,
+                    ) = if start_path_node > 0 {
+                        (
+                            start_path_node_in_pre_r - r_f == 1,
+                            r_f + r_f_subtree_size == start_path_node_in_pre_r,
+                        )
+                    } else {
+                        (false, false)
+                    };
                     let f_forest_is_tree = r_f_in_pre_l == l_f;
                     let r_f_node = r_f_in_pre_l;
                     let sp1s_row = (r_f + 1) - it1_pre_r_off;
@@ -981,8 +1007,9 @@ pub(crate) fn spf_a(
                         let (b, a) = delta_order(r_f_node, r_g_in_pre_l);
                         sp3 = delta.get(b, a) as i64;
                         if sp3 < min_cost {
-                            let fna_target =
-                                fna[(r_g + other_idx.sizes[r_g_in_pre_l as usize] as i64 - 1) as usize];
+                            let fna_target = fna[(r_g
+                                + other_idx.sizes[r_g_in_pre_l as usize] as i64
+                                - 1) as usize];
                             sp3 += match sp3source {
                                 1 => s[(sp3s_row, fna_target - it2_pre_r_off)],
                                 2 => current_forest_cost2 - other_subtree_ins_cost(r_g_in_pre_l),
@@ -1003,7 +1030,10 @@ pub(crate) fn spf_a(
                 if l_g > current_subtree_pre_l2 && l_g - 1 == parent_of_l_g {
                     if right_part {
                         let (b, a) = delta_order(end_path_node, parent_of_l_g);
-                        let v = s[(r_f_last + 1 - it1_pre_r_off, l_g_minus1_in_pre_r + 1 - it2_pre_r_off)] as u64;
+                        let v = s[(
+                            r_f_last + 1 - it1_pre_r_off,
+                            l_g_minus1_in_pre_r + 1 - it2_pre_r_off,
+                        )] as u64;
                         if std::env::var("APTED_DEBUG").is_ok() {
                             eprintln!("spfA write-C: delta[{b}][{a}] = {v}");
                         }
@@ -1014,7 +1044,10 @@ pub(crate) fn spf_a(
                         && end_path_node_in_pre_r == parent_of_end_path_node_in_pre_r + 1
                     {
                         let (b, a) = delta_order(parent_of_end_path_node, parent_of_l_g);
-                        let v = s[(r_f_last - it1_pre_r_off, l_g_minus1_in_pre_r + 1 - it2_pre_r_off)] as u64;
+                        let v = s[(
+                            r_f_last - it1_pre_r_off,
+                            l_g_minus1_in_pre_r + 1 - it2_pre_r_off,
+                        )] as u64;
                         if std::env::var("APTED_DEBUG").is_ok() {
                             eprintln!("spfA write-D: delta[{b}][{a}] = {v}");
                         }
@@ -1022,7 +1055,10 @@ pub(crate) fn spf_a(
                     }
                     let mut r_f2 = r_f_first;
                     while r_f2 >= r_f_last {
-                        q[r_f2 as usize] = s[(r_f2 - it1_pre_r_off, parent_of_l_g_in_pre_r + 1 - it2_pre_r_off)];
+                        q[r_f2 as usize] = s[(
+                            r_f2 - it1_pre_r_off,
+                            parent_of_l_g_in_pre_r + 1 - it2_pre_r_off,
+                        )];
                         r_f2 -= 1;
                     }
                 }
@@ -1511,12 +1547,12 @@ pub(crate) fn compute_opt_strategy_post_l(
             }
         }
 
-        if let Some(parent_post_l) = parent_v_post_l {
-            if cost1_l[parent_post_l].is_none() {
-                cost1_l[parent_post_l] = Some(vec![0i64; size2]);
-                cost1_r[parent_post_l] = Some(vec![0i64; size2]);
-                cost1_i[parent_post_l] = Some(vec![0i64; size2]);
-            }
+        if let Some(parent_post_l) = parent_v_post_l
+            && cost1_l[parent_post_l].is_none()
+        {
+            cost1_l[parent_post_l] = Some(vec![0i64; size2]);
+            cost1_r[parent_post_l] = Some(vec![0i64; size2]);
+            cost1_i[parent_post_l] = Some(vec![0i64; size2]);
         }
 
         // Reset for every `v` - `cost2_*` accumulate `w`'s contributions *within this v's own
@@ -1954,19 +1990,29 @@ pub(crate) fn gted(
             current_path_node = parent;
         }
         if std::env::var("APTED_DEBUG").is_ok() {
-            eprintln!("gted T1-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}");
+            eprintln!(
+                "gted T1-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
+            );
         }
         return match strategy_path_type {
             0 => spf_l(ctx, delta, true, current1, current2),
             1 => spf_r(ctx, delta, true, current1, current2),
-            _ => spf_a(ctx, delta, true, current1, current2, current_path_node_global as usize),
+            _ => spf_a(
+                ctx,
+                delta,
+                true,
+                current1,
+                current2,
+                current_path_node_global as usize,
+            ),
         };
     }
 
     // Path lives on the `after` side. (`current2 == 0` is impossible here - handled at the top
     // of this function, before the strategy was ever read.)
     let current_path_node_global = current_path_node_global - path_id_offset;
-    let strategy_path_type = get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
+    let strategy_path_type =
+        get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
     let mut current_path_node = current_path_node_global as usize;
     loop {
         let parent = ctx.after_idx.parents[current_path_node];
@@ -1982,55 +2028,37 @@ pub(crate) fn gted(
         current_path_node = parent;
     }
     if std::env::var("APTED_DEBUG").is_ok() {
-        eprintln!("gted T2-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}");
+        eprintln!(
+            "gted T2-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
+        );
     }
     match strategy_path_type {
         0 => spf_l(ctx, delta, false, current2, current1),
         1 => spf_r(ctx, delta, false, current2, current1),
-        _ => spf_a(ctx, delta, false, current2, current1, current_path_node_global as usize),
+        _ => spf_a(
+            ctx,
+            delta,
+            false,
+            current2,
+            current1,
+            current_path_node_global as usize,
+        ),
     }
 }
 
-/// Recursive tree-decomposition driver, forcing the "always decompose `before`'s leftmost path"
-/// strategy rather than the real per-subtree-optimal strategy choice (`gted` below). No longer
-/// used by the live engine - kept as a `#[cfg(test)]`-only oracle validator, the first stepping
-/// stone that pinned the indexing/virtual-root plumbing (and `spf_l`) in isolation before the
-/// real bidirectional `gted`/`compute_opt_strategy_post_l` existed to validate against.
+/// Recursive tree-decomposition driver, forcing APTED's RIGHT strategy: always decomposes
+/// `before`'s *rightmost* path, recursing into off-path (non-last) children, then `spf_r` for the
+/// resolved path. A `#[cfg(test)]`-only validator: pins `spf_r`/`compute_right_keyroots`/
+/// `apted_tree_edit_dist_r` against the oracle in isolation, since the live engine's strategy
+/// choice (`compute_opt_strategy_post_l`) doesn't otherwise guarantee the right-side machinery
+/// gets exercised on every test case.
 #[cfg(test)]
-pub(crate) fn gted_forced_left(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, current2: usize) -> u64 {
-    // Deliberately *not* Java's `if subtreeSize1 == 1 || subtreeSize2 == 1: return spf1(...)`
-    // shortcut: `current2` never moves off the virtual root in this forced-left milestone (real
-    // APTED's strategy normally narrows both sides in lockstep, which is what makes that
-    // shortcut safe there), so a `spf1`-only leaf comparison would only ever get written against
-    // the *whole* other forest, never against the individual after-keyroots an ancestor's own
-    // sweep later needs to look up. `spf_l` below already handles a single-node `path_subtree`
-    // correctly - its own outermost row trivially satisfies the "aligned" check - so every node,
-    // leaf or not, goes through the same per-after-keyroot sweep.
-    let mut current_path_node = ctx.before_idx.pre_l_to_lld(current1);
-    loop {
-        let parent = ctx.before_idx.parents[current_path_node];
-        if parent < 0 || (parent as usize) < current1 {
-            break;
-        }
-        let parent = parent as usize;
-        for &child in &ctx.before_idx.children[parent] {
-            if child != current_path_node {
-                gted_forced_left(ctx, delta, child, current2);
-            }
-        }
-        current_path_node = parent;
-    }
-
-    spf_l(ctx, delta, true, current1, current2)
-}
-
-/// Mirror image of `gted_forced_left`, forcing APTED's RIGHT strategy instead - always
-/// decomposes `before`'s *rightmost* path, recursing into off-path (non-last) children, then
-/// `spf_r` for the resolved path. A `#[cfg(test)]`-only validator: pins `spf_r`/
-/// `compute_right_keyroots`/`apted_tree_edit_dist_r` against the oracle in isolation, the same
-/// way `gted_forced_left` pinned the left-side machinery.
-#[cfg(test)]
-pub(crate) fn gted_forced_right(ctx: &EngineCtx, delta: &mut DeltaTable, current1: usize, current2: usize) -> u64 {
+pub(crate) fn gted_forced_right(
+    ctx: &EngineCtx,
+    delta: &mut DeltaTable,
+    current1: usize,
+    current2: usize,
+) -> u64 {
     let mut current_path_node = ctx.before_idx.pre_l_to_rld(current1);
     loop {
         let parent = ctx.before_idx.parents[current_path_node];
@@ -2216,4 +2244,3 @@ pub(crate) fn compute_delta_forced_right(
         gted_forced_right,
     )
 }
-

@@ -27,4 +27,4 @@ mod common;
 mod engine;
 mod zhang_shasha;
 
-pub use common::{for_nodes, for_roots, Algorithm};
+pub use common::{Algorithm, for_nodes, for_roots};

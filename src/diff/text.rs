@@ -31,20 +31,11 @@ use crate::{
 * This is a datastructure with an API instead of simply being a vector of ranges because we want
 * the ability to partially look up ranges for large files efficiently.
 */
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TextDiff {
     // TODO: A much more complex tree-based structure for very large files.
     before_ranges: Vec<RangeMatch>,
     after_ranges: Vec<RangeMatch>,
-}
-
-impl Default for TextDiff {
-    fn default() -> Self {
-        Self {
-            before_ranges: Vec::new(),
-            after_ranges: Vec::new(),
-        }
-    }
 }
 
 /// Returns the RangeMatches from source to destination.

@@ -47,3 +47,66 @@ pub fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn collect_files(root: &Path) -> HashSet<PathBuf> {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        all_files_from_path(root, tx).expect("walk root");
+        rx.into_iter().collect()
+    }
+
+    #[test]
+    fn walks_directory_and_skips_anomalous_paths() {
+        let dir = tempdir().expect("create temp dir");
+
+        let normal_file = dir.path().join("main.rs");
+        fs::write(&normal_file, "fn main() {}").expect("write normal file");
+
+        let nested_dir = dir.path().join("src").join("nested");
+        fs::create_dir_all(&nested_dir).expect("create nested dir");
+        let nested_file = nested_dir.join("lib.rs");
+        fs::write(&nested_file, "// nested").expect("write nested file");
+
+        let anomalous_dir = dir.path().join("third_party");
+        fs::create_dir_all(&anomalous_dir).expect("create anomalous dir");
+        let anomalous_file = anomalous_dir.join("vendored.rs");
+        fs::write(&anomalous_file, "// vendored").expect("write anomalous file");
+
+        let found = collect_files(dir.path());
+
+        assert!(found.contains(&normal_file));
+        assert!(found.contains(&nested_file));
+        assert!(!found.contains(&anomalous_file));
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn single_file_path_is_returned_directly() {
+        let dir = tempdir().expect("create temp dir");
+        let file = dir.path().join("only.rs");
+        fs::write(&file, "fn main() {}").expect("write file");
+
+        let found = collect_files(&file);
+
+        assert_eq!(found, HashSet::from([file]));
+    }
+
+    #[test]
+    fn single_anomalous_file_path_is_skipped() {
+        let dir = tempdir().expect("create temp dir");
+        let nested = dir.path().join("third_party");
+        fs::create_dir_all(&nested).expect("create dir");
+        let file = nested.join("only.rs");
+        fs::write(&file, "fn main() {}").expect("write file");
+
+        let found = collect_files(&file);
+
+        assert!(found.is_empty());
+    }
+}

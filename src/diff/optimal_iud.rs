@@ -107,6 +107,7 @@ impl SubtreeKey {
 * what was the minimal cost operation of the 4, and if it was an insert or delete, what was the
 * optimal index for the operation.
 */
+#[allow(clippy::too_many_arguments)]
 pub fn for_nodes(
     before: &Code,
     after: &Code,
@@ -306,6 +307,7 @@ fn choose_algorithm_branch(
 * Internal solve function that works with slices to avoid allocation.
 * This is the main recursive function for the optimal IU diff algorithm.
 */
+#[allow(clippy::too_many_arguments)]
 fn solve_with_slices(
     before: &Code,
     after: &Code,
@@ -612,6 +614,7 @@ fn solve_with_slices(
 * The function returns the cost, but the actual mapping can be reconstructed using the memoo
 * memooization map.
 */
+#[allow(clippy::too_many_arguments)]
 fn solve(
     before: &Code,
     after: &Code,
@@ -950,7 +953,7 @@ mod tests {
 
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec!["function_item", "block", "expression_statement:2"],
+            &["function_item", "block", "expression_statement:2"],
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
@@ -1105,7 +1108,7 @@ mod tests {
         // expression_statement node that as added, and it's subtree, was solved
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec!["function_item", "block", "expression_statement:2"],
+            &["function_item", "block", "expression_statement:2"],
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
@@ -1124,16 +1127,12 @@ mod tests {
         assert_eq!(solution.cost, 12);
 
         // Now we work backwards as explained in the comment above...
-        let before_closing_bracket = test::helper::node_for_path(
-            before_ast.root_node(),
-            &vec!["function_item", "block", "}"],
-        )?;
+        let before_closing_bracket =
+            test::helper::node_for_path(before_ast.root_node(), &["function_item", "block", "}"])?;
         let before_closing_bracket_id = before_closing_bracket.id();
 
-        let after_closing_bracket = test::helper::node_for_path(
-            after_ast.root_node(),
-            &vec!["function_item", "block", "}"],
-        )?;
+        let after_closing_bracket =
+            test::helper::node_for_path(after_ast.root_node(), &["function_item", "block", "}"])?;
         let after_closing_bracket_id = after_closing_bracket.id();
 
         let solution = old_memoo
@@ -1308,7 +1307,7 @@ mod tests {
 
         let added_expression_node = test::helper::node_for_path(
             after_ast.root_node(),
-            &vec!["function_item", "block", "expression_statement:2"],
+            &["function_item", "block", "expression_statement:2"],
         )?;
 
         let added_expression_node_mapping = diff.mapping.get(&(0, added_expression_node.id()));
@@ -1356,7 +1355,7 @@ mod tests {
 
         let deleted_expression_node = test::helper::node_for_path(
             before_ast.root_node(),
-            &vec!["function_item", "block", "expression_statement:2"],
+            &["function_item", "block", "expression_statement:2"],
         )?;
 
         let deleted_expression_node_mapping = diff.mapping.get(&(deleted_expression_node.id(), 0));

@@ -17,7 +17,7 @@
  */
 use anyhow::{Context, Result};
 use metrohash::MetroHash64;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::Hasher;
 
 use crate::code::{ASTMetadata, Code};
@@ -90,7 +90,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         metadata
             .full_hash_to_node
             .entry(full_hash)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(node_id);
 
         // Store structural hash mappings
@@ -100,7 +100,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         metadata
             .structural_hash_to_node
             .entry(structural_hash)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(node_id);
 
         // Push children to stack for processing
@@ -172,6 +172,7 @@ fn compute_structural_hash<'a>(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use std::collections::HashSet;
 
     use crate::test::helper;
 
@@ -277,7 +278,7 @@ mod tests {
             // (this happens when nodes have same structure but different content)
             let mut found_different_content_same_structure = false;
 
-            for (_, node_set) in &metadata.structural_hash_to_node {
+            for node_set in metadata.structural_hash_to_node.values() {
                 if node_set.len() > 1 {
                     // Multiple nodes share the same structural hash
                     let mut full_hashes = HashSet::new();

@@ -34,6 +34,17 @@ use crate::diff::text::TextDiff;
 
 /// A structure that holds node caches for both before and after Code objects.
 #[derive(Debug, Clone, Default)]
+/// # Safety invariant
+///
+/// The `'static` lifetime on these nodes is a lie told via `transmute` in `build` below: each
+/// node actually borrows from the `tree_sitter::Tree` owned by the `Code` (`before`/`after`)
+/// passed into `build`. The compiler cannot check this, so it's on every caller: a `NodeCache`
+/// must never be read from (or kept alive past) the point where the `Code` it was built from is
+/// dropped or its `ast` field is replaced/reparsed. Every current caller builds the `Code` values
+/// and the `NodeCache` as plain local variables within the same function and never lets the cache
+/// outlive them, which is what makes this sound today - but nothing in the type signature
+/// enforces it, so a future caller that stashes a `NodeCache` somewhere longer-lived than the
+/// `Code` it was derived from would be silent undefined behavior, not a compile error or panic.
 pub struct NodeCache {
     /// Cache of nodes from the before Code object, keyed by node ID.
     pub before: HashMap<usize, tree_sitter::Node<'static>>,
@@ -44,6 +55,9 @@ pub struct NodeCache {
 impl NodeCache {
     /// Build node caches for both Code objects.
     /// This function will always build the caches - it assumes ASTs are parsed.
+    ///
+    /// See the safety invariant documented on `NodeCache` above: the returned cache borrows from
+    /// `before`/`after`'s ASTs under an erased `'static` lifetime and must not outlive them.
     pub fn build(before: &Code, after: &Code) -> Self {
         let before_cache = before
             .ast
@@ -54,8 +68,13 @@ impl NodeCache {
                 let mut stack = vec![root_node];
 
                 while let Some(node) = stack.pop() {
-                    // Cache this node
-                    cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+                    // SAFETY: see the safety invariant documented on `NodeCache` - this cache
+                    // (and therefore this erased lifetime) must not outlive `before`.
+                    cache.insert(node.id(), unsafe {
+                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
+                            node,
+                        )
+                    });
 
                     // Add children to stack for traversal
                     let mut cursor = node.walk();
@@ -77,8 +96,13 @@ impl NodeCache {
                 let mut stack = vec![root_node];
 
                 while let Some(node) = stack.pop() {
-                    // Cache this node
-                    cache.insert(node.id(), unsafe { std::mem::transmute(node) });
+                    // SAFETY: see the safety invariant documented on `NodeCache` - this cache
+                    // (and therefore this erased lifetime) must not outlive `after`.
+                    cache.insert(node.id(), unsafe {
+                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
+                            node,
+                        )
+                    });
 
                     // Add children to stack for traversal
                     let mut cursor = node.walk();

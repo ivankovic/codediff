@@ -74,6 +74,19 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             // there is simply duplicated code in the file, and quite big chunks of it too.
             // For now, we take the first node and match to that.
             //
+            // This is more than just an unprincipled choice of *which* duplicate to match: since
+            // `full_hash_to_node`'s value is a `HashSet<usize>` (default, randomized hasher),
+            // *which* node `.next()` returns can differ between separate process runs of this
+            // same binary on the exact same input (though it's consistent across repeated calls
+            // within one run, since this is just reading an unmodified set). Worse, nothing here
+            // removes an after-node from consideration once some before-node has claimed it, so
+            // if `before` also has N>1 nodes sharing this hash, every one of them independently
+            // computes the same `.next()` and they all collapse onto that *one* after-node -
+            // leaving the other (N-1) equally-valid after-side duplicates unmatched by this pass
+            // entirely (see `duplicate_hash_group_collapses_onto_a_single_after_node` below for a
+            // test pinning this specific behavior). A later, less precise pass ends up treating
+            // those leftover duplicates as an insert/delete pair instead of a no-op match.
+            //
             // TODO: Implement better matching strategy for multiple nodes with same hash
             if let Some(&after_node_id) = after_node_ids.iter().next() {
                 // Find the actual node with the matching ID - use cache for O(1) lookup
@@ -141,5 +154,116 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::code::{Code, Language, Metadata, metadata};
+    use std::collections::HashSet;
+
+    fn parsed_rust_code(contents: &str) -> Code {
+        let mut code = Code {
+            contents: contents.to_string(),
+            metadata: Metadata {
+                language: Some(Language::Rust),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
+            .expect("set Rust grammar");
+        code.parse(&mut parser);
+        code
+    }
+
+    /// When the same statement appears more than once in a file, every copy hashes identically.
+    /// `solve` doesn't track which after-side candidates an earlier before-node in the same hash
+    /// group has already claimed, so every before-node in the group independently picks
+    /// `after_node_ids.iter().next()` - which, for an *unmodified* `HashSet` queried repeatedly
+    /// within one process, returns the same element every time. The result: every duplicate
+    /// before-node maps to the *same* after-node, and the other, equally-valid after-candidates
+    /// are never matched by this pass at all.
+    ///
+    /// This test pins that *structural* outcome (they collapse onto one target) rather than
+    /// *which* node wins, since which one wins depends on `HashSet`'s randomized iteration order
+    /// and can differ between process runs of the same binary on the same input.
+    #[test]
+    fn duplicate_hash_group_collapses_onto_a_single_after_node() {
+        // `solve_identical_trees` only ever considers "reference nodes" (`reference_nodes.rs`;
+        // for Rust: function/struct/impl items, not arbitrary statements), so the duplicated
+        // node here has to be a whole `function_item`. `after` repeats the same two duplicated
+        // functions as `before` *plus* a trailing, unique one, so nothing at the root/module
+        // level is byte-identical and the algorithm can't shortcut by matching an enclosing node
+        // wholesale - it has to decide, at the `function_item` level itself, which of the two
+        // duplicated functions is "the" match. (The two functions sharing a name is invalid Rust,
+        // but tree-sitter parses it fine, which is all `solve` needs.)
+        let before_contents = "fn dup() {\n    1 + 1;\n}\nfn dup() {\n    1 + 1;\n}\n";
+        let after_contents =
+            "fn dup() {\n    1 + 1;\n}\nfn dup() {\n    1 + 1;\n}\nfn other() {\n    2;\n}\n";
+        let before = parsed_rust_code(before_contents);
+        let after = parsed_rust_code(after_contents);
+
+        let before_metadata =
+            metadata::compute_ast_metadata(&before).expect("compute before metadata");
+        let after_metadata =
+            metadata::compute_ast_metadata(&after).expect("compute after metadata");
+        let node_cache = NodeCache::build(&before, &after);
+
+        // Find the *outermost* hash group shared by at least two nodes on both sides - i.e. the
+        // one with the largest byte span, since that's the duplicated subtree with no larger
+        // duplicated ancestor to instead absorb the match. (Every node nested inside a duplicated
+        // function is itself duplicated too - e.g. the `1` literal appears four times - so
+        // picking by *count* would instead find one of those nested leaf groups, which aren't
+        // reference nodes at all and so are never visited by `solve`'s own outer loop.)
+        let (_, duplicate_before_ids) = before_metadata
+            .full_hash_to_node
+            .iter()
+            .filter(|(hash, before_ids)| {
+                before_ids.len() >= 2
+                    && after_metadata
+                        .full_hash_to_node
+                        .get(*hash)
+                        .is_some_and(|after_ids| after_ids.len() >= 2)
+            })
+            .max_by_key(|(_, before_ids)| {
+                before_ids
+                    .iter()
+                    .filter_map(|id| node_cache.before.get(id))
+                    .map(|node| node.byte_range().len())
+                    .max()
+                    .unwrap_or(0)
+            })
+            .expect("the duplicated `dup` functions must produce a shared-hash group");
+        assert_eq!(
+            duplicate_before_ids.len(),
+            2,
+            "expected exactly the two duplicated `function_item` nodes"
+        );
+
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff);
+
+        let after_targets: Vec<usize> = duplicate_before_ids
+            .iter()
+            .map(|before_id| {
+                diff.mapping
+                    .keys()
+                    .find(|(b, _)| b == before_id)
+                    .unwrap_or_else(|| panic!("before-node {before_id} was never matched at all"))
+                    .1
+            })
+            .collect();
+
+        assert_eq!(
+            after_targets.iter().collect::<HashSet<_>>().len(),
+            1,
+            "all duplicate before-nodes currently collapse onto the same after-node - if this \
+             starts failing, the matching strategy improved and this test (and the comment on \
+             `after_node_ids.iter().next()` above) should be updated together"
+        );
     }
 }
