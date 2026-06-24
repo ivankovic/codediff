@@ -15,19 +15,30 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#[cfg(test)]
-mod no_change;
-#[cfg(test)]
-mod hello_world_added_message;
-#[cfg(test)]
-mod python_refactoring;
-#[cfg(test)]
-mod leet_code_1_bugfix;
-#[cfg(test)]
-mod hello_world_removed_message;
-#[cfg(test)]
-mod rust_hash_optimization;
-#[cfg(test)]
-mod python_added_if_block;
-#[cfg(test)]
-mod rust_add_if;
+use crate::diff;
+use crate::diff::ASTMappingOperation;
+use crate::test;
+
+use anyhow::Result;
+
+#[test]
+fn no_change() -> Result<()> {
+    let test_diffs = test::helper::handmade_test_code_pairs()?;
+    let (before, after) = test_diffs.get("no-change").unwrap().clone();
+
+    let diff = diff::diff_code(&before, &after);
+
+    assert!(diff.ast.is_some());
+
+    let diff_ast = diff.ast.unwrap();
+    let before_ast = before.ast.unwrap();
+    let after_ast = after.ast.unwrap();
+
+    let mapping = diff_ast
+        .mapping
+        .get(&(before_ast.root_node().id(), after_ast.root_node().id()))
+        .unwrap();
+    assert_eq!(mapping.operation, ASTMappingOperation::Identical);
+
+    Ok(())
+}
