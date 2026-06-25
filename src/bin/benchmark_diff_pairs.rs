@@ -101,7 +101,7 @@ struct Args {
     /// (Zhang-Shasha) grows superlinearly with tree size, so an unbounded run on the largest
     /// real-world files would not finish; skipped pairs still record their AST size, which is
     /// exactly the signal that matters for the slow tail.
-    #[arg(long, default_value_t = 8_000)]
+    #[arg(long, default_value_t = 16_000)]
     max_combined_nodes: usize,
 
     /// Only repeat the timing measurement (up to `iterations` times) when the first call took

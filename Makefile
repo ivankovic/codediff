@@ -47,6 +47,16 @@ sample-pairs: build
 benchmark-pairs: build
 	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark.csv
 
+# Rust-only variants of the two targets above, fixed at 1000 sampled pairs (sample_code_pairs'
+# default --count and --seed, so re-running against the same checkouts reproduces the same pairs).
+# This is the pipeline used to track diff_code's performance over time on real Rust commits;
+# re-run benchmark-pairs-rust after any change to the diff algorithm to measure its effect.
+sample-pairs-rust: build
+	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_rust.csv --language Rust
+
+benchmark-pairs-rust: build
+	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark_rust.csv
+
 # Analysis target that respects current mode
 analyze: file-stats
 

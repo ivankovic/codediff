@@ -34,36 +34,33 @@ pub fn node_matches<'a>(
 ) -> Option<(String, String)> {
     let node_kind = node.kind();
 
+    let bytes = code.contents.as_bytes();
+
     // Language-specific reference nodes
     match language {
         Language::Rust => match node_kind {
-            "function_item" => {
-                if let Some(identifier_node) = node.child(1)
-                    && identifier_node.kind() == "identifier"
-                    && let identifier = identifier_node.utf8_text(code.contents.as_bytes())
-                    && identifier.is_ok()
-                {
-                    Some((
-                        String::from(node_kind),
-                        String::from(identifier.unwrap_or("This should not happen")),
-                    ))
-                } else {
-                    None
-                }
-            }
-            "struct_item" => {
-                if let Some(identifier_node) = node.child(1)
-                    && identifier_node.kind() == "type_identifier"
-                    && let identifier = identifier_node.utf8_text(code.contents.as_bytes())
-                    && identifier.is_ok()
-                {
-                    Some((
-                        String::from(node_kind),
-                        String::from(identifier.unwrap_or("This should not happen")),
-                    ))
-                } else {
-                    None
-                }
+            "function_item" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "struct_item" | "enum_item" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "type_identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "impl_item" => {
+                let type_name = node
+                    .child_by_field_name("type")
+                    .and_then(|n| n.utf8_text(bytes).ok())?;
+                let trait_name = node
+                    .child_by_field_name("trait")
+                    .and_then(|n| n.utf8_text(bytes).ok());
+                let key = match trait_name {
+                    Some(t) => format!("{t} for {type_name}"),
+                    None => type_name.to_string(),
+                };
+                Some((node_kind.to_string(), key))
             }
             _ => None,
         },
@@ -75,9 +72,50 @@ pub fn node_matches<'a>(
 mod tests {
     use anyhow::Result;
 
+    use crate::code::{Code, Language};
     use crate::test::helper;
 
     use super::*;
+
+    fn collect_matches(src: &str) -> Vec<(String, String)> {
+        let code = Code::from_string(src, &Language::Rust);
+        let ast = code.ast.as_ref().expect("AST should parse");
+        let root = ast.root_node();
+        let mut cursor = root.walk();
+        root.children(&mut cursor)
+            .filter_map(|child| node_matches(&child, &Language::Rust, &code))
+            .collect()
+    }
+
+    #[test]
+    fn rust_public_items_are_matched() {
+        let matches = collect_matches(
+            "pub fn pub_fn() {} \
+             fn private_fn() {} \
+             pub struct PubStruct; \
+             struct PrivateStruct; \
+             pub enum PubEnum { A } \
+             enum PrivateEnum { B } \
+             impl PubStruct {} \
+             impl Display for PubStruct {}",
+        );
+        let expected = [
+            ("function_item", "pub_fn"),
+            ("function_item", "private_fn"),
+            ("struct_item", "PubStruct"),
+            ("struct_item", "PrivateStruct"),
+            ("enum_item", "PubEnum"),
+            ("enum_item", "PrivateEnum"),
+            ("impl_item", "PubStruct"),
+            ("impl_item", "Display for PubStruct"),
+        ];
+        for (kind, name) in &expected {
+            assert!(
+                matches.iter().any(|(k, n)| k == kind && n == name),
+                "missing ({kind}, {name}) in {matches:?}"
+            );
+        }
+    }
 
     #[test]
     fn root_nodes_are_reference_in_all_languages() -> Result<()> {
