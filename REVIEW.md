@@ -34,6 +34,15 @@ All findings from the last review pass have been addressed:
 
 # Pending
 
+*  Exploratory testng found: The colours are too dark on a light terminal. Let's use an existing
+   library of colours and give the user a choice of themes using the 'c' button. It should pop-up
+   the list of themes. Store the users choice for future runs in a config file in the current
+   working directory. Use the most popular Rust config file library to manage the config file.
+*  Exploratory testng found: On the after side, the first node remains always highlighted in blue,
+   even if the cursor moves on the before side. I think this is because the "after side" cursor is
+   on the first node. When we switch sides with Tab key, we should make sure to disable the
+   highlighting of the node under the cursor on the inactive side, and instead make the higlight
+   strictly follow the cursor on the active side.
 *  `diff/text.rs`'s `TextDiff::for_range` is still an `unimplemented!()` stub. The TUI needed
    the same point-lookup query and ended up with its own (tested) binary-search implementation in
    `tui/widgets/code_viewer.rs` instead. Deliberately *not* consolidated in this pass: `for_range`
