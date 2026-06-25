@@ -37,3 +37,6 @@ venv.bak/
 # AI stuff
 .serena
 .claude
+
+# codediff TUI's persisted theme choice (written to the cwd it's run from)
+.codediff.toml

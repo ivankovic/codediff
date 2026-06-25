@@ -18,6 +18,7 @@
 pub mod code_viewer;
 pub mod diff_viewer;
 pub mod file_dialog;
+pub mod theme_dialog;
 
 use anyhow::Result;
 use crossterm::event::{KeyEvent, MouseEvent};

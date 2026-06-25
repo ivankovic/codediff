@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use strum::Display;
 
 use crate::diff::text::RangeMatch;
+use crate::tui::theme::OverlayTheme;
 
 /// One entry in a directory listing shown by the file dialog.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,4 +67,6 @@ pub enum Action {
     DiffReady(DiffSessionData),
     /// The background diff computation failed.
     DiffFailed(String),
+    /// The user picked a color theme in the theme dialog.
+    ThemeSelected(OverlayTheme),
 }

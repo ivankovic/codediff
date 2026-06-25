@@ -25,6 +25,7 @@ use super::Component;
 use crate::diff::text::RangeMatch;
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::Action;
+use crate::tui::theme::OverlayTheme;
 
 /// A component that displays source code
 ///
@@ -114,6 +115,17 @@ impl CodeViewer {
     /// Set (or clear) the cross-highlighted range coming from the other panel's cursor.
     pub fn set_highlight_destination(&mut self, destination: Option<TextRange>) {
         self.state.highlight_destination = destination;
+    }
+
+    /// Mark whether this side's cursor is the one currently driving navigation; see
+    /// `CodeViewerState::is_focused`.
+    pub fn set_focused(&mut self, focused: bool) {
+        self.state.is_focused = focused;
+    }
+
+    /// Set the palette used to paint the diff/cursor overlay, picked via the `c` theme picker.
+    pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
+        self.widget.set_overlay_theme(theme);
     }
 
     /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, clamping the

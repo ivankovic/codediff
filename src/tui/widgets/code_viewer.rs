@@ -33,6 +33,7 @@ use syntect::parsing::{SyntaxReference, SyntaxSet};
 use crate::code::language::language_for_path;
 use crate::diff::text::{RangeMatch, TextOperation};
 use crate::diff::text_range::TextRange;
+use crate::tui::theme::{OverlayPalette, OverlayTheme};
 
 /// Static syntax set loaded once
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
@@ -94,29 +95,17 @@ fn syntect_color_to_ratatui(color: syntect::highlighting::Color) -> ratatui::sty
     ratatui::style::Color::Rgb(color.r, color.g, color.b)
 }
 
-/// Background color used to paint a given diff operation, or `None` for `Identical`/`NotYetSet`
-/// ranges which keep plain syntax highlighting.
-fn background_for_operation(operation: &TextOperation) -> Option<Color> {
+/// Background color used to paint a given diff operation from `palette`, or `None` for
+/// `Identical`/`NotYetSet` ranges which keep plain syntax highlighting.
+fn background_for_operation(operation: &TextOperation, palette: &OverlayPalette) -> Option<Color> {
     match operation {
-        TextOperation::Insert => Some(Color::Rgb(20, 60, 20)),
-        TextOperation::Delete => Some(Color::Rgb(70, 20, 20)),
-        TextOperation::Move => Some(Color::Rgb(70, 60, 10)),
-        TextOperation::Update => Some(Color::Rgb(60, 20, 60)),
+        TextOperation::Insert => Some(palette.insert_bg),
+        TextOperation::Delete => Some(palette.delete_bg),
+        TextOperation::Move => Some(palette.move_bg),
+        TextOperation::Update => Some(palette.update_bg),
         TextOperation::Identical | TextOperation::NotYetSet => None,
     }
 }
-
-/// Foreground paired with every overlay background below. Plain (un-highlighted) text relies on
-/// the terminal's own default foreground, which is fine since it's paired with the terminal's own
-/// default background too. But these overlay backgrounds are hardcoded dark colors, so on a
-/// light-themed terminal (dark default foreground) they'd render as dark-on-dark; an explicit
-/// light foreground keeps them readable regardless of the terminal's color scheme.
-const OVERLAY_FG: Color = Color::Rgb(225, 225, 225);
-
-/// Background color used to cross-highlight the node matched to the cursor on the other panel.
-/// Deliberately brighter/more saturated than the diff colors above so the cursor stands out
-/// against any of them rather than blending in at similar dark luminance.
-const CROSS_HIGHLIGHT_BG: Color = Color::Rgb(40, 90, 200);
 
 /// A range is a pure alignment marker (no real text on this side) when it has no width.
 pub fn is_empty_range(range: &TextRange) -> bool {
@@ -232,6 +221,12 @@ pub struct CodeViewerState {
     pub cursor_col: usize,
     /// The range to cross-highlight in blue, set from the matched node on the other panel.
     pub highlight_destination: Option<TextRange>,
+    /// Whether this side's cursor is the one currently driving navigation (i.e. it's the side
+    /// `Tab` last selected). Gates which of the two blue-highlight mechanisms below applies: the
+    /// focused side shows the node under its own (live) cursor, while the unfocused side shows
+    /// only `highlight_destination` pushed from the focused side - never both on the same panel,
+    /// and never the unfocused side's own stale cursor position.
+    pub is_focused: bool,
 }
 
 impl CodeViewerState {
@@ -299,6 +294,9 @@ pub struct CodeViewerWidget {
     /// The full file, syntax-highlighted once and cached; rebuilt whenever the content, language,
     /// theme, or highlighting toggle changes.
     highlighted_lines: Vec<Line<'static>>,
+    /// The palette used to paint the diff/cursor overlay (not the syntax-highlighting theme
+    /// above); user-selectable via the `c` theme picker, see `tui/theme.rs`.
+    overlay_theme: OverlayTheme,
 }
 
 impl CodeViewerWidget {
@@ -395,6 +393,14 @@ impl CodeViewerWidget {
     pub fn set_theme(&mut self, theme_name: String) {
         self.theme_name = Some(theme_name);
         self.rebuild_highlight_cache();
+    }
+
+    /// Set the palette used to paint the diff/cursor overlay (distinct from the syntax-
+    /// highlighting theme above). No cache rebuild needed: unlike syntax highlighting, the
+    /// overlay is painted fresh on every frame in `overlay_row`, not cached in
+    /// `highlighted_lines`.
+    pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
+        self.overlay_theme = theme;
     }
 
     /// Get the total number of lines
@@ -507,6 +513,7 @@ impl CodeViewerWidget {
 
     /// Apply diff coloring, the cross-panel highlight, and the cursor marker to one row.
     fn overlay_row(&self, row: usize, state: &CodeViewerState) -> Line<'static> {
+        let palette = self.overlay_theme.palette();
         let mut line = self.highlighted_lines[row].clone();
         let row_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
         let cursor_range = range_at(
@@ -522,12 +529,12 @@ impl CodeViewerWidget {
                 continue;
             };
 
-            if let Some(bg) = background_for_operation(&range_match.operation) {
+            if let Some(bg) = background_for_operation(&range_match.operation, &palette) {
                 line = paint_columns(
                     &line,
                     start_col,
                     end_col,
-                    Style::new().fg(OVERLAY_FG).bg(bg),
+                    Style::new().fg(palette.overlay_fg).bg(bg),
                 );
             }
 
@@ -535,25 +542,35 @@ impl CodeViewerWidget {
             // range on the other panel (below), both render in the same blue: they're the same
             // visual signal ("this is the node under/matched to the cursor"), just on different
             // panels. The literal cursor position itself is drawn as the real terminal cursor
-            // (see `CodeViewer::cursor_screen_position`), not by this overlay.
-            if cursor_range == Some(index) {
+            // (see `CodeViewer::cursor_screen_position`), not by this overlay. Only the focused
+            // side draws this: an unfocused side's own `cursor_row`/`cursor_col` is just wherever
+            // it was left, not a live cursor, so painting it here would show a stale highlight.
+            if state.is_focused && cursor_range == Some(index) {
                 line = paint_columns(
                     &line,
                     start_col,
                     end_col,
-                    Style::new().fg(OVERLAY_FG).bg(CROSS_HIGHLIGHT_BG),
+                    Style::new()
+                        .fg(palette.overlay_fg)
+                        .bg(palette.cross_highlight_bg),
                 );
             }
         }
 
-        if let Some(destination) = &state.highlight_destination
+        // The cross-highlight pushed from the focused side's cursor; only relevant on the
+        // unfocused side (the focused side already shows its own cursor highlight above), so
+        // switching focus can never paint both blues onto the same panel at once.
+        if !state.is_focused
+            && let Some(destination) = &state.highlight_destination
             && let Some((start_col, end_col)) = columns_on_row(destination, row, row_len)
         {
             line = paint_columns(
                 &line,
                 start_col,
                 end_col,
-                Style::new().fg(OVERLAY_FG).bg(CROSS_HIGHLIGHT_BG),
+                Style::new()
+                    .fg(palette.overlay_fg)
+                    .bg(palette.cross_highlight_bg),
             );
         }
 
@@ -632,6 +649,11 @@ mod tests {
         CodeViewerWidget::default().with_contents(text.to_string())
     }
 
+    /// The palette `widget_with_line`'s widget uses, since it never overrides `overlay_theme`.
+    fn default_palette() -> OverlayPalette {
+        OverlayTheme::default().palette()
+    }
+
     fn range_match(operation: TextOperation, start_col: usize, end_col: usize) -> RangeMatch {
         RangeMatch {
             source: TextRange::new(0, start_col, 0, end_col),
@@ -662,10 +684,11 @@ mod tests {
         let line = widget.overlay_row(0, &state);
         let span = &line.spans[0];
         assert_eq!(span.content, "hello");
-        assert_eq!(span.style.fg, Some(OVERLAY_FG));
+        let palette = default_palette();
+        assert_eq!(span.style.fg, Some(palette.overlay_fg));
         assert_eq!(
             span.style.bg,
-            background_for_operation(&TextOperation::Insert)
+            background_for_operation(&TextOperation::Insert, &palette)
         );
     }
 
@@ -683,14 +706,66 @@ mod tests {
             cursor_row: 0,
             cursor_col: 0,
             viewport_height: 1,
+            is_focused: true,
             ..Default::default()
         };
 
         let line = widget.overlay_row(0, &state);
         let span = &line.spans[0];
         assert_eq!(span.content, "hello");
-        assert_eq!(span.style.fg, Some(OVERLAY_FG));
-        assert_eq!(span.style.bg, Some(CROSS_HIGHLIGHT_BG));
+        let palette = default_palette();
+        assert_eq!(span.style.fg, Some(palette.overlay_fg));
+        assert_eq!(span.style.bg, Some(palette.cross_highlight_bg));
+    }
+
+    /// An unfocused panel must not highlight its own (stale) cursor position: that mechanism is
+    /// reserved for whichever side `Tab` last selected. This is the bug from exploratory
+    /// testing, where the "after" side's first node stayed highlighted blue forever because its
+    /// own never-moving cursor kept matching this check regardless of focus.
+    #[test]
+    fn unfocused_panel_does_not_highlight_its_own_cursor_range() {
+        let widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 0,
+            viewport_height: 1,
+            is_focused: false,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let span = &line.spans[0];
+        assert_eq!(span.content, "hello");
+        // Still gets the diff color (Insert), just not the cross-highlight blue.
+        assert_eq!(
+            span.style.bg,
+            background_for_operation(&TextOperation::Insert, &default_palette())
+        );
+    }
+
+    /// The focused panel must not also show a stale `highlight_destination` left over from
+    /// before it gained focus: after `Tab`, the newly-focused side shows only its own live
+    /// cursor, never both blues at once.
+    #[test]
+    fn focused_panel_ignores_stale_highlight_destination() {
+        let widget = widget_with_line("hello world");
+        let state = CodeViewerState {
+            is_focused: true,
+            // Left over from when this side was the unfocused cross-highlight target.
+            highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        assert!(
+            line.spans.iter().all(|span| span.style.bg.is_none()),
+            "no span should be painted: highlight_destination is stale once focused"
+        );
     }
 
     /// Binary-search lookup: finds the covering range, picks the real range over a zero-width
@@ -751,6 +826,7 @@ mod tests {
     fn cross_highlight_destination_uses_bright_blue_with_explicit_foreground() {
         let widget = widget_with_line("hello world");
         let state = CodeViewerState {
+            is_focused: false,
             highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
             viewport_height: 1,
             ..Default::default()
@@ -762,7 +838,35 @@ mod tests {
             .iter()
             .find(|span| span.content == "world")
             .expect("highlighted span");
-        assert_eq!(span.style.fg, Some(OVERLAY_FG));
-        assert_eq!(span.style.bg, Some(CROSS_HIGHLIGHT_BG));
+        let palette = default_palette();
+        assert_eq!(span.style.fg, Some(palette.overlay_fg));
+        assert_eq!(span.style.bg, Some(palette.cross_highlight_bg));
+    }
+
+    /// `set_overlay_theme` must actually change what gets painted, with no rebuild step
+    /// required: that's the whole point of the `c` theme picker.
+    #[test]
+    fn set_overlay_theme_changes_painted_colors() {
+        let mut widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 99,
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let before = widget.overlay_row(0, &state).spans[0].style;
+        widget.set_overlay_theme(OverlayTheme::SolarizedLight);
+        let after = widget.overlay_row(0, &state).spans[0].style;
+
+        assert_ne!(before.bg, after.bg);
+        assert_eq!(
+            after.fg,
+            Some(OverlayTheme::SolarizedLight.palette().overlay_fg)
+        );
     }
 }

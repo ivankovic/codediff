@@ -20,7 +20,7 @@ use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::Paragraph,
+    widgets::{Clear, Paragraph},
 };
 use tokio::sync::mpsc;
 use tracing::{debug, error};
@@ -34,8 +34,10 @@ use crate::tui::components::{
     Component,
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
+    theme_dialog::ThemeDialog,
 };
 use crate::tui::events::Event;
+use crate::tui::theme::{self, OverlayTheme};
 use crate::tui::ui::UI;
 
 /// Which top-level screen is currently shown.
@@ -46,6 +48,8 @@ pub enum AppScreen {
     Viewer,
     /// A file dialog is open, picking a file for `dialog_target`.
     SelectFile,
+    /// The theme picker popup is open, drawn over the (still-visible) viewer.
+    SelectTheme,
     /// The background diff computation is running.
     Diffing,
 }
@@ -57,6 +61,7 @@ pub struct App {
 
     diff_viewer: DiffViewer,
     file_dialog: Option<FileDialog>,
+    theme_dialog: Option<ThemeDialog>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -64,6 +69,8 @@ pub struct App {
     screen: AppScreen,
     /// Which panel the open file dialog is selecting a file for.
     dialog_target: Option<Panel>,
+    /// The currently active overlay color theme, persisted across runs (see `tui::theme`).
+    current_theme: OverlayTheme,
     /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
     /// The "After" file path, once a file has been picked for that panel.
@@ -85,10 +92,12 @@ impl App {
             frame_rate,
             diff_viewer: DiffViewer::new(),
             file_dialog: None,
+            theme_dialog: None,
             action_tx,
             action_rx,
             screen: AppScreen::default(),
             dialog_target: None,
+            current_theme: OverlayTheme::default(),
             before_path: None,
             after_path: None,
             last_error: None,
@@ -98,6 +107,11 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        // Loaded here rather than in `new` so constructing an `App` (e.g. in tests) never
+        // touches disk; only actually running the TUI reads (and may create) the config file.
+        self.current_theme = theme::load_overlay_theme();
+        self.diff_viewer.set_overlay_theme(self.current_theme);
+
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);
@@ -155,6 +169,11 @@ impl App {
                     self.open_file_dialog(title, ui)?;
                     action_tx.send(Action::Render)?;
                 }
+                KeyCode::Char('c') if self.screen == AppScreen::Viewer => {
+                    self.theme_dialog = Some(ThemeDialog::new(self.current_theme));
+                    self.screen = AppScreen::SelectTheme;
+                    action_tx.send(Action::Render)?;
+                }
                 _ => {}
             }
         }
@@ -178,6 +197,10 @@ impl App {
         match self.screen {
             AppScreen::Viewer => self.diff_viewer.handle_events(Some(event)),
             AppScreen::SelectFile => match self.file_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
+            AppScreen::SelectTheme => match self.theme_dialog.as_mut() {
                 Some(dialog) => dialog.handle_events(Some(event)),
                 None => Ok(None),
             },
@@ -223,6 +246,9 @@ impl App {
                     self.last_error = Some(message.clone());
                     self.screen = AppScreen::Viewer;
                     self.file_dialog = None;
+                }
+                Action::ThemeSelected(selected_theme) => {
+                    self.apply_theme_selection(*selected_theme)
                 }
                 _ => {}
             }
@@ -274,7 +300,18 @@ impl App {
 
     fn handle_dialog_cancelled(&mut self) {
         self.file_dialog = None;
+        self.theme_dialog = None;
         self.dialog_target = None;
+        self.screen = AppScreen::Viewer;
+    }
+
+    /// Apply a theme choice from the theme dialog: update the live viewer, persist it for future
+    /// runs, and return to the normal viewer screen.
+    fn apply_theme_selection(&mut self, selected_theme: OverlayTheme) {
+        self.current_theme = selected_theme;
+        self.diff_viewer.set_overlay_theme(selected_theme);
+        theme::save_overlay_theme(selected_theme);
+        self.theme_dialog = None;
         self.screen = AppScreen::Viewer;
     }
 
@@ -319,6 +356,7 @@ impl App {
                     Some(dialog) => dialog.draw(frame, area),
                     None => Ok(()),
                 },
+                AppScreen::SelectTheme => self.draw_theme_dialog(frame, area),
                 AppScreen::Diffing => {
                     let status = Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center);
                     frame.render_widget(status, area);
@@ -350,6 +388,17 @@ impl App {
             layout[1],
         );
         Ok(())
+    }
+
+    /// Draw the theme picker as a popup over the (still-visible) viewer behind it.
+    fn draw_theme_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(dialog) = self.theme_dialog.as_mut() else {
+            return Ok(());
+        };
+        let popup = dialog.popup_area(area);
+        frame.render_widget(Clear, popup);
+        dialog.draw(frame, popup)
     }
 }
 
@@ -490,5 +539,24 @@ mod tests {
         assert_eq!(app.screen, AppScreen::Viewer);
         assert!(app.dialog_target.is_none());
         Ok(())
+    }
+
+    /// `apply_theme_selection` is the only place that calls `theme::save_overlay_theme`, which
+    /// writes to the real process cwd (there's no per-test path injection for it, since the
+    /// production code intentionally always targets the cwd it's run from). Clean up the file
+    /// this test causes to be written so repeated runs don't see a stale leftover.
+    #[test]
+    fn apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.screen = AppScreen::SelectTheme;
+        app.theme_dialog = Some(ThemeDialog::new(app.current_theme));
+
+        app.apply_theme_selection(OverlayTheme::SolarizedLight);
+
+        assert_eq!(app.current_theme, OverlayTheme::SolarizedLight);
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.theme_dialog.is_none());
+
+        let _ = std::fs::remove_file(theme::config_path());
     }
 }

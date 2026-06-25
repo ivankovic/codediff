@@ -31,18 +31,40 @@ All findings from the last review pass have been addressed:
 *  Silenced the 3 remaining `too_many_arguments` warnings (`optimal_iud.rs`) with
    `#[allow(clippy::too_many_arguments)]`, matching the existing convention used elsewhere in the
    algorithm core, rather than restructuring hot-path signatures.
+*  Fixed the exploratory-testing bug where the "after" side's first node stayed highlighted blue
+   forever regardless of cursor movement: `overlay_row` (`tui/widgets/code_viewer.rs`) painted
+   each side's own `cursor_row`/`cursor_col` match unconditionally, but only the focused side's
+   cursor is actually live - the unfocused side's was just wherever `load_ranges` had left it.
+   Added `CodeViewerState::is_focused`, set by `DiffViewer::sync_focus` whenever `active_panel`
+   changes (on load and on `Tab`), and gated both highlight mechanisms on it: the focused side
+   shows its own cursor, the unfocused side shows only the destination pushed from the focused
+   side's cursor - never both on one panel. Verified interactively in a real terminal (tmux) that
+   the highlight now correctly follows the live cursor after `Tab` and after cursor movement.
+*  Fixed the exploratory-testing complaint that the diff/cursor overlay colors are too dark on a
+   light terminal, with a `c` theme picker rather than just retuning the one hardcoded palette:
+   - Replaced the hardcoded RGB consts in `tui/widgets/code_viewer.rs` with `OverlayTheme`
+     (`tui/theme.rs`), an enum of palettes - `Dark` (the original colors, kept as default),
+     `Solarized Dark`, and `Solarized Light`. The Solarized variants aren't invented colors: each
+     band is the real Solarized (Ethan Schoonover) accent alpha-blended toward that variant's own
+     Solarized base color. `Solarized Light` is the actual fix - dark text on light pastel bands,
+     instead of the light-on-dark scheme that's unreadable once a terminal's background is light.
+   - `c` opens a popup (`tui/components/theme_dialog.rs`) listing all themes over the still-visible
+     viewer; arrow keys + Enter apply the choice live to both panels via
+     `DiffViewer::set_overlay_theme`.
+   - Persisted to `.codediff.toml` in the cwd via `confy`, not `config-rs` (the literal
+     most-downloaded Rust config crate): `config-rs` is read-only and can't write a choice back to
+     disk, which storing a user choice requires. `confy::load_path`/`store_path` round-trip a
+     small struct to an exact path, which is the actual shape of this problem.
+   - Note for future work: syntax highlighting (`syntect`, `CodeViewerWidget::enable_syntax_
+     highlighting`) is fully wired but never actually turned on anywhere in the live app - only in
+     tests. Left untouched here (out of scope, and turning on dead code is pure regression risk),
+     but worth knowing if "the code has no syntax highlighting" comes up in a future review.
+   - Verified interactively in a real terminal (tmux): selecting "Solarized Light" changes both
+     panels' colors immediately, writes the theme to `.codediff.toml`, and a fresh run of the
+     binary loads that choice back on startup.
 
 # Pending
 
-*  Exploratory testng found: The colours are too dark on a light terminal. Let's use an existing
-   library of colours and give the user a choice of themes using the 'c' button. It should pop-up
-   the list of themes. Store the users choice for future runs in a config file in the current
-   working directory. Use the most popular Rust config file library to manage the config file.
-*  Exploratory testng found: On the after side, the first node remains always highlighted in blue,
-   even if the cursor moves on the before side. I think this is because the "after side" cursor is
-   on the first node. When we switch sides with Tab key, we should make sure to disable the
-   highlighting of the node under the cursor on the inactive side, and instead make the higlight
-   strictly follow the cursor on the active side.
 *  `diff/text.rs`'s `TextDiff::for_range` is still an `unimplemented!()` stub. The TUI needed
    the same point-lookup query and ended up with its own (tested) binary-search implementation in
    `tui/widgets/code_viewer.rs` instead. Deliberately *not* consolidated in this pass: `for_range`

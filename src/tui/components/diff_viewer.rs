@@ -28,6 +28,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
 use crate::tui::actions::{Action, DiffSessionData};
+use crate::tui::theme::OverlayTheme;
 
 /// A component that displays the before/after files side by side for diffing
 #[derive(Default)]
@@ -95,6 +96,7 @@ impl DiffViewer {
         self.left_viewer.set_ranges(data.before_ranges.clone());
         self.right_viewer.set_ranges(data.after_ranges.clone());
         self.active_panel = Panel::Before;
+        self.sync_focus();
         self.sync_cross_highlight();
     }
 
@@ -117,6 +119,23 @@ impl DiffViewer {
     fn sync_cross_highlight(&mut self) {
         let destination = self.focused_viewer().cursor_destination();
         self.other_viewer().set_highlight_destination(destination);
+    }
+
+    /// Make sure exactly one side is marked focused, matching `active_panel`: the focused side
+    /// then shows its own live cursor, and the other side shows only the pushed cross-highlight
+    /// (see `CodeViewerState::is_focused`). Call whenever `active_panel` changes.
+    fn sync_focus(&mut self) {
+        self.left_viewer
+            .set_focused(self.active_panel == Panel::Before);
+        self.right_viewer
+            .set_focused(self.active_panel == Panel::After);
+    }
+
+    /// Set the palette used to paint the diff/cursor overlay on both panels, picked via the `c`
+    /// theme picker.
+    pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
+        self.left_viewer.set_overlay_theme(theme);
+        self.right_viewer.set_overlay_theme(theme);
     }
 
     /// The panel whose cursor currently drives navigation.
@@ -167,6 +186,7 @@ impl DiffViewer {
             Panel::Before => Panel::After,
             Panel::After => Panel::Before,
         };
+        self.sync_focus();
     }
 
     /// Get the filename of the active viewer
@@ -446,4 +466,49 @@ fn panel_block<'a>(name: &'static str, color: Color, filename: &str, active: boo
             border::ROUNDED
         })
         .border_style(Style::new().fg(color))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_diff_data() -> DiffSessionData {
+        DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: "before".to_string(),
+            after_contents: "after".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+        }
+    }
+
+    /// Regression test for the exploratory-testing bug: after `Tab` moves focus to "After",
+    /// exactly the "After" side shows its own cursor highlight and the "Before" side shows only
+    /// the pushed cross-highlight - never the other way around, and never both blues on one
+    /// panel at once.
+    #[test]
+    fn tab_moves_focus_exclusively_to_the_other_panel() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+
+        assert!(viewer.left_viewer.state().is_focused);
+        assert!(!viewer.right_viewer.state().is_focused);
+
+        viewer.toggle_active_panel();
+
+        assert!(
+            !viewer.left_viewer.state().is_focused,
+            "Before must lose focus once Tab moves it to After"
+        );
+        assert!(
+            viewer.right_viewer.state().is_focused,
+            "After must gain focus after Tab"
+        );
+
+        // Toggling back must restore focus to "Before" alone.
+        viewer.toggle_active_panel();
+        assert!(viewer.left_viewer.state().is_focused);
+        assert!(!viewer.right_viewer.state().is_focused);
+    }
 }
