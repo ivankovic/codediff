@@ -16,13 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::code::Code;
-use crate::diff::optimal_iud;
+use crate::diff::apted::{self, Algorithm};
 use crate::diff::{ASTDiff, NodeCache};
 
 /**
 * Match semantically structural nodes and solve their subtrees.
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
     let before_metadata = match &before.metadata.ast_metadata {
         Some(m) => m,
         None => return,
@@ -39,14 +39,12 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         {
             // TODO: Consider checking the cost and reject the solution if it is too
             // expensive?
-            let _ = optimal_iud::for_nodes(
-                before,
-                after,
+            let _ = apted::for_nodes(
                 before_metadata,
                 after_metadata,
                 vec![before_node_id],
                 vec![after_node_id],
-                node_cache,
+                Algorithm::ZhangShasha,
                 diff,
             );
         }

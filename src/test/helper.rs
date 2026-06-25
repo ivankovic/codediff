@@ -15,6 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod optimal_iud;
+
 use anyhow::{Result, bail};
 use git2::{Repository, Signature};
 use std::collections::HashMap;

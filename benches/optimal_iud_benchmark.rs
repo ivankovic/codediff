@@ -16,8 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use codediff::diff::optimal_iud::for_roots;
 use codediff::diff::{ASTDiff, NodeCache};
+use codediff::test::helper::optimal_iud::for_roots;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::time::Duration;
 

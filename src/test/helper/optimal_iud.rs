@@ -667,7 +667,7 @@ fn add_subtree_to_diff(
         let mapping = ASTMapping {
             cost: node_cost,
             operation: operation.clone(),
-            reason: super::ASTMappingReason::OptimalIDU,
+            reason: crate::diff::ASTMappingReason::OptimalIDU,
         };
 
         if *operation == ASTMappingOperation::InsertWithChildren {
@@ -729,7 +729,7 @@ fn update_diff(
         let mapping = ASTMapping {
             cost: solution.cost,
             operation: solution.operation.clone(),
-            reason: super::ASTMappingReason::OptimalIDU,
+            reason: crate::diff::ASTMappingReason::OptimalIDU,
         };
 
         match algorithm_branch {
@@ -840,7 +840,7 @@ fn update_diff(
                                             cost: 0,
                                             operation: ASTMappingOperation::Identical,
                                             reason:
-                                                super::ASTMappingReason::IdenticalHashOfAncestor,
+                                                crate::diff::ASTMappingReason::IdenticalHashOfAncestor,
                                         };
                                         diff.add_mapping(
                                             before_child_id,
