@@ -64,6 +64,40 @@ pub fn node_matches<'a>(
             }
             _ => None,
         },
+        Language::Python => match node_kind {
+            "function_definition" | "class_definition" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::Go => match node_kind {
+            "function_declaration" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "method_declaration" => {
+                let method_name = node
+                    .child_by_field_name("name")
+                    .and_then(|n| n.utf8_text(bytes).ok())?;
+                let receiver = node.child_by_field_name("receiver")?;
+                let mut rc = receiver.walk();
+                let param_decl = receiver.named_children(&mut rc).next()?;
+                let type_node = param_decl.child_by_field_name("type")?;
+                let type_text = type_node.utf8_text(bytes).ok()?;
+                // Strip leading `*` for pointer receivers: `*Foo` → `Foo`
+                let receiver_type = type_text.trim_start_matches('*');
+                Some((node_kind.to_string(), format!("{receiver_type}.{method_name}")))
+            }
+            "type_spec" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "type_identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -145,5 +179,144 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn go_functions_methods_and_types_are_matched() {
+        let src = r#"
+package main
+
+func TopLevel() {}
+
+func (s *Server) HandleRequest() {}
+func (s Server) Name() string { return "" }
+
+type Server struct { port int }
+type Handler interface { Handle() }
+"#;
+        let code = Code::from_string(src, &Language::Go);
+        let ast = code.ast.as_ref().expect("AST should parse");
+
+        fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
+            let mut out = Vec::new();
+            if let Some(m) = node_matches(&node, lang, code) { out.push(m); }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                out.extend(collect_all(child, lang, code));
+            }
+            out
+        }
+        let matches = collect_all(ast.root_node(), &Language::Go, &code);
+
+        for (kind, name) in &[
+            ("function_declaration", "TopLevel"),
+            ("method_declaration", "Server.HandleRequest"),
+            ("method_declaration", "Server.Name"),
+            ("type_spec", "Server"),
+            ("type_spec", "Handler"),
+        ] {
+            assert!(
+                matches.iter().any(|(k, n)| k == kind && n == name),
+                "missing ({kind}, {name}) in {matches:?}"
+            );
+        }
+        assert!(node_matches(&ast.root_node(), &Language::Go, &code).is_none());
+    }
+
+    #[test]
+    fn python_functions_and_classes_are_matched() {
+        let src = "
+def top_fn():
+    pass
+
+async def async_fn():
+    pass
+
+class MyClass:
+    def __init__(self):
+        pass
+
+    def method(self):
+        pass
+
+@decorator
+def decorated_fn():
+    pass
+
+@decorator
+class DecoratedClass:
+    pass
+";
+        let code = Code::from_string(src, &Language::Python);
+        let ast = code.ast.as_ref().expect("AST should parse");
+
+        // Collect matches from all nodes (DFS), as metadata.rs does
+        fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
+            let mut out = Vec::new();
+            if let Some(m) = node_matches(&node, lang, code) {
+                out.push(m);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                out.extend(collect_all(child, lang, code));
+            }
+            out
+        }
+        let matches = collect_all(ast.root_node(), &Language::Python, &code);
+
+        for (kind, name) in &[
+            ("function_definition", "top_fn"),
+            ("function_definition", "async_fn"),
+            ("class_definition", "MyClass"),
+            ("function_definition", "__init__"),
+            ("function_definition", "method"),
+            ("function_definition", "decorated_fn"),
+            ("class_definition", "DecoratedClass"),
+        ] {
+            assert!(
+                matches.iter().any(|(k, n)| k == kind && n == name),
+                "missing ({kind}, {name}) in {matches:?}"
+            );
+        }
+        // Root (module) should not match
+        assert!(node_matches(&ast.root_node(), &Language::Python, &code).is_none());
+    }
+
+    #[test]
+    fn python_methods_in_class_are_pre_matched() {
+        use crate::diff::{ASTDiff, NodeCache};
+        use crate::diff::solve_semantically_structural_nodes::solve;
+
+        let before_src = "
+class Calculator:
+    def add(self, a, b):
+        return a + b
+    def subtract(self, a, b):
+        return a - b
+";
+        let after_src = "
+class Calculator:
+    def add(self, a, b):
+        return a + b
+    def subtract(self, a, b):
+        return a - b - 1  # changed
+";
+        let before = Code::from_string(before_src, &Language::Python);
+        let after = Code::from_string(after_src, &Language::Python);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff);
+
+        // Both methods should be matched.
+        let matched_names: Vec<&str> = ["add", "subtract"].iter().copied().filter(|&name| {
+            let bm = before.metadata.ast_metadata.as_ref().unwrap();
+            let am = after.metadata.ast_metadata.as_ref().unwrap();
+            let bk = ("function_definition".to_string(), name.to_string());
+            let ak = ("function_definition".to_string(), name.to_string());
+            bm.semantically_structural_nodes.get(&bk)
+                .and_then(|&bid| am.semantically_structural_nodes.get(&ak).map(|&aid| (bid, aid)))
+                .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+        }).collect();
+        assert_eq!(matched_names.len(), 2, "both methods should be matched; got {matched_names:?}");
     }
 }

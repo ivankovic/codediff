@@ -17,7 +17,7 @@
  */
 use std::collections::HashMap;
 
-use crate::code::{ASTMetadata, Code};
+use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::{ASTDiff, NodeCache};
 
@@ -39,8 +39,51 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         None => return,
     };
 
-    // Pass 0: top-level macro_invocations with large flat token_tree bodies.
-    solve_flat_macro_bodies(before, after, before_metadata, after_metadata, diff);
+    let language = before.metadata.language.as_ref();
+
+    // Pass 0a: Rust — top-level macro_invocations with large flat token_tree bodies.
+    if matches!(language, Some(Language::Rust)) {
+        solve_flat_macro_bodies(before, after, before_metadata, after_metadata, diff);
+    }
+
+    // Pass 0b: Python — class pairs with method pre-matching (mirrors Rust impl recursion).
+    if matches!(language, Some(Language::Python)) {
+        for ((kind, identifier), &before_class_id) in
+            &before_metadata.semantically_structural_nodes
+        {
+            if kind != "class_definition" {
+                continue;
+            }
+            let Some(&after_class_id) = after_metadata
+                .semantically_structural_nodes
+                .get(&(kind.clone(), identifier.clone()))
+            else {
+                continue;
+            };
+            let before_methods = methods_in_class(before_class_id, before_metadata);
+            let after_methods = methods_in_class(after_class_id, after_metadata);
+            for (method_name, before_method_id) in &before_methods {
+                if let Some(&after_method_id) = after_methods.get(method_name) {
+                    let _ = apted::for_nodes(
+                        before_metadata,
+                        after_metadata,
+                        vec![*before_method_id],
+                        vec![after_method_id],
+                        Algorithm::ZhangShasha,
+                        diff,
+                    );
+                }
+            }
+            let _ = apted::for_nodes(
+                before_metadata,
+                after_metadata,
+                vec![before_class_id],
+                vec![after_class_id],
+                Algorithm::ZhangShasha,
+                diff,
+            );
+        }
+    }
 
     // Pass 1: impl_item pairs — match methods within each matched impl first, then diff the impl.
     // This is done before the global pass so that method node_ids are in `diff` before any
@@ -85,10 +128,10 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     }
 
     // Pass 2: all other matched pairs (fn, struct, enum, …).
-    // Methods already matched in Pass 1 are skipped via filter_before/after_nodes inside
+    // Methods already matched in Pass 0b/1 are skipped via filter_before/after_nodes inside
     // for_nodes → resolve_forest.
     for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
-        if kind == "impl_item" {
+        if kind == "impl_item" || kind == "class_definition" {
             continue;
         }
         if let Some(&after_node_id) = after_metadata
@@ -151,6 +194,43 @@ fn fn_name_from_node_info(fn_id: usize, meta: &ASTMetadata) -> Option<String> {
             .filter(|info| info.kind == "identifier")
             .map(|info| info.text.clone())
     })
+}
+
+/// Collect methods from a Python `class_definition` node, keyed by function name.
+///
+/// Handles both plain `function_definition` children and `decorated_definition` wrappers
+/// (e.g. `@staticmethod def foo()`). Only the innermost `function_definition` name is used
+/// as the key, so decorators don't affect matching.
+fn methods_in_class(class_id: usize, meta: &ASTMetadata) -> HashMap<String, usize> {
+    let mut methods = HashMap::new();
+    let Some(class_info) = meta.node_info.get(&class_id) else { return methods };
+    for &child_id in &class_info.children {
+        let Some(child_info) = meta.node_info.get(&child_id) else { continue };
+        if child_info.kind != "block" {
+            continue;
+        }
+        for &item_id in &child_info.children {
+            let Some(item_info) = meta.node_info.get(&item_id) else { continue };
+            if item_info.kind == "function_definition" {
+                if let Some(name) = fn_name_from_node_info(item_id, meta) {
+                    methods.entry(name).or_insert(item_id);
+                }
+            } else if item_info.kind == "decorated_definition" {
+                // The `function_definition` is a child of decorated_definition.
+                if let Some(&fn_id) = item_info.children.iter().find(|&&id| {
+                    meta.node_info
+                        .get(&id)
+                        .map_or(false, |ci| ci.kind == "function_definition")
+                }) {
+                    if let Some(name) = fn_name_from_node_info(fn_id, meta) {
+                        methods.entry(name).or_insert(fn_id);
+                    }
+                }
+            }
+        }
+        break;
+    }
+    methods
 }
 
 /// Minimum leaf-child count for a token_tree to be treated as a flat sequence.

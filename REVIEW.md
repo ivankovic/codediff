@@ -77,3 +77,4 @@ All findings from the last review pass have been addressed:
    numerical code that should be profiled (via `benches/diff_code_benchmark`) before touching.
 *  `diff/apted/common.rs` (2294 lines) and `engine.rs` (2219 lines) remain by far the largest
    files in the repo. Not a problem on its own; noted for context if more work lands there.
+
