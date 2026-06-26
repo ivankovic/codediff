@@ -814,6 +814,193 @@ pub(crate) fn subtree_ins_cost(
     cost
 }
 
+// --- Flat-tree fast path: Myers O(ND) sequence diff ---
+
+/// Minimum number of leaf children required to trigger the flat-tree optimisation.
+const FLAT_MIN_CHILDREN: usize = 50;
+/// Edit-distance cap for Myers diff. If d exceeds this, we fall back to mark-as-replaced.
+const FLAT_MAX_EDIT: usize = 1000;
+
+/// Returns the unmatched direct children of `root_id` if the root has at least
+/// `FLAT_MIN_CHILDREN` unmatched children. Children may be leaves or interior nodes;
+/// all mapping helpers (`emit_identical_subtree`, `add_delete/insert_mappings`) handle
+/// subtrees recursively, so depth-1 is not a requirement.
+fn flat_children(
+    root_id: usize,
+    meta: &ASTMetadata,
+    node_map: &HashMap<usize, usize>,
+) -> Option<Vec<usize>> {
+    let info = meta.node_info.get(&root_id)?;
+    let children: Vec<usize> = info
+        .children
+        .iter()
+        .copied()
+        .filter(|&id| !node_map.contains_key(&id))
+        .collect();
+    if children.len() >= FLAT_MIN_CHILDREN {
+        Some(children)
+    } else {
+        None
+    }
+}
+
+/// Myers O(ND) LCS on two sequences of hashes. Returns matched `(a_idx, b_idx)` pairs
+/// in ascending order, or `None` if the edit distance exceeds `max_edit`.
+fn myers_lcs(a: &[u64], b: &[u64], max_edit: usize) -> Option<Vec<(usize, usize)>> {
+    let n = a.len();
+    let m = b.len();
+    if n == 0 || m == 0 {
+        return Some(vec![]);
+    }
+    let limit = max_edit.min(n + m);
+    let offset = limit + 1; // v[k + offset] for k in [-limit, +limit]
+    let v_size = 2 * limit + 3;
+    let mut v = vec![0usize; v_size];
+    let mut snapshots: Vec<Vec<usize>> = Vec::with_capacity(limit + 1);
+
+    for d in 0..=limit {
+        snapshots.push(v.clone()); // snapshots[d] = v before step d's modifications
+        for k in (-(d as i64)..=(d as i64)).step_by(2) {
+            let ki = (k + offset as i64) as usize;
+            // Choose whether to arrive via a delete (from k-1) or insert (from k+1).
+            let x = if k == -(d as i64) {
+                v[ki + 1] // forced insert
+            } else if k == d as i64 || v[ki - 1] >= v[ki + 1] {
+                v[ki - 1] + 1 // delete
+            } else {
+                v[ki + 1] // insert
+            };
+            let mut x = x;
+            let mut y = (x as i64 - k) as usize;
+            // Extend snake (diagonal matches).
+            while x < n && y < m && a[x] == b[y] {
+                x += 1;
+                y += 1;
+            }
+            v[ki] = x;
+            if x >= n && y >= m {
+                return Some(backtrack_myers(&snapshots, a, b, d, offset));
+            }
+        }
+    }
+    None
+}
+
+fn backtrack_myers(
+    snapshots: &[Vec<usize>],
+    a: &[u64],
+    b: &[u64],
+    d: usize,
+    offset: usize,
+) -> Vec<(usize, usize)> {
+    let mut matches = Vec::new();
+    let mut x = a.len() as i64;
+    let mut y = b.len() as i64;
+
+    for step in (1..=d).rev() {
+        let v = &snapshots[step]; // v at start of step `step` (= after step `step-1`)
+        let k = x - y;
+        let ki = (k + offset as i64) as usize;
+        let prev_k = if k == -(step as i64) {
+            k + 1 // came via insert
+        } else if k == step as i64 || v[ki - 1] >= v[ki + 1] {
+            k - 1 // came via delete
+        } else {
+            k + 1 // came via insert
+        };
+        let prev_x = v[(prev_k + offset as i64) as usize] as i64;
+        let prev_y = prev_x - prev_k;
+        // First position on diagonal k after the non-diagonal move.
+        let x_enter = if prev_k < k { prev_x + 1 } else { prev_x };
+        // Collect snake matches (x_enter..x) in reverse.
+        let mut xi = x;
+        let mut yi = y;
+        while xi > x_enter {
+            xi -= 1;
+            yi -= 1;
+            matches.push((xi as usize, yi as usize));
+        }
+        x = prev_x;
+        y = prev_y;
+    }
+    // Initial snake: common prefix from (0, 0) to (x, y) after step 0.
+    while x > 0 && y > 0 {
+        x -= 1;
+        y -= 1;
+        matches.push((x as usize, y as usize));
+    }
+    matches.reverse();
+    matches
+}
+
+/// Resolve a flat-tree root pair via Myers sequence diff and emit all mappings into `diff`.
+fn resolve_flat_tree_pair(
+    before_root: usize,
+    after_root: usize,
+    before_children: Vec<usize>,
+    after_children: Vec<usize>,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    diff: &mut ASTDiff,
+) {
+    let before_hashes: Vec<u64> = before_children
+        .iter()
+        .map(|&id| before_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+    let after_hashes: Vec<u64> = after_children
+        .iter()
+        .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+
+    match myers_lcs(&before_hashes, &after_hashes, FLAT_MAX_EDIT) {
+        Some(pairs) => {
+            let mut before_matched = vec![false; before_children.len()];
+            let mut after_matched = vec![false; after_children.len()];
+            for (bi, ai) in pairs {
+                before_matched[bi] = true;
+                after_matched[ai] = true;
+                // Matched by identical hash.
+                emit_identical_subtree(
+                    before_children[bi],
+                    after_children[ai],
+                    before_meta,
+                    after_meta,
+                    diff,
+                );
+            }
+            for (i, &id) in before_children.iter().enumerate() {
+                if !before_matched[i] {
+                    add_delete_mappings(id, before_meta, diff);
+                }
+            }
+            for (i, &id) in after_children.iter().enumerate() {
+                if !after_matched[i] {
+                    add_insert_mappings(id, after_meta, diff);
+                }
+            }
+        }
+        None => {
+            // Edit distance exceeds FLAT_MAX_EDIT: mark all children replaced.
+            for &id in &before_children {
+                add_delete_mappings(id, before_meta, diff);
+            }
+            for &id in &after_children {
+                add_insert_mappings(id, after_meta, diff);
+            }
+        }
+    }
+
+    diff.add_mapping(
+        before_root,
+        after_root,
+        ASTMapping {
+            cost: 0,
+            operation: ASTMappingOperation::MatchButNotIdentical,
+            reason: ASTMappingReason::FlatSequenceDiff,
+        },
+    );
+}
+
 /// Filter out before nodes that are already mapped in the diff.
 pub(crate) fn filter_before_nodes(node_ids: Vec<usize>, diff: &ASTDiff) -> Vec<usize> {
     node_ids
@@ -887,6 +1074,16 @@ pub(crate) fn resolve_forest(
             .is_some_and(|(bh, ah)| bh == ah);
         if hashes_match {
             emit_identical_subtree(b, a, before_meta, after_meta, diff);
+            return;
+        }
+        // Fast path: flat trees (single root, all leaf children) → Myers O(ND) sequence diff.
+        // Zhang-Shasha has no structural savings on depth-1 trees; Myers is O(N·d) where d is
+        // the edit distance, typically much smaller than N for lightly-modified files.
+        if let (Some(bc), Some(ac)) = (
+            flat_children(b, before_meta, &diff.before_node_map),
+            flat_children(a, after_meta, &diff.after_node_map),
+        ) {
+            resolve_flat_tree_pair(b, a, bc, ac, before_meta, after_meta, diff);
             return;
         }
     }
@@ -2451,5 +2648,122 @@ mod tests {
         assert_eq!(mapping.cost, 23);
 
         Ok(())
+    }
+
+    #[test]
+    fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
+        // Two token_tree-like flat structures: 100 identical tokens plus one changed value.
+        // Myers should match 100 identical tokens and mark 2 as delete/insert.
+        let before_tokens: Vec<&str> = (0..50)
+            .map(|_| "tok")
+            .chain(std::iter::once("old_value"))
+            .chain((0..50).map(|_| "tok"))
+            .collect();
+        let after_tokens: Vec<&str> = (0..50)
+            .map(|_| "tok")
+            .chain(std::iter::once("new_value"))
+            .chain((0..50).map(|_| "tok"))
+            .collect();
+
+        // Build synthetic metadata where the root has 101 leaf children.
+        let mut before_meta = ASTMetadata::default();
+        let mut after_meta = ASTMetadata::default();
+
+        fn build_flat(tokens: &[&str], meta: &mut ASTMetadata) -> (usize, Vec<usize>) {
+            let root_id = 9000;
+            let child_ids: Vec<usize> = (0..tokens.len()).map(|i| i + 1).collect();
+            for (i, &tok) in tokens.iter().enumerate() {
+                let id = i + 1;
+                meta.node_info.insert(id, ASTNodeMetadata {
+                    kind: "token".to_string(),
+                    text: tok.to_string(),
+                    children: vec![],
+                });
+                // Use the token text as hash so identical tokens match.
+                use std::hash::{Hash, Hasher};
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                tok.hash(&mut h);
+                meta.node_to_full_hash.insert(id, h.finish());
+            }
+            meta.node_info.insert(root_id, ASTNodeMetadata {
+                kind: "token_tree".to_string(),
+                text: String::new(),
+                children: child_ids.clone(),
+            });
+            meta.node_to_full_hash.insert(root_id, 0); // different hashes → will not short-circuit
+            (root_id, child_ids)
+        }
+
+        let (before_root, _) = build_flat(&before_tokens, &mut before_meta);
+        let (after_root, _) = build_flat(&after_tokens, &mut after_meta);
+        // Make root hashes differ so the identical fast-path is skipped.
+        before_meta.node_to_full_hash.insert(before_root, 1);
+        after_meta.node_to_full_hash.insert(after_root, 2);
+
+        let mut diff = ASTDiff::default();
+        for_nodes(
+            &before_meta,
+            &after_meta,
+            vec![before_root],
+            vec![after_root],
+            Algorithm::ZhangShasha,
+            &mut diff,
+        )?;
+
+        // Root pair should be mapped via flat-tree path.
+        let root_mapping = diff.mapping.get(&(before_root, after_root)).expect("root mapped");
+        assert_eq!(root_mapping.reason, ASTMappingReason::FlatSequenceDiff);
+        assert_eq!(root_mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+
+        // The 100 identical "tok" tokens should all be matched (Identical).
+        let identical_count = diff
+            .mapping
+            .values()
+            .filter(|m| m.operation == ASTMappingOperation::Identical)
+            .count();
+        assert_eq!(identical_count, 100, "all 100 identical tokens should be matched");
+
+        // "old_value" (before child 51) should be deleted; "new_value" (after child 51) inserted.
+        assert!(
+            diff.mapping.contains_key(&(51, 0)),
+            "old_value token should be deleted"
+        );
+        assert!(
+            diff.mapping.contains_key(&(0, 51)),
+            "new_value token should be inserted"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn myers_lcs_basic() {
+        // [1,2,3] vs [1,4,3]: matches at positions (0,0) and (2,2).
+        let a = [1u64, 2, 3];
+        let b = [1u64, 4, 3];
+        let matches = myers_lcs(&a, &b, 100).expect("should find solution");
+        assert_eq!(matches, vec![(0, 0), (2, 2)]);
+    }
+
+    #[test]
+    fn myers_lcs_identical() {
+        let a = [1u64, 2, 3, 4, 5];
+        let matches = myers_lcs(&a, &a, 0).expect("d=0 for identical");
+        assert_eq!(matches, vec![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+    }
+
+    #[test]
+    fn myers_lcs_empty() {
+        assert_eq!(myers_lcs(&[], &[1u64], 10), Some(vec![]));
+        assert_eq!(myers_lcs(&[1u64], &[], 10), Some(vec![]));
+        assert_eq!(myers_lcs(&[], &[], 10), Some(vec![]));
+    }
+
+    #[test]
+    fn myers_lcs_exceeds_limit() {
+        // a and b share no elements → d = n+m; with limit=3 it should return None.
+        let a = [1u64, 2, 3];
+        let b = [4u64, 5, 6];
+        assert!(myers_lcs(&a, &b, 3).is_none());
     }
 }

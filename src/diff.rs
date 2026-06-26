@@ -434,6 +434,8 @@ pub enum ASTMappingReason {
     OptimalIDU,
     /// Mapping determined by the APTED (A Preorder Tree Edit Distance) algorithm.
     APTED,
+    /// Mapping produced by Myers sequence diff on a flat tree (single root, all leaf children).
+    FlatSequenceDiff,
 }
 
 /**
