@@ -145,8 +145,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Compare two benchmark_diff_pairs runs and chart the speed difference."
     )
-    parser.add_argument("--before", default="diff_pairs_benchmark_rust_optimal_iud.csv")
-    parser.add_argument("--after", default="diff_pairs_benchmark_rust.csv")
+    parser.add_argument("--before", required=True,
+                        help="CSV from an earlier benchmark_diff_pairs run")
+    parser.add_argument("--after", required=True,
+                        help="CSV from a later benchmark_diff_pairs run")
     parser.add_argument("--plots-dir", default="plots")
     args = parser.parse_args()
 
