@@ -26,7 +26,7 @@
 #   ./measure/benchmark_all.sh [OPTIONS]
 #
 # Options:
-#   --language LANG       Rust | Python | Go | all  (default: all)
+#   --language LANG       Rust | Python | Go | Kotlin | all  (default: all)
 #   --limit N             Max combined AST nodes to attempt (default: 16000)
 #   --count N             Pairs to sample when no sample file exists (default: 1000)
 #   --repos-dir DIR       Root of checked-out git repositories
@@ -75,7 +75,7 @@ done
 
 # ── resolve language list ────────────────────────────────────────────────────
 if [[ "$LANGUAGE" == "all" ]]; then
-  LANGUAGES=("Rust" "Python" "Go")
+  LANGUAGES=("Rust" "Python" "Go" "Kotlin")
 else
   LANGUAGES=("$LANGUAGE")
 fi

@@ -38,6 +38,7 @@ LANG_META = {
     "rust":   ("Rust",   "#CE422B"),
     "python": ("Python", "#3572A5"),
     "go":     ("Go",     "#00ADD8"),
+    "kotlin": ("Kotlin", "#A97BFF"),
 }
 
 

@@ -32,18 +32,32 @@ pub fn node_matches(node_kind: &str, language: &Language) -> bool {
     // Language-specific reference nodes
     match language {
         Language::Rust => {
-            node_kind == "source_file" ||  // The root node of any sopurce file
+            node_kind == "source_file" ||
             node_kind == "function_item" ||
             node_kind == "impl_item" ||
             node_kind == "struct_item" ||
+            node_kind == "enum_item" ||
+            node_kind == "trait_item" ||
+            node_kind == "type_item" ||
+            node_kind == "mod_item" ||
             node_kind == "use_declaration" ||
             node_kind == "if_expression"
         }
-        Language::Python => node_kind == "module", // Python modules/source files
+        Language::Python => {
+            node_kind == "module" ||
+            node_kind == "function_definition" ||
+            node_kind == "class_definition"
+        }
         Language::Java => node_kind == "program", // Java source files are represented as "program" nodes
         Language::C => node_kind == "translation_unit", // C source files use "translation_unit" as root
         Language::CPP => node_kind == "translation_unit", // C++ also uses "translation_unit" as root
-        Language::Go => node_kind == "source_file", // Go source files use "source_file" as root
+        Language::Go => {
+            node_kind == "source_file" ||
+            node_kind == "function_declaration" ||
+            node_kind == "method_declaration" ||
+            node_kind == "type_spec" ||
+            node_kind == "type_alias"
+        }
         Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
         Language::TypeScript => node_kind == "program", // TypeScript also uses "program" as root
         Language::TSX => node_kind == "program",    // TSX also uses "program" as root
@@ -51,7 +65,14 @@ pub fn node_matches(node_kind: &str, language: &Language) -> bool {
         Language::Ruby => node_kind == "program",   // Ruby also uses "program" as root
         Language::R => node_kind == "program",      // R also uses "program" as root
         Language::Swift => node_kind == "source_file", // Swift source files use "source_file" as root
-        Language::Kotlin => node_kind == "source_file", // Kotlin source files use "source_file" as root
+        Language::Kotlin => {
+            node_kind == "source_file" ||
+            node_kind == "function_declaration" ||
+            node_kind == "class_declaration" ||
+            node_kind == "object_declaration" ||
+            node_kind == "companion_object" ||
+            node_kind == "type_alias"
+        }
         Language::Scala => node_kind == "compilation_unit", // Scala source files use "compilation_unit" as root
         Language::CSharp => node_kind == "compilation_unit", // C# source files use "compilation_unit" as root
         Language::HTML => node_kind == "document", // HTML documents use "document" as root
