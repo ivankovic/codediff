@@ -2212,7 +2212,7 @@ mod tests {
         // naturally choose, then verify that APTED doesn't create a second mapping
         // for the same node.
         let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+        let (before, after) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
 
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
@@ -2384,7 +2384,7 @@ mod tests {
     #[test]
     fn test_no_change() -> Result<()> {
         let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("no-change").unwrap().clone();
+        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
 
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
@@ -2413,7 +2413,10 @@ mod tests {
     #[test]
     fn test_hello_world_added_message() -> Result<()> {
         let test_diffs = helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (before, after) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
@@ -2460,7 +2463,7 @@ mod tests {
     fn test_hello_world_removed_message() -> Result<()> {
         let test_diffs = helper::handmade_test_code_pairs()?;
         let (before, after) = test_diffs
-            .get("hello-world-removed-message")
+            .get("rust-hello-world-removed-message")
             .unwrap()
             .clone();
 
@@ -2674,22 +2677,28 @@ mod tests {
             let child_ids: Vec<usize> = (0..tokens.len()).map(|i| i + 1).collect();
             for (i, &tok) in tokens.iter().enumerate() {
                 let id = i + 1;
-                meta.node_info.insert(id, ASTNodeMetadata {
-                    kind: "token".to_string(),
-                    text: tok.to_string(),
-                    children: vec![],
-                });
+                meta.node_info.insert(
+                    id,
+                    ASTNodeMetadata {
+                        kind: "token".to_string(),
+                        text: tok.to_string(),
+                        children: vec![],
+                    },
+                );
                 // Use the token text as hash so identical tokens match.
                 use std::hash::{Hash, Hasher};
                 let mut h = std::collections::hash_map::DefaultHasher::new();
                 tok.hash(&mut h);
                 meta.node_to_full_hash.insert(id, h.finish());
             }
-            meta.node_info.insert(root_id, ASTNodeMetadata {
-                kind: "token_tree".to_string(),
-                text: String::new(),
-                children: child_ids.clone(),
-            });
+            meta.node_info.insert(
+                root_id,
+                ASTNodeMetadata {
+                    kind: "token_tree".to_string(),
+                    text: String::new(),
+                    children: child_ids.clone(),
+                },
+            );
             meta.node_to_full_hash.insert(root_id, 0); // different hashes → will not short-circuit
             (root_id, child_ids)
         }
@@ -2711,9 +2720,15 @@ mod tests {
         )?;
 
         // Root pair should be mapped via flat-tree path.
-        let root_mapping = diff.mapping.get(&(before_root, after_root)).expect("root mapped");
+        let root_mapping = diff
+            .mapping
+            .get(&(before_root, after_root))
+            .expect("root mapped");
         assert_eq!(root_mapping.reason, ASTMappingReason::FlatSequenceDiff);
-        assert_eq!(root_mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+        assert_eq!(
+            root_mapping.operation,
+            ASTMappingOperation::MatchButNotIdentical
+        );
 
         // The 100 identical "tok" tokens should all be matched (Identical).
         let identical_count = diff
@@ -2721,7 +2736,10 @@ mod tests {
             .values()
             .filter(|m| m.operation == ASTMappingOperation::Identical)
             .count();
-        assert_eq!(identical_count, 100, "all 100 identical tokens should be matched");
+        assert_eq!(
+            identical_count, 100,
+            "all 100 identical tokens should be matched"
+        );
 
         // "old_value" (before child 51) should be deleted; "new_value" (after child 51) inserted.
         assert!(
@@ -2749,7 +2767,7 @@ mod tests {
     fn myers_lcs_identical() {
         let a = [1u64, 2, 3, 4, 5];
         let matches = myers_lcs(&a, &a, 0).expect("d=0 for identical");
-        assert_eq!(matches, vec![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+        assert_eq!(matches, vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
     }
 
     #[test]

@@ -725,9 +725,9 @@ mod tests {
         }
 
         // We should have all the expected diffs
-        assert!(diffs.contains_key("no-change"));
-        assert!(diffs.contains_key("hello-world-added-message"));
-        assert!(diffs.contains_key("leet-code-1-bugfix"));
+        assert!(diffs.contains_key("rust-no-change"));
+        assert!(diffs.contains_key("rust-hello-world-added-message"));
+        assert!(diffs.contains_key("rust-leetcode-1-bugfix"));
 
         assert!(diffs.len() > 3);
 
@@ -740,9 +740,9 @@ mod tests {
 
         assert!(!diffs.is_empty(), "Should have found some test code pairs");
 
-        assert!(diffs.contains_key("no-change"));
+        assert!(diffs.contains_key("rust-no-change"));
 
-        let (before, after) = diffs.get("no-change").unwrap();
+        let (before, after) = diffs.get("rust-no-change").unwrap();
 
         assert_ne!(before.contents, "");
         assert_ne!(after.contents, "");
@@ -760,9 +760,9 @@ mod tests {
 
         assert!(!diffs.is_empty(), "Should have found some test diffs");
 
-        assert!(diffs.contains_key("no-change"));
+        assert!(diffs.contains_key("rust-no-change"));
 
-        let (before, after, diff) = diffs.get("no-change").unwrap();
+        let (before, after, diff) = diffs.get("rust-no-change").unwrap();
 
         // The diff should have the AST computed since we passed true for compute_ast
         assert!(diff.ast.is_some());

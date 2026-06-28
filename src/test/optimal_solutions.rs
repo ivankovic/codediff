@@ -16,18 +16,18 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #[cfg(test)]
-mod no_change;
-#[cfg(test)]
-mod hello_world_added_message;
+mod python_added_if_block;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
-mod leet_code_1_bugfix;
-#[cfg(test)]
-mod hello_world_removed_message;
+mod rust_add_if;
 #[cfg(test)]
 mod rust_hash_optimization;
 #[cfg(test)]
-mod python_added_if_block;
+mod rust_hello_world_added_message;
 #[cfg(test)]
-mod rust_add_if;
+mod rust_hello_world_removed_message;
+#[cfg(test)]
+mod rust_leetcode_1_bugfix;
+#[cfg(test)]
+mod rust_no_change;

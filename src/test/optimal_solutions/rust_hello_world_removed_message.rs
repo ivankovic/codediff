@@ -22,9 +22,12 @@ use crate::test;
 use anyhow::Result;
 
 #[test]
-fn hello_world_added_message() -> Result<()> {
+fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+    let (before, after) = test_diffs
+        .get("rust-hello-world-removed-message")
+        .unwrap()
+        .clone();
 
     let diff = diff::diff_code(&before, &after);
 
@@ -38,18 +41,16 @@ fn hello_world_added_message() -> Result<()> {
     let after_root = after_ast.root_node();
 
     let path = vec!["function_item"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     let path = vec!["function_item", "block", "expression_statement:1"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
-    assert!(test::helper::was_tree_added(
+    assert!(test::helper::was_tree_deleted(
         &["function_item", "block", "expression_statement:2"],
-        after_root,
+        before_root,
         &diff_ast
     )?);
 

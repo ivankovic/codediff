@@ -22,7 +22,7 @@ use crate::test;
 use anyhow::Result;
 
 #[test]
-fn rust_hash_optimization() -> Result<()> {
+fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
 
@@ -39,8 +39,7 @@ fn rust_hash_optimization() -> Result<()> {
 
     // The use declarations, the second was added.
     let path = vec!["use_declaration:1"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     assert!(test::helper::was_tree_added(
@@ -51,8 +50,7 @@ fn rust_hash_optimization() -> Result<()> {
 
     // struct SubtreeKey
     let path = vec!["struct_item"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     // #derive
@@ -102,25 +100,21 @@ fn rust_hash_optimization() -> Result<()> {
 
     // Verify that fn main and it's code is solved
     let path = vec!["function_item"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     // The first let is similar, but Vec<usize> was changed to SubtreeKey
     let path = vec!["function_item", "block", "let_declaration:1"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     // The second 2 are identical
     let path = vec!["function_item", "block", "let_declaration:2"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     let path = vec!["function_item", "block", "let_declaration:3"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     // Followed by 2 added let declarations

@@ -943,7 +943,10 @@ mod tests {
     #[test]
     fn skip_matched_nodes_test() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (_, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (_, after) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1021,7 +1024,10 @@ mod tests {
     #[test]
     fn solve_for_hello_world_added_message() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (before, after) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1155,7 +1161,10 @@ mod tests {
     fn solve_for_hello_world_deleted_message() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (after, before) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1206,7 +1215,7 @@ mod tests {
     fn solve_for_leetcode_1_bugfix() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+        let (after, before) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1285,7 +1294,10 @@ mod tests {
     #[test]
     fn hello_world_added_message() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (before, after) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1333,7 +1345,10 @@ mod tests {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Note that we flipped after and before so the addition becomes a deletion.
-        let (after, before) = test_diffs.get("hello-world-added-message").unwrap().clone();
+        let (after, before) = test_diffs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1505,7 +1520,7 @@ mod tests {
     }
 
     #[test]
-    fn python_leetcode_1_added_if_block_reverse() -> Result<()> {
+    fn python_added_if_block_reverse() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
 
         // Note that we do a sneaky and flip (before, after) to get a delete instead of an add.
@@ -1647,7 +1662,7 @@ mod tests {
     fn leetcode_1_bugfix() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+        let (after, before) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1681,7 +1696,7 @@ mod tests {
     #[test]
     fn no_change_skips_already_matched_nodes() -> Result<()> {
         let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("no-change").unwrap().clone();
+        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
 
         // First, run the full diff algorithm which should match all nodes
         let mut diff = ASTDiff {
@@ -1725,12 +1740,12 @@ mod tests {
 
         // Static map of expected costs for each diff
         let expected_costs: std::collections::HashMap<&str, u64> = [
-            ("no-change", 0),
-            ("hello-world-added-message", 12),
-            ("leet-code-1-bugfix", 41),
+            ("rust-no-change", 0),
+            ("rust-hello-world-added-message", 12),
+            ("rust-leetcode-1-bugfix", 41),
             ("python-added-if-block", 13),
             ("rust-error-handling", 63),
-            ("hello-world-removed-message", 12),
+            ("rust-hello-world-removed-message", 12),
             ("python-api-change", 230),
             ("rust-cost-optimization", 16),
             ("python-bugfix-loop", 43),

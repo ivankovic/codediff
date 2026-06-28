@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn no_change_all_ranges() -> Result<()> {
         let code_pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = code_pairs.get("no-change").unwrap().clone();
+        let (before, after) = code_pairs.get("rust-no-change").unwrap().clone();
         let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::Diff::from_code(&before, &after);
 
@@ -492,7 +492,10 @@ mod tests {
     #[test]
     fn hello_world_added_message_all_ranges() -> Result<()> {
         let code_pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = code_pairs.get("hello-world-added-message").unwrap().clone();
+        let (before, after) = code_pairs
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
         let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::Diff::from_code(&before, &after);
 

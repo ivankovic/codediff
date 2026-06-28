@@ -22,9 +22,9 @@ use crate::test;
 use anyhow::Result;
 
 #[test]
-fn no_change() -> Result<()> {
+fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("no-change").unwrap().clone();
+    let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
 
     let diff = diff::diff_code(&before, &after);
 

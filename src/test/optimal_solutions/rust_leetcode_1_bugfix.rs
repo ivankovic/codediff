@@ -22,9 +22,9 @@ use crate::test;
 use anyhow::Result;
 
 #[test]
-fn leet_code_1_bugfix() -> Result<()> {
+fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("leet-code-1-bugfix").unwrap().clone();
+    let (before, after) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
 
     let diff = diff::diff_code(&before, &after);
 
@@ -38,28 +38,23 @@ fn leet_code_1_bugfix() -> Result<()> {
     let after_root = after_ast.root_node();
 
     let path = vec!["use_declaration"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     let path = vec!["impl_item"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     let path = vec!["impl_item", "type_identifier"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     let path = vec!["impl_item", "declaration_list"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     let path = vec!["impl_item", "declaration_list", "function_item"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
 
     let path = vec![
@@ -68,8 +63,7 @@ fn leet_code_1_bugfix() -> Result<()> {
         "function_item",
         "parameters",
     ];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     assert!(test::helper::was_tree_added(

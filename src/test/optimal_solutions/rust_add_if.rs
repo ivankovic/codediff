@@ -22,7 +22,7 @@ use crate::test;
 use anyhow::Result;
 
 #[test]
-fn rust_add_if() -> Result<()> {
+fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs.get("rust-add-if").unwrap().clone();
 
@@ -72,10 +72,8 @@ fn rust_add_if() -> Result<()> {
 
     let outer_if_expression_after = test::helper::node_for_path(after_root, &path)?;
 
-    let inner_if_expression_after = test::helper::node_for_path(
-        outer_if_expression_after,
-        &["else_clause", "if_expression"],
-    )?;
+    let inner_if_expression_after =
+        test::helper::node_for_path(outer_if_expression_after, &["else_clause", "if_expression"])?;
 
     assert!(
         diff_ast
