@@ -26,6 +26,9 @@ test:
 build: test
 	cargo build --release
 
+hermetic-benchmark:
+	cargo bench -- diff
+
 # Fetch repositories using the current mode
 fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
 	$(SCRIPTS_FETCH_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)
