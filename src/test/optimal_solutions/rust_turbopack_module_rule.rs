@@ -131,11 +131,13 @@ fn optimal_solution() -> Result<()> {
         ASTMappingOperation::Identical,
         "The 9th use declarations EcmascriptOptions is not correctly mapped"
     );
+    // bytes_source_transform::BytesSourceTransform is a scoped path, not a plain identifier,
+    // so it appears as a scoped_identifier node in the use_list.
     let path = [
         "use_declaration:9",
         "scoped_use_list",
         "use_list",
-        "identifier:3",
+        "scoped_identifier",
     ];
     test::helper::was_tree_added(&path, after_root, &diff_ast)?;
 

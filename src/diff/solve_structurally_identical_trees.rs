@@ -82,8 +82,13 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         {
             // If we have multiple reference nodes with exactly the same structural hash, then
             // there is simply duplicated code in the file with the same structure.
-            // For now, we take the first node and match to that.
-            if let Some(&after_node_id) = after_node_ids.iter().next() {
+            // Skip after nodes already claimed by a previous before node so we don't steal
+            // a match that belongs to another pair (e.g. two use-declarations with the same
+            // structural shape but different text content).
+            if let Some(&after_node_id) = after_node_ids
+                .iter()
+                .find(|&&id| !diff.after_node_map.contains_key(&id))
+            {
                 // Find the actual node with the matching ID - use cache for O(1) lookup
                 let matching_after_node = node_cache.after.get(&after_node_id).cloned();
                 let Some(matching_after_node) = matching_after_node else {
