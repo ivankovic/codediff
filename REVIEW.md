@@ -10,8 +10,6 @@
 
 # Pending
 
-*  Feature request: pressing 'g' moves the cursor on the inactive tab to the matched node, and then
-   switches the active tab as if you pressed Tab.
 *  Two `// TODO: first pointers can be precomputed` notes remain in the APTED hot loop
    (`apted/engine.rs`) - a known micro-perf opportunity, not actioned since it's hand-tuned
    numerical code that should be profiled (via `benches/diff_code_benchmark`) before touching.
