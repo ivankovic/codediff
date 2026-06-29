@@ -52,10 +52,13 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
 
         // Determine which child index to use
         let child_index = if parts.len() > 1 {
-            parts[1]
-                .parse::<usize>()
-                .map_err(|_| anyhow::anyhow!("Invalid index in path segment: {}", path_segment))?
-                - 1 // Convert to 0-indexed
+            parts[1].parse::<usize>().map_err(|_| {
+                anyhow::anyhow!(
+                    "Invalid index in path segment: {} for path {:?}",
+                    path_segment,
+                    path
+                )
+            })? - 1 // Convert to 0-indexed
         } else {
             0 // Use first matching child
         };
@@ -78,8 +81,9 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
         match found_node {
             Some(node) => current_node = node,
             None => bail!(
-                "Path segment '{}' not found at current position",
-                path_segment
+                "Path segment '{}' not found at current position for path {:?}",
+                path_segment,
+                path
             ),
         }
     }

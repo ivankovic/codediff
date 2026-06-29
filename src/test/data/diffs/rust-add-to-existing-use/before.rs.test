@@ -1,0 +1,5 @@
+use std::fmt::Display;
+
+fn main() {
+  println!("Test output");
+}

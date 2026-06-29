@@ -22,6 +22,8 @@ mod python_refactoring;
 #[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
+mod rust_add_to_existing_use;
+#[cfg(test)]
 mod rust_hash_optimization;
 #[cfg(test)]
 mod rust_hello_world_added_message;
