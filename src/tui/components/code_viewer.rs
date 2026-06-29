@@ -216,6 +216,18 @@ impl CodeViewer {
         self.widget.language_name()
     }
 
+    /// Scroll the viewport to keep `row` visible, without moving the cursor.
+    pub fn scroll_to_show_row(&mut self, row: usize) {
+        let row = row.min(self.line_count().saturating_sub(1));
+        if row < self.state.scroll {
+            self.state.scroll = row;
+        } else if self.state.viewport_height > 0
+            && row >= self.state.scroll + self.state.viewport_height
+        {
+            self.state.scroll = row.saturating_sub(self.state.viewport_height - 1);
+        }
+    }
+
     /// Get the viewport height
     pub fn viewport_height(&self) -> usize {
         self.state.viewport_height

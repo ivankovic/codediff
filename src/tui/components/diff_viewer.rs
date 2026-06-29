@@ -101,17 +101,19 @@ impl DiffViewer {
     }
 
     /// Move the focused panel's cursor vertically (by one line) and push the resulting matched
-    /// node onto the other panel's cross-highlight.
+    /// node onto the other panel's cross-highlight, scrolling it to keep the destination visible.
     pub fn move_cursor_vertical(&mut self, direction: i32) {
         self.focused_viewer().move_cursor_vertical(direction);
         self.sync_cross_highlight();
+        self.sync_scroll();
     }
 
     /// Move the focused panel's cursor horizontally (by one character) and push the resulting
-    /// matched node onto the other panel's cross-highlight.
+    /// matched node onto the other panel's cross-highlight, scrolling it to keep the destination visible.
     pub fn move_cursor_horizontal(&mut self, direction: i32) {
         self.focused_viewer().move_cursor_horizontal(direction);
         self.sync_cross_highlight();
+        self.sync_scroll();
     }
 
     /// Push the focused panel's current cursor destination onto the other panel's
@@ -119,6 +121,14 @@ impl DiffViewer {
     fn sync_cross_highlight(&mut self) {
         let destination = self.focused_viewer().cursor_destination();
         self.other_viewer().set_highlight_destination(destination);
+    }
+
+    /// Scroll the inactive panel's viewport so the destination row of the focused panel's cursor
+    /// stays visible; call after cursor movement.
+    fn sync_scroll(&mut self) {
+        if let Some(dest) = self.focused_viewer().cursor_destination() {
+            self.other_viewer().scroll_to_show_row(dest.start_row);
+        }
     }
 
     /// Make sure exactly one side is marked focused, matching `active_panel`: the focused side

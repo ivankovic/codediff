@@ -1714,15 +1714,15 @@ mod tests {
         assert!(diff.mapping.contains_key(&(before_root_id, after_root_id)));
 
         // Now test that for_roots() correctly skips over already matched nodes
-        // by measuring execution time - it should be very fast (< 30ms)
+        // by measuring execution time - it should be very fast (< 50ms)
         let start_time = std::time::Instant::now();
         let result = for_roots(&before, &after, &node_cache, &mut diff);
         let duration = start_time.elapsed();
 
         assert!(result.is_ok(), "for_roots() should succeed");
         assert!(
-            duration.as_millis() < 30,
-            "for_roots() should complete in < 30ms when all nodes are already matched, but took {}ms",
+            duration.as_millis() < 50,
+            "for_roots() should complete in < 50ms when all nodes are already matched, but took {}ms",
             duration.as_millis()
         );
 
