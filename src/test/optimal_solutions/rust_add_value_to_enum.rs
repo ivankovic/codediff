@@ -1,0 +1,146 @@
+/*  This file is part of the CodeDiff code diffing tool.
+ *
+ *  Copyright (C) 2026 Marko Ivankovic
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+use crate::diff;
+use crate::diff::ASTMappingOperation;
+use crate::test;
+
+use anyhow::{Ok, Result};
+
+#[test]
+fn optimal_solution() -> Result<()> {
+    let test_diffs = test::helper::handmade_test_code_pairs()?;
+    let (before, after) = test_diffs.get("rust-add-value-to-enum").unwrap().clone();
+
+    let diff = diff::diff_code(&before, &after);
+
+    assert!(diff.ast.is_some());
+
+    let diff_ast = diff.ast.unwrap();
+    let before_ast = before.ast.unwrap();
+    let after_ast = after.ast.unwrap();
+
+    let before_root = before_ast.root_node();
+    let after_root = after_ast.root_node();
+
+    let path = ["enum_item"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The enum as a whole is not correctly mapped"
+    );
+
+    let path = ["enum_item", "enum_variant_list"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The enums variant list as a whole is not correctly mapped"
+    );
+
+    let path = ["enum_item", "enum_variant_list", "enum_variant:1"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The first enum variant, Ecmascript, is not correctly mapped"
+    );
+
+    test::helper::was_tree_added(
+        &["enum_item", "enum_variant_list", "enum_variant:2"],
+        after_root,
+        &diff_ast,
+    )?;
+
+    let mapping = test::helper::mapping_for_path(
+        &["enum_item", "enum_variant_list", "enum_variant:2"],
+        &["enum_item", "enum_variant_list", "enum_variant:3"],
+        before_root,
+        after_root,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The last enum variant, Webassembly, is not correctly mapped"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn optimal_solution_for_reversed_diff() -> Result<()> {
+    let test_diffs = test::helper::handmade_test_code_pairs()?;
+    let (after, before) = test_diffs.get("rust-add-value-to-enum").unwrap().clone();
+
+    let diff = diff::diff_code(&before, &after);
+
+    assert!(diff.ast.is_some());
+
+    let diff_ast = diff.ast.unwrap();
+    let before_ast = before.ast.unwrap();
+    let after_ast = after.ast.unwrap();
+
+    let before_root = before_ast.root_node();
+    let after_root = after_ast.root_node();
+
+    let path = ["enum_item"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The enum as a whole is not correctly mapped"
+    );
+
+    let path = ["enum_item", "enum_variant_list"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The enums variant list as a whole is not correctly mapped"
+    );
+
+    let path = ["enum_item", "enum_variant_list", "enum_variant:1"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The first enum variant, Ecmascript, is not correctly mapped"
+    );
+
+    test::helper::was_tree_deleted(
+        &["enum_item", "enum_variant_list", "enum_variant:2"],
+        before_root,
+        &diff_ast,
+    )?;
+
+    let mapping = test::helper::mapping_for_path(
+        &["enum_item", "enum_variant_list", "enum_variant:3"],
+        &["enum_item", "enum_variant_list", "enum_variant:2"],
+        before_root,
+        after_root,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The last enum variant, Webassembly, is not correctly mapped"
+    );
+
+    Ok(())
+}

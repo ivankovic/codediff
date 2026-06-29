@@ -1,0 +1,21 @@
+#[turbo_tasks::value(shared)]
+#[derive(Hash, Debug, Clone)]
+pub enum ModuleType {
+    Ecmascript {
+        /// Transforms to run first: transpile TypeScript, decorators, ...
+        preprocess: ResolvedVc<EcmascriptInputTransforms>,
+        /// Transforms to execute on standard EcmaScript (plus JSX): styled-jsx, swc plugins, ...
+        main: ResolvedVc<EcmascriptInputTransforms>,
+        /// Transforms to run last: JSX, preset-env, scan for imports, ...
+        postprocess: ResolvedVc<EcmascriptInputTransforms>,
+        #[turbo_tasks(trace_ignore)]
+        options: ResolvedVc<EcmascriptOptions>,
+    },
+    WebAssembly {
+        source_ty: WebAssemblySourceType,
+    },
+}
+
+fn main () {
+  println!("Test")
+}
