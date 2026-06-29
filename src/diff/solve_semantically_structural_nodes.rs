@@ -19,7 +19,88 @@ use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
-use crate::diff::{ASTDiff, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+
+/// Recursively add Identical mappings for an already-verified identical subtree pair.
+///
+/// Both subtrees must have the same full hash (caller's responsibility). All descendants are
+/// matched pairwise, position by position, since equal full hashes guarantee equal structure.
+fn add_identical_subtree(
+    before_id: usize,
+    after_id: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    diff: &mut ASTDiff,
+    is_root: bool,
+) {
+    let reason = if is_root {
+        ASTMappingReason::IdenticalHash
+    } else {
+        ASTMappingReason::IdenticalHashOfAncestor
+    };
+    diff.add_mapping(
+        before_id,
+        after_id,
+        ASTMapping { cost: 0, operation: ASTMappingOperation::Identical, reason },
+    );
+    let Some(before_info) = before_meta.node_info.get(&before_id) else { return };
+    let Some(after_info) = after_meta.node_info.get(&after_id) else { return };
+    for (&b_child, &a_child) in before_info.children.iter().zip(after_info.children.iter()) {
+        add_identical_subtree(b_child, a_child, before_meta, after_meta, diff, false);
+    }
+}
+
+/// Pre-match children of a semantically-matched pair that share both the same ordinal position
+/// and the same full hash.
+///
+/// Walks both subtrees in parallel (depth-first). At each level, children at the same position
+/// are compared:
+/// - Same hash → the entire subtree is matched as Identical (all descendants are mapped).
+/// - Different hash, same kind → recurse deeper (handles container nodes like variant_list whose
+///   hash changed because a child was added/deleted, but whose surviving children are unchanged).
+/// - Different hash, different kind → stop this branch.
+///
+/// This reduces the residual seen by APTED from the full pair to just the changed fragment,
+/// turning O(n²) into O(k²) where k is the number of nodes that actually differ.
+fn pre_match_by_path(
+    before_id: usize,
+    after_id: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    diff: &mut ASTDiff,
+) {
+    let Some(before_info) = before_meta.node_info.get(&before_id) else { return };
+    let Some(after_info) = after_meta.node_info.get(&after_id) else { return };
+    let before_children = before_info.children.clone();
+    let after_children = after_info.children.clone();
+
+    for (&b_child, &a_child) in before_children.iter().zip(after_children.iter()) {
+        if diff.before_node_map.contains_key(&b_child) || diff.after_node_map.contains_key(&a_child) {
+            continue;
+        }
+        let b_hash = before_meta.node_to_full_hash.get(&b_child);
+        let a_hash = after_meta.node_to_full_hash.get(&a_child);
+        if b_hash.is_some() && b_hash == a_hash {
+            add_identical_subtree(b_child, a_child, before_meta, after_meta, diff, true);
+        } else {
+            let b_kind = before_meta.node_info.get(&b_child).map(|i| i.kind.as_str());
+            let a_kind = after_meta.node_info.get(&a_child).map(|i| i.kind.as_str());
+            if b_kind != a_kind || b_kind.is_none() {
+                // Kinds differ: the two child lists have diverged at this position.
+                // All subsequent positions would be misaligned, so stop here.
+                break;
+            }
+            // Only recurse when the subtree shapes match (same structural hash).
+            // Recursing into differently-shaped same-kind nodes (e.g. two field_declarations
+            // with different type children) produces spurious matches for shared tokens like `:`.
+            let b_struct = before_meta.node_to_structural_hash.get(&b_child);
+            let a_struct = after_meta.node_to_structural_hash.get(&a_child);
+            if b_struct.is_some() && b_struct == a_struct {
+                pre_match_by_path(b_child, a_child, before_meta, after_meta, diff);
+            }
+        }
+    }
+}
 
 /**
 * Match semantically structural nodes and solve their subtrees.
@@ -30,20 +111,20 @@ use crate::diff::{ASTDiff, NodeCache};
 * the unmatched residual (impl header + unmatched methods).
 */
 pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = match &before.metadata.ast_metadata {
-        Some(m) => m,
-        None => return,
-    };
-    let after_metadata = match &after.metadata.ast_metadata {
-        Some(m) => m,
-        None => return,
-    };
+    let before_metadata =
+        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
+        });
+    let after_metadata =
+        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
+        });
 
     let language = before.metadata.language.as_ref();
 
     // Pass 0a: Rust — top-level macro_invocations with large flat token_tree bodies.
     if matches!(language, Some(Language::Rust)) {
-        solve_flat_macro_bodies(before, after, before_metadata, after_metadata, diff);
+        solve_flat_macro_bodies(before, after, &before_metadata, &after_metadata, diff);
     }
 
     // Pass 0b: Python — class pairs with method pre-matching (mirrors Rust impl recursion).
@@ -60,13 +141,13 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             else {
                 continue;
             };
-            let before_methods = methods_in_class(before_class_id, before_metadata);
-            let after_methods = methods_in_class(after_class_id, after_metadata);
+            let before_methods = methods_in_class(before_class_id, &before_metadata);
+            let after_methods = methods_in_class(after_class_id, &after_metadata);
             for (method_name, before_method_id) in &before_methods {
                 if let Some(&after_method_id) = after_methods.get(method_name) {
                     let _ = apted::for_nodes(
-                        before_metadata,
-                        after_metadata,
+                        &before_metadata,
+                        &after_metadata,
                         vec![*before_method_id],
                         vec![after_method_id],
                         Algorithm::ZhangShasha,
@@ -75,8 +156,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                 }
             }
             let _ = apted::for_nodes(
-                before_metadata,
-                after_metadata,
+                &before_metadata,
+                &after_metadata,
                 vec![before_class_id],
                 vec![after_class_id],
                 Algorithm::ZhangShasha,
@@ -100,14 +181,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             continue;
         };
 
-        let before_methods = methods_in_impl(before_impl_id, before_metadata);
-        let after_methods = methods_in_impl(after_impl_id, after_metadata);
+        let before_methods = methods_in_impl(before_impl_id, &before_metadata);
+        let after_methods = methods_in_impl(after_impl_id, &after_metadata);
 
         for (method_name, before_method_id) in &before_methods {
             if let Some(&after_method_id) = after_methods.get(method_name) {
+                pre_match_by_path(*before_method_id, after_method_id, &before_metadata, &after_metadata, diff);
                 let _ = apted::for_nodes(
-                    before_metadata,
-                    after_metadata,
+                    &before_metadata,
+                    &after_metadata,
                     vec![*before_method_id],
                     vec![after_method_id],
                     Algorithm::ZhangShasha,
@@ -116,10 +198,11 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             }
         }
 
+        pre_match_by_path(before_impl_id, after_impl_id, &before_metadata, &after_metadata, diff);
         // The method subtrees are now in `diff` and will be pruned by PostorderIndexer.
         let _ = apted::for_nodes(
-            before_metadata,
-            after_metadata,
+            &before_metadata,
+            &after_metadata,
             vec![before_impl_id],
             vec![after_impl_id],
             Algorithm::ZhangShasha,
@@ -138,15 +221,59 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             .semantically_structural_nodes
             .get(&(kind.clone(), identifier.clone()))
         {
+            pre_match_by_path(before_node_id, after_node_id, &before_metadata, &after_metadata, diff);
             let _ = apted::for_nodes(
-                before_metadata,
-                after_metadata,
+                &before_metadata,
+                &after_metadata,
                 vec![before_node_id],
                 vec![after_node_id],
                 Algorithm::ZhangShasha,
                 diff,
             );
         }
+    }
+
+    // Pass 3: semantic nodes that exist only on one side (pure deletions and insertions).
+    //
+    // Running APTED on the full source_file pair would force it to compare these lone subtrees
+    // against everything on the other side, burning O(n²) time for what is really an O(n) walk.
+    // Calling for_nodes with an empty opposite forest lets APTED mark the whole subtree as
+    // deleted / inserted in a single O(n) pass, removing them from the apted_roots residual.
+    for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
+        if diff.before_node_map.contains_key(&before_node_id) {
+            continue;
+        }
+        let key = (kind.clone(), identifier.clone());
+        if after_metadata.semantically_structural_nodes.contains_key(&key) {
+            continue; // Has a counterpart — handled by Pass 1/2.
+        }
+        // No after counterpart: mark this entire subtree as deleted.
+        let _ = apted::for_nodes(
+            &before_metadata,
+            &after_metadata,
+            vec![before_node_id],
+            vec![],
+            Algorithm::ZhangShasha,
+            diff,
+        );
+    }
+    for ((kind, identifier), &after_node_id) in &after_metadata.semantically_structural_nodes {
+        if diff.after_node_map.contains_key(&after_node_id) {
+            continue;
+        }
+        let key = (kind.clone(), identifier.clone());
+        if before_metadata.semantically_structural_nodes.contains_key(&key) {
+            continue; // Has a counterpart — handled by Pass 1/2.
+        }
+        // No before counterpart: mark this entire subtree as inserted.
+        let _ = apted::for_nodes(
+            &before_metadata,
+            &after_metadata,
+            vec![],
+            vec![after_node_id],
+            Algorithm::ZhangShasha,
+            diff,
+        );
     }
 }
 
