@@ -171,5 +171,65 @@ fn optimal_solution() -> Result<()> {
         "The ModuleType enum is not correctly mapped",
     );
 
+    // These are the enum Values that are not changed at all
+    let paths = [
+        ["enum_item:2", "enum_variant_list", "enum_variant:1"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:2"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:3"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:4"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:5"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:6"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:7"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:8"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:9"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:10"],
+        ["enum_item:2", "enum_variant_list", "enum_variant:11"],
+    ];
+    for path in paths.iter() {
+        let mapping =
+            test::helper::mapping_for_path(path, path, before_root, after_root, &diff_ast)?;
+        assert_eq!(
+            mapping.operation,
+            ASTMappingOperation::Identical,
+            "The first 11 enum values in ModuleType enum are not correctly detected as identical"
+        );
+    }
+
+    // The 12th variant is the deleted InlinedBytesJS
+    test::helper::was_tree_deleted(
+        &["enum_item:2", "enum_variant_list", "enum_variant:12"],
+        before_root,
+        &diff_ast,
+    )?;
+
+    // The remaining 2 variants match as identical, but they are now off-by-one in the two trees.
+    let mapping = test::helper::mapping_for_path(
+        &["enum_item:2", "enum_variant_list", "enum_variant:13"],
+        &["enum_item:2", "enum_variant_list", "enum_variant:12"],
+        before_root,
+        after_root,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The WebAssembly enum value in ModuleType enum is not correctly detected as identical"
+    );
+    let mapping = test::helper::mapping_for_path(
+        &["enum_item:2", "enum_variant_list", "enum_variant:14"],
+        &["enum_item:2", "enum_variant_list", "enum_variant:13"],
+        before_root,
+        after_root,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The Custom enum value in ModuleType enum is not correctly detected as identical"
+    );
+
+    // TODO: complete the optimal solution for the rest of the file. There is a lot  of changed
+    // nodes there, it's a real complicated diff.
+
     Ok(())
 }
