@@ -31,3 +31,5 @@ mod rust_hello_world_removed_message;
 mod rust_leetcode_1_bugfix;
 #[cfg(test)]
 mod rust_no_change;
+#[cfg(test)]
+mod rust_turbopack_module_rule;
