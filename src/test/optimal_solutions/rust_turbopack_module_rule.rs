@@ -141,12 +141,7 @@ fn optimal_solution() -> Result<()> {
     ];
     test::helper::was_tree_added(&path, after_root, &diff_ast)?;
 
-    // This is the ModuleType enum.
-    // There are 2 changes in the enum:
-    // 1. InlinedBytesJS enum value was deleted
-    // 2. Whitespace in StaticUrlJS was removed
-    //
-    // Only the 1st change is part of the diff. AST diffs ignore whitespace changes.
+    // This is the ModuleType enum. InlinedBytesJS enum variant was deleted.
 
     // First, the two attribute items above the enum, they are identical.
     let path = ["attribute_item:4"];
@@ -230,8 +225,56 @@ fn optimal_solution() -> Result<()> {
         "The Custom enum value in ModuleType enum is not correctly detected as identical"
     );
 
-    // TODO: complete the optimal solution for the rest of the file. There is a lot  of changed
-    // nodes there, it's a real complicated diff.
+    // Now we deal with impl Display for ModuleType.
+    // The only change is that the InlinedBytesJS was removed from the match.
+    //
+    let path = ["impl_item:2"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType is not correctly mapped",
+    );
+    let path = ["impl_item:2", "declaration_list"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType body is not correctly mapped",
+    );
+    let path = ["impl_item:2", "declaration_list", "function_item"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType - fmt function is not correctly mapped",
+    );
+
+    // The function parameters and the return value are the same
+    let path = [
+        "impl_item:2",
+        "declaration_list",
+        "function_item",
+        "parameters",
+    ];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The impl Display for ModuleType - fmt function is not correctly mapped",
+    );
+    let path = [
+        "impl_item:2",
+        "declaration_list",
+        "function_item",
+        "scoped_type_identifier",
+    ];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The impl Display for ModuleType - fmt function is not correctly mapped",
+    );
 
     Ok(())
 }
