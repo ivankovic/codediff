@@ -397,5 +397,10 @@ fn optimal_solution() -> Result<()> {
         "The ModuleType::Custom match arm in impl Display for ModuleType is not correctly mapped"
     );
 
+    assert!(
+        test::helper::was_tree_added(&["enum_item:3"], after_root, &diff_ast)?,
+        "The entire subtree for pub enum ConfiguredModuleType was not correctly marked as added"
+    );
+
     Ok(())
 }
