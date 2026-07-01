@@ -228,27 +228,13 @@ fn optimal_solution() -> Result<()> {
     // Now we deal with impl Display for ModuleType.
     // The only change is that the InlinedBytesJS was removed from the match.
     //
-    let path = ["impl_item:2"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType is not correctly mapped",
-    );
-    let path = ["impl_item:2", "declaration_list"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType body is not correctly mapped",
-    );
-    let path = ["impl_item:2", "declaration_list", "function_item"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType - fmt function is not correctly mapped",
-    );
+    assert!(test::helper::entire_path_has_mapping(
+        &["impl_item:2", "declaration_list", "function_item"],
+        before_root,
+        after_root,
+        &diff_ast,
+        ASTMappingOperation::MatchButNotIdentical
+    )?, "The impl Display for ModuleType path is not correctly mapped");
 
     // The function parameters and the return value are the same
     let path = [
@@ -277,43 +263,23 @@ fn optimal_solution() -> Result<()> {
     );
 
     // This is the block with the match statement
-    let path = ["impl_item:2", "declaration_list", "function_item", "block"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType - fmt function body (block) is not correctly mapped",
-    );
+    assert!(test::helper::entire_path_has_mapping(
+        &[
+            "impl_item:2",
+            "declaration_list",
+            "function_item",
+            "block",
+            "expression_statement",
+            "match_expression",
+            "match_block"
+        ],
+        before_root,
+        after_root,
+        &diff_ast,
+        ASTMappingOperation::MatchButNotIdentical
+    )?, "The impl Display for ModuleType - fmt function body path is not correctly mapped");
 
-    let path = [
-        "impl_item:2",
-        "declaration_list",
-        "function_item",
-        "block",
-        "expression_statement",
-    ];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType - fmt function body (expression_statement) is not correctly mapped",
-    );
-
-    let path = [
-        "impl_item:2",
-        "declaration_list",
-        "function_item",
-        "block",
-        "expression_statement",
-        "match_expression",
-    ];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType - fmt function body (match_expression) is not correctly mapped",
-    );
-
+    // We use these as starting points for the helper calls to make the path strings shorter.
     let path = [
         "impl_item:2",
         "declaration_list",
@@ -323,14 +289,6 @@ fn optimal_solution() -> Result<()> {
         "match_expression",
         "match_block",
     ];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The impl Display for ModuleType - fmt function body (match_block) is not correctly mapped",
-    );
-
-    // We use these as starting points for the helper calls to make the path strings shorter.
     let match_block_before = test::helper::node_for_path(before_root, &path)?;
     let match_block_after = test::helper::node_for_path(after_root, &path)?;
 

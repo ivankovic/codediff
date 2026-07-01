@@ -37,21 +37,13 @@ fn optimal_solution() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    let path = ["enum_item"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The enum as a whole is not correctly mapped"
-    );
-
-    let path = ["enum_item", "enum_variant_list"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The enums variant list as a whole is not correctly mapped"
-    );
+    assert!(test::helper::entire_path_has_mapping(
+        &["enum_item", "enum_variant_list"],
+        before_root,
+        after_root,
+        &diff_ast,
+        ASTMappingOperation::MatchButNotIdentical
+    )?, "The enum path is not correctly mapped");
 
     let path = ["enum_item", "enum_variant_list", "enum_variant:1"];
     let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
@@ -99,21 +91,13 @@ fn optimal_solution_for_reversed_diff() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    let path = ["enum_item"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The enum as a whole is not correctly mapped"
-    );
-
-    let path = ["enum_item", "enum_variant_list"];
-    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(
-        mapping.operation,
-        ASTMappingOperation::MatchButNotIdentical,
-        "The enums variant list as a whole is not correctly mapped"
-    );
+    assert!(test::helper::entire_path_has_mapping(
+        &["enum_item", "enum_variant_list"],
+        before_root,
+        after_root,
+        &diff_ast,
+        ASTMappingOperation::MatchButNotIdentical
+    )?, "The enum path is not correctly mapped");
 
     let path = ["enum_item", "enum_variant_list", "enum_variant:1"];
     let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;

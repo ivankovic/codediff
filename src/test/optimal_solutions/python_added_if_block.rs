@@ -44,15 +44,13 @@ fn python_added_if_block() -> Result<()> {
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     // The interesting part is the added if_statement
-    let path = vec!["if_statement"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-
-    let path = vec!["if_statement", "block"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
-    assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
+    assert!(test::helper::entire_path_has_mapping(
+        &["if_statement", "block"],
+        before_root,
+        after_root,
+        &diff_ast,
+        ASTMappingOperation::MatchButNotIdentical
+    )?, "The if_statement block path is not correctly mapped");
 
     let path = vec!["if_statement", "block", "expression_statement:1"];
     let mapping =

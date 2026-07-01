@@ -27,7 +27,7 @@ use tempfile::tempdir;
 use tree_sitter::Node;
 
 use crate::code::{Code, metadata};
-use crate::diff::{ASTDiff, ASTMapping};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation};
 
 /**
 * Follows path from the root node and returns the resulting node, if the path is valid.
@@ -113,6 +113,71 @@ pub fn mapping_for_path<'a>(
     let mapping = mapping.unwrap();
 
     Ok(mapping.clone())
+}
+
+/**
+* Returns true if all nodes along the given path in both trees have the same mapping operation.
+*
+* This function is useful for checking that a sequence of nodes that all have the same mapping
+* and path prefixes. For each node along the path (including intermediate nodes), it checks
+* that the corresponding nodes in the before and after trees have a mapping with the expected
+* operation.
+*
+* @param path The path to check in both trees (same path for before and after)
+* @param before_root The root node of the before tree
+* @param after_root The root node of the after tree
+* @param diff The ASTDiff containing the mappings
+* @param expected_operation The expected ASTMappingOperation that all nodes should have
+* @return true if all nodes along the path have the expected mapping operation
+*/
+pub fn entire_path_has_mapping<'a>(
+    path: &[&str],
+    before_root: Node<'a>,
+    after_root: Node<'a>,
+    diff: &ASTDiff,
+    expected_operation: ASTMappingOperation,
+) -> Result<bool> {
+    // Build up the path incrementally, checking each intermediate node
+    let mut current_before_path = Vec::new();
+    let mut current_after_path = Vec::new();
+
+    for &path_segment in path {
+        current_before_path.push(path_segment);
+        current_after_path.push(path_segment);
+
+        // Get the nodes at this level
+        match node_for_path(before_root, &current_before_path) {
+            Ok(node_before) => {
+                // Try to get the after node
+                match node_for_path(after_root, &current_after_path) {
+                    Ok(node_after) => {
+                        // Get the mapping for these nodes
+                        let mapping = diff.mapping.get(&(node_before.id(), node_after.id()));
+
+                        if let Some(mapping) = mapping {
+                            // Check if this mapping has the expected operation
+                            if mapping.operation != expected_operation {
+                                return Ok(false);
+                            }
+                        } else {
+                            // If there's no mapping, the path doesn't have the expected operation
+                            return Ok(false);
+                        }
+                    }
+                    Err(_) => {
+                        // If we can't find the path in the after tree, return false
+                        return Ok(false);
+                    }
+                }
+            }
+            Err(_) => {
+                // If we can't find the path in the before tree, return false
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
 }
 
 pub fn was_node_added<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Result<bool> {
@@ -777,6 +842,99 @@ mod tests {
         // Check that code objects are returned
         assert_ne!(before.contents, "");
         assert_ne!(after.contents, "");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_entire_path_has_mapping() -> Result<()> {
+        // Use rust-no-change since all nodes should have Identical mapping
+        let test_diffs = handmade_test_code_pairs()?;
+        let (before, after) = test_diffs
+            .get("rust-no-change")
+            .unwrap()
+            .clone();
+
+        let diff = crate::diff::diff_code(&before, &after);
+        let diff_ast = diff.ast.unwrap();
+        let before_ast = before.ast.unwrap();
+        let after_ast = after.ast.unwrap();
+
+        let before_root = before_ast.root_node();
+        let after_root = after_ast.root_node();
+
+        // rust-no-change has impl_item as a child of source_file (with comments before it)
+        // Test a path where all nodes should have Identical mapping (no changes)
+        let path = vec!["impl_item"];
+        assert!(entire_path_has_mapping(
+            &path,
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::Identical
+        )?);
+
+        let path = vec!["impl_item", "declaration_list"];
+        assert!(entire_path_has_mapping(
+            &path,
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::Identical
+        )?);
+
+        let path = vec!["impl_item", "declaration_list", "function_item"];
+        assert!(entire_path_has_mapping(
+            &path,
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::Identical
+        )?);
+
+        // Test with wrong expected operation - should return false
+        let path = vec!["impl_item"];
+        assert!(!entire_path_has_mapping(
+            &path,
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::MatchButNotIdentical
+        )?);
+
+        // Test with a non-existent path - should return false (no mapping)
+        let path = vec!["impl_item", "nonexistent"];
+        assert!(!entire_path_has_mapping(
+            &path,
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::Identical
+        )?);
+
+        // Test with rust-hello-world-added-message where we know function_item has MatchButNotIdentical
+        let test_diffs2 = handmade_test_code_pairs()?;
+        let (before2, after2) = test_diffs2
+            .get("rust-hello-world-added-message")
+            .unwrap()
+            .clone();
+
+        let diff2 = crate::diff::diff_code(&before2, &after2);
+        let diff_ast2 = diff2.ast.unwrap();
+        let before_ast2 = before2.ast.unwrap();
+        let after_ast2 = after2.ast.unwrap();
+        let before_root2 = before_ast2.root_node();
+        let after_root2 = after_ast2.root_node();
+
+        // Just check the function_item node - it has MatchButNotIdentical
+        let path = vec!["function_item"];
+        assert!(entire_path_has_mapping(
+            &path,
+            before_root2,
+            after_root2,
+            &diff_ast2,
+            ASTMappingOperation::MatchButNotIdentical
+        )?);
 
         Ok(())
     }
