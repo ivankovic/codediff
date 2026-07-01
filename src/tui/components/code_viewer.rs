@@ -168,6 +168,22 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
+    /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
+    /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
+    /// to match the active panel's cursor destination.
+    pub fn set_cursor_position(&mut self, row: usize, col: usize) {
+        let total_lines = self.line_count();
+        if total_lines == 0 {
+            return;
+        }
+        let clamped_row = row.min(total_lines.saturating_sub(1));
+        let line_len = self.widget.line_len(clamped_row);
+        let clamped_col = col.min(line_len);
+        self.state.cursor_row = clamped_row;
+        self.state.cursor_col = clamped_col;
+        self.scroll_to_cursor();
+    }
+
     /// Where the cursor should be drawn on screen within `area` (the same area passed to
     /// `draw`), accounting for the widget's own border and the current scroll position. `None`
     /// if the cursor's row is scrolled out of view, or its column is past the (not horizontally

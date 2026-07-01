@@ -117,10 +117,16 @@ impl DiffViewer {
     }
 
     /// Push the focused panel's current cursor destination onto the other panel's
-    /// cross-highlight; call after anything that can change the cursor or the focused panel.
+    /// cross-highlight, and move the other panel's cursor to follow the matched leaf node;
+    /// call after anything that can change the cursor or the focused panel.
     fn sync_cross_highlight(&mut self) {
         let destination = self.focused_viewer().cursor_destination();
-        self.other_viewer().set_highlight_destination(destination);
+        self.other_viewer().set_highlight_destination(destination.clone());
+        
+        // Also move the inactive side's cursor to follow the matched leaf node
+        if let Some(dest_range) = destination {
+            self.other_viewer().set_cursor_position(dest_range.start_row, dest_range.start_column);
+        }
     }
 
     /// Scroll the inactive panel's viewport so the destination row of the focused panel's cursor
@@ -520,5 +526,67 @@ mod tests {
         viewer.toggle_active_panel();
         assert!(viewer.left_viewer.state().is_focused);
         assert!(!viewer.right_viewer.state().is_focused);
+    }
+
+    /// Test that moving the cursor on the active side moves the inactive side's cursor to
+    /// follow the matched leaf node.
+    #[test]
+    fn moving_cursor_on_active_side_moves_inactive_side_cursor_to_matched_node() {
+        use crate::diff::text_range::TextRange;
+        use crate::diff::text::{TextOperation, RangeMatch};
+
+        let mut viewer = DiffViewer::new();
+        
+        // Create sample diff data with two ranges
+        let data = DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: "abc\ndef\nghi".to_string(),
+            after_contents: "ABC\nDEF\nGHI".to_string(),
+            before_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 0, 3),
+                    destination: TextRange::new(0, 0, 0, 3),
+                    operation: TextOperation::Update,
+                },
+                RangeMatch {
+                    source: TextRange::new(1, 0, 1, 3),
+                    destination: TextRange::new(1, 0, 1, 3),
+                    operation: TextOperation::Update,
+                },
+            ],
+            after_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 0, 3),
+                    destination: TextRange::new(0, 0, 0, 3),
+                    operation: TextOperation::Update,
+                },
+                RangeMatch {
+                    source: TextRange::new(1, 0, 1, 3),
+                    destination: TextRange::new(1, 0, 1, 3),
+                    operation: TextOperation::Update,
+                },
+            ],
+        };
+        
+        viewer.load_diff(&data);
+        
+        // Initially, cursor should be on first range (0, 0)
+        assert_eq!(viewer.left_viewer.state().cursor_row, 0);
+        assert_eq!(viewer.left_viewer.state().cursor_col, 0);
+        
+        // The right side's cursor should also be at (0, 0) to follow the matched node
+        assert_eq!(viewer.right_viewer.state().cursor_row, 0);
+        assert_eq!(viewer.right_viewer.state().cursor_col, 0);
+        
+        // Move cursor down on left side
+        viewer.move_cursor_vertical(1);
+        
+        // Left cursor should now be on row 1
+        assert_eq!(viewer.left_viewer.state().cursor_row, 1);
+        
+        // Right cursor should follow to the matched destination (row 1, col 0)
+        assert_eq!(viewer.right_viewer.state().cursor_row, 1);
+        assert_eq!(viewer.right_viewer.state().cursor_col, 0);
     }
 }
