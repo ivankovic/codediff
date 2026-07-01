@@ -273,7 +273,128 @@ fn optimal_solution() -> Result<()> {
     assert_eq!(
         mapping.operation,
         ASTMappingOperation::Identical,
-        "The impl Display for ModuleType - fmt function is not correctly mapped",
+        "The impl Display for ModuleType - fmt function return type is not correctly mapped",
+    );
+
+    // This is the block with the match statement
+    let path = ["impl_item:2", "declaration_list", "function_item", "block"];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType - fmt function body (block) is not correctly mapped",
+    );
+
+    let path = [
+        "impl_item:2",
+        "declaration_list",
+        "function_item",
+        "block",
+        "expression_statement",
+    ];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType - fmt function body (expression_statement) is not correctly mapped",
+    );
+
+    let path = [
+        "impl_item:2",
+        "declaration_list",
+        "function_item",
+        "block",
+        "expression_statement",
+        "match_expression",
+    ];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType - fmt function body (match_expression) is not correctly mapped",
+    );
+
+    let path = [
+        "impl_item:2",
+        "declaration_list",
+        "function_item",
+        "block",
+        "expression_statement",
+        "match_expression",
+        "match_block",
+    ];
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::MatchButNotIdentical,
+        "The impl Display for ModuleType - fmt function body (match_block) is not correctly mapped",
+    );
+
+    // We use these as starting points for the helper calls to make the path strings shorter.
+    let match_block_before = test::helper::node_for_path(before_root, &path)?;
+    let match_block_after = test::helper::node_for_path(after_root, &path)?;
+
+    // These are the match arms that are not changed.
+    let paths = [
+        // The first 11 match_arms are identical, as are the last 2.
+        // However, because the 12th was deleted, it moves the indexing on the after side so we only
+        // check for 1 to 11 here.
+        ["match_arm:1"],
+        ["match_arm:2"],
+        ["match_arm:3"],
+        ["match_arm:4"],
+        ["match_arm:5"],
+        ["match_arm:6"],
+        ["match_arm:7"],
+        ["match_arm:8"],
+        ["match_arm:9"],
+        ["match_arm:10"],
+        ["match_arm:11"],
+    ];
+    for path in paths.iter() {
+        let mapping = test::helper::mapping_for_path(
+            path,
+            path,
+            match_block_before,
+            match_block_after,
+            &diff_ast,
+        )?;
+        assert_eq!(
+            mapping.operation,
+            ASTMappingOperation::Identical,
+            "The first 11 match arms in impl Display for ModuleType are not correctly mapped"
+        );
+    }
+
+    assert!(test::helper::was_tree_deleted(
+        &["match_arm:12"],
+        match_block_before,
+        &diff_ast
+    )?);
+
+    let mapping = test::helper::mapping_for_path(
+        &["match_arm:13"],
+        &["match_arm:12"],
+        match_block_before,
+        match_block_after,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The ModuleType::WebAssembly match arm in impl Display for ModuleType is not correctly mapped"
+    );
+    let mapping = test::helper::mapping_for_path(
+        &["match_arm:14"],
+        &["match_arm:13"],
+        match_block_before,
+        match_block_after,
+        &diff_ast,
+    )?;
+    assert_eq!(
+        mapping.operation,
+        ASTMappingOperation::Identical,
+        "The ModuleType::Custom match arm in impl Display for ModuleType is not correctly mapped"
     );
 
     Ok(())
