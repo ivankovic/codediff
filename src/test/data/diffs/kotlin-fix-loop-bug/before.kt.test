@@ -1,0 +1,14 @@
+fun findIndex(items: List<String>, target: String): Int {
+    for (i in 0 until items.size) {
+        if (items[i] == target) {
+            return i
+        }
+    }
+    return -1
+}
+
+fun main() {
+    val items = listOf("a", "b", "c")
+    val index = findIndex(items, "b")
+    println(index)
+}

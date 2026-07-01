@@ -1,0 +1,9 @@
+function fetchData(callback: (data: string) => void): void {
+    setTimeout(() => {
+        callback("Hello, World!");
+    }, 1000);
+}
+
+fetchData((data) => {
+    console.log(data);
+});

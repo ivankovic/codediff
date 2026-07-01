@@ -1,0 +1,10 @@
+data class Person(val name: String, val age: Int)
+
+fun createPerson(name: String, age: Int): Person {
+    return Person(name, age)
+}
+
+fun main() {
+    val person = createPerson("Alice", 30)
+    println(person)
+}

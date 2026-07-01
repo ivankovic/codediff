@@ -1,0 +1,15 @@
+#include <vector>
+#include <iostream>
+
+void printVector(const std::vector<int>& vec) {
+    for (int num : vec) {
+        std::cout << num << " ";
+    }
+    std::cout << "\n";
+}
+
+int main() {
+    const std::vector<int> numbers = {1, 2, 3, 4, 5};
+    printVector(numbers);
+    return 0;
+}

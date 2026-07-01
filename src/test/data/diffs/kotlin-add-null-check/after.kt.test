@@ -1,0 +1,12 @@
+fun processUserInput(input: String?): String {
+    if (input == null) {
+        return ""
+    }
+    return input.uppercase()
+}
+
+fun main() {
+    val input: String? = null
+    val result = processUserInput(input)
+    println(result)
+}

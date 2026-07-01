@@ -1,0 +1,30 @@
+interface Person {
+    name: string;
+    email: string;
+    getName(): string;
+    getEmail(): string;
+}
+
+class User implements Person {
+    constructor(public name: string, public email: string) {}
+    
+    getName(): string {
+        return this.name;
+    }
+    
+    getEmail(): string {
+        return this.email;
+    }
+}
+
+class Admin implements Person {
+    constructor(public name: string, public email: string) {}
+    
+    getName(): string {
+        return this.name;
+    }
+    
+    getEmail(): string {
+        return this.email;
+    }
+}

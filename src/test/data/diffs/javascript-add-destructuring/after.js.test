@@ -1,0 +1,9 @@
+const user = {
+    name: 'Alice',
+    age: 30,
+    email: 'alice@example.com'
+};
+
+const { name, age, email } = user;
+
+console.log(name, age, email);

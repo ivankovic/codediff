@@ -1,0 +1,14 @@
+public class Calculator {
+    public int divide(int a, int b) {
+        System.out.println("Dividing " + a + " by " + b);
+        return a / b;
+    }
+
+    public static void main(String[] args) {
+        Calculator calculator = new Calculator();
+        System.out.println("Starting calculation...");
+        int result = calculator.divide(10, 2);
+        System.out.println("Result: " + result);
+        System.out.println("Calculation complete.");
+    }
+}

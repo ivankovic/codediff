@@ -1,0 +1,14 @@
+fun calculateRectangleArea(width: Double, height: Double): Double {
+    return width * height
+}
+
+fun calculateRectanglePerimeter(width: Double, height: Double): Double {
+    return 2 * (width + height)
+}
+
+fun main() {
+    val width = 5.0
+    val height = 3.0
+    println("Area: ${calculateRectangleArea(width, height)}")
+    println("Perimeter: ${calculateRectanglePerimeter(width, height)}")
+}

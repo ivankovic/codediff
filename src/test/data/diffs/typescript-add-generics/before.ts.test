@@ -1,0 +1,17 @@
+class NumberContainer {
+    private value: number;
+    
+    constructor(value: number) {
+        this.value = value;
+    }
+    
+    getValue(): number {
+        return this.value;
+    }
+    
+    setValue(value: number): void {
+        this.value = value;
+    }
+}
+
+const container = new NumberContainer(42);

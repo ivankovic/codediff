@@ -1,0 +1,13 @@
+#include <iostream>
+
+class Resource {
+public:
+    Resource() { std::cout << "Resource acquired\n"; }
+    ~Resource() { std::cout << "Resource released\n"; }
+};
+
+int main() {
+    Resource* res = new Resource();
+    // Use resource
+    return 0;
+}

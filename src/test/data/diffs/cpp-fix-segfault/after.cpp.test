@@ -1,0 +1,19 @@
+#include <iostream>
+
+int* findValue(int* array, int size, int target) {
+    for (int i = 0; i < size; i++) {
+        if (array[i] == target) {
+            return &array[i];
+        }
+    }
+    return nullptr;
+}
+
+int main() {
+    int arr[5] = {1, 2, 3, 4, 5};
+    int* result = findValue(arr, 5, 3);
+    if (result) {
+        std::cout << "Found: " << *result << "\n";
+    }
+    return 0;
+}

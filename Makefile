@@ -29,6 +29,19 @@ build: test
 hermetic-benchmark:
 	cargo bench -- diff
 
+benchmark-hermetic:
+	cargo bench
+
+# Benchmark against existing sampled pairs for all languages in benchmark_all.sh (Rust, Python, Go, Kotlin)
+# and run analysis afterwards
+benchmark-sampled: build
+	@echo "Running benchmarks for all languages (Rust, Python, Go, Kotlin)..."
+	@echo "Results will be written to research/results/"
+	cd research && ./measure/benchmark_all.sh --language all --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
+	@echo ""
+	@echo "Running analysis..."
+	cd research && uv run ./analysis/benchmark_report.py
+
 # Fetch repositories using the current mode
 fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
 	$(SCRIPTS_FETCH_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)

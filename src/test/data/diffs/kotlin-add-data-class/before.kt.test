@@ -1,0 +1,11 @@
+fun createPerson(name: String, age: Int): Map<String, Any> {
+    return mapOf(
+        "name" to name,
+        "age" to age
+    )
+}
+
+fun main() {
+    val person = createPerson("Alice", 30)
+    println(person)
+}

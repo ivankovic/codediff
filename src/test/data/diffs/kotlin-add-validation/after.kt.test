@@ -1,0 +1,14 @@
+fun registerUser(email: String, password: String): Boolean {
+    if (!email.contains("@")) {
+        throw IllegalArgumentException("Invalid email format")
+    }
+    if (password.length < 8) {
+        throw IllegalArgumentException("Password must be at least 8 characters")
+    }
+    println("Registering user with email: $email")
+    return true
+}
+
+fun main() {
+    registerUser("test@example.com", "password123")
+}

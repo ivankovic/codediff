@@ -1,0 +1,9 @@
+fun processUserInput(input: String?): String {
+    return input.uppercase()
+}
+
+fun main() {
+    val input: String? = null
+    val result = processUserInput(input)
+    println(result)
+}

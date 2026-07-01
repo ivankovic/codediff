@@ -1,0 +1,14 @@
+#include <iostream>
+
+class IntBox {
+    int value;
+public:
+    IntBox(int v) : value(v) {}
+    int getValue() const { return value; }
+};
+
+int main() {
+    IntBox box(42);
+    std::cout << "Value: " << box.getValue() << "\n";
+    return 0;
+}

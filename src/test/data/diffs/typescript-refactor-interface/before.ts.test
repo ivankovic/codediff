@@ -1,0 +1,23 @@
+class User {
+    constructor(public name: string, public email: string) {}
+    
+    getName(): string {
+        return this.name;
+    }
+    
+    getEmail(): string {
+        return this.email;
+    }
+}
+
+class Admin {
+    constructor(public name: string, public email: string) {}
+    
+    getName(): string {
+        return this.name;
+    }
+    
+    getEmail(): string {
+        return this.email;
+    }
+}

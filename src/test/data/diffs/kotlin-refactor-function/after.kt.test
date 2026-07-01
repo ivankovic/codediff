@@ -1,0 +1,10 @@
+data class Rectangle(val width: Double, val height: Double) {
+    fun area(): Double = width * height
+    fun perimeter(): Double = 2 * (width + height)
+}
+
+fun main() {
+    val rectangle = Rectangle(5.0, 3.0)
+    println("Area: ${rectangle.area()}")
+    println("Perimeter: ${rectangle.perimeter()}")
+}

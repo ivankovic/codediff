@@ -1,0 +1,6 @@
+function findIndex(array, target) {
+    return array.indexOf(target);
+}
+
+const numbers = [1, 2, 3, 4, 5];
+const index = findIndex(numbers, 3);

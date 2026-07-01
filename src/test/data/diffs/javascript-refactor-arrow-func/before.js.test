@@ -1,0 +1,11 @@
+const numbers = [1, 2, 3, 4, 5];
+
+const doubled = numbers.map(function(n) {
+    return n * 2;
+});
+
+const evens = numbers.filter(function(n) {
+    return n % 2 === 0;
+});
+
+console.log(doubled, evens);

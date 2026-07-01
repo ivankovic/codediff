@@ -1,0 +1,8 @@
+fun registerUser(email: String, password: String): Boolean {
+    println("Registering user with email: $email")
+    return true
+}
+
+fun main() {
+    registerUser("test@example.com", "password123")
+}

@@ -1,0 +1,14 @@
+#include <iostream>
+#include <memory>
+
+class Resource {
+public:
+    Resource() { std::cout << "Resource acquired\n"; }
+    ~Resource() { std::cout << "Resource released\n"; }
+};
+
+int main() {
+    std::unique_ptr<Resource> res = std::make_unique<Resource>();
+    // Use resource
+    return 0;
+}

@@ -1,0 +1,12 @@
+async function fetchData(): Promise<string> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve("Hello, World!");
+        }, 1000);
+    });
+}
+
+(async () => {
+    const data = await fetchData();
+    console.log(data);
+})();

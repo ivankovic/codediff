@@ -1,0 +1,12 @@
+#include <vector>
+#include <algorithm>
+
+int findMin(const std::vector<int>& vec) {
+    if (vec.empty()) return 0;
+    return *std::min_element(vec.begin(), vec.end());
+}
+
+int main() {
+    std::vector<int> numbers = {5, 2, 8, 1, 9};
+    return findMin(numbers);
+}
