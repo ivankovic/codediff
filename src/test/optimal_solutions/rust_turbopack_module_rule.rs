@@ -402,5 +402,66 @@ fn optimal_solution() -> Result<()> {
         "The entire subtree for pub enum ConfiguredModuleType was not correctly marked as added"
     );
 
+    // This is the more subjective part of this diff.
+    //
+    // impl ConfiguredModuleType fn parse is new, since ConfiguredModuleType is itself new.
+    //
+    // But the match is partially the logical functionality that was previously in
+    // ModuleType::from_str_with_defaults. In particular, the match arms have the same patterns.
+    //
+    // If we think about the human in this case, what a reviewer would like to see is:
+    //
+    // 1. These are roughly the same match patterns.
+    // 2. Is any pattern missing?
+    // 3. Was any pattern added?
+
+    assert!(
+        test::helper::was_node_added(&["impl_item:3"], after_root, &diff_ast)?,
+        "The impl ConfiguredModuleType impl_item was not correctly marked as added",
+    );
+
+    assert!(
+        test::helper::was_node_added(&["impl_item:3", "declaration_list"], after_root, &diff_ast)?,
+        "The impl ConfiguredModuleType declaration_list was not correctly marked as added",
+    );
+
+    assert!(
+        test::helper::was_node_added(
+            &["impl_item:3", "declaration_list", "function_item:1"],
+            after_root,
+            &diff_ast
+        )?,
+        "The impl ConfiguredModuleType fn parse was not correctly marked as added",
+    );
+
+    assert!(
+        test::helper::was_node_added(
+            &[
+                "impl_item:3",
+                "declaration_list",
+                "function_item:1",
+                "block"
+            ],
+            after_root,
+            &diff_ast
+        )?,
+        "The impl ConfiguredModuleType fn parse block was not correctly marked as added",
+    );
+
+    assert!(
+        test::helper::was_node_added(
+            &[
+                "impl_item:3",
+                "declaration_list",
+                "function_item:1",
+                "block",
+                "call_expression"
+            ],
+            after_root,
+            &diff_ast
+        )?,
+        "The impl ConfiguredModuleType fn parse block was not correctly marked as added",
+    );
+
     Ok(())
 }
