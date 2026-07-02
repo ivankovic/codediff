@@ -24,7 +24,9 @@ case "$1" in
   cpp-*)    lang="cpp" ;;
   go-*)     lang="go" ;;
   js-*)     lang="js" ;;
+  javascript-*)     lang="js" ;;
   ts-*)     lang="ts" ;;
+  typescript-*)     lang="ts" ;;
   ruby-*)   lang="rb" ;;
   swift-*)  lang="swift" ;;
   kotlin-*) lang="kt" ;;

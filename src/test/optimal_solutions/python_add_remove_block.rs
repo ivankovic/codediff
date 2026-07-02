@@ -15,35 +15,11 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#[cfg(test)]
-mod java_add_logging;
-#[cfg(test)]
-mod kotlin_add_validation;
-#[cfg(test)]
-mod python_add_remove_block;
-#[cfg(test)]
-mod python_added_if_block;
-#[cfg(test)]
-mod python_added_if_block_small;
-#[cfg(test)]
-mod python_refactoring;
-#[cfg(test)]
-mod rust_add_if;
-#[cfg(test)]
-mod rust_add_to_existing_use;
-#[cfg(test)]
-mod rust_add_value_to_enum;
-#[cfg(test)]
-mod rust_algorithm_change;
-#[cfg(test)]
-mod rust_hash_optimization;
-#[cfg(test)]
-mod rust_hello_world_added_message;
-#[cfg(test)]
-mod rust_hello_world_removed_message;
-#[cfg(test)]
-mod rust_leetcode_1_bugfix;
-#[cfg(test)]
-mod rust_no_change;
-#[cfg(test)]
-mod rust_turbopack_module_rule;
+use anyhow::Result;
+
+use crate::test;
+
+#[test]
+fn optimal_solution() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping("python-add-remove-block")
+}
