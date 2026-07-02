@@ -54,7 +54,16 @@
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
 *   s              save human_mapping.json and ensure the optimal_solutions test stub exists
+*   o              open a different test case: lists every directory under src/test/data/diffs/,
+*                  j/k to move, Enter to open, Esc to cancel. If the current mapping has unsaved
+*                  changes, asks first whether to save or discard them before switching
 *   q / Esc        quit
+*
+* After a match finalizes (including a modal answer), both panels' cursors auto-advance to their
+* own next unmarked node (if one exists past the current position). After an insert or delete,
+* only the panel that was actually marked (After or Before, respectively) auto-advances, since the
+* other side wasn't touched. This makes stepping through a tree top to bottom mostly just holding
+* down the marking key.
 */
 use std::io::{self, Stdout};
 use std::time::Duration;
@@ -80,6 +89,7 @@ use std::fs;
 use std::path::PathBuf;
 use tree_sitter::Node;
 
+use codediff::code::Code;
 use codediff::test::helper::human_mapping::{self, HumanMapping, HumanMappingEntry, HumanOperation};
 use codediff::test::helper::{node_for_path, path_for_node};
 
@@ -95,14 +105,12 @@ struct Args {
     name: String,
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
-    let name = args.name;
-
+/// Loads and parses the before/after code for a test case, by name.
+fn load_case(name: &str) -> Result<(Code, Code)> {
     let mut pairs = codediff::test::helper::handmade_test_code_pairs()
         .context("Failed to load test code pairs from src/test/data/diffs")?;
 
-    let (before, after) = pairs.remove(&name).ok_or_else(|| {
+    let (before, after) = pairs.remove(name).ok_or_else(|| {
         let mut available: Vec<_> = pairs.keys().cloned().collect();
         available.sort();
         anyhow!(
@@ -112,20 +120,47 @@ fn main() -> Result<()> {
         )
     })?;
 
-    let before_tree = before
-        .ast
-        .as_ref()
-        .context("Before code has no AST (unsupported or undetected language)")?;
-    let after_tree = after
-        .ast
-        .as_ref()
-        .context("After code has no AST (unsupported or undetected language)")?;
-    let before_root = before_tree.root_node();
-    let after_root = after_tree.root_node();
+    if before.ast.is_none() {
+        bail!("Before code for '{}' has no AST (unsupported or undetected language)", name);
+    }
+    if after.ast.is_none() {
+        bail!("After code for '{}' has no AST (unsupported or undetected language)", name);
+    }
+
+    Ok((before, after))
+}
+
+/// Names of every directory under `src/test/data/diffs/` (not just the ones that successfully
+/// parse into a Code pair), for the `o` (open) picker.
+fn list_available_cases() -> Result<Vec<String>> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+
+    let mut names: Vec<String> = fs::read_dir(&root)
+        .with_context(|| format!("reading {:?}", root))?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect();
+    names.sort();
+
+    Ok(names)
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+    let name = args.name;
+
+    let (before, after) = load_case(&name)?;
+    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
     let mapping = human_mapping::load(&name).unwrap_or_default();
 
-    let mut app = App::new(before_root.id(), after_root.id(), mapping);
+    let mut app = App::new(name, before_root_id, after_root_id, mapping);
 
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -134,15 +169,7 @@ fn main() -> Result<()> {
     }));
 
     let mut terminal = setup_terminal()?;
-    let result = run_event_loop(
-        &mut terminal,
-        &mut app,
-        &name,
-        before_root,
-        after_root,
-        before.contents.as_bytes(),
-        after.contents.as_bytes(),
-    );
+    let result = run_event_loop(&mut terminal, &mut app, before, after);
     restore_terminal()?;
 
     result
@@ -226,9 +253,17 @@ enum Modal {
         after_kind: String,
         recursive: bool,
     },
+    /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
+    OpenDiffPicker { options: Vec<String>, selected: usize },
+    /// Raised when the picker's selection is confirmed while the current mapping has unsaved
+    /// changes: asks whether to save the *current* case before switching to `target`.
+    ConfirmDiscardUnsaved { target: String },
 }
 
 struct App {
+    /// Name of the currently open test case (a directory under src/test/data/diffs/). Can change
+    /// at runtime via the `o` (open) picker.
+    name: String,
     focus: Focus,
     before: PanelState,
     after: PanelState,
@@ -240,15 +275,16 @@ struct App {
 }
 
 impl App {
-    fn new(before_root_id: usize, after_root_id: usize, mapping: HumanMapping) -> Self {
+    fn new(name: String, before_root_id: usize, after_root_id: usize, mapping: HumanMapping) -> Self {
         Self {
+            name,
             focus: Focus::Before,
             before: PanelState::new(before_root_id),
             after: PanelState::new(after_root_id),
             mapping,
             dirty: false,
             status: Some(
-                "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit.".to_string(),
+                "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open.".to_string(),
             ),
             modal: None,
             should_quit: false,
@@ -284,12 +320,22 @@ fn walk_visible<'a>(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MarkKind {
+    Deleted,
+    Inserted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NodeStatus {
     Unmarked,
     Matched,
     /// `inherited` is true when this node isn't marked directly but an ancestor is marked
     /// with `with_children`, implying this node too.
-    Marked { with_children: bool, inherited: bool },
+    Marked {
+        kind: MarkKind,
+        with_children: bool,
+        inherited: bool,
+    },
 }
 
 /// Resolved node IDs for every human-authored entry, used to look up a node's status in O(1)
@@ -370,12 +416,14 @@ fn status_before(node: Node, caches: &Caches) -> NodeStatus {
     }
     if let Some(&with_children) = caches.before_removed.get(&node.id()) {
         return NodeStatus::Marked {
+            kind: MarkKind::Deleted,
             with_children,
             inherited: false,
         };
     }
     if is_inherited_removed(node, &caches.before_removed) {
         return NodeStatus::Marked {
+            kind: MarkKind::Deleted,
             with_children: true,
             inherited: true,
         };
@@ -389,12 +437,14 @@ fn status_after(node: Node, caches: &Caches) -> NodeStatus {
     }
     if let Some(&with_children) = caches.after_removed.get(&node.id()) {
         return NodeStatus::Marked {
+            kind: MarkKind::Inserted,
             with_children,
             inherited: false,
         };
     }
     if is_inherited_removed(node, &caches.after_removed) {
         return NodeStatus::Marked {
+            kind: MarkKind::Inserted,
             with_children: true,
             inherited: true,
         };
@@ -423,6 +473,54 @@ fn jump_to_edge(panel: &mut PanelState, flat: &[(Node, usize)], to_start: bool) 
     if let Some((node, _)) = edge {
         panel.cursor_id = node.id();
     }
+}
+
+/// Moves `panel`'s cursor forward to the next node (strictly after the current position) with
+/// `NodeStatus::Unmarked`, if one exists. Leaves the cursor untouched otherwise.
+fn advance_to_next_unmarked(
+    panel: &mut PanelState,
+    flat: &[(Node, usize)],
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) {
+    let Some(idx) = flat.iter().position(|(n, _)| n.id() == panel.cursor_id) else {
+        return;
+    };
+    for (node, _) in &flat[idx + 1..] {
+        if status_fn(*node, caches) == NodeStatus::Unmarked {
+            panel.cursor_id = node.id();
+            return;
+        }
+    }
+}
+
+/// After a match finalizes, walks both panels' cursors forward to their own next unmarked node
+/// (independently), as a quality-of-life step-through-the-tree convenience. Recomputes caches
+/// fresh from `app.mapping`, since the caller's caches predate the change that was just applied.
+fn advance_both_to_next_unmarked(
+    app: &mut App,
+    before_flat: &[(Node, usize)],
+    after_flat: &[(Node, usize)],
+    before_root: Node,
+    after_root: Node,
+) {
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
+    advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
+}
+
+/// Same as [`advance_both_to_next_unmarked`], but only for the Before panel: used after a
+/// delete, which only touches the Before side, so only that cursor should step forward.
+fn advance_before_to_next_unmarked(app: &mut App, before_flat: &[(Node, usize)], before_root: Node, after_root: Node) {
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
+}
+
+/// Same as [`advance_both_to_next_unmarked`], but only for the After panel: used after an
+/// insert, which only touches the After side, so only that cursor should step forward.
+fn advance_after_to_next_unmarked(app: &mut App, after_flat: &[(Node, usize)], before_root: Node, after_root: Node) {
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
 
 fn expand_or_descend(panel: &mut PanelState, flat: &[(Node, usize)]) {
@@ -975,17 +1073,35 @@ fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
         NodeStatus::Unmarked => (" ", Style::default().fg(Color::Gray)),
         NodeStatus::Matched => ("M", Style::default().fg(Color::Cyan)),
         NodeStatus::Marked {
+            kind: MarkKind::Deleted,
             with_children: false,
             inherited: false,
-        } => ("x", Style::default().fg(Color::Red)),
+        } => ("-", Style::default().fg(Color::Red)),
         NodeStatus::Marked {
+            kind: MarkKind::Deleted,
             with_children: true,
             inherited: false,
-        } => ("X", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-        NodeStatus::Marked { inherited: true, .. } => (
-            "x",
-            Style::default().fg(Color::Red).add_modifier(Modifier::DIM),
-        ),
+        } => ("-", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        NodeStatus::Marked {
+            kind: MarkKind::Deleted,
+            inherited: true,
+            ..
+        } => ("-", Style::default().fg(Color::Red).add_modifier(Modifier::DIM)),
+        NodeStatus::Marked {
+            kind: MarkKind::Inserted,
+            with_children: false,
+            inherited: false,
+        } => ("+", Style::default().fg(Color::Green)),
+        NodeStatus::Marked {
+            kind: MarkKind::Inserted,
+            with_children: true,
+            inherited: false,
+        } => ("+", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        NodeStatus::Marked {
+            kind: MarkKind::Inserted,
+            inherited: true,
+            ..
+        } => ("+", Style::default().fg(Color::Green).add_modifier(Modifier::DIM)),
     }
 }
 
@@ -1128,7 +1244,7 @@ fn draw_ui(
     frame.render_widget(Paragraph::new(footer).wrap(Wrap { trim: true }), chunks[2]);
 
     if let Some(modal) = &app.modal {
-        render_modal(frame, size, modal);
+        render_modal(frame, size, modal, name);
     }
 }
 
@@ -1152,15 +1268,17 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
-fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal) {
-    let (title, body) = match modal {
+fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal, current_name: &str) {
+    match modal {
         Modal::ConfirmKindMismatch {
             before_kind,
             after_kind,
             ..
-        } => (
+        } => render_text_modal(
+            frame,
+            area,
             "Node kinds do not match!",
-            format!(
+            &format!(
                 "Before: {}\nAfter:  {}\n\nAre you sure you want to add this mapping? (y/n)",
                 before_kind, after_kind
             ),
@@ -1169,22 +1287,79 @@ fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal) {
             before_kind,
             after_kind,
             ..
-        } => (
+        } => render_text_modal(
+            frame,
+            area,
             "Choose match type",
-            format!(
+            &format!(
                 "'{}' <-> '{}' both have children.\n\n[y] Identical    [n] MatchButNotIdentical    [Esc] Cancel",
                 before_kind, after_kind
             ),
         ),
-    };
+        Modal::OpenDiffPicker { options, selected } => {
+            render_open_picker(frame, area, options, *selected);
+        }
+        Modal::ConfirmDiscardUnsaved { target } => render_text_modal(
+            frame,
+            area,
+            "Unsaved changes",
+            &format!(
+                "'{}' has unsaved changes.\n\nSave before opening '{}'?\n\n[s] Save & Open    [d] Discard & Open    [Esc] Cancel",
+                current_name, target
+            ),
+        ),
+    }
+}
 
+fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
     let popup_area = centered_rect(60, 30, area);
     frame.render_widget(Clear, popup_area);
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
         .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
-    frame.render_widget(Paragraph::new(body).block(block).wrap(Wrap { trim: true }), popup_area);
+    frame.render_widget(
+        Paragraph::new(body.to_string()).block(block).wrap(Wrap { trim: true }),
+        popup_area,
+    );
+}
+
+/// Renders the `o` (open) picker: a scrollable list of test case names, with `selected`
+/// highlighted. Scroll position is recomputed fresh each frame from `selected` (no persisted
+/// state needed) by roughly centering it in the viewport, clamped to the list's extent.
+fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selected: usize) {
+    let popup_area = centered_rect(60, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    let max_scroll = options.len().saturating_sub(inner_height);
+    let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
+
+    let items: Vec<ListItem> = options
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(inner_height.max(1))
+        .map(|(i, name)| {
+            let style = if i == selected {
+                Style::default().bg(Color::Yellow).fg(Color::Black)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(name.clone(), style)))
+        })
+        .collect();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "Open diff ({}/{}) — j/k move, Enter open, Esc cancel",
+            selected + 1,
+            options.len()
+        ))
+        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+    frame.render_widget(List::new(items).block(block), popup_area);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1194,16 +1369,22 @@ fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal) {
 fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    name: &str,
-    before_root: Node,
-    after_root: Node,
-    before_src: &[u8],
-    after_src: &[u8],
+    mut before: Code,
+    mut after: Code,
 ) -> Result<()> {
     loop {
+        let before_root = before.ast.as_ref().context("Before code has no AST")?.root_node();
+        let after_root = after.ast.as_ref().context("After code has no AST")?.root_node();
+        let before_src = before.contents.as_bytes();
+        let after_src = after.contents.as_bytes();
+
         let before_flat = flatten_visible(before_root, &app.before.collapsed);
         let after_flat = flatten_visible(after_root, &app.after.collapsed);
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+
+        // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and passing
+        // both `app` and `&app.name` as separate arguments to the same call would conflict.
+        let current_name = app.name.clone();
 
         terminal.draw(|f| {
             draw_ui(
@@ -1214,16 +1395,18 @@ fn run_event_loop(
                 &caches,
                 before_src,
                 after_src,
-                name,
+                &current_name,
             )
         })?;
+
+        let mut open_request: Option<String> = None;
 
         if event::poll(Duration::from_millis(250))?
             && let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
         {
             if app.modal.is_some() {
-                handle_modal_key(
+                open_request = handle_modal_key(
                     app,
                     key.code,
                     &before_flat,
@@ -1243,10 +1426,33 @@ fn run_event_loop(
                     before_root,
                     after_root,
                     &caches,
-                    name,
                     before_src,
                     after_src,
                 );
+            }
+        }
+
+        // Applied after the borrows above (`before_root`/`before_flat`/... all borrow from
+        // `before`/`after`) have had their last use, so reassigning here is sound: the compiler
+        // ends those borrows at last-use, not at the end of the lexical scope.
+        if let Some(name) = open_request {
+            match load_case(&name) {
+                Ok((new_before, new_after)) => {
+                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
+                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    before = new_before;
+                    after = new_after;
+                    app.mapping = human_mapping::load(&name).unwrap_or_default();
+                    app.name = name;
+                    app.before = PanelState::new(before_root_id);
+                    app.after = PanelState::new(after_root_id);
+                    app.focus = Focus::Before;
+                    app.dirty = false;
+                    app.status = Some(format!("Opened '{}'", app.name));
+                }
+                Err(err) => {
+                    app.status = Some(format!("Error opening '{}': {:#}", name, err));
+                }
             }
         }
 
@@ -1266,7 +1472,6 @@ fn handle_key(
     before_root: Node,
     after_root: Node,
     caches: &Caches,
-    name: &str,
     before_src: &[u8],
     after_src: &[u8],
 ) {
@@ -1345,6 +1550,7 @@ fn handle_key(
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
+                    advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
                 }
                 Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
@@ -1367,6 +1573,7 @@ fn handle_key(
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
+                    advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
                 }
                 Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
@@ -1390,6 +1597,7 @@ fn handle_key(
                 );
                 if res.is_ok() {
                     app.dirty = true;
+                    advance_before_to_next_unmarked(app, before_flat, before_root, after_root);
                 }
                 Some(res)
             }
@@ -1411,6 +1619,7 @@ fn handle_key(
                 );
                 if res.is_ok() {
                     app.dirty = true;
+                    advance_after_to_next_unmarked(app, after_flat, before_root, after_root);
                 }
                 Some(res)
             }
@@ -1432,7 +1641,22 @@ fn handle_key(
             }
             Some(res)
         }
-        KeyCode::Char('s') => Some(action_save(&mut app.mapping, &mut app.dirty, name)),
+        KeyCode::Char('s') => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
+        KeyCode::Char('o') => {
+            match list_available_cases() {
+                Ok(options) if !options.is_empty() => {
+                    let selected = options.iter().position(|o| o == &app.name).unwrap_or(0);
+                    app.modal = Some(Modal::OpenDiffPicker { options, selected });
+                }
+                Ok(_) => {
+                    app.status = Some("No test cases found in src/test/data/diffs".to_string());
+                }
+                Err(err) => {
+                    app.status = Some(format!("Error listing cases: {:#}", err));
+                }
+            }
+            None
+        }
         _ => None,
     };
 
@@ -1444,8 +1668,11 @@ fn handle_key(
     }
 }
 
-/// Routes a keypress while `app.modal` is `Some`: only y/Y, n/N and Esc are understood, everything
-/// else is ignored so it doesn't leak through to the normal keybindings underneath the popup.
+/// Routes a keypress while `app.modal` is `Some`. Returns `Some(name)` when the human just
+/// confirmed switching to a different test case (via the open picker, possibly after a save/
+/// discard decision): the caller is responsible for actually loading it, since that needs
+/// mutable access to the owned `Code` values that `run_event_loop` holds, which can't be threaded
+/// down here alongside `Node`s borrowed from them.
 #[allow(clippy::too_many_arguments)]
 fn handle_modal_key(
     app: &mut App,
@@ -1457,9 +1684,9 @@ fn handle_modal_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-) {
+) -> Option<String> {
     let Some(modal) = app.modal.take() else {
-        return;
+        return None;
     };
 
     match modal {
@@ -1486,6 +1713,7 @@ fn handle_modal_key(
                     HumanOperation::MatchButNotIdentical,
                     recursive,
                 ));
+                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 app.status = Some("Cancelled: node kinds do not match".to_string());
@@ -1523,6 +1751,7 @@ fn handle_modal_key(
                     HumanOperation::Identical,
                     recursive,
                 ));
+                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }
             KeyCode::Char('n') | KeyCode::Char('N') => {
                 app.dirty = true;
@@ -1540,6 +1769,7 @@ fn handle_modal_key(
                     HumanOperation::MatchButNotIdentical,
                     recursive,
                 ));
+                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }
             KeyCode::Esc => {
                 app.status = Some("Cancelled".to_string());
@@ -1554,7 +1784,59 @@ fn handle_modal_key(
                 });
             }
         },
+        Modal::OpenDiffPicker { options, selected } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::OpenDiffPicker {
+                    selected: selected.saturating_sub(1),
+                    options,
+                });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::OpenDiffPicker {
+                    selected: (selected + 1).min(options.len().saturating_sub(1)),
+                    options,
+                });
+            }
+            KeyCode::Enter => {
+                let target = options[selected].clone();
+                if app.dirty {
+                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target });
+                } else {
+                    return Some(target);
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::OpenDiffPicker { options, selected });
+            }
+        },
+        Modal::ConfirmDiscardUnsaved { target } => match code {
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
+                    Ok(_) => return Some(target),
+                    Err(err) => {
+                        app.status = Some(format!(
+                            "Save failed ({:#}); not opening '{}'.",
+                            err, target
+                        ));
+                    }
+                }
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {
+                return Some(target);
+            }
+            KeyCode::Esc | KeyCode::Char('c') | KeyCode::Char('C') => {
+                app.status = Some("Cancelled".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::ConfirmDiscardUnsaved { target });
+            }
+        },
     }
+
+    None
 }
 
 fn action_save(mapping: &mut HumanMapping, dirty: &mut bool, name: &str) -> Result<String> {
