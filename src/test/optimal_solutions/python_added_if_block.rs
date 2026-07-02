@@ -122,3 +122,8 @@ fn python_added_if_block() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn matches_human_solution() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping("python-added-if-block")
+}

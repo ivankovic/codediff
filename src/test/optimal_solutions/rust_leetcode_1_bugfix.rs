@@ -80,3 +80,8 @@ fn optimal_solution() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn matches_human_solution() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping("rust-leetcode-1-bugfix")
+}
