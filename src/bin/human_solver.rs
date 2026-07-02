@@ -20,7 +20,8 @@
 * A helper binary for building the ground-truth AST mappings used by src/test/optimal_solutions.
 *
 * Run as `cargo run --bin human_solver -- <name>`, where `<name>` is the name of a directory under
-* `src/test/data/diffs/` (e.g. "rust-add-if"). It opens a Ratatui TUI showing the TreeSitter ASTs
+* `src/test/data/diffs/` (e.g. "rust-add-if"). If `<name>` is omitted, it opens the `o` case picker
+* directly so you can choose one. It opens a Ratatui TUI showing the TreeSitter ASTs
 * of the before and after code side by side (not the source text), lets a human walk both trees
 * independently and mark nodes as matching, deleted or inserted, and saves the result as
 * `src/test/data/diffs/<name>/human_mapping.json`. It also creates the corresponding
@@ -49,7 +50,9 @@
 *                  the top-level pair is interactive (same rules as `m`); matched descendants are
 *                  classified automatically, bottom-up: Identical only if every node beneath it is
 *                  also Identical, otherwise MatchButNotIdentical -- prompting per node would be
-*                  unusable for a tree of any size
+*                  unusable for a tree of any size. Any pair (top-level or descendant) that ends up
+*                  classified Identical and has children is collapsed in both panels, to keep
+*                  whole-unchanged subtrees from cluttering the view
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
@@ -101,8 +104,9 @@ use codediff::test::helper::{node_for_path, path_for_node};
 )]
 struct Args {
     /// Name of the test case, i.e. the directory name under src/test/data/diffs/ (e.g.
-    /// "rust-add-if"). Always starts with a language prefix.
-    name: String,
+    /// "rust-add-if"). Always starts with a language prefix. If omitted, opens the case picker
+    /// directly.
+    name: Option<String>,
 }
 
 /// Loads and parses the before/after code for a test case, by name.
@@ -152,7 +156,22 @@ fn list_available_cases() -> Result<Vec<String>> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let name = args.name;
+
+    // Loading a case requires an initial, valid AST pair to render behind the picker modal, so
+    // when no name is given on the command line, fall back to the first available case and
+    // immediately open the picker on top of it rather than restructuring the rest of the app to
+    // tolerate no case being loaded at all.
+    let (name, initial_picker_options) = match args.name {
+        Some(name) => (name, None),
+        None => {
+            let options = list_available_cases()?;
+            let first = options
+                .first()
+                .cloned()
+                .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))?;
+            (first, Some(options))
+        }
+    };
 
     let (before, after) = load_case(&name)?;
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
@@ -161,6 +180,10 @@ fn main() -> Result<()> {
     let mapping = human_mapping::load(&name).unwrap_or_default();
 
     let mut app = App::new(name, before_root_id, after_root_id, mapping);
+
+    if let Some(options) = initial_picker_options {
+        app.modal = Some(Modal::OpenDiffPicker { options, selected: 0 });
+    }
 
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -797,6 +820,10 @@ fn action_match_subtree(
 /// Used to bulk-fill the rest of an `M` (recursive match) after the top-level pair's own
 /// operation has already been decided (automatically, or via a `Modal::ChooseMatchKind` answer) --
 /// prompting per node for a tree with hundreds of nodes would be unusable.
+///
+/// Any pair (this one or a descendant) that ends up classified `Identical` and has children is
+/// also collapsed in both panels, so a whole-unchanged subtree doesn't clutter the view -- this is
+/// the main payoff of `M` over doing the same matches one at a time with `m`.
 #[allow(clippy::too_many_arguments)]
 fn auto_match_pair(
     mapping: &mut HumanMapping,
@@ -809,6 +836,8 @@ fn auto_match_pair(
     after_src: &[u8],
     matched: &mut usize,
     skipped: &mut usize,
+    before_collapsed: &mut std::collections::HashSet<usize>,
+    after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> bool {
     if is_inherited_removed(b, &caches.before_removed) || is_inherited_removed(a, &caches.after_removed) {
         *skipped += 1;
@@ -855,6 +884,7 @@ fn auto_match_pair(
     for (b_child, a_child) in b_children.into_iter().zip(a_children) {
         let child_identical = auto_match_pair(
             mapping, before_root, after_root, caches, b_child, a_child, before_src, after_src, matched, skipped,
+            before_collapsed, after_collapsed,
         );
         all_identical &= child_identical;
     }
@@ -868,6 +898,10 @@ fn auto_match_pair(
         if all_identical { HumanOperation::Identical } else { HumanOperation::MatchButNotIdentical },
     );
     *matched += 1;
+    if all_identical {
+        before_collapsed.insert(b.id());
+        after_collapsed.insert(a.id());
+    }
     all_identical
 }
 
@@ -888,6 +922,8 @@ fn apply_modal_choice(
     after_id: usize,
     operation: HumanOperation,
     recursive: bool,
+    before_collapsed: &mut std::collections::HashSet<usize>,
+    after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> String {
     let (Some(b), Some(a)) = (find_node_by_id(before_flat, before_id), find_node_by_id(after_flat, after_id))
     else {
@@ -898,6 +934,11 @@ fn apply_modal_choice(
 
     if !recursive {
         return format!("Matched '{}' <-> '{}' as {:?}", b.kind(), a.kind(), operation);
+    }
+
+    if operation == HumanOperation::Identical {
+        before_collapsed.insert(b.id());
+        after_collapsed.insert(a.id());
     }
 
     let mut matched = 1usize;
@@ -914,7 +955,7 @@ fn apply_modal_choice(
         for (b_child, a_child) in b_children.into_iter().zip(a_children) {
             auto_match_pair(
                 mapping, before_root, after_root, caches, b_child, a_child, before_src, after_src, &mut matched,
-                &mut skipped,
+                &mut skipped, before_collapsed, after_collapsed,
             );
         }
     }
@@ -1712,6 +1753,8 @@ fn handle_modal_key(
                     after_id,
                     HumanOperation::MatchButNotIdentical,
                     recursive,
+                    &mut app.before.collapsed,
+                    &mut app.after.collapsed,
                 ));
                 advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }
@@ -1750,6 +1793,8 @@ fn handle_modal_key(
                     after_id,
                     HumanOperation::Identical,
                     recursive,
+                    &mut app.before.collapsed,
+                    &mut app.after.collapsed,
                 ));
                 advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }
@@ -1768,6 +1813,8 @@ fn handle_modal_key(
                     after_id,
                     HumanOperation::MatchButNotIdentical,
                     recursive,
+                    &mut app.before.collapsed,
+                    &mut app.after.collapsed,
                 ));
                 advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
             }

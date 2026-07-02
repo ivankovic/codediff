@@ -22,6 +22,11 @@ use crate::test;
 use anyhow::{Ok, Result};
 
 #[test]
+fn matches_human_solution() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping("rust-turbopack-module-rule")
+}
+
+#[test]
 fn optimal_solution() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs
@@ -228,13 +233,16 @@ fn optimal_solution() -> Result<()> {
     // Now we deal with impl Display for ModuleType.
     // The only change is that the InlinedBytesJS was removed from the match.
     //
-    assert!(test::helper::entire_path_has_mapping(
-        &["impl_item:2", "declaration_list", "function_item"],
-        before_root,
-        after_root,
-        &diff_ast,
-        ASTMappingOperation::MatchButNotIdentical
-    )?, "The impl Display for ModuleType path is not correctly mapped");
+    assert!(
+        test::helper::entire_path_has_mapping(
+            &["impl_item:2", "declaration_list", "function_item"],
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::MatchButNotIdentical
+        )?,
+        "The impl Display for ModuleType path is not correctly mapped"
+    );
 
     // The function parameters and the return value are the same
     let path = [
@@ -263,21 +271,24 @@ fn optimal_solution() -> Result<()> {
     );
 
     // This is the block with the match statement
-    assert!(test::helper::entire_path_has_mapping(
-        &[
-            "impl_item:2",
-            "declaration_list",
-            "function_item",
-            "block",
-            "expression_statement",
-            "match_expression",
-            "match_block"
-        ],
-        before_root,
-        after_root,
-        &diff_ast,
-        ASTMappingOperation::MatchButNotIdentical
-    )?, "The impl Display for ModuleType - fmt function body path is not correctly mapped");
+    assert!(
+        test::helper::entire_path_has_mapping(
+            &[
+                "impl_item:2",
+                "declaration_list",
+                "function_item",
+                "block",
+                "expression_statement",
+                "match_expression",
+                "match_block"
+            ],
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::MatchButNotIdentical
+        )?,
+        "The impl Display for ModuleType - fmt function body path is not correctly mapped"
+    );
 
     // We use these as starting points for the helper calls to make the path strings shorter.
     let path = [
