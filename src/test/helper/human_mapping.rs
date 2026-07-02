@@ -126,6 +126,29 @@ fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
 }
 
+/// Helper function to find a node by ID in a tree and return its kind.
+/// Returns "None" if the node is not found, "0" if the ID is 0,
+/// or the node kind if found.
+fn node_kind_for_id(root: Node, node_id: usize) -> String {
+    if node_id == 0 {
+        return "0".to_string();
+    }
+    
+    let mut stack = vec![root];
+    while let Some(n) = stack.pop() {
+        if n.id() == node_id {
+            return n.kind().to_string();
+        }
+        
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    
+    "None".to_string()
+}
+
 /// Pushes a mismatch for every node in `node`'s subtree (inclusive) that isn't mapped to zero
 /// (i.e. deleted, if `node` is in the before tree, or inserted, if in the after tree) in `node_map`.
 fn check_subtree_maps_to_zero(
@@ -133,17 +156,24 @@ fn check_subtree_maps_to_zero(
     node_map: &HashMap<usize, usize>,
     context: &str,
     mismatches: &mut Vec<String>,
+    lookup_root: Node,
 ) {
     let mut stack = vec![node];
     while let Some(n) = stack.pop() {
         match node_map.get(&n.id()) {
             Some(0) => {}
-            other => mismatches.push(format!(
-                "{}: descendant node '{}' was expected to be removed (mapped to 0), but was mapped to {:?}",
-                context,
-                n.kind(),
-                other
-            )),
+            other => {
+                let mapped_kind = match other {
+                    Some(&mapped_id) => node_kind_for_id(lookup_root, mapped_id),
+                    None => "None".to_string(),
+                };
+                mismatches.push(format!(
+                    "{}: descendant node '{}' was expected to be removed (mapped to 0), but was mapped to {}",
+                    context,
+                    n.kind(),
+                    mapped_kind
+                ))
+            }
         }
 
         let mut cursor = n.walk();
@@ -192,14 +222,18 @@ fn check_entry(
 
             let actual_partner = diff_ast.before_node_map.get(&before_node.id()).copied();
             if actual_partner != Some(after_node.id()) {
+                let mapped_kind = match actual_partner {
+                    Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
+                    None => "None".to_string(),
+                };
                 mismatches.push(format!(
-                    "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {:?}",
+                    "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}",
                     entry.operation,
                     before_path,
                     after_path,
                     before_node.kind(),
                     after_node.kind(),
-                    actual_partner
+                    mapped_kind
                 ));
                 return Ok(());
             }
@@ -232,15 +266,20 @@ fn check_entry(
                     &diff_ast.before_node_map,
                     &format!("Delete (with children) {:?}", before_path),
                     mismatches,
+                    after_root,
                 );
             } else {
                 let actual = diff_ast.before_node_map.get(&before_node.id()).copied();
                 if actual != Some(0) {
+                    let mapped_kind = match actual {
+                        Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
+                        None => "None".to_string(),
+                    };
                     mismatches.push(format!(
-                        "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {:?}",
+                        "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {}",
                         before_path,
                         before_node.kind(),
-                        actual
+                        mapped_kind
                     ));
                 }
             }
@@ -259,15 +298,20 @@ fn check_entry(
                     &diff_ast.after_node_map,
                     &format!("Insert (with children) {:?}", after_path),
                     mismatches,
+                    before_root,
                 );
             } else {
                 let actual = diff_ast.after_node_map.get(&after_node.id()).copied();
                 if actual != Some(0) {
+                    let mapped_kind = match actual {
+                        Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
+                        None => "None".to_string(),
+                    };
                     mismatches.push(format!(
-                        "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {:?}",
+                        "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {}",
                         after_path,
                         after_node.kind(),
-                        actual
+                        mapped_kind
                     ));
                 }
             }
