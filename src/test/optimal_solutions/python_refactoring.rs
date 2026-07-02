@@ -58,6 +58,6 @@ use crate::test;
 //  equals signs are an Identical match, the integer is a delete and the call with it's
 //  subtree is an add.
 #[test]
-fn optimal_solution() -> Result<()> {
+fn matches_human_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping("python-refactoring")
 }

@@ -76,6 +76,11 @@ fn optimal_solution() -> Result<()> {
 }
 
 #[test]
+fn matches_human_solution() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping("rust-add-value-to-enum")
+}
+
+#[test]
 fn optimal_solution_for_reversed_diff() -> Result<()> {
     let test_diffs = test::helper::handmade_test_code_pairs()?;
     let (after, before) = test_diffs.get("rust-add-value-to-enum").unwrap().clone();
