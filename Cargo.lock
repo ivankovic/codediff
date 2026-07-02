@@ -288,6 +288,7 @@ dependencies = [
  "regex",
  "rusqlite",
  "serde",
+ "serde_json",
  "signal-hook 0.4.4",
  "strum 0.28.0",
  "syntect",

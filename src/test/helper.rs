@@ -15,6 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod human_mapping;
 pub mod optimal_iud;
 
 use anyhow::{Result, bail};
@@ -46,21 +47,22 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     let mut current_node = root;
 
     for path_segment in path {
-        // Parse the path segment to extract node type and optional index
-        let parts: Vec<&str> = path_segment.split(':').collect();
-        let node_type = parts[0];
-
-        // Determine which child index to use
-        let child_index = if parts.len() > 1 {
-            parts[1].parse::<usize>().map_err(|_| {
-                anyhow::anyhow!(
-                    "Invalid index in path segment: {} for path {:?}",
-                    path_segment,
-                    path
-                )
-            })? - 1 // Convert to 0-indexed
-        } else {
-            0 // Use first matching child
+        // Parse the path segment to extract node type and optional index. Split on the *last*
+        // colon rather than the first: node kinds can themselves contain colons (e.g. TypeScript's
+        // ":" token, Rust's "::" token), but the index suffix we append is always pure digits, so
+        // the rightmost colon is always the one we inserted.
+        let (node_type, child_index) = match path_segment.rsplit_once(':') {
+            Some((node_type, index_str)) => {
+                let index = index_str.parse::<usize>().map_err(|_| {
+                    anyhow::anyhow!(
+                        "Invalid index in path segment: {} for path {:?}",
+                        path_segment,
+                        path
+                    )
+                })? - 1; // Convert to 0-indexed
+                (node_type, index)
+            }
+            None => (*path_segment, 0), // No index given: use first matching child
         };
 
         // Find the matching child node
@@ -89,6 +91,46 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     }
 
     Ok(current_node)
+}
+
+/**
+* The inverse of [`node_for_path`]: computes the path from the root of the tree down to `node`,
+* using the same "type" / "type:index" mini-language.
+*
+* This always emits the fully-qualified "type:index" form (never the bare-type shorthand), which
+* `node_for_path` also accepts, so the two functions round-trip: for any node in a tree,
+* `node_for_path(root, &path_for_node(node))` returns that same node.
+*
+* Paths are stable across re-parses of the same source text (unlike TreeSitter node IDs, which are
+* arena slot indices and can differ between parses), which is why this is the basis for comparing
+* human-authored ground-truth mappings against freshly computed diffs.
+*/
+pub fn path_for_node(node: Node) -> Vec<String> {
+    let mut path = Vec::new();
+    let mut current = node;
+
+    while let Some(parent) = current.parent() {
+        let kind = current.kind();
+
+        // Count how many earlier siblings share this node's kind, to reproduce the same
+        // 1-indexed "occurrence of this kind" numbering that node_for_path consumes.
+        let mut occurrence = 0usize;
+        let mut cursor = parent.walk();
+        for sibling in parent.children(&mut cursor) {
+            if sibling.id() == current.id() {
+                break;
+            }
+            if sibling.kind() == kind {
+                occurrence += 1;
+            }
+        }
+
+        path.push(format!("{}:{}", kind, occurrence + 1));
+        current = parent;
+    }
+
+    path.reverse();
+    path
 }
 
 pub fn mapping_for_path<'a>(
@@ -710,6 +752,55 @@ mod tests {
 
         // Invalid paths
         assert!(node_for_path(ast.root_node(), &["no such node"]).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_path_for_node_round_trips_through_node_for_path() -> Result<()> {
+        // path_for_node must be the exact inverse of node_for_path for every node in a tree,
+        // since human-authored mappings are compared against fresh diffs purely by path.
+        let test_diffs = handmade_test_code_pairs()?;
+
+        for (name, (before, after)) in &test_diffs {
+            for (label, code) in [("before", before), ("after", after)] {
+                let ast = code
+                    .ast
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{} {} has no AST", name, label));
+                let root = ast.root_node();
+
+                let mut stack = vec![root];
+                while let Some(node) = stack.pop() {
+                    let path = path_for_node(node);
+                    let path_refs: Vec<&str> = path.iter().map(String::as_str).collect();
+                    let found = node_for_path(root, &path_refs).unwrap_or_else(|e| {
+                        panic!(
+                            "{} {}: path {:?} for node {} ({}) did not resolve: {}",
+                            name,
+                            label,
+                            path_refs,
+                            node.kind(),
+                            node.id(),
+                            e
+                        )
+                    });
+                    assert_eq!(
+                        found.id(),
+                        node.id(),
+                        "{} {}: path {:?} resolved to a different node than it was derived from",
+                        name,
+                        label,
+                        path_refs
+                    );
+
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        stack.push(child);
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
