@@ -42,17 +42,16 @@
 *                  together, so this will always show as a mismatch, but can be useful for
 *                  exploration). If the kinds match and neither node has children, the operation
 *                  (Identical/Update) is inferred automatically by comparing their text. If the
-*                  kinds match and either has children, asks whether to mark it Identical (the
-*                  whole subtree is unchanged) or MatchButNotIdentical (it differs somewhere)
+*                  kinds match and either has children, it's classified automatically too: Identical
+*                  if both subtrees' precomputed content hashes match (byte-identical), otherwise
+*                  MatchButNotIdentical -- no prompt
 *   M              like `m`, but also recurses into children pairwise as long as both sides
 *                  have the same number of children with the same kinds; stops recursing (without
-*                  error) at the first level that diverges, leaving it for manual resolution. Only
-*                  the top-level pair is interactive (same rules as `m`); matched descendants are
-*                  classified automatically, bottom-up: Identical only if every node beneath it is
-*                  also Identical, otherwise MatchButNotIdentical -- prompting per node would be
-*                  unusable for a tree of any size. Any pair (top-level or descendant) that ends up
-*                  classified Identical and has children is collapsed in both panels, to keep
-*                  whole-unchanged subtrees from cluttering the view
+*                  error) at the first level that diverges, leaving it for manual resolution. Every
+*                  pair, top-level and descendant alike, is classified the same way as `m` (by
+*                  content hash for nodes with children, by text for leaves) with no prompting. Any
+*                  pair that ends up classified Identical and has children is collapsed in both
+*                  panels, to keep whole-unchanged subtrees from cluttering the view
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
@@ -114,7 +113,7 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
     let mut pairs = codediff::test::helper::handmade_test_code_pairs()
         .context("Failed to load test code pairs from src/test/data/diffs")?;
 
-    let (before, after) = pairs.remove(name).ok_or_else(|| {
+    let (mut before, mut after) = pairs.remove(name).ok_or_else(|| {
         let mut available: Vec<_> = pairs.keys().cloned().collect();
         available.sort();
         anyhow!(
@@ -130,6 +129,11 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
     if after.ast.is_none() {
         bail!("After code for '{}' has no AST (unsupported or undetected language)", name);
     }
+
+    // Populates node_to_full_hash (among other things), which `m`/`M` use to auto-classify
+    // matches on nodes with children instead of asking.
+    before.ensure_parsed().context("Failed to compute AST metadata for before code")?;
+    after.ensure_parsed().context("Failed to compute AST metadata for after code")?;
 
     Ok((before, after))
 }
@@ -264,16 +268,6 @@ enum Modal {
         after_kind: String,
         /// Whether this originated from `M` (recursive), in which case confirming also
         /// auto-matches the rest of the subtree.
-        recursive: bool,
-    },
-    /// The before and after cursor nodes have matching kinds and at least one has children, so
-    /// there's no simple text comparison to fall back on: the human has to say whether the
-    /// subtree is fully unchanged or not.
-    ChooseMatchKind {
-        before_id: usize,
-        after_id: usize,
-        before_kind: String,
-        after_kind: String,
         recursive: bool,
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
@@ -690,6 +684,29 @@ fn apply_match_entry(
     });
 }
 
+/// Classifies a same-kind pair with children as `Identical` or `MatchButNotIdentical` without
+/// asking: `before_hash`/`after_hash` are each node's precomputed full-content hash (kind + text +
+/// children's hashes, folded bottom-up -- see `code::hash::hash_code`), so two subtrees hash equal
+/// iff they're byte-identical. Missing hashes (shouldn't happen once `load_case` has run
+/// `ensure_parsed`) are treated conservatively as not identical.
+fn subtree_match_operation(
+    before_id: usize,
+    after_id: usize,
+    before_hash: &HashMap<usize, u64>,
+    after_hash: &HashMap<usize, u64>,
+) -> HumanOperation {
+    let identical = matches!(
+        (before_hash.get(&before_id), after_hash.get(&after_id)),
+        (Some(b), Some(a)) if b == a
+    );
+    if identical {
+        HumanOperation::Identical
+    } else {
+        HumanOperation::MatchButNotIdentical
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn action_match(
     mapping: &mut HumanMapping,
     before_flat: &[(Node, usize)],
@@ -701,6 +718,8 @@ fn action_match(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
+    before_hash: &HashMap<usize, u64>,
+    after_hash: &HashMap<usize, u64>,
 ) -> Result<ActionOutcome> {
     let before_node =
         find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
@@ -724,29 +743,22 @@ fn action_match(
         }));
     }
 
-    if before_node.child_count() == 0 && after_node.child_count() == 0 {
-        let identical = node_values_equal(before_node, after_node, before_src, after_src);
-        let operation = if identical {
+    let operation = if before_node.child_count() == 0 && after_node.child_count() == 0 {
+        if node_values_equal(before_node, after_node, before_src, after_src) {
             HumanOperation::Identical
         } else {
             HumanOperation::Update
-        };
-        apply_match_entry(mapping, before_root, after_root, before_node, after_node, operation);
-        return Ok(ActionOutcome::Done(format!(
-            "Matched '{}' <-> '{}' as {}",
-            before_node.kind(),
-            after_node.kind(),
-            if identical { "Identical" } else { "Update" }
-        )));
-    }
-
-    Ok(ActionOutcome::NeedsModal(Modal::ChooseMatchKind {
-        before_id: before_node.id(),
-        after_id: after_node.id(),
-        before_kind: before_node.kind().to_string(),
-        after_kind: after_node.kind().to_string(),
-        recursive: false,
-    }))
+        }
+    } else {
+        subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
+    };
+    apply_match_entry(mapping, before_root, after_root, before_node, after_node, operation);
+    Ok(ActionOutcome::Done(format!(
+        "Matched '{}' <-> '{}' as {:?}",
+        before_node.kind(),
+        after_node.kind(),
+        operation
+    )))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -761,6 +773,10 @@ fn action_match_subtree(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
+    before_hash: &HashMap<usize, u64>,
+    after_hash: &HashMap<usize, u64>,
+    before_collapsed: &mut std::collections::HashSet<usize>,
+    after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> Result<ActionOutcome> {
     let before_node =
         find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
@@ -784,8 +800,7 @@ fn action_match_subtree(
         }));
     }
 
-    // A leaf top pair has no children to auto-fill, so resolve it immediately like `m` does
-    // instead of opening a pointless "Identical or MatchButNotIdentical?" modal.
+    // A leaf top pair has no children to auto-fill, so resolve it immediately like `m` does.
     if before_node.child_count() == 0 && after_node.child_count() == 0 {
         let identical = node_values_equal(before_node, after_node, before_src, after_src);
         let operation = if identical {
@@ -802,13 +817,24 @@ fn action_match_subtree(
         )));
     }
 
-    Ok(ActionOutcome::NeedsModal(Modal::ChooseMatchKind {
-        before_id: before_node.id(),
-        after_id: after_node.id(),
-        before_kind: before_node.kind().to_string(),
-        after_kind: after_node.kind().to_string(),
-        recursive: true,
-    }))
+    let operation = subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash);
+    let msg = apply_modal_choice(
+        mapping,
+        before_flat,
+        after_flat,
+        before_root,
+        after_root,
+        caches,
+        before_src,
+        after_src,
+        before_node.id(),
+        after_node.id(),
+        operation,
+        true,
+        before_collapsed,
+        after_collapsed,
+    );
+    Ok(ActionOutcome::Done(msg))
 }
 
 /// Auto-matches `b` <-> `a` and all descendants, with no prompting: leaves are classified
@@ -817,9 +843,9 @@ fn action_match_subtree(
 /// matching further) the moment a level's child-kind sequences diverge, or a node is already
 /// covered by an unrelated ancestor mark. Returns whether the whole subtree matched Identically.
 ///
-/// Used to bulk-fill the rest of an `M` (recursive match) after the top-level pair's own
-/// operation has already been decided (automatically, or via a `Modal::ChooseMatchKind` answer) --
-/// prompting per node for a tree with hundreds of nodes would be unusable.
+/// Used to bulk-fill the rest of an `M` (recursive match) after the top-level pair's own operation
+/// has already been decided (via `subtree_match_operation` or a confirmed `Modal::ConfirmKindMismatch`)
+/// -- classifying each descendant individually by hash keeps this fast for a tree of any size.
 ///
 /// Any pair (this one or a descendant) that ends up classified `Identical` and has children is
 /// also collapsed in both panels, so a whole-unchanged subtree doesn't clutter the view -- this is
@@ -905,9 +931,9 @@ fn auto_match_pair(
     all_identical
 }
 
-/// Finishes resolving a `Modal::ConfirmKindMismatch` or `Modal::ChooseMatchKind`: applies the
-/// chosen operation to the top pair, and if `recursive`, auto-fills the rest of the subtree via
-/// [`auto_match_pair`].
+/// Applies `operation` to the top pair -- whether decided by `subtree_match_operation` (`M`) or a
+/// confirmed `Modal::ConfirmKindMismatch` -- and if `recursive`, auto-fills the rest of the subtree
+/// via [`auto_match_pair`].
 #[allow(clippy::too_many_arguments)]
 fn apply_modal_choice(
     mapping: &mut HumanMapping,
@@ -1324,19 +1350,6 @@ fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal, current_name: &str
                 before_kind, after_kind
             ),
         ),
-        Modal::ChooseMatchKind {
-            before_kind,
-            after_kind,
-            ..
-        } => render_text_modal(
-            frame,
-            area,
-            "Choose match type",
-            &format!(
-                "'{}' <-> '{}' both have children.\n\n[y] Identical    [n] MatchButNotIdentical    [Esc] Cancel",
-                before_kind, after_kind
-            ),
-        ),
         Modal::OpenDiffPicker { options, selected } => {
             render_open_picker(frame, area, options, *selected);
         }
@@ -1423,6 +1436,22 @@ fn run_event_loop(
         let after_flat = flatten_visible(after_root, &app.after.collapsed);
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
 
+        // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
+        // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
+        // with children without asking (see `subtree_match_operation`).
+        let before_hash = &before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .context("Before code has no AST metadata")?
+            .node_to_full_hash;
+        let after_hash = &after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .context("After code has no AST metadata")?
+            .node_to_full_hash;
+
         // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and passing
         // both `app` and `&app.name` as separate arguments to the same call would conflict.
         let current_name = app.name.clone();
@@ -1469,6 +1498,8 @@ fn run_event_loop(
                     &caches,
                     before_src,
                     after_src,
+                    before_hash,
+                    after_hash,
                 );
             }
         }
@@ -1505,6 +1536,7 @@ fn run_event_loop(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn handle_key(
     app: &mut App,
     code: KeyCode,
@@ -1515,6 +1547,8 @@ fn handle_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
+    before_hash: &HashMap<usize, u64>,
+    after_hash: &HashMap<usize, u64>,
 ) {
     let focus = app.focus;
 
@@ -1587,6 +1621,8 @@ fn handle_key(
                 caches,
                 before_src,
                 after_src,
+                before_hash,
+                after_hash,
             ) {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
@@ -1610,6 +1646,10 @@ fn handle_key(
                 caches,
                 before_src,
                 after_src,
+                before_hash,
+                after_hash,
+                &mut app.before.collapsed,
+                &mut app.after.collapsed,
             ) {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
@@ -1763,66 +1803,6 @@ fn handle_modal_key(
             }
             _ => {
                 app.modal = Some(Modal::ConfirmKindMismatch {
-                    before_id,
-                    after_id,
-                    before_kind,
-                    after_kind,
-                    recursive,
-                });
-            }
-        },
-        Modal::ChooseMatchKind {
-            before_id,
-            after_id,
-            before_kind,
-            after_kind,
-            recursive,
-        } => match code {
-            KeyCode::Char('y') | KeyCode::Char('Y') => {
-                app.dirty = true;
-                app.status = Some(apply_modal_choice(
-                    &mut app.mapping,
-                    before_flat,
-                    after_flat,
-                    before_root,
-                    after_root,
-                    caches,
-                    before_src,
-                    after_src,
-                    before_id,
-                    after_id,
-                    HumanOperation::Identical,
-                    recursive,
-                    &mut app.before.collapsed,
-                    &mut app.after.collapsed,
-                ));
-                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
-            }
-            KeyCode::Char('n') | KeyCode::Char('N') => {
-                app.dirty = true;
-                app.status = Some(apply_modal_choice(
-                    &mut app.mapping,
-                    before_flat,
-                    after_flat,
-                    before_root,
-                    after_root,
-                    caches,
-                    before_src,
-                    after_src,
-                    before_id,
-                    after_id,
-                    HumanOperation::MatchButNotIdentical,
-                    recursive,
-                    &mut app.before.collapsed,
-                    &mut app.after.collapsed,
-                ));
-                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
-            }
-            KeyCode::Esc => {
-                app.status = Some("Cancelled".to_string());
-            }
-            _ => {
-                app.modal = Some(Modal::ChooseMatchKind {
                     before_id,
                     after_id,
                     before_kind,
