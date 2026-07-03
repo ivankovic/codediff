@@ -16,6 +16,14 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #[cfg(test)]
+mod cpp_add_const_correctness;
+#[cfg(test)]
+mod cpp_add_memory_management;
+#[cfg(test)]
+mod cpp_add_templates;
+#[cfg(test)]
+mod cpp_fix_segfault;
+#[cfg(test)]
 mod java_add_logging;
 #[cfg(test)]
 mod kotlin_add_validation;

@@ -1,5 +1,10 @@
 # Next features to implement
 
+*  cpp-fix-segfault shows a problem with the current algorithm. The node KIND < transforms to <=.
+   But even though this is a node KIND, not value, change, we still want to allow this. At the
+   moment, we don't, but we probably should. At the same time, we probably don't want to allow all
+   possible kind updates, e.g. for loop to function declaration is probably not ok... This needs
+   brainstorming.
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
 
