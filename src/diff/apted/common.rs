@@ -294,6 +294,7 @@ pub(crate) fn forest_dist(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     cost_model: &UnitCostModel,
+    containment: Option<&ContainmentCtx>,
     delta: &mut DeltaTable,
     i: usize,
     j: usize,
@@ -305,33 +306,38 @@ pub(crate) fn forest_dist(
 
     forestdist[(lld_i, lld_j)] = 0;
 
-    // Precompute per-dj node metadata/lld/preorder once, outside the di loop - the di loop
+    // Precompute per-dj node id/metadata/lld/preorder once, outside the di loop - the di loop
     // would otherwise redo the same `node_info` HashMap lookup (and lld/pre array reads) for
     // every dj on every single di iteration, turning what should be O(range) prep work into
     // O(di_range * dj_range) redundant lookups.
-    let dj_info: Vec<(&ASTNodeMetadata, usize, usize)> = ((lld_j + 1)..=j)
+    let dj_info: Vec<(usize, &ASTNodeMetadata, usize, usize)> = ((lld_j + 1)..=j)
         .map(|dj| {
+            let after_id = after.node_id_at(dj);
             let node2 = after_meta
                 .node_info
-                .get(&after.node_id_at(dj))
+                .get(&after_id)
                 .expect("indexed node must have metadata");
-            (node2, after.post_to_lld[dj - 1], after.post_to_pre[dj - 1])
+            (after_id, node2, after.post_to_lld[dj - 1], after.post_to_pre[dj - 1])
         })
         .collect();
 
     for di in (lld_i + 1)..=i {
+        let before_id = before.node_id_at(di);
         let node1 = before_meta
             .node_info
-            .get(&before.node_id_at(di))
+            .get(&before_id)
             .expect("indexed node must have metadata");
         forestdist[(di, lld_j)] = forestdist[(di - 1, lld_j)] + cost_model.del(node1);
         let lld_di = before.post_to_lld[di - 1];
         let pre_di = before.post_to_pre[di - 1];
 
-        for (dj, &(node2, lld_dj, pre_dj)) in ((lld_j + 1)..=j).zip(dj_info.iter()) {
+        for (dj, &(after_id, node2, lld_dj, pre_dj)) in ((lld_j + 1)..=j).zip(dj_info.iter()) {
             forestdist[(lld_i, dj)] = forestdist[(lld_i, dj - 1)] + cost_model.ins(node2);
 
-            let cost_ren = cost_model.ren(node1, node2);
+            let mut cost_ren = cost_model.ren(node1, node2);
+            if let Some(ctx) = containment {
+                cost_ren = ctx.adjust(before_id, after_id, cost_ren);
+            }
 
             if lld_di == lld_i && lld_dj == lld_j {
                 forestdist[(di, dj)] = (forestdist[(di - 1, dj)] + cost_model.del(node1))
@@ -373,6 +379,7 @@ pub(crate) fn compute_edit_mapping(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     cost_model: &UnitCostModel,
+    containment: Option<&ContainmentCtx>,
     delta: &mut DeltaTable,
 ) -> Vec<RawDecision> {
     let size1 = before.size;
@@ -402,6 +409,7 @@ pub(crate) fn compute_edit_mapping(
         before_meta,
         after_meta,
         cost_model,
+        containment,
         delta,
         size1,
         size2,
@@ -420,6 +428,7 @@ pub(crate) fn compute_edit_mapping(
                 before_meta,
                 after_meta,
                 cost_model,
+                containment,
                 delta,
                 last_row,
                 last_col,
@@ -1017,6 +1026,151 @@ pub(crate) fn filter_after_nodes(node_ids: Vec<usize>, diff: &ASTDiff) -> Vec<us
         .collect()
 }
 
+/// Cost charged for a `ren()` pairing that `ContainmentCtx` has vetoed - deliberately the same
+/// value `UnitCostModel::ren` already uses for mismatched kinds, so a containment-inconsistent
+/// pairing is exactly as unattractive to the DP as a kind mismatch, never merely "more expensive
+/// than the best alternative" (which could still lose to an equally bad alternative pairing).
+const FORBIDDEN_RENAME_COST: u64 = COST_DELETE + COST_INSERT + 1;
+
+/// Build a child -> parent map covering every node in `meta`, so ancestor/descendant checks don't
+/// need repeated subtree walks. `ASTNodeMetadata` has no parent pointer, so this is derived once
+/// from the children lists.
+fn build_parent_map(meta: &ASTMetadata) -> HashMap<usize, usize> {
+    let mut parents = HashMap::new();
+    for (&id, info) in &meta.node_info {
+        for &child in &info.children {
+            parents.insert(child, id);
+        }
+    }
+    parents
+}
+
+/// True if `node` is `ancestor` itself or a descendant of it, walking up via `parents`.
+fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &HashMap<usize, usize>) -> bool {
+    loop {
+        if node == ancestor {
+            return true;
+        }
+        match parents.get(&node) {
+            Some(&parent) => node = parent,
+            None => return false,
+        }
+    }
+}
+
+/// For every node in `root_ids`' original (unpruned) subtrees, the ids of nodes already present
+/// in `node_map` reachable below it - i.e. where the chunks `PostorderIndexer` prunes away
+/// actually landed. Computed bottom-up in one pass (as opposed to a fresh subtree walk per query)
+/// since `ContainmentCtx` needs this for every node that might appear as a `ren()` candidate, not
+/// just one. Does not recurse past an already-mapped node: earlier passes match descendants
+/// consistently under the node they fixed, so the immediate boundary is enough to know where a
+/// whole pruned chunk landed.
+fn compute_pruned_targets(
+    root_ids: &[usize],
+    meta: &ASTMetadata,
+    node_map: &HashMap<usize, usize>,
+) -> HashMap<usize, Vec<usize>> {
+    fn visit(
+        node_id: usize,
+        meta: &ASTMetadata,
+        node_map: &HashMap<usize, usize>,
+        memo: &mut HashMap<usize, Vec<usize>>,
+    ) -> Vec<usize> {
+        if let Some(cached) = memo.get(&node_id) {
+            return cached.clone();
+        }
+        let result = if let Some(&target) = node_map.get(&node_id) {
+            if target == 0 { Vec::new() } else { vec![target] }
+        } else if let Some(info) = meta.node_info.get(&node_id) {
+            info.children
+                .iter()
+                .flat_map(|&child| visit(child, meta, node_map, memo))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        memo.insert(node_id, result.clone());
+        result
+    }
+
+    let mut memo = HashMap::new();
+    for &root_id in root_ids {
+        visit(root_id, meta, node_map, &mut memo);
+    }
+    // Only nodes with at least one pruned descendant are useful to callers; drop the rest (most
+    // of the tree) to keep the lookup small.
+    memo.retain(|_, targets| !targets.is_empty());
+    memo
+}
+
+/// Per-`resolve_forest`-call context letting `ren()` refuse pairings that would contradict a
+/// mapping some earlier pass already fixed. `PostorderIndexer` prunes already-matched descendants
+/// out of the forest entirely, so without this, nothing stops the DP from matching a "hollowed
+/// out" ancestor - one whose real child was pruned away into some unrelated part of the other
+/// tree - to any other same-kind node, including ones that break the ancestor-order-preservation
+/// every tree-edit-distance mapping is supposed to guarantee. Concretely: if `before_id`'s pruned
+/// descendant landed at `t`, then `before_id` may only be matched to an ancestor-or-self of `t`;
+/// symmetrically for the after side. (See the `rust-add-if` case this was written for: the
+/// `if`/`else` wrapper statement was getting matched deep inside the sibling `if` branch its own
+/// child had already been pruned into, for free, since both were internal nodes of the same kind.)
+///
+/// Built once per `resolve_forest` call and threaded down into `forest_dist` everywhere it's
+/// invoked (both the keyroot sweep and the backtrace). Parent maps are only built when the
+/// corresponding pruned-targets map is non-empty, so the common case (nothing pruned in this
+/// particular forest) costs nothing beyond two empty-map lookups.
+pub(crate) struct ContainmentCtx {
+    before_pruned_targets: HashMap<usize, Vec<usize>>,
+    after_pruned_targets: HashMap<usize, Vec<usize>>,
+    before_parents: Option<HashMap<usize, usize>>,
+    after_parents: Option<HashMap<usize, usize>>,
+}
+
+impl ContainmentCtx {
+    fn build(
+        before_root_ids: &[usize],
+        after_root_ids: &[usize],
+        before_meta: &ASTMetadata,
+        after_meta: &ASTMetadata,
+        diff: &ASTDiff,
+    ) -> Self {
+        let before_pruned_targets =
+            compute_pruned_targets(before_root_ids, before_meta, &diff.before_node_map);
+        let after_pruned_targets =
+            compute_pruned_targets(after_root_ids, after_meta, &diff.after_node_map);
+        let before_parents = (!after_pruned_targets.is_empty()).then(|| build_parent_map(before_meta));
+        let after_parents = (!before_pruned_targets.is_empty()).then(|| build_parent_map(after_meta));
+        ContainmentCtx {
+            before_pruned_targets,
+            after_pruned_targets,
+            before_parents,
+            after_parents,
+        }
+    }
+
+    /// Adjusts a `ren()`-computed `base` cost: if matching `before_id` to `after_id` would
+    /// contradict where an already-pruned descendant of either landed, escalate to
+    /// `FORBIDDEN_RENAME_COST` so the DP looks elsewhere. `base` is returned unchanged whenever
+    /// neither side has any pruned descendants to check (the common case).
+    pub(crate) fn adjust(&self, before_id: usize, after_id: usize, base: u64) -> u64 {
+        if base >= FORBIDDEN_RENAME_COST {
+            return base;
+        }
+        if let Some(targets) = self.before_pruned_targets.get(&before_id) {
+            let parents = self.after_parents.as_ref().expect("built when map non-empty");
+            if targets.iter().any(|&t| !is_ancestor_or_self(after_id, t, parents)) {
+                return FORBIDDEN_RENAME_COST;
+            }
+        }
+        if let Some(targets) = self.after_pruned_targets.get(&after_id) {
+            let parents = self.before_parents.as_ref().expect("built when map non-empty");
+            if targets.iter().any(|&t| !is_ancestor_or_self(before_id, t, parents)) {
+                return FORBIDDEN_RENAME_COST;
+            }
+        }
+        base
+    }
+}
+
 /// Resolve the mapping for a forest of (possibly already partially mapped) sibling roots on
 /// each side. This is the single entry point that builds the pruned postorder indexers, runs
 /// the keyroot-based forest-distance computation, and translates the result into `diff`.
@@ -1091,10 +1245,34 @@ pub(crate) fn resolve_forest(
     let before_idx = PostorderIndexer::build(before_meta, &before_root_ids, &diff.before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, &after_root_ids, &diff.after_node_map);
 
+    // Built once and threaded into every `ren()` evaluation below (both the delta sweep and the
+    // backtrace), so a "hollowed out" ancestor left behind by pruning can't freely rename onto a
+    // node that would contradict where its pruned descendant already landed. See `ContainmentCtx`.
+    let containment = ContainmentCtx::build(
+        &before_root_ids,
+        &after_root_ids,
+        before_meta,
+        after_meta,
+        diff,
+    );
+
     let mut delta = match algorithm {
-        Algorithm::ZhangShasha => {
-            compute_delta_zhang_shasha(&before_idx, &after_idx, before_meta, after_meta, cost_model)
-        }
+        Algorithm::ZhangShasha => compute_delta_zhang_shasha(
+            &before_idx,
+            &after_idx,
+            before_meta,
+            after_meta,
+            cost_model,
+            Some(&containment),
+        ),
+        // NOTE: `compute_delta` (engine.rs) does not know about `containment` - its own `vren`
+        // has no containment-consistency check. `compute_edit_mapping` below still applies
+        // `containment` via `forest_dist` regardless of which branch filled `delta`, so if this
+        // branch is ever exercised on a forest with a real containment violation, its `delta`
+        // table and the shared backtrace's `forest_dist` calls would disagree. Currently safe
+        // because nothing in the pipeline passes `Algorithm::Apted` (see the TODO on
+        // `Diff::from_code`) and the existing Apted oracle tests don't hit that scenario - but fix
+        // this in lockstep with `compute_delta_zhang_shasha` before switching production over.
         Algorithm::Apted => compute_delta(
             &before_idx,
             &after_idx,
@@ -1113,6 +1291,7 @@ pub(crate) fn resolve_forest(
         before_meta,
         after_meta,
         cost_model,
+        Some(&containment),
         &mut delta,
     );
     let mut before_decision: HashMap<usize, BeforeDecision> = HashMap::new();
@@ -1310,6 +1489,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+        None,
         );
         let oracle_decisions = compute_edit_mapping(
             &before_idx,
@@ -1317,6 +1497,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+            None,
             &mut oracle_delta,
         );
         let oracle_cost =
@@ -1339,6 +1520,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+            None,
             &mut new_delta,
         );
         let new_cost = mapping_total_cost(&new_decisions, before_meta, after_meta, &cost_model);
@@ -1370,6 +1552,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+        None,
         );
         let oracle_decisions = compute_edit_mapping(
             &before_idx,
@@ -1377,6 +1560,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+            None,
             &mut oracle_delta,
         );
         let oracle_cost =
@@ -1399,6 +1583,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
+            None,
             &mut new_delta,
         );
         let new_cost = mapping_total_cost(&new_decisions, before_meta, after_meta, &cost_model);
@@ -1661,6 +1846,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+                None,
                 &mut new_delta,
             );
             let new_elapsed = t0.elapsed();
@@ -1672,6 +1858,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+            None,
             );
             let _ = compute_edit_mapping(
                 &before_idx,
@@ -1679,6 +1866,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+                None,
                 &mut oracle_delta,
             );
             let oracle_elapsed = t0.elapsed();
@@ -1745,6 +1933,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+                None,
                 &mut new_delta,
             );
             let new_elapsed = t0.elapsed();
@@ -1756,6 +1945,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+            None,
             );
             let _ = compute_edit_mapping(
                 &before_idx,
@@ -1763,6 +1953,7 @@ mod tests {
                 &before_meta,
                 &after_meta,
                 &cost_model,
+                None,
                 &mut oracle_delta,
             );
             let oracle_elapsed = t0.elapsed();
@@ -1823,7 +2014,7 @@ mod tests {
         let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
 
         let mut oracle_delta =
-            compute_delta_zhang_shasha(&before_idx, &after_idx, before, after, &cost_model);
+            compute_delta_zhang_shasha(&before_idx, &after_idx, before, after, &cost_model, None);
         // Snapshot *before* compute_edit_mapping, which mutates delta in place as it recomputes
         // forest_dist - comparing post-mutation tables would compare the wrong thing.
         let oracle_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
@@ -1839,6 +2030,7 @@ mod tests {
             before,
             after,
             &cost_model,
+            None,
             &mut oracle_delta,
         );
         eprintln!("ORACLE decisions: {oracle_decisions:?}");
@@ -1863,6 +2055,7 @@ mod tests {
             before,
             after,
             &cost_model,
+            None,
             &mut new_delta,
         );
         eprintln!("NEW decisions: {new_decisions:?}");
@@ -1900,6 +2093,7 @@ mod tests {
             before,
             after,
             &cost_model,
+            None,
             &mut oracle_d2,
             before_idx.size,
             after_idx.size,
@@ -1912,6 +2106,7 @@ mod tests {
             before,
             after,
             &cost_model,
+            None,
             &mut new_d2,
             before_idx.size,
             after_idx.size,
@@ -1987,13 +2182,14 @@ mod tests {
         let after_idx = PostorderIndexer::build(&after, &[7], &empty_map);
 
         let mut oracle_delta =
-            compute_delta_zhang_shasha(&before_idx, &after_idx, &before, &after, &cost_model);
+            compute_delta_zhang_shasha(&before_idx, &after_idx, &before, &after, &cost_model, None);
         let oracle_decisions = compute_edit_mapping(
             &before_idx,
             &after_idx,
             &before,
             &after,
             &cost_model,
+            None,
             &mut oracle_delta,
         );
         eprintln!("ORACLE decisions: {oracle_decisions:?}");
@@ -2015,6 +2211,7 @@ mod tests {
             &before,
             &after,
             &cost_model,
+            None,
             &mut new_delta,
         );
         eprintln!("NEW decisions: {new_decisions:?}");

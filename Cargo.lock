@@ -281,6 +281,7 @@ dependencies = [
  "indoc",
  "infer",
  "insta",
+ "libc",
  "metrohash",
  "num_cpus",
  "rand",

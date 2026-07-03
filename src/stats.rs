@@ -45,10 +45,30 @@ pub struct CodeStats {
     pub lines_of_code: u64,
     pub bytes: u64,
 
+    /// Per-node-kind stats (occurrence count and subtree-size histogram), keyed by TreeSitter
+    /// node kind (e.g. "function_item", "if_expression"). See [`KindStats`].
+    pub kind_stats: std::collections::HashMap<String, KindStats>,
+
     // Errors.
     pub failed_to_convert_to_utf8: bool,
     pub failed_to_parse: bool,
     pub too_large_to_parse: bool,
+}
+
+/**
+* Aggregated stats for a single TreeSitter node kind within one file: how many nodes of that kind
+* exist, and a log2-bucketed histogram of the size (node count) of the subtree rooted at each one.
+*
+* The subtree-size histogram uses `size.ilog2()` as the bucket key: bucket 0 is subtree size 1
+* (a leaf of this kind), bucket 1 is sizes 2-3, bucket 2 is sizes 4-7, and so on - bucket B covers
+* `[2^B, 2^(B+1))`. This keeps the histogram small (one entry per size *order of magnitude* seen,
+* not one per exact size) while still letting downstream analysis approximate percentiles or
+* answer "what fraction of `for_expression` subtrees are bigger than N nodes" questions.
+*/
+#[derive(Debug, Clone, Default)]
+pub struct KindStats {
+    pub count: u64,
+    pub subtree_size_histogram: std::collections::HashMap<u32, u64>,
 }
 
 /**
@@ -99,6 +119,32 @@ pub fn count_nodes(root: Node) -> usize {
     }
 
     count
+}
+
+/**
+* Compute per-kind occurrence counts and subtree-size histograms for every node in a TreeSitter
+* tree, in a single post-order traversal. See [`KindStats`] for the histogram bucketing scheme.
+*/
+pub fn compute_kind_stats(root: Node) -> std::collections::HashMap<String, KindStats> {
+    let mut stats = std::collections::HashMap::new();
+    visit_for_kind_stats(root, &mut stats);
+    stats
+}
+
+/// Returns the subtree size (including `node` itself) so the caller can bucket it.
+fn visit_for_kind_stats(node: Node, stats: &mut std::collections::HashMap<String, KindStats>) -> usize {
+    let mut size = 1;
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        size += visit_for_kind_stats(child, stats);
+    }
+
+    let entry = stats.entry(node.kind().to_string()).or_default();
+    entry.count += 1;
+    let bucket = size.ilog2();
+    *entry.subtree_size_histogram.entry(bucket).or_insert(0) += 1;
+
+    size
 }
 
 /**
@@ -173,6 +219,7 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
                 match parser.parse(&stats.code.contents, None) {
                     Some(tree) => {
                         stats.ast_nodes = count_nodes(tree.root_node());
+                        stats.kind_stats = compute_kind_stats(tree.root_node());
                     }
                     None => stats.failed_to_parse = true,
                 }

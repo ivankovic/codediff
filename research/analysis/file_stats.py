@@ -166,6 +166,95 @@ def load_data(db_path):
     return df
 
 
+def load_node_kind_counts(db_path):
+    """
+    Load per-file AST node-kind counts (from `file_stats`' `node_kind_counts` table, one row per
+    (file, TreeSitter node kind) pair) joined with each file's language.
+
+    Args:
+        db_path: Path to the SQLite database
+
+    Returns:
+        DataFrame with columns: language, kind, count (one row per file/kind pair; the same
+        `kind` appears once per file it occurs in, not pre-aggregated across files).
+    """
+    return pl.read_database_uri(
+        """
+        SELECT f.language AS language, k.kind AS kind, k.count AS count
+        FROM node_kind_counts k
+        JOIN files f ON f.id = k.file_id
+        WHERE f.language IS NOT NULL
+        """,
+        f"sqlite://{db_path}",
+    )
+
+
+def write_top_node_kinds_by_language(
+    node_kind_df, top_n=100, output_filename="top_node_kinds_by_language.md"
+):
+    """
+    Compute the sorted distribution of AST node kinds per language (by total occurrence count
+    summed across every file of that language) and write the top `top_n` kinds per language to a
+    markdown file, one table per language.
+
+    Args:
+        node_kind_df: DataFrame as returned by load_node_kind_counts (columns: language, kind,
+            count)
+        top_n: How many of the most common node kinds to keep per language
+        output_filename: Path to write the markdown report to
+
+    Returns:
+        DataFrame with the full (not just top_n) per-language node-kind distribution, columns:
+        language, kind, total_count, pct_of_language - sorted by language then total_count
+        descending. Useful for follow-up analysis beyond what the markdown table shows.
+    """
+    per_language_totals = node_kind_df.group_by("language").agg(
+        pl.col("count").sum().alias("language_total")
+    )
+
+    distribution = (
+        node_kind_df.group_by(["language", "kind"])
+        .agg(pl.col("count").sum().alias("total_count"))
+        .join(per_language_totals, on="language")
+        .with_columns(
+            (pl.col("total_count") / pl.col("language_total") * 100).alias("pct_of_language")
+        )
+        .sort(["language", "total_count"], descending=[False, True])
+        .drop("language_total")
+    )
+
+    languages = sorted(distribution.select(pl.col("language")).unique()["language"].to_list())
+
+    lines = [
+        "# Most common AST node kinds per language",
+        "",
+        f"Top {top_n} TreeSitter node kinds by total occurrence count, per language, as a "
+        "percentage of all counted nodes in that language.",
+        "",
+    ]
+
+    for language in languages:
+        language_df = distribution.filter(pl.col("language") == language).head(top_n)
+
+        lines.append(f"## {language}")
+        lines.append("")
+        lines.append("| Rank | Node kind | Count | % of language |")
+        lines.append("|---:|---|---:|---:|")
+        for rank, row in enumerate(language_df.iter_rows(named=True), start=1):
+            lines.append(
+                f"| {rank} | `{row['kind']}` | {row['total_count']:,} | "
+                f"{row['pct_of_language']:.2f}% |"
+            )
+        lines.append("")
+
+    with open(output_filename, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print(f"Top {top_n} node kinds per language written to {output_filename}")
+
+    return distribution
+
+
 def compute_full_dataset_stats(df):
     """
     Compute and display statistics for the full dataset.
@@ -334,3 +423,7 @@ if __name__ == "__main__":
 
     # Compute code-only statistics
     compute_code_only_stats(code_df)
+
+    # Distribution of AST node kinds per language, and the 100 most common per language
+    node_kind_df = load_node_kind_counts(db_path)
+    write_top_node_kinds_by_language(node_kind_df, top_n=100)

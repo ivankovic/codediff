@@ -18,7 +18,9 @@
 
 use crate::code::ASTMetadata;
 
-use super::common::{DeltaTable, ForestDist, PostorderIndexer, UnitCostModel, forest_dist};
+use super::common::{
+    ContainmentCtx, DeltaTable, ForestDist, PostorderIndexer, UnitCostModel, forest_dist,
+};
 
 /// Populates `delta[(pre_before, pre_after)]` - the fully-resolved tree edit distance between the
 /// subtree rooted at `pre_before` and the subtree rooted at `pre_after` - for every keyroot pair.
@@ -36,6 +38,7 @@ pub(crate) fn compute_delta_zhang_shasha(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     cost_model: &UnitCostModel,
+    containment: Option<&ContainmentCtx>,
 ) -> DeltaTable {
     let mut delta = DeltaTable::new(before.size.max(1), after.size.max(1));
     if before.size == 0 || after.size == 0 {
@@ -59,6 +62,7 @@ pub(crate) fn compute_delta_zhang_shasha(
                 before_meta,
                 after_meta,
                 cost_model,
+                containment,
                 &mut delta,
                 kr1_boundary,
                 kr2_boundary,
