@@ -189,6 +189,32 @@ def load_node_kind_counts(db_path):
     )
 
 
+def _format_kind_as_code(kind):
+    """
+    Render a TreeSitter node-kind string as a Markdown inline code span, safely handling kinds
+    that are themselves made of backticks or pipes - e.g. Rust's `|` closure-argument delimiter,
+    `||`/`||=` operators, or a grammar's literal backtick token. A naive f"`{kind}`" wrap breaks
+    on such kinds: it prematurely closes the code span and, since `|` is also the Markdown table
+    cell delimiter, corrupts the table structure itself.
+    """
+    max_backtick_run = 0
+    current_run = 0
+    for ch in kind:
+        if ch == "`":
+            current_run += 1
+            max_backtick_run = max(max_backtick_run, current_run)
+        else:
+            current_run = 0
+
+    fence = "`" * (max_backtick_run + 1)
+    padding = " " if kind.startswith("`") or kind.endswith("`") else ""
+    code_span = f"{fence}{padding}{kind}{padding}{fence}"
+
+    # `|` is the table cell delimiter; it must be escaped even inside a code span, since table
+    # parsing splits on unescaped pipes before inline formatting is applied.
+    return code_span.replace("|", "\\|")
+
+
 def write_top_node_kinds_by_language(
     node_kind_df, top_n=100, output_filename="top_node_kinds_by_language.md"
 ):
@@ -242,7 +268,7 @@ def write_top_node_kinds_by_language(
         lines.append("|---:|---|---:|---:|")
         for rank, row in enumerate(language_df.iter_rows(named=True), start=1):
             lines.append(
-                f"| {rank} | `{row['kind']}` | {row['total_count']:,} | "
+                f"| {rank} | {_format_kind_as_code(row['kind'])} | {row['total_count']:,} | "
                 f"{row['pct_of_language']:.2f}% |"
             )
         lines.append("")
