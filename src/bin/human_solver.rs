@@ -52,6 +52,18 @@
 *                  content hash for nodes with children, by text for leaves) with no prompting. Any
 *                  pair that ends up classified Identical and has children is collapsed in both
 *                  panels, to keep whole-unchanged subtrees from cluttering the view
+*   a              if the focused cursor node is matched (per the human mapping), move the other
+*                  panel's cursor to its matched node. If that node isn't currently visible,
+*                  scrolls the other panel so it's centered in the viewport (clamped at the
+*                  start/end of the tree, where a true center isn't possible)
+*   A              like `a`, but aligns to the node codediff's own diff (`p`) mapped the cursor
+*                  node to, instead of the human mapping. Requires `p` to have been run first
+*   p              run codediff's own diff algorithm and show its verdict for every node in
+*                  parentheses next to the human-marked status glyph -- M matched (any operation),
+*                  - deleted, + inserted, ? no verdict (e.g. the tree root) -- for a quick visual
+*                  comparison against the human mapping without leaving the TUI. A trailing `*`
+*                  marks a node the human has already decided on where codediff's verdict
+*                  disagrees (matched to a different node, or matched vs. deleted/inserted)
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
@@ -92,6 +104,7 @@ use std::path::PathBuf;
 use tree_sitter::Node;
 
 use codediff::code::Code;
+use codediff::diff::{ASTDiff, diff_code};
 use codediff::test::helper::human_mapping::{self, HumanMapping, HumanMappingEntry, HumanOperation};
 use codediff::test::helper::{node_for_path, path_for_node};
 
@@ -240,6 +253,10 @@ struct PanelState {
     cursor_id: usize,
     collapsed: std::collections::HashSet<usize>,
     scroll: usize,
+    /// Number of rows available for list content, as of the last render (`render_panel`'s
+    /// `inner_height`). Used by `action_align` to decide whether a node is currently on screen and,
+    /// if not, how big a window to center it in -- 0 until the first frame has been drawn.
+    viewport_height: usize,
 }
 
 impl PanelState {
@@ -248,6 +265,7 @@ impl PanelState {
             cursor_id: root_id,
             collapsed: std::collections::HashSet::new(),
             scroll: 0,
+            viewport_height: 0,
         }
     }
 }
@@ -289,6 +307,10 @@ struct App {
     status: Option<String>,
     modal: Option<Modal>,
     should_quit: bool,
+    /// codediff's own diff, computed on demand by `p` and rendered in parentheses next to each
+    /// node's human-marked status glyph for a quick visual diff against the human mapping. `None`
+    /// until `p` has been pressed at least once for the current case.
+    algo_diff: Option<ASTDiff>,
 }
 
 impl App {
@@ -305,6 +327,7 @@ impl App {
             ),
             modal: None,
             should_quit: false,
+            algo_diff: None,
         }
     }
 }
@@ -469,6 +492,74 @@ fn status_after(node: Node, caches: &Caches) -> NodeStatus {
     NodeStatus::Unmarked
 }
 
+/// codediff's own per-node verdict, computed from an `ASTDiff` (via `p`) the same way `NodeStatus`
+/// is computed from the human mapping, but collapsed to a single glyph rather than distinguishing
+/// with-children/inherited marks: `before_node_map`/`after_node_map` already carry that down to
+/// every descendant node directly, since codediff maps (or zero-maps) every node in the tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AlgoStatus {
+    /// Mapped to a node on the other side (whatever the specific `ASTMappingOperation`).
+    Matched,
+    Deleted,
+    Inserted,
+    /// No entry for this node at all, e.g. the tree root (see `ASTDiff::is_complete`) or a diff
+    /// that hasn't been recomputed since the tree changed underneath it.
+    Unknown,
+}
+
+fn algo_status_before(node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
+    match diff_ast.before_node_map.get(&node.id()) {
+        Some(0) => AlgoStatus::Deleted,
+        Some(_) => AlgoStatus::Matched,
+        None => AlgoStatus::Unknown,
+    }
+}
+
+fn algo_status_after(node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
+    match diff_ast.after_node_map.get(&node.id()) {
+        Some(0) => AlgoStatus::Inserted,
+        Some(_) => AlgoStatus::Matched,
+        None => AlgoStatus::Unknown,
+    }
+}
+
+fn algo_status_glyph(status: AlgoStatus) -> &'static str {
+    match status {
+        AlgoStatus::Matched => "M",
+        AlgoStatus::Deleted => "-",
+        AlgoStatus::Inserted => "+",
+        AlgoStatus::Unknown => "?",
+    }
+}
+
+/// True if codediff's verdict for the Before `node` disagrees with the human's, once the human has
+/// actually made a decision about it: not just whether both sides call it "matched", but whether
+/// they agree on *what* it's matched to (mirrors the comparison `check_entry` makes for the
+/// `optimal_solutions` tests). A node the human hasn't marked yet has nothing to disagree with, so
+/// it's never flagged, even if codediff already has an opinion.
+fn algo_disagrees_before(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
+    let algo_partner = diff_ast.before_node_map.get(&node.id()).copied();
+    if let Some(human_after_id) = caches.before_match.get(&node.id()) {
+        return algo_partner != Some(*human_after_id);
+    }
+    if caches.before_removed.contains_key(&node.id()) || is_inherited_removed(node, &caches.before_removed) {
+        return algo_partner != Some(0);
+    }
+    false
+}
+
+/// Same as [`algo_disagrees_before`], but for the After tree.
+fn algo_disagrees_after(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
+    let algo_partner = diff_ast.after_node_map.get(&node.id()).copied();
+    if let Some(human_before_id) = caches.after_match.get(&node.id()) {
+        return algo_partner != Some(*human_before_id);
+    }
+    if caches.after_removed.contains_key(&node.id()) || is_inherited_removed(node, &caches.after_removed) {
+        return algo_partner != Some(0);
+    }
+    false
+}
+
 // ---------------------------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------------------------
@@ -578,6 +669,114 @@ fn ensure_visible(scroll: &mut usize, cursor_idx: usize, viewport_height: usize)
     } else if cursor_idx >= *scroll + viewport_height {
         *scroll = cursor_idx + 1 - viewport_height;
     }
+}
+
+/// Finds the node with id `id` anywhere in `root`'s subtree, regardless of collapse state (unlike
+/// `flatten_visible`, which only sees expanded nodes). Used by `action_align` to locate a matched
+/// node that may currently be hidden under a collapsed ancestor.
+fn find_node_by_id_anywhere(root: Node, id: usize) -> Option<Node> {
+    if root.id() == id {
+        return Some(root);
+    }
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        if let Some(found) = find_node_by_id_anywhere(child, id) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Removes every strict ancestor of `node` from `collapsed`, so `node` is guaranteed to appear in
+/// that panel's `flatten_visible` output.
+fn expand_ancestors(collapsed: &mut std::collections::HashSet<usize>, node: Node) {
+    let mut current = node;
+    while let Some(parent) = current.parent() {
+        collapsed.remove(&parent.id());
+        current = parent;
+    }
+}
+
+/// Shared tail of `action_align`/`action_align_algo`: moves the *other* panel's cursor to
+/// `target_id`. If the target is hidden under a collapsed ancestor, expands every ancestor along
+/// its path so it becomes visible. If the target wasn't already on screen (whether because it was
+/// hidden, or just scrolled out of view), centers the other panel's viewport on it;
+/// `idx.saturating_sub(half).min(max_scroll)` naturally clamps that centering at the start/end of
+/// the tree, where a true center isn't possible.
+fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: Node, target_id: usize) -> Result<String> {
+    let other_root = match focus {
+        Focus::Before => after_root,
+        Focus::After => before_root,
+    };
+    let other = match focus {
+        Focus::Before => &mut app.after,
+        Focus::After => &mut app.before,
+    };
+
+    let was_visible = flatten_visible(other_root, &other.collapsed)
+        .iter()
+        .position(|(n, _)| n.id() == target_id)
+        .is_some_and(|idx| idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1));
+
+    let target_node =
+        find_node_by_id_anywhere(other_root, target_id).context("Matched node not found in tree")?;
+    expand_ancestors(&mut other.collapsed, target_node);
+    other.cursor_id = target_id;
+
+    if !was_visible {
+        let flat = flatten_visible(other_root, &other.collapsed);
+        let idx = flat.iter().position(|(n, _)| n.id() == target_id).unwrap_or(0);
+        let height = other.viewport_height.max(1);
+        let max_scroll = flat.len().saturating_sub(height);
+        other.scroll = idx.saturating_sub(height / 2).min(max_scroll);
+    }
+
+    Ok(format!("Aligned to matched '{}'", target_node.kind()))
+}
+
+/// Implements `a`: aligns to the node the *human mapping* says the cursor node is matched with, if
+/// any. See [`align_cursor_to`] for how the target is made visible.
+fn action_align(app: &mut App, focus: Focus, before_root: Node, after_root: Node, caches: &Caches) -> Result<String> {
+    let (own_cursor, matches) = match focus {
+        Focus::Before => (app.before.cursor_id, &caches.before_match),
+        Focus::After => (app.after.cursor_id, &caches.after_match),
+    };
+
+    let target_id = *matches
+        .get(&own_cursor)
+        .context("Cursor node is not matched to anything")?;
+
+    align_cursor_to(app, focus, before_root, after_root, target_id)
+}
+
+/// Implements `A`: like `a`, but aligns to the node *codediff's own diff* (`p`) says the cursor
+/// node is mapped to, instead of the human mapping. Requires `p` to have been run at least once
+/// for the current case, and fails if codediff mapped the cursor node to nothing (i.e. it
+/// considers it deleted/inserted rather than matched).
+fn action_align_algo(app: &mut App, focus: Focus, before_root: Node, after_root: Node) -> Result<String> {
+    let target_id = {
+        let diff_ast = app
+            .algo_diff
+            .as_ref()
+            .context("No codediff result yet; press 'p' to run it first")?;
+        let own_cursor = match focus {
+            Focus::Before => app.before.cursor_id,
+            Focus::After => app.after.cursor_id,
+        };
+        let node_map = match focus {
+            Focus::Before => &diff_ast.before_node_map,
+            Focus::After => &diff_ast.after_node_map,
+        };
+        *node_map
+            .get(&own_cursor)
+            .context("codediff has no verdict for this node")?
+    };
+
+    if target_id == 0 {
+        bail!("codediff maps this node to nothing (deleted/inserted), not to a matching node");
+    }
+
+    align_cursor_to(app, focus, before_root, after_root, target_id)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1173,6 +1372,7 @@ fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn render_panel(
     frame: &mut Frame,
     area: Rect,
@@ -1183,8 +1383,10 @@ fn render_panel(
     side: Side,
     src: &[u8],
     focused: bool,
+    algo_diff: Option<&ASTDiff>,
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
+    panel.viewport_height = inner_height;
     let cursor_idx = flat
         .iter()
         .position(|(n, _)| n.id() == panel.cursor_id)
@@ -1202,8 +1404,22 @@ fn render_panel(
                 Side::After => status_after(*node, caches),
             };
             let (glyph, mut style) = status_glyph_and_style(status);
+            let (algo_glyph, disagrees) = algo_diff
+                .map(|diff_ast| {
+                    let algo_status = match side {
+                        Side::Before => algo_status_before(*node, diff_ast),
+                        Side::After => algo_status_after(*node, diff_ast),
+                    };
+                    let disagrees = match side {
+                        Side::Before => algo_disagrees_before(*node, caches, diff_ast),
+                        Side::After => algo_disagrees_after(*node, caches, diff_ast),
+                    };
+                    (format!("({})", algo_status_glyph(algo_status)), disagrees)
+                })
+                .unwrap_or_default();
             let indent = "  ".repeat(*depth);
-            let text = format!("{}{} {}", indent, glyph, node_label(*node, src));
+            let marker = if disagrees { " *" } else { "" };
+            let text = format!("{}{}{} {}{}", indent, glyph, algo_glyph, node_label(*node, src), marker);
 
             if idx == cursor_idx {
                 style = style
@@ -1282,6 +1498,7 @@ fn draw_ui(
         Side::Before,
         before_src,
         app.focus == Focus::Before,
+        app.algo_diff.as_ref(),
     );
     render_panel(
         frame,
@@ -1293,10 +1510,11 @@ fn draw_ui(
         Side::After,
         after_src,
         app.focus == Focus::After,
+        app.algo_diff.as_ref(),
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  q quit",
+        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -1500,6 +1718,8 @@ fn run_event_loop(
                     after_src,
                     before_hash,
                     after_hash,
+                    &before,
+                    &after,
                 );
             }
         }
@@ -1520,6 +1740,7 @@ fn run_event_loop(
                     app.after = PanelState::new(after_root_id);
                     app.focus = Focus::Before;
                     app.dirty = false;
+                    app.algo_diff = None;
                     app.status = Some(format!("Opened '{}'", app.name));
                 }
                 Err(err) => {
@@ -1536,7 +1757,6 @@ fn run_event_loop(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn handle_key(
     app: &mut App,
     code: KeyCode,
@@ -1549,6 +1769,8 @@ fn handle_key(
     after_src: &[u8],
     before_hash: &HashMap<usize, u64>,
     after_hash: &HashMap<usize, u64>,
+    before: &Code,
+    after: &Code,
 ) {
     let focus = app.focus;
 
@@ -1705,6 +1927,8 @@ fn handle_key(
                 Some(res)
             }
         }
+        KeyCode::Char('a') => Some(action_align(app, focus, before_root, after_root, caches)),
+        KeyCode::Char('A') => Some(action_align_algo(app, focus, before_root, after_root)),
         KeyCode::Char('u') => {
             let res = action_unmark(
                 &mut app.mapping,
@@ -1721,6 +1945,22 @@ fn handle_key(
                 app.dirty = true;
             }
             Some(res)
+        }
+        KeyCode::Char('p') => {
+            let diff = diff_code(before, after);
+            app.status = Some(match diff.ast {
+                Some(ast_diff) => {
+                    let msg = format!(
+                        "Ran codediff: {} before-node(s), {} after-node(s) mapped",
+                        ast_diff.before_node_map.len(),
+                        ast_diff.after_node_map.len()
+                    );
+                    app.algo_diff = Some(ast_diff);
+                    msg
+                }
+                None => "codediff produced no AST diff".to_string(),
+            });
+            None
         }
         KeyCode::Char('s') => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
         KeyCode::Char('o') => {

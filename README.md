@@ -116,6 +116,7 @@ Rust's project structure must be followed.
 
 Some directories don't exist yet but should be created if the need arises.
 
+```
 <root of the repository>
     |- /src             <- The implementation
         |- main.rs      <- The main entry point, spawns the background threads and the UI
@@ -136,6 +137,7 @@ Some directories don't exist yet but should be created if the need arises.
     |- SPECS.md         <- Detailed specifications and all decisions that were taken
     |- REVIEW.md        <- Comments about the codebase that need to be improved uppon
     |- TODO.md          <- List of small to  mid size TODO items that need to be fixed in the future
+```
 
 The SPECS.md and README.md files can exist in any subdirectory, and they always serve the same
 purpose:
