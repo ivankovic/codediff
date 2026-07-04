@@ -241,12 +241,134 @@ pub fn is_semantically_structural<'a>(
     }
 }
 
+// Families of single-token operator kinds that occupy the same grammatical "slot" in a
+// TreeSitter grammar (e.g. the `operator` field of `binary_expression`/`assignment_expression`).
+// Two leaf nodes whose kinds fall in the same family represent the same conceptual operation with
+// a different operator, so matching them as an Update (rather than a Delete+Insert) mirrors what
+// a human would consider "the same node, tweaked" - e.g. the classic `<` -> `<=` off-by-one fix.
+// Crucially these are separate arrays, not one big list: `kinds_update_allowed` only allows a
+// match when both kinds fall in the *same* family, so `<` can cross to `<=` but never to `+`.
+//
+// Tokens are drawn from the actual TreeSitter grammars this project depends on (verified against
+// each crate's `node-types.json`), not guessed. A token that never appears in a given language's
+// grammar is harmless to leave in these shared lists - it simply never matches anything.
+
+/// Relational and equality comparisons (including alternate spellings: C++'s `not_eq`/`<=>`,
+/// JS/PHP's `===`/`!==`, Python/PHP's old-style `<>`, Ruby's `=~`/`!~` match operators).
+///
+/// Deliberately excludes keyword-based comparisons that double as other syntax in the same
+/// grammar (Python/JS `in`, Python `is`/`is not`/`not in`, JS/PHP `instanceof`): those tokens
+/// also appear outside of comparisons (e.g. `for x in y`), so allowing them here risks the DP
+/// matching an unrelated keyword occurrence purely because it's a cheaper leaf-level swap.
+const COMPARISON_OPS: &[&str] = &[
+    "<", "<=", ">", ">=", "==", "!=", "===", "!==", "<>", "<=>", "not_eq", "=~", "!~",
+];
+
+/// Arithmetic operators.
+const ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "//", "@"];
+
+/// PHP additionally uses `.` as its string-concatenation operator, in the same `binary_expression`
+/// slot as the arithmetic operators - a human swapping `.` for `+` (or vice versa) is a classic
+/// PHP typo/bugfix.
+const PHP_ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "."];
+
+/// Bitwise operators (including C++'s alternative keyword spellings and Go's `&^` AND-NOT).
+const BITWISE_OPS: &[&str] = &["&", "|", "^", "<<", ">>", ">>>", "&^", "bitand", "bitor", "xor"];
+
+/// Logical/boolean operators, including keyword spellings and the null-coalescing/Elvis operators
+/// (`??`, `?:`), which occupy the same "fallback value" slot as `||` in these grammars.
+const LOGICAL_OPS: &[&str] = &["&&", "||", "and", "or", "??", "?:"];
+
+/// Plain `=` and every compound/augmented-assignment spelling. Converting `x = x + 1` into
+/// `x += 1` is a one-token operator change on the same kind of statement, not a different one.
+const ASSIGNMENT_OPS: &[&str] = &[
+    "=", "+=", "-=", "*=", "/=", "%=", "**=", "//=", "&=", "|=", "^=", "<<=", ">>=", ">>>=", "&&=",
+    "||=", "??=", "@=", ".=", "and_eq", "or_eq", "xor_eq", "&^=",
+];
+
+/// Increment/decrement.
+const INCREMENT_OPS: &[&str] = &["++", "--"];
+
+/// Rust's range operators: `a..b` (exclusive), `a..=b` (inclusive), and the pattern-only `a...b`
+/// spelling. Switching between exclusive and inclusive bounds is the single most common Rust
+/// off-by-one fix (e.g. `for i in 0..n` -> `for i in 0..=n`).
+const RUST_RANGE_OPS: &[&str] = &["..", "..=", "..."];
+
+/// True if `kind_a` and `kind_b` both appear in the same family in `families`.
+fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
+    families
+        .iter()
+        .any(|family| family.contains(&kind_a) && family.contains(&kind_b))
+}
+
 /**
 * Returns true if a node with kind_a is allowed to be matched with node with kind_b
 * with an Update operation.
+*
+* By default (and for any language/kind pair not covered below), nodes of different kinds are
+* never allowed to match - see `UnitCostModel::ren`'s doc comment for why. The families above are
+* deliberate, hand-picked exceptions: single-token operator leaves that occupy the same syntactic
+* slot in their language's grammar, where a human would consider a kind change (e.g. `<` -> `<=`)
+* to be an edit of the same node rather than a wholesale replacement.
 */
-pub fn kinds_update_allowed(_kind_a: &str, _kind_b: &str, _language: &Language) -> bool {
-    false
+pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> bool {
+    if kind_a == kind_b {
+        return true;
+    }
+
+    let families: &[&[&str]] = match language {
+        Language::C | Language::Java | Language::Go | Language::CSharp => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+        ],
+        Language::CPP => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+        ],
+        Language::Rust => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            RUST_RANGE_OPS,
+        ],
+        Language::JavaScript | Language::TypeScript | Language::TSX => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+        ],
+        Language::Python => &[COMPARISON_OPS, ARITHMETIC_OPS, LOGICAL_OPS, ASSIGNMENT_OPS],
+        Language::Kotlin => &[COMPARISON_OPS, LOGICAL_OPS, ASSIGNMENT_OPS],
+        Language::PHP => &[
+            COMPARISON_OPS,
+            PHP_ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+        ],
+        Language::Ruby => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+        ],
+        _ => return false,
+    };
+
+    in_shared_family(kind_a, kind_b, families)
 }
 
 #[cfg(test)]
@@ -257,6 +379,58 @@ mod tests {
     use crate::test::helper;
 
     use super::*;
+
+    #[test]
+    fn kinds_update_allowed_same_kind_is_always_allowed() {
+        assert!(kinds_update_allowed("<", "<", &Language::CPP));
+        assert!(kinds_update_allowed("identifier", "identifier", &Language::Unknown));
+    }
+
+    #[test]
+    fn cpp_relational_operators_cross_match() {
+        // The motivating case: `for (...; i < size; ...)` -> `for (...; i <= size; ...)`.
+        assert!(kinds_update_allowed("<", "<=", &Language::CPP));
+        assert!(kinds_update_allowed("==", "!=", &Language::CPP));
+        assert!(kinds_update_allowed(">=", "<=>", &Language::CPP));
+    }
+
+    #[test]
+    fn cpp_operators_never_cross_families() {
+        assert!(!kinds_update_allowed("<", "+", &Language::CPP));
+        assert!(!kinds_update_allowed("&&", "&", &Language::CPP));
+        assert!(!kinds_update_allowed("=", "==", &Language::CPP));
+    }
+
+    #[test]
+    fn cpp_increment_decrement_cross_match() {
+        assert!(kinds_update_allowed("++", "--", &Language::CPP));
+    }
+
+    #[test]
+    fn rust_range_operators_cross_match() {
+        // The classic Rust off-by-one fix: `0..n` -> `0..=n`.
+        assert!(kinds_update_allowed("..", "..=", &Language::Rust));
+        assert!(!kinds_update_allowed("..", "+", &Language::Rust));
+    }
+
+    #[test]
+    fn rust_compound_assignment_crosses_with_plain_assignment() {
+        assert!(kinds_update_allowed("=", "+=", &Language::Rust));
+        assert!(kinds_update_allowed("+=", "-=", &Language::Rust));
+    }
+
+    #[test]
+    fn unknown_language_never_allows_cross_kind_matches() {
+        assert!(!kinds_update_allowed("<", "<=", &Language::Unknown));
+    }
+
+    #[test]
+    fn python_excludes_keyword_comparisons_from_family() {
+        // `in`/`is`/`instanceof` double as other syntax elsewhere in the grammar, so they're
+        // deliberately excluded from the shared comparison family (see COMPARISON_OPS doc).
+        assert!(!kinds_update_allowed("in", "==", &Language::Python));
+        assert!(kinds_update_allowed("<", "<=", &Language::Python));
+    }
 
     // Tests for is_reference (formerly node_matches from reference_nodes.rs)
 

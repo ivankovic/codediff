@@ -85,6 +85,7 @@ pub fn hermetic_expand(m: &mut Metadata) {
 */
 pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
+    metadata.language = code.metadata.language.unwrap_or_default();
     crate::code::hash::hash_code(code, &mut metadata)?;
     compute_subtree_sizes(code, &mut metadata)?;
     compute_node_info(code, &mut metadata)?;

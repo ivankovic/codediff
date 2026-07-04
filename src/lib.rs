@@ -40,7 +40,7 @@ pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
     let code_after = Code::from_string(after, language);
 
     let mut diff = diff_code(&code_before, &code_after);
-    diff.language = language.clone();
+    diff.language = *language;
     diff
 }
 

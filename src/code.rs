@@ -141,7 +141,7 @@ impl Code {
             metadata: Metadata {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
-                language: Some(language.clone()),
+                language: Some(*language),
                 columns_for_row: None,
                 ast_metadata: None,
             },
@@ -254,6 +254,10 @@ pub struct ASTMetadata {
     pub semantically_structural_nodes: HashMap<(String, String), usize>,
     /// Node information for each node, indexed by node_id.
     pub node_info: HashMap<usize, ASTNodeMetadata>,
+    /// The language this tree was parsed as, so the cost model can consult
+    /// [`crate::diff::nodes::kinds_update_allowed`] without threading a separate parameter
+    /// through every APTED call site.
+    pub language: Language,
 }
 
 /**
@@ -262,7 +266,7 @@ pub struct ASTMetadata {
 * Implemented as a crate enum instead of reusing someting like TreeSitter language to allow for
 * better error handling of unknown or not-supported languages.
 */
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum Language {
     #[default]
     Unknown,

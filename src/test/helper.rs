@@ -511,7 +511,6 @@ pub fn handmade_test_diffs(
             language: before
                 .metadata
                 .language
-                .clone()
                 .unwrap_or(crate::code::Language::Unknown),
             ..Default::default()
         };

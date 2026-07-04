@@ -19,7 +19,8 @@
 use anyhow::Result;
 use std::collections::HashMap;
 
-use crate::code::{ASTMetadata, ASTNodeMetadata, Code};
+use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Language};
+use crate::diff::nodes::kinds_update_allowed;
 use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
     COST_UPDATE, NodeCache,
@@ -29,7 +30,12 @@ use super::engine::compute_delta;
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
 /// Cost model for APTED - unit cost model
-pub(crate) struct UnitCostModel;
+pub(crate) struct UnitCostModel {
+    /// The language both sides of the diff are parsed as, consulted by `ren` to allow a small,
+    /// hand-picked set of cross-kind operator swaps (see `kinds_update_allowed`) that would
+    /// otherwise always be forbidden.
+    pub(crate) language: Language,
+}
 
 impl UnitCostModel {
     pub(crate) fn del(&self, _node: &ASTNodeMetadata) -> u64 {
@@ -54,6 +60,11 @@ impl UnitCostModel {
                 // accounted for separately via `delta`/recursion).
                 0
             }
+        } else if kinds_update_allowed(&node1.kind, &node2.kind, &self.language) {
+            // A hand-picked exception (e.g. `<` -> `<=`): different kinds, but the same
+            // conceptual operator slot. These are always leaves with differing text, so this is
+            // exactly the same-kind/different-text case above.
+            COST_UPDATE
         } else {
             // Different kinds - matching is more expensive than delete + insert
             // to ensure that nodes with different kinds are not matched.
@@ -556,6 +567,13 @@ pub(crate) fn classify_match(
     let after_info = after_meta.node_info.get(&after_id).unwrap();
 
     if before_info.kind != after_info.kind {
+        if kinds_update_allowed(&before_info.kind, &after_info.kind, &before_meta.language) {
+            // A hand-picked cross-kind exception (e.g. `<` -> `<=`) that `ren` priced the same as
+            // a same-kind, different-text leaf update. Matches the `HumanOperation` convention:
+            // matched pairs with different kinds are always `MatchButNotIdentical`, never
+            // `Update` (which is reserved for same-kind pairs).
+            return (ASTMappingOperation::MatchButNotIdentical, COST_UPDATE);
+        }
         // Should not happen in practice: UnitCostModel::ren makes this strictly more expensive
         // than a separate delete + insert, so compute_edit_mapping should never choose it.
         return (
@@ -600,7 +618,9 @@ pub(crate) fn emit_match(
         after_id,
         ctx.before_meta,
         ctx.after_meta,
-        &UnitCostModel,
+        &UnitCostModel {
+            language: ctx.before_meta.language,
+        },
     );
     let mut total = root_cost;
 
@@ -643,7 +663,13 @@ pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut
         .unwrap_or(false)
     {
         add_delete_mappings(before_id, ctx.before_meta, diff);
-        return subtree_del_cost(before_id, ctx.before_meta, &UnitCostModel);
+        return subtree_del_cost(
+            before_id,
+            ctx.before_meta,
+            &UnitCostModel {
+                language: ctx.before_meta.language,
+            },
+        );
     }
 
     // Something below this node is reused elsewhere: delete just this node (cost 1) and let
@@ -678,7 +704,13 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
         .unwrap_or(false)
     {
         add_insert_mappings(after_id, ctx.after_meta, diff);
-        return subtree_ins_cost(after_id, ctx.after_meta, &UnitCostModel);
+        return subtree_ins_cost(
+            after_id,
+            ctx.after_meta,
+            &UnitCostModel {
+                language: ctx.after_meta.language,
+            },
+        );
     }
 
     let mut total = COST_INSERT;
@@ -740,7 +772,13 @@ pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut
         return;
     }
     if !diff.mapping.contains_key(&(node_id, 0)) {
-        let cost = subtree_del_cost(node_id, meta, &UnitCostModel);
+        let cost = subtree_del_cost(
+            node_id,
+            meta,
+            &UnitCostModel {
+                language: meta.language,
+            },
+        );
         diff.add_mapping(
             node_id,
             0,
@@ -767,7 +805,13 @@ pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut
         return;
     }
     if !diff.mapping.contains_key(&(0, node_id)) {
-        let cost = subtree_ins_cost(node_id, meta, &UnitCostModel);
+        let cost = subtree_ins_cost(
+            node_id,
+            meta,
+            &UnitCostModel {
+                language: meta.language,
+            },
+        );
         diff.add_mapping(
             0,
             node_id,
@@ -1027,9 +1071,11 @@ pub(crate) fn filter_after_nodes(node_ids: Vec<usize>, diff: &ASTDiff) -> Vec<us
 }
 
 /// Cost charged for a `ren()` pairing that `ContainmentCtx` has vetoed - deliberately the same
-/// value `UnitCostModel::ren` already uses for mismatched kinds, so a containment-inconsistent
-/// pairing is exactly as unattractive to the DP as a kind mismatch, never merely "more expensive
-/// than the best alternative" (which could still lose to an equally bad alternative pairing).
+/// value `UnitCostModel::ren` already uses for *disallowed* mismatched kinds (kinds not covered by
+/// `kinds_update_allowed`), so a containment-inconsistent pairing is exactly as unattractive to
+/// the DP, never merely "more expensive than the best alternative" (which could still lose to an
+/// equally bad alternative pairing). Note this is strictly more than the `COST_UPDATE` charged for
+/// an *allowed* cross-kind pairing, so the veto still dominates even over that cheaper option.
 const FORBIDDEN_RENAME_COST: u64 = COST_DELETE + COST_INSERT + 1;
 
 /// Build a child -> parent map covering every node in `meta`, so ancestor/descendant checks don't
@@ -1361,7 +1407,9 @@ pub fn for_nodes(
     algorithm: Algorithm,
     diff: &mut ASTDiff,
 ) -> Result<()> {
-    let cost_model = UnitCostModel;
+    let cost_model = UnitCostModel {
+        language: before_metadata.language,
+    };
     resolve_forest(
         before_node_ids,
         after_node_ids,
@@ -1478,7 +1526,9 @@ mod tests {
         before_node_map: &HashMap<usize, usize>,
         after_node_map: &HashMap<usize, usize>,
     ) {
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
 
         let before_idx = PostorderIndexer::build(before_meta, before_root_ids, before_node_map);
         let after_idx = PostorderIndexer::build(after_meta, after_root_ids, after_node_map);
@@ -1540,7 +1590,9 @@ mod tests {
         before_root_ids: &[usize],
         after_root_ids: &[usize],
     ) {
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
         let empty_map = HashMap::new();
 
         let before_idx = PostorderIndexer::build(before_meta, before_root_ids, &empty_map);
@@ -1808,7 +1860,9 @@ mod tests {
     fn bench_compute_delta_large_balanced_trees() {
         let kinds = ["a", "b", "c"];
         let texts = ["x", "y", "z"];
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
         let empty_map = HashMap::new();
 
         for depth in [9usize, 10, 11, 12, 14] {
@@ -1882,7 +1936,9 @@ mod tests {
     fn bench_compute_delta_typical_random_trees() {
         let kinds = ["a", "b", "c"];
         let texts = ["x", "y", "z"];
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
         let empty_map = HashMap::new();
 
         for depth in [8usize, 9, 10] {
@@ -2008,7 +2064,9 @@ mod tests {
         before_root: usize,
         after_root: usize,
     ) {
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
         let empty_map = HashMap::new();
         let before_idx = PostorderIndexer::build(before, &[before_root], &empty_map);
         let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
@@ -2176,7 +2234,9 @@ mod tests {
             (13, "b".into(), "".into(), vec![14]),
             (7, "b".into(), "".into(), vec![8, 10, 13]),
         ]);
-        let cost_model = UnitCostModel;
+        let cost_model = UnitCostModel {
+            language: Language::Unknown,
+        };
         let empty_map = HashMap::new();
         let before_idx = PostorderIndexer::build(&before, &[0], &empty_map);
         let after_idx = PostorderIndexer::build(&after, &[7], &empty_map);

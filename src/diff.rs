@@ -206,11 +206,7 @@ impl Diff {
 
         Self {
             ast: Some(ast_diff),
-            language: before
-                .metadata
-                .language
-                .clone()
-                .unwrap_or(Language::Unknown),
+            language: before.metadata.language.unwrap_or(Language::Unknown),
             text: None,
         }
     }
@@ -248,8 +244,11 @@ impl ASTDiff {
      *
      * Useful in tests.
      */
-    pub fn is_valid(&self, _before: &Code, _after: &Code, node_cache: &NodeCache) -> bool {
-        // Check that each mapping only maps nodes of the same type
+    pub fn is_valid(&self, before: &Code, _after: &Code, node_cache: &NodeCache) -> bool {
+        let language = before.metadata.language.unwrap_or_default();
+
+        // Check that each mapping only maps nodes of the same type, or a hand-picked cross-kind
+        // exception (see `crate::diff::nodes::kinds_update_allowed`).
         for (before_id, after_id) in self.mapping.keys() {
             if *before_id == 0 || *after_id == 0 {
                 // Null-mapping is an Insert/Delete.
@@ -268,7 +267,13 @@ impl ASTDiff {
             // Check that the node types match
             let before_node = before_node.unwrap();
             let after_node = after_node.unwrap();
-            if before_node.kind() != after_node.kind() {
+            if before_node.kind() != after_node.kind()
+                && !crate::diff::nodes::kinds_update_allowed(
+                    before_node.kind(),
+                    after_node.kind(),
+                    &language,
+                )
+            {
                 return false;
             }
         }
