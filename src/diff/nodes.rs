@@ -241,6 +241,14 @@ pub fn is_semantically_structural<'a>(
     }
 }
 
+/**
+* Returns true if a node with kind_a is allowed to be matched with node with kind_b
+* with an Update operation.
+*/
+pub fn kinds_update_allowed(_kind_a: &str, _kind_b: &str, _language: &Language) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
