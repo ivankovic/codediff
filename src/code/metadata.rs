@@ -20,8 +20,7 @@ use anyhow::Result;
 use crate::code::language;
 use crate::code::tip;
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Metadata};
-use crate::diff::reference_nodes;
-use crate::diff::semantic_structure_nodes;
+use crate::diff::nodes;
 
 /// Compute the number of columns (characters) in each row of the given code.
 ///
@@ -198,7 +197,7 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         let node_id = node.id();
 
         // Check if this node is a reference node
-        if reference_nodes::node_matches(node.kind(), language)
+        if nodes::is_reference(node.kind(), language)
             && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
         {
             reference_nodes_with_sizes.push((node_id, subtree_size));
@@ -246,8 +245,8 @@ fn discover_semantic_structure_nodes(code: &Code, metadata: &mut ASTMetadata) ->
     while let Some(node) = stack.pop() {
         let node_id = node.id();
 
-        // Check if this node is a reference node
-        if let Some(t) = semantic_structure_nodes::node_matches(&node, language, code) {
+        // Check if this node is semantically structural
+        if let Some(t) = nodes::is_semantically_structural(&node, language, code) {
             metadata.semantically_structural_nodes.insert(t, node_id);
         }
 

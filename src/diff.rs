@@ -16,8 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod apted;
-pub mod reference_nodes;
-pub mod semantic_structure_nodes;
+pub mod nodes;
 pub mod solve_identical_trees;
 pub mod solve_semantically_structural_nodes;
 pub mod solve_structurally_identical_trees;

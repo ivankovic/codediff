@@ -19,6 +19,74 @@ use tree_sitter::Node;
 
 use crate::code::{Code, Language};
 
+/**
+* Determines if a node with the given kind is a reference node for the given language.
+*
+* Reference nodes are nodes that are used as anchors for diffing. Typically these are
+* nodes that represent significant structural elements in the code, such as source files
+* or function definitions.
+*
+* You can think of reference nodes as "parts of code humans think about". I.e. humans rarely think
+* about a specific semicolon in a C++ file, but they do think about entire functions as whole
+* entities.
+*/
+pub fn is_reference(node_kind: &str, language: &Language) -> bool {
+    // Language-specific reference nodes
+    match language {
+        Language::Rust => {
+            node_kind == "source_file" ||
+            node_kind == "function_item" ||
+            node_kind == "impl_item" ||
+            node_kind == "struct_item" ||
+            node_kind == "enum_item" ||
+            node_kind == "trait_item" ||
+            node_kind == "type_item" ||
+            node_kind == "mod_item" ||
+            node_kind == "use_declaration" ||
+            node_kind == "if_expression"
+        }
+        Language::Python => {
+            node_kind == "module" ||
+            node_kind == "function_definition" ||
+            node_kind == "class_definition"
+        }
+        Language::Java => node_kind == "program", // Java source files are represented as "program" nodes
+        Language::C => node_kind == "translation_unit", // C source files use "translation_unit" as root
+        Language::CPP => node_kind == "translation_unit", // C++ also uses "translation_unit" as root
+        Language::Go => {
+            node_kind == "source_file" ||
+            node_kind == "function_declaration" ||
+            node_kind == "method_declaration" ||
+            node_kind == "type_spec" ||
+            node_kind == "type_alias"
+        }
+        Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
+        Language::TypeScript => node_kind == "program", // TypeScript also uses "program" as root
+        Language::TSX => node_kind == "program",    // TSX also uses "program" as root
+        Language::PHP => node_kind == "program",    // PHP also uses "program" as root
+        Language::Ruby => node_kind == "program",   // Ruby also uses "program" as root
+        Language::R => node_kind == "program",      // R also uses "program" as root
+        Language::Swift => node_kind == "source_file", // Swift source files use "source_file" as root
+        Language::Kotlin => {
+            node_kind == "source_file" ||
+            node_kind == "function_declaration" ||
+            node_kind == "class_declaration" ||
+            node_kind == "object_declaration" ||
+            node_kind == "companion_object" ||
+            node_kind == "type_alias"
+        }
+        Language::Scala => node_kind == "compilation_unit", // Scala source files use "compilation_unit" as root
+        Language::CSharp => node_kind == "compilation_unit", // C# source files use "compilation_unit" as root
+        Language::HTML => node_kind == "document", // HTML documents use "document" as root
+        Language::CSS => node_kind == "stylesheet", // CSS stylesheets use "stylesheet" as root
+        Language::LUA => node_kind == "chunk",     // Lua chunks use "chunk" as root
+        Language::Vimscript => node_kind == "script_file", // Vimscript files use "script_file" as root
+        Language::ShellScript => node_kind == "program",   // Shell scripts use "program" as root
+        // Add other languages as needed
+        _ => false,
+    }
+}
+
 /*
 * Semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
 * typically enforced by the compiler in some way. For example, there can only ever be ONE
@@ -27,7 +95,7 @@ use crate::code::{Code, Language};
 *
 * Returns (node_kind, identifier) if the node matches.
 */
-pub fn node_matches<'a>(
+pub fn is_semantically_structural<'a>(
     node: &Node<'a>,
     language: &Language,
     code: &Code,
@@ -87,7 +155,7 @@ pub fn node_matches<'a>(
                 let param_decl = receiver.named_children(&mut rc).next()?;
                 let type_node = param_decl.child_by_field_name("type")?;
                 let type_text = type_node.utf8_text(bytes).ok()?;
-                // Strip leading `*` for pointer receivers: `*Foo` → `Foo`
+                // Strip leading `*` for pointer receivers: `*Foo` \u{2192} `Foo`
                 let receiver_type = type_text.trim_start_matches('*');
                 Some((node_kind.to_string(), format!("{receiver_type}.{method_name}")))
             }
@@ -113,7 +181,7 @@ pub fn node_matches<'a>(
                         .find(|c| c.kind() == "user_type" && c.start_byte() < name_start)
                         .and_then(|r| r.utf8_text(bytes).ok())
                         .map(|s| {
-                            // Strip type params for key stability: `List<String>` → `List`
+                            // Strip type params for key stability: `List<String>` \u{2192} `List`
                             let base = s.split('<').next().unwrap_or(s).trim();
                             format!("{}.", base)
                         })
@@ -182,13 +250,48 @@ mod tests {
 
     use super::*;
 
+    // Tests for is_reference (formerly node_matches from reference_nodes.rs)
+
+    #[test]
+    fn root_nodes_are_reference_in_all_languages() -> Result<()> {
+        let codes = helper::handmade_test_code()?;
+
+        // Test on all handmade code files
+        for (filename, code) in &codes {
+            // Get the language from metadata
+            let language_msg = format!("Language should be set for file: {}", filename);
+            let language = code.metadata.language.as_ref().expect(&language_msg);
+
+            // Get the AST
+            let ast_msg = format!("AST should be parsed for file: {}", filename);
+            let ast = code.ast.as_ref().expect(&ast_msg);
+
+            // Get the root node
+            let root_node = ast.root_node();
+            let root_node_kind = root_node.kind();
+
+            // Check if the root node is a reference node
+            assert!(
+                is_reference(root_node_kind, language),
+                "Root node '{}' should be a reference node for language {:?} in file {}",
+                root_node_kind,
+                language,
+                filename
+            );
+        }
+
+        Ok(())
+    }
+
+    // Tests for is_semantically_structural (formerly node_matches from semantic_structure_nodes.rs)
+
     fn collect_matches(src: &str) -> Vec<(String, String)> {
         let code = Code::from_string(src, &Language::Rust);
         let ast = code.ast.as_ref().expect("AST should parse");
         let root = ast.root_node();
         let mut cursor = root.walk();
         root.children(&mut cursor)
-            .filter_map(|child| node_matches(&child, &Language::Rust, &code))
+            .filter_map(|child| is_semantically_structural(&child, &Language::Rust, &code))
             .collect()
     }
 
@@ -223,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn root_nodes_are_reference_in_all_languages() -> Result<()> {
+    fn root_nodes_are_not_semantically_structural_in_all_languages() -> Result<()> {
         let codes = helper::handmade_test_code()?;
 
         // Test on all handmade code files
@@ -242,7 +345,7 @@ mod tests {
             // The root node is in principle NOT a semantically structural node.
             // This is because it doesn't actually change the semantic of the code in any way.
             assert!(
-                node_matches(&root_node, language, code).is_none(),
+                is_semantically_structural(&root_node, language, code).is_none(),
                 "Root node should not be a semantically structural node in language {:?} in file {}",
                 language,
                 filename
@@ -270,7 +373,7 @@ type Handler interface { Handle() }
 
         fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
             let mut out = Vec::new();
-            if let Some(m) = node_matches(&node, lang, code) { out.push(m); }
+            if let Some(m) = is_semantically_structural(&node, lang, code) { out.push(m); }
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 out.extend(collect_all(child, lang, code));
@@ -291,7 +394,7 @@ type Handler interface { Handle() }
                 "missing ({kind}, {name}) in {matches:?}"
             );
         }
-        assert!(node_matches(&ast.root_node(), &Language::Go, &code).is_none());
+        assert!(is_semantically_structural(&ast.root_node(), &Language::Go, &code).is_none());
     }
 
     #[test]
@@ -324,7 +427,7 @@ class DecoratedClass:
         // Collect matches from all nodes (DFS), as metadata.rs does
         fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
             let mut out = Vec::new();
-            if let Some(m) = node_matches(&node, lang, code) {
+            if let Some(m) = is_semantically_structural(&node, lang, code) {
                 out.push(m);
             }
             let mut cursor = node.walk();
@@ -350,7 +453,7 @@ class DecoratedClass:
             );
         }
         // Root (module) should not match
-        assert!(node_matches(&ast.root_node(), &Language::Python, &code).is_none());
+        assert!(is_semantically_structural(&ast.root_node(), &Language::Python, &code).is_none());
     }
 
     #[test]
@@ -424,7 +527,7 @@ type Stringer interface { String() string }
 
         fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
             let mut out = Vec::new();
-            if let Some(m) = node_matches(&node, lang, code) { out.push(m); }
+            if let Some(m) = is_semantically_structural(&node, lang, code) { out.push(m); }
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 out.extend(collect_all(child, lang, code));
@@ -449,7 +552,7 @@ type Stringer interface { String() string }
         let ast = code.ast.as_ref().expect("AST should parse");
         fn walk(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
             let mut out = Vec::new();
-            if let Some(m) = node_matches(&node, lang, code) {
+            if let Some(m) = is_semantically_structural(&node, lang, code) {
                 out.push(m);
             }
             let mut cursor = node.walk();
