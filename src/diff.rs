@@ -17,8 +17,10 @@
  */
 pub mod apted;
 pub mod nodes;
+pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_semantically_structural_nodes;
+pub mod solve_similar_flow_control;
 pub mod solve_structurally_identical_trees;
 pub mod text;
 pub mod text_range;
@@ -192,6 +194,30 @@ impl Diff {
 
         // These speed up the diff, but don't guaranteed an optimal solution
         solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
+
+        // MatchSimilarFlowControl: before orphaned semantic nodes are blanket-marked as deleted/
+        // inserted below, pair up still-unmatched match/switch constructs whose arm patterns
+        // overlap enough to be "the same shape", and anchor the matching arms.
+        solve_similar_flow_control::solve(before, after, &node_cache, &mut ast_diff);
+
+        // MatchIdenticalDiagnosticStatements: mop up any still-unmatched logging/bail/assert/debug
+        // -printf style statements that are byte-for-byte identical on both sides. Runs after every
+        // bigger/coarser pass above so it can't fragment a match one of them would otherwise have
+        // made in one piece, but before the orphan blanket-delete below so it can still find such
+        // statements inside a function/impl that has no same-named counterpart - see that pass's
+        // doc comment for the full reasoning.
+        solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
+        // (no same-named counterpart, and not claimed by the heuristics above) is marked as a
+        // from-scratch delete/insert. Deliberately runs after the heuristics above - see their doc
+        // comments for why.
+        solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
+            before,
+            after,
+            &node_cache,
+            &mut ast_diff,
+        );
 
         // This is the final, slow algorithm.
         // The more nodes are already matched, the faster it is.

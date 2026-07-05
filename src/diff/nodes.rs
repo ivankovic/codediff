@@ -371,6 +371,328 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
     in_shared_family(kind_a, kind_b, families)
 }
 
+/// A flow-control construct family, used to keep `MatchSimilarFlowControl` from ever pairing a
+/// `match` against a `switch`, etc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowControlFamily {
+    Match,
+    Switch,
+    If,
+}
+
+/// One arm/case of a flow-control container, together with its normalized discriminant text (the
+/// match pattern or case label), used by `MatchSimilarFlowControl` to score how similar two
+/// containers are.
+///
+/// `signature` is `None` for a wildcard/default arm (Rust/Python `_`, a bare `default:`): matching
+/// those across two constructs is trivial and would inflate the similarity score without telling
+/// us anything real, so they're excluded from scoring (see `flow_control_similarity`).
+#[derive(Debug, Clone)]
+pub struct FlowControlArm {
+    pub node_id: usize,
+    pub signature: Option<String>,
+}
+
+/// Returns which [`FlowControlFamily`] `node_kind` belongs to for `language`, if any.
+///
+/// `if`/`else if` chains are supported too, but only for languages where `alternative` recurses
+/// into either a bare block or another `if` (Python's flat `elif_clause`/`else_clause` fields on a
+/// single `if_statement` don't fit that shape, so Python `if` isn't covered here - only its
+/// `match_statement` is).
+pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowControlFamily> {
+    match (language, node_kind) {
+        (Language::Rust, "match_expression") => Some(FlowControlFamily::Match),
+        (Language::Rust, "if_expression") => Some(FlowControlFamily::If),
+        (Language::Python, "match_statement") => Some(FlowControlFamily::Match),
+        (
+            Language::C
+            | Language::CPP
+            | Language::JavaScript
+            | Language::TypeScript
+            | Language::TSX
+            | Language::CSharp,
+            "switch_statement",
+        ) => Some(FlowControlFamily::Switch),
+        (Language::Go, "expression_switch_statement") => Some(FlowControlFamily::Switch),
+        (
+            Language::C
+            | Language::CPP
+            | Language::Java
+            | Language::Go
+            | Language::JavaScript
+            | Language::TypeScript
+            | Language::TSX
+            | Language::CSharp,
+            "if_statement",
+        ) => Some(FlowControlFamily::If),
+        _ => None,
+    }
+}
+
+/// Extracts the byte range of `container`'s discriminant, excluding a trailing guard/`when`
+/// clause if the grammar attaches one directly to the pattern node under a `condition` field
+/// (Rust's `match_pattern` does this for `pattern if guard`; Python's `case_pattern` doesn't need
+/// it since the guard is a sibling field on `case_clause` instead, so this is a no-op there).
+fn signature_text(container: Node, source: &[u8]) -> Option<String> {
+    let start = container.start_byte();
+    let guard = container.child_by_field_name("condition");
+    let end = guard.map(|g| g.start_byte()).unwrap_or_else(|| container.end_byte());
+    if end <= start {
+        return None;
+    }
+    let text = std::str::from_utf8(&source[start..end]).ok()?.trim();
+    // When a guard is present, the slice still includes the `if`/`when` keyword introducing it
+    // (the keyword itself isn't part of the `condition` field) - strip it back off.
+    let text = if guard.is_some() {
+        text.strip_suffix("if")
+            .or_else(|| text.strip_suffix("when"))
+            .map(str::trim_end)
+            .unwrap_or(text)
+    } else {
+        text
+    };
+    if text.is_empty() || text == "_" {
+        None
+    } else {
+        Some(text.to_string())
+    }
+}
+
+/// Extracts the arm/case list for a recognized flow-control container node (see
+/// [`flow_control_family`]). Returns `None` if `node`'s kind isn't a recognized container.
+pub fn flow_control_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
+    match flow_control_family(node.kind(), language)? {
+        FlowControlFamily::Match => match_arms(node, language, source),
+        FlowControlFamily::Switch => switch_arms(node, language, source),
+        FlowControlFamily::If => if_chain_arms(node, language, source),
+    }
+}
+
+fn match_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
+    match language {
+        Language::Rust => {
+            let body = node.child_by_field_name("body")?; // match_block
+            let mut cursor = body.walk();
+            Some(
+                body.children(&mut cursor)
+                    .filter(|c| c.kind() == "match_arm")
+                    .map(|arm| FlowControlArm {
+                        node_id: arm.id(),
+                        signature: arm
+                            .child_by_field_name("pattern")
+                            .and_then(|pattern| signature_text(pattern, source)),
+                    })
+                    .collect(),
+            )
+        }
+        Language::Python => {
+            let body = node.child_by_field_name("body")?; // block
+            let mut cursor = body.walk();
+            Some(
+                body.children(&mut cursor)
+                    .filter(|c| c.kind() == "case_clause")
+                    .map(|arm| FlowControlArm {
+                        node_id: arm.id(),
+                        // `case_pattern` is `case_clause`'s sole unnamed child, always the first
+                        // one (the optional `guard`/`consequence` fields always follow it).
+                        signature: arm
+                            .named_child(0)
+                            .and_then(|pattern| signature_text(pattern, source)),
+                    })
+                    .collect(),
+            )
+        }
+        _ => None,
+    }
+}
+
+fn switch_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
+    let arm = |n: Node, value_field: &str| FlowControlArm {
+        node_id: n.id(),
+        signature: n
+            .child_by_field_name(value_field)
+            .and_then(|v| signature_text(v, source)),
+    };
+    match language {
+        Language::C | Language::CPP => {
+            let body = node.child_by_field_name("body")?; // compound_statement
+            let mut cursor = body.walk();
+            Some(
+                body.children(&mut cursor)
+                    .filter(|c| c.kind() == "case_statement")
+                    .map(|n| arm(n, "value"))
+                    .collect(),
+            )
+        }
+        Language::JavaScript | Language::TypeScript | Language::TSX => {
+            let body = node.child_by_field_name("body")?; // switch_body
+            let mut cursor = body.walk();
+            Some(
+                body.children(&mut cursor)
+                    .filter(|c| c.kind() == "switch_case" || c.kind() == "switch_default")
+                    .map(|n| arm(n, "value"))
+                    .collect(),
+            )
+        }
+        Language::CSharp => {
+            let body = node.child_by_field_name("body")?; // switch_body
+            let mut cursor = body.walk();
+            Some(
+                body.children(&mut cursor)
+                    .filter(|c| c.kind() == "switch_section")
+                    .map(|n| FlowControlArm {
+                        node_id: n.id(),
+                        signature: n
+                            .child_by_field_name("expression")
+                            .or_else(|| n.child_by_field_name("pattern"))
+                            .and_then(|v| signature_text(v, source)),
+                    })
+                    .collect(),
+            )
+        }
+        Language::Go => {
+            // No `body` field: `expression_case`/`default_case` are direct children.
+            let mut cursor = node.walk();
+            Some(
+                node.children(&mut cursor)
+                    .filter(|c| c.kind() == "expression_case" || c.kind() == "default_case")
+                    .map(|n| arm(n, "value"))
+                    .collect(),
+            )
+        }
+        _ => None,
+    }
+}
+
+/// Walks an `if`/`else if`/`else` chain starting at `node` (which must already be the outermost
+/// unmatched `if` for this comparison), producing one arm per branch: the condition text for each
+/// `if`/`else if`, and a final wildcard (`signature: None`) arm for a trailing bare `else`, if any.
+///
+/// `else_clause`-wrapping grammars (Rust, C, C++, JS/TS/TSX) always give that wrapper exactly one
+/// child - either a block or a nested `if` - so unwrapping it is a single `named_child(0)`. Grammars
+/// that put `alternative` directly on the next branch (Java, Go, C#) need no unwrapping at all.
+fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
+    let wraps_else_clause = matches!(
+        language,
+        Language::Rust | Language::C | Language::CPP | Language::JavaScript | Language::TypeScript | Language::TSX
+    );
+
+    let mut arms = Vec::new();
+    let mut current = node;
+    // A chain this long would be a code smell in the source itself; the cap is just to keep a
+    // malformed/unexpected tree from looping forever.
+    for _ in 0..64 {
+        let signature = current
+            .child_by_field_name("condition")
+            .and_then(|condition| trimmed_text(condition, source));
+        arms.push(FlowControlArm { node_id: current.id(), signature });
+
+        let Some(alternative) = current.child_by_field_name("alternative") else { break };
+        let next = if wraps_else_clause {
+            match alternative.named_child(0) {
+                Some(inner) => inner,
+                None => break,
+            }
+        } else {
+            alternative
+        };
+
+        if flow_control_family(next.kind(), language) == Some(FlowControlFamily::If) {
+            current = next;
+        } else {
+            // A bare `else { ... }`: terminal, no condition of its own.
+            arms.push(FlowControlArm { node_id: next.id(), signature: None });
+            break;
+        }
+    }
+    Some(arms)
+}
+
+fn trimmed_text(node: Node, source: &[u8]) -> Option<String> {
+    let text = node.utf8_text(source).ok()?.trim();
+    if text.is_empty() { None } else { Some(text.to_string()) }
+}
+
+/// Fraction of non-wildcard arm signatures shared between two flow-control containers (Jaccard
+/// similarity: shared signatures / all distinct signatures across both sides).
+///
+/// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
+/// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
+pub fn flow_control_similarity(before_arms: &[FlowControlArm], after_arms: &[FlowControlArm]) -> f64 {
+    let before_set: std::collections::HashSet<&str> =
+        before_arms.iter().filter_map(|a| a.signature.as_deref()).collect();
+    let after_set: std::collections::HashSet<&str> =
+        after_arms.iter().filter_map(|a| a.signature.as_deref()).collect();
+    if before_set.is_empty() || after_set.is_empty() {
+        return 0.0;
+    }
+    let intersection = before_set.intersection(&after_set).count();
+    let union = before_set.union(&after_set).count();
+    intersection as f64 / union as f64
+}
+
+/// Substrings that mark a call/macro as "meant for the programmer" (logging, error bailouts,
+/// assertions, debug prints) rather than output meant for the end user. Matched against the
+/// *lowercased last segment* of the callee path (e.g. `log::error!` -> "error",
+/// `logger.WarnF` -> "warnf", `self.logger.debug` -> "debug"), so e.g. Go's `Errorf`/`Warnf`/
+/// `Fatalln` or Java/C#'s `LogError`/`LogWarning` all match via substring containment without
+/// needing one entry per per-language spelling convention.
+const DIAGNOSTIC_CALLEE_KEYWORDS: &[&str] = &[
+    "printf", "fprintf", "sprintf", "eprintln", "eprint", "panic", "bail", "unreachable", "todo",
+    "unimplemented", "assert", "log", "error", "err", "warn", "warning", "info", "debug", "trace",
+    "fatal", "critical", "die",
+];
+
+/// Whether `node_kind` is a call-like node this pass should even consider - i.e. worth extracting
+/// a callee name from. Deliberately per-language, since "a function call" is a different node
+/// kind (and a different callee field name) in every grammar.
+fn is_call_like(node_kind: &str, language: &Language) -> bool {
+    matches!(
+        (language, node_kind),
+        (Language::Rust, "call_expression" | "macro_invocation")
+            | (Language::C | Language::CPP | Language::Go, "call_expression")
+            | (
+                Language::JavaScript | Language::TypeScript | Language::TSX,
+                "call_expression"
+            )
+            | (Language::Java, "method_invocation")
+            | (Language::CSharp, "invocation_expression")
+            | (Language::Python, "call")
+    )
+}
+
+/// Extracts the callee (function/macro path) text of a call-like node, e.g. `log::error` out of
+/// `log::error!(...)`, or `logger.warn` out of `logger.warn(...)`.
+fn callee_text<'a>(node: Node, language: &Language, source: &'a [u8]) -> Option<&'a str> {
+    let field_name = match (language, node.kind()) {
+        (Language::Rust, "macro_invocation") => "macro",
+        (Language::Java, "method_invocation") => "name",
+        _ => "function",
+    };
+    node.child_by_field_name(field_name)?.utf8_text(source).ok()
+}
+
+/// Whether `node` is a call/macro invocation whose callee looks like it's meant for the
+/// programmer (logging, `bail!`/`panic!`, assertions, debug `printf`s) rather than the end user.
+/// This is intentionally a loose, substring-based heuristic - see [`DIAGNOSTIC_CALLEE_KEYWORDS`] -
+/// since the pass that uses it only ever pairs nodes whose *entire subtree hash* is identical, so
+/// an over-eager match here is harmless: it just means two byte-for-byte identical statements get
+/// matched, which is a reasonable outcome regardless of why they were flagged as candidates.
+pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -> bool {
+    if !is_call_like(node.kind(), language) {
+        return false;
+    }
+    let Some(callee) = callee_text(node, language, source) else { return false };
+    let last_segment = callee
+        .rsplit(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(callee)
+        .to_lowercase();
+    DIAGNOSTIC_CALLEE_KEYWORDS
+        .iter()
+        .any(|keyword| last_segment.contains(keyword))
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -384,6 +706,185 @@ mod tests {
     fn kinds_update_allowed_same_kind_is_always_allowed() {
         assert!(kinds_update_allowed("<", "<", &Language::CPP));
         assert!(kinds_update_allowed("identifier", "identifier", &Language::Unknown));
+    }
+
+    fn rust_match_container(src: &str) -> Code {
+        Code::from_string(src, &Language::Rust)
+    }
+
+    fn find_first<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(found) = find_first(child, kind) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn rust_match_arms_extracts_string_literal_patterns() {
+        let code = rust_match_container(
+            r#"
+fn f(s: &str) {
+    match s {
+        "a" => 1,
+        "b" => 2,
+        _ => 0,
+    };
+}
+"#,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let match_expr = find_first(ast.root_node(), "match_expression").unwrap();
+        let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
+        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
+        assert_eq!(signatures, vec![Some("\"a\""), Some("\"b\""), None]);
+    }
+
+    #[test]
+    fn rust_match_arm_guard_is_excluded_from_signature() {
+        let code = rust_match_container(
+            r#"
+fn f(s: i32) {
+    match s {
+        n if n > 0 => 1,
+        _ => 0,
+    };
+}
+"#,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let match_expr = find_first(ast.root_node(), "match_expression").unwrap();
+        let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
+        assert_eq!(arms[0].signature.as_deref(), Some("n"));
+    }
+
+    #[test]
+    fn flow_control_similarity_ignores_wildcard_and_scores_jaccard() {
+        let before = rust_match_container(
+            r#"
+fn f(s: &str) {
+    match s {
+        "asset" => 1,
+        "ecmascript" => 2,
+        "wasm" => 3,
+        _ => 0,
+    };
+}
+"#,
+        );
+        let after = rust_match_container(
+            r#"
+fn f(s: &str) {
+    match s {
+        "asset" => 1,
+        "ecmascript" => 2,
+        "json" => 4,
+        _ => 0,
+    };
+}
+"#,
+        );
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
+        let before_expr = find_first(before_ast.root_node(), "match_expression").unwrap();
+        let after_expr = find_first(after_ast.root_node(), "match_expression").unwrap();
+        let before_arms =
+            match_arms(before_expr, &Language::Rust, before.contents.as_bytes()).unwrap();
+        let after_arms = match_arms(after_expr, &Language::Rust, after.contents.as_bytes()).unwrap();
+
+        // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4). Wildcards
+        // excluded from both sets entirely, so a trivial `_`<->`_` match can't inflate the score.
+        let score = flow_control_similarity(&before_arms, &after_arms);
+        assert!((score - 0.5).abs() < 1e-9, "expected 2/4 = 0.5, got {score}");
+    }
+
+    #[test]
+    fn c_switch_arms_extracts_case_values_and_default() {
+        let code = Code::from_string(
+            r#"
+void f(int x) {
+    switch (x) {
+        case 1: break;
+        case 2: break;
+        default: break;
+    }
+}
+"#,
+            &Language::C,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let switch_stmt = find_first(ast.root_node(), "switch_statement").unwrap();
+        let arms = switch_arms(switch_stmt, &Language::C, code.contents.as_bytes()).unwrap();
+        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
+        assert_eq!(signatures, vec![Some("1"), Some("2"), None]);
+    }
+
+    #[test]
+    fn rust_if_chain_extracts_conditions_and_trailing_else() {
+        let code = rust_match_container(
+            r#"
+fn f(x: i32) -> i32 {
+    if x > 0 {
+        1
+    } else if x < 0 {
+        2
+    } else {
+        0
+    }
+}
+"#,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let if_expr = find_first(ast.root_node(), "if_expression").unwrap();
+        let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
+        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
+        assert_eq!(signatures, vec![Some("x > 0"), Some("x < 0"), None]);
+    }
+
+    #[test]
+    fn rust_if_chain_without_else_has_no_trailing_wildcard_arm() {
+        let code = rust_match_container(
+            r#"
+fn f(x: i32) {
+    if x > 0 {
+        1;
+    }
+}
+"#,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let if_expr = find_first(ast.root_node(), "if_expression").unwrap();
+        let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
+        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
+        assert_eq!(signatures, vec![Some("x > 0")]);
+    }
+
+    #[test]
+    fn c_if_chain_extracts_conditions() {
+        let code = Code::from_string(
+            r#"
+int f(int x) {
+    if (x > 0) {
+        return 1;
+    } else if (x < 0) {
+        return 2;
+    } else {
+        return 0;
+    }
+}
+"#,
+            &Language::C,
+        );
+        let ast = code.ast.as_ref().unwrap();
+        let if_stmt = find_first(ast.root_node(), "if_statement").unwrap();
+        let arms = if_chain_arms(if_stmt, &Language::C, code.contents.as_bytes()).unwrap();
+        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
+        assert_eq!(signatures, vec![Some("(x > 0)"), Some("(x < 0)"), None]);
     }
 
     #[test]
@@ -860,5 +1361,95 @@ class Calculator {
             })
             .collect();
         assert_eq!(matched_names.len(), 2, "both methods should be pre-matched; got {matched_names:?}");
+    }
+
+    #[test]
+    fn rust_bail_macro_and_ordinary_call_are_classified_correctly() {
+        let code = Code::from_string(
+            "fn f(s: &str) -> Result<()> { if s.is_empty() { bail!(\"empty\"); } compute(1); Ok(()) }",
+            &Language::Rust,
+        );
+        let root = code.ast.as_ref().unwrap().root_node();
+        let source = code.contents.as_bytes();
+        let bail = find_first(root, "macro_invocation").unwrap();
+        let call = find_first(root, "call_expression").unwrap();
+        assert!(is_diagnostic_statement(bail, &Language::Rust, source), "bail! should be diagnostic");
+        assert!(
+            !is_diagnostic_statement(call, &Language::Rust, source),
+            "an ordinary call like compute(1) should not be diagnostic"
+        );
+    }
+
+    #[test]
+    fn c_fprintf_to_stderr_is_diagnostic() {
+        let code = Code::from_string(
+            "void f(void) { fprintf(stderr, \"bad thing\\n\"); ok(1); }",
+            &Language::C,
+        );
+        let root = code.ast.as_ref().unwrap().root_node();
+        let source = code.contents.as_bytes();
+        let mut calls = Vec::new();
+        collect_all(root, "call_expression", &mut calls);
+        let fprintf = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::C, source) == Some("fprintf"))
+            .expect("fprintf call should be present");
+        let ok_call = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::C, source) == Some("ok"))
+            .expect("ok call should be present");
+        assert!(is_diagnostic_statement(*fprintf, &Language::C, source));
+        assert!(!is_diagnostic_statement(*ok_call, &Language::C, source));
+    }
+
+    #[test]
+    fn python_logging_error_is_diagnostic_via_attribute_access() {
+        let code = Code::from_string("logging.error('bad thing')\ncompute(1)\n", &Language::Python);
+        let root = code.ast.as_ref().unwrap().root_node();
+        let source = code.contents.as_bytes();
+        let mut calls = Vec::new();
+        collect_all(root, "call", &mut calls);
+        let log_call = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::Python, source) == Some("logging.error"))
+            .expect("logging.error call should be present");
+        let compute_call = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::Python, source) == Some("compute"))
+            .expect("compute call should be present");
+        assert!(is_diagnostic_statement(*log_call, &Language::Python, source));
+        assert!(!is_diagnostic_statement(*compute_call, &Language::Python, source));
+    }
+
+    #[test]
+    fn go_log_fatal_is_diagnostic_via_selector_expression() {
+        let code = Code::from_string(
+            "package main\nfunc f() {\n\tlog.Fatal(\"boom\")\n\tcompute(1)\n}\n",
+            &Language::Go,
+        );
+        let root = code.ast.as_ref().unwrap().root_node();
+        let source = code.contents.as_bytes();
+        let mut calls = Vec::new();
+        collect_all(root, "call_expression", &mut calls);
+        let fatal_call = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::Go, source) == Some("log.Fatal"))
+            .expect("log.Fatal call should be present");
+        let compute_call = calls
+            .iter()
+            .find(|n| callee_text(**n, &Language::Go, source) == Some("compute"))
+            .expect("compute call should be present");
+        assert!(is_diagnostic_statement(*fatal_call, &Language::Go, source));
+        assert!(!is_diagnostic_statement(*compute_call, &Language::Go, source));
+    }
+
+    fn collect_all<'a>(node: tree_sitter::Node<'a>, kind: &str, out: &mut Vec<tree_sitter::Node<'a>>) {
+        if node.kind() == kind {
+            out.push(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            collect_all(child, kind, out);
+        }
     }
 }

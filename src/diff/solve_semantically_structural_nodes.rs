@@ -233,12 +233,36 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         }
     }
 
-    // Pass 3: semantic nodes that exist only on one side (pure deletions and insertions).
-    //
-    // Running APTED on the full source_file pair would force it to compare these lone subtrees
-    // against everything on the other side, burning O(n²) time for what is really an O(n) walk.
-    // Calling for_nodes with an empty opposite forest lets APTED mark the whole subtree as
-    // deleted / inserted in a single O(n) pass, removing them from the apted_roots residual.
+    // Pass 3 (`solve_orphaned_semantic_nodes`) intentionally does *not* run here — see its own
+    // doc comment for why it's a separate, later step.
+}
+
+/**
+* Pass 3: semantic nodes that exist only on one side (pure deletions and insertions).
+*
+* Running APTED on the full source_file pair would force it to compare these lone subtrees
+* against everything on the other side, burning O(n²) time for what is really an O(n) walk.
+* Calling for_nodes with an empty opposite forest lets APTED mark the whole subtree as
+* deleted / inserted in a single O(n) pass, removing them from the apted_roots residual.
+*
+* This is split out from [`solve`] and run as its own, later step (after
+* `solve_similar_flow_control`, per `Diff::from_code`) so that heuristic gets first crack at any
+* semantic node that's "orphaned" only because it was renamed/restructured: it can pull out and
+* match the parts that are still recognizably the same (e.g. a `match`'s arms) before this pass
+* blanket-marks whatever's left as a from-scratch delete/insert. `add_delete_mappings`/
+* `add_insert_mappings` already skip over any node a prior pass mapped, so nothing pre-matched by
+* that heuristic gets clobbered here.
+*/
+pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
+    let before_metadata =
+        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
+        });
+    let after_metadata =
+        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
+            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
+        });
+
     for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
         if diff.before_node_map.contains_key(&before_node_id) {
             continue;
