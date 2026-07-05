@@ -67,10 +67,19 @@
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
-*   s              save human_mapping.json and ensure the optimal_solutions test stub exists
+*   s              if the current case is a real test case (opened via `o`): save
+*                  human_mapping.json and ensure the optimal_solutions test stub exists. If it's a
+*                  sample (opened via `O`): prompt for a name and promote it -- copies the sample's
+*                  before/after content into src/test/data/diffs/<name>/, saves
+*                  human_mapping.json and the test stub there, and records <name> against the
+*                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
+*                  other than letters/digits/-/_, or a diffs/ case with that name already exists
 *   o              open a different test case: lists every directory under src/test/data/diffs/,
 *                  j/k to move, Enter to open, Esc to cancel. If the current mapping has unsaved
-*                  changes, asks first whether to save or discard them before switching
+*                  changes, asks first whether to save (only offered for a real test case; see `s`
+*                  above) or discard them before switching
+*   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
+*                  see `s` above for what happens when one of these is saved
 *   q / Esc        quit
 *
 * After a match finalizes (including a modal answer), both panels' cursors auto-advance to their
@@ -98,15 +107,16 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
 };
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 use codediff::code::Code;
 use codediff::diff::{ASTDiff, diff_code};
 use codediff::test::helper::human_mapping::{self, HumanMapping, HumanMappingEntry, HumanOperation};
-use codediff::test::helper::{node_for_path, path_for_node};
+use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -151,16 +161,36 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
     Ok((before, after))
 }
 
-/// Names of every directory under `src/test/data/diffs/` (not just the ones that successfully
-/// parse into a Code pair), for the `o` (open) picker.
-fn list_available_cases() -> Result<Vec<String>> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn diffs_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
         .join("data")
-        .join("diffs");
+        .join("diffs")
+}
 
-    let mut names: Vec<String> = fs::read_dir(&root)
+fn samples_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("samples")
+}
+
+fn diffs_case_dir(name: &str) -> PathBuf {
+    diffs_root().join(name)
+}
+
+/// Names of every directory directly under `root` (not just the ones that successfully parse
+/// into a Code pair), for the `o`/`O` open pickers.
+fn list_dir_names(root: &Path) -> Result<Vec<String>> {
+    // Not an error: `samples/` in particular won't exist at all until `materialize_test_diffs`
+    // has been run once.
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut names: Vec<String> = fs::read_dir(root)
         .with_context(|| format!("reading {:?}", root))?
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().is_dir())
@@ -169,6 +199,54 @@ fn list_available_cases() -> Result<Vec<String>> {
     names.sort();
 
     Ok(names)
+}
+
+fn list_available_cases() -> Result<Vec<String>> {
+    list_dir_names(&diffs_root())
+}
+
+fn list_available_samples() -> Result<Vec<String>> {
+    list_dir_names(&samples_root())
+}
+
+/// Provenance recorded by `materialize_test_diffs` alongside each `src/test/data/samples/<name>/`
+/// fixture (`source.json`): the exact `sample.csv` row it came from. Used, when the sample is
+/// promoted, to find and update that row without having to reverse-engineer it from the
+/// (lossy: lowercased, 8-char commit) directory name.
+#[derive(Debug, Clone, Deserialize)]
+struct SampleSource {
+    language: String,
+    repository: String,
+    commit: String,
+    path: String,
+}
+
+/// Loads and parses the before/after code for a sampled candidate under
+/// `src/test/data/samples/<name>/`, along with its recorded provenance.
+fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
+    let dir = samples_root().join(name);
+
+    let mut parser = tree_sitter::Parser::new();
+    let (mut before, mut after) = code_pair_from_dir(&dir, &mut parser)
+        .with_context(|| format!("Failed to load sample from {:?}", dir))?
+        .ok_or_else(|| anyhow!("No before/after fixture found in samples/{}", name))?;
+
+    if before.ast.is_none() {
+        bail!("Before code for sample '{}' has no AST (unsupported or undetected language)", name);
+    }
+    if after.ast.is_none() {
+        bail!("After code for sample '{}' has no AST (unsupported or undetected language)", name);
+    }
+    before.ensure_parsed().context("Failed to compute AST metadata for before code")?;
+    after.ensure_parsed().context("Failed to compute AST metadata for after code")?;
+
+    let source_path = dir.join("source.json");
+    let contents = fs::read_to_string(&source_path)
+        .with_context(|| format!("reading {:?}", source_path))?;
+    let source: SampleSource = serde_json::from_str(&contents)
+        .with_context(|| format!("parsing {:?}", source_path))?;
+
+    Ok((before, after, source))
 }
 
 fn main() -> Result<()> {
@@ -196,7 +274,7 @@ fn main() -> Result<()> {
 
     let mapping = human_mapping::load(&name).unwrap_or_default();
 
-    let mut app = App::new(name, before_root_id, after_root_id, mapping);
+    let mut app = App::new(name, CaseOrigin::Diffs, before_root_id, after_root_id, mapping);
 
     if let Some(options) = initial_picker_options {
         app.modal = Some(Modal::OpenDiffPicker { options, selected: 0 });
@@ -290,15 +368,50 @@ enum Modal {
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
     OpenDiffPicker { options: Vec<String>, selected: usize },
-    /// Raised when the picker's selection is confirmed while the current mapping has unsaved
+    /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
+    /// open.
+    OpenSamplePicker { options: Vec<String>, selected: usize },
+    /// Raised when a picker's selection is confirmed while the current mapping has unsaved
     /// changes: asks whether to save the *current* case before switching to `target`.
-    ConfirmDiscardUnsaved { target: String },
+    /// `can_save` is false when the current case is a sample, since promoting one needs a name
+    /// (see `PromptPromoteName`) rather than being a single-key save.
+    ConfirmDiscardUnsaved { target: OpenTarget, can_save: bool },
+    /// Raised by `s` when the current case is a sample: asks for the name to promote it under in
+    /// `src/test/data/diffs/`. Re-raised with `error` set (input preserved) if the name is
+    /// invalid or already in use.
+    PromptPromoteName { input: String, error: Option<String> },
+}
+
+/// Which open picker (`o` or `O`) a pending switch came from, and the name selected.
+#[derive(Debug, Clone)]
+enum OpenTarget {
+    Diffs(String),
+    Sample(String),
+}
+
+impl OpenTarget {
+    fn name(&self) -> &str {
+        match self {
+            OpenTarget::Diffs(name) | OpenTarget::Sample(name) => name,
+        }
+    }
+}
+
+/// Where the currently open case's content lives: a committed test case, or a not-yet-promoted
+/// sample. Determines what `s` does (see `Modal::PromptPromoteName`) and what `o`/`O` need to know
+/// before switching away with unsaved changes.
+#[derive(Debug, Clone)]
+enum CaseOrigin {
+    Diffs,
+    Sample(SampleSource),
 }
 
 struct App {
-    /// Name of the currently open test case (a directory under src/test/data/diffs/). Can change
-    /// at runtime via the `o` (open) picker.
+    /// Name of the currently open case: a directory under src/test/data/diffs/ (if `origin` is
+    /// `Diffs`) or src/test/data/samples/ (if `origin` is `Sample`). Can change at runtime via
+    /// the `o`/`O` (open) pickers, or via promoting a sample with `s`.
     name: String,
+    origin: CaseOrigin,
     focus: Focus,
     before: PanelState,
     after: PanelState,
@@ -314,9 +427,16 @@ struct App {
 }
 
 impl App {
-    fn new(name: String, before_root_id: usize, after_root_id: usize, mapping: HumanMapping) -> Self {
+    fn new(
+        name: String,
+        origin: CaseOrigin,
+        before_root_id: usize,
+        after_root_id: usize,
+        mapping: HumanMapping,
+    ) -> Self {
         Self {
             name,
+            origin,
             focus: Focus::Before,
             before: PanelState::new(before_root_id),
             after: PanelState::new(after_root_id),
@@ -1569,15 +1689,35 @@ fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal, current_name: &str
             ),
         ),
         Modal::OpenDiffPicker { options, selected } => {
-            render_open_picker(frame, area, options, *selected);
+            render_open_picker(frame, area, options, *selected, "diff");
         }
-        Modal::ConfirmDiscardUnsaved { target } => render_text_modal(
+        Modal::OpenSamplePicker { options, selected } => {
+            render_open_picker(frame, area, options, *selected, "sample");
+        }
+        Modal::ConfirmDiscardUnsaved { target, can_save } => render_text_modal(
             frame,
             area,
             "Unsaved changes",
+            &if *can_save {
+                format!(
+                    "'{}' has unsaved changes.\n\nSave before opening '{}'?\n\n[s] Save & Open    [d] Discard & Open    [Esc] Cancel",
+                    current_name, target.name()
+                )
+            } else {
+                format!(
+                    "'{}' has unsaved changes (it's a sample; promote it with 's' from the main view to save it).\n\nOpen '{}' anyway?\n\n[d] Discard & Open    [Esc] Cancel",
+                    current_name, target.name()
+                )
+            },
+        ),
+        Modal::PromptPromoteName { input, error } => render_text_modal(
+            frame,
+            area,
+            "Promote sample to test case",
             &format!(
-                "'{}' has unsaved changes.\n\nSave before opening '{}'?\n\n[s] Save & Open    [d] Discard & Open    [Esc] Cancel",
-                current_name, target
+                "Enter a name for src/test/data/diffs/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                input,
+                error.as_deref().map(|e| format!("\n{}\n", e)).unwrap_or_default(),
             ),
         ),
     }
@@ -1596,10 +1736,11 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
     );
 }
 
-/// Renders the `o` (open) picker: a scrollable list of test case names, with `selected`
-/// highlighted. Scroll position is recomputed fresh each frame from `selected` (no persisted
-/// state needed) by roughly centering it in the viewport, clamped to the list's extent.
-fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selected: usize) {
+/// Renders the `o`/`O` (open) pickers: a scrollable list of names (test cases for `o`, samples
+/// for `O`, per `kind`), with `selected` highlighted. Scroll position is recomputed fresh each
+/// frame from `selected` (no persisted state needed) by roughly centering it in the viewport,
+/// clamped to the list's extent.
+fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selected: usize, kind: &str) {
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
 
@@ -1625,7 +1766,8 @@ fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selecte
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open diff ({}/{}) — j/k move, Enter open, Esc cancel",
+            "Open {} ({}/{}) — j/k move, Enter open, Esc cancel",
+            kind,
             selected + 1,
             options.len()
         ))
@@ -1687,7 +1829,7 @@ fn run_event_loop(
             )
         })?;
 
-        let mut open_request: Option<String> = None;
+        let mut open_request: Option<OpenTarget> = None;
 
         if event::poll(Duration::from_millis(250))?
             && let Event::Key(key) = event::read()?
@@ -1727,8 +1869,8 @@ fn run_event_loop(
         // Applied after the borrows above (`before_root`/`before_flat`/... all borrow from
         // `before`/`after`) have had their last use, so reassigning here is sound: the compiler
         // ends those borrows at last-use, not at the end of the lexical scope.
-        if let Some(name) = open_request {
-            match load_case(&name) {
+        match open_request {
+            Some(OpenTarget::Diffs(name)) => match load_case(&name) {
                 Ok((new_before, new_after)) => {
                     let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
                     let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
@@ -1736,6 +1878,7 @@ fn run_event_loop(
                     after = new_after;
                     app.mapping = human_mapping::load(&name).unwrap_or_default();
                     app.name = name;
+                    app.origin = CaseOrigin::Diffs;
                     app.before = PanelState::new(before_root_id);
                     app.after = PanelState::new(after_root_id);
                     app.focus = Focus::Before;
@@ -1746,7 +1889,31 @@ fn run_event_loop(
                 Err(err) => {
                     app.status = Some(format!("Error opening '{}': {:#}", name, err));
                 }
-            }
+            },
+            Some(OpenTarget::Sample(name)) => match load_sample(&name) {
+                Ok((new_before, new_after, source)) => {
+                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
+                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    before = new_before;
+                    after = new_after;
+                    app.mapping = HumanMapping::default();
+                    app.name = name;
+                    app.origin = CaseOrigin::Sample(source);
+                    app.before = PanelState::new(before_root_id);
+                    app.after = PanelState::new(after_root_id);
+                    app.focus = Focus::Before;
+                    app.dirty = false;
+                    app.algo_diff = None;
+                    app.status = Some(format!(
+                        "Opened sample '{}' (press s to promote it into a test case)",
+                        app.name
+                    ));
+                }
+                Err(err) => {
+                    app.status = Some(format!("Error opening sample '{}': {:#}", name, err));
+                }
+            },
+            None => {}
         }
 
         if app.should_quit {
@@ -1962,7 +2129,13 @@ fn handle_key(
             });
             None
         }
-        KeyCode::Char('s') => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
+        KeyCode::Char('s') => match &app.origin {
+            CaseOrigin::Diffs => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
+            CaseOrigin::Sample(_) => {
+                app.modal = Some(Modal::PromptPromoteName { input: String::new(), error: None });
+                None
+            }
+        },
         KeyCode::Char('o') => {
             match list_available_cases() {
                 Ok(options) if !options.is_empty() => {
@@ -1974,6 +2147,21 @@ fn handle_key(
                 }
                 Err(err) => {
                     app.status = Some(format!("Error listing cases: {:#}", err));
+                }
+            }
+            None
+        }
+        KeyCode::Char('O') => {
+            match list_available_samples() {
+                Ok(options) if !options.is_empty() => {
+                    let selected = options.iter().position(|o| o == &app.name).unwrap_or(0);
+                    app.modal = Some(Modal::OpenSamplePicker { options, selected });
+                }
+                Ok(_) => {
+                    app.status = Some("No samples found in src/test/data/samples".to_string());
+                }
+                Err(err) => {
+                    app.status = Some(format!("Error listing samples: {:#}", err));
                 }
             }
             None
@@ -2005,7 +2193,7 @@ fn handle_modal_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-) -> Option<String> {
+) -> Option<OpenTarget> {
     let Some(modal) = app.modal.take() else {
         return None;
     };
@@ -2065,9 +2253,10 @@ fn handle_modal_key(
                 });
             }
             KeyCode::Enter => {
-                let target = options[selected].clone();
+                let target = OpenTarget::Diffs(options[selected].clone());
                 if app.dirty {
-                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target });
+                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
                 } else {
                     return Some(target);
                 }
@@ -2079,14 +2268,44 @@ fn handle_modal_key(
                 app.modal = Some(Modal::OpenDiffPicker { options, selected });
             }
         },
-        Modal::ConfirmDiscardUnsaved { target } => match code {
-            KeyCode::Char('s') | KeyCode::Char('S') => {
+        Modal::OpenSamplePicker { options, selected } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::OpenSamplePicker {
+                    selected: selected.saturating_sub(1),
+                    options,
+                });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::OpenSamplePicker {
+                    selected: (selected + 1).min(options.len().saturating_sub(1)),
+                    options,
+                });
+            }
+            KeyCode::Enter => {
+                let target = OpenTarget::Sample(options[selected].clone());
+                if app.dirty {
+                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                } else {
+                    return Some(target);
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::OpenSamplePicker { options, selected });
+            }
+        },
+        Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
+            KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
                     Ok(_) => return Some(target),
                     Err(err) => {
                         app.status = Some(format!(
                             "Save failed ({:#}); not opening '{}'.",
-                            err, target
+                            err,
+                            target.name()
                         ));
                     }
                 }
@@ -2098,7 +2317,35 @@ fn handle_modal_key(
                 app.status = Some("Cancelled".to_string());
             }
             _ => {
-                app.modal = Some(Modal::ConfirmDiscardUnsaved { target });
+                app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+            }
+        },
+        Modal::PromptPromoteName { mut input, error: _ } => match code {
+            KeyCode::Enter => {
+                let new_name = input.trim().to_string();
+                match action_promote(app, &new_name, before_src, after_src) {
+                    Ok(msg) => app.status = Some(msg),
+                    Err(err) => {
+                        app.modal = Some(Modal::PromptPromoteName {
+                            input,
+                            error: Some(format!("{:#}", err)),
+                        });
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                app.modal = Some(Modal::PromptPromoteName { input, error: None });
+            }
+            KeyCode::Char(c) => {
+                input.push(c);
+                app.modal = Some(Modal::PromptPromoteName { input, error: None });
+            }
+            _ => {
+                app.modal = Some(Modal::PromptPromoteName { input, error: None });
             }
         },
     }
@@ -2118,6 +2365,155 @@ fn action_save(mapping: &mut HumanMapping, dirty: &mut bool, name: &str) -> Resu
     } else {
         "Saved human_mapping.json".to_string()
     })
+}
+
+/// A name must be non-empty, start with a letter (so `module_name` -- which just swaps `-` for
+/// `_` -- produces a valid Rust identifier) and contain only characters safe to use directly as
+/// a directory name.
+/// Rust keywords (2015 through 2024 edition, strict and reserved). `module_name` turns a case
+/// name directly into a module identifier (`-` -> `_`), so a name that collides with one of these
+/// would produce a stub that fails to compile -- caught here instead, before anything is written.
+const RUST_KEYWORDS: &[&str] = &[
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+    "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move",
+    "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true",
+    "type", "unsafe", "use", "where", "while", "abstract", "become", "box", "do", "final", "gen",
+    "macro", "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+];
+
+fn validate_new_case_name(name: &str) -> Result<()> {
+    if name.is_empty() {
+        bail!("Name cannot be empty");
+    }
+    if !name.chars().next().unwrap().is_ascii_alphabetic() {
+        bail!("Name must start with a letter");
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        bail!("Name may only contain letters, digits, '-' and '_'");
+    }
+    if RUST_KEYWORDS.contains(&module_name(name).as_str()) {
+        bail!(
+            "'{}' becomes the Rust keyword '{}' as a module name; pick another name",
+            name,
+            module_name(name)
+        );
+    }
+    Ok(())
+}
+
+/// Promotes the currently open sample (`app.origin` must be `CaseOrigin::Sample`) into a real
+/// test case under `src/test/data/diffs/<new_name>/`: copies the before/after content sitting in
+/// `before_src`/`after_src` (the same bytes currently on screen, read once from
+/// `src/test/data/samples/<app.name>/` when the sample was opened), saves human_mapping.json and
+/// the optimal_solutions stub via the normal `action_save` path, and records `new_name` against
+/// the matching row in sample.csv. On success, `app` is switched over to the new diffs/ case so
+/// subsequent `s` presses behave like a normal save.
+fn action_promote(app: &mut App, new_name: &str, before_src: &[u8], after_src: &[u8]) -> Result<String> {
+    let CaseOrigin::Sample(source) = app.origin.clone() else {
+        bail!("Current case is not a sample");
+    };
+
+    validate_new_case_name(new_name)?;
+
+    let dir = diffs_case_dir(new_name);
+    if dir.exists() {
+        bail!("'{}' already exists in src/test/data/diffs", new_name);
+    }
+
+    let ext = Path::new(&source.path)
+        .extension()
+        .map(|e| e.to_string_lossy().into_owned())
+        .ok_or_else(|| anyhow!("sample path {} has no extension", source.path))?;
+
+    fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
+    fs::write(dir.join(format!("before.{ext}.test")), before_src)?;
+    fs::write(dir.join(format!("after.{ext}.test")), after_src)?;
+
+    let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name)?;
+
+    let csv_note = match update_sample_csv(&source, new_name) {
+        Ok(true) => String::new(),
+        Ok(false) => " (source row not found in sample.csv; not updated)".to_string(),
+        Err(err) => format!(" (failed to update sample.csv: {:#})", err),
+    };
+
+    app.name = new_name.to_string();
+    app.origin = CaseOrigin::Diffs;
+
+    Ok(format!("Promoted to '{}'. {}{}", new_name, save_msg, csv_note))
+}
+
+fn sample_csv_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("sample.csv")
+}
+
+struct SampleCsvRow {
+    language: String,
+    repository: String,
+    commit: String,
+    path: String,
+    promoted_to: String,
+}
+
+fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result<bool> {
+    update_sample_csv_at(&sample_csv_path(), source, new_name)
+}
+
+/// Marks the sample.csv row matching `source` as promoted to `new_name`, preserving every other
+/// row and column untouched. Returns `Ok(false)` (not an error) if no row matches -- e.g. the
+/// sample was placed under samples/ by hand rather than by `sample_test_diffs` -- since that
+/// shouldn't undo a promotion that has already otherwise succeeded.
+fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let mut reader = csv::Reader::from_path(path).with_context(|| format!("reading {:?}", path))?;
+    let mut rows: Vec<SampleCsvRow> = Vec::new();
+    for record in reader.records() {
+        let record = record?;
+        rows.push(SampleCsvRow {
+            language: record[0].to_string(),
+            repository: record[1].to_string(),
+            commit: record[2].to_string(),
+            path: record[3].to_string(),
+            promoted_to: record.get(4).unwrap_or("").to_string(),
+        });
+    }
+
+    let mut found = false;
+    for row in &mut rows {
+        if row.language == source.language
+            && row.repository == source.repository
+            && row.commit == source.commit
+            && row.path == source.path
+        {
+            row.promoted_to = new_name.to_string();
+            found = true;
+        }
+    }
+
+    if !found {
+        return Ok(false);
+    }
+
+    let mut writer = csv::Writer::from_path(path).with_context(|| format!("writing {:?}", path))?;
+    writer.write_record(["language", "repository", "commit", "path", "promoted_to"])?;
+    for row in &rows {
+        writer.write_record([
+            &row.language,
+            &row.repository,
+            &row.commit,
+            &row.path,
+            &row.promoted_to,
+        ])?;
+    }
+    writer.flush()?;
+    Ok(true)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2232,4 +2628,128 @@ fn insert_mod_declaration(module: &str) -> Result<()> {
 
     fs::write(&mod_file, out).with_context(|| format!("writing {:?}", mod_file))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn validate_new_case_name_rejects_empty() {
+        assert!(validate_new_case_name("").is_err());
+    }
+
+    #[test]
+    fn validate_new_case_name_rejects_leading_digit() {
+        assert!(validate_new_case_name("1rust-add-if").is_err());
+    }
+
+    #[test]
+    fn validate_new_case_name_rejects_unsafe_characters() {
+        assert!(validate_new_case_name("rust/add-if").is_err());
+        assert!(validate_new_case_name("rust add if").is_err());
+        assert!(validate_new_case_name("rust.add.if").is_err());
+    }
+
+    #[test]
+    fn validate_new_case_name_accepts_letters_digits_hyphen_underscore() {
+        assert!(validate_new_case_name("rust-add-if_2").is_ok());
+    }
+
+    #[test]
+    fn validate_new_case_name_rejects_rust_keywords() {
+        assert!(validate_new_case_name("match").is_err());
+        assert!(validate_new_case_name("type").is_err());
+        assert!(validate_new_case_name("self").is_err());
+        // A keyword as a substring of a longer name is fine -- only an exact module-name
+        // collision matters.
+        assert!(validate_new_case_name("matches-guard").is_ok());
+    }
+
+    fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {
+        let mut writer = csv::Writer::from_path(path).unwrap();
+        writer
+            .write_record(["language", "repository", "commit", "path", "promoted_to"])
+            .unwrap();
+        for (language, repository, commit, row_path, promoted_to) in rows {
+            writer
+                .write_record([language, repository, commit, row_path, promoted_to])
+                .unwrap();
+        }
+        writer.flush().unwrap();
+    }
+
+    fn read_csv(path: &Path) -> Vec<(String, String)> {
+        let mut reader = csv::Reader::from_path(path).unwrap();
+        reader
+            .records()
+            .map(|r| {
+                let r = r.unwrap();
+                (r[3].to_string(), r.get(4).unwrap_or("").to_string())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn update_sample_csv_sets_promoted_to_on_the_matching_row_only() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[
+                ("Rust", "repo", "abc123", "src/a.rs", ""),
+                ("Rust", "repo", "def456", "src/b.rs", ""),
+            ],
+        );
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+        };
+        let found = update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap();
+        assert!(found);
+
+        let rows = read_csv(file.path());
+        assert_eq!(
+            rows,
+            vec![
+                ("src/a.rs".to_string(), "rust-new-case".to_string()),
+                ("src/b.rs".to_string(), "".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn update_sample_csv_returns_false_when_no_row_matches() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(file.path(), &[("Rust", "repo", "abc123", "src/a.rs", "")]);
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "other-repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+        };
+        let found = update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap();
+        assert!(!found);
+
+        // Untouched: no row matched, so nothing should have been rewritten.
+        let rows = read_csv(file.path());
+        assert_eq!(rows, vec![("src/a.rs".to_string(), "".to_string())]);
+    }
+
+    #[test]
+    fn update_sample_csv_returns_false_when_file_does_not_exist() {
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+        };
+        let found =
+            update_sample_csv_at(Path::new("/nonexistent/sample.csv"), &source, "name").unwrap();
+        assert!(!found);
+    }
 }

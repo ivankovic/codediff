@@ -419,67 +419,80 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
         if path.is_dir() {
             let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
 
-            let mut before_code = None;
-            let mut after_code = None;
-
-            // Read all files in the directory
-            for file_entry in fs::read_dir(&path)? {
-                let file_entry = file_entry?;
-                let file_path = file_entry.path();
-
-                if file_path.is_file() {
-                    let file_name = file_path
-                        .file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .into_owned();
-
-                    if file_name.starts_with("before.") && file_name.ends_with(".test") {
-                        let contents = fs::read_to_string(&file_path)?;
-                        let mut code = Code {
-                            contents,
-                            ..Default::default()
-                        };
-                        code.metadata.path = Some(file_path.with_extension(""));
-                        metadata::hermetic_expand(&mut code.metadata);
-                        before_code = Some(code);
-                    } else if file_name.starts_with("after.") && file_name.ends_with(".test") {
-                        let contents = fs::read_to_string(&file_path)?;
-                        let mut code = Code {
-                            contents,
-                            ..Default::default()
-                        };
-                        code.metadata.path = Some(file_path.with_extension(""));
-                        metadata::hermetic_expand(&mut code.metadata);
-                        after_code = Some(code);
-                    }
-                }
-            }
-
-            // Parse both codes if they exist
-            if let (Some(mut before), Some(mut after)) = (before_code, after_code) {
-                if let Some(language) = &before.metadata.language {
-                    let ts_language = crate::code::language::to_treesitter(language)
-                        .expect("Handmade test code for unknown language?");
-
-                    parser.set_language(&ts_language)?;
-                    before.parse(&mut parser);
-                }
-
-                if let Some(language) = &after.metadata.language {
-                    let ts_language = crate::code::language::to_treesitter(language)
-                        .expect("Handmade test code for unknown language?");
-
-                    parser.set_language(&ts_language)?;
-                    after.parse(&mut parser);
-                }
-
-                result.insert(dir_name, (before, after));
+            if let Some(pair) = code_pair_from_dir(&path, &mut parser)? {
+                result.insert(dir_name, pair);
             }
         }
     }
 
     Ok(result)
+}
+
+/**
+* Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair out of a single directory
+* (a test case under `src/test/data/diffs/`, or a sampled candidate under
+* `src/test/data/samples/`). Returns `None` if the directory doesn't have both files -- this is
+* not an error, since `handmade_test_code_pairs` tolerates directories that aren't (yet) complete
+* test cases.
+*/
+pub fn code_pair_from_dir(path: &Path, parser: &mut tree_sitter::Parser) -> Result<Option<(Code, Code)>> {
+    let mut before_code = None;
+    let mut after_code = None;
+
+    for file_entry in fs::read_dir(path)? {
+        let file_entry = file_entry?;
+        let file_path = file_entry.path();
+
+        if file_path.is_file() {
+            let file_name = file_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+
+            if file_name.starts_with("before.") && file_name.ends_with(".test") {
+                let contents = fs::read_to_string(&file_path)?;
+                let mut code = Code {
+                    contents,
+                    ..Default::default()
+                };
+                code.metadata.path = Some(file_path.with_extension(""));
+                metadata::hermetic_expand(&mut code.metadata);
+                before_code = Some(code);
+            } else if file_name.starts_with("after.") && file_name.ends_with(".test") {
+                let contents = fs::read_to_string(&file_path)?;
+                let mut code = Code {
+                    contents,
+                    ..Default::default()
+                };
+                code.metadata.path = Some(file_path.with_extension(""));
+                metadata::hermetic_expand(&mut code.metadata);
+                after_code = Some(code);
+            }
+        }
+    }
+
+    let (Some(mut before), Some(mut after)) = (before_code, after_code) else {
+        return Ok(None);
+    };
+
+    if let Some(language) = &before.metadata.language {
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Handmade test code for unknown language?");
+
+        parser.set_language(&ts_language)?;
+        before.parse(parser);
+    }
+
+    if let Some(language) = &after.metadata.language {
+        let ts_language = crate::code::language::to_treesitter(language)
+            .expect("Handmade test code for unknown language?");
+
+        parser.set_language(&ts_language)?;
+        after.parse(parser);
+    }
+
+    Ok(Some((before, after)))
 }
 
 /**
