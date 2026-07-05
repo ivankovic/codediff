@@ -1,0 +1,6 @@
+{
+  "language": "CSharp",
+  "repository": "Lidarr-Lidarr.git",
+  "commit": "a4af75b60cdc531c2280d994a1ef1141bb7c830e",
+  "path": "src/Lidarr.Api.V1/Calendar/CalendarController.cs"
+}

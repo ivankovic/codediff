@@ -1,0 +1,6 @@
+{
+  "language": "XML",
+  "repository": "odoo-odoo.git",
+  "commit": "859930c9ad71c9ce997723994df5b298cfc40a15",
+  "path": "addons/point_of_sale/views/pos_order_view.xml"
+}

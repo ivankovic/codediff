@@ -1,0 +1,6 @@
+{
+  "language": "Go",
+  "repository": "gin-gonic-gin.git",
+  "commit": "c9b344118f6426e9211c2e4530ac983a541f437a",
+  "path": "examples/upload-file/single/main.go"
+}

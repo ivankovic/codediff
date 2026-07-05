@@ -1,0 +1,6 @@
+{
+  "language": "LUA",
+  "repository": "neovim-neovim.git",
+  "commit": "3325536150eda0de4dc69f25beca416c0a0b3e3a",
+  "path": "test/functional/ui/screen.lua"
+}

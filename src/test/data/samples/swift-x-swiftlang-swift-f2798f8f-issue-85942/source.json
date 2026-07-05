@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "swiftlang-swift.git",
+  "commit": "f2798f8ff420ed83454fed70586be86ba088eef1",
+  "path": "test/Constraints/issue-85942.swift"
+}

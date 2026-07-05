@@ -1,0 +1,6 @@
+{
+  "language": "CSharp",
+  "repository": "Lidarr-Lidarr.git",
+  "commit": "98a90e2f8f6860253cd8a85434502231c43470f0",
+  "path": "src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs"
+}

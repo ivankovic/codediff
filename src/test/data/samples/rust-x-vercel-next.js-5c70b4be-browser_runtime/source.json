@@ -1,0 +1,6 @@
+{
+  "language": "Rust",
+  "repository": "vercel-next.js.git",
+  "commit": "5c70b4beaa80ec7031284153ba012b243788ef1e",
+  "path": "turbopack/crates/turbopack-ecmascript-runtime/src/browser_runtime.rs"
+}

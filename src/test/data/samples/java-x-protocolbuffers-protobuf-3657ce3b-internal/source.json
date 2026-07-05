@@ -1,0 +1,6 @@
+{
+  "language": "Java",
+  "repository": "protocolbuffers-protobuf.git",
+  "commit": "3657ce3ba3b4f02978df0bb1c4f0864086186dd2",
+  "path": "java/core/src/main/java/com/google/protobuf/Internal.java"
+}

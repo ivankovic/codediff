@@ -1,0 +1,6 @@
+{
+  "language": "LUA",
+  "repository": "awesomeWM-awesome.git",
+  "commit": "88c65a71ddd9ef5b6c18cef576580a4bf7c691dd",
+  "path": "tests/examples/wibox/container/arcchart/paddings.lua"
+}

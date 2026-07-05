@@ -1,0 +1,6 @@
+{
+  "language": "C",
+  "repository": "postgres-postgres.git",
+  "commit": "788ec96d591d0a7c916f2f4332765f46410d73b5",
+  "path": "src/backend/replication/logical/slotsync.c"
+}

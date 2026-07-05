@@ -1,0 +1,6 @@
+{
+  "language": "CSS",
+  "repository": "microsoft-playwright.git",
+  "commit": "5d5b28f782e17b2a74f208aa0d532a2e10e50651",
+  "path": "packages/html-reporter/src/testFileView.css"
+}

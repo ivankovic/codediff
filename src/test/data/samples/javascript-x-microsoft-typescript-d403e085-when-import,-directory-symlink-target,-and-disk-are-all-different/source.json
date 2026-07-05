@@ -1,0 +1,6 @@
+{
+  "language": "JavaScript",
+  "repository": "microsoft-TypeScript.git",
+  "commit": "d403e0850f33521c684bbecd4a24522a4dc66b33",
+  "path": "tests/baselines/reference/tsserver/forceConsistentCasingInFileNames/when-import,-directory-symlink-target,-and-disk-are-all-different.js"
+}

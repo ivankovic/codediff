@@ -1,0 +1,6 @@
+{
+  "language": "Vimscript",
+  "repository": "neovim-neovim.git",
+  "commit": "0dfac68928778f3ed6297c5ad46a79eb9a8dc69d",
+  "path": "test/old/testdir/test_cd.vim"
+}

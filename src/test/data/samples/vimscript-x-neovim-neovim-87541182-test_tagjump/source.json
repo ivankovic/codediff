@@ -1,0 +1,6 @@
+{
+  "language": "Vimscript",
+  "repository": "neovim-neovim.git",
+  "commit": "8754118213d79d316f740e739201b34639b4c8f6",
+  "path": "test/old/testdir/test_tagjump.vim"
+}

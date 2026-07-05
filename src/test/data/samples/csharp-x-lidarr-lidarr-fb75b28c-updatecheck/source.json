@@ -1,0 +1,6 @@
+{
+  "language": "CSharp",
+  "repository": "Lidarr-Lidarr.git",
+  "commit": "fb75b28cb18b4a00db7fbd5fdae2266ac999cc30",
+  "path": "src/NzbDrone.Core/HealthCheck/Checks/UpdateCheck.cs"
+}

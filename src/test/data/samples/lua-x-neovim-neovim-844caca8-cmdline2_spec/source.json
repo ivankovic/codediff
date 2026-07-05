@@ -1,0 +1,6 @@
+{
+  "language": "LUA",
+  "repository": "neovim-neovim.git",
+  "commit": "844caca881f85fa4e143fbfa982fba48590e8a60",
+  "path": "test/functional/ui/cmdline2_spec.lua"
+}

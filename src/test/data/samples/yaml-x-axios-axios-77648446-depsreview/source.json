@@ -1,0 +1,6 @@
+{
+  "language": "YAML",
+  "repository": "axios-axios.git",
+  "commit": "7764844686b241f346b5a0462942cf20d9781cd1",
+  "path": ".github/workflows/depsreview.yaml"
+}

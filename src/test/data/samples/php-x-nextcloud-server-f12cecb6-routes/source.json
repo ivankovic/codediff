@@ -1,0 +1,6 @@
+{
+  "language": "PHP",
+  "repository": "nextcloud-server.git",
+  "commit": "f12cecb68470ad970eed430b019a1baaac6bf28a",
+  "path": "apps/files_external/appinfo/routes.php"
+}

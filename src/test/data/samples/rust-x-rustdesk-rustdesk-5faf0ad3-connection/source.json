@@ -1,0 +1,6 @@
+{
+  "language": "Rust",
+  "repository": "rustdesk-rustdesk.git",
+  "commit": "5faf0ad3cfef1b7237e6cbca53038d76ffdc281d",
+  "path": "src/server/connection.rs"
+}

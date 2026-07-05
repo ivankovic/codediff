@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "nextcloud-ios.git",
+  "commit": "b6dddea2df91b94b3653110c4421d312a9910516",
+  "path": "iOSClient/Networking/NCService.swift"
+}

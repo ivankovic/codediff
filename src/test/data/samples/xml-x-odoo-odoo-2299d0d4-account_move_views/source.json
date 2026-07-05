@@ -1,0 +1,6 @@
+{
+  "language": "XML",
+  "repository": "odoo-odoo.git",
+  "commit": "2299d0d449acec4d9a1c098eb989cbf06add3a6a",
+  "path": "addons/account/views/account_move_views.xml"
+}

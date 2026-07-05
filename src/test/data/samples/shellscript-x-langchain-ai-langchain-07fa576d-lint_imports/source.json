@@ -1,0 +1,6 @@
+{
+  "language": "ShellScript",
+  "repository": "langchain-ai-langchain.git",
+  "commit": "07fa576de1c4d6485331691d4ac8cabc6d80f960",
+  "path": "libs/partners/chroma/scripts/lint_imports.sh"
+}

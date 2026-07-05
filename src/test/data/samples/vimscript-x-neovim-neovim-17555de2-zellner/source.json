@@ -1,0 +1,6 @@
+{
+  "language": "Vimscript",
+  "repository": "neovim-neovim.git",
+  "commit": "17555de2674fb7aa79815d815395aebfc01ea8ec",
+  "path": "runtime/colors/zellner.vim"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "Rust",
+  "repository": "rust-lang-rust.git",
+  "commit": "cfcbcb715c5120e481b2d1303b590a5eb2417e55",
+  "path": "compiler/rustc_query_impl/src/execution.rs"
+}

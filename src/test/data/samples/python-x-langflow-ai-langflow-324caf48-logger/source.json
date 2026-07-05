@@ -1,0 +1,6 @@
+{
+  "language": "Python",
+  "repository": "langflow-ai-langflow.git",
+  "commit": "324caf486c2274efcbeaf8648f5165c76c38c6ce",
+  "path": "src/backend/base/langflow/logging/logger.py"
+}

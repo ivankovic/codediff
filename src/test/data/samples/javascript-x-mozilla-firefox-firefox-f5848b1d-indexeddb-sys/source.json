@@ -1,0 +1,6 @@
+{
+  "language": "JavaScript",
+  "repository": "mozilla-firefox-firefox.git",
+  "commit": "f5848b1deb702ab2647691f2591c8a5410fb5541",
+  "path": "toolkit/modules/IndexedDB.sys.mjs"
+}

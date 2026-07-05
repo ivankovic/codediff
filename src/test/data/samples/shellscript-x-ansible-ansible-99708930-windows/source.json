@@ -1,0 +1,6 @@
+{
+  "language": "ShellScript",
+  "repository": "ansible-ansible.git",
+  "commit": "99708930841723f3ecc20e95e82a0cd780003dbd",
+  "path": ".azure-pipelines/commands/windows.sh"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "TSX",
+  "repository": "apache-superset.git",
+  "commit": "fdcb942f3c7c33cac49032ab748eb3a68eaa8bfa",
+  "path": "superset-frontend/src/features/home/Menu.test.tsx"
+}

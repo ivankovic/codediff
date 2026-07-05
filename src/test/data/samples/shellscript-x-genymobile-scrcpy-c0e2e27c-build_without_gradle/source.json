@@ -1,0 +1,6 @@
+{
+  "language": "ShellScript",
+  "repository": "Genymobile-scrcpy.git",
+  "commit": "c0e2e27cf9eb38a95b324ba9aeeb34dab6d2e72f",
+  "path": "server/build_without_gradle.sh"
+}

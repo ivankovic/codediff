@@ -1,0 +1,6 @@
+{
+  "language": "ShellScript",
+  "repository": "pytorch-pytorch.git",
+  "commit": "fa8028ada56dd49831539ac0612e47167030087f",
+  "path": ".ci/pytorch/check_binary.sh"
+}

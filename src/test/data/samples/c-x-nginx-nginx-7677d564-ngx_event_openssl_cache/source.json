@@ -1,0 +1,6 @@
+{
+  "language": "C",
+  "repository": "nginx-nginx.git",
+  "commit": "7677d5646aeb761b8b9da5af3eb10c008aae3f90",
+  "path": "src/event/ngx_event_openssl_cache.c"
+}

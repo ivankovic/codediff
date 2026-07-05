@@ -1,0 +1,6 @@
+{
+  "language": "CPP",
+  "repository": "nextcloud-desktop.git",
+  "commit": "585b6ca32dc97c51ede2dad1c002b8a2625e12fc",
+  "path": "test/testnextcloudpropagator.cpp"
+}

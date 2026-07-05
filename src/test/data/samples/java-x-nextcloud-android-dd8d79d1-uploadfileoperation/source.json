@@ -1,0 +1,6 @@
+{
+  "language": "Java",
+  "repository": "nextcloud-android.git",
+  "commit": "dd8d79d1d914cb33b641ca058a1f9f30d811ce5f",
+  "path": "app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java"
+}

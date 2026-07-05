@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "nextcloud-ios.git",
+  "commit": "87283c7103ff55c9ab575bfb750a0afbefbbeae7",
+  "path": "iOSClient/Networking/E2EE/NCNetworkingE2EEUpload.swift"
+}

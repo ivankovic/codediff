@@ -1,0 +1,6 @@
+{
+  "language": "Vimscript",
+  "repository": "neovim-neovim.git",
+  "commit": "9ca69488cf08d78609ad4baef50bbcbbc937a9b7",
+  "path": "runtime/pack/dist/opt/matchit/autoload/matchit.vim"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "Kotlin",
+  "repository": "nextcloud-android.git",
+  "commit": "1af8f6b1849b4f751387c876ca4c2e3283e4b490",
+  "path": "app/src/main/java/com/nextcloud/client/jobs/BackgroundJobManagerImpl.kt"
+}

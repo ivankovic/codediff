@@ -1,0 +1,6 @@
+{
+  "language": "Go",
+  "repository": "caddyserver-caddy.git",
+  "commit": "5a6b2f8d1d4633622b551357f3cc9d27ec669d02",
+  "path": "internal/filesystems/map.go"
+}

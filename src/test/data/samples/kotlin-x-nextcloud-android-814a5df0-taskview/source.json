@@ -1,0 +1,6 @@
+{
+  "language": "Kotlin",
+  "repository": "nextcloud-android.git",
+  "commit": "814a5df0488146e79a7d8092a46098176af8ea39",
+  "path": "app/src/main/java/com/nextcloud/client/assistant/task/TaskView.kt"
+}

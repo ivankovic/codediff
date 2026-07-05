@@ -1,0 +1,6 @@
+{
+  "language": "CSharp",
+  "repository": "Radarr-Radarr.git",
+  "commit": "219477273675b23a426554896a145d553fc9a319",
+  "path": "src/NzbDrone.Core/Parser/IsoLanguages.cs"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "YAML",
+  "repository": "mozilla-pdf.js.git",
+  "commit": "f6ad1a5610d677bca23f88baf72a28c47d825d2d",
+  "path": ".github/workflows/fluent_linter.yml"
+}

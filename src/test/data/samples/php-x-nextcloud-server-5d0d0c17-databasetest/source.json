@@ -1,0 +1,6 @@
+{
+  "language": "PHP",
+  "repository": "nextcloud-server.git",
+  "commit": "5d0d0c17e5ecf108506506606be53dfa8bc7586a",
+  "path": "tests/lib/User/DatabaseTest.php"
+}

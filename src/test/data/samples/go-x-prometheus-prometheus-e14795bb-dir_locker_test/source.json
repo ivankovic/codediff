@@ -1,0 +1,6 @@
+{
+  "language": "Go",
+  "repository": "prometheus-prometheus.git",
+  "commit": "e14795bbf4fbd1837a9e3428aafb40b4b1dda99d",
+  "path": "tsdb/tsdbutil/dir_locker_test.go"
+}

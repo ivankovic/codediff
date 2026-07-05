@@ -1,0 +1,6 @@
+{
+  "language": "Java",
+  "repository": "Genymobile-scrcpy.git",
+  "commit": "3acffaae57238ee47e05f97f8e762a04550fdad8",
+  "path": "server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java"
+}

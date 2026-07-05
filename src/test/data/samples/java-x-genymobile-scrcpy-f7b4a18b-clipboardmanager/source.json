@@ -1,0 +1,6 @@
+{
+  "language": "Java",
+  "repository": "Genymobile-scrcpy.git",
+  "commit": "f7b4a18b4398c013b2bed9630b7bb35eb50ad97e",
+  "path": "server/src/main/java/com/genymobile/scrcpy/wrappers/ClipboardManager.java"
+}

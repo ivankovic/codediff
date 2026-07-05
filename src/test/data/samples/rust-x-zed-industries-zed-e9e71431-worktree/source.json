@@ -1,0 +1,6 @@
+{
+  "language": "Rust",
+  "repository": "zed-industries-zed.git",
+  "commit": "e9e71431bb26ce554d4ed2024569745df6dd9047",
+  "path": "crates/worktree/src/worktree.rs"
+}

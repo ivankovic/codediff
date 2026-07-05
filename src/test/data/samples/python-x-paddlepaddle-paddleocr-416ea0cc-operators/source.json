@@ -1,0 +1,6 @@
+{
+  "language": "Python",
+  "repository": "PaddlePaddle-PaddleOCR.git",
+  "commit": "416ea0ccee4fd79960e3a4363d02779f4904fb56",
+  "path": "ppocr/data/imaug/operators.py"
+}

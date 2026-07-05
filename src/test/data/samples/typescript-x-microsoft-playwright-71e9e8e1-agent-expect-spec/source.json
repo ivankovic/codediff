@@ -1,0 +1,6 @@
+{
+  "language": "TypeScript",
+  "repository": "microsoft-playwright.git",
+  "commit": "71e9e8e102b92e10c3edfc48185c791af3a4d6f1",
+  "path": "tests/library/agent-expect.spec.ts"
+}

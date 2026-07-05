@@ -1,0 +1,6 @@
+{
+  "language": "LUA",
+  "repository": "neovim-neovim.git",
+  "commit": "dec3c6fa346b298e7feb72398f9fdd5d59c11444",
+  "path": "test/functional/testnvim.lua"
+}

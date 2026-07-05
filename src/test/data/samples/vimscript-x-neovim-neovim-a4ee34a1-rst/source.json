@@ -1,0 +1,6 @@
+{
+  "language": "Vimscript",
+  "repository": "neovim-neovim.git",
+  "commit": "a4ee34a165ef5b190378740d2c4ce15410f0f477",
+  "path": "runtime/ftplugin/rst.vim"
+}

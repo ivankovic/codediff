@@ -1,0 +1,6 @@
+{
+  "language": "C",
+  "repository": "torvalds-linux.git",
+  "commit": "11c2adcd1fa2a9380a507db1e57c8542bfc81827",
+  "path": "tools/objtool/klp-diff.c"
+}

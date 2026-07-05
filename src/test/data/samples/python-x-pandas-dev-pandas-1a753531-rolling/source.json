@@ -1,0 +1,6 @@
+{
+  "language": "Python",
+  "repository": "pandas-dev-pandas.git",
+  "commit": "1a753531c565e11d4d78912d09b9343945da9363",
+  "path": "pandas/core/window/rolling.py"
+}

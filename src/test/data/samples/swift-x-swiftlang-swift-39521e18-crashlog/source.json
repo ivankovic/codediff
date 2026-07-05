@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "swiftlang-swift.git",
+  "commit": "39521e18c2f53e4890a4e7e6905434a20b801d32",
+  "path": "utils/swift-dev-utils/Sources/CrashReduce/CrashLog.swift"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "HTML",
+  "repository": "mozilla-firefox-firefox.git",
+  "commit": "a5c6959314b1f185f42a314f41a454ed8652c87f",
+  "path": "testing/web-platform/tests/orientation-sensor/RelativeOrientationSensor-iframe-access.https.html"
+}

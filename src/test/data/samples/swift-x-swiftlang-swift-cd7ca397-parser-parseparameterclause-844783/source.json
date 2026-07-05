@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "swiftlang-swift.git",
+  "commit": "cd7ca397e3a3386e571a4974ec7e58398e0908b8",
+  "path": "validation-test/IDE/crashers/Parser-parseParameterClause-844783.swift"
+}

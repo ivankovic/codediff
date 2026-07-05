@@ -1,0 +1,6 @@
+{
+  "language": "Swift",
+  "repository": "swiftlang-swift.git",
+  "commit": "0266a0a0dffb7b0f92cd0d934fb6b39af249cdff",
+  "path": "test/AutoDiff/validation-test/closure_specialization/multi_bb_no_bte.swift"
+}

@@ -1,0 +1,6 @@
+{
+  "language": "Python",
+  "repository": "pytorch-pytorch.git",
+  "commit": "ae0bccf0eba0b22ac30cd62b9a397327d95455bf",
+  "path": "torch/nn/attention/_fa3.py"
+}

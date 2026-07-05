@@ -1,0 +1,6 @@
+{
+  "language": "LUA",
+  "repository": "neovim-neovim.git",
+  "commit": "0501c5fd0959895b18d8166c6c034cdf1832edf3",
+  "path": "runtime/lua/vim/lsp/buf.lua"
+}
