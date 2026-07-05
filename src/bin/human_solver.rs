@@ -64,6 +64,12 @@
 *                  comparison against the human mapping without leaving the TUI. A trailing `*`
 *                  marks a node the human has already decided on where codediff's verdict
 *                  disagrees (matched to a different node, or matched vs. deleted/inserted)
+*   t              show the raw before/after source as plain text, side by side, instead of the
+*                  AST tree -- for just reading the code. j/k scroll (both sides together), T
+*                  switches to the unix diff view instead, Esc closes
+*   T              show the output of the system `diff -u` between the before and after content --
+*                  a plain line-based diff, as a point of comparison against codediff's own
+*                  AST-based diff. j/k scroll, t switches to the text view instead, Esc closes
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
@@ -80,6 +86,7 @@
 *                  above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
 *                  see `s` above for what happens when one of these is saved
+*   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
 * After a match finalizes (including a modal answer), both panels' cursors auto-advance to their
@@ -88,7 +95,7 @@
 * other side wasn't touched. This makes stepping through a tree top to bottom mostly just holding
 * down the marking key.
 */
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -130,6 +137,34 @@ struct Args {
     /// directly.
     name: Option<String>,
 }
+
+/// Shown by the `?` help popup (`Modal::Help`). Kept as a plain reference sheet, separate from the
+/// fuller explanations in this file's own doc comment, so it fits legibly in a single screen.
+const HELP_TEXT: &str = "\
+Tab            switch focus between Before/After panels
+Up/k, Down/j   move cursor
+Left/h         collapse current node, or go to its parent
+Right/l        expand current node, or go to its first child
+g / G          jump to first / last visible node
+
+m / M          match cursor nodes (M also recurses into matching children)
+d / D          mark Before node deleted / deleted with subtree
+i / I          mark After node inserted / inserted with subtree
+u              unmark the focused cursor node
+a / A          align other panel to the human mapping / to codediff's mapping
+p              run codediff's own diff, show its verdict next to each node
+
+t              view raw before/after text (not the AST tree)
+T              view the output of unix `diff -u`
+                 (t/T switch between these two views while either is open)
+
+s              save -- or, on a sample, prompt for a name and promote it
+o              open a different test case (src/test/data/diffs/)
+O              open a sampled candidate (src/test/data/samples/)
+
+?              toggle this help
+q / Esc        quit
+";
 
 /// Loads and parses the before/after code for a test case, by name.
 fn load_case(name: &str) -> Result<(Code, Code)> {
@@ -247,6 +282,35 @@ fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
         .with_context(|| format!("parsing {:?}", source_path))?;
 
     Ok((before, after, source))
+}
+
+/// Runs the system `diff -u` between `before_src` and `after_src`, as a point of comparison
+/// against codediff's own AST-based diff. Writes both sides to temp files first (rather than
+/// relying on any on-disk path the content may have originally come from) so this always reflects
+/// exactly what's currently loaded, regardless of case origin.
+fn run_unix_diff(before_src: &[u8], after_src: &[u8]) -> Result<String> {
+    let mut before_file = tempfile::NamedTempFile::new().context("creating temp file for before content")?;
+    before_file.write_all(before_src).context("writing before content to temp file")?;
+    let mut after_file = tempfile::NamedTempFile::new().context("creating temp file for after content")?;
+    after_file.write_all(after_src).context("writing after content to temp file")?;
+
+    let output = std::process::Command::new("diff")
+        .arg("-u")
+        .arg("--label")
+        .arg("before")
+        .arg("--label")
+        .arg("after")
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .context("running unix `diff` (is it installed?)")?;
+
+    match output.status.code() {
+        // 0 = identical, 1 = differences found -- both normal outcomes, not errors.
+        Some(0) => Ok("(no textual differences)".to_string()),
+        Some(1) => Ok(String::from_utf8_lossy(&output.stdout).into_owned()),
+        _ => bail!("diff failed: {}", String::from_utf8_lossy(&output.stderr)),
+    }
 }
 
 fn main() -> Result<()> {
@@ -380,6 +444,15 @@ enum Modal {
     /// `src/test/data/diffs/`. Re-raised with `error` set (input preserved) if the name is
     /// invalid or already in use.
     PromptPromoteName { input: String, error: Option<String> },
+    /// Raised by `t`: shows the raw before/after source side by side, for reading the actual code
+    /// instead of navigating the AST tree. `T` while open switches to `UnixDiffView` instead.
+    TextView { scroll: u16 },
+    /// Raised by `T`: shows the output of running the system `diff -u` between the before and
+    /// after content -- a plain line-based diff, as a point of comparison against codediff's own
+    /// AST-based diff (`p`). `t` while open switches to `TextView` instead.
+    UnixDiffView { output: String, scroll: u16 },
+    /// Raised by `?`: lists every keybinding. `?` or `Esc` while open closes it.
+    Help { scroll: u16 },
 }
 
 /// Which open picker (`o` or `O`) a pending switch came from, and the name selected.
@@ -1634,7 +1707,7 @@ fn draw_ui(
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  q quit",
+        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -1649,7 +1722,14 @@ fn draw_ui(
     frame.render_widget(Paragraph::new(footer).wrap(Wrap { trim: true }), chunks[2]);
 
     if let Some(modal) = &app.modal {
-        render_modal(frame, size, modal, name);
+        render_modal(
+            frame,
+            size,
+            modal,
+            name,
+            std::str::from_utf8(before_src).unwrap_or(""),
+            std::str::from_utf8(after_src).unwrap_or(""),
+        );
     }
 }
 
@@ -1673,7 +1753,14 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
-fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal, current_name: &str) {
+fn render_modal(
+    frame: &mut Frame,
+    area: Rect,
+    modal: &Modal,
+    current_name: &str,
+    before_src: &str,
+    after_src: &str,
+) {
     match modal {
         Modal::ConfirmKindMismatch {
             before_kind,
@@ -1720,6 +1807,15 @@ fn render_modal(frame: &mut Frame, area: Rect, modal: &Modal, current_name: &str
                 error.as_deref().map(|e| format!("\n{}\n", e)).unwrap_or_default(),
             ),
         ),
+        Modal::TextView { scroll } => {
+            render_text_view_modal(frame, area, before_src, after_src, *scroll);
+        }
+        Modal::UnixDiffView { output, scroll } => {
+            render_unix_diff_modal(frame, area, output, *scroll);
+        }
+        Modal::Help { scroll } => {
+            render_help_modal(frame, area, *scroll);
+        }
     }
 }
 
@@ -1732,6 +1828,92 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
         .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
     frame.render_widget(
         Paragraph::new(body.to_string()).block(block).wrap(Wrap { trim: true }),
+        popup_area,
+    );
+}
+
+/// Renders the `t` (text view) modal: the raw before/after source, side by side, as plain text
+/// rather than the AST tree -- useful for just reading the code. `scroll` applies to both sides
+/// identically, since it's meant for eyeballing roughly-aligned content, not precise per-side
+/// navigation.
+fn render_text_view_modal(frame: &mut Frame, area: Rect, before_src: &str, after_src: &str, scroll: u16) {
+    let popup_area = centered_rect(92, 90, area);
+    frame.render_widget(Clear, popup_area);
+
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(popup_area);
+
+    let block_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    frame.render_widget(
+        Paragraph::new(before_src).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Before (text) — j/k scroll, T diff view, Esc close")
+                .border_style(block_style),
+        ).scroll((scroll, 0)),
+        columns[0],
+    );
+    frame.render_widget(
+        Paragraph::new(after_src).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("After (text)")
+                .border_style(block_style),
+        ).scroll((scroll, 0)),
+        columns[1],
+    );
+}
+
+/// Renders the `T` (unix diff) modal: the already-computed output of `diff -u` between the before
+/// and after content, with `+`/`-` lines colored to match the rest of the UI's insert/delete
+/// convention and `@@` hunk headers highlighted.
+fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str, scroll: u16) {
+    let popup_area = centered_rect(92, 90, area);
+    frame.render_widget(Clear, popup_area);
+
+    let lines: Vec<Line> = output
+        .lines()
+        .map(|line| {
+            let style = if line.starts_with("+++") || line.starts_with("---") {
+                Style::default().add_modifier(Modifier::BOLD)
+            } else if line.starts_with('+') {
+                Style::default().fg(Color::Green)
+            } else if line.starts_with('-') {
+                Style::default().fg(Color::Red)
+            } else if line.starts_with("@@") {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            Line::from(Span::styled(line.to_string(), style))
+        })
+        .collect();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("unix `diff -u` — j/k scroll, t text view, Esc close")
+        .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+
+    frame.render_widget(
+        Paragraph::new(lines).block(block).scroll((scroll, 0)),
+        popup_area,
+    );
+}
+
+/// Renders the `?` help modal: a static reference sheet of every keybinding (`HELP_TEXT`).
+fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
+    let popup_area = centered_rect(90, 90, area);
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Keybindings — j/k scroll, ? or Esc to close")
+        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+    frame.render_widget(
+        Paragraph::new(HELP_TEXT).block(block).scroll((scroll, 0)),
         popup_area,
     );
 }
@@ -1946,6 +2128,10 @@ fn handle_key(
             app.should_quit = true;
             None
         }
+        KeyCode::Char('?') => {
+            app.modal = Some(Modal::Help { scroll: 0 });
+            None
+        }
         KeyCode::Tab => {
             app.focus = focus.toggle();
             None
@@ -2127,6 +2313,17 @@ fn handle_key(
                 }
                 None => "codediff produced no AST diff".to_string(),
             });
+            None
+        }
+        KeyCode::Char('t') => {
+            app.modal = Some(Modal::TextView { scroll: 0 });
+            None
+        }
+        KeyCode::Char('T') => {
+            match run_unix_diff(before_src, after_src) {
+                Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
+                Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
+            }
             None
         }
         KeyCode::Char('s') => match &app.origin {
@@ -2346,6 +2543,67 @@ fn handle_modal_key(
             }
             _ => {
                 app.modal = Some(Modal::PromptPromoteName { input, error: None });
+            }
+        },
+        Modal::TextView { scroll } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::TextView { scroll: scroll.saturating_sub(1) });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::TextView { scroll: scroll.saturating_add(1) });
+            }
+            KeyCode::PageUp => {
+                app.modal = Some(Modal::TextView { scroll: scroll.saturating_sub(10) });
+            }
+            KeyCode::PageDown => {
+                app.modal = Some(Modal::TextView { scroll: scroll.saturating_add(10) });
+            }
+            KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
+                Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
+                Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
+            },
+            KeyCode::Esc => {
+                app.status = Some("Closed text view".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::TextView { scroll });
+            }
+        },
+        Modal::UnixDiffView { output, scroll } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_sub(1) });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_add(1) });
+            }
+            KeyCode::PageUp => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_sub(10) });
+            }
+            KeyCode::PageDown => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_add(10) });
+            }
+            KeyCode::Char('t') => {
+                app.modal = Some(Modal::TextView { scroll: 0 });
+            }
+            KeyCode::Esc => {
+                app.status = Some("Closed diff view".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll });
+            }
+        },
+        Modal::Help { scroll } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::Help { scroll: scroll.saturating_sub(1) });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::Help { scroll: scroll.saturating_add(1) });
+            }
+            KeyCode::Esc | KeyCode::Char('?') => {
+                app.status = Some("Closed help".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::Help { scroll });
             }
         },
     }
@@ -2665,6 +2923,85 @@ mod tests {
         // A keyword as a substring of a longer name is fine -- only an exact module-name
         // collision matters.
         assert!(validate_new_case_name("matches-guard").is_ok());
+    }
+
+    #[test]
+    fn run_unix_diff_reports_no_differences_for_identical_content() {
+        let output = run_unix_diff(b"fn main() {}\n", b"fn main() {}\n").unwrap();
+        assert_eq!(output, "(no textual differences)");
+    }
+
+    #[test]
+    fn run_unix_diff_shows_added_and_removed_lines() {
+        let output = run_unix_diff(b"line one\nline two\n", b"line one\nline three\n").unwrap();
+        assert!(output.contains("-line two"));
+        assert!(output.contains("+line three"));
+        assert!(output.contains("--- before"));
+        assert!(output.contains("+++ after"));
+    }
+
+    /// Concatenates every cell's symbol in a `TestBackend`'s buffer, so a rendered frame's
+    /// content can be checked with a plain `contains`.
+    fn rendered_text(terminal: &Terminal<ratatui::backend::TestBackend>) -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    }
+
+    #[test]
+    fn text_view_modal_renders_both_sides_content() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 24);
+
+        terminal
+            .draw(|f| {
+                render_text_view_modal(f, area, "fn old_name() {}", "fn new_name() {}", 0);
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains("old_name"), "before content missing from render: {text}");
+        assert!(text.contains("new_name"), "after content missing from render: {text}");
+    }
+
+    #[test]
+    fn unix_diff_modal_renders_diff_output() {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 24);
+
+        let output = run_unix_diff(b"fn main() {\n    old();\n}\n", b"fn main() {\n    new();\n}\n").unwrap();
+        terminal
+            .draw(|f| {
+                render_unix_diff_modal(f, area, &output, 0);
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains("old();"), "removed line missing from render: {text}");
+        assert!(text.contains("new();"), "added line missing from render: {text}");
+    }
+
+    #[test]
+    fn help_modal_renders_keybindings() {
+        // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
+        // clipped by the popup's width or height -- this test is about content, not layout.
+        let backend = ratatui::backend::TestBackend::new(140, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 140, 40);
+
+        terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains("Keybindings"), "help title missing from render: {text}");
+        assert!(text.contains("switch focus between"), "first entry missing from render: {text}");
+        assert!(text.contains("toggle this help"), "help entry missing from render: {text}");
+        assert!(text.contains("quit"), "last entry missing from render: {text}");
     }
 
     fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {
