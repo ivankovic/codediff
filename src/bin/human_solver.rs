@@ -1139,6 +1139,34 @@ fn remove_direct_entries_for(
     });
 }
 
+/// Like [`remove_direct_entries_for`], but removes every entry touching *any* id in `before_ids`/
+/// `after_ids` in one pass, instead of one id at a time. Used by `apply_modal_choice` to batch-clear
+/// a whole subtree's worth of potential conflicts before `auto_match_pair` recurses into it and
+/// appends entries directly -- doing this per-node instead (i.e. calling `remove_direct_entries_for`
+/// once per node like `apply_match_entry` does) is what made `M` quadratic over a big subtree.
+fn remove_entries_touching(
+    entries: &mut Vec<HumanMappingEntry>,
+    before_ids: &std::collections::HashSet<usize>,
+    after_ids: &std::collections::HashSet<usize>,
+    before_root: Node,
+    after_root: Node,
+) {
+    entries.retain(|entry| {
+        let touches_before = entry
+            .before_path
+            .as_ref()
+            .and_then(|p| node_for_path(before_root, &path_refs(p)).ok())
+            .is_some_and(|n| before_ids.contains(&n.id()));
+        let touches_after = entry
+            .after_path
+            .as_ref()
+            .and_then(|p| node_for_path(after_root, &path_refs(p)).ok())
+            .is_some_and(|n| after_ids.contains(&n.id()));
+        !(touches_before || touches_after)
+    });
+}
+
+
 fn find_node_by_id<'a>(flat: &[(Node<'a>, usize)], id: usize) -> Option<Node<'a>> {
     flat.iter().find(|(n, _)| n.id() == id).map(|(n, _)| *n)
 }
@@ -1538,16 +1566,35 @@ fn action_match_subtree(
 /// Any pair (this one or a descendant) that ends up classified `Identical` and has children is
 /// also collapsed in both panels, so a whole-unchanged subtree doesn't clutter the view -- this is
 /// the main payoff of `M` over doing the same matches one at a time with `m`.
+///
+/// Rather than pushing straight into `mapping.entries` (via `apply_match_entry`, which costs
+/// O(current entry count) per call through its dedup scan -- recursing over a subtree of size k
+/// would turn that into O(k^2), exactly the hang `action_match_to_end` (`f`) had before it was
+/// fixed the same way, and `M` hits it too since this function is its recursive workhorse), this
+/// buffers new entries into `new_entries` and records every node id it actually decides on into
+/// `touched_before`/`touched_after`. The caller ([`apply_modal_choice`]) removes pre-existing
+/// entries for exactly those touched ids in one batch pass *after* recursion finishes, then
+/// appends `new_entries` -- cheaper than a scan per node, and correct in a way that eagerly
+/// collecting a subtree's ids up front isn't: recursion can bail out of a node early (kind
+/// mismatch or a shape mismatch) without visiting its descendants at all, and a descendant that
+/// was never visited must keep whatever pre-existing entry it had, not have it wiped because it
+/// happened to be nested under the node `M` was pressed on.
+///
+/// Paths are looked up from `before_paths`/`after_paths` (each precomputed once, in
+/// `apply_modal_choice`, by [`precompute_paths`]) instead of calling `path_for_node` fresh per
+/// node, for the same reason.
 #[allow(clippy::too_many_arguments)]
 fn auto_match_pair(
-    mapping: &mut HumanMapping,
-    before_root: Node,
-    after_root: Node,
+    new_entries: &mut Vec<HumanMappingEntry>,
+    touched_before: &mut std::collections::HashSet<usize>,
+    touched_after: &mut std::collections::HashSet<usize>,
     caches: &Caches,
     b: Node,
     a: Node,
     before_src: &[u8],
     after_src: &[u8],
+    before_paths: &HashMap<usize, Vec<String>>,
+    after_paths: &HashMap<usize, Vec<String>>,
     matched: &mut usize,
     skipped: &mut usize,
     before_collapsed: &mut std::collections::HashSet<usize>,
@@ -1558,10 +1605,23 @@ fn auto_match_pair(
         return false;
     }
 
+    let push = |new_entries: &mut Vec<HumanMappingEntry>,
+                touched_before: &mut std::collections::HashSet<usize>,
+                touched_after: &mut std::collections::HashSet<usize>,
+                operation: HumanOperation| {
+        new_entries.push(HumanMappingEntry {
+            operation,
+            before_path: before_paths.get(&b.id()).cloned(),
+            after_path: after_paths.get(&a.id()).cloned(),
+        });
+        touched_before.insert(b.id());
+        touched_after.insert(a.id());
+    };
+
     if b.kind() != a.kind() {
         // Shouldn't happen for children reached via the same_shape check below, but the very
         // first call into this function (the top pair's children) hasn't been shape-checked yet.
-        apply_match_entry(mapping, before_root, after_root, b, a, HumanOperation::MatchButNotIdentical);
+        push(new_entries, touched_before, touched_after, HumanOperation::MatchButNotIdentical);
         *matched += 1;
         return false;
     }
@@ -1573,12 +1633,10 @@ fn auto_match_pair(
 
     if b_children.is_empty() && a_children.is_empty() {
         let identical = node_values_equal(b, a, before_src, after_src);
-        apply_match_entry(
-            mapping,
-            before_root,
-            after_root,
-            b,
-            a,
+        push(
+            new_entries,
+            touched_before,
+            touched_after,
             if identical { HumanOperation::Identical } else { HumanOperation::Update },
         );
         *matched += 1;
@@ -1589,7 +1647,7 @@ fn auto_match_pair(
         && b_children.iter().zip(&a_children).all(|(x, y)| x.kind() == y.kind());
 
     if !same_shape {
-        apply_match_entry(mapping, before_root, after_root, b, a, HumanOperation::MatchButNotIdentical);
+        push(new_entries, touched_before, touched_after, HumanOperation::MatchButNotIdentical);
         *matched += 1;
         return false;
     }
@@ -1597,18 +1655,16 @@ fn auto_match_pair(
     let mut all_identical = true;
     for (b_child, a_child) in b_children.into_iter().zip(a_children) {
         let child_identical = auto_match_pair(
-            mapping, before_root, after_root, caches, b_child, a_child, before_src, after_src, matched, skipped,
-            before_collapsed, after_collapsed,
+            new_entries, touched_before, touched_after, caches, b_child, a_child, before_src, after_src,
+            before_paths, after_paths, matched, skipped, before_collapsed, after_collapsed,
         );
         all_identical &= child_identical;
     }
 
-    apply_match_entry(
-        mapping,
-        before_root,
-        after_root,
-        b,
-        a,
+    push(
+        new_entries,
+        touched_before,
+        touched_after,
         if all_identical { HumanOperation::Identical } else { HumanOperation::MatchButNotIdentical },
     );
     *matched += 1;
@@ -1666,12 +1722,29 @@ fn apply_modal_choice(
         && b_children.iter().zip(&a_children).all(|(x, y)| x.kind() == y.kind());
 
     if same_shape {
+        let before_paths = precompute_paths(before_root);
+        let after_paths = precompute_paths(after_root);
+        let mut new_entries = Vec::new();
+        let mut touched_before = std::collections::HashSet::new();
+        let mut touched_after = std::collections::HashSet::new();
+
         for (b_child, a_child) in b_children.into_iter().zip(a_children) {
             auto_match_pair(
-                mapping, before_root, after_root, caches, b_child, a_child, before_src, after_src, &mut matched,
-                &mut skipped, before_collapsed, after_collapsed,
+                &mut new_entries, &mut touched_before, &mut touched_after, caches, b_child, a_child, before_src,
+                after_src, &before_paths, &after_paths, &mut matched, &mut skipped, before_collapsed,
+                after_collapsed,
             );
         }
+
+        // Batched equivalent of what `apply_match_entry`'s per-node dedup scan would otherwise do
+        // node by node inside `auto_match_pair` (an O(existing entries) scan for every node in the
+        // subtree, which goes quadratic over a big one -- see `auto_match_pair`'s doc comment):
+        // clear out, in one pass, any pre-existing entry that touches a node the recursion above
+        // actually decided on, *then* append what it produced. Using the ids `auto_match_pair`
+        // actually touched (rather than every id in the subtree) matters: a node the recursion
+        // bailed out of without visiting keeps whatever pre-existing entry it had.
+        remove_entries_touching(&mut mapping.entries, &touched_before, &touched_after, before_root, after_root);
+        mapping.entries.extend(new_entries);
     }
 
     if skipped > 0 {
@@ -3600,16 +3673,22 @@ mod tests {
         let mut skipped = 0usize;
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
+        let before_paths = precompute_paths(before_root);
+        let after_paths = precompute_paths(after_root);
+        let mut touched_before = std::collections::HashSet::new();
+        let mut touched_after = std::collections::HashSet::new();
 
         auto_match_pair(
-            &mut mapping,
-            before_root,
-            after_root,
+            &mut mapping.entries,
+            &mut touched_before,
+            &mut touched_after,
             &Caches::default(),
             before_stmt_a,
             after_stmt_a,
             source.as_bytes(),
             source.as_bytes(),
+            &before_paths,
+            &after_paths,
             &mut matched,
             &mut skipped,
             &mut before_collapsed,
@@ -3892,6 +3971,217 @@ mod tests {
         );
     }
 
+    /// `M`'s recursive workhorse (`auto_match_pair`) had the same O(n^2) shape `f` did, for the
+    /// same reason: it called `apply_match_entry` (O(current entry count) per call, via
+    /// `remove_direct_entries_for`'s full scan) once per node in the subtree. On the same
+    /// ~5,500-node real fixture matched against itself (so `same_shape` holds all the way down and
+    /// the whole tree gets recursed), the original implementation didn't finish within 2 minutes.
+    /// Mirrors `action_match_to_end_is_linear_not_quadratic_in_tree_size`'s synthetic large tree so
+    /// this doesn't depend on any file under src/test/data/.
+    #[test]
+    fn action_match_subtree_is_linear_not_quadratic_in_tree_size() {
+        let mut source = String::from("fn main() {\n");
+        for i in 0..3000 {
+            source.push_str(&format!("    a{i}();\n"));
+        }
+        source.push_str("}\n");
+
+        let before_tree = parse_rust(&source);
+        let after_tree = parse_rust(&source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        assert!(before_flat.len() > 10_000, "expected a large tree, got {} nodes", before_flat.len());
+
+        let mut mapping = HumanMapping::default();
+        let caches = Caches::default();
+        let mut before_collapsed = std::collections::HashSet::new();
+        let mut after_collapsed = std::collections::HashSet::new();
+        let no_hashes = HashMap::new();
+
+        let start = std::time::Instant::now();
+        let outcome = action_match_subtree(
+            &mut mapping,
+            &before_flat,
+            &after_flat,
+            before_root.id(),
+            after_root.id(),
+            before_root,
+            after_root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &mut before_collapsed,
+            &mut after_collapsed,
+        )
+        .unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(matches!(outcome, ActionOutcome::Done(_)));
+        assert_eq!(mapping.entries.len(), before_flat.len(), "M should match every node in the identical subtree");
+        assert!(
+            elapsed.as_secs() < 5,
+            "took {elapsed:?} to sweep {} nodes -- the old O(n^2) implementation didn't finish \
+             within 2 minutes on a comparably sized real fixture, so anything anywhere near that \
+             here means the quadratic blowup is back",
+            before_flat.len()
+        );
+    }
+
+    #[test]
+    fn m_preserves_a_pre_existing_match_under_a_subtree_it_bails_out_of() {
+        // Shapes: `if true { a(); }` before vs `if true { a(); c(); }` after -- the `if`'s inner
+        // block has 3 children before, 4 after, so `auto_match_pair` bails at that block (pushes
+        // one MatchButNotIdentical for the block itself, does not recurse into its children).
+        // `a();`'s `expression_statement` sits *below* that bail point, so `M` (pressed above it,
+        // at the whole function) should never touch its pre-existing entry.
+        let before_source = "fn main() {\n    if true {\n        a();\n    }\n    b();\n}\n";
+        let after_source = "fn main() {\n    if true {\n        a();\n        c();\n    }\n    b();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let inner_block_before = find_first(before_root, "if_expression")
+            .and_then(|n| find_first(n, "block"))
+            .unwrap();
+        let inner_block_after = find_first(after_root, "if_expression")
+            .and_then(|n| find_first(n, "block"))
+            .unwrap();
+        let d_before = inner_block_before
+            .child(1)
+            .filter(|n| n.kind() == "expression_statement")
+            .expect("a(); statement");
+        let d_after = inner_block_after
+            .child(1)
+            .filter(|n| n.kind() == "expression_statement")
+            .expect("a(); statement");
+
+        let mut mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(path_for_node(d_before)),
+                after_path: Some(path_for_node(d_after)),
+            }],
+        };
+
+        let function_before = before_root.child(0).unwrap();
+        let function_after = after_root.child(0).unwrap();
+        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let no_hashes = HashMap::new();
+        let mut before_collapsed = std::collections::HashSet::new();
+        let mut after_collapsed = std::collections::HashSet::new();
+
+        action_match_subtree(
+            &mut mapping,
+            &before_flat,
+            &after_flat,
+            function_before.id(),
+            function_after.id(),
+            before_root,
+            after_root,
+            &Caches::default(),
+            before_source.as_bytes(),
+            after_source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &mut before_collapsed,
+            &mut after_collapsed,
+        )
+        .unwrap();
+
+        let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+        assert_eq!(
+            caches.before_match.get(&d_before.id()),
+            Some(&d_after.id()),
+            "M bailed at an ancestor without recursing into `a();` -- its pre-existing match should \
+             survive untouched, not be silently dropped: {:?}",
+            mapping.entries
+        );
+    }
+
+    #[test]
+    fn m_replaces_a_pre_existing_match_on_a_node_it_actually_revisits() {
+        // Identical before/after: `same_shape` holds at every level, so `M` pressed at the root
+        // recurses all the way down and revisits every node, including `a();`. Pre-seed a *wrong*
+        // pre-existing entry for `a();` (pointing at `b();` instead of its own counterpart) and
+        // confirm `M` replaces it with exactly one correct entry -- not a leftover stale one
+        // alongside the new one, which would silently corrupt the saved mapping.
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let (before_stmt_a, _) = two_statements(before_root);
+        let (after_stmt_a, after_stmt_b) = two_statements(after_root);
+
+        let mut mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(path_for_node(before_stmt_a)),
+                after_path: Some(path_for_node(after_stmt_b)), // deliberately wrong partner
+            }],
+        };
+
+        let function_before = before_root.child(0).unwrap();
+        let function_after = after_root.child(0).unwrap();
+        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let no_hashes = HashMap::new();
+        let mut before_collapsed = std::collections::HashSet::new();
+        let mut after_collapsed = std::collections::HashSet::new();
+
+        action_match_subtree(
+            &mut mapping,
+            &before_flat,
+            &after_flat,
+            function_before.id(),
+            function_after.id(),
+            before_root,
+            after_root,
+            &Caches::default(),
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &mut before_collapsed,
+            &mut after_collapsed,
+        )
+        .unwrap();
+
+        let matching: Vec<_> = mapping
+            .entries
+            .iter()
+            .filter(|entry| {
+                entry
+                    .before_path
+                    .as_ref()
+                    .and_then(|p| node_for_path(before_root, &path_refs(p)).ok())
+                    .is_some_and(|n| n.id() == before_stmt_a.id())
+            })
+            .collect();
+        assert_eq!(
+            matching.len(),
+            1,
+            "expected exactly one entry for `a();` after M, found {}: {:?}",
+            matching.len(),
+            mapping.entries
+        );
+
+        let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+        assert_eq!(
+            caches.before_match.get(&before_stmt_a.id()),
+            Some(&after_stmt_a.id()),
+            "M should have replaced the stale wrong-partner entry with the correct one: {:?}",
+            mapping.entries
+        );
+    }
+
     fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {
         let mut writer = csv::Writer::from_path(path).unwrap();
         writer
@@ -4005,3 +4295,4 @@ mod tests {
         assert!(promoted.is_empty());
     }
 }
+
