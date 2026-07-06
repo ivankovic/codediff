@@ -32,7 +32,19 @@ mod cpp_add_templates;
 #[cfg(test)]
 mod cpp_fix_segfault;
 #[cfg(test)]
+mod cpp_optimize_algorithm;
+#[cfg(test)]
+mod java_add_interface;
+#[cfg(test)]
 mod java_add_logging;
+#[cfg(test)]
+mod java_fix_array_index;
+#[cfg(test)]
+mod java_refactor_constants;
+#[cfg(test)]
+mod javascript_add_array_method;
+#[cfg(test)]
+mod javascript_add_destructuring;
 #[cfg(test)]
 mod kotlin_add_validation;
 #[cfg(test)]

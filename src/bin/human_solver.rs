@@ -52,6 +52,12 @@
 *                  content hash for nodes with children, by text for leaves) with no prompting. Any
 *                  pair that ends up classified Identical and has children is collapsed in both
 *                  panels, to keep whole-unchanged subtrees from cluttering the view
+*   f              repeats what a single `m` press does, over and over -- match the cursor pair,
+*                  advance both cursors to their own next unmarked node, match that pair, and so
+*                  on -- as if `m` were being pressed by hand again and again. Stops exactly where
+*                  a human doing that would have to stop too: once there's nothing left to pair up
+*                  (end of file), or the next pair has different kinds, which raises the same
+*                  confirmation `m` would (pressing `f` again afterwards resumes the sweep)
 *   a              if the focused cursor node is matched (per the human mapping), move the other
 *                  panel's cursor to its matched node. If that node isn't currently visible,
 *                  scrolls the other panel so it's centered in the viewport (clamped at the
@@ -92,7 +98,9 @@
 *                  changes, asks first whether to save (only offered for a real test case; see `s`
 *                  above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
-*                  see `s` above for what happens when one of these is saved
+*                  see `s` above for what happens when one of these is saved. Samples already
+*                  promoted (per sample.csv's `promoted_to` column) are marked " - SOLVED"; press
+*                  `H` inside this picker to hide them
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -155,6 +163,7 @@ Right/l        expand current node, or go to its first child
 g / G          jump to first / last visible node
 
 m / M          match cursor nodes (M also recurses into matching children)
+f              repeat m until end of file or a kind mismatch needs your input
 d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node
@@ -169,7 +178,9 @@ H              toggle hiding fully solved subtrees (unmarked nodes and their
 
 s              save -- or, on a sample, prompt for a name and promote it
 o              open a different test case (src/test/data/diffs/)
-O              open a sampled candidate (src/test/data/samples/)
+O              open a sampled candidate (src/test/data/samples/); already-promoted
+                 samples are marked \" - SOLVED\" -- press H inside this picker to
+                 hide/show them
 
 ?              toggle this help
 q / Esc        quit
@@ -249,8 +260,62 @@ fn list_available_cases() -> Result<Vec<String>> {
     list_dir_names(&diffs_root())
 }
 
-fn list_available_samples() -> Result<Vec<String>> {
-    list_dir_names(&samples_root())
+/// Every sample directory name under src/test/data/samples/, paired with whether it has already
+/// been promoted into src/test/data/diffs/. A sample counts as promoted when its `source.json`
+/// (language, repository, commit, path) matches a sample.csv row whose `promoted_to` column is
+/// non-empty -- the same join `action_promote`/`update_sample_csv` use, so it stays correct even
+/// if the promoted diffs/ case was later renamed or the sample directory has a numbered suffix.
+fn list_samples_with_status() -> Result<Vec<(String, bool)>> {
+    let names = list_dir_names(&samples_root())?;
+    let promoted = promoted_sample_sources()?;
+
+    Ok(names
+        .into_iter()
+        .map(|name| {
+            let solved = source_json_for_sample(&name)
+                .map(|source| {
+                    promoted.contains(&(source.language, source.repository, source.commit, source.path))
+                })
+                .unwrap_or(false);
+            (name, solved)
+        })
+        .collect())
+}
+
+/// Reads just the provenance out of a sample's `source.json`, without parsing its before/after
+/// code (unlike `load_sample`) -- cheap enough to call once per sample when listing.
+fn source_json_for_sample(name: &str) -> Option<SampleSource> {
+    let contents = fs::read_to_string(samples_root().join(name).join("source.json")).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
+fn promoted_sample_sources() -> Result<std::collections::HashSet<(String, String, String, String)>> {
+    promoted_sample_sources_at(&sample_csv_path())
+}
+
+/// The (language, repository, commit, path) of every row in the sample.csv at `path` whose
+/// `promoted_to` column is non-empty. Returns an empty set, not an error, if `path` doesn't exist.
+fn promoted_sample_sources_at(
+    path: &Path,
+) -> Result<std::collections::HashSet<(String, String, String, String)>> {
+    if !path.exists() {
+        return Ok(std::collections::HashSet::new());
+    }
+
+    let mut reader = csv::Reader::from_path(path).with_context(|| format!("reading {:?}", path))?;
+    let mut promoted = std::collections::HashSet::new();
+    for record in reader.records() {
+        let record = record?;
+        if !record.get(4).unwrap_or("").is_empty() {
+            promoted.insert((
+                record[0].to_string(),
+                record[1].to_string(),
+                record[2].to_string(),
+                record[3].to_string(),
+            ));
+        }
+    }
+    Ok(promoted)
 }
 
 /// Provenance recorded by `materialize_test_diffs` alongside each `src/test/data/samples/<name>/`
@@ -442,8 +507,14 @@ enum Modal {
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
     OpenDiffPicker { options: Vec<String>, selected: usize },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
-    /// open.
-    OpenSamplePicker { options: Vec<String>, selected: usize },
+    /// open. Each option is paired with whether it has already been promoted into
+    /// src/test/data/diffs/ (per sample.csv's `promoted_to` column) -- shown as " - SOLVED" and,
+    /// when `hide_solved` is set, left out of the list entirely.
+    OpenSamplePicker {
+        options: Vec<(String, bool)>,
+        selected: usize,
+        hide_solved: bool,
+    },
     /// Raised when a picker's selection is confirmed while the current mapping has unsaved
     /// changes: asks whether to save the *current* case before switching to `target`.
     /// `can_save` is false when the current case is a sample, since promoting one needs a name
@@ -1216,6 +1287,168 @@ fn action_match(
     )))
 }
 
+/// Implements `f`: repeats exactly what a single `m` press does -- match the Before and After
+/// cursor nodes (auto-classified Identical/Update for leaves, or by content hash for nodes with
+/// children, precisely like [`action_match`]), then advance both cursors to their own next
+/// `Unmarked` node -- over and over, as if `m` were being pressed by hand again and again.
+///
+/// Stops in exactly the two places a human doing that would have to stop too: once neither cursor
+/// has an `Unmarked` node left to advance to (there's nothing left to pair up -- end of file), or
+/// the moment the next pair has different kinds, which is precisely when a real `m` press would
+/// raise [`Modal::ConfirmKindMismatch`] instead of matching outright. Every match applied before
+/// that point is kept; pressing `f` again after resolving the mismatch (or manually) resumes the
+/// sweep from the new cursor position.
+///
+/// Deliberately doesn't go through [`apply_match_entry`]/[`rebuild_caches`]/[`path_for_node`] on
+/// every single node the way a literal "call `action_match` in a loop" implementation would:
+/// those are built for a human's pace (one call per keypress, cost spread over real time), and
+/// each costs O(current entry count) or O(sibling count) -- fine for a single `m` press, but this
+/// loop can run once per AST node, so paying that on every iteration turns an O(n) sweep into
+/// O(n^2). Two real fixtures exposed this: a ~5,500-node real-world file took 26s to reach 740
+/// matches and climbing (`rebuild_caches`/`apply_match_entry`'s O(entries)-per-call cost), and a
+/// large flat JSON-array-shaped tree took 52s even after that fix (`path_for_node`'s O(siblings)
+/// occurrence-counting, paid per node, on a level with thousands of same-kind children). Both are
+/// worked around here: `caches` is built once and updated incrementally in place; entries are
+/// appended directly, skipping `apply_match_entry`'s dedup scan (provably a no-op here, since
+/// `status_before`/`status_after` having just reported `Unmarked` means neither node has an
+/// existing entry to remove); cursors are tracked as plain indices into `before_flat`/`after_flat`
+/// so advancing never re-scans from the start; and every node's path is looked up in a table
+/// built by one O(n) pass per tree ([`precompute_paths`]) instead of walked fresh from each node.
+#[allow(clippy::too_many_arguments)]
+fn action_match_to_end(
+    app: &mut App,
+    before_flat: &[(Node, usize)],
+    after_flat: &[(Node, usize)],
+    before_root: Node,
+    after_root: Node,
+    before_src: &[u8],
+    after_src: &[u8],
+    before_hash: &HashMap<usize, u64>,
+    after_hash: &HashMap<usize, u64>,
+) -> Result<ActionOutcome> {
+    let mut matched = 0usize;
+    let mut caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let before_paths = precompute_paths(before_root);
+    let after_paths = precompute_paths(after_root);
+
+    let mut before_idx = before_flat
+        .iter()
+        .position(|(n, _)| n.id() == app.before.cursor_id)
+        .context("Before cursor node not found")?;
+    let mut after_idx = after_flat
+        .iter()
+        .position(|(n, _)| n.id() == app.after.cursor_id)
+        .context("After cursor node not found")?;
+
+    loop {
+        let before_node = before_flat[before_idx].0;
+        let after_node = after_flat[after_idx].0;
+
+        // Nothing left to pair up on at least one side: reached the end of what `f` can do. (This
+        // also covers a node under an inherited delete/insert-with-children mark, since
+        // `status_before`/`status_after` never report those as `Unmarked`.)
+        if status_before(before_node, &caches) != NodeStatus::Unmarked
+            || status_after(after_node, &caches) != NodeStatus::Unmarked
+        {
+            break;
+        }
+
+        if before_node.kind() != after_node.kind() {
+            app.before.cursor_id = before_node.id();
+            app.after.cursor_id = after_node.id();
+            return Ok(ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
+                before_id: before_node.id(),
+                after_id: after_node.id(),
+                before_kind: before_node.kind().to_string(),
+                after_kind: after_node.kind().to_string(),
+                recursive: false,
+            }));
+        }
+
+        let operation = if before_node.child_count() == 0 && after_node.child_count() == 0 {
+            if node_values_equal(before_node, after_node, before_src, after_src) {
+                HumanOperation::Identical
+            } else {
+                HumanOperation::Update
+            }
+        } else {
+            subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
+        };
+        app.mapping.entries.push(HumanMappingEntry {
+            operation,
+            before_path: before_paths.get(&before_node.id()).cloned(),
+            after_path: after_paths.get(&after_node.id()).cloned(),
+        });
+        caches.before_match.insert(before_node.id(), after_node.id());
+        caches.after_match.insert(after_node.id(), before_node.id());
+        app.dirty = true;
+        matched += 1;
+
+        let next_before = next_unmarked_index(before_idx + 1, before_flat, &caches, status_before);
+        let next_after = next_unmarked_index(after_idx + 1, after_flat, &caches, status_after);
+        if let Some(idx) = next_before {
+            before_idx = idx;
+        }
+        if let Some(idx) = next_after {
+            after_idx = idx;
+        }
+        if next_before.is_none() || next_after.is_none() {
+            break;
+        }
+    }
+
+    app.before.cursor_id = before_flat[before_idx].0.id();
+    app.after.cursor_id = after_flat[after_idx].0.id();
+
+    Ok(ActionOutcome::Done(if matched == 0 {
+        "Nothing left to match".to_string()
+    } else {
+        format!("Matched {matched} pair(s) up to end of file")
+    }))
+}
+
+/// The first index at or after `start` whose node is `Unmarked`, or `None` if there isn't one.
+/// Callers that advance `start` monotonically across repeated calls (as `action_match_to_end`
+/// does) get amortized O(n) total work rather than O(n) *per call* -- each slot in `flat` is only
+/// ever examined once across the whole sweep.
+fn next_unmarked_index(
+    start: usize,
+    flat: &[(Node, usize)],
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) -> Option<usize> {
+    (start..flat.len()).find(|&i| status_fn(flat[i].0, caches) == NodeStatus::Unmarked)
+}
+
+/// Every node's path, in the same `"{kind}:{occurrence}"`-per-level format [`path_for_node`]
+/// produces, computed in a single top-down O(n) pass over `root` instead of `path_for_node`'s
+/// per-node O(sibling count) backward walk. That per-node cost is invisible for a single lookup,
+/// but a node with many same-kind siblings (a big JSON array's elements, a large enum's variants)
+/// makes it O(width) *per node at that level*, which a caller that looks up every node's path in a
+/// tight loop (like [`action_match_to_end`]) would pay again and again -- this instead assigns
+/// each child its 1-indexed occurrence while visiting its parent's children exactly once.
+fn precompute_paths(root: Node) -> HashMap<usize, Vec<String>> {
+    let mut paths = HashMap::new();
+    paths.insert(root.id(), Vec::new());
+
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        let node_path = paths.get(&node.id()).cloned().unwrap_or_default();
+        let mut occurrence: HashMap<&str, usize> = HashMap::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let count = occurrence.entry(child.kind()).or_insert(0);
+            *count += 1;
+            let mut child_path = node_path.clone();
+            child_path.push(format!("{}:{}", child.kind(), count));
+            paths.insert(child.id(), child_path);
+            stack.push(child);
+        }
+    }
+
+    paths
+}
+
 #[allow(clippy::too_many_arguments)]
 fn action_match_subtree(
     mapping: &mut HumanMapping,
@@ -1770,7 +2003,7 @@ fn draw_ui(
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -1841,8 +2074,8 @@ fn render_modal(
         Modal::OpenDiffPicker { options, selected } => {
             render_open_picker(frame, area, options, *selected, "diff");
         }
-        Modal::OpenSamplePicker { options, selected } => {
-            render_open_picker(frame, area, options, *selected, "sample");
+        Modal::OpenSamplePicker { options, selected, hide_solved } => {
+            render_open_sample_picker(frame, area, options, *selected, *hide_solved);
         }
         Modal::ConfirmDiscardUnsaved { target, can_save } => render_text_modal(
             frame,
@@ -2015,6 +2248,59 @@ fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selecte
             kind,
             selected + 1,
             options.len()
+        ))
+        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+    frame.render_widget(List::new(items).block(block), popup_area);
+}
+
+/// Like `render_open_picker`, but for `O`'s sample picker: solved (already-promoted) entries are
+/// shown in green with a " - SOLVED" suffix, and are left out of the list entirely when
+/// `hide_solved` is set.
+fn render_open_sample_picker(
+    frame: &mut Frame,
+    area: Rect,
+    options: &[(String, bool)],
+    selected: usize,
+    hide_solved: bool,
+) {
+    let visible: Vec<&(String, bool)> =
+        options.iter().filter(|(_, solved)| !hide_solved || !*solved).collect();
+
+    let popup_area = centered_rect(60, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    let max_scroll = visible.len().saturating_sub(inner_height);
+    let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
+
+    let items: Vec<ListItem> = visible
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(inner_height.max(1))
+        .map(|(i, (name, solved))| {
+            let style = if i == selected {
+                Style::default().bg(Color::Yellow).fg(Color::Black)
+            } else if *solved {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default()
+            };
+            let label = if *solved { format!("{name} - SOLVED") } else { name.clone() };
+            ListItem::new(Line::from(Span::styled(label, style)))
+        })
+        .collect();
+
+    let solved_count = options.iter().filter(|(_, solved)| *solved).count();
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "Open sample ({}/{}) — j/k move, Enter open, H {} solved ({} total), Esc cancel",
+            if visible.is_empty() { 0 } else { selected + 1 },
+            visible.len(),
+            if hide_solved { "show" } else { "hide" },
+            solved_count,
         ))
         .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
 
@@ -2281,6 +2567,24 @@ fn handle_key(
             }
             None
         }
+        KeyCode::Char('f') => {
+            match action_match_to_end(
+                app,
+                before_flat,
+                after_flat,
+                before_root,
+                after_root,
+                before_src,
+                after_src,
+                before_hash,
+                after_hash,
+            ) {
+                Ok(ActionOutcome::Done(msg)) => app.status = Some(msg),
+                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
+                Err(err) => app.status = Some(format!("Error: {:#}", err)),
+            }
+            None
+        }
         KeyCode::Char('M') => {
             match action_match_subtree(
                 &mut app.mapping,
@@ -2430,10 +2734,10 @@ fn handle_key(
             None
         }
         KeyCode::Char('O') => {
-            match list_available_samples() {
+            match list_samples_with_status() {
                 Ok(options) if !options.is_empty() => {
-                    let selected = options.iter().position(|o| o == &app.name).unwrap_or(0);
-                    app.modal = Some(Modal::OpenSamplePicker { options, selected });
+                    let selected = options.iter().position(|(name, _)| name == &app.name).unwrap_or(0);
+                    app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved: false });
                 }
                 Ok(_) => {
                     app.status = Some("No samples found in src/test/data/samples".to_string());
@@ -2546,35 +2850,73 @@ fn handle_modal_key(
                 app.modal = Some(Modal::OpenDiffPicker { options, selected });
             }
         },
-        Modal::OpenSamplePicker { options, selected } => match code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::OpenSamplePicker {
-                    selected: selected.saturating_sub(1),
-                    options,
-                });
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::OpenSamplePicker {
-                    selected: (selected + 1).min(options.len().saturating_sub(1)),
-                    options,
-                });
-            }
-            KeyCode::Enter => {
-                let target = OpenTarget::Sample(options[selected].clone());
-                if app.dirty {
-                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
-                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
-                } else {
-                    return Some(target);
+        Modal::OpenSamplePicker { options, selected, hide_solved } => {
+            // Cloned rather than borrowed, so `options` stays free to move into whichever
+            // `Modal::OpenSamplePicker` gets rebuilt below.
+            let visible: Vec<(String, bool)> = options
+                .iter()
+                .filter(|(_, solved)| !hide_solved || !*solved)
+                .cloned()
+                .collect();
+
+            match code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        selected: selected.saturating_sub(1),
+                        options,
+                        hide_solved,
+                    });
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        selected: (selected + 1).min(visible.len().saturating_sub(1)),
+                        options,
+                        hide_solved,
+                    });
+                }
+                KeyCode::Enter => {
+                    if let Some((name, _)) = visible.get(selected) {
+                        let target = OpenTarget::Sample(name.clone());
+                        if app.dirty {
+                            let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                            app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                        } else {
+                            return Some(target);
+                        }
+                    } else {
+                        app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved });
+                    }
+                }
+                KeyCode::Char('h') | KeyCode::Char('H') => {
+                    let current_name = visible.get(selected).map(|(name, _)| name.clone());
+                    let new_hide_solved = !hide_solved;
+                    let new_visible_len = options
+                        .iter()
+                        .filter(|(_, solved)| !new_hide_solved || !*solved)
+                        .count();
+                    let new_selected = current_name
+                        .and_then(|name| {
+                            options
+                                .iter()
+                                .filter(|(_, solved)| !new_hide_solved || !*solved)
+                                .position(|(n, _)| *n == name)
+                        })
+                        .unwrap_or(0)
+                        .min(new_visible_len.saturating_sub(1));
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        options,
+                        selected: new_selected,
+                        hide_solved: new_hide_solved,
+                    });
+                }
+                KeyCode::Esc => {
+                    app.status = Some("Cancelled".to_string());
+                }
+                _ => {
+                    app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved });
                 }
             }
-            KeyCode::Esc => {
-                app.status = Some("Cancelled".to_string());
-            }
-            _ => {
-                app.modal = Some(Modal::OpenSamplePicker { options, selected });
-            }
-        },
+        }
         Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
@@ -3069,6 +3411,75 @@ mod tests {
     }
 
     #[test]
+    fn open_sample_picker_marks_solved_entries_and_can_hide_them() {
+        let options = vec![
+            ("rust-x-foo-abc12345-a".to_string(), true),
+            ("rust-x-foo-def67890-b".to_string(), false),
+        ];
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 24);
+
+        terminal
+            .draw(|f| render_open_sample_picker(f, area, &options, 0, false))
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(text.contains("rust-x-foo-abc12345-a - SOLVED"), "solved marker missing: {text}");
+        assert!(text.contains("rust-x-foo-def67890-b"), "unsolved entry missing: {text}");
+        assert!(text.contains("1/2"), "count should include both entries: {text}");
+
+        terminal
+            .draw(|f| render_open_sample_picker(f, area, &options, 0, true))
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(!text.contains("SOLVED"), "solved entry should be hidden: {text}");
+        assert!(text.contains("rust-x-foo-def67890-b"), "unsolved entry should still show: {text}");
+        assert!(text.contains("1/1"), "count should only include the unsolved entry: {text}");
+    }
+
+    #[test]
+    fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
+        // Regression guard for the switch from `options[selected]` to `visible.get(selected)`:
+        // with a solved entry hidden, `selected` indexes the *filtered* list, so index 1 here must
+        // resolve to "unsolved-two" (the second visible entry), not "unsolved-one" (index 1 in the
+        // unfiltered `options`) or the hidden "solved-one".
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app =
+            App::new("test".to_string(), CaseOrigin::Diffs, root.id(), root.id(), HumanMapping::default());
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        app.modal = Some(Modal::OpenSamplePicker {
+            options: vec![
+                ("solved-one".to_string(), true),
+                ("unsolved-one".to_string(), false),
+                ("unsolved-two".to_string(), false),
+            ],
+            selected: 1,
+            hide_solved: true,
+        });
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        match target {
+            Some(OpenTarget::Sample(name)) => assert_eq!(name, "unsolved-two"),
+            other => panic!("expected OpenTarget::Sample(\"unsolved-two\"), got {other:?}"),
+        }
+    }
+
+    #[test]
     fn help_modal_renders_keybindings() {
         // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
         // clipped by the popup's width or height -- this test is about content, not layout.
@@ -3220,6 +3631,267 @@ mod tests {
         );
     }
 
+    #[test]
+    fn action_match_to_end_matches_identical_trees_completely() {
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let no_hashes = HashMap::new();
+
+        let outcome = action_match_to_end(
+            &mut app,
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, ActionOutcome::Done(_)));
+        assert!(app.dirty);
+
+        let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+        for (node, _) in &before_flat {
+            assert_ne!(
+                status_before(*node, &caches),
+                NodeStatus::Unmarked,
+                "every node, including unnamed tokens, should be matched: {:?} unmatched",
+                node.kind()
+            );
+        }
+
+        // Running it again once everything is matched must be a no-op, not a duplicate sweep.
+        let entries_before = app.mapping.entries.len();
+        let outcome = action_match_to_end(
+            &mut app,
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+        )
+        .unwrap();
+        assert!(matches!(outcome, ActionOutcome::Done(ref msg) if msg == "Nothing left to match"));
+        assert_eq!(app.mapping.entries.len(), entries_before);
+    }
+
+    #[test]
+    fn action_match_to_end_stops_at_a_kind_mismatch_but_keeps_prior_matches() {
+        let before_source = "fn main() {\n    a();\n}\n";
+        let after_source = "fn main() {\n    1;\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let no_hashes = HashMap::new();
+
+        let outcome = action_match_to_end(
+            &mut app,
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            before_source.as_bytes(),
+            after_source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+        )
+        .unwrap();
+
+        let (before_id, after_id, before_kind, after_kind) = match outcome {
+            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
+                before_id,
+                after_id,
+                before_kind,
+                after_kind,
+                recursive,
+            }) => {
+                assert!(!recursive, "f should raise a single-pair mismatch, not a recursive one");
+                (before_id, after_id, before_kind, after_kind)
+            }
+            ActionOutcome::Done(msg) => panic!("expected a kind mismatch modal, action completed instead: {msg}"),
+            ActionOutcome::NeedsModal(other) => panic!("expected ConfirmKindMismatch, got {other:?}"),
+        };
+        assert_ne!(before_kind, after_kind);
+
+        // The common prefix (fn main() { ... before the differing statement) must already be
+        // matched, even though the sweep didn't run to completion.
+        assert!(app.dirty);
+        assert!(!app.mapping.entries.is_empty(), "should have matched at least the common prefix");
+
+        // The cursor is parked exactly on the mismatched pair, ready for a human (or a plain `m`)
+        // to resolve it and then resume with `f` again.
+        assert_eq!(app.before.cursor_id, before_id);
+        assert_eq!(app.after.cursor_id, after_id);
+    }
+
+    fn collect_subtree_ids(node: Node, out: &mut Vec<usize>) {
+        out.push(node.id());
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            collect_subtree_ids(child, out);
+        }
+    }
+
+    #[test]
+    fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node() {
+        // Before has an extra trailing statement the After side has nothing to pair it with.
+        // `f` pairs cursors positionally (exactly like repeated `m`), so once the shared `a(); b();`
+        // prefix is consumed the After cursor lands on the block's closing `}` while the Before
+        // cursor is still sitting on `c();` -- a kind mismatch, so the sweep must stop there rather
+        // than inventing a match for `c();`.
+        let before_source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+        let after_source = "fn main() {\n    a();\n    b();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let block = find_first(before_root, "block").unwrap();
+        let mut cursor = block.walk();
+        let statement_c = block
+            .children(&mut cursor)
+            .filter(|n| n.kind() == "expression_statement")
+            .nth(2)
+            .expect("before source has three statements");
+        let mut untouchable_ids = Vec::new();
+        collect_subtree_ids(statement_c, &mut untouchable_ids);
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let no_hashes = HashMap::new();
+
+        let outcome = action_match_to_end(
+            &mut app,
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            before_source.as_bytes(),
+            after_source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+        )
+        .unwrap();
+
+        assert!(app.dirty, "the shared a(); b(); prefix should have been matched");
+        match outcome {
+            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch { before_kind, after_kind, .. }) => {
+                assert_ne!(before_kind, after_kind);
+            }
+            ActionOutcome::Done(msg) => panic!(
+                "expected the sweep to stop on a kind mismatch once `c();` has nothing left to pair \
+                 with, action completed instead: {msg}"
+            ),
+            ActionOutcome::NeedsModal(other) => panic!("expected ConfirmKindMismatch, got {other:?}"),
+        }
+
+        let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+        for id in untouchable_ids {
+            assert!(
+                !caches.before_match.contains_key(&id) && !caches.before_removed.contains_key(&id),
+                "the trailing `c();` statement (or any of its children) must not have been paired \
+                 with anything on the After side"
+            );
+        }
+    }
+
+    /// Regression guard for a real hang: on a ~5,500-node real-world fixture, the original
+    /// implementation (which called `apply_match_entry`/`rebuild_caches` -- each O(current entry
+    /// count) -- once per node, and re-derived the cursor's flat-array position by linear scan
+    /// every iteration) took 26s to reach only 740 of 5477 matches, and was still accelerating: an
+    /// effective hang for anything but a toy fixture. Generates a large *synthetic* identical
+    /// before/after tree (no dependency on any file under src/test/data/, which can be renamed or
+    /// removed) and asserts the sweep finishes fast. If this regresses back to quadratic, this
+    /// test will time out or take drastically longer, not just get slower by a little.
+    #[test]
+    fn action_match_to_end_is_linear_not_quadratic_in_tree_size() {
+        let mut source = String::from("fn main() {\n");
+        for i in 0..3000 {
+            source.push_str(&format!("    a{i}();\n"));
+        }
+        source.push_str("}\n");
+
+        let before_tree = parse_rust(&source);
+        let after_tree = parse_rust(&source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        assert!(before_flat.len() > 10_000, "expected a large tree, got {} nodes", before_flat.len());
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let no_hashes = HashMap::new();
+
+        let start = std::time::Instant::now();
+        let outcome = action_match_to_end(
+            &mut app,
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+        )
+        .unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(matches!(outcome, ActionOutcome::Done(_)));
+        assert_eq!(app.mapping.entries.len(), before_flat.len());
+        assert!(
+            elapsed.as_secs() < 5,
+            "took {elapsed:?} to sweep {} nodes -- the old O(n^2) implementation took 26s to do \
+             barely a tenth of a ~5,500-node real fixture, so anything anywhere near that here \
+             means the quadratic blowup is back",
+            before_flat.len()
+        );
+    }
+
     fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {
         let mut writer = csv::Writer::from_path(path).unwrap();
         writer
@@ -3304,5 +3976,32 @@ mod tests {
         let found =
             update_sample_csv_at(Path::new("/nonexistent/sample.csv"), &source, "name").unwrap();
         assert!(!found);
+    }
+
+    #[test]
+    fn promoted_sample_sources_at_only_includes_rows_with_a_non_empty_promoted_to() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[
+                ("Rust", "repo", "abc123", "src/a.rs", "rust-already-promoted"),
+                ("Rust", "repo", "def456", "src/b.rs", ""),
+            ],
+        );
+
+        let promoted = promoted_sample_sources_at(file.path()).unwrap();
+        assert_eq!(promoted.len(), 1);
+        assert!(promoted.contains(&(
+            "Rust".to_string(),
+            "repo".to_string(),
+            "abc123".to_string(),
+            "src/a.rs".to_string(),
+        )));
+    }
+
+    #[test]
+    fn promoted_sample_sources_at_is_empty_when_file_does_not_exist() {
+        let promoted = promoted_sample_sources_at(Path::new("/nonexistent/sample.csv")).unwrap();
+        assert!(promoted.is_empty());
     }
 }
