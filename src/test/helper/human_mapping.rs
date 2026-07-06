@@ -183,6 +183,38 @@ fn check_subtree_maps_to_zero(
     }
 }
 
+/// Formats " (op X, reason Y)" for the mapping the before node actually landed in, so a mismatch
+/// message identifies which pass produced the wrong mapping (via `ASTMappingReason`), not just
+/// what it mapped to. Empty string when there's no mapping to describe.
+fn actual_mapping_info(
+    diff_ast: &ASTDiff,
+    before_id: usize,
+    actual_partner: Option<usize>,
+) -> String {
+    let Some(partner) = actual_partner else {
+        return String::new();
+    };
+    match diff_ast.mapping.get(&(before_id, partner)) {
+        Some(m) => format!(" (op {:?}, reason {:?})", m.operation, m.reason),
+        None => String::new(),
+    }
+}
+
+/// After-side counterpart of `actual_mapping_info` (mapping keys are `(before, after)`).
+fn actual_mapping_info_after(
+    diff_ast: &ASTDiff,
+    after_id: usize,
+    actual_partner: Option<usize>,
+) -> String {
+    let Some(partner) = actual_partner else {
+        return String::new();
+    };
+    match diff_ast.mapping.get(&(partner, after_id)) {
+        Some(m) => format!(" (op {:?}, reason {:?})", m.operation, m.reason),
+        None => String::new(),
+    }
+}
+
 /// The [`ASTMappingOperation`] codediff is expected to have chosen for a matched pair, given the
 /// human's [`HumanOperation`] for that pair.
 fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperation> {
@@ -227,13 +259,14 @@ fn check_entry(
                     None => "None".to_string(),
                 };
                 mismatches.push(format!(
-                    "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}",
+                    "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}{}",
                     entry.operation,
                     before_path,
                     after_path,
                     before_node.kind(),
                     after_node.kind(),
-                    mapped_kind
+                    mapped_kind,
+                    actual_mapping_info(diff_ast, before_node.id(), actual_partner)
                 ));
                 return Ok(());
             }
@@ -276,10 +309,11 @@ fn check_entry(
                         None => "None".to_string(),
                     };
                     mismatches.push(format!(
-                        "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {}",
+                        "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {}{}",
                         before_path,
                         before_node.kind(),
-                        mapped_kind
+                        mapped_kind,
+                        actual_mapping_info(diff_ast, before_node.id(), actual)
                     ));
                 }
             }
@@ -308,10 +342,11 @@ fn check_entry(
                         None => "None".to_string(),
                     };
                     mismatches.push(format!(
-                        "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {}",
+                        "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {}{}",
                         after_path,
                         after_node.kind(),
-                        mapped_kind
+                        mapped_kind,
+                        actual_mapping_info_after(diff_ast, after_node.id(), actual)
                     ));
                 }
             }
@@ -323,14 +358,13 @@ fn check_entry(
 
 /**
 * Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
-* checks that every human-authored decision holds in codediff's output.
+* returns every point of disagreement between the two (empty if they fully agree).
 *
-* This is the whole body of the generated `optimal_solutions/<name>.rs` tests: `human_solver`
-* writes a human_mapping.json file, and each of those tests just calls this function. Reports every
-* mismatch at once (rather than failing on the first one), since the point of these tests is to see
-* the full extent of any disagreement between codediff and the human-authored optimum.
+* Shared by `assert_matches_human_mapping` (which just turns a non-empty result into a test
+* failure) and the `benchmark_optimal_solutions` binary (which wants the raw count across every
+* fixture, not a single pass/fail).
 */
-pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
+pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
     let mapping = load(name)?;
 
     let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
@@ -352,6 +386,21 @@ pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
     for entry in &mapping.entries {
         check_entry(entry, before_root, after_root, &diff_ast, &mut mismatches)?;
     }
+
+    Ok(mismatches)
+}
+
+/**
+* Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
+* checks that every human-authored decision holds in codediff's output.
+*
+* This is the whole body of the generated `optimal_solutions/<name>.rs` tests: `human_solver`
+* writes a human_mapping.json file, and each of those tests just calls this function. Reports every
+* mismatch at once (rather than failing on the first one), since the point of these tests is to see
+* the full extent of any disagreement between codediff and the human-authored optimum.
+*/
+pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
+    let mismatches = compute_mismatches(name)?;
 
     if !mismatches.is_empty() {
         bail!(

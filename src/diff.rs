@@ -19,6 +19,7 @@ pub mod apted;
 pub mod nodes;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
+pub mod solve_moved_subtrees;
 pub mod solve_semantically_structural_nodes;
 pub mod solve_similar_flow_control;
 pub mod solve_structurally_identical_trees;
@@ -230,6 +231,12 @@ impl Diff {
             &mut ast_diff,
         );
 
+        // MoveDetectionRecovery: dead last, after every pass above has had first claim on all
+        // content - pairs up byte-identical subtrees that ended the pipeline as a wholly-deleted
+        // + wholly-inserted couple (i.e. code that moved, which ordered tree edit distance can
+        // only express as delete+insert). See that pass's doc comment for the guardrails.
+        solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
+
         Self {
             ast: Some(ast_diff),
             language: before.metadata.language.unwrap_or(Language::Unknown),
@@ -263,6 +270,25 @@ impl ASTDiff {
         self.mapping.insert((before_id, after_id), mapping);
         self.before_node_map.insert(before_id, after_id);
         self.after_node_map.insert(after_id, before_id);
+    }
+
+    /**
+     * Removes a `(before_id, 0)` delete mapping, so the node can be re-mapped to a real partner.
+     *
+     * Deliberately only defined for *null* mappings (deletes/inserts): removing a real pair would
+     * also need to fix up the partner's reverse entry, which no caller needs today. Note the
+     * shared `after_node_map[0]` reverse slot is left alone - every delete overwrites it, so it
+     * holds an arbitrary earlier delete's id by design and nothing may rely on it.
+     */
+    pub fn remove_delete_mapping(&mut self, before_id: usize) {
+        self.mapping.remove(&(before_id, 0));
+        self.before_node_map.remove(&before_id);
+    }
+
+    /// Removes a `(0, after_id)` insert mapping - see `remove_delete_mapping`.
+    pub fn remove_insert_mapping(&mut self, after_id: usize) {
+        self.mapping.remove(&(0, after_id));
+        self.after_node_map.remove(&after_id);
     }
 
     /**
@@ -466,6 +492,10 @@ pub enum ASTMappingReason {
     APTED,
     /// Mapping produced by Myers sequence diff on a flat tree (single root, all leaf children).
     FlatSequenceDiff,
+    /// A fully-deleted subtree and a byte-identical fully-inserted subtree were paired up after
+    /// the main pipeline finished - the code didn't change, it moved (possibly into or out of a
+    /// newly-inserted wrapper). See `solve_moved_subtrees`.
+    MovedSubtree,
 }
 
 /**

@@ -371,6 +371,107 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
     in_shared_family(kind_a, kind_b, families)
 }
 
+/// Generic structural punctuation: bracket/separator tokens that exist purely as grammar glue and
+/// carry no content of their own, in every language this project supports. Deliberately a flat,
+/// language-agnostic list (unlike the operator families above) since these symbols play the same
+/// "structural glue" role in effectively every grammar - there's no language where `(` means
+/// something other than "start of a grouped/parenthesized thing".
+const GENERIC_PUNCTUATION: &[&str] = &[
+    "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", ".",
+];
+
+/// True if `kind` denotes a generic punctuation/operator token - a single TreeSitter leaf that
+/// exists as grammar glue (`<`, `<=`, `(`, `{`, `::`, ...) rather than content a human would
+/// recognize as meaningful on its own. Used by `matching_allowed` to decide which matches need
+/// "small context" support beyond a bare kind check: unlike an identifier or literal, whose own
+/// text already carries evidence of a real correspondence, two `)` tokens (or a `<`/`<=` pair) are
+/// identical/compatible essentially everywhere in a file, so kind-compatibility alone is never
+/// enough to justify matching them.
+///
+/// Backed by the same operator-family lists `kinds_update_allowed` uses (plus `GENERIC_PUNCTUATION`
+/// for brackets/separators) rather than a generic "is it all symbols" heuristic, since several
+/// families include keyword-spelled operators (`and`, `bitand`, `not_eq`, ...) that a purely
+/// symbolic check would miss.
+pub fn is_generic_token_kind(kind: &str) -> bool {
+    GENERIC_PUNCTUATION.contains(&kind)
+        || [
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            PHP_ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+            RUST_RANGE_OPS,
+        ]
+        .iter()
+        .any(|family| family.contains(&kind))
+}
+
+/// Character-bigram Dice similarity threshold for `leaf_texts_similar`. 0.6 keeps clear renames
+/// (`fetch_user` -> `fetch_user_data`, `user_id` -> `userId`) while rejecting unrelated
+/// identifiers that share only a stray character pair.
+const LEAF_TEXT_SIMILARITY_THRESHOLD: f64 = 0.6;
+
+/**
+* True if two leaf texts are similar enough that a human would read the pair as "the same token,
+* renamed/tweaked" rather than two unrelated tokens.
+*
+* Uses character-bigram Dice similarity: cheap, symmetric, no allocation beyond two small sets,
+* and robust to affix changes (`foo` -> `foo_bar` scores well). Texts too short to have bigrams
+* (length <= 1, or length 2 with no overlap) effectively always fail - deliberately so: `i` -> `j`
+* or `0` -> `1` carry no textual evidence on their own, and the caller's other arm (a nearby
+* matched ancestor, i.e. same-slot context) is the correct way for those legitimate small renames
+* to survive.
+*/
+pub fn leaf_texts_similar(text_a: &str, text_b: &str) -> bool {
+    if text_a == text_b {
+        return true;
+    }
+    let bigrams = |s: &str| -> std::collections::HashSet<(char, char)> {
+        s.chars().zip(s.chars().skip(1)).collect()
+    };
+    let a = bigrams(text_a);
+    let b = bigrams(text_b);
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    let common = a.intersection(&b).count();
+    2.0 * common as f64 / (a.len() + b.len()) as f64 >= LEAF_TEXT_SIMILARITY_THRESHOLD
+}
+
+/**
+* Generalizes `kinds_update_allowed` with a "small context" requirement for generic tokens.
+*
+* Delegates the kind-compatibility question to `kinds_update_allowed` first. If that allows the
+* pair, and *neither* kind is a generic token (see `is_generic_token_kind`) - e.g. two
+* `identifier`s, or two `return_statement`s - the kind check alone is enough, exactly as before.
+*
+* But if either kind is a generic token, kind-compatibility is necessary and not sufficient:
+* additionally requires `parents_matched()` to hold, i.e. the two nodes' immediate enclosing
+* nodes must themselves already correspond. Without this, the tree-edit-distance search is free to
+* match any lone `<` (or unrelated `<`/`<=` pair) between two statements that have nothing else in
+* common, purely because reusing a leaf is cheaper than deleting one and inserting the other -
+* exactly the "surprising cheap match" a human wouldn't read as the same token edited in place.
+*
+* `parents_matched` is a callback rather than a plain bool so callers that already know the answer
+* is irrelevant (neither kind is a generic token) never pay for computing it.
+*/
+pub fn matching_allowed(
+    kind_a: &str,
+    kind_b: &str,
+    language: &Language,
+    parents_matched: impl FnOnce() -> bool,
+) -> bool {
+    if !kinds_update_allowed(kind_a, kind_b, language) {
+        return false;
+    }
+    if !is_generic_token_kind(kind_a) && !is_generic_token_kind(kind_b) {
+        return true;
+    }
+    parents_matched()
+}
+
 /// A flow-control construct family, used to keep `MatchSimilarFlowControl` from ever pairing a
 /// `match` against a `switch`, etc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -931,6 +1032,62 @@ int f(int x) {
         // deliberately excluded from the shared comparison family (see COMPARISON_OPS doc).
         assert!(!kinds_update_allowed("in", "==", &Language::Python));
         assert!(kinds_update_allowed("<", "<=", &Language::Python));
+    }
+
+    #[test]
+    fn generic_token_kind_covers_operators_and_punctuation() {
+        assert!(is_generic_token_kind("<"));
+        assert!(is_generic_token_kind("<="));
+        assert!(is_generic_token_kind("("));
+        assert!(is_generic_token_kind(")"));
+        assert!(is_generic_token_kind("{"));
+        assert!(is_generic_token_kind("::"));
+        assert!(is_generic_token_kind("and")); // keyword-spelled operator, not purely symbolic
+    }
+
+    #[test]
+    fn generic_token_kind_excludes_content_bearing_leaves() {
+        assert!(!is_generic_token_kind("identifier"));
+        assert!(!is_generic_token_kind("string_literal"));
+        assert!(!is_generic_token_kind("return_statement"));
+    }
+
+    #[test]
+    fn matching_allowed_rejects_whatever_kinds_update_allowed_rejects() {
+        // `+` and `<` are never kind-compatible, regardless of context.
+        assert!(!matching_allowed("<", "+", &Language::CPP, || true));
+    }
+
+    #[test]
+    fn matching_allowed_requires_context_for_generic_tokens_only() {
+        // Same identifier kind, not a generic token: context is never even consulted.
+        assert!(matching_allowed("identifier", "identifier", &Language::CPP, || {
+            panic!("must not evaluate parents_matched for a non-generic-token kind")
+        }));
+
+        // Generic token, kind-compatible (same kind): allowed only if context says so.
+        assert!(matching_allowed("<", "<", &Language::CPP, || true));
+        assert!(!matching_allowed("<", "<", &Language::CPP, || false));
+
+        // Generic token, cross-kind family swap: same rule applies.
+        assert!(matching_allowed("<", "<=", &Language::CPP, || true));
+        assert!(!matching_allowed("<", "<=", &Language::CPP, || false));
+    }
+
+    #[test]
+    fn leaf_texts_similar_accepts_clear_renames() {
+        assert!(leaf_texts_similar("fetch_user", "fetch_user_data"));
+        assert!(leaf_texts_similar("user_data", "userData"));
+        assert!(leaf_texts_similar("same", "same"));
+    }
+
+    #[test]
+    fn leaf_texts_similar_rejects_unrelated_and_tiny_texts() {
+        assert!(!leaf_texts_similar("i", "numbers"));
+        assert!(!leaf_texts_similar("min", "result"));
+        // Too short for bigram evidence - the context arm of the caller's OR handles these.
+        assert!(!leaf_texts_similar("i", "j"));
+        assert!(!leaf_texts_similar("0", "1"));
     }
 
     // Tests for is_reference (formerly node_matches from reference_nodes.rs)
