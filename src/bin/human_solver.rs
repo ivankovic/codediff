@@ -70,6 +70,13 @@
 *   T              show the output of the system `diff -u` between the before and after content --
 *                  a plain line-based diff, as a point of comparison against codediff's own
 *                  AST-based diff. j/k scroll, t switches to the text view instead, Esc closes
+*   H              toggle hiding fully solved subtrees in both panels: a node (and everything
+*                  under it) is hidden once it and every one of its descendants has some mark
+*                  (matched, deleted or inserted) -- nothing left there to review. Any node that's
+*                  still unmarked stays visible, together with its whole ancestor chain, since an
+*                  ancestor of an unmarked node can never itself count as fully solved. Recomputed
+*                  fresh every frame, so marking or unmarking a node updates what's hidden
+*                  immediately, without needing to toggle `H` again
 *   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
 *   i / I          mark the After cursor node as inserted / inserted with its whole subtree
 *   u              remove the mark directly on the focused cursor node
@@ -157,6 +164,8 @@ p              run codediff's own diff, show its verdict next to each node
 t              view raw before/after text (not the AST tree)
 T              view the output of unix `diff -u`
                  (t/T switch between these two views while either is open)
+H              toggle hiding fully solved subtrees (unmarked nodes and their
+                 ancestors always stay visible)
 
 s              save -- or, on a sample, prompt for a name and promote it
 o              open a different test case (src/test/data/diffs/)
@@ -497,6 +506,11 @@ struct App {
     /// node's human-marked status glyph for a quick visual diff against the human mapping. `None`
     /// until `p` has been pressed at least once for the current case.
     algo_diff: Option<ASTDiff>,
+    /// Toggled by `H`: when true, a subtree is left out of both panels' flattened view entirely
+    /// once every node in it (the root and all descendants) has `NodeStatus` other than
+    /// `Unmarked` -- i.e. nothing left in it to review. Recomputed fresh each frame from the
+    /// current mapping, so it can't drift out of sync with what's actually marked.
+    hide_solved: bool,
 }
 
 impl App {
@@ -521,6 +535,7 @@ impl App {
             modal: None,
             should_quit: false,
             algo_diff: None,
+            hide_solved: false,
         }
     }
 }
@@ -529,10 +544,16 @@ impl App {
 // Tree flattening & node status
 // ---------------------------------------------------------------------------------------------
 
-/// Flattens a tree into preorder (node, depth) pairs, skipping the children of collapsed nodes.
-fn flatten_visible<'a>(root: Node<'a>, collapsed: &std::collections::HashSet<usize>) -> Vec<(Node<'a>, usize)> {
+/// Flattens a tree into preorder (node, depth) pairs, skipping the children of collapsed nodes and
+/// (if `hidden` is given) any node -- and its whole subtree -- present in `hidden` entirely. A
+/// node that's hidden this way doesn't get a row of its own, unlike a collapsed one.
+fn flatten_visible<'a>(
+    root: Node<'a>,
+    collapsed: &std::collections::HashSet<usize>,
+    hidden: Option<&std::collections::HashSet<usize>>,
+) -> Vec<(Node<'a>, usize)> {
     let mut out = Vec::new();
-    walk_visible(root, 0, collapsed, &mut out);
+    walk_visible(root, 0, collapsed, hidden, &mut out);
     out
 }
 
@@ -540,15 +561,19 @@ fn walk_visible<'a>(
     node: Node<'a>,
     depth: usize,
     collapsed: &std::collections::HashSet<usize>,
+    hidden: Option<&std::collections::HashSet<usize>>,
     out: &mut Vec<(Node<'a>, usize)>,
 ) {
+    if hidden.is_some_and(|hidden| hidden.contains(&node.id())) {
+        return;
+    }
     out.push((node, depth));
     if collapsed.contains(&node.id()) {
         return;
     }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_visible(child, depth + 1, collapsed, out);
+        walk_visible(child, depth + 1, collapsed, hidden, out);
     }
 }
 
@@ -683,6 +708,44 @@ fn status_after(node: Node, caches: &Caches) -> NodeStatus {
         };
     }
     NodeStatus::Unmarked
+}
+
+/// Node IDs whose entire subtree -- the node itself and every descendant -- has `NodeStatus`
+/// other than `Unmarked`: nothing left in it to review. Used by the `H` (hide solved) toggle to
+/// prune those subtrees from the flattened view (via `flatten_visible`'s `hidden` set) while any
+/// node that's still `Unmarked` stays visible, along with its full ancestor chain (an ancestor of
+/// an `Unmarked` node can never itself be fully solved, so it's never included here).
+fn fully_solved_nodes(
+    root: Node,
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) -> std::collections::HashSet<usize> {
+    let mut solved = std::collections::HashSet::new();
+    mark_fully_solved(root, caches, status_fn, &mut solved);
+    solved
+}
+
+/// Post-order: returns whether `node`'s own subtree is fully solved, recording it in `solved` if
+/// so. A node counts as solved only if it is itself marked *and* every child is fully solved.
+fn mark_fully_solved(
+    node: Node,
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+    solved: &mut std::collections::HashSet<usize>,
+) -> bool {
+    let mut cursor = node.walk();
+    let mut all_children_solved = true;
+    for child in node.children(&mut cursor) {
+        if !mark_fully_solved(child, caches, status_fn, solved) {
+            all_children_solved = false;
+        }
+    }
+
+    let is_solved = all_children_solved && status_fn(node, caches) != NodeStatus::Unmarked;
+    if is_solved {
+        solved.insert(node.id());
+    }
+    is_solved
 }
 
 /// codediff's own per-node verdict, computed from an `ASTDiff` (via `p`) the same way `NodeStatus`
@@ -906,7 +969,7 @@ fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: N
         Focus::After => &mut app.before,
     };
 
-    let was_visible = flatten_visible(other_root, &other.collapsed)
+    let was_visible = flatten_visible(other_root, &other.collapsed, None)
         .iter()
         .position(|(n, _)| n.id() == target_id)
         .is_some_and(|idx| idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1));
@@ -917,7 +980,7 @@ fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: N
     other.cursor_id = target_id;
 
     if !was_visible {
-        let flat = flatten_visible(other_root, &other.collapsed);
+        let flat = flatten_visible(other_root, &other.collapsed, None);
         let idx = flat.iter().position(|(n, _)| n.id() == target_id).unwrap_or(0);
         let height = other.viewport_height.max(1);
         let max_scroll = flat.len().saturating_sub(height);
@@ -1707,7 +1770,7 @@ fn draw_ui(
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -1974,9 +2037,18 @@ fn run_event_loop(
         let before_src = before.contents.as_bytes();
         let after_src = after.contents.as_bytes();
 
-        let before_flat = flatten_visible(before_root, &app.before.collapsed);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed);
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+
+        // Recomputed fresh every frame from the current mapping (cheap: one pass per side over
+        // the whole tree, same cost class as `rebuild_caches` itself), so `H` can't show a
+        // subtree as hidden after it's actually been un-marked, or vice versa.
+        let before_hidden =
+            app.hide_solved.then(|| fully_solved_nodes(before_root, &caches, status_before));
+        let after_hidden =
+            app.hide_solved.then(|| fully_solved_nodes(after_root, &caches, status_after));
+
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
 
         // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
         // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
@@ -2324,6 +2396,15 @@ fn handle_key(
                 Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
                 Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
             }
+            None
+        }
+        KeyCode::Char('H') => {
+            app.hide_solved = !app.hide_solved;
+            app.status = Some(if app.hide_solved {
+                "Hiding fully solved subtrees".to_string()
+            } else {
+                "Showing all nodes".to_string()
+            });
             None
         }
         KeyCode::Char('s') => match &app.origin {
@@ -3002,6 +3083,141 @@ mod tests {
         assert!(text.contains("switch focus between"), "first entry missing from render: {text}");
         assert!(text.contains("toggle this help"), "help entry missing from render: {text}");
         assert!(text.contains("quit"), "last entry missing from render: {text}");
+    }
+
+    /// Parses a tiny Rust snippet for the `fully_solved_nodes`/`flatten_visible` tests below,
+    /// decoupled from any real fixture on disk.
+    fn parse_rust(source: &str) -> tree_sitter::Tree {
+        let language = codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&language).unwrap();
+        parser.parse(source, None).unwrap()
+    }
+
+    fn find_first<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        node.children(&mut cursor).find_map(|child| find_first(child, kind))
+    }
+
+    /// The function body's two top-level statements, `a();` and `b();`.
+    fn two_statements(root: Node) -> (Node, Node) {
+        let block = find_first(root, "block").unwrap();
+        let mut cursor = block.walk();
+        let statements: Vec<Node> = block
+            .children(&mut cursor)
+            .filter(|n| n.kind() == "expression_statement")
+            .collect();
+        assert_eq!(statements.len(), 2);
+        (statements[0], statements[1])
+    }
+
+    fn mark_subtree_matched(node: Node, caches: &mut Caches) {
+        caches.before_match.insert(node.id(), usize::MAX);
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            mark_subtree_matched(child, caches);
+        }
+    }
+
+    #[test]
+    fn fully_solved_nodes_hides_fully_marked_subtree_but_keeps_unmarked_ancestors() {
+        let tree = parse_rust("fn main() {\n    a();\n    b();\n}\n");
+        let root = tree.root_node();
+        let (stmt_a, stmt_b) = two_statements(root);
+        let block = find_first(root, "block").unwrap();
+
+        let mut caches = Caches::default();
+        // `a();` and everything under it is matched: fully solved.
+        mark_subtree_matched(stmt_a, &mut caches);
+        // `b();` itself is matched, but its `call_expression` child is left Unmarked, so the
+        // statement as a whole is not fully solved.
+        caches.before_match.insert(stmt_b.id(), usize::MAX);
+
+        let solved = fully_solved_nodes(root, &caches, status_before);
+
+        assert!(solved.contains(&stmt_a.id()), "fully marked subtree should be solved");
+        assert!(!solved.contains(&stmt_b.id()), "partially marked subtree should not be solved");
+        assert!(!solved.contains(&block.id()), "block has an unsolved descendant, so isn't solved");
+        assert!(!solved.contains(&root.id()), "root has an unsolved descendant, so isn't solved");
+    }
+
+    #[test]
+    fn flatten_visible_skips_hidden_subtree_entirely_but_keeps_siblings() {
+        let tree = parse_rust("fn main() {\n    a();\n    b();\n}\n");
+        let root = tree.root_node();
+        let (stmt_a, stmt_b) = two_statements(root);
+
+        let mut hidden = std::collections::HashSet::new();
+        hidden.insert(stmt_a.id());
+
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), Some(&hidden));
+
+        assert!(
+            !flat.iter().any(|(n, _)| n.id() == stmt_a.id()),
+            "hidden node itself should not appear"
+        );
+        assert!(
+            flat.iter().any(|(n, _)| n.id() == stmt_b.id()),
+            "sibling of a hidden node should still appear"
+        );
+        // The root is always an ancestor of the still-visible sibling, so it must survive too.
+        assert!(flat.iter().any(|(n, _)| n.id() == root.id()));
+    }
+
+    /// The synthetic-Caches tests above prove `fully_solved_nodes` is correct *given* every node
+    /// in a subtree (including unnamed tokens like `;`, `{`, `}`) has an entry. They don't prove
+    /// the real marking path actually produces that. `M` (`auto_match_pair`) is the tool the docs
+    /// point people at for matching a whole subtree at once, specifically so `H` has something to
+    /// hide -- this drives it for real, on a real (unchanged) pair, and checks the result through
+    /// the same `rebuild_caches` -> `fully_solved_nodes` pipeline the running app uses.
+    #[test]
+    fn fully_solved_nodes_hides_a_subtree_matched_for_real_via_m() {
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let (before_stmt_a, _) = two_statements(before_root);
+        let (after_stmt_a, _) = two_statements(after_root);
+        let (_, before_stmt_b) = two_statements(before_root);
+
+        let mut mapping = HumanMapping::default();
+        let mut matched = 0usize;
+        let mut skipped = 0usize;
+        let mut before_collapsed = std::collections::HashSet::new();
+        let mut after_collapsed = std::collections::HashSet::new();
+
+        auto_match_pair(
+            &mut mapping,
+            before_root,
+            after_root,
+            &Caches::default(),
+            before_stmt_a,
+            after_stmt_a,
+            source.as_bytes(),
+            source.as_bytes(),
+            &mut matched,
+            &mut skipped,
+            &mut before_collapsed,
+            &mut after_collapsed,
+        );
+
+        let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+        assert_eq!(caches.unresolved, 0, "every entry M produced should resolve: {:?}", mapping.entries);
+
+        let solved = fully_solved_nodes(before_root, &caches, status_before);
+        assert!(
+            solved.contains(&before_stmt_a.id()),
+            "M should mark every child (including unnamed tokens), fully solving the subtree: {:?}",
+            mapping.entries
+        );
+        assert!(
+            !solved.contains(&before_stmt_b.id()),
+            "b(); was never matched, so it must not be treated as solved"
+        );
     }
 
     fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {

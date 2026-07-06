@@ -16,6 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #[cfg(test)]
+mod c_ffmpeg_added_typedef_to_enum;
+#[cfg(test)]
 mod cpp_add_const_correctness;
 #[cfg(test)]
 mod cpp_add_memory_management;
