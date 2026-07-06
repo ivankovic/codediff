@@ -34,6 +34,8 @@ mod cpp_fix_segfault;
 #[cfg(test)]
 mod cpp_optimize_algorithm;
 #[cfg(test)]
+mod java_add_exception_handling;
+#[cfg(test)]
 mod java_add_interface;
 #[cfg(test)]
 mod java_add_logging;
