@@ -18,6 +18,12 @@
 #[cfg(test)]
 mod c_ffmpeg_added_typedef_to_enum;
 #[cfg(test)]
+mod c_freeciv_add_parameter_to_function;
+#[cfg(test)]
+mod c_htop_remove_function_declaration;
+#[cfg(test)]
+mod c_microsoft_terminal_add_function;
+#[cfg(test)]
 mod cpp_add_const_correctness;
 #[cfg(test)]
 mod cpp_add_memory_management;
