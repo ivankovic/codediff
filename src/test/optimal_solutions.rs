@@ -60,11 +60,17 @@ mod kotlin_add_validation;
 #[cfg(test)]
 mod kotlin_fix_loop_bug;
 #[cfg(test)]
+mod kotlin_refactor_function;
+#[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
 mod python_added_if_block;
 #[cfg(test)]
 mod python_added_if_block_small;
+#[cfg(test)]
+mod python_api_change;
+#[cfg(test)]
+mod python_bugfix_loop;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
@@ -75,6 +81,8 @@ mod rust_add_to_existing_use;
 mod rust_add_value_to_enum;
 #[cfg(test)]
 mod rust_algorithm_change;
+#[cfg(test)]
+mod rust_cost_optimization;
 #[cfg(test)]
 mod rust_hash_optimization;
 #[cfg(test)]
@@ -87,3 +95,9 @@ mod rust_leetcode_1_bugfix;
 mod rust_no_change;
 #[cfg(test)]
 mod rust_turbopack_module_rule;
+#[cfg(test)]
+mod rust_zed_git_panel_settings;
+#[cfg(test)]
+mod typescript_add_error_handling;
+#[cfg(test)]
+mod typescript_add_generics;
