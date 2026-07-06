@@ -1795,21 +1795,6 @@
       ]
     },
     {
-      "operation": "delete",
-      "before_path": [
-        "function_declaration:3",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "value_arguments:1",
-        "value_argument:1",
-        "string_literal:1",
-        "interpolation:1",
-        "call_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
       "operation": "insert",
       "after_path": [
         "function_declaration:1",
@@ -1822,22 +1807,6 @@
         "interpolation:1",
         "call_expression:1",
         "navigation_expression:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "value_arguments:1",
-        "value_argument:1",
-        "string_literal:1",
-        "interpolation:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "identifier:1"
       ]
     },
     {
@@ -2655,6 +2624,34 @@
         "function_body:1",
         "block:1",
         "}:1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "function_declaration:3",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "value_arguments:1",
+        "value_argument:1",
+        "string_literal:1",
+        "interpolation:1",
+        "call_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "value_arguments:1",
+        "value_argument:1",
+        "string_literal:1",
+        "interpolation:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        "identifier:1"
       ]
     }
   ]

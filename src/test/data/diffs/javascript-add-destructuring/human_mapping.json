@@ -724,17 +724,6 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "lexical_declaration:4",
-        ";:1"
-      ],
-      "after_path": [
-        "lexical_declaration:2",
-        ";:1"
-      ]
-    },
-    {
       "operation": "delete",
       "before_path": [
         "lexical_declaration:2",

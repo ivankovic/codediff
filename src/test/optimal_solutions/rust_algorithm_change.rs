@@ -21,5 +21,16 @@ use crate::test;
 
 #[test]
 fn matches_human_solution() -> Result<()> {
+    // In this test, we have several subjective quality decisions:
+    //
+    // 1. The theorethical lowest-cost solution uses some of the call_exprsion, identifier,
+    //    arguments and '(' and ')' from the before side, e.g. from "..nums.len()" and mapps them as
+    //    Update/MatchButNotIdentical/Identical with the "HashSet::new()" call. However, this is
+    //    very low quality matching from a human perspective. It is extremely unlikely a human would
+    //    actually transform "..nums.len()" into HashSet::new(). It is far more likely it would be a
+    //    Delete + Insert.
+    // 2. The "return Some(nums[i])" / "return Some(num)" pair however, is something we want to
+    //    match. While similar logic to 1. applies, showing to the human that the loop in both cases
+    //    contains the logically same return is valuable, so these nodes should match.
     test::helper::human_mapping::assert_matches_human_mapping("rust-algorithm-change")
 }
