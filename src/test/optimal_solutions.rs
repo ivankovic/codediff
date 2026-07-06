@@ -46,7 +46,19 @@ mod javascript_add_array_method;
 #[cfg(test)]
 mod javascript_add_destructuring;
 #[cfg(test)]
+mod javascript_add_event_listener;
+#[cfg(test)]
+mod javascript_fix_promises;
+#[cfg(test)]
+mod javascript_refactor_arrow_func;
+#[cfg(test)]
+mod kotlin_add_data_class;
+#[cfg(test)]
+mod kotlin_add_null_check;
+#[cfg(test)]
 mod kotlin_add_validation;
+#[cfg(test)]
+mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
