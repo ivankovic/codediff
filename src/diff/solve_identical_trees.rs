@@ -16,145 +16,37 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::code::Code;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::hash_tree_matching::{self, HashMatchSpec};
+use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 
 /**
 * Perform size-ordered matching between two AST trees.
 *
-* This function uses the pre-computed reference_nodes_ordered list to efficiently
-* find reference nodes in order of decreasing subtree size. For each reference node,
-* it checks if a node with the same full hash exists in the after tree. If they do, it adds
-* the two nodes to the mapping collection with the IdenticalHash reason, and then recursively
-* adds all their children nodes with the IdenticalHashOfAncestor reason.
+* This pass walks the pre-computed reference_nodes_ordered list (largest subtrees first) and, for
+* each before-side reference node, looks for an unclaimed after-side node with the same *full*
+* hash - byte-for-byte identical subtree content. On a hit it maps the pair with the
+* IdenticalHash reason, then recursively maps all their children with the
+* IdenticalHashOfAncestor reason. Duplicated code (several nodes sharing one full hash) pairs up
+* copy-for-copy, since already-claimed after nodes are skipped.
+*
+* The traversal itself is shared with `solve_structurally_identical_trees` - see
+* `hash_tree_matching::solve`; this file only configures it for full hashes.
 */
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let _before_tree = before.ast.as_ref().expect("Before code must be parsed");
-    let _after_tree = after.ast.as_ref().expect("After code must be parsed");
-
-    // Use existing metadata or compute if not available
-    // Note: We clone to avoid lifetime issues, but in practice metadata is usually already computed
-    let before_metadata =
-        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-        });
-
-    let after_metadata =
-        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-        });
-
-    // Get the pre-computed reference nodes ordered by subtree size (largest first)
-    let reference_nodes_ordered = &before_metadata.reference_nodes_ordered;
-
-    // Iterate over reference nodes in order (largest subtrees first)
-    for &before_node_id in reference_nodes_ordered {
-        // Skip already mapped nodes
-        if diff
-            .mapping
-            .iter()
-            .any(|((before_id, _), _)| *before_id == before_node_id)
-        {
-            continue;
-        }
-
-        // Get the node from the cache
-        let before_node = node_cache.before.get(&before_node_id).cloned();
-        let Some(before_node) = before_node else {
-            continue;
-        };
-
-        // Get the hash for this reference node
-        let Some(before_hash) = before_metadata.node_to_full_hash.get(&before_node_id) else {
-            continue;
-        };
-
-        // Look for a node in the after tree with the same hash
-        if let Some(after_node_ids) = after_metadata.full_hash_to_node.get(before_hash) {
-            // If we have multiple reference nodes with exactly the same full hash, then
-            // there is simply duplicated code in the file, and quite big chunks of it too.
-            // For now, we take the first node and match to that.
-            //
-            // This is more than just an unprincipled choice of *which* duplicate to match: since
-            // `full_hash_to_node`'s value is a `HashSet<usize>` (default, randomized hasher),
-            // *which* node `.next()` returns can differ between separate process runs of this
-            // same binary on the exact same input (though it's consistent across repeated calls
-            // within one run, since this is just reading an unmodified set). Worse, nothing here
-            // removes an after-node from consideration once some before-node has claimed it, so
-            // if `before` also has N>1 nodes sharing this hash, every one of them independently
-            // computes the same `.next()` and they all collapse onto that *one* after-node -
-            // leaving the other (N-1) equally-valid after-side duplicates unmatched by this pass
-            // entirely (see `duplicate_hash_group_collapses_onto_a_single_after_node` below for a
-            // test pinning this specific behavior). A later, less precise pass ends up treating
-            // those leftover duplicates as an insert/delete pair instead of a no-op match.
-            //
-            // TODO: Implement better matching strategy for multiple nodes with same hash
-            if let Some(&after_node_id) = after_node_ids.iter().next() {
-                // Find the actual node with the matching ID - use cache for O(1) lookup
-                let matching_after_node = node_cache.after.get(&after_node_id).cloned();
-                let Some(matching_after_node) = matching_after_node else {
-                    continue;
-                };
-
-                {
-                    let after_node_id = matching_after_node.id();
-
-                    // Add this mapping
-                    diff.add_mapping(
-                        before_node_id,
-                        after_node_id,
-                        ASTMapping {
-                            cost: 0,
-                            operation: ASTMappingOperation::Identical,
-                            reason: ASTMappingReason::IdenticalHash,
-                        },
-                    );
-
-                    // Recursively add all descendants with IdenticalHashOfAncestor reason
-                    let mut stack = vec![(before_node, matching_after_node)];
-
-                    while let Some((before_parent, after_parent)) = stack.pop() {
-                        let mut before_children_cursor = before_parent.walk();
-                        let mut after_children_cursor = after_parent.walk();
-
-                        let before_children: Vec<_> = before_parent
-                            .children(&mut before_children_cursor)
-                            .collect();
-                        let after_children: Vec<_> =
-                            after_parent.children(&mut after_children_cursor).collect();
-
-                        // Match children by position and kind
-                        for (before_child, after_child) in
-                            before_children.into_iter().zip(after_children.into_iter())
-                        {
-                            if before_child.kind() == after_child.kind() {
-                                let before_child_id = before_child.id();
-                                let after_child_id = after_child.id();
-
-                                if !diff
-                                    .mapping
-                                    .iter()
-                                    .any(|((child_id, _), _)| *child_id == before_child_id)
-                                {
-                                    diff.add_mapping(
-                                        before_child_id,
-                                        after_child_id,
-                                        ASTMapping {
-                                            cost: 0,
-                                            operation: ASTMappingOperation::Identical,
-                                            reason: ASTMappingReason::IdenticalHashOfAncestor,
-                                        },
-                                    );
-
-                                    // Add this child to stack to process its children
-                                    stack.push((before_child, after_child));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    hash_tree_matching::solve(
+        before,
+        after,
+        node_cache,
+        diff,
+        &HashMatchSpec {
+            node_to_hash: |meta| &meta.node_to_full_hash,
+            hash_to_nodes: |meta| &meta.full_hash_to_node,
+            // A full-hash match is byte-identical by construction, no text comparison needed.
+            classify: |_, _, _, _| (ASTMappingOperation::Identical, 0),
+            root_reason: ASTMappingReason::IdenticalHash,
+            descendant_reason: ASTMappingReason::IdenticalHashOfAncestor,
+        },
+    );
 }
 
 #[cfg(test)]
@@ -181,18 +73,16 @@ mod tests {
     }
 
     /// When the same statement appears more than once in a file, every copy hashes identically.
-    /// `solve` doesn't track which after-side candidates an earlier before-node in the same hash
-    /// group has already claimed, so every before-node in the group independently picks
-    /// `after_node_ids.iter().next()` - which, for an *unmodified* `HashSet` queried repeatedly
-    /// within one process, returns the same element every time. The result: every duplicate
-    /// before-node maps to the *same* after-node, and the other, equally-valid after-candidates
-    /// are never matched by this pass at all.
+    /// `solve` skips after-side candidates that an earlier before-node has already claimed, so
+    /// each duplicate before-node gets its *own* after-node: the copies pair up one-to-one
+    /// instead of all collapsing onto a single target (which is what this pass used to do, and
+    /// what left the remaining copies to be mis-reported as insert/delete pairs by later passes).
     ///
-    /// This test pins that *structural* outcome (they collapse onto one target) rather than
-    /// *which* node wins, since which one wins depends on `HashSet`'s randomized iteration order
-    /// and can differ between process runs of the same binary on the same input.
+    /// Which copy pairs with which is deliberately not asserted: all candidates are equivalent
+    /// under the full hash, and `HashSet` iteration order makes the specific assignment vary
+    /// between process runs.
     #[test]
-    fn duplicate_hash_group_collapses_onto_a_single_after_node() {
+    fn duplicate_hash_group_matches_each_copy_to_a_distinct_after_node() {
         // `solve_identical_trees` only ever considers "reference nodes" (`reference_nodes.rs`;
         // for Rust: function/struct/impl items, not arbitrary statements), so the duplicated
         // node here has to be a whole `function_item`. `after` repeats the same two duplicated
@@ -260,10 +150,8 @@ mod tests {
 
         assert_eq!(
             after_targets.iter().collect::<HashSet<_>>().len(),
-            1,
-            "all duplicate before-nodes currently collapse onto the same after-node - if this \
-             starts failing, the matching strategy improved and this test (and the comment on \
-             `after_node_ids.iter().next()` above) should be updated together"
+            after_targets.len(),
+            "each duplicate before-node must claim its own after-node"
         );
     }
 }

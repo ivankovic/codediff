@@ -60,7 +60,7 @@ pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
 }
 
 /**
-* Compute all metadata fileds, that can be computed without reading any new information.
+* Compute all metadata fields, that can be computed without reading any new information.
 */
 pub fn hermetic_expand(m: &mut Metadata) {
     if m.tip.is_none()
@@ -92,6 +92,23 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     discover_reference_nodes(code, &mut metadata)?;
     discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
+}
+
+/**
+* Borrow `code`'s AST metadata if it has already been computed, computing a fresh (owned) copy
+* only when it hasn't.
+*
+* Every diff pass needs both sides' metadata; before this helper each pass deep-cloned the whole
+* `ASTMetadata` (several whole-tree HashMaps) per side just to sidestep borrow bookkeeping. In the
+* normal pipeline the metadata is always already present, so this is a plain borrow and costs
+* nothing. A `Code` that failed to parse yields the default (empty) metadata, matching the
+* fail-safe convention documented on `Diff`.
+*/
+pub fn metadata_of(code: &Code) -> std::borrow::Cow<'_, ASTMetadata> {
+    match &code.metadata.ast_metadata {
+        Some(metadata) => std::borrow::Cow::Borrowed(metadata),
+        None => std::borrow::Cow::Owned(compute_ast_metadata(code).unwrap_or_default()),
+    }
 }
 
 fn compute_subtree_sizes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {

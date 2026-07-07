@@ -2288,18 +2288,8 @@ pub fn for_roots(
     diff: &mut ASTDiff,
 ) -> Result<()> {
     // Compute metadata once at the top level
-    let before_metadata = before
-        .metadata
-        .ast_metadata
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
-    let after_metadata = after
-        .metadata
-        .ast_metadata
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
     let after_root_id = after.ast.as_ref().unwrap().root_node().id();

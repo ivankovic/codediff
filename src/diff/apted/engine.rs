@@ -573,10 +573,12 @@ pub(crate) fn spf_a(
     let mut fta = vec![-1i64; max_size as usize + 1];
     let mut q = vec![0i64; max_size as usize + 1];
     // Incrementally summed forest size/cost - F is `path_idx`'s side, G is `other_idx`'s.
+    // The G-side pair is (re)computed from scratch inside the loops before every read, so it
+    // gets no initial value.
     let mut current_forest_size1: i64 = 0;
-    let mut current_forest_size2: i64 = 0;
+    let mut current_forest_size2: i64;
     let mut current_forest_cost1: i64 = 0;
-    let mut current_forest_cost2: i64 = 0;
+    let mut current_forest_cost2: i64;
 
     let mut start_path_node: i64 = -1;
     let mut end_path_node = path_id as i64;
@@ -590,7 +592,7 @@ pub(crate) fn spf_a(
         it1_pre_l_off = end_path_node;
         it1_pre_r_off = path_idx.pre_to_pre_r[end_path_node as usize] as i64;
         let mut r_f_last: i64 = -1;
-        let mut l_f_last: i64 = -1;
+        let mut l_f_last: i64;
         let end_path_node_in_pre_r = path_idx.pre_to_pre_r[end_path_node as usize] as i64;
         let start_path_node_in_pre_r = if start_path_node == -1 {
             i64::MAX / 4
@@ -695,7 +697,7 @@ pub(crate) fn spf_a(
                     let swrite_row = l_f - it1_pre_l_off;
                     let mut sp1source = 1u8;
                     let mut sp3source = 1u8;
-                    let mut sp3 = 0i64;
+                    let mut sp3: i64;
                     if f_forest_is_tree {
                         if l_f_subtree_size == 1 {
                             sp1source = 3;

@@ -235,7 +235,7 @@ pub struct ASTMetadata {
     pub node_to_full_hash: HashMap<usize, u64>,
     /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node id>.
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration called "i" will hash to the same hash. Therefor, the map is actually going from
+    /// declaration called "i" will hash to the same hash. Therefore, the map is actually going from
     /// a hash to a set of nodes.
     pub full_hash_to_node: HashMap<u64, HashSet<usize>>,
     /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
@@ -244,7 +244,7 @@ pub struct ASTMetadata {
     pub node_to_structural_hash: HashMap<usize, u64>,
     /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node id>
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration will hash to the same structural hash. Therefor, the map value is a set.
+    /// declaration will hash to the same structural hash. Therefore, the map value is a set.
     pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: HashMap<usize, usize>,
@@ -263,7 +263,7 @@ pub struct ASTMetadata {
 /**
 * The programming language.
 *
-* Implemented as a crate enum instead of reusing someting like TreeSitter language to allow for
+* Implemented as a crate enum instead of reusing something like TreeSitter language to allow for
 * better error handling of unknown or not-supported languages.
 */
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

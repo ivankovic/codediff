@@ -19,13 +19,14 @@ use anyhow::Result;
 use clap::Parser;
 use git2::{Delta, DiffDelta, DiffFindOptions, Oid, Repository, Sort};
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use std::collections::HashMap;
-use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::stats::filesystem::find_git_repositories;
+use codediff::stats::sampling::Reservoir;
 use codediff::metadata;
 
 // Files outside this range are excluded: near-empty files make trivial benchmark cases, and
@@ -95,48 +96,6 @@ struct Candidate {
     old_path: String,
 }
 
-/// Reservoir sampling (Algorithm R): picks a uniform random sample of `capacity` items from a
-/// stream of unknown length in a single pass, without holding the whole stream in memory.
-#[derive(Default)]
-struct Reservoir {
-    items: Vec<Candidate>,
-    seen: u64,
-}
-
-impl Reservoir {
-    fn offer(&mut self, candidate: Candidate, capacity: usize, rng: &mut impl Rng) {
-        self.seen += 1;
-        if self.items.len() < capacity {
-            self.items.push(candidate);
-        } else {
-            let j = rng.gen_range(0..self.seen) as usize;
-            if j < capacity {
-                self.items[j] = candidate;
-            }
-        }
-    }
-}
-
-/// Find all git repositories in top-level subdirectories of the given path, or the path itself
-/// if it is already a repository. Sorted for reproducible traversal order across runs.
-fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
-    let mut repo_paths = Vec::new();
-
-    if base_path.join(".git").exists() {
-        repo_paths.push(base_path.to_path_buf());
-    } else if base_path.is_dir() {
-        for entry in fs::read_dir(base_path)? {
-            let path = entry?.path();
-            if path.is_dir() && path.join(".git").exists() {
-                repo_paths.push(path);
-            }
-        }
-    }
-
-    repo_paths.sort();
-    Ok(repo_paths)
-}
-
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -152,7 +111,7 @@ fn main() -> Result<()> {
     let bucket_capacity = (args.count / SIZE_BUCKETS.len()).max(1);
 
     let mut rng = StdRng::seed_from_u64(args.seed);
-    let mut reservoirs: HashMap<(String, &'static str), Reservoir> = HashMap::new();
+    let mut reservoirs: HashMap<(String, &'static str), Reservoir<Candidate>> = HashMap::new();
 
     for repo_path in &repo_paths {
         let repository_name = repo_path
@@ -201,7 +160,7 @@ fn sample_repository(
     bucket_capacity: usize,
     language_filter: Option<&str>,
     max_commits: usize,
-    reservoirs: &mut HashMap<(String, &'static str), Reservoir>,
+    reservoirs: &mut HashMap<(String, &'static str), Reservoir<Candidate>>,
     rng: &mut StdRng,
 ) -> Result<()> {
     let repo = Repository::open(repo_path)?;
@@ -309,7 +268,7 @@ fn text_pair_size(repo: &Repository, delta: &DiffDelta) -> Option<usize> {
     Some(before_len.max(after_len))
 }
 
-fn write_csv(path: &Path, reservoirs: &HashMap<(String, &'static str), Reservoir>) -> Result<()> {
+fn write_csv(path: &Path, reservoirs: &HashMap<(String, &'static str), Reservoir<Candidate>>) -> Result<()> {
     let mut writer = csv::Writer::from_path(path)?;
     writer.write_record([
         "language",
@@ -355,7 +314,7 @@ mod tests {
     fn samples_real_pairs_from_handmade_repository() -> Result<()> {
         let repo_path = helper::handmade_git_repository()?;
         let mut rng = StdRng::seed_from_u64(1);
-        let mut reservoirs: HashMap<(String, &'static str), Reservoir> = HashMap::new();
+        let mut reservoirs: HashMap<(String, &'static str), Reservoir<Candidate>> = HashMap::new();
 
         sample_repository(
             &repo_path,
@@ -379,28 +338,6 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[test]
-    fn reservoir_never_exceeds_capacity() {
-        let mut rng = StdRng::seed_from_u64(7);
-        let mut reservoir = Reservoir::default();
-
-        for i in 0..100 {
-            reservoir.offer(
-                Candidate {
-                    repository: "r".to_string(),
-                    commit: i.to_string(),
-                    path: "p".to_string(),
-                    old_path: "p".to_string(),
-                },
-                10,
-                &mut rng,
-            );
-        }
-
-        assert_eq!(reservoir.items.len(), 10);
-        assert_eq!(reservoir.seen, 100);
     }
 
     #[test]

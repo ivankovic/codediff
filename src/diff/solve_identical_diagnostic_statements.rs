@@ -59,12 +59,8 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 * one.
 */
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-        crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-    });
-    let after_metadata = after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-        crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-    });
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     let Some(before_ast) = before.ast.as_ref() else { return };
     let Some(after_ast) = after.ast.as_ref() else { return };
@@ -320,9 +316,9 @@ fn b() {
     #[test]
     fn duplicate_identical_diagnostic_calls_are_matched_one_to_one() {
         // Two identical `bail!` calls on each side: each before-node should claim a distinct
-        // after-node, not both collapse onto the same one (contrast with the pre-existing
-        // `solve_identical_trees::duplicate_hash_group_collapses_onto_a_single_after_node` quirk -
-        // this pass indexes after-candidates in a `VecDeque` per hash specifically to avoid that).
+        // after-node, not both collapse onto the same one (`solve_identical_trees` used to have
+        // exactly that collapse quirk, since fixed - this pass indexes after-candidates in a
+        // `VecDeque` per hash to guarantee one-to-one pairing).
         let before_src = r#"
 fn a() {
     if true { bail!("dup"); }

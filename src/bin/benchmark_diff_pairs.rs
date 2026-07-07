@@ -166,11 +166,7 @@ fn open_repo<'a>(
 
 fn blob_content(repo: &Repository, treeish: &str, path: &str) -> Result<Vec<u8>> {
     let tree = repo.revparse_single(treeish)?.peel_to_tree()?;
-    let blob = tree
-        .get_path(Path::new(path))?
-        .to_object(repo)?
-        .peel_to_blob()?;
-    Ok(blob.content().to_vec())
+    codediff::stats::git::blob_bytes(repo, &tree, Path::new(path))
 }
 
 fn measure_pair(

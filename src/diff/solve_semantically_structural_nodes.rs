@@ -111,14 +111,8 @@ fn pre_match_by_path(
 * the unmatched residual (impl header + unmatched methods).
 */
 pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata =
-        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-        });
-    let after_metadata =
-        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-        });
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     let language = before.metadata.language.as_ref();
 
@@ -254,14 +248,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 * that heuristic gets clobbered here.
 */
 pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata =
-        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-        });
-    let after_metadata =
-        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-        });
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
         if diff.before_node_map.contains_key(&before_node_id) {

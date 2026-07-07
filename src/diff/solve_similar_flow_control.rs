@@ -53,12 +53,8 @@ use crate::diff::{ASTDiff, NodeCache};
 const SIMILARITY_THRESHOLD: f64 = 0.75;
 
 pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-        crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-    });
-    let after_metadata = after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-        crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-    });
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     let Some(before_ast) = before.ast.as_ref() else { return };
     let Some(after_ast) = after.ast.as_ref() else { return };

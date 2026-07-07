@@ -167,10 +167,9 @@ fn find_repo_path(roots: &[PathBuf], repository: &str) -> Option<PathBuf> {
 }
 
 fn blob_text(repo: &Repository, tree: &Tree, path: &Path) -> Result<String> {
-    let entry = tree.get_path(path)?;
-    let blob = repo.find_blob(entry.id())?;
-    let content = std::str::from_utf8(blob.content())?;
-    Ok(content.to_string())
+    Ok(String::from_utf8(codediff::stats::git::blob_bytes(
+        repo, tree, path,
+    )?)?)
 }
 
 /// Directory name: `<language>-x-<repository>-<commit>-<filename>`, all lowercase, with the

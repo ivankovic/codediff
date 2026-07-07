@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod apted;
+pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
@@ -60,66 +61,39 @@ impl NodeCache {
     /// See the safety invariant documented on `NodeCache` above: the returned cache borrows from
     /// `before`/`after`'s ASTs under an erased `'static` lifetime and must not outlive them.
     pub fn build(before: &Code, after: &Code) -> Self {
-        let before_cache = before
-            .ast
-            .as_ref()
-            .map(|ast| {
-                let root_node = ast.root_node();
-                let mut cache = HashMap::new();
-                let mut stack = vec![root_node];
-
-                while let Some(node) = stack.pop() {
-                    // SAFETY: see the safety invariant documented on `NodeCache` - this cache
-                    // (and therefore this erased lifetime) must not outlive `before`.
-                    cache.insert(node.id(), unsafe {
-                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
-                            node,
-                        )
-                    });
-
-                    // Add children to stack for traversal
-                    let mut cursor = node.walk();
-                    for child in node.children(&mut cursor) {
-                        stack.push(child);
-                    }
-                }
-
-                cache
-            })
-            .unwrap_or_default();
-
-        let after_cache = after
-            .ast
-            .as_ref()
-            .map(|ast| {
-                let root_node = ast.root_node();
-                let mut cache = HashMap::new();
-                let mut stack = vec![root_node];
-
-                while let Some(node) = stack.pop() {
-                    // SAFETY: see the safety invariant documented on `NodeCache` - this cache
-                    // (and therefore this erased lifetime) must not outlive `after`.
-                    cache.insert(node.id(), unsafe {
-                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
-                            node,
-                        )
-                    });
-
-                    // Add children to stack for traversal
-                    let mut cursor = node.walk();
-                    for child in node.children(&mut cursor) {
-                        stack.push(child);
-                    }
-                }
-
-                cache
-            })
-            .unwrap_or_default();
-
         NodeCache {
-            before: before_cache,
-            after: after_cache,
+            before: Self::cache_for(before),
+            after: Self::cache_for(after),
         }
+    }
+
+    /// Every node of `code`'s AST, keyed by node ID, under the erased `'static` lifetime
+    /// described on `NodeCache`. Empty if `code` has no AST.
+    fn cache_for(code: &Code) -> HashMap<usize, tree_sitter::Node<'static>> {
+        code.ast
+            .as_ref()
+            .map(|ast| {
+                let mut cache = HashMap::new();
+                let mut stack = vec![ast.root_node()];
+
+                while let Some(node) = stack.pop() {
+                    // SAFETY: see the safety invariant documented on `NodeCache` - this cache
+                    // (and therefore this erased lifetime) must not outlive `code`.
+                    cache.insert(node.id(), unsafe {
+                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
+                            node,
+                        )
+                    });
+
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        stack.push(child);
+                    }
+                }
+
+                cache
+            })
+            .unwrap_or_default()
     }
 
     pub fn get_in_any(&self, node_id: &usize) -> Option<&Node<'_>> {
@@ -433,24 +407,24 @@ pub enum ASTMappingOperation {
     DoNothing,
     /// No operation is needed. The match is perfect.
     Identical,
-    /// The node and it's entire subtree is moved to a different parent node.
+    /// The node and its entire subtree is moved to a different parent node.
     Move,
     /// The node's value is updated.
     Update,
     /// The node is inserted between a parent node and a consecutive subsequence of the parent
     /// node's children. Note that the subsequence can be empty.
     Insert,
-    /// The node and all it's children are inserted. This is a special operation that makes the
+    /// The node and all its children are inserted. This is a special operation that makes the
     /// algorithm more efficient but also uglier to implement. It results in much shorter edit
     /// scripts and shallower recursion depth, but it changes the domain of operations from "one
     /// node" to "subtrees".
     InsertWithChildren,
-    /// The node is deleted and it's children, if any, are connected to it's parent node. If the
-    /// root node is deleted, in theory the children form a forrest of trees instead. This only
-    /// happens theorethically during some algorithm computations, since a diff script that deletes
+    /// The node is deleted and its children, if any, are connected to its parent node. If the
+    /// root node is deleted, in theory the children form a forest of trees instead. This only
+    /// happens theoretically during some algorithm computations, since a diff script that deletes
     /// the root node would be guaranteed to create invalid code, unless the code is already empty.
     Delete,
-    /// The node and all it's children are deleted. Same as InsertWithChildren, this is a more
+    /// The node and all its children are deleted. Same as InsertWithChildren, this is a more
     /// complex operation that results in more efficient code.
     DeleteWithChildren,
     /// The node maps to a different node, but not all of their children are identical.
@@ -464,7 +438,7 @@ pub enum ASTMappingOperation {
 pub enum ASTMappingReason {
     #[default]
     /// The hash of the nodes and their subtrees is identical and so they were matched. Note that
-    /// typically leaf nodes will never get this mapping reason, since maping common nodes, e.g.
+    /// typically leaf nodes will never get this mapping reason, since mapping common nodes, e.g.
     /// ";" to random other ";" in the code is extremely confusing and unnatural to humans.
     IdenticalHash,
     /// This node is part of a subtree that got matched when a parent or another ancestor node was
@@ -784,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn hello_world_translations_in_all_langauges() -> Result<()> {
+    fn hello_world_translations_in_all_languages() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
 
         for (filename, before) in &test_codes {

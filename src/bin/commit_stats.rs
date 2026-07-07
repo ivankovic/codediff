@@ -42,35 +42,6 @@ struct Args {
     queue_capacity: usize,
 }
 
-/// Find all git repositories in top-level subdirectories of the given path
-fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
-    let mut repo_paths = Vec::new();
-
-    println!("Looking for repositories...");
-
-    // Check if the base path itself is a git repository
-    if base_path.join(".git").exists() {
-        // If it's a git repo, don't scan for more repos
-        repo_paths.push(base_path.to_path_buf());
-    } else if base_path.is_dir() {
-        // If it's a normal directory, look for git repos in subdirectories
-        for entry in std::fs::read_dir(base_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                let git_dir = path.join(".git");
-                if git_dir.exists() {
-                    repo_paths.push(path);
-                }
-            }
-        }
-    }
-
-    println!("Found {} repositories.", repo_paths.len());
-
-    Ok(repo_paths)
-}
-
 /// Process multiple repositories in parallel using async
 async fn process_repositories_parallel(
     repo_paths: &[PathBuf],
@@ -166,7 +137,7 @@ async fn main() -> Result<()> {
     let queue_capacity = args.queue_capacity;
 
     // Find all git repositories in subfolders
-    let repo_paths = find_git_repositories(base_path)?;
+    let repo_paths = codediff::stats::filesystem::find_git_repositories(base_path)?;
 
     if repo_paths.is_empty() {
         eprintln!("No git repositories found in: {:?}", base_path);

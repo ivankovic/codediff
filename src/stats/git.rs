@@ -1,0 +1,28 @@
+/*  This file is part of the CodeDiff code diffing tool.
+ *
+ *  Copyright (C) 2026 Marko Ivankovic
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+use std::path::Path;
+
+use anyhow::Result;
+use git2::{Repository, Tree};
+
+/// The raw content of the blob at `path` inside `tree`.
+pub fn blob_bytes(repo: &Repository, tree: &Tree, path: &Path) -> Result<Vec<u8>> {
+    let entry = tree.get_path(path)?;
+    let blob = repo.find_blob(entry.id())?;
+    Ok(blob.content().to_vec())
+}

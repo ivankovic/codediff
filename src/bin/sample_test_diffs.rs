@@ -24,13 +24,15 @@ use anyhow::Result;
 use clap::Parser;
 use git2::{Delta, Repository, Sort};
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::stats::filesystem::find_git_repositories;
+use codediff::stats::sampling::Reservoir;
 use codediff::metadata;
 
 // Files outside this range are excluded: near-empty files make trivial test fixtures, and
@@ -102,48 +104,6 @@ fn default_output_path() -> PathBuf {
         .join("sample.csv")
 }
 
-/// Reservoir sampling (Algorithm R): picks a uniform random sample of `capacity` items from a
-/// stream of unknown length in a single pass, without holding the whole stream in memory.
-#[derive(Default)]
-struct Reservoir {
-    items: Vec<Row>,
-    seen: u64,
-}
-
-impl Reservoir {
-    fn offer(&mut self, row: Row, capacity: usize, rng: &mut impl Rng) {
-        self.seen += 1;
-        if self.items.len() < capacity {
-            self.items.push(row);
-        } else {
-            let j = rng.gen_range(0..self.seen) as usize;
-            if j < capacity {
-                self.items[j] = row;
-            }
-        }
-    }
-}
-
-/// Find all git repositories in top-level subdirectories of the given path, or the path itself
-/// if it is already a repository. Sorted for reproducible traversal order across runs.
-fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
-    let mut repo_paths = Vec::new();
-
-    if base_path.join(".git").exists() {
-        repo_paths.push(base_path.to_path_buf());
-    } else if base_path.is_dir() {
-        for entry in fs::read_dir(base_path)? {
-            let path = entry?.path();
-            if path.is_dir() && path.join(".git").exists() {
-                repo_paths.push(path);
-            }
-        }
-    }
-
-    repo_paths.sort();
-    Ok(repo_paths)
-}
-
 fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
     if !path.exists() {
         return Ok(Vec::new());
@@ -188,7 +148,7 @@ fn main() -> Result<()> {
         None => StdRng::from_entropy(),
     };
 
-    let mut reservoirs: HashMap<String, Reservoir> = HashMap::new();
+    let mut reservoirs: HashMap<String, Reservoir<Row>> = HashMap::new();
     let mut capacities: HashMap<String, usize> = HashMap::new();
 
     for repo_path in &repo_paths {
@@ -236,7 +196,7 @@ fn sample_repository(
     target_count: usize,
     existing_counts: &HashMap<String, usize>,
     existing_keys: &HashSet<SampleKey>,
-    reservoirs: &mut HashMap<String, Reservoir>,
+    reservoirs: &mut HashMap<String, Reservoir<Row>>,
     capacities: &mut HashMap<String, usize>,
     rng: &mut StdRng,
 ) -> Result<()> {
@@ -349,7 +309,7 @@ fn text_pair_in_range(repo: &Repository, before_id: git2::Oid, after_id: git2::O
 fn write_csv(
     path: &Path,
     existing_rows: Vec<Row>,
-    reservoirs: HashMap<String, Reservoir>,
+    reservoirs: HashMap<String, Reservoir<Row>>,
 ) -> Result<()> {
     let mut rows = existing_rows;
     for (_, reservoir) in reservoirs {
@@ -400,7 +360,7 @@ mod tests {
             existing_keys.insert((row.repository.clone(), row.commit.clone(), row.path.clone()));
         }
 
-        let mut reservoirs: HashMap<String, Reservoir> = HashMap::new();
+        let mut reservoirs: HashMap<String, Reservoir<Row>> = HashMap::new();
         let mut capacities: HashMap<String, usize> = HashMap::new();
         let mut rng = StdRng::seed_from_u64(seed);
 
@@ -473,26 +433,4 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn reservoir_never_exceeds_capacity() {
-        let mut rng = StdRng::seed_from_u64(7);
-        let mut reservoir = Reservoir::default();
-
-        for i in 0..100 {
-            reservoir.offer(
-                Row {
-                    language: "Rust".to_string(),
-                    repository: "r".to_string(),
-                    commit: i.to_string(),
-                    path: "p".to_string(),
-                    promoted_to: String::new(),
-                },
-                10,
-                &mut rng,
-            );
-        }
-
-        assert_eq!(reservoir.items.len(), 10);
-        assert_eq!(reservoir.seen, 100);
-    }
 }

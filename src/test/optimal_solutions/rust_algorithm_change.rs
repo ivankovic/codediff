@@ -24,7 +24,7 @@ fn matches_human_solution() -> Result<()> {
     // In this test, we have several subjective quality decisions:
     //
     // 1. The theorethical lowest-cost solution uses some of the call_exprsion, identifier,
-    //    arguments and '(' and ')' from the before side, e.g. from "..nums.len()" and mapps them as
+    //    arguments and '(' and ')' from the before side, e.g. from "..nums.len()" and maps them as
     //    Update/MatchButNotIdentical/Identical with the "HashSet::new()" call. However, this is
     //    very low quality matching from a human perspective. It is extremely unlikely a human would
     //    actually transform "..nums.len()" into HashSet::new(). It is far more likely it would be a

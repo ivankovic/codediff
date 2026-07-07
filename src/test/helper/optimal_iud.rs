@@ -118,7 +118,7 @@ pub fn for_nodes(
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
 ) -> Result<()> {
-    let mut memoo = HashMap::new();
+    let mut memo = HashMap::new();
 
     solve(
         before,
@@ -129,7 +129,7 @@ pub fn for_nodes(
         after_node_ids.clone(),
         node_cache,
         diff,
-        &mut memoo,
+        &mut memo,
     )?;
 
     update_diff(
@@ -138,7 +138,7 @@ pub fn for_nodes(
         &before_node_ids,
         &after_node_ids,
         node_cache,
-        &memoo,
+        &memo,
         diff,
     )?;
 
@@ -152,18 +152,8 @@ pub fn for_roots(
     diff: &mut ASTDiff,
 ) -> Result<()> {
     // Compute metadata once at the top level
-    let before_metadata = before
-        .metadata
-        .ast_metadata
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(before).unwrap_or_default());
-    let after_metadata = after
-        .metadata
-        .ast_metadata
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| crate::code::metadata::compute_ast_metadata(after).unwrap_or_default());
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
 
     let before_root_id = before.ast.as_ref().unwrap().root_node().id();
     let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -250,18 +240,18 @@ fn ids_of_children(node: &Node) -> Vec<usize> {
 }
 
 fn skip_matched_nodes(subtrees: &[usize], diff: &ASTDiff) -> (bool, usize) {
-    let mut first_unmached_node_index = 0;
-    let mut has_unmached_nodes = false;
+    let mut first_unmatched_node_index = 0;
+    let mut has_unmatched_nodes = false;
 
     for (i, node_id) in subtrees.iter().enumerate() {
         if !diff.is_node_mapped(node_id) {
-            has_unmached_nodes = true;
-            first_unmached_node_index = i;
+            has_unmatched_nodes = true;
+            first_unmatched_node_index = i;
             break;
         }
     }
 
-    (has_unmached_nodes, first_unmached_node_index)
+    (has_unmatched_nodes, first_unmatched_node_index)
 }
 
 /**
@@ -283,20 +273,20 @@ enum AlgorithmChoice {
 fn choose_algorithm_branch(
     before_subtrees: &[usize],
     after_subtrees: &[usize],
-    before_has_unmached_nodes: bool,
-    before_first_unmached_node_index: usize,
-    after_has_unmached_nodes: bool,
-    after_first_unmached_node_index: usize,
+    before_has_unmatched_nodes: bool,
+    before_first_unmatched_node_index: usize,
+    after_has_unmatched_nodes: bool,
+    after_first_unmatched_node_index: usize,
 ) -> AlgorithmChoice {
     if before_subtrees.is_empty() && after_subtrees.is_empty() {
         return AlgorithmChoice::EmptyState;
-    } else if !before_has_unmached_nodes && !after_has_unmached_nodes {
+    } else if !before_has_unmatched_nodes && !after_has_unmatched_nodes {
         return AlgorithmChoice::AllNodesMatched;
-    } else if before_subtrees.is_empty() || !before_has_unmached_nodes {
+    } else if before_subtrees.is_empty() || !before_has_unmatched_nodes {
         return AlgorithmChoice::InsertAll;
-    } else if after_subtrees.is_empty() || !after_has_unmached_nodes {
+    } else if after_subtrees.is_empty() || !after_has_unmatched_nodes {
         return AlgorithmChoice::DeleteAll;
-    } else if before_first_unmached_node_index != 0 || after_first_unmached_node_index != 0 {
+    } else if before_first_unmatched_node_index != 0 || after_first_unmatched_node_index != 0 {
         return AlgorithmChoice::SkipMatchedNodes;
     }
 
@@ -317,34 +307,34 @@ fn solve_with_slices(
     after_subtrees: &[usize],
     node_cache: &NodeCache,
     diff: &ASTDiff,
-    memoo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
+    memo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
 ) -> Result<u64> {
     // If both subtrees are empty, there is nothing to do.
     if before_subtrees.is_empty() && after_subtrees.is_empty() {
         return Ok(0);
     }
 
-    // Check if memoo already has the solution for this input and return that.
+    // Check if memo already has the solution for this input and return that.
     let before_key = SubtreeKey::new(before_subtrees);
     let after_key = SubtreeKey::new(after_subtrees);
     let key = (before_key.clone(), after_key.clone());
-    if let Some(solution) = memoo.get(&key) {
+    if let Some(solution) = memo.get(&key) {
         return Ok(solution.cost);
     }
     let mut result = Solution::new();
 
-    let (before_has_unmached_nodes, before_first_unmached_node_index) =
+    let (before_has_unmatched_nodes, before_first_unmatched_node_index) =
         skip_matched_nodes(before_subtrees, diff);
-    let (after_has_unmached_nodes, after_first_unmached_node_index) =
+    let (after_has_unmatched_nodes, after_first_unmatched_node_index) =
         skip_matched_nodes(after_subtrees, diff);
 
     let algorithm_branch = choose_algorithm_branch(
         before_subtrees,
         after_subtrees,
-        before_has_unmached_nodes,
-        before_first_unmached_node_index,
-        after_has_unmached_nodes,
-        after_first_unmached_node_index,
+        before_has_unmatched_nodes,
+        before_first_unmatched_node_index,
+        after_has_unmatched_nodes,
+        after_first_unmatched_node_index,
     );
 
     match algorithm_branch {
@@ -358,11 +348,11 @@ fn solve_with_slices(
                 after,
                 before_metadata,
                 after_metadata,
-                &before_subtrees[before_first_unmached_node_index..],
-                &after_subtrees[after_first_unmached_node_index..],
+                &before_subtrees[before_first_unmatched_node_index..],
+                &after_subtrees[after_first_unmatched_node_index..],
                 node_cache,
                 diff,
-                memoo,
+                memo,
             )?;
             result.operation = ASTMappingOperation::DoNothing;
         }
@@ -444,7 +434,7 @@ fn solve_with_slices(
                     &after_subtrees[1..],
                     node_cache,
                     diff,
-                    memoo,
+                    memo,
                 )?;
 
                 // However, if the two roots match perfectly, there is no need to descend into their
@@ -459,7 +449,7 @@ fn solve_with_slices(
                         &ids_of_children(after_first_node),
                         node_cache,
                         diff,
-                        memoo,
+                        memo,
                     )?;
                 }
                 solution_if_match.cost = cost;
@@ -495,7 +485,7 @@ fn solve_with_slices(
                     &after_subtrees[i..],
                     node_cache,
                     diff,
-                    memoo,
+                    memo,
                 )?;
 
                 if cost + cost_to_match_rest >= best_cost_so_far {
@@ -512,7 +502,7 @@ fn solve_with_slices(
                         &after_subtrees[..i],
                         node_cache,
                         diff,
-                        memoo,
+                        memo,
                     )?;
 
                 if cost < solution_if_delete.cost {
@@ -550,7 +540,7 @@ fn solve_with_slices(
                     &after_subtrees[1..],
                     node_cache,
                     diff,
-                    memoo,
+                    memo,
                 )?;
 
                 if cost + cost_to_mach_rest >= best_cost_so_far {
@@ -567,7 +557,7 @@ fn solve_with_slices(
                         &after_children,
                         node_cache,
                         diff,
-                        memoo,
+                        memo,
                     )?;
 
                 if cost < solution_if_insert.cost {
@@ -600,10 +590,10 @@ fn solve_with_slices(
         }
     }
 
-    // Insert the solution into memoo with the before and after subtrees as the key.
+    // Insert the solution into memo with the before and after subtrees as the key.
     let key = (before_key, after_key);
     let cost = result.cost;
-    memoo.insert(key, result);
+    memo.insert(key, result);
     Ok(cost)
 }
 
@@ -611,8 +601,8 @@ fn solve_with_slices(
 * Recursively solve the subtree mapping problem using only Insert, Delete, Update and Identical
 * operations.
 *
-* The function returns the cost, but the actual mapping can be reconstructed using the memoo
-* memooization map.
+* The function returns the cost, but the actual mapping can be reconstructed using the memo
+* memoization map.
 */
 #[allow(clippy::too_many_arguments)]
 fn solve(
@@ -624,7 +614,7 @@ fn solve(
     after_subtrees: Vec<usize>,
     node_cache: &NodeCache,
     diff: &ASTDiff,
-    memoo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
+    memo: &mut HashMap<(SubtreeKey, SubtreeKey), Solution>,
 ) -> Result<u64> {
     solve_with_slices(
         before,
@@ -635,7 +625,7 @@ fn solve(
         &after_subtrees,
         node_cache,
         diff,
-        memoo,
+        memo,
     )
 }
 
@@ -683,10 +673,10 @@ fn add_subtree_to_diff(
 }
 
 /**
-* Update the diff using the solution stored in memoo.
+* Update the diff using the solution stored in memo.
 *
 * Note that this function is linear in the number of nodes, since it knows exactly which path to
-* choose because of the already computed memoo map.
+* choose because of the already computed memo map.
 */
 fn update_diff(
     before_metadata: &ASTMetadata,
@@ -694,7 +684,7 @@ fn update_diff(
     before_node_ids: &[usize],
     after_node_ids: &[usize],
     node_cache: &NodeCache,
-    memoo: &HashMap<(SubtreeKey, SubtreeKey), Solution>,
+    memo: &HashMap<(SubtreeKey, SubtreeKey), Solution>,
     diff: &mut ASTDiff,
 ) -> Result<()> {
     let mut stack = Vec::new();
@@ -706,24 +696,24 @@ fn update_diff(
             continue;
         }
 
-        let (before_has_unmached_nodes, before_first_unmached_node_index) =
+        let (before_has_unmatched_nodes, before_first_unmatched_node_index) =
             skip_matched_nodes(&before_subtrees, diff);
-        let (after_has_unmached_nodes, after_first_unmached_node_index) =
+        let (after_has_unmatched_nodes, after_first_unmatched_node_index) =
             skip_matched_nodes(&after_subtrees, diff);
 
         let algorithm_branch = choose_algorithm_branch(
             &before_subtrees,
             &after_subtrees,
-            before_has_unmached_nodes,
-            before_first_unmached_node_index,
-            after_has_unmached_nodes,
-            after_first_unmached_node_index,
+            before_has_unmatched_nodes,
+            before_first_unmatched_node_index,
+            after_has_unmatched_nodes,
+            after_first_unmatched_node_index,
         );
 
         let before_key = SubtreeKey::new(&before_subtrees);
         let after_key = SubtreeKey::new(&after_subtrees);
         let key = (before_key, after_key);
-        let solution = memoo
+        let solution = memo
             .get(&key)
             .ok_or_else(|| anyhow::anyhow!("Solution for a subproblem not found"))?;
         let mapping = ASTMapping {
@@ -738,8 +728,8 @@ fn update_diff(
             }
             AlgorithmChoice::SkipMatchedNodes => {
                 stack.push((
-                    before_subtrees[before_first_unmached_node_index..].to_vec(),
-                    after_subtrees[after_first_unmached_node_index..].to_vec(),
+                    before_subtrees[before_first_unmatched_node_index..].to_vec(),
+                    after_subtrees[after_first_unmatched_node_index..].to_vec(),
                 ));
             }
             AlgorithmChoice::InsertAll => {
@@ -960,11 +950,11 @@ mod tests {
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
-        let (has_unmached_nodes, first_unmached_node_index) =
+        let (has_unmatched_nodes, first_unmatched_node_index) =
             skip_matched_nodes(&[addedd_subtree_root_id], &diff);
 
-        assert!(has_unmached_nodes);
-        assert_eq!(first_unmached_node_index, 0);
+        assert!(has_unmatched_nodes);
+        assert_eq!(first_unmatched_node_index, 0);
 
         Ok(())
     }
@@ -980,7 +970,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut memoo = HashMap::new();
+        let mut memo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
 
         // Compute metadata for tests
@@ -1013,7 +1003,7 @@ mod tests {
             vec![after_root_id],
             &node_cache,
             &diff,
-            &mut memoo,
+            &mut memo,
         )?;
 
         assert_eq!(total_cost, 1);
@@ -1033,7 +1023,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut memoo = HashMap::new();
+        let mut memo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
 
         // Compute metadata for tests
@@ -1104,7 +1094,7 @@ mod tests {
             vec![after_root_id],
             &node_cache,
             &diff,
-            &mut memoo,
+            &mut memo,
         )?;
 
         let before_ast = before.ast.unwrap();
@@ -1118,7 +1108,7 @@ mod tests {
         )?;
         let addedd_subtree_root_id = added_subtree.id();
 
-        let old_memoo: HashMap<(Vec<usize>, Vec<usize>), Solution> = memoo
+        let old_memo: HashMap<(Vec<usize>, Vec<usize>), Solution> = memo
             .iter()
             .map(|((before_key, after_key), solution)| {
                 let before_vec = before_key.subtrees.to_vec();
@@ -1126,7 +1116,7 @@ mod tests {
                 ((before_vec, after_vec), solution.clone())
             })
             .collect();
-        let solution = old_memoo
+        let solution = old_memo
             .get(&(Vec::new(), vec![addedd_subtree_root_id]))
             .unwrap();
         assert_eq!(solution.operation, ASTMappingOperation::InsertWithChildren);
@@ -1141,7 +1131,7 @@ mod tests {
             test::helper::node_for_path(after_ast.root_node(), &["function_item", "block", "}"])?;
         let after_closing_bracket_id = after_closing_bracket.id();
 
-        let solution = old_memoo
+        let solution = old_memo
             .get(&(
                 vec![before_closing_bracket_id],
                 vec![addedd_subtree_root_id, after_closing_bracket_id],
@@ -1170,7 +1160,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut memoo = HashMap::new();
+        let mut memo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
 
         // Compute metadata for tests
@@ -1203,7 +1193,7 @@ mod tests {
             vec![after_root_id],
             &node_cache,
             &diff,
-            &mut memoo,
+            &mut memo,
         )?;
 
         assert_eq!(total_cost, 12);
@@ -1221,7 +1211,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut memoo = HashMap::new();
+        let mut memo = HashMap::new();
         let node_cache = NodeCache::build(&before, &after);
 
         // Compute metadata for tests
@@ -1254,7 +1244,7 @@ mod tests {
             vec![after_root_id],
             &node_cache,
             &diff,
-            &mut memoo,
+            &mut memo,
         )?;
 
         // 41 new nodes are added

@@ -22,6 +22,26 @@ use walkdir::WalkDir;
 
 use crate::metadata;
 
+/// Find all git repositories in top-level subdirectories of the given path, or the path itself
+/// if it is already a repository. Sorted for reproducible traversal order across runs.
+pub fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
+    let mut repo_paths = Vec::new();
+
+    if base_path.join(".git").exists() {
+        repo_paths.push(base_path.to_path_buf());
+    } else if base_path.is_dir() {
+        for entry in std::fs::read_dir(base_path)? {
+            let path = entry?.path();
+            if path.is_dir() && path.join(".git").exists() {
+                repo_paths.push(path);
+            }
+        }
+    }
+
+    repo_paths.sort();
+    Ok(repo_paths)
+}
+
 pub fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> {
     if root.is_file() {
         // Ignore error if no receivers (program shutting down)

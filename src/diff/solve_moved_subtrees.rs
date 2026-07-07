@@ -62,14 +62,8 @@ const MIN_MOVE_SUBTREE_SIZE: usize = 4;
 
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let language = before.metadata.language.unwrap_or_default();
-    let before_metadata =
-        before.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(before).unwrap_or_default()
-        });
-    let after_metadata =
-        after.metadata.ast_metadata.clone().unwrap_or_else(|| {
-            crate::code::metadata::compute_ast_metadata(after).unwrap_or_default()
-        });
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
     let before_parents = build_parent_map(&before_metadata);
     let after_parents = build_parent_map(&after_metadata);
 
