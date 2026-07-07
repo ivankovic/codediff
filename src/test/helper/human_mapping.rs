@@ -37,7 +37,7 @@ use std::fs;
 use std::path::PathBuf;
 use tree_sitter::Node;
 
-use crate::diff::{ASTDiff, ASTMappingOperation};
+use crate::diff::{ASTDiff, ASTMappingOperation, NodeCache};
 use crate::test::helper::node_for_path;
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
@@ -376,12 +376,17 @@ pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
     let diff = crate::diff::diff_code(&before, &after);
     let diff_ast = diff.ast.context("Diff has no AST")?;
 
+    // Check that the produced diff is valid
+    let node_cache = NodeCache::build(&before, &after);
+    let mut mismatches = Vec::new();
+    if !diff_ast.is_valid(&before, &after, &node_cache) {
+        mismatches.push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
+    }
+
     let before_ast = before.ast.context("Before code has no AST")?;
     let after_ast = after.ast.context("After code has no AST")?;
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
-
-    let mut mismatches = Vec::new();
 
     for entry in &mapping.entries {
         check_entry(entry, before_root, after_root, &diff_ast, &mut mismatches)?;

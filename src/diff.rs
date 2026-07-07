@@ -913,27 +913,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_valid_with_real_diff() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-
-        // Test that all real diffs are valid
-        for (diff_name, (before, after)) in test_diffs {
-            let diff = Diff::from_code(&before, &after);
-            let diff_ast = diff.ast.unwrap();
-
-            // The mapping from a real diff should always be valid
-            let node_cache = NodeCache::build(&before, &after);
-            assert!(
-                diff_ast.is_valid(&before, &after, &node_cache),
-                "Real diff mappings should always be valid for diff: {}",
-                diff_name
-            );
-        }
-
-        Ok(())
-    }
-
-    #[test]
     fn test_is_valid_with_null_mapping() -> Result<()> {
         let test_codes = test::helper::handmade_test_code()?;
         let before = test_codes.get("hello-world.rs").unwrap().clone();

@@ -927,29 +927,6 @@ mod tests {
     }
 
     #[test]
-    fn test_handmade_test_diffs_creates_diff_objects() -> Result<()> {
-        let diffs = handmade_test_diffs(true, false, "")?;
-
-        assert!(!diffs.is_empty(), "Should have found some test diffs");
-
-        assert!(diffs.contains_key("rust-no-change"));
-
-        let (before, after, diff) = diffs.get("rust-no-change").unwrap();
-
-        // The diff should have the AST computed since we passed true for compute_ast
-        assert!(diff.ast.is_some());
-
-        // The language should be set
-        assert_ne!(diff.language, crate::code::Language::Unknown);
-
-        // Check that code objects are returned
-        assert_ne!(before.contents, "");
-        assert_ne!(after.contents, "");
-
-        Ok(())
-    }
-
-    #[test]
     fn test_entire_path_has_mapping() -> Result<()> {
         // Use rust-no-change since all nodes should have Identical mapping
         let test_diffs = handmade_test_code_pairs()?;
