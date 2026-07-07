@@ -86,6 +86,12 @@ mod rust_algorithm_change;
 #[cfg(test)]
 mod rust_cost_optimization;
 #[cfg(test)]
+mod rust_data_structure;
+#[cfg(test)]
+mod rust_error_handling;
+#[cfg(test)]
+mod rust_firefox_webrenderer_borders;
+#[cfg(test)]
 mod rust_hash_optimization;
 #[cfg(test)]
 mod rust_hello_world_added_message;
@@ -94,9 +100,21 @@ mod rust_hello_world_removed_message;
 #[cfg(test)]
 mod rust_leetcode_1_bugfix;
 #[cfg(test)]
+mod rust_next_font_imports_generator;
+#[cfg(test)]
 mod rust_no_change;
 #[cfg(test)]
+mod rust_sniffnet_protocol;
+#[cfg(test)]
+mod rust_tauri_api_build_1;
+#[cfg(test)]
+mod rust_tauri_api_build_2;
+#[cfg(test)]
+mod rust_tauri_cli_ios_dev;
+#[cfg(test)]
 mod rust_turbopack_module_rule;
+#[cfg(test)]
+mod rust_turbopack_persistence_tools_main;
 #[cfg(test)]
 mod rust_zed_git_panel_settings;
 #[cfg(test)]
