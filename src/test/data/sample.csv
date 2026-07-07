@@ -39,7 +39,7 @@ CSharp,Sonarr-Sonarr.git,8ee10adbd4b53fba5be6a870291d3107c1962436,src/Sonarr.Api
 CSharp,Sonarr-Sonarr.git,9a69222c9a1c42c2571f21e2d4a2e02b90216248,src/NzbDrone.Core/DataAugmentation/Scene/SceneMappingService.cs,
 CSharp,jellyfin-jellyfin.git,7ba77804c414d012df311f9a5d644078dfa4a94a,MediaBrowser.Controller/LibraryTaskScheduler/LimitedConcurrencyLibraryScheduler.cs,
 CSharp,jellyfin-jellyfin.git,c8d2f436608c631e94461e70c3a7511031d32f58,Jellyfin.Server/Migrations/Routines/ReseedFolderFlag.cs,
-Go,caddyserver-caddy.git,2faeac0a104c72e9396717406ecb7c353bf9aa64,modules/caddyhttp/reverseproxy/httptransport.go,
+Go,caddyserver-caddy.git,2faeac0a104c72e9396717406ecb7c353bf9aa64,modules/caddyhttp/reverseproxy/httptransport.go,go-user-slices-library
 Go,caddyserver-caddy.git,5a6b2f8d1d4633622b551357f3cc9d27ec669d02,internal/filesystems/map.go,
 Go,gin-gonic-gin.git,088cdd74d42df20d4e58aa17d3f4403a22e8a545,debug.go,
 Go,gin-gonic-gin.git,6f94fd05c98d1043e329398f6f742dc680be9b29,examples/custom-validation/server.go,
@@ -89,7 +89,7 @@ JavaScript,microsoft-TypeScript.git,d403e0850f33521c684bbecd4a24522a4dc66b33,"te
 JavaScript,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/tsserver/projectReferences/when-file-is-not-part-of-first-config-tree-found-appConfig-not-composite-with-file-open-before-revert.js,
 JavaScript,mozilla-firefox-firefox.git,f5848b1deb702ab2647691f2591c8a5410fb5541,toolkit/modules/IndexedDB.sys.mjs,
 JavaScript,twbs-bootstrap.git,2a1bf52b73fc9a97f6fef75aa1b29b3e9f0288b3,js/dist/util/swipe.js,
-Kotlin,immich-app-immich.git,c403e03a42bf3847d154430693f31b0f39ad6134,mobile/android/app/src/main/kotlin/app/alextran/immich/core/NetworkApiPlugin.kt,
+Kotlin,immich-app-immich.git,c403e03a42bf3847d154430693f31b0f39ad6134,mobile/android/app/src/main/kotlin/app/alextran/immich/core/NetworkApiPlugin.kt,kotlin-small-api-change
 Kotlin,mozilla-firefox-firefox.git,5541db34cccc8174bbed160fa05b2d610137a19e,mobile/android/android-components/components/lib/llm-mlpa/src/main/java/mozilla/components/lib/llm/mlpa/MlpaLlmProvider.kt,
 Kotlin,nextcloud-android.git,1af8f6b1849b4f751387c876ca4c2e3283e4b490,app/src/main/java/com/nextcloud/client/jobs/BackgroundJobManagerImpl.kt,
 Kotlin,nextcloud-android.git,814a5df0488146e79a7d8092a46098176af8ea39,app/src/main/java/com/nextcloud/client/assistant/task/TaskView.kt,

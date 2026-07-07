@@ -36,6 +36,8 @@ mod cpp_fix_segfault;
 #[cfg(test)]
 mod cpp_optimize_algorithm;
 #[cfg(test)]
+mod go_user_slices_library;
+#[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
 mod java_add_interface;
@@ -65,6 +67,8 @@ mod kotlin_add_validation;
 mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod kotlin_refactor_function;
+#[cfg(test)]
+mod kotlin_small_api_change;
 #[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
