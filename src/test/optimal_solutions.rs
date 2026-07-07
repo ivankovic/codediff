@@ -24,6 +24,8 @@ mod c_htop_remove_function_declaration;
 #[cfg(test)]
 mod c_microsoft_terminal_add_function;
 #[cfg(test)]
+mod c_nginx_add_typedef;
+#[cfg(test)]
 mod cpp_add_const_correctness;
 #[cfg(test)]
 mod cpp_add_memory_management;

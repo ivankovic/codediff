@@ -3,7 +3,7 @@ C,FFmpeg-FFmpeg.git,1d16161a8bb897a2a6f20bfcad0486e966b3f086,libswscale/ops.h,c-
 C,freeciv-freeciv.git,556f7def010b5f34fbe3c994c66e313bfc9fc2f7,ai/default/daiair.h,c-freeciv-add-parameter-to-function
 C,htop-dev-htop.git,23ebdbb5ebcd261d86dc8ba18e6bf0b9b57cf345,Table.h,c-htop-remove-function-declaration
 C,microsoft-terminal.git,dbbc581154eb4e6f0086963eecf4983d7196caae,src/cascadia/TerminalControl/TermControl.h,c-microsoft-terminal-add-function
-C,nginx-nginx.git,7677d5646aeb761b8b9da5af3eb10c008aae3f90,src/event/ngx_event_openssl_cache.c,
+C,nginx-nginx.git,7677d5646aeb761b8b9da5af3eb10c008aae3f90,src/event/ngx_event_openssl_cache.c,c-nginx-add-typedef
 C,postgres-postgres.git,788ec96d591d0a7c916f2f4332765f46410d73b5,src/backend/replication/logical/slotsync.c,
 C,python-cpython.git,979d92fefc0b6863c9783659f80d36cdfac90506,Python/optimizer_cases.c.h,
 C,torvalds-linux.git,11c2adcd1fa2a9380a507db1e57c8542bfc81827,tools/objtool/klp-diff.c,
