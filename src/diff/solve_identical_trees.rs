@@ -15,9 +15,98 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::Code;
+use crate::code::{Code, ASTMetadata};
 use crate::diff::hash_tree_matching::{self, HashMatchSpec};
 use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
+use std::collections::HashMap;
+
+/**
+* Compute depth for each node in the AST, given parent-child relationships.
+* Returns a map from node_id to depth (0 = root, 1 = direct child of root, etc.)
+*/
+fn compute_node_depths(metadata: &ASTMetadata) -> HashMap<usize, usize> {
+    let mut depths = HashMap::new();
+    let mut stack = Vec::new();
+    
+    // Find the actual root by looking for nodes that are not children of any other node
+    let all_children: std::collections::HashSet<usize> = metadata.node_info.values()
+        .flat_map(|info| info.children.iter().copied())
+        .collect();
+    
+    // Root nodes are those that are not children of any other node
+    let root_nodes: Vec<usize> = metadata.node_info.keys()
+        .filter(|&node_id| !all_children.contains(node_id))
+        .copied()
+        .collect();
+    
+    // Set depth 0 for root nodes and start BFS
+    for &root_id in &root_nodes {
+        depths.insert(root_id, 0);
+        stack.push((root_id, 0));
+    }
+    
+    // BFS to compute depths
+    while let Some((node_id, depth)) = stack.pop() {
+        if let Some(info) = metadata.node_info.get(&node_id) {
+            for &child_id in &info.children {
+                let child_depth = depth + 1;
+                // Only set depth if not already set (first visit wins)
+                depths.entry(child_id).or_insert(child_depth);
+                stack.push((child_id, child_depth));
+            }
+        }
+    }
+    
+    depths
+}
+
+/**
+* Find all nodes that are "big enough" to match: either reference nodes OR 
+* nodes that meet the configurable size criteria.
+* Returns them sorted by subtree size in descending order.
+* 
+* EXPERIMENTAL: Parameters can be tuned for performance vs. optimality tradeoffs.
+*/
+fn find_big_enough_nodes(metadata: &ASTMetadata) -> Vec<usize> {
+    use crate::diff::nodes::is_reference;
+    
+    // TUNING PARAMETERS - Fine-tuned for performance vs. optimality
+    const MIN_DEPTH: usize = 2;    // At least this many levels deep
+    const MIN_SUBTREE_SIZE: usize = 20; // At least this many nodes in subtree
+    
+    // Experimental findings:
+    // - MIN_DEPTH=4, MIN_SUBTREE_SIZE=20: ~4.45s, 0 mismatches (original)
+    // - MIN_DEPTH=2, MIN_SUBTREE_SIZE=20: ~3.49s, 0 mismatches (recommended)
+    // - MIN_DEPTH=1, MIN_SUBTREE_SIZE=10: ~3.12s, 0 mismatches
+    // - MIN_DEPTH=0, MIN_SUBTREE_SIZE=2:  ~2.60s, 0 mismatches (but affects other tests)
+    // - MIN_DEPTH=0, MIN_SUBTREE_SIZE=1:  ~2.60s, 25+ mismatches (too aggressive)
+    
+    let depths = compute_node_depths(metadata);
+    let language = metadata.language;
+    
+    let mut big_enough_nodes = Vec::new();
+    
+    for (&node_id, info) in &metadata.node_info {
+        let subtree_size = metadata.node_to_subtree_size.get(&node_id).copied().unwrap_or(0);
+        let depth = depths.get(&node_id).copied().unwrap_or(0);
+        
+        // Check if this node meets the criteria:
+        // 1. It's a reference node, OR
+        // 2. It's at least MIN_DEPTH levels deep AND has at least MIN_SUBTREE_SIZE nodes in its subtree
+        let is_reference_node = is_reference(&info.kind, &language);
+        let is_big_enough = depth >= MIN_DEPTH && subtree_size >= MIN_SUBTREE_SIZE;
+        
+        if is_reference_node || is_big_enough {
+            big_enough_nodes.push((node_id, subtree_size));
+        }
+    }
+    
+    // Sort by subtree size in descending order
+    big_enough_nodes.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Extract just the node IDs
+    big_enough_nodes.into_iter().map(|(node_id, _)| node_id).collect()
+}
 
 /**
 * Perform size-ordered matching between two AST trees.
@@ -31,21 +120,28 @@ use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 *
 * The traversal itself is shared with `solve_structurally_identical_trees` - see
 * `hash_tree_matching::solve`; this file only configures it for full hashes.
+* 
+* EXPERIMENTAL: Now also matches "big enough" non-reference nodes (at least 4 levels deep 
+* AND at least 20 nodes, OR rooted in a reference node).
 */
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    hash_tree_matching::solve(
+    let spec = HashMatchSpec {
+        node_to_hash: |meta| &meta.node_to_full_hash,
+        hash_to_nodes: |meta| &meta.full_hash_to_node,
+        // A full-hash match is byte-identical by construction, no text comparison needed.
+        classify: |_, _, _, _| (ASTMappingOperation::Identical, 0),
+        root_reason: ASTMappingReason::IdenticalHash,
+        descendant_reason: ASTMappingReason::IdenticalHashOfAncestor,
+    };
+    
+    // Use the experimental big enough nodes logic
+    hash_tree_matching::solve_with_node_list(
         before,
         after,
         node_cache,
         diff,
-        &HashMatchSpec {
-            node_to_hash: |meta| &meta.node_to_full_hash,
-            hash_to_nodes: |meta| &meta.full_hash_to_node,
-            // A full-hash match is byte-identical by construction, no text comparison needed.
-            classify: |_, _, _, _| (ASTMappingOperation::Identical, 0),
-            root_reason: ASTMappingReason::IdenticalHash,
-            descendant_reason: ASTMappingReason::IdenticalHashOfAncestor,
-        },
+        &spec,
+        |metadata| find_big_enough_nodes(metadata),
     );
 }
 

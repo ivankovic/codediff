@@ -408,6 +408,32 @@ pub fn is_generic_token_kind(kind: &str) -> bool {
         .any(|family| family.contains(&kind))
 }
 
+/**
+* Returns true if the node kind represents a comment in any supported language.
+*
+* TreeSitter grammars use various node kinds for comments:
+* - `comment` (generic, used by many languages)
+* - `line_comment` (Java, Rust, Kotlin, etc.)
+* - `block_comment` (Java, Rust, Kotlin, etc.)
+* - `js_comment` (JavaScript/TypeScript specific)
+*
+* This function provides a unified way to check if a node is a comment across all languages.
+*/
+pub fn is_comment(kind: &str) -> bool {
+    matches!(
+        kind,
+        "comment"
+            | "line_comment"
+            | "block_comment"
+            | "js_comment"
+            | "html_comment"
+            | "xml_comment"
+            | "css_comment"
+            | "c_comment"
+            | "cpp_comment"
+    )
+}
+
 /// Character-bigram Dice similarity threshold for `leaf_texts_similar`. 0.6 keeps clear renames
 /// (`fetch_user` -> `fetch_user_data`, `user_id` -> `userId`) while rejecting unrelated
 /// identifiers that share only a stray character pair.

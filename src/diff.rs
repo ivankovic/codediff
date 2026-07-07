@@ -18,6 +18,7 @@
 pub mod apted;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
+pub mod solve_comment_nodes;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_moved_subtrees;
@@ -166,6 +167,11 @@ impl Diff {
         // diffs.
         solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
         solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Match comment nodes that immediately precede already-matched nodes. Runs after hash
+        // and structural matching to take advantage of nodes already matched by those passes.
+        // This reduces the workload for the final, slow tree edit distance algorithm.
+        solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
 
         // These speed up the diff, but don't guaranteed an optimal solution
         solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
@@ -470,6 +476,9 @@ pub enum ASTMappingReason {
     /// the main pipeline finished - the code didn't change, it moved (possibly into or out of a
     /// newly-inserted wrapper). See `solve_moved_subtrees`.
     MovedSubtree,
+    /// A comment node that was matched because it immediately precedes a matched node on both
+    /// before and after sides. See `solve_comment_nodes`.
+    CommentSibling,
 }
 
 /**

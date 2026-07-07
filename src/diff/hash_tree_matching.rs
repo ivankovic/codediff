@@ -64,12 +64,26 @@ pub(crate) fn solve(
     diff: &mut ASTDiff,
     spec: &HashMatchSpec,
 ) {
+    solve_with_node_list(before, after, node_cache, diff, spec, |metadata| metadata.reference_nodes_ordered.clone())
+}
+
+/// Generic version of solve that accepts a custom node list selector
+pub(crate) fn solve_with_node_list(
+    before: &Code,
+    after: &Code,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+    spec: &HashMatchSpec,
+    node_list_selector: impl Fn(&ASTMetadata) -> Vec<usize>,
+) {
     let before_metadata = metadata_of(before);
     let after_metadata = metadata_of(after);
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
-    for &before_node_id in &before_metadata.reference_nodes_ordered {
+    let before_node_ids = node_list_selector(&before_metadata);
+    
+    for &before_node_id in &before_node_ids {
         // Skip nodes already mapped, whether by an earlier pass or by a larger ancestor match
         // made earlier in this very loop.
         if diff.before_node_map.contains_key(&before_node_id) {

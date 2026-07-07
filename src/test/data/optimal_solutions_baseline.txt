@@ -1,0 +1,64 @@
+Solution                               Mismatches  Human Unsolved
+----------------------------------------------------------------
+rust-turbopack-module-rule                    166               
+c-nginx-add-typedef                           154               
+rust-next-font-imports-generator              114               
+rust-firefox-webrenderer-borders               18               
+rust-algorithm-change                          12               
+go-user-slices-library                          5               
+rust-error-handling                             1               
+c-ffmpeg-added-typedef-to-enum                  0               
+c-freeciv-add-parameter-to-function             0               
+c-htop-remove-function-declaration              0               
+c-microsoft-terminal-add-function               0               
+cpp-add-const-correctness                       0               
+cpp-add-memory-management                       0               
+cpp-add-templates                               0               
+cpp-fix-segfault                                0               
+cpp-optimize-algorithm                          0               
+java-add-exception-handling                     0               
+java-add-interface                              0               
+java-add-logging                                0               
+java-fix-array-index                            0               
+java-refactor-constants                         0               
+javascript-add-array-method                     0               
+javascript-add-destructuring                    0               
+javascript-add-event-listener                   0               
+javascript-fix-promises                         0               
+javascript-refactor-arrow-func                  0               
+kotlin-add-data-class                           0               
+kotlin-add-null-check                           0               
+kotlin-add-validation                           0               
+kotlin-fix-loop-bug                             0               
+kotlin-refactor-function                        0               
+kotlin-small-api-change                         0               
+python-add-remove-block                         0               
+python-added-if-block                           0               
+python-added-if-block-small                     0               
+python-api-change                               0               
+python-bugfix-loop                              0               
+python-refactoring                              0               
+rust-add-if                                     0               
+rust-add-to-existing-use                        0               
+rust-add-value-to-enum                          0               
+rust-cost-optimization                          0               
+rust-data-structure                             0               
+rust-hash-optimization                          0               
+rust-hello-world-added-message                  0               
+rust-hello-world-removed-message                0               
+rust-leetcode-1-bugfix                          0               
+rust-no-change                                  0               
+rust-sniffnet-protocol                          0               
+rust-tauri-api-build-1                          0               
+rust-tauri-api-build-2                          0               
+rust-tauri-cli-ios-dev                          0               
+rust-turbopack-persistence-tools-main           0               
+rust-zed-git-panel-settings                     0               
+typescript-add-error-handling                   0               
+typescript-add-generics                         0               
+rust-zed-workspace-tasks                        -            yes
+typescript-add-type-annotations                 -            yes
+typescript-async-await                          -            yes
+typescript-refactor-interface                   -            yes
+----------------------------------------------------------------
+TOTAL                                         470              4
