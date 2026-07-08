@@ -186,20 +186,25 @@ O              open a sampled candidate (src/test/data/samples/); already-promot
 q / Esc        quit
 ";
 
-/// Loads and parses the before/after code for a test case, by name.
+/// Loads and parses the before/after code for a test case, by name. Parses only this one case's
+/// directory (rather than every directory under src/test/data/diffs/, as a naive
+/// `handmade_test_code_pairs`-style lookup would) since this runs on every `o`-picker open, not
+/// just at startup.
 fn load_case(name: &str) -> Result<(Code, Code)> {
-    let mut pairs = codediff::test::helper::handmade_test_code_pairs()
-        .context("Failed to load test code pairs from src/test/data/diffs")?;
-
-    let (mut before, mut after) = pairs.remove(name).ok_or_else(|| {
-        let mut available: Vec<_> = pairs.keys().cloned().collect();
-        available.sort();
-        anyhow!(
+    let dir = diffs_case_dir(name);
+    if !dir.is_dir() {
+        let available = list_available_cases().unwrap_or_default();
+        bail!(
             "No test case named '{}' found in src/test/data/diffs.\nAvailable: {}",
             name,
             available.join(", ")
-        )
-    })?;
+        );
+    }
+
+    let mut parser = tree_sitter::Parser::new();
+    let (mut before, mut after) = code_pair_from_dir(&dir, &mut parser)
+        .with_context(|| format!("Failed to load test case from {:?}", dir))?
+        .ok_or_else(|| anyhow!("Directory '{}' exists but is missing a before/after fixture", name))?;
 
     if before.ast.is_none() {
         bail!("Before code for '{}' has no AST (unsupported or undetected language)", name);
@@ -1955,55 +1960,50 @@ fn render_panel(
         .unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
 
-    let items: Vec<ListItem> = flat
-        .iter()
-        .enumerate()
-        .skip(panel.scroll)
-        .take(inner_height.max(1))
-        .map(|(idx, (node, depth))| {
-            let status = match side {
-                Side::Before => status_before(*node, caches),
-                Side::After => status_after(*node, caches),
-            };
-            let (glyph, mut style) = status_glyph_and_style(status);
-            let (algo_glyph, disagrees) = algo_diff
-                .map(|diff_ast| {
-                    let algo_status = match side {
-                        Side::Before => algo_status_before(*node, diff_ast),
-                        Side::After => algo_status_after(*node, diff_ast),
-                    };
-                    let disagrees = match side {
-                        Side::Before => algo_disagrees_before(*node, caches, diff_ast),
-                        Side::After => algo_disagrees_after(*node, caches, diff_ast),
-                    };
-                    (format!("({})", algo_status_glyph(algo_status)), disagrees)
-                })
-                .unwrap_or_default();
-            let indent = "  ".repeat(*depth);
-            let marker = if disagrees { " *" } else { "" };
-            let text = format!("{}{}{} {}{}", indent, glyph, algo_glyph, node_label(*node, src), marker);
+    // Single pass over the whole (potentially multi-thousand-node) flat list: computes each node's
+    // status once, both to build the visible page's rows and to total up unmarked nodes for the
+    // header, rather than walking `flat` twice and calling status_before/status_after on every
+    // node both times.
+    let mut total_unmarked = 0usize;
+    let mut items: Vec<ListItem> = Vec::with_capacity(inner_height.max(1));
+    for (idx, (node, depth)) in flat.iter().enumerate() {
+        let status = match side {
+            Side::Before => status_before(*node, caches),
+            Side::After => status_after(*node, caches),
+        };
+        if status == NodeStatus::Unmarked {
+            total_unmarked += 1;
+        }
+        if idx < panel.scroll || idx >= panel.scroll + inner_height.max(1) {
+            continue;
+        }
 
-            if idx == cursor_idx {
-                style = style
-                    .bg(if focused { Color::Yellow } else { Color::DarkGray })
-                    .fg(Color::Black);
-            }
+        let (glyph, mut style) = status_glyph_and_style(status);
+        let (algo_glyph, disagrees) = algo_diff
+            .map(|diff_ast| {
+                let algo_status = match side {
+                    Side::Before => algo_status_before(*node, diff_ast),
+                    Side::After => algo_status_after(*node, diff_ast),
+                };
+                let disagrees = match side {
+                    Side::Before => algo_disagrees_before(*node, caches, diff_ast),
+                    Side::After => algo_disagrees_after(*node, caches, diff_ast),
+                };
+                (format!("({})", algo_status_glyph(algo_status)), disagrees)
+            })
+            .unwrap_or_default();
+        let indent = "  ".repeat(*depth);
+        let marker = if disagrees { " *" } else { "" };
+        let text = format!("{}{}{} {}{}", indent, glyph, algo_glyph, node_label(*node, src), marker);
 
-            ListItem::new(Line::from(Span::styled(text, style)))
-        })
-        .collect();
+        if idx == cursor_idx {
+            style = style
+                .bg(if focused { Color::Yellow } else { Color::DarkGray })
+                .fg(Color::Black);
+        }
 
-    // Count unmarked nodes across the *whole* tree, not just the visible page, for the header.
-    let total_unmarked = flat
-        .iter()
-        .filter(|(node, _)| {
-            let status = match side {
-                Side::Before => status_before(*node, caches),
-                Side::After => status_after(*node, caches),
-            };
-            status == NodeStatus::Unmarked
-        })
-        .count();
+        items.push(ListItem::new(Line::from(Span::styled(text, style))));
+    }
 
     let border_style = if focused {
         Style::default().fg(Color::Yellow)
@@ -2384,30 +2384,96 @@ fn render_open_sample_picker(
 // Event loop
 // ---------------------------------------------------------------------------------------------
 
+/// Everything derived from the current trees, mapping, and collapse/hide state that drawing a
+/// frame or interpreting a keystroke needs. Rebuilding this is the expensive part of the loop (a
+/// handful of whole-tree passes); see `run_event_loop`'s `needs_redraw` for why it only happens
+/// once per keystroke rather than on every idle poll timeout.
+struct FrameState<'a> {
+    before_root: Node<'a>,
+    after_root: Node<'a>,
+    before_src: &'a [u8],
+    after_src: &'a [u8],
+    caches: Caches,
+    before_flat: Vec<(Node<'a>, usize)>,
+    after_flat: Vec<(Node<'a>, usize)>,
+}
+
+fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Result<FrameState<'a>> {
+    let before_root = before.ast.as_ref().context("Before code has no AST")?.root_node();
+    let after_root = after.ast.as_ref().context("After code has no AST")?.root_node();
+    let before_src = before.contents.as_bytes();
+    let after_src = after.contents.as_bytes();
+
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+
+    // Recomputed fresh whenever frame state is rebuilt, so `H` can't show a subtree as hidden
+    // after it's actually been un-marked, or vice versa.
+    let before_hidden = app.hide_solved.then(|| fully_solved_nodes(before_root, &caches, status_before));
+    let after_hidden = app.hide_solved.then(|| fully_solved_nodes(after_root, &caches, status_after));
+
+    let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
+    let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
+
+    Ok(FrameState { before_root, after_root, before_src, after_src, caches, before_flat, after_flat })
+}
+
 fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
     mut before: Code,
     mut after: Code,
 ) -> Result<()> {
+    // Whether the on-screen frame reflects the current state. Set whenever something might have
+    // changed (a key was handled, a case was switched, the terminal was resized) and cleared right
+    // after redrawing. On a pure idle poll timeout -- the common case, since the TUI just sits
+    // there most of the time -- nothing is recomputed or redrawn at all, instead of unconditionally
+    // rebuilding caches and re-flattening both (possibly multi-thousand-node) trees ~4 times a
+    // second regardless of whether the user touched anything. This is also why opening the `o`/`O`
+    // picker used to feel slow on a large case: the picker is a modal drawn on top of the same
+    // panels, so every idle tick kept recomputing the underlying case's state for no reason even
+    // while you were just staring at the picker deciding what to pick.
+    let mut needs_redraw = true;
+
     loop {
-        let before_root = before.ast.as_ref().context("Before code has no AST")?.root_node();
-        let after_root = after.ast.as_ref().context("After code has no AST")?.root_node();
-        let before_src = before.contents.as_bytes();
-        let after_src = after.contents.as_bytes();
+        if needs_redraw {
+            let state = compute_frame_state(&before, &after, app)?;
+            // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and
+            // passing both `app` and `&app.name` as separate arguments to the same call would
+            // conflict.
+            let current_name = app.name.clone();
+            terminal.draw(|f| {
+                draw_ui(
+                    f,
+                    app,
+                    &state.before_flat,
+                    &state.after_flat,
+                    &state.caches,
+                    state.before_src,
+                    state.after_src,
+                    &current_name,
+                )
+            })?;
+            needs_redraw = false;
+        }
 
-        let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+        if !event::poll(Duration::from_millis(250))? {
+            continue;
+        }
 
-        // Recomputed fresh every frame from the current mapping (cheap: one pass per side over
-        // the whole tree, same cost class as `rebuild_caches` itself), so `H` can't show a
-        // subtree as hidden after it's actually been un-marked, or vice versa.
-        let before_hidden =
-            app.hide_solved.then(|| fully_solved_nodes(before_root, &caches, status_before));
-        let after_hidden =
-            app.hide_solved.then(|| fully_solved_nodes(after_root, &caches, status_after));
+        let event = event::read()?;
+        let Event::Key(key) = event else {
+            // e.g. a resize: nothing to recompute, just redraw at the (possibly new) size.
+            needs_redraw = true;
+            continue;
+        };
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
 
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
+        // Needed to interpret this keystroke against the state as of just before it (cursor
+        // position, current marks, etc.); recomputed here rather than reused from the last draw so
+        // it's guaranteed fresh even for the very first keystroke after a case switch.
+        let state = compute_frame_state(&before, &after, app)?;
 
         // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
         // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
@@ -2425,61 +2491,41 @@ fn run_event_loop(
             .context("After code has no AST metadata")?
             .node_to_full_hash;
 
-        // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and passing
-        // both `app` and `&app.name` as separate arguments to the same call would conflict.
-        let current_name = app.name.clone();
-
-        terminal.draw(|f| {
-            draw_ui(
-                f,
-                app,
-                &before_flat,
-                &after_flat,
-                &caches,
-                before_src,
-                after_src,
-                &current_name,
-            )
-        })?;
-
         let mut open_request: Option<OpenTarget> = None;
 
-        if event::poll(Duration::from_millis(250))?
-            && let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            if app.modal.is_some() {
-                open_request = handle_modal_key(
-                    app,
-                    key.code,
-                    &before_flat,
-                    &after_flat,
-                    before_root,
-                    after_root,
-                    &caches,
-                    before_src,
-                    after_src,
-                );
-            } else {
-                handle_key(
-                    app,
-                    key.code,
-                    &before_flat,
-                    &after_flat,
-                    before_root,
-                    after_root,
-                    &caches,
-                    before_src,
-                    after_src,
-                    before_hash,
-                    after_hash,
-                    &before,
-                    &after,
-                );
-            }
+        if app.modal.is_some() {
+            open_request = handle_modal_key(
+                app,
+                key.code,
+                &state.before_flat,
+                &state.after_flat,
+                state.before_root,
+                state.after_root,
+                &state.caches,
+                state.before_src,
+                state.after_src,
+            );
+        } else {
+            handle_key(
+                app,
+                key.code,
+                &state.before_flat,
+                &state.after_flat,
+                state.before_root,
+                state.after_root,
+                &state.caches,
+                state.before_src,
+                state.after_src,
+                before_hash,
+                after_hash,
+                &before,
+                &after,
+            );
         }
 
-        // Applied after the borrows above (`before_root`/`before_flat`/... all borrow from
+        needs_redraw = true;
+
+        // Applied after the borrows above (`state`, `before_hash`/`after_hash`, all borrowing from
         // `before`/`after`) have had their last use, so reassigning here is sound: the compiler
         // ends those borrows at last-use, not at the end of the lexical scope.
         match open_request {
