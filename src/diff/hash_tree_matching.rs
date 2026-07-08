@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use tree_sitter::Node;
 
@@ -36,7 +36,7 @@ pub(crate) struct HashMatchSpec {
     /// Which per-node hash map to read on the before side (full or structural).
     pub node_to_hash: fn(&ASTMetadata) -> &HashMap<usize, u64>,
     /// The corresponding reverse map on the after side.
-    pub hash_to_nodes: fn(&ASTMetadata) -> &HashMap<u64, HashSet<usize>>,
+    pub hash_to_nodes: fn(&ASTMetadata) -> &HashMap<u64, Vec<usize>>,
     /// Classifies one paired (before, after) node: the operation and its cost. Full-hash matches
     /// are `Identical` by construction; structural matches compare the nodes' text to decide
     /// between `Identical` and `Update`.
@@ -101,8 +101,9 @@ pub(crate) fn solve_with_node_list(
 
         // Skip after nodes already claimed - by an earlier pass, or by a previous before-node in
         // this same hash group - so duplicated code pairs up copy-for-copy instead of stealing a
-        // match that belongs to another pair. Which unclaimed copy wins is arbitrary (`HashSet`
-        // iteration order), which is fine: all candidates are equivalent under this pass's hash.
+        // match that belongs to another pair. Which unclaimed copy wins is deterministic (`Vec`
+        // in the same order `hash::hash_code` visited the nodes, not a `HashSet`'s hash-seeded
+        // bucket order), so the same input always produces the same pairing.
         let Some(&after_node_id) = after_candidates
             .iter()
             .find(|&&id| !diff.after_node_map.contains_key(&id))

@@ -36,10 +36,11 @@ use crate::code::{ASTMetadata, Code};
 *
 * The metadata structure will be populated with:
 *   - node_to_full_hash: Map from node IDs to full hashes
-*   - full_hash_to_node: Reverse map from full hashes to sets of node IDs (since multiple nodes
-*     can have the same full hash)
+*   - full_hash_to_node: Reverse map from full hashes to node IDs (since multiple nodes can have
+*     the same full hash), in the deterministic order this function visits them
 *   - node_to_structural_hash: Map from node IDs to structural hashes
-*   - structural_hash_to_node: Reverse map from structural hashes to sets of node IDs
+*   - structural_hash_to_node: Reverse map from structural hashes to node IDs, same ordering
+*     guarantee as full_hash_to_node
 *
 * Note that TS Node IDs are semi-stable. The TS documentation goes into detail, but for our purpose
 * they are stable between edits and re-parsing, and since we do neither we are ok.
@@ -91,7 +92,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             .full_hash_to_node
             .entry(full_hash)
             .or_default()
-            .insert(node_id);
+            .push(node_id);
 
         // Store structural hash mappings
         metadata
@@ -101,7 +102,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             .structural_hash_to_node
             .entry(structural_hash)
             .or_default()
-            .insert(node_id);
+            .push(node_id);
 
         // Push children to stack for processing
         for child in node.children(&mut cursor) {

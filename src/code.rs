@@ -21,7 +21,7 @@ pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
 
 use anyhow::{Result, anyhow};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 
 /**
@@ -218,6 +218,24 @@ pub struct ASTNodeMetadata {
     pub text: String,
     /// Children IDs
     pub children: Vec<usize>,
+    /// Byte offset where this node starts in the source.
+    ///
+    /// Tree-sitter node ids are arena slots - stable within one parse, but not across separate
+    /// parses of identical source (allocator/arena layout can differ run to run). Any tie-break
+    /// that needs to be reproducible *across* parses (and therefore across process launches) must
+    /// sort by a property of the source text, not by node id. `start_byte` is exactly that: a
+    /// pure function of the parse tree's shape, identical for the "same" node no matter which
+    /// process or arena produced it.
+    ///
+    /// Not unique on its own: an ancestor and its leftmost descendant (e.g. an
+    /// `expression_statement` and the `call_expression` that starts it) always share a
+    /// `start_byte`. Pair with `preorder_index` wherever a tie-break needs to be both parse-stable
+    /// *and* guaranteed unique.
+    pub start_byte: usize,
+    /// This node's index in a preorder (root, then children left to right) walk of the tree.
+    /// Unique per node and, like `start_byte`, a pure function of the tree's shape - not the
+    /// arena that happened to produce it - so it's safe to use across separate parses.
+    pub preorder_index: usize,
 }
 
 /**
@@ -233,19 +251,27 @@ pub struct ASTMetadata {
     /// values of the node and it's entire subtree, in order. The nodes are identified by their
     /// treesitter node id.
     pub node_to_full_hash: HashMap<usize, u64>,
-    /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node id>.
+    /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node ids>.
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
     /// declaration called "i" will hash to the same hash. Therefore, the map is actually going from
-    /// a hash to a set of nodes.
-    pub full_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// a hash to a list of nodes.
+    ///
+    /// Deliberately a `Vec`, not a `HashSet`: nodes are pushed in the same deterministic traversal
+    /// order every time (see `hash::hash_code`), so which duplicate a caller picks first (e.g.
+    /// `hash_tree_matching::solve_with_node_list`'s candidate selection) is reproducible run to
+    /// run. A `HashSet` here previously made that choice depend on the hasher's per-instance random
+    /// seed, silently changing codediff's output between otherwise-identical runs whenever a hash
+    /// had more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).
+    /// There are never true duplicate entries within one list (each node is visited exactly once),
+    /// so this loses nothing a `HashSet` provided.
+    pub full_hash_to_node: HashMap<u64, Vec<usize>>,
     /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
     /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
     /// changes. The nodes are identified by their treesitter node id.
     pub node_to_structural_hash: HashMap<usize, u64>,
-    /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node id>
-    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration will hash to the same structural hash. Therefore, the map value is a set.
-    pub structural_hash_to_node: HashMap<u64, HashSet<usize>>,
+    /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node ids>. See
+    /// `full_hash_to_node` for why this is a `Vec`, not a `HashSet`.
+    pub structural_hash_to_node: HashMap<u64, Vec<usize>>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: HashMap<usize, usize>,
     /// node.id() -> depth (root = 0, its children = 1, ...)

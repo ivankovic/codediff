@@ -158,6 +158,7 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 
     let mut stack = Vec::new();
     stack.push(root_node);
+    let mut preorder_index = 0usize;
 
     while let Some(node) = stack.pop() {
         let node_id = node.id();
@@ -177,11 +178,16 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
                 kind,
                 text,
                 children,
+                start_byte: node.start_byte(),
+                preorder_index,
             },
         );
+        preorder_index += 1;
 
-        // Push children to stack
-        for child in node.children(&mut node.walk()) {
+        // Push children in reverse so the stack (LIFO) pops them back out left-to-right, keeping
+        // `preorder_index` a genuine preorder (root, then children in document order).
+        let mut child_cursor = node.walk();
+        for child in node.children(&mut child_cursor).collect::<Vec<_>>().into_iter().rev() {
             stack.push(child);
         }
     }

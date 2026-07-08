@@ -1433,16 +1433,35 @@ fn validate_fresh_matches(
         depth
     };
 
-    let mut pairs: Vec<(usize, usize, usize)> = before_decision
+    // Ordered by depth, then by document position, then by preorder index (not node id):
+    // `before_decision` is a `HashMap`, so the source order here is hash-seeded, and node ids are
+    // arena slots that aren't stable across separate parses of identical source - a node_id
+    // tiebreak would still let a demotion cascade differently between process runs even though it
+    // looks stable within one. `start_byte` alone isn't enough either: an ancestor and its
+    // leftmost descendant share a start byte, so ties there still need breaking - `preorder_index`
+    // is unique per node and, like `start_byte`, a pure function of the tree's shape.
+    let mut pairs: Vec<(usize, usize, usize, usize, usize, usize, usize)> = before_decision
         .iter()
         .filter_map(|(&b, d)| match d {
-            BeforeDecision::Match(a) => Some((depth_of(b), b, *a)),
+            BeforeDecision::Match(a) => {
+                let before_info = ctx.before_meta.node_info.get(&b)?;
+                let after_info = ctx.after_meta.node_info.get(a)?;
+                Some((
+                    depth_of(b),
+                    before_info.start_byte,
+                    after_info.start_byte,
+                    before_info.preorder_index,
+                    after_info.preorder_index,
+                    b,
+                    *a,
+                ))
+            }
             BeforeDecision::Delete => None,
         })
         .collect();
     pairs.sort_unstable();
 
-    for (_, b, a) in pairs {
+    for (_, _, _, _, _, b, a) in pairs {
         if before_decision.get(&b) != Some(&BeforeDecision::Match(a)) {
             continue;
         }
@@ -1553,16 +1572,29 @@ fn pull_up_wrapped_matches(
     before_decision: &mut HashMap<usize, BeforeDecision>,
     after_decision: &mut HashMap<usize, AfterDecision>,
 ) {
-    let mut pairs: Vec<(usize, usize)> = before_decision
+    // Ordered by document position, then by preorder index, not node id - see the identical
+    // rationale on the sort in `validate_fresh_matches`.
+    let mut pairs: Vec<(usize, usize, usize, usize, usize, usize)> = before_decision
         .iter()
         .filter_map(|(&b, d)| match d {
-            BeforeDecision::Match(a) => Some((b, *a)),
+            BeforeDecision::Match(a) => {
+                let before_info = before_meta.node_info.get(&b)?;
+                let after_info = after_meta.node_info.get(a)?;
+                Some((
+                    before_info.start_byte,
+                    after_info.start_byte,
+                    before_info.preorder_index,
+                    after_info.preorder_index,
+                    b,
+                    *a,
+                ))
+            }
             BeforeDecision::Delete => None,
         })
         .collect();
     pairs.sort_unstable();
 
-    for (b, a) in pairs {
+    for (_, _, _, _, b, a) in pairs {
         // A previous iteration may have retargeted or demoted this pair.
         if before_decision.get(&b) != Some(&BeforeDecision::Match(a)) {
             continue;
@@ -1779,7 +1811,19 @@ fn promote_same_slot_pairs(
             queue.push((pb, t));
         }
     }
-    queue.sort_unstable();
+    // Ordered by document position, then by preorder index, not node id - see the identical
+    // rationale on the sort in `validate_fresh_matches`. Position-sorting still groups equal
+    // `(b, a)` pairs adjacently (they share both keys), so the following `dedup` is unaffected.
+    queue.sort_unstable_by_key(|&(b, a)| {
+        let before_info = before_meta.node_info.get(&b);
+        let after_info = after_meta.node_info.get(&a);
+        (
+            before_info.map(|i| i.start_byte).unwrap_or(usize::MAX),
+            after_info.map(|i| i.start_byte).unwrap_or(usize::MAX),
+            before_info.map(|i| i.preorder_index).unwrap_or(usize::MAX),
+            after_info.map(|i| i.preorder_index).unwrap_or(usize::MAX),
+        )
+    });
     queue.dedup();
 
     let mut seen: HashSet<(usize, usize)> = HashSet::new();
@@ -2320,6 +2364,8 @@ mod tests {
                     kind: kind.to_string(),
                     text: text.to_string(),
                     children: children.to_vec(),
+                    start_byte: id,
+                    preorder_index: id,
                 },
             );
         }
@@ -2670,6 +2716,8 @@ mod tests {
                     kind: kind.clone(),
                     text: text.clone(),
                     children: children.clone(),
+                    start_byte: *id,
+                    preorder_index: *id,
                 },
             );
         }
@@ -3787,6 +3835,8 @@ mod tests {
                         kind: "token".to_string(),
                         text: tok.to_string(),
                         children: vec![],
+                        start_byte: id,
+                        preorder_index: id,
                     },
                 );
                 // Use the token text as hash so identical tokens match.
@@ -3801,6 +3851,8 @@ mod tests {
                     kind: "token_tree".to_string(),
                     text: String::new(),
                     children: child_ids.clone(),
+                    start_byte: root_id,
+                    preorder_index: root_id,
                 },
             );
             meta.node_to_full_hash.insert(root_id, 0); // different hashes → will not short-circuit

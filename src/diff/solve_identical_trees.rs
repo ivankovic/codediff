@@ -43,12 +43,20 @@ fn find_big_enough_nodes(metadata: &ASTMetadata) -> Vec<usize> {
         let is_big_enough = depth >= MIN_DEPTH && subtree_size >= MIN_SUBTREE_SIZE;
 
         if is_reference_node || is_big_enough {
-            big_enough_nodes.push((node_id, subtree_size));
+            big_enough_nodes.push((node_id, subtree_size, info.start_byte));
         }
     }
 
-    big_enough_nodes.sort_by(|a, b| b.1.cmp(&a.1));
-    big_enough_nodes.into_iter().map(|(node_id, _)| node_id).collect()
+    // `metadata.node_info` is a `HashMap`, so the loop above visits nodes in a hash-seeded (not
+    // deterministic) order. Sorting by `subtree_size` alone doesn't fix that: duplicate/repeated
+    // code produces many equal-size nodes, and a stable sort only preserves whatever order they
+    // arrived in. Breaking ties by `start_byte` (document position) makes the full ordering - and
+    // therefore which duplicate a caller processes first - deterministic. This must be `start_byte`
+    // and not `node_id`: node ids are tree-sitter arena slots, stable within one parse but not
+    // across separate parses of identical source, so a node_id tiebreak would still let the result
+    // vary between process runs even though it looks stable within a single run.
+    big_enough_nodes.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
+    big_enough_nodes.into_iter().map(|(node_id, _, _)| node_id).collect()
 }
 
 /**
@@ -114,8 +122,9 @@ mod tests {
     /// what left the remaining copies to be mis-reported as insert/delete pairs by later passes).
     ///
     /// Which copy pairs with which is deliberately not asserted: all candidates are equivalent
-    /// under the full hash, and `HashSet` iteration order makes the specific assignment vary
-    /// between process runs.
+    /// under the full hash, so the specific assignment is an internal implementation detail (the
+    /// order `full_hash_to_node`'s candidate list was built in) rather than a documented contract
+    /// - even though, unlike when this test was written, that order is now deterministic.
     #[test]
     fn duplicate_hash_group_matches_each_copy_to_a_distinct_after_node() {
         // `solve_identical_trees` only ever considers "reference nodes" (`reference_nodes.rs`;

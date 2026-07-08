@@ -68,22 +68,27 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let after_parents = build_parent_map(&after_metadata);
 
     // Every candidate on the deleted side, largest subtree first, so a moved container is
-    // re-mapped as one piece before its own children are considered separately.
-    let mut deleted: Vec<(usize, usize)> = diff
+    // re-mapped as one piece before its own children are considered separately. Ties broken by
+    // `start_byte` (document position), not `node_id`: `diff.before_node_map` is a `HashMap`, so
+    // the source order here is already hash-seeded, and node ids are arena slots that aren't
+    // stable across separate parses of identical source - only a source-position tiebreak keeps
+    // the result reproducible across process runs, not just within one.
+    let mut deleted: Vec<(usize, usize, usize)> = diff
         .before_node_map
         .iter()
         .filter(|&(_, &target)| target == 0)
         .filter_map(|(&b, _)| {
             let size = before_metadata.node_to_subtree_size.get(&b).copied()?;
-            (size >= MIN_MOVE_SUBTREE_SIZE).then_some((size, b))
+            let start_byte = before_metadata.node_info.get(&b)?.start_byte;
+            (size >= MIN_MOVE_SUBTREE_SIZE).then_some((size, start_byte, b))
         })
         .collect();
-    deleted.sort_unstable_by(|x, y| y.cmp(x));
+    deleted.sort_unstable_by(|x, y| y.0.cmp(&x.0).then(x.1.cmp(&y.1)));
 
     let mut claimed_before: HashSet<usize> = HashSet::new();
     let mut claimed_after: HashSet<usize> = HashSet::new();
 
-    for (_, b) in deleted {
+    for (_, _, b) in deleted {
         if claimed_before.contains(&b) {
             continue;
         }
@@ -97,8 +102,10 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             continue;
         };
 
-        // `full_hash_to_node`'s values are HashSets (randomized iteration order), so order
-        // candidates by document position for run-to-run determinism.
+        // `full_hash_to_node`'s candidates already arrive in a deterministic order (see its doc
+        // comment), but not a document-position one - re-order by document position so that, among
+        // several equally-valid move targets, the earliest one in the file wins, which is what a
+        // human skimming the diff would expect.
         let mut candidates: Vec<usize> = candidates
             .iter()
             .copied()
