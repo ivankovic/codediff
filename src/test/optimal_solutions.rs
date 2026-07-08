@@ -38,6 +38,8 @@ mod cpp_fix_segfault;
 #[cfg(test)]
 mod cpp_optimize_algorithm;
 #[cfg(test)]
+mod go_lazygit_add_to_if_condition;
+#[cfg(test)]
 mod go_user_slices_library;
 #[cfg(test)]
 mod java_add_exception_handling;
@@ -68,7 +70,11 @@ mod kotlin_add_validation;
 #[cfg(test)]
 mod kotlin_fix_loop_bug;
 #[cfg(test)]
+mod kotlin_nextcloud_remove_function;
+#[cfg(test)]
 mod kotlin_refactor_function;
+#[cfg(test)]
+mod kotlin_remove_function;
 #[cfg(test)]
 mod kotlin_small_api_change;
 #[cfg(test)]

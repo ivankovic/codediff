@@ -45,7 +45,7 @@ Go,gin-gonic-gin.git,088cdd74d42df20d4e58aa17d3f4403a22e8a545,debug.go,
 Go,gin-gonic-gin.git,6f94fd05c98d1043e329398f6f742dc680be9b29,examples/custom-validation/server.go,
 Go,gin-gonic-gin.git,c9b344118f6426e9211c2e4530ac983a541f437a,examples/upload-file/single/main.go,
 Go,jesseduffield-lazygit.git,89a0542a978b525dab97607dca9c6ae51ea95caf,pkg/gui/presentation/submodules.go,
-Go,jesseduffield-lazygit.git,c5acad777d695425491dc26319260ced9e81677d,pkg/gui/patch_exploring/state.go,
+Go,jesseduffield-lazygit.git,c5acad777d695425491dc26319260ced9e81677d,pkg/gui/patch_exploring/state.go,go-lazygit-add-to-if-condition
 Go,kubernetes-kubernetes.git,69167c14bd5a582823eec9c361c066780cfa01b0,pkg/kubelet/apis/pods/server_unit_test.go,
 Go,ollama-ollama.git,0dabb4ef6a1aab240a59b6bb4ef82372d335e3a9,parser/parser.go,
 Go,prometheus-prometheus.git,e14795bbf4fbd1837a9e3428aafb40b4b1dda99d,tsdb/tsdbutil/dir_locker_test.go,
@@ -90,8 +90,8 @@ JavaScript,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tes
 JavaScript,mozilla-firefox-firefox.git,f5848b1deb702ab2647691f2591c8a5410fb5541,toolkit/modules/IndexedDB.sys.mjs,
 JavaScript,twbs-bootstrap.git,2a1bf52b73fc9a97f6fef75aa1b29b3e9f0288b3,js/dist/util/swipe.js,
 Kotlin,immich-app-immich.git,c403e03a42bf3847d154430693f31b0f39ad6134,mobile/android/app/src/main/kotlin/app/alextran/immich/core/NetworkApiPlugin.kt,kotlin-small-api-change
-Kotlin,mozilla-firefox-firefox.git,5541db34cccc8174bbed160fa05b2d610137a19e,mobile/android/android-components/components/lib/llm-mlpa/src/main/java/mozilla/components/lib/llm/mlpa/MlpaLlmProvider.kt,
-Kotlin,nextcloud-android.git,1af8f6b1849b4f751387c876ca4c2e3283e4b490,app/src/main/java/com/nextcloud/client/jobs/BackgroundJobManagerImpl.kt,
+Kotlin,mozilla-firefox-firefox.git,5541db34cccc8174bbed160fa05b2d610137a19e,mobile/android/android-components/components/lib/llm-mlpa/src/main/java/mozilla/components/lib/llm/mlpa/MlpaLlmProvider.kt,kotlin-remove-function
+Kotlin,nextcloud-android.git,1af8f6b1849b4f751387c876ca4c2e3283e4b490,app/src/main/java/com/nextcloud/client/jobs/BackgroundJobManagerImpl.kt,kotlin-nextcloud-remove-function
 Kotlin,nextcloud-android.git,814a5df0488146e79a7d8092a46098176af8ea39,app/src/main/java/com/nextcloud/client/assistant/task/TaskView.kt,
 Kotlin,nextcloud-android.git,9142730334c907913bc1b59353dd4a2a014916c1,app/src/androidTest/java/com/nextcloud/client/ActivitiesActivityIT.kt,
 Kotlin,nextcloud-android.git,ae3e759e615367e0a78472eb83fc7c94634fca30,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadHelper.kt,
