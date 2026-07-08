@@ -37,8 +37,8 @@ use std::fs;
 use std::path::PathBuf;
 use tree_sitter::Node;
 
-use crate::diff::{ASTDiff, ASTMappingOperation, NodeCache};
-use crate::test::helper::node_for_path;
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, NodeCache};
+use crate::test::helper::{node_for_path, path_for_node};
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
@@ -356,9 +356,79 @@ fn check_entry(
     Ok(())
 }
 
+/// Describes one `(before_id, after_id)` pair for a non-determinism report: `"0"` for a
+/// delete/insert null-id, otherwise the node's path (resolved via `node_cache`), so the report
+/// reads like the rest of this file's mismatch messages instead of raw arena IDs.
+fn describe_node_id(node_id: usize, cache: &HashMap<usize, Node>) -> String {
+    if node_id == 0 {
+        return "0".to_string();
+    }
+    match cache.get(&node_id) {
+        Some(&node) => format!("{:?}", path_for_node(node)),
+        None => "<unknown node>".to_string(),
+    }
+}
+
+/// Describes what a run decided for one mapping key, or "unmapped" if that run has no entry for it.
+fn describe_run_mapping(mapping: Option<&ASTMapping>) -> String {
+    match mapping {
+        Some(m) => format!("{:?} (reason {:?})", m.operation, m.reason),
+        None => "unmapped".to_string(),
+    }
+}
+
+/// Compares two `diff_code` runs computed from the *same* already-parsed before/after trees (so
+/// node IDs are directly comparable across them) and describes every `(before_id, after_id)` pair
+/// whose presence or `ASTMappingOperation` differs between the two - i.e. every sign that
+/// `diff_code` is not a pure function of its inputs. Empty when the runs fully agree.
+fn describe_nondeterminism(
+    run_number: usize,
+    baseline: &ASTDiff,
+    repeat: &ASTDiff,
+    node_cache: &NodeCache,
+) -> Vec<String> {
+    let mut keys: Vec<(usize, usize)> = baseline
+        .mapping
+        .keys()
+        .chain(repeat.mapping.keys())
+        .copied()
+        .collect();
+    keys.sort_unstable();
+    keys.dedup();
+
+    keys.into_iter()
+        .filter_map(|key| {
+            let base_entry = baseline.mapping.get(&key);
+            let repeat_entry = repeat.mapping.get(&key);
+            let differs = match (base_entry, repeat_entry) {
+                (Some(a), Some(b)) => a.operation != b.operation,
+                (a, b) => a.is_some() != b.is_some(),
+            };
+            if !differs {
+                return None;
+            }
+            let (before_id, after_id) = key;
+            Some(format!(
+                "Non-deterministic diff: run 1 and run {run_number} disagree on {} <-> {}: {} vs {}",
+                describe_node_id(before_id, &node_cache.before),
+                describe_node_id(after_id, &node_cache.after),
+                describe_run_mapping(base_entry),
+                describe_run_mapping(repeat_entry),
+            ))
+        })
+        .collect()
+}
+
 /**
 * Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
 * returns every point of disagreement between the two (empty if they fully agree).
+*
+* Also runs `diff_code` two more times on the same parsed trees and compares all three results
+* against each other: `diff_code` is supposed to be a pure function of its inputs, so any
+* difference between repeated calls means some pass is relying on unordered iteration (e.g. a
+* `HashSet` breaking a tie) to pick a winner, which would otherwise silently make every mismatch
+* count in this suite - and in `benchmark_optimal_solutions`, which shares this function -
+* unreliable from run to run.
 *
 * Shared by `assert_matches_human_mapping` (which just turns a non-empty result into a test
 * failure) and the `benchmark_optimal_solutions` binary (which wants the raw count across every
@@ -376,9 +446,21 @@ pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
     let diff = crate::diff::diff_code(&before, &after);
     let diff_ast = diff.ast.context("Diff has no AST")?;
 
-    // Check that the produced diff is valid
     let node_cache = NodeCache::build(&before, &after);
     let mut mismatches = Vec::new();
+
+    for run_number in 2..=3 {
+        let repeat = crate::diff::diff_code(&before, &after);
+        let repeat_ast = repeat.ast.context("Diff has no AST")?;
+        mismatches.extend(describe_nondeterminism(
+            run_number,
+            &diff_ast,
+            &repeat_ast,
+            &node_cache,
+        ));
+    }
+
+    // Check that the produced diff is valid
     if !diff_ast.is_valid(&before, &after, &node_cache) {
         mismatches.push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
     }
@@ -422,6 +504,8 @@ pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::{Code, Language};
+    use crate::diff::ASTMappingReason;
     use crate::test::helper::path_for_node;
 
     #[test]
@@ -531,5 +615,83 @@ mod tests {
         assert!(!mismatches.is_empty());
 
         Ok(())
+    }
+
+    #[test]
+    fn describe_nondeterminism_is_empty_when_runs_agree() {
+        let before = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let after = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        let mut baseline = ASTDiff::default();
+        baseline.add_mapping(
+            before_root.id(),
+            after_root.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
+        );
+        let repeat = baseline.clone();
+
+        assert!(describe_nondeterminism(2, &baseline, &repeat, &node_cache).is_empty());
+    }
+
+    #[test]
+    fn describe_nondeterminism_reports_a_differing_operation() {
+        let before = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let after = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let key = (before_root.id(), after_root.id());
+
+        let mut baseline = ASTDiff::default();
+        baseline.add_mapping(
+            key.0,
+            key.1,
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
+        );
+
+        let mut repeat = baseline.clone();
+        repeat.mapping.get_mut(&key).unwrap().operation = ASTMappingOperation::Update;
+
+        let report = describe_nondeterminism(3, &baseline, &repeat, &node_cache);
+        assert_eq!(report.len(), 1, "{report:?}");
+        assert!(report[0].contains("run 1 and run 3"), "{}", report[0]);
+        assert!(report[0].contains("Identical"), "{}", report[0]);
+        assert!(report[0].contains("Update"), "{}", report[0]);
+    }
+
+    #[test]
+    fn describe_nondeterminism_reports_a_pair_missing_from_one_run() {
+        let before = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let after = Code::from_string("fn f() { 1 + 1; }", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        let mut baseline = ASTDiff::default();
+        baseline.add_mapping(
+            before_root.id(),
+            after_root.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
+        );
+        let repeat = ASTDiff::default();
+
+        let report = describe_nondeterminism(2, &baseline, &repeat, &node_cache);
+        assert_eq!(report.len(), 1, "{report:?}");
+        assert!(report[0].contains("unmapped"), "{}", report[0]);
     }
 }

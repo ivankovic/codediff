@@ -75,7 +75,44 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
                         reason: ASTMappingReason::CommentSibling,
                     },
                 );
+
+                // The comment node's own text matched byte-for-byte, so every descendant (e.g.
+                // the `//`/`/*`/`*/` marker tokens) is identical too - map them now. Without
+                // this, `PostorderIndexer` would prune the whole subtree the moment it sees the
+                // comment node itself already mapped, leaving those descendants with no mapping
+                // at all (not even a delete) for every later pass to find.
+                map_identical_descendants(before_comment_node, after_comment_node, diff);
             }
+        }
+    }
+}
+
+/// Recursively map every descendant of an already-matched, byte-identical pair - same idiom as
+/// `solve_identical_trees`/`solve_identical_diagnostic_statements`. Safe here because the caller
+/// only reaches this after confirming the comment nodes' full text is identical, which guarantees
+/// their subtrees line up 1:1 in both structure and content.
+fn map_identical_descendants<'a>(before_node: Node<'a>, after_node: Node<'a>, diff: &mut ASTDiff) {
+    let mut stack = vec![(before_node, after_node)];
+    while let Some((before_parent, after_parent)) = stack.pop() {
+        let mut before_cursor = before_parent.walk();
+        let mut after_cursor = after_parent.walk();
+        let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
+        let after_children: Vec<_> = after_parent.children(&mut after_cursor).collect();
+
+        for (before_child, after_child) in before_children.into_iter().zip(after_children) {
+            if diff.before_node_map.contains_key(&before_child.id()) {
+                continue;
+            }
+            diff.add_mapping(
+                before_child.id(),
+                after_child.id(),
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Identical,
+                    reason: ASTMappingReason::IdenticalHashOfAncestor,
+                },
+            );
+            stack.push((before_child, after_child));
         }
     }
 }
@@ -147,5 +184,29 @@ mod tests {
             .find(|m| m.reason == ASTMappingReason::CommentSibling)
             .expect("leading comment should be matched via CommentSibling");
         assert_eq!(comment_mapping.operation, ASTMappingOperation::Identical);
+
+        // The comment node itself matching isn't enough - tree-sitter's Rust grammar gives
+        // `line_comment` its own `//` child. If that child isn't also mapped, later passes can
+        // never find it (its parent is already mapped, so `PostorderIndexer` prunes the whole
+        // subtree), leaving it with no mapping at all.
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let before_marker = find_first(before_root, "//").expect("before `//` token should exist");
+        assert!(
+            diff.before_node_map.contains_key(&before_marker.id()),
+            "the comment's `//` marker token should also be mapped, not just the comment node"
+        );
+    }
+
+    fn find_first<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(found) = find_first(child, kind) {
+                return Some(found);
+            }
+        }
+        None
     }
 }
