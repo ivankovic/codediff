@@ -10,10 +10,10 @@ CodeDiff must be able to process 100% of all commits in the full test dataset.
 
 The full test dataset contains the git commit history, as available on the main branch, for about
 7400 open source git repositories. The list of repositories was extracted from the Gentoo Linux
-distribution and is available in list_of_repositories.csv.
+distribution and is available in `research/list_of_repositories.csv`.
 
-A smaller list of 100 repositories, called "small" dataset is available for faster iterations when
-debugging.
+A smaller list of 100 repositories, the "small" dataset, is available in the same directory for
+faster iterations when debugging.
 
 ## Fast
 
@@ -26,15 +26,19 @@ Benchmarks are used to make sure performance doesn't regress.
 # Using the TUI
 
 `cargo run` opens a terminal UI with two panels, "Before" and "After". Terminals 220 columns or
-wider show both panels side by side; narrower terminals show one panel at a time.
+wider show both panels side by side; narrower terminals show one panel at a time. Passing two file
+paths, `cargo run -- BEFORE AFTER`, opens straight into their diff instead of an empty viewer.
 
 * `Tab` — switch the active panel.
 * `o` — open a file selector for the active panel. Once both panels have a file, the diff between
   them is computed and drawn automatically (green = inserted, red = deleted, dark green = updated,
   yellow = moved).
-* Arrow keys or `h`/`j`/`k`/`l` — move the cursor between changed ranges. The range under the
-  cursor, and the matching range on the other panel, are highlighted in blue.
-* `q` or `Esc` — quit (`Esc` cancels an open file selector instead, while one is open).
+* `c` — open the theme picker.
+* Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
+  editor. The range under the cursor, and the matching range on the other panel, are highlighted
+  in blue.
+* `Page Up`/`Page Down`/`Home`/`End` — scroll.
+* `q` or `Esc` — quit (`Esc` cancels an open dialog instead, while one is open).
 
 # License
 
@@ -59,7 +63,8 @@ humans too.
 
 The project is completely written in Rust.
 
-SQLite is used to store user configuation and other runtime data.
+User configuration (e.g. the active theme) is stored on disk via `confy`. SQLite is used
+separately, by the dataset-analysis tools in `src/bin/`, to store the stats they collect.
 
 The UI is a Terminal UI written using the excellent Ratatui and Crossterm libraries.
 
@@ -79,22 +84,22 @@ No Rust check errors are allowed. Rust check should be run frequently.
 
 Automated tests should be run frequently during coding.
 
-Benchmarks should be used to measure quality. These should be run on demand.
+Diff quality and diff speed are measured separately (see "Quality" and "Speed" below) and should
+be checked on demand, definitely before any release.
 
 ### Automated tests
 
-Each file in src/ should end with the test module for that file, as is typicall in Rust. These tests
-should test both happy-path and corner cases.
+Each file in src/ should end with the test module for that file, as is typical in Rust. These tests
+should test both happy-path and corner cases, and should use src/test/helper.rs to get handmade
+high quality test data.
 
-**Tests in src/ must run in under 1 second**.
+**Per-file unit tests must run in under 1 second.**
 
-Tests in src/ should use the src/tests/helper.rs to get handmade high quality test data. These tests
-should cover happy-path tests and corner cases extensively.
+src/test/ additionally holds slower, fixture-driven tests (e.g. src/test/optimal_solutions/, which
+checks real diffs against human-verified ground truth). **These must run in under 5 seconds.**
 
-**Tests in tests/ must run in under 5 seconds.**
-
-Semi-automated tests that run on the small and full dataset that take some time to run and should be
-run when appropriate, definitely before any release.
+Semi-automated tests that run on the small and full dataset take some time to run and should be run
+when appropriate, definitely before any release.
 
 ### How should tests handle dependencies?
 
@@ -104,11 +109,17 @@ Ideally, the real implementation is used.
 
 When necessary, e.g. for filesystem or database access, fake in-memory implementations should be used.
 
-### Benchmarks
+### Quality
 
-Automated benchmarks that use the Rust criterion library should measure the wall clock time for the
-main algorithm, the code diff, on all handmade test cases provided by src/test/helper.rs must be run
-frequently to ensure no regressions.
+`cargo run --release --bin benchmark_optimal_solutions` diffs every fixture in
+src/test/data/diffs/ that has a human-verified ground truth mapping, and reports how many nodes
+each one gets wrong. Use this to check whether a change made diffs better or worse.
+
+### Speed
+
+Automated benchmarks, using the Rust criterion library, measure the wall clock time of the main
+diffing algorithm on all handmade test cases from src/test/helper.rs. Run these frequently to
+catch performance regressions.
 
 ## Code structure
 
@@ -119,24 +130,25 @@ Some directories don't exist yet but should be created if the need arises.
 ```
 <root of the repository>
     |- /src             <- The implementation
-        |- main.rs      <- The main entry point, spawns the background threads and the UI
+        |- main.rs      <- Entry point: parses CLI args and starts the TUI
         |- code.rs      <- The struct and methods related to reading and parsing one unit of code
         |- code/        <- Sensible implementation units related to code.rs
         |- diff.rs      <- Everything related to actually diffing two or more units of code
         |- diff/        <- Sensible implementation units related to diff.rs
         |- stats.rs     <- Tools used to process large datasets to guide the design
-        |- stast/       <- Sensible implementation units related to stats.rs
-        |- app.rs       <- The app controler, responds to events and controlls the UI
-        |- tui/         <- All TUI components go in this directory
-            |- SPECS.md <- TUI specs
-        |- tui.rs       <- The visual elements of the TUI, the view
-    |- /test            <- Integration and end-to-end automated tests
+        |- stats/       <- Sensible implementation units related to stats.rs
+        |- tui.rs       <- Declares the TUI's submodules and sets up logging
+        |- tui/         <- The TUI itself: app.rs (controller), ui.rs (terminal rendering),
+        |                  components/, widgets/
+        |   |- SPECS.md <- TUI specs
+        |- test/        <- Shared test helpers, plus slower fixture-driven tests (see "Testing")
+        |- bin/         <- Standalone developer tools (benchmarking, dataset sampling, etc.)
     |- /benches         <- Benchmarks
+    |- /research        <- Datasets and analysis scripts used to guide design decisions
     |- README.md        <- This file. Only very high level information goes here
     |- AGENTS.md        <- AI-only instructions
-    |- SPECS.md         <- Detailed specifications and all decisions that were taken
-    |- REVIEW.md        <- Comments about the codebase that need to be improved uppon
-    |- TODO.md          <- List of small to  mid size TODO items that need to be fixed in the future
+    |- REVIEW.md        <- Comments about the codebase that need to be improved upon
+    |- TODO.md          <- List of small to mid size TODO items that need to be fixed in the future
 ```
 
 The SPECS.md and README.md files can exist in any subdirectory, and they always serve the same
@@ -146,4 +158,5 @@ purpose:
 *  SPECS.md - Semi-structured collection of specifications and a decision log of every decision that
    was taken during implementation.
 
-The TODO.md and REVIEW.md files are always only in the root of the repository.
+TODO.md and REVIEW.md are normally root-only. A subsystem can have its own TODO.md for issues
+specific to it (e.g. src/diff/TODO.md) - but REVIEW.md stays root-only.

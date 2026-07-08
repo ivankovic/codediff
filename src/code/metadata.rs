@@ -89,6 +89,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     crate::code::hash::hash_code(code, &mut metadata)?;
     compute_subtree_sizes(code, &mut metadata)?;
     compute_node_info(code, &mut metadata)?;
+    compute_node_depths(code, &mut metadata)?;
     discover_reference_nodes(code, &mut metadata)?;
     discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
@@ -182,6 +183,23 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         // Push children to stack
         for child in node.children(&mut node.walk()) {
             stack.push(child);
+        }
+    }
+
+    Ok(())
+}
+
+/// Compute the depth of every node (root = 0, its children = 1, ...).
+fn compute_node_depths(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
+    let ast = code.ast.as_ref().expect("AST must be parsed");
+
+    let mut stack = vec![(ast.root_node(), 0)];
+    while let Some((node, depth)) = stack.pop() {
+        metadata.node_to_depth.insert(node.id(), depth);
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push((child, depth + 1));
         }
     }
 

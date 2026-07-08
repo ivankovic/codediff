@@ -15,6 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use tree_sitter::Node;
+
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
     diff::{ASTDiff, ASTMappingOperation, NodeCache, text_range::TextRange},
@@ -132,78 +134,50 @@ fn ranges(
                             }
                         }
                         ASTMappingOperation::DeleteWithChildren => {
-                            // We are adding to the "end" of the last used range, so move it to the
-                            // right limit.
-                            last_non_move_range = last_non_move_range.right_limit();
-
-                            new_range = Some(RangeMatch {
-                                source: TextRange::from_treesitter_range(
-                                    node.range(),
-                                    &source_columns,
-                                ),
-                                destination: last_non_move_range.clone(),
-                                operation: TextOperation::Delete,
-                            });
-
+                            new_range = Some(advance_and_build_range(
+                                &mut last_non_move_range,
+                                node,
+                                &source_columns,
+                                TextOperation::Delete,
+                            ));
                             descend = false;
                         }
                         ASTMappingOperation::InsertWithChildren => {
-                            // We are adding to the "end" of the last used range, so move it to the
-                            // right limit.
-                            last_non_move_range = last_non_move_range.right_limit();
-
-                            new_range = Some(RangeMatch {
-                                source: TextRange::from_treesitter_range(
-                                    node.range(),
-                                    &source_columns,
-                                ),
-                                destination: last_non_move_range.clone(),
-                                operation: TextOperation::Insert,
-                            });
-
+                            new_range = Some(advance_and_build_range(
+                                &mut last_non_move_range,
+                                node,
+                                &source_columns,
+                                TextOperation::Insert,
+                            ));
                             descend = false;
                         }
                         ASTMappingOperation::Delete => {
                             if node.child_count() == 0 {
-                                last_non_move_range = last_non_move_range.right_limit();
-
-                                new_range = Some(RangeMatch {
-                                    source: TextRange::from_treesitter_range(
-                                        node.range(),
-                                        &source_columns,
-                                    ),
-                                    destination: last_non_move_range.clone(),
-                                    operation: TextOperation::Delete,
-                                });
+                                new_range = Some(advance_and_build_range(
+                                    &mut last_non_move_range,
+                                    node,
+                                    &source_columns,
+                                    TextOperation::Delete,
+                                ));
                             }
                         }
                         ASTMappingOperation::Insert => {
                             if node.child_count() == 0 {
-                                last_non_move_range = last_non_move_range.right_limit();
-
-                                new_range = Some(RangeMatch {
-                                    source: TextRange::from_treesitter_range(
-                                        node.range(),
-                                        &source_columns,
-                                    ),
-                                    destination: last_non_move_range.clone(),
-                                    operation: TextOperation::Insert,
-                                });
+                                new_range = Some(advance_and_build_range(
+                                    &mut last_non_move_range,
+                                    node,
+                                    &source_columns,
+                                    TextOperation::Insert,
+                                ));
                             }
                         }
                         ASTMappingOperation::Update => {
-                            // We are adding to the "end" of the last used range, so move it to the
-                            // right limit.
-                            last_non_move_range = last_non_move_range.right_limit();
-
-                            new_range = Some(RangeMatch {
-                                source: TextRange::from_treesitter_range(
-                                    node.range(),
-                                    &source_columns,
-                                ),
-                                destination: last_non_move_range.clone(),
-                                operation: TextOperation::Update,
-                            });
+                            new_range = Some(advance_and_build_range(
+                                &mut last_non_move_range,
+                                node,
+                                &source_columns,
+                                TextOperation::Update,
+                            ));
                         }
                         _ => {
                             // For other operations, just allow the descent into the tree
@@ -245,6 +219,23 @@ fn ranges(
     }
 
     ranges
+}
+
+/// Build the `RangeMatch` for a non-Identical, non-Move node: advances `last_non_move_range` to
+/// its own right limit (we're appending after whatever was last placed) and anchors the new
+/// range's destination there, since the node has no real destination-side counterpart to point at.
+fn advance_and_build_range(
+    last_non_move_range: &mut TextRange,
+    node: Node,
+    columns: &[usize],
+    operation: TextOperation,
+) -> RangeMatch {
+    *last_non_move_range = last_non_move_range.right_limit();
+    RangeMatch {
+        source: TextRange::from_treesitter_range(node.range(), columns),
+        destination: last_non_move_range.clone(),
+        operation,
+    }
 }
 
 /// Take the destination range, and merge it into the source range to recover insertions/deletions.

@@ -94,7 +94,11 @@ impl TextRange {
         }
     }
 
-    /// Returns true if the range is a zero range.
+    /// Returns true if this is exactly the `(0,0)-(0,0)` range produced by `zero()`.
+    ///
+    /// This is *not* a general emptiness check (a range can be empty, i.e. `start == end`, at any
+    /// position) - callers use it to detect the `zero()` sentinel, e.g. "no range accumulated yet"
+    /// in `text.rs`'s range-building loop.
     pub fn is_zero(&self) -> bool {
         self.start_row == 0 && self.start_column == 0 && self.end_row == 0 && self.end_column == 0
     }
@@ -111,6 +115,10 @@ impl TextRange {
         let mut end_row = ts_range.end_point.row;
         let mut end_column = ts_range.end_point.column;
 
+        // If the end point lands exactly at the end of its row, normalize it to (next row, 0) per
+        // this module's convention (see the doc comment above). `end_row < columns_per_row.len()`
+        // both guards the index below and skips normalization when `end_row` is already one past
+        // the last real row - i.e. already in normalized form, nothing to do.
         if end_row < columns_per_row.len() && columns_per_row[end_row] == end_column {
             end_row += 1;
             end_column = 0;
@@ -232,12 +240,7 @@ fn row_col_to_char_index(row: usize, col: usize, code: &str) -> usize {
         char_index += 1;
     }
 
-    // If we reach the end of the string, check if the position is at the end
-    if current_row == row && current_col <= col {
-        return char_index;
-    }
-
-    // Position is beyond the string - return the string length
+    // Position is at or beyond the end of the string - clamp to the string length.
     char_index
 }
 

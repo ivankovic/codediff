@@ -21,6 +21,93 @@ use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 
+/// TUNING PARAMETERS for semantically structural node matching.
+/// For matched semantically structural node pairs, only run APTED if at least one side
+/// is "big enough" OR if their structural hashes differ (indicating structural changes).
+/// This avoids expensive O(n²) computations on small, structurally-identical pairs.
+/// 
+/// Note: This optimization only applies to languages that have semantically structural nodes defined
+/// (Rust, Python, Go, Kotlin, Java, etc.). Languages without semantically structural nodes (like C)
+/// are unaffected.
+const MIN_SEMANTIC_DEPTH: usize = 2;
+const MIN_SEMANTIC_SUBTREE_SIZE: usize = 20;
+
+/// Compute depth for each node in the AST, given parent-child relationships.
+fn compute_node_depths(metadata: &ASTMetadata) -> HashMap<usize, usize> {
+    let mut depths = HashMap::new();
+    let mut stack = Vec::new();
+    
+    // Find the actual root by looking for nodes that are not children of any other node
+    let all_children: std::collections::HashSet<usize> = metadata.node_info.values()
+        .flat_map(|info| info.children.iter().copied())
+        .collect();
+    
+    // Root nodes are those that are not children of any other node
+    let root_nodes: Vec<usize> = metadata.node_info.keys()
+        .filter(|&node_id| !all_children.contains(node_id))
+        .copied()
+        .collect();
+    
+    // Set depth 0 for root nodes and start BFS
+    for &root_id in &root_nodes {
+        depths.insert(root_id, 0);
+        stack.push((root_id, 0));
+    }
+    
+    // BFS to compute depths
+    while let Some((node_id, depth)) = stack.pop() {
+        if let Some(info) = metadata.node_info.get(&node_id) {
+            for &child_id in &info.children {
+                let child_depth = depth + 1;
+                depths.entry(child_id).or_insert(child_depth);
+                stack.push((child_id, child_depth));
+            }
+        }
+    }
+    
+    depths
+}
+
+/// Check if a semantically structural node is "big enough" to warrant running APTED.
+/// Returns true if the node meets the depth and subtree size criteria.
+fn is_big_enough_semantic_node(node_id: usize, metadata: &ASTMetadata, depths: &HashMap<usize, usize>) -> bool {
+    let depth = depths.get(&node_id).copied().unwrap_or(0);
+    let subtree_size = metadata.node_to_subtree_size.get(&node_id).copied().unwrap_or(0);
+    depth >= MIN_SEMANTIC_DEPTH && subtree_size >= MIN_SEMANTIC_SUBTREE_SIZE
+}
+
+/// Check if we should run APTED on a matched semantically structural node pair.
+/// Returns true if at least one node is big enough OR if structural hashes differ.
+/// 
+/// Rationale: If both nodes are small and have matching structural hashes, the tree structure
+/// is identical. In this case, any differences are text-only (e.g., a changed constant) and will
+/// be caught efficiently by later passes. Running APTED (O(n²)) on such pairs is wasteful.
+fn should_run_apted(
+    before_id: usize,
+    after_id: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    before_depths: &HashMap<usize, usize>,
+    after_depths: &HashMap<usize, usize>,
+) -> bool {
+    // Run APTED if at least one side is big enough
+    if is_big_enough_semantic_node(before_id, before_meta, before_depths)
+        || is_big_enough_semantic_node(after_id, after_meta, after_depths) {
+        return true;
+    }
+    
+    // Also run if structural hashes differ (structural changes need APTED)
+    let b_struct = before_meta.node_to_structural_hash.get(&before_id);
+    let a_struct = after_meta.node_to_structural_hash.get(&after_id);
+    if b_struct != a_struct {
+        return true;
+    }
+    
+    // Both nodes are small and structurally identical - skip APTED
+    // (differences will be caught by later passes)
+    false
+}
+
 /// Recursively add Identical mappings for an already-verified identical subtree pair.
 ///
 /// Both subtrees must have the same full hash (caller's responsibility). All descendants are
@@ -114,6 +201,10 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 
+    // Compute depths for both trees for the big-enough heuristic
+    let before_depths = compute_node_depths(&before_metadata);
+    let after_depths = compute_node_depths(&after_metadata);
+
     let language = before.metadata.language.as_ref();
 
     // Pass 0a: Rust — top-level macro_invocations with large flat token_tree bodies.
@@ -139,24 +230,44 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             let after_methods = methods_in_class(after_class_id, &after_metadata);
             for (method_name, before_method_id) in &before_methods {
                 if let Some(&after_method_id) = after_methods.get(method_name) {
-                    let _ = apted::for_nodes(
+                    // Only run APTED on method pairs that warrant it
+                    if should_run_apted(
+                        *before_method_id,
+                        after_method_id,
                         &before_metadata,
                         &after_metadata,
-                        vec![*before_method_id],
-                        vec![after_method_id],
-                        Algorithm::ZhangShasha,
-                        diff,
-                    );
+                        &before_depths,
+                        &after_depths,
+                    ) {
+                        let _ = apted::for_nodes(
+                            &before_metadata,
+                            &after_metadata,
+                            vec![*before_method_id],
+                            vec![after_method_id],
+                            Algorithm::ZhangShasha,
+                            diff,
+                        );
+                    }
                 }
             }
-            let _ = apted::for_nodes(
+            // Only run APTED on class pairs that warrant it
+            if should_run_apted(
+                before_class_id,
+                after_class_id,
                 &before_metadata,
                 &after_metadata,
-                vec![before_class_id],
-                vec![after_class_id],
-                Algorithm::ZhangShasha,
-                diff,
-            );
+                &before_depths,
+                &after_depths,
+            ) {
+                let _ = apted::for_nodes(
+                    &before_metadata,
+                    &after_metadata,
+                    vec![before_class_id],
+                    vec![after_class_id],
+                    Algorithm::ZhangShasha,
+                    diff,
+                );
+            }
         }
     }
 
@@ -181,27 +292,47 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         for (method_name, before_method_id) in &before_methods {
             if let Some(&after_method_id) = after_methods.get(method_name) {
                 pre_match_by_path(*before_method_id, after_method_id, &before_metadata, &after_metadata, diff);
-                let _ = apted::for_nodes(
+                // Only run APTED on method pairs that warrant it
+                if should_run_apted(
+                    *before_method_id,
+                    after_method_id,
                     &before_metadata,
                     &after_metadata,
-                    vec![*before_method_id],
-                    vec![after_method_id],
-                    Algorithm::ZhangShasha,
-                    diff,
-                );
+                    &before_depths,
+                    &after_depths,
+                ) {
+                    let _ = apted::for_nodes(
+                        &before_metadata,
+                        &after_metadata,
+                        vec![*before_method_id],
+                        vec![after_method_id],
+                        Algorithm::ZhangShasha,
+                        diff,
+                    );
+                }
             }
         }
 
         pre_match_by_path(before_impl_id, after_impl_id, &before_metadata, &after_metadata, diff);
         // The method subtrees are now in `diff` and will be pruned by PostorderIndexer.
-        let _ = apted::for_nodes(
+        // Only run APTED on impl pairs that warrant it
+        if should_run_apted(
+            before_impl_id,
+            after_impl_id,
             &before_metadata,
             &after_metadata,
-            vec![before_impl_id],
-            vec![after_impl_id],
-            Algorithm::ZhangShasha,
-            diff,
-        );
+            &before_depths,
+            &after_depths,
+        ) {
+            let _ = apted::for_nodes(
+                &before_metadata,
+                &after_metadata,
+                vec![before_impl_id],
+                vec![after_impl_id],
+                Algorithm::ZhangShasha,
+                diff,
+            );
+        }
     }
 
     // Pass 2: all other matched pairs (fn, struct, enum, …).
@@ -216,14 +347,24 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             .get(&(kind.clone(), identifier.clone()))
         {
             pre_match_by_path(before_node_id, after_node_id, &before_metadata, &after_metadata, diff);
-            let _ = apted::for_nodes(
+            // Only run APTED if the pair warrants it (big enough or structural differences)
+            if should_run_apted(
+                before_node_id,
+                after_node_id,
                 &before_metadata,
                 &after_metadata,
-                vec![before_node_id],
-                vec![after_node_id],
-                Algorithm::ZhangShasha,
-                diff,
-            );
+                &before_depths,
+                &after_depths,
+            ) {
+                let _ = apted::for_nodes(
+                    &before_metadata,
+                    &after_metadata,
+                    vec![before_node_id],
+                    vec![after_node_id],
+                    Algorithm::ZhangShasha,
+                    diff,
+                );
+            }
         }
     }
 

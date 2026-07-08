@@ -50,9 +50,8 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "function_definition" ||
             node_kind == "class_definition"
         }
-        Language::Java => node_kind == "program", // Java source files are represented as "program" nodes
-        Language::C => node_kind == "translation_unit", // C source files use "translation_unit" as root
-        Language::CPP => node_kind == "translation_unit", // C++ also uses "translation_unit" as root
+        Language::Java => node_kind == "program",
+        Language::C | Language::CPP => node_kind == "translation_unit",
         Language::Go => {
             node_kind == "source_file" ||
             node_kind == "function_declaration" ||
@@ -60,13 +59,14 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "type_spec" ||
             node_kind == "type_alias"
         }
-        Language::JavaScript => node_kind == "program", // JavaScript programs use "program" as root
-        Language::TypeScript => node_kind == "program", // TypeScript also uses "program" as root
-        Language::TSX => node_kind == "program",    // TSX also uses "program" as root
-        Language::PHP => node_kind == "program",    // PHP also uses "program" as root
-        Language::Ruby => node_kind == "program",   // Ruby also uses "program" as root
-        Language::R => node_kind == "program",      // R also uses "program" as root
-        Language::Swift => node_kind == "source_file", // Swift source files use "source_file" as root
+        Language::JavaScript
+        | Language::TypeScript
+        | Language::TSX
+        | Language::PHP
+        | Language::Ruby
+        | Language::R
+        | Language::ShellScript => node_kind == "program",
+        Language::Swift => node_kind == "source_file",
         Language::Kotlin => {
             node_kind == "source_file" ||
             node_kind == "function_declaration" ||
@@ -75,13 +75,11 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "companion_object" ||
             node_kind == "type_alias"
         }
-        Language::Scala => node_kind == "compilation_unit", // Scala source files use "compilation_unit" as root
-        Language::CSharp => node_kind == "compilation_unit", // C# source files use "compilation_unit" as root
-        Language::HTML => node_kind == "document", // HTML documents use "document" as root
-        Language::CSS => node_kind == "stylesheet", // CSS stylesheets use "stylesheet" as root
-        Language::LUA => node_kind == "chunk",     // Lua chunks use "chunk" as root
-        Language::Vimscript => node_kind == "script_file", // Vimscript files use "script_file" as root
-        Language::ShellScript => node_kind == "program",   // Shell scripts use "program" as root
+        Language::Scala | Language::CSharp => node_kind == "compilation_unit",
+        Language::HTML => node_kind == "document",
+        Language::CSS => node_kind == "stylesheet",
+        Language::LUA => node_kind == "chunk",
+        Language::Vimscript => node_kind == "script_file",
         // Add other languages as needed
         _ => false,
     }
@@ -1161,6 +1159,20 @@ int f(int x) {
             .collect()
     }
 
+    /// Recursively collects every semantically-structural match in `node`'s subtree (unlike
+    /// `collect_matches`, which only looks at direct children of the root).
+    fn collect_semantic_matches(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        if let Some(m) = is_semantically_structural(&node, lang, code) {
+            out.push(m);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            out.extend(collect_semantic_matches(child, lang, code));
+        }
+        out
+    }
+
     #[test]
     fn rust_public_items_are_matched() {
         let matches = collect_matches(
@@ -1237,16 +1249,7 @@ type Handler interface { Handle() }
         let code = Code::from_string(src, &Language::Go);
         let ast = code.ast.as_ref().expect("AST should parse");
 
-        fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
-            let mut out = Vec::new();
-            if let Some(m) = is_semantically_structural(&node, lang, code) { out.push(m); }
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                out.extend(collect_all(child, lang, code));
-            }
-            out
-        }
-        let matches = collect_all(ast.root_node(), &Language::Go, &code);
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
 
         for (kind, name) in &[
             ("function_declaration", "TopLevel"),
@@ -1290,19 +1293,7 @@ class DecoratedClass:
         let code = Code::from_string(src, &Language::Python);
         let ast = code.ast.as_ref().expect("AST should parse");
 
-        // Collect matches from all nodes (DFS), as metadata.rs does
-        fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
-            let mut out = Vec::new();
-            if let Some(m) = is_semantically_structural(&node, lang, code) {
-                out.push(m);
-            }
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                out.extend(collect_all(child, lang, code));
-            }
-            out
-        }
-        let matches = collect_all(ast.root_node(), &Language::Python, &code);
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Python, &code);
 
         for (kind, name) in &[
             ("function_definition", "top_fn"),
@@ -1391,16 +1382,7 @@ type Stringer interface { String() string }
         let code = Code::from_string(src, &Language::Go);
         let ast = code.ast.as_ref().expect("AST should parse");
 
-        fn collect_all(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
-            let mut out = Vec::new();
-            if let Some(m) = is_semantically_structural(&node, lang, code) { out.push(m); }
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                out.extend(collect_all(child, lang, code));
-            }
-            out
-        }
-        let matches = collect_all(ast.root_node(), &Language::Go, &code);
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
 
         for (kind, name) in &[
             ("type_alias", "MyInt"),
@@ -1416,18 +1398,7 @@ type Stringer interface { String() string }
     fn collect_all_kotlin(src: &str) -> Vec<(String, String)> {
         let code = Code::from_string(src, &Language::Kotlin);
         let ast = code.ast.as_ref().expect("AST should parse");
-        fn walk(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
-            let mut out = Vec::new();
-            if let Some(m) = is_semantically_structural(&node, lang, code) {
-                out.push(m);
-            }
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                out.extend(walk(child, lang, code));
-            }
-            out
-        }
-        walk(ast.root_node(), &Language::Kotlin, &code)
+        collect_semantic_matches(ast.root_node(), &Language::Kotlin, &code)
     }
 
     #[test]

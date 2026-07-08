@@ -23,45 +23,25 @@ use crate::code::Code;
 use crate::diff::nodes::is_comment;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 
-/**
-* Match comment nodes that immediately precede already-matched nodes.
-*
-* This pass runs after the hash and structural matching passes. It looks at all nodes that
-* have already been matched by previous passes and checks if they have sibling comment nodes
-* immediately before them. If both before and after sides have matching comment nodes, it matches them.
-*
-* This optimization helps reduce the workload for the final, slow tree edit distance algorithm
-* by matching comment nodes early, especially in codebases with extensive documentation.
-*
-* The algorithm:
-* 1. Collect all node IDs that have been matched by previous passes
-* 2. For each matched node pair (before_id, after_id):
-*    a. Find the immediately preceding sibling on both before and after sides
-*    b. If both are comment nodes (checked via `is_comment`)
-*    c. And neither comment node has been matched yet
-*    d. And the comment text is identical (or very similar)
-*    e. Then match the comment nodes
-* 3. Continue this process recursively for comment chains (multiple consecutive comments)
-*
-* This is deliberately conservative - it only matches comments that:
-* - Are immediately before already-matched nodes
-* - Have identical text content
-* - Are direct siblings (same parent)
-*
-* This ensures we don't incorrectly match comments that belong to different code sections.
-*/
+/// Match comment nodes that immediately precede already-matched nodes.
+///
+/// Runs after the hash and structural matching passes, catching leading comments early so the
+/// slow tree edit distance pass has less work left, especially in heavily-documented codebases.
+///
+/// Deliberately conservative: a comment only matches its counterpart if it's the immediate
+/// preceding sibling of an already-matched node, unmatched itself, and textually identical. This
+/// avoids matching comments that belong to different code sections. Comment chains (multiple
+/// consecutive comments) are not handled - only the single comment directly touching the matched
+/// node.
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
-    // Collect all node IDs that have already been matched
     let matched_before_ids: HashSet<usize> = diff.before_node_map.keys().cloned().collect();
     let matched_after_ids: HashSet<usize> = diff.after_node_map.keys().cloned().collect();
 
-    // Collect all currently matched nodes to process
     let current_mappings: Vec<(usize, usize)> = diff.before_node_map.iter().map(|(&k, &v)| (k, v)).collect();
-    
-    // For each matched node pair, find preceding comment siblings
+
     for (before_id, after_id) in current_mappings {
         // Skip if either node is 0 (delete/insert)
         if before_id == 0 || after_id == 0 {
@@ -71,23 +51,19 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         let Some(&before_node) = node_cache.before.get(&before_id) else {
             continue;
         };
-        
+
         let Some(&after_node) = node_cache.after.get(&after_id) else {
             continue;
         };
 
-        // Look for immediately preceding siblings that are comment nodes
-        // Note: We pass empty sets for newly_matched since we're doing a single pass
-        // This means we won't handle chains of comments in this version, but that's OK
-        // as it's still better than nothing and much simpler
-        let before_comment = find_immediate_preceding_comment_sibling(before_node, &matched_before_ids, &HashSet::new());
-        let after_comment = find_immediate_preceding_comment_sibling(after_node, &matched_after_ids, &HashSet::new());
-        
+        let before_comment = find_immediate_preceding_comment_sibling(before_node, &matched_before_ids);
+        let after_comment = find_immediate_preceding_comment_sibling(after_node, &matched_after_ids);
+
         if let (Some((before_comment_node, before_comment_id)), Some((after_comment_node, after_comment_id))) = (before_comment, after_comment) {
             // Check if the comment text is identical
             let before_text = before_comment_node.utf8_text(before_src).unwrap_or("");
             let after_text = after_comment_node.utf8_text(after_src).unwrap_or("");
-            
+
             if before_text == after_text {
                 // Match the comment nodes
                 diff.add_mapping(
@@ -108,38 +84,29 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 fn find_immediate_preceding_comment_sibling<'a>(
     node: Node<'a>,
     already_matched: &HashSet<usize>,
-    newly_matched: &HashSet<usize>,
 ) -> Option<(Node<'a>, usize)> {
     let parent = node.parent()?;
     let node_id = node.id();
-    
+
     let mut cursor = parent.walk();
     let mut prev_sibling: Option<Node> = None;
-    
+
     for child in parent.children(&mut cursor) {
         if child.id() == node_id {
-            // We found our target node, return the previous sibling if it was a comment
-            if let Some(prev) = prev_sibling {
-                let prev_id = prev.id();
-                if is_comment(prev.kind()) 
-                    && !already_matched.contains(&prev_id) 
-                    && !newly_matched.contains(&prev_id) {
-                    return Some((prev, prev_id));
-                }
-            }
-            break; // We found our target, no need to continue
+            let prev = prev_sibling?;
+            let prev_id = prev.id();
+            return (is_comment(prev.kind()) && !already_matched.contains(&prev_id)).then_some((prev, prev_id));
         }
         prev_sibling = Some(child);
     }
-    
+
     None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::code::{Code, Language, Metadata};
-    use crate::diff::ASTDiff;
+    use crate::code::{Code, Language};
 
     #[test]
     fn test_is_comment_function() {
@@ -148,7 +115,7 @@ mod tests {
         assert!(is_comment("line_comment"));
         assert!(is_comment("block_comment"));
         assert!(is_comment("js_comment"));
-        
+
         // Test non-comment node kinds
         assert!(!is_comment("function_item"));
         assert!(!is_comment("identifier"));
@@ -156,59 +123,29 @@ mod tests {
     }
 
     #[test]
-    fn test_comment_matching_simple_rust() {
-        let before_contents = r#"// This is a comment
-fn hello() {
-    println!("Hello");
-}
-"#;
+    fn matches_leading_comment_of_an_unchanged_sibling_function() {
+        // `hello` and its leading comment are unchanged, but `other`'s body gains an `if`
+        // statement, changing its tree shape - so neither the hash nor the structural pass can
+        // match the whole file as one unit; only `hello`'s `function_item` matches, via
+        // `solve_identical_trees`. Its leading comment is a *sibling*, not a descendant, so it's
+        // untouched by that match and left for this pass to pick up specifically, which we
+        // verify via `ASTMappingReason::CommentSibling`.
+        let before = Code::from_string(
+            "// This is a comment\nfn hello() {\n    println!(\"Hello\");\n}\nfn other() {\n    1;\n}\n",
+            &Language::Rust,
+        );
+        let after = Code::from_string(
+            "// This is a comment\nfn hello() {\n    println!(\"Hello\");\n}\nfn other() {\n    if true {\n        2;\n    }\n}\n",
+            &Language::Rust,
+        );
 
-        let after_contents = r#"// This is a comment
-fn hello() {
-    println!("Hello");
-}
-"#;
+        let diff = crate::diff::diff_code(&before, &after).ast.expect("ast diff");
 
-        let mut before = Code {
-            contents: before_contents.to_string(),
-            metadata: Metadata {
-                language: Some(Language::Rust),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let mut after = Code {
-            contents: after_contents.to_string(),
-            metadata: Metadata {
-                language: Some(Language::Rust),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        // Parse the code
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
-            .expect("set Rust grammar");
-        
-        before.parse(&mut parser);
-        after.parse(&mut parser);
-
-        let node_cache = NodeCache::build(&before, &after);
-        let mut diff = ASTDiff::default();
-
-        // Run the comment matching (after some basic matching would have happened)
-        // In this simple case, the function nodes should be matched first
-        solve(&before, &after, &node_cache, &mut diff);
-
-        // Check that we have some mappings
-        // Note: In this simple test, there might not be any mappings yet because
-        // the comment matching depends on other nodes being matched first
-        println!("Diff has {} mappings", diff.mapping.len());
-        
-        // For now, just check that the function doesn't panic
-        assert!(true); // Placeholder - the test is mainly to ensure no panics
+        let comment_mapping = diff
+            .mapping
+            .values()
+            .find(|m| m.reason == ASTMappingReason::CommentSibling)
+            .expect("leading comment should be matched via CommentSibling");
+        assert_eq!(comment_mapping.operation, ASTMappingOperation::Identical);
     }
 }
