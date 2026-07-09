@@ -70,6 +70,9 @@
 *                  comparison against the human mapping without leaving the TUI. A trailing `*`
 *                  marks a node the human has already decided on where codediff's verdict
 *                  disagrees (matched to a different node, or matched vs. deleted/inserted)
+*   n / N          jump the focused cursor forward/backward to the next/previous node marked with
+*                  that trailing `*` (a mismatch between the human mapping and codediff's verdict).
+*                  Wraps around the ends of the tree. Requires `p` to have been run first
 *   t              show the raw before/after source as plain text, side by side, instead of the
 *                  AST tree -- for just reading the code. j/k scroll (both sides together), T
 *                  switches to the unix diff view instead, Esc closes
@@ -169,6 +172,7 @@ i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node
 a / A          align other panel to the human mapping / to codediff's mapping
 p              run codediff's own diff, show its verdict next to each node
+n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 
 t              view raw before/after text (not the AST tree)
 T              view the output of unix `diff -u`
@@ -961,6 +965,62 @@ fn advance_before_to_next_unmarked(app: &mut App, before_flat: &[(Node, usize)],
 fn advance_after_to_next_unmarked(app: &mut App, after_flat: &[(Node, usize)], before_root: Node, after_root: Node) {
     let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
+}
+
+/// Moves `panel`'s cursor to the next (`forward`) or previous node where `disagrees_fn` is true,
+/// relative to its current position, wrapping around the ends of `flat` like a `vim` `n`/`N`
+/// search. Returns the node landed on, or `None` if `disagrees_fn` is false for every node.
+fn advance_to_next_mismatch<'a>(
+    panel: &mut PanelState,
+    flat: &[(Node<'a>, usize)],
+    caches: &Caches,
+    diff_ast: &ASTDiff,
+    disagrees_fn: fn(Node, &Caches, &ASTDiff) -> bool,
+    forward: bool,
+) -> Option<Node<'a>> {
+    if flat.is_empty() {
+        return None;
+    }
+    let len = flat.len();
+    let idx = flat.iter().position(|(n, _)| n.id() == panel.cursor_id).unwrap_or(0);
+    for step in 1..=len {
+        let i = if forward { (idx + step) % len } else { (idx + len - step) % len };
+        let (node, _) = flat[i];
+        if disagrees_fn(node, caches, diff_ast) {
+            panel.cursor_id = node.id();
+            return Some(node);
+        }
+    }
+    None
+}
+
+/// Implements `n`/`N`: moves the focused panel's cursor to the next/previous node where codediff's
+/// verdict (`p`) disagrees with the human mapping (the same condition that draws the trailing `*`
+/// in `render_panel`). Requires `p` to have been run at least once for the current case.
+fn action_next_mismatch(
+    app: &mut App,
+    focus: Focus,
+    before_flat: &[(Node, usize)],
+    after_flat: &[(Node, usize)],
+    caches: &Caches,
+    forward: bool,
+) -> Result<String> {
+    let diff_ast = app
+        .algo_diff
+        .as_ref()
+        .context("No codediff result yet; press 'p' to run it first")?;
+    let found = match focus {
+        Focus::Before => {
+            advance_to_next_mismatch(&mut app.before, before_flat, caches, diff_ast, algo_disagrees_before, forward)
+        }
+        Focus::After => {
+            advance_to_next_mismatch(&mut app.after, after_flat, caches, diff_ast, algo_disagrees_after, forward)
+        }
+    };
+    match found {
+        Some(node) => Ok(format!("Jumped to mismatch: '{}'", node.kind())),
+        None => bail!("No mismatches in this panel"),
+    }
 }
 
 fn expand_or_descend(panel: &mut PanelState, flat: &[(Node, usize)]) {
@@ -2076,7 +2136,7 @@ fn draw_ui(
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -2810,6 +2870,8 @@ fn handle_key(
             });
             None
         }
+        KeyCode::Char('n') => Some(action_next_mismatch(app, focus, before_flat, after_flat, caches, true)),
+        KeyCode::Char('N') => Some(action_next_mismatch(app, focus, before_flat, after_flat, caches, false)),
         KeyCode::Char('t') => {
             app.modal = Some(Modal::TextView { scroll: 0 });
             None
