@@ -32,42 +32,6 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 const MIN_SEMANTIC_DEPTH: usize = 2;
 const MIN_SEMANTIC_SUBTREE_SIZE: usize = 20;
 
-/// Compute depth for each node in the AST, given parent-child relationships.
-fn compute_node_depths(metadata: &ASTMetadata) -> HashMap<usize, usize> {
-    let mut depths = HashMap::new();
-    let mut stack = Vec::new();
-    
-    // Find the actual root by looking for nodes that are not children of any other node
-    let all_children: std::collections::HashSet<usize> = metadata.node_info.values()
-        .flat_map(|info| info.children.iter().copied())
-        .collect();
-    
-    // Root nodes are those that are not children of any other node
-    let root_nodes: Vec<usize> = metadata.node_info.keys()
-        .filter(|&node_id| !all_children.contains(node_id))
-        .copied()
-        .collect();
-    
-    // Set depth 0 for root nodes and start BFS
-    for &root_id in &root_nodes {
-        depths.insert(root_id, 0);
-        stack.push((root_id, 0));
-    }
-    
-    // BFS to compute depths
-    while let Some((node_id, depth)) = stack.pop() {
-        if let Some(info) = metadata.node_info.get(&node_id) {
-            for &child_id in &info.children {
-                let child_depth = depth + 1;
-                depths.entry(child_id).or_insert(child_depth);
-                stack.push((child_id, child_depth));
-            }
-        }
-    }
-    
-    depths
-}
-
 /// Check if a semantically structural node is "big enough" to warrant running APTED.
 /// Returns true if the node meets the depth and subtree size criteria.
 fn is_big_enough_semantic_node(node_id: usize, metadata: &ASTMetadata, depths: &HashMap<usize, usize>) -> bool {
@@ -201,9 +165,10 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 
-    // Compute depths for both trees for the big-enough heuristic
-    let before_depths = compute_node_depths(&before_metadata);
-    let after_depths = compute_node_depths(&after_metadata);
+    // Depths for both trees for the big-enough heuristic - already precomputed once per file in
+    // `ASTMetadata` (see `compute_ast_metadata`), no need to walk the tree again here.
+    let before_depths = &before_metadata.node_to_depth;
+    let after_depths = &after_metadata.node_to_depth;
 
     let language = before.metadata.language.as_ref();
 
@@ -244,7 +209,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                             &after_metadata,
                             vec![*before_method_id],
                             vec![after_method_id],
-                            Algorithm::ZhangShasha,
+                            Algorithm::Apted,
                             diff,
                         );
                     }
@@ -264,7 +229,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                     &after_metadata,
                     vec![before_class_id],
                     vec![after_class_id],
-                    Algorithm::ZhangShasha,
+                    Algorithm::Apted,
                     diff,
                 );
             }
@@ -306,7 +271,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                         &after_metadata,
                         vec![*before_method_id],
                         vec![after_method_id],
-                        Algorithm::ZhangShasha,
+                        Algorithm::Apted,
                         diff,
                     );
                 }
@@ -329,7 +294,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                 &after_metadata,
                 vec![before_impl_id],
                 vec![after_impl_id],
-                Algorithm::ZhangShasha,
+                Algorithm::Apted,
                 diff,
             );
         }
@@ -361,7 +326,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                     &after_metadata,
                     vec![before_node_id],
                     vec![after_node_id],
-                    Algorithm::ZhangShasha,
+                    Algorithm::Apted,
                     diff,
                 );
             }
@@ -406,7 +371,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             &after_metadata,
             vec![before_node_id],
             vec![],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
     }
@@ -424,7 +389,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             &after_metadata,
             vec![],
             vec![after_node_id],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
     }
@@ -547,7 +512,7 @@ fn solve_flat_macro_bodies(
             after_metadata,
             vec![*before_tt_id],
             vec![after_tt_id],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
         // Diff the macro_invocation wrapper (token_tree body already in diff → pruned).
@@ -556,7 +521,7 @@ fn solve_flat_macro_bodies(
             after_metadata,
             vec![*before_macro_id],
             vec![after_macro_id],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
     }

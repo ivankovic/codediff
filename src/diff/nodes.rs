@@ -738,22 +738,42 @@ fn trimmed_text(node: Node, source: &[u8]) -> Option<String> {
     if text.is_empty() { None } else { Some(text.to_string()) }
 }
 
+/// The set of non-wildcard arm signatures for a flow-control container, as used by
+/// `flow_control_similarity_of_sets`. Callers comparing one candidate against many others (e.g.
+/// `solve_similar_flow_control`'s all-pairs scoring) should build this once per candidate and
+/// reuse it, rather than re-deriving it from `arms` on every pairwise comparison.
+pub fn flow_control_signature_set(arms: &[FlowControlArm]) -> std::collections::HashSet<&str> {
+    arms.iter().filter_map(|a| a.signature.as_deref()).collect()
+}
+
+/// Fraction of non-wildcard arm signatures shared between two flow-control containers (Jaccard
+/// similarity: shared signatures / all distinct signatures across both sides), given their
+/// precomputed signature sets (see `flow_control_signature_set`).
+///
+/// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
+/// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
+pub fn flow_control_similarity_of_sets(
+    before_set: &std::collections::HashSet<&str>,
+    after_set: &std::collections::HashSet<&str>,
+) -> f64 {
+    if before_set.is_empty() || after_set.is_empty() {
+        return 0.0;
+    }
+    let intersection = before_set.intersection(after_set).count();
+    let union = before_set.union(after_set).count();
+    intersection as f64 / union as f64
+}
+
 /// Fraction of non-wildcard arm signatures shared between two flow-control containers (Jaccard
 /// similarity: shared signatures / all distinct signatures across both sides).
 ///
 /// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
 /// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
 pub fn flow_control_similarity(before_arms: &[FlowControlArm], after_arms: &[FlowControlArm]) -> f64 {
-    let before_set: std::collections::HashSet<&str> =
-        before_arms.iter().filter_map(|a| a.signature.as_deref()).collect();
-    let after_set: std::collections::HashSet<&str> =
-        after_arms.iter().filter_map(|a| a.signature.as_deref()).collect();
-    if before_set.is_empty() || after_set.is_empty() {
-        return 0.0;
-    }
-    let intersection = before_set.intersection(&after_set).count();
-    let union = before_set.union(&after_set).count();
-    intersection as f64 / union as f64
+    flow_control_similarity_of_sets(
+        &flow_control_signature_set(before_arms),
+        &flow_control_signature_set(after_arms),
+    )
 }
 
 /// Substrings that mark a call/macro as "meant for the programmer" (logging, error bailouts,

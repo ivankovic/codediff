@@ -1966,19 +1966,6 @@ fn repair_leaf_slots(
     }
 }
 
-/// Build a child -> parent map covering every node in `meta`, so ancestor/descendant checks don't
-/// need repeated subtree walks. `ASTNodeMetadata` has no parent pointer, so this is derived once
-/// from the children lists.
-fn build_parent_map(meta: &ASTMetadata) -> HashMap<usize, usize> {
-    let mut parents = HashMap::new();
-    for (&id, info) in &meta.node_info {
-        for &child in &info.children {
-            parents.insert(child, id);
-        }
-    }
-    parents
-}
-
 /// True if `node` is `ancestor` itself or a descendant of it, walking up via `parents`.
 fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &HashMap<usize, usize>) -> bool {
     loop {
@@ -2052,33 +2039,40 @@ fn compute_pruned_targets(
 /// invoked (both the keyroot sweep and the backtrace). Parent maps are only built when the
 /// corresponding pruned-targets map is non-empty, so the common case (nothing pruned in this
 /// particular forest) costs nothing beyond two empty-map lookups.
-pub(crate) struct ContainmentCtx {
+pub(crate) struct ContainmentCtx<'a> {
     before_pruned_targets: HashMap<usize, Vec<usize>>,
     after_pruned_targets: HashMap<usize, Vec<usize>>,
-    before_parents: Option<HashMap<usize, usize>>,
-    after_parents: Option<HashMap<usize, usize>>,
+    before_parents: &'a HashMap<usize, usize>,
+    after_parents: &'a HashMap<usize, usize>,
 }
 
-impl ContainmentCtx {
+impl<'a> ContainmentCtx<'a> {
     fn build(
         before_root_ids: &[usize],
         after_root_ids: &[usize],
-        before_meta: &ASTMetadata,
-        after_meta: &ASTMetadata,
+        before_meta: &'a ASTMetadata,
+        after_meta: &'a ASTMetadata,
         diff: &ASTDiff,
     ) -> Self {
         let before_pruned_targets =
             compute_pruned_targets(before_root_ids, before_meta, &diff.before_node_map);
         let after_pruned_targets =
             compute_pruned_targets(after_root_ids, after_meta, &diff.after_node_map);
-        let before_parents = (!after_pruned_targets.is_empty()).then(|| build_parent_map(before_meta));
-        let after_parents = (!before_pruned_targets.is_empty()).then(|| build_parent_map(after_meta));
+        // Parent maps are precomputed once per file in `ASTMetadata` (see `node_to_parent`), so
+        // borrowing them here - even when this particular forest has nothing pruned and won't
+        // end up using them - costs nothing beyond the borrow itself.
         ContainmentCtx {
             before_pruned_targets,
             after_pruned_targets,
-            before_parents,
-            after_parents,
+            before_parents: &before_meta.node_to_parent,
+            after_parents: &after_meta.node_to_parent,
         }
+    }
+
+    /// True if this forest has no pruned descendants to respect on either side - i.e. `adjust()`
+    /// is a no-op for every pair, so the containment-unaware Apted `compute_delta` path is safe.
+    pub(crate) fn is_trivial(&self) -> bool {
+        self.before_pruned_targets.is_empty() && self.after_pruned_targets.is_empty()
     }
 
     /// Adjusts a `ren()`-computed `base` cost: if matching `before_id` to `after_id` would
@@ -2090,14 +2084,12 @@ impl ContainmentCtx {
             return base;
         }
         if let Some(targets) = self.before_pruned_targets.get(&before_id) {
-            let parents = self.after_parents.as_ref().expect("built when map non-empty");
-            if targets.iter().any(|&t| !is_ancestor_or_self(after_id, t, parents)) {
+            if targets.iter().any(|&t| !is_ancestor_or_self(after_id, t, self.after_parents)) {
                 return FORBIDDEN_RENAME_COST;
             }
         }
         if let Some(targets) = self.after_pruned_targets.get(&after_id) {
-            let parents = self.before_parents.as_ref().expect("built when map non-empty");
-            if targets.iter().any(|&t| !is_ancestor_or_self(before_id, t, parents)) {
+            if targets.iter().any(|&t| !is_ancestor_or_self(before_id, t, self.before_parents)) {
                 return FORBIDDEN_RENAME_COST;
             }
         }
@@ -2190,6 +2182,19 @@ pub(crate) fn resolve_forest(
         diff,
     );
 
+    // `compute_delta` (engine.rs) does not know about `containment` - its own `vren` has no
+    // containment-consistency check, unlike `compute_delta_zhang_shasha`'s `forest_dist` calls.
+    // `compute_edit_mapping` below always applies `containment` via `forest_dist` regardless of
+    // which branch filled `delta`, so running the Apted branch on a forest with a *real*
+    // containment constraint (some pruned descendant to respect) would let `delta` disagree with
+    // the containment-aware backtrace. `ContainmentCtx` is only non-trivial when this forest
+    // actually has pruned targets on one side, so gate the algorithm choice on that: the common
+    // case (nothing pruned in this particular forest) is provably safe for Apted since
+    // `adjust()` is then a no-op and both algorithms compute the identical containment-free
+    // optimum. See TODO.md for the plan to make `compute_delta` containment-aware and drop this
+    // gate.
+    let algorithm = if containment.is_trivial() { algorithm } else { Algorithm::ZhangShasha };
+
     let mut delta = match algorithm {
         Algorithm::ZhangShasha => compute_delta_zhang_shasha(
             &before_idx,
@@ -2199,14 +2204,6 @@ pub(crate) fn resolve_forest(
             cost_model,
             Some(&containment),
         ),
-        // NOTE: `compute_delta` (engine.rs) does not know about `containment` - its own `vren`
-        // has no containment-consistency check. `compute_edit_mapping` below still applies
-        // `containment` via `forest_dist` regardless of which branch filled `delta`, so if this
-        // branch is ever exercised on a forest with a real containment violation, its `delta`
-        // table and the shared backtrace's `forest_dist` calls would disagree. Currently safe
-        // because nothing in the pipeline passes `Algorithm::Apted` (see the TODO on
-        // `Diff::from_code`) and the existing Apted oracle tests don't hit that scenario - but fix
-        // this in lockstep with `compute_delta_zhang_shasha` before switching production over.
         Algorithm::Apted => compute_delta(
             &before_idx,
             &after_idx,
@@ -2245,15 +2242,13 @@ pub(crate) fn resolve_forest(
         }
     }
 
-    let before_parents = build_parent_map(before_meta);
-    let after_parents = build_parent_map(after_meta);
     improve_slot_alignment(
         before_meta,
         after_meta,
         diff,
         &before_root_ids,
-        &before_parents,
-        &after_parents,
+        &before_meta.node_to_parent,
+        &after_meta.node_to_parent,
         &mut before_decision,
         &mut after_decision,
     );

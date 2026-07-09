@@ -64,8 +64,8 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let language = before.metadata.language.unwrap_or_default();
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
-    let before_parents = build_parent_map(&before_metadata);
-    let after_parents = build_parent_map(&after_metadata);
+    let before_parents = &before_metadata.node_to_parent;
+    let after_parents = &after_metadata.node_to_parent;
 
     // Every candidate on the deleted side, largest subtree first, so a moved container is
     // re-mapped as one piece before its own children are considered separately. Ties broken by
@@ -146,17 +146,6 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         claim_subtree(b, &before_metadata, &mut claimed_before);
         claim_subtree(a, &after_metadata, &mut claimed_after);
     }
-}
-
-/// Derived once per side; `ASTNodeMetadata` has no parent pointers.
-fn build_parent_map(meta: &ASTMetadata) -> HashMap<usize, usize> {
-    let mut parents = HashMap::new();
-    for (&id, info) in &meta.node_info {
-        for &child in &info.children {
-            parents.insert(child, id);
-        }
-    }
-    parents
 }
 
 /// The kind of the outermost reference node (see `is_reference`) on `node`'s still-unmapped

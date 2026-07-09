@@ -454,28 +454,40 @@ fn describe_nondeterminism(
 * fixture, not a single pass/fail).
 */
 pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
-    let mapping = load(name)?;
-
     let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs
         .get(name)
-        .with_context(|| format!("No before/after test code pair found for '{}'", name))?
-        .clone();
+        .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
+    compute_mismatches_for(name, before, after)
+}
 
-    let diff = crate::diff::diff_code(&before, &after);
+/**
+* Same as [`compute_mismatches`], but takes an already-loaded before/after pair instead of looking
+* it up in a freshly-fetched `handmade_test_code_pairs()` map.
+*
+* Callers that check many fixtures in a loop (e.g. `benchmark_optimal_solutions`) should load the
+* map once and call this directly with a borrowed pair, rather than going through
+* `compute_mismatches` once per fixture - `handmade_test_code_pairs()` is memoized, but every call
+* still clones the *entire* map to hand back an owned one, which is O(fixture count) work just to
+* reach a single entry.
+*/
+pub fn compute_mismatches_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<Vec<String>> {
+    let mapping = load(name)?;
+
+    let diff = crate::diff::diff_code(before, after);
     let diff_ast = diff.ast.context("Diff has no AST")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let language = before.metadata.language.unwrap_or_default();
     let mut mismatches = describe_nondeterminism(&before.contents, &after.contents, &language);
 
     // Check that the produced diff is valid
-    if !diff_ast.is_valid(&before, &after, &node_cache) {
+    if !diff_ast.is_valid(before, after, &node_cache) {
         mismatches.push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
     }
 
-    let before_ast = before.ast.context("Before code has no AST")?;
-    let after_ast = after.ast.context("After code has no AST")?;
+    let before_ast = before.ast.as_ref().context("Before code has no AST")?;
+    let after_ast = after.ast.as_ref().context("After code has no AST")?;
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 

@@ -276,6 +276,10 @@ pub struct ASTMetadata {
     pub node_to_subtree_size: HashMap<usize, usize>,
     /// node.id() -> depth (root = 0, its children = 1, ...)
     pub node_to_depth: HashMap<usize, usize>,
+    /// child node.id() -> parent node.id(), covering every non-root node. `ASTNodeMetadata` has
+    /// no parent pointer, so this is derived once here from `node_info`'s children lists, rather
+    /// than every ancestor/containment check re-deriving its own copy from scratch.
+    pub node_to_parent: HashMap<usize, usize>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
     /// Maps a (kind, identifier) pair, for example ('function_item', 'main') to a node_id.

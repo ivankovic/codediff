@@ -402,6 +402,22 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 * object pair.
 */
 pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
+    // Every fixture directory is re-read and re-parsed with tree-sitter on every call. Fine for
+    // the handful of direct callers that run once, but `compute_mismatches` (human_mapping.rs)
+    // calls this once *per fixture* it checks - across a whole suite run that turns one full
+    // O(fixture count) parse pass into an O(fixture count squared) one. The fixtures are
+    // immutable for the life of the process (nothing in this codebase mutates the on-disk test
+    // data at runtime), so memoize the whole map after the first successful build and hand out
+    // clones of the cached `Code` pairs from then on.
+    static CACHE: std::sync::OnceLock<HashMap<String, (Code, Code)>> = std::sync::OnceLock::new();
+    if let Some(cached) = CACHE.get() {
+        return Ok(cached.clone());
+    }
+    let result = handmade_test_code_pairs_uncached()?;
+    Ok(CACHE.get_or_init(|| result).clone())
+}
+
+fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
     let mut result = HashMap::new();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))

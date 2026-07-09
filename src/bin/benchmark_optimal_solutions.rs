@@ -129,7 +129,8 @@ fn main() -> Result<()> {
             });
             continue;
         }
-        let mismatches = human_mapping::compute_mismatches(name)?;
+        let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+        let mismatches = human_mapping::compute_mismatches_for(name, before, after)?;
         rows.push(Row {
             name: name.clone(),
             mismatches: Some(mismatches.len()),

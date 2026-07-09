@@ -90,6 +90,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     compute_subtree_sizes(code, &mut metadata)?;
     compute_node_info(code, &mut metadata)?;
     compute_node_depths(code, &mut metadata)?;
+    compute_node_parents(&mut metadata);
     discover_reference_nodes(code, &mut metadata)?;
     discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
@@ -109,6 +110,16 @@ pub fn metadata_of(code: &Code) -> std::borrow::Cow<'_, ASTMetadata> {
     match &code.metadata.ast_metadata {
         Some(metadata) => std::borrow::Cow::Borrowed(metadata),
         None => std::borrow::Cow::Owned(compute_ast_metadata(code).unwrap_or_default()),
+    }
+}
+
+/// Populates `node_to_parent` from `node_info`'s children lists. Must run after
+/// `compute_node_info`.
+fn compute_node_parents(metadata: &mut ASTMetadata) {
+    for (&id, info) in &metadata.node_info {
+        for &child in &info.children {
+            metadata.node_to_parent.insert(child, id);
+        }
     }
 }
 

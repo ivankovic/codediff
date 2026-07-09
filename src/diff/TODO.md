@@ -52,6 +52,31 @@ here so nobody re-discovers the same false positives.
 
 ## Real, still open
 
+- **`compute_delta` (apted/engine.rs) isn't containment-aware - this is the big remaining perf
+  lever.** A 2026-07-09 perf pass found that `Algorithm::ZhangShasha`'s classic keyroot DP
+  (`compute_delta_zhang_shasha`, O(n1·n2·min(depth,leaves)₁·min(depth,leaves)₂)) is what makes
+  large, mostly-rewritten pairs slow - e.g. one single method pair in `rust-zed-workspace-tasks`
+  cost >1.2s alone. `Algorithm::Apted` is asymptotically far better and already fuzz-verified
+  correct (`test_apted_engine_matches_oracle_fuzz`, a 20k-seed shrinker) *for the
+  containment-free case*, but its `compute_delta`/`vren` never applies `ContainmentCtx` the way
+  `compute_delta_zhang_shasha`'s `forest_dist` calls do - see the comment above the
+  `ContainmentCtx::is_trivial()` gate in `resolve_forest` (apted/common.rs). That gate now falls
+  back to Zhang-Shasha whenever a forest has real pruned-descendant constraints, which is safe
+  (confirmed: identical `cargo test --lib` pass/fail set and identical
+  `benchmark_optimal_solutions` TOTAL before/after adding the gate) but means Apted is rarely
+  used in practice, since `pre_match_by_path`/method pre-matching (the common case in
+  `solve_semantically_structural_nodes`) is exactly what makes containment non-trivial. Measured
+  with the gate always tripping on the hot fixtures above, Apted's speedup fully evaporates back
+  to the Zhang-Shasha baseline.
+  Real fix: thread `Option<&ContainmentCtx>` (or just the two parent maps + pruned-target maps)
+  into `EngineCtx` and apply the same `adjust()` logic at each of `vren`'s ~6 call sites in
+  `spf_a`/`spf_l`/`spf_r`/`gted`. This changes the DP's hot inner loop in an algorithm that took
+  three real, ground-truthed bugfixes (see the comment above `compute_delta`) to get correct in
+  the containment-free case - do not ship without a dedicated containment-aware fuzz check (extend
+  the existing oracle fuzz to build forests with pruned descendants, or compare Apted-with-
+  containment against Zhang-Shasha-with-containment on such forests) alongside the existing
+  20k-seed shrinker. Once verified, the `Algorithm::ZhangShasha` fallback in the `is_trivial()`
+  gate (apted/common.rs, in `resolve_forest`) can be deleted and Apted used unconditionally.
 - **`apted::for_nodes`/`for_roots` return `Result<()>` that can never be `Err`** -
   `resolve_forest` isn't fallible, `for_nodes` just wraps its call in `Ok(())` unconditionally.
   Every call site does `let _ = apted::for_nodes(...)`, silencing an error that can't occur. The

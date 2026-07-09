@@ -21,7 +21,10 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
-use crate::diff::nodes::{FlowControlArm, flow_control_arms, flow_control_family, flow_control_similarity};
+use crate::diff::nodes::{
+    FlowControlArm, flow_control_arms, flow_control_family, flow_control_signature_set,
+    flow_control_similarity_of_sets,
+};
 use crate::diff::{ASTDiff, NodeCache};
 
 /**
@@ -77,15 +80,22 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         return;
     }
 
+    // Precompute each candidate's signature set once - the all-pairs scoring below would
+    // otherwise rebuild both HashSets from scratch on every one of the B*A comparisons.
+    let before_sets: Vec<_> =
+        before_candidates.iter().map(|(_, arms)| flow_control_signature_set(arms)).collect();
+    let after_sets: Vec<_> =
+        after_candidates.iter().map(|(_, arms)| flow_control_signature_set(arms)).collect();
+
     // Score every same-family candidate pair, keep the ones clearing the threshold.
     let mut scored_pairs: Vec<(f64, usize, usize)> = Vec::new();
-    for (before_idx, (before_node, before_arms)) in before_candidates.iter().enumerate() {
+    for (before_idx, (before_node, _)) in before_candidates.iter().enumerate() {
         let before_family = flow_control_family(before_node.kind(), &language);
-        for (after_idx, (after_node, after_arms)) in after_candidates.iter().enumerate() {
+        for (after_idx, (after_node, _)) in after_candidates.iter().enumerate() {
             if before_family != flow_control_family(after_node.kind(), &language) {
                 continue;
             }
-            let score = flow_control_similarity(before_arms, after_arms);
+            let score = flow_control_similarity_of_sets(&before_sets[before_idx], &after_sets[after_idx]);
             if score >= SIMILARITY_THRESHOLD {
                 scored_pairs.push((score, before_idx, after_idx));
             }
@@ -114,7 +124,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             &after_metadata,
             vec![before_node.id()],
             vec![after_node.id()],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
     }
@@ -175,7 +185,7 @@ fn anchor_matching_arms(
             after_metadata,
             vec![arm.node_id],
             vec![after_arm_id],
-            Algorithm::ZhangShasha,
+            Algorithm::Apted,
             diff,
         );
     }
