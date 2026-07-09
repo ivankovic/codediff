@@ -1,8 +1,6 @@
 # Next features to implement
 
-*  Handling comments smarter in the diff. Full line comments are definitely "anchored" to whatever
-   node is after them. So if we match a node that has preceeding comment nodes as siblings on the
-   same level, we should expand the Match to the comment nodes as well.
+*  Human Solver -> Go to next missmatch keyboard shortcut
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
 
