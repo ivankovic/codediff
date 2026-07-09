@@ -47,8 +47,11 @@ struct Args {
 struct Row {
     name: String,
     /// `None` means there's no `human_mapping.json` for this fixture yet (unsolved), as opposed
-    /// to `Some(0)`, which means codediff matches the human mapping exactly.
-    mismatches: Option<usize>,
+    /// to `Some((0, _))`, which means codediff matches the human mapping exactly.
+    ///
+    /// The second element of the tuple is the total node count (before + after trees combined),
+    /// the denominator for the mismatch percentage - see `human_mapping::total_node_count_for`.
+    mismatches: Option<(usize, usize)>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -131,16 +134,17 @@ fn main() -> Result<()> {
         }
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
         let mismatches = human_mapping::compute_mismatches_for(name, before, after)?;
+        let total_nodes = human_mapping::total_node_count_for(before, after);
         rows.push(Row {
             name: name.clone(),
-            mismatches: Some(mismatches.len()),
+            mismatches: Some((mismatches.len(), total_nodes)),
         });
     }
 
     // Worst offenders first, so regressions/improvements are the first thing visible; unsolved
     // fixtures (nothing to compare against yet) sort after every solved one.
     rows.sort_by(|a, b| match (a.mismatches, b.mismatches) {
-        (Some(x), Some(y)) => y.cmp(&x).then_with(|| a.name.cmp(&b.name)),
+        (Some((x, _)), Some((y, _))) => y.cmp(&x).then_with(|| a.name.cmp(&b.name)),
         (Some(_), None) => std::cmp::Ordering::Less,
         (None, Some(_)) => std::cmp::Ordering::Greater,
         (None, None) => a.name.cmp(&b.name),
@@ -159,24 +163,29 @@ fn print_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!(
-        "{:<name_width$}  {:>10}  {:>13}",
+        "{:<name_width$}  {:>10}  {:>7}  {:>13}",
         "Solution",
         "Mismatches",
+        "Mism %",
         "Human Unsolved",
         name_width = name_width
     );
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 13));
+    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13));
 
     let mut total_mismatches = 0usize;
+    let mut total_nodes = 0usize;
     let mut total_unsolved = 0usize;
     for row in rows {
         match row.mismatches {
-            Some(count) => {
+            Some((count, nodes)) => {
                 total_mismatches += count;
+                total_nodes += nodes;
+                let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
                 println!(
-                    "{:<name_width$}  {:>10}  {:>13}",
+                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}",
                     row.name,
                     count,
+                    pct,
                     "",
                     name_width = name_width
                 );
@@ -184,8 +193,9 @@ fn print_table(rows: &[Row]) {
             None => {
                 total_unsolved += 1;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>13}",
+                    "{:<name_width$}  {:>10}  {:>7}  {:>13}",
                     row.name,
+                    "-",
                     "-",
                     "yes",
                     name_width = name_width
@@ -194,11 +204,17 @@ fn print_table(rows: &[Row]) {
         }
     }
 
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 13));
+    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13));
+    let total_pct = if total_nodes > 0 {
+        100.0 * total_mismatches as f64 / total_nodes as f64
+    } else {
+        0.0
+    };
     println!(
-        "{:<name_width$}  {:>10}  {:>13}",
+        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}",
         "TOTAL",
         total_mismatches,
+        total_pct,
         total_unsolved,
         name_width = name_width
     );
