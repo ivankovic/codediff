@@ -27,10 +27,10 @@ build: test
 	cargo build --release
 
 hermetic-benchmark:
-	cargo bench -- diff
+	cargo bench --bench diff_code_benchmark
 
 hermetic-benchmark-update-baseline:
-	cargo bench -- diff --save-baseline baseline
+	cargo bench --bench diff_code_benchmark -- --save-baseline baseline
 
 # Benchmark against existing sampled pairs for all languages in benchmark_all.sh (Rust, Python, Go, Kotlin)
 # and run analysis afterwards
