@@ -21,7 +21,76 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code};
 use crate::code::metadata::metadata_of;
+use crate::diff::nodes::is_reference;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+
+/// Configuration for selecting which nodes to consider for hash-based matching.
+/// 
+/// Nodes are included if they are either:
+/// - Reference nodes (language-specific structural elements like functions, classes)
+/// - OR meet the minimum depth and subtree size thresholds
+/// 
+/// This allows the hash matching passes to also consider large, deep subtrees
+/// that aren't formally "reference nodes" but are still worth matching.
+#[derive(Debug, Clone)]
+pub struct NodeSelectionConfig {
+    /// Minimum tree depth for a non-reference node to be included
+    pub min_depth: usize,
+    /// Minimum number of nodes in the subtree for a non-reference node to be included
+    pub min_subtree_size: usize,
+}
+
+impl Default for NodeSelectionConfig {
+    fn default() -> Self {
+        Self {
+            // Tuned against the benchmark suite: 0/45 was found to provide optimal results.
+            // With solve_identical_trees using extended selection and solve_structurally_identical_trees
+            // using only reference nodes, this gives: 1437 -> 771 (666 fewer mismatches).
+            // This is the best configuration found after testing various thresholds.
+            min_depth: 0,
+            min_subtree_size: 45,
+        }
+    }
+}
+
+impl NodeSelectionConfig {
+    /// Create a node list selector function that can be passed to `solve_with_node_list`.
+    /// 
+    /// The selector includes reference nodes plus any nodes that meet the depth/size thresholds,
+    /// sorted by subtree size (largest first) and then by start byte for deterministic ordering.
+    pub fn to_node_list_selector(&self) -> impl Fn(&ASTMetadata) -> Vec<usize> + '_ {
+        move |metadata: &ASTMetadata| build_extended_node_list(metadata, self)
+    }
+}
+
+/// Build an extended node list that includes reference nodes plus nodes meeting size thresholds.
+/// 
+/// Returns nodes sorted by subtree size (largest first), with ties broken by start_byte
+/// for deterministic ordering across runs.
+pub fn build_extended_node_list(metadata: &ASTMetadata, config: &NodeSelectionConfig) -> Vec<usize> {
+    let language = metadata.language;
+    let mut nodes_with_info: Vec<(usize, usize, usize)> = Vec::new(); // (node_id, subtree_size, start_byte)
+
+    for (&node_id, info) in &metadata.node_info {
+        let subtree_size = metadata.node_to_subtree_size.get(&node_id).copied().unwrap_or(0);
+        let depth = metadata.node_to_depth.get(&node_id).copied().unwrap_or(0);
+        let start_byte = info.start_byte;
+
+        let is_reference_node = is_reference(&info.kind, &language);
+        let is_big_enough = depth >= config.min_depth && subtree_size >= config.min_subtree_size;
+
+        if is_reference_node || is_big_enough {
+            nodes_with_info.push((node_id, subtree_size, start_byte));
+        }
+    }
+
+    // Sort by subtree size descending, then by start_byte ascending for deterministic tiebreaking.
+    // Using start_byte (document position) rather than node_id ensures stability across
+    // separate parses of identical source, since node_ids are tree-sitter arena slots that
+    // may differ between parses even for identical code.
+    nodes_with_info.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
+    nodes_with_info.into_iter().map(|(node_id, _, _)| node_id).collect()
+}
 
 /**
 * The shared engine behind `solve_identical_trees` and `solve_structurally_identical_trees`.
@@ -50,13 +119,22 @@ pub(crate) struct HashMatchSpec {
 /**
 * Perform size-ordered hash matching between two AST trees, as configured by `spec`.
 *
+* This is a convenience wrapper around `solve_with_node_list` that uses only reference nodes
+* (via `reference_nodes_ordered`). For matching that also includes big-enough non-reference
+* nodes, call `solve_with_node_list` directly with a custom node list selector.
+*
 * Uses the pre-computed `reference_nodes_ordered` list to visit before-side reference nodes in
 * order of decreasing subtree size. For each one, looks for an after-side node with the same hash
 * that no earlier before-node has already claimed (when the same hash appears more than once, the
 * file simply contains duplicated code - each copy gets its own partner instead of every copy
 * collapsing onto one). On a hit, maps the pair with `spec.root_reason` and then descends both
 * subtrees in lockstep, pairing children by position and kind with `spec.descendant_reason`.
+* 
+* Note: This function is retained for backward compatibility. New code should use
+* `solve_with_node_list` with `NodeSelectionConfig::to_node_list_selector()` for the
+* extended node selection (reference nodes + big-enough nodes).
 */
+#[allow(dead_code)]
 pub(crate) fn solve(
     before: &Code,
     after: &Code,

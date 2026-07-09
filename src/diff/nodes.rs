@@ -292,6 +292,22 @@ const INCREMENT_OPS: &[&str] = &["++", "--"];
 /// off-by-one fix (e.g. `for i in 0..n` -> `for i in 0..=n`).
 const RUST_RANGE_OPS: &[&str] = &["..", "..=", "..."];
 
+/// Identifier-like node kinds that can match each other across different kinds.
+/// These all represent "names" in the code - variables, fields, types, properties - and a human
+/// would consider them the same logical entity even if the AST node kind differs.
+/// For example, in C: `pwd` (identifier) -> `cb_data.pwd` (field_identifier) should match as
+/// the same conceptual "pwd" being referenced, just with different qualification.
+///
+/// Note: scoped_identifier and scoped_type_identifier are excluded because they represent
+/// qualified names (e.g., `std::fs::File`) where the qualification is part of the identity.
+const IDENTIFIER_KINDS: &[&str] = &[
+    "identifier",
+    "field_identifier",
+    "type_identifier",
+    "property_identifier",
+    "shorthand_property_identifier",
+];
+
 /// True if `kind_a` and `kind_b` both appear in the same family in `families`.
 fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
     families
@@ -304,13 +320,25 @@ fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
 * with an Update operation.
 *
 * By default (and for any language/kind pair not covered below), nodes of different kinds are
-* never allowed to match - see `UnitCostModel::ren`'s doc comment for why. The families above are
+* never allowed to match - see `UnitCostModel::ren`'s doc comment for why. The families below are
 * deliberate, hand-picked exceptions: single-token operator leaves that occupy the same syntactic
 * slot in their language's grammar, where a human would consider a kind change (e.g. `<` -> `<=`)
 * to be an edit of the same node rather than a wholesale replacement.
+*
+* Additionally, identifier-like kinds (identifier, field_identifier, type_identifier, etc.) are allowed
+* to match each other across all languages, since they all represent "names" that a human would
+* consider the same logical entity regardless of qualification level.
 */
 pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> bool {
     if kind_a == kind_b {
+        return true;
+    }
+
+    // Allow identifier-like kinds to match each other across all languages.
+    // This enables matching e.g. identifier "pwd" to field_identifier "pwd" in
+    // expressions like `pwd++` -> `cb_data.pwd++`, which is a common pattern
+    // in real code changes (see c-nginx-add-typedef optimal solution).
+    if IDENTIFIER_KINDS.contains(&kind_a) && IDENTIFIER_KINDS.contains(&kind_b) {
         return true;
     }
 
@@ -377,6 +405,12 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
 const GENERIC_PUNCTUATION: &[&str] = &[
     "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", ".",
 ];
+
+/// True if `kind` is an identifier-like node kind (identifier, field_identifier, etc.)
+/// that represents a "name" in the code.
+pub fn is_identifier_kind(kind: &str) -> bool {
+    IDENTIFIER_KINDS.contains(&kind)
+}
 
 /// True if `kind` denotes a generic punctuation/operator token - a single TreeSitter leaf that
 /// exists as grammar glue (`<`, `<=`, `(`, `{`, `::`, ...) rather than content a human would
@@ -851,6 +885,33 @@ mod tests {
     fn kinds_update_allowed_same_kind_is_always_allowed() {
         assert!(kinds_update_allowed("<", "<", &Language::CPP));
         assert!(kinds_update_allowed("identifier", "identifier", &Language::Unknown));
+    }
+
+    #[test]
+    fn kinds_update_allowed_cross_kind_identifiers() {
+        // Test that identifier-like kinds can match each other
+        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::C));
+        assert!(kinds_update_allowed("identifier", "type_identifier", &Language::Rust));
+        assert!(kinds_update_allowed("field_identifier", "identifier", &Language::C));
+        assert!(kinds_update_allowed("type_identifier", "field_identifier", &Language::Rust));
+        assert!(kinds_update_allowed("property_identifier", "identifier", &Language::JavaScript));
+        
+        // Test that it works across all languages
+        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Unknown));
+        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Java));
+        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Python));
+        
+        // scoped_type_identifier is NOT included in IDENTIFIER_KINDS because it represents
+        // qualified names where the qualification is part of the identity
+        assert!(!kinds_update_allowed("scoped_type_identifier", "type_identifier", &Language::Rust));
+    }
+
+    #[test]
+    fn kinds_update_allowed_identifiers_do_not_match_non_identifiers() {
+        // Test that identifier kinds don't match non-identifier kinds
+        assert!(!kinds_update_allowed("identifier", "+", &Language::C));
+        assert!(!kinds_update_allowed("field_identifier", "(", &Language::C));
+        assert!(!kinds_update_allowed("type_identifier", "string_literal", &Language::Rust));
     }
 
     fn rust_match_container(src: &str) -> Code {

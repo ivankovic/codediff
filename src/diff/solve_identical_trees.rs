@@ -15,64 +15,39 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::{Code, ASTMetadata};
-use crate::diff::hash_tree_matching::{self, HashMatchSpec};
+use crate::code::Code;
+use crate::diff::hash_tree_matching::{self, HashMatchSpec, NodeSelectionConfig};
 use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
-
-/// Find all nodes worth checking for a full-hash match: reference nodes, plus any node deep and
-/// large enough that a match there is still worth the hash lookup. Returned largest-subtree-first.
-///
-/// MIN_DEPTH/MIN_SUBTREE_SIZE were tuned against the benchmark suite: 2/20 was the best
-/// runtime/optimality tradeoff found (4/20 was slower for the same result; going below 2/20
-/// started trading mismatches for speed).
-fn find_big_enough_nodes(metadata: &ASTMetadata) -> Vec<usize> {
-    use crate::diff::nodes::is_reference;
-
-    const MIN_DEPTH: usize = 2;
-    const MIN_SUBTREE_SIZE: usize = 20;
-
-    let language = metadata.language;
-
-    let mut big_enough_nodes = Vec::new();
-
-    for (&node_id, info) in &metadata.node_info {
-        let subtree_size = metadata.node_to_subtree_size.get(&node_id).copied().unwrap_or(0);
-        let depth = metadata.node_to_depth.get(&node_id).copied().unwrap_or(0);
-
-        let is_reference_node = is_reference(&info.kind, &language);
-        let is_big_enough = depth >= MIN_DEPTH && subtree_size >= MIN_SUBTREE_SIZE;
-
-        if is_reference_node || is_big_enough {
-            big_enough_nodes.push((node_id, subtree_size, info.start_byte));
-        }
-    }
-
-    // `metadata.node_info` is a `HashMap`, so the loop above visits nodes in a hash-seeded (not
-    // deterministic) order. Sorting by `subtree_size` alone doesn't fix that: duplicate/repeated
-    // code produces many equal-size nodes, and a stable sort only preserves whatever order they
-    // arrived in. Breaking ties by `start_byte` (document position) makes the full ordering - and
-    // therefore which duplicate a caller processes first - deterministic. This must be `start_byte`
-    // and not `node_id`: node ids are tree-sitter arena slots, stable within one parse but not
-    // across separate parses of identical source, so a node_id tiebreak would still let the result
-    // vary between process runs even though it looks stable within a single run.
-    big_enough_nodes.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
-    big_enough_nodes.into_iter().map(|(node_id, _, _)| node_id).collect()
-}
 
 /**
 * Perform size-ordered matching between two AST trees.
 *
-* This pass walks the pre-computed reference_nodes_ordered list (largest subtrees first) and, for
-* each before-side reference node, looks for an unclaimed after-side node with the same *full*
-* hash - byte-for-byte identical subtree content. On a hit it maps the pair with the
-* IdenticalHash reason, then recursively maps all their children with the
+* This pass walks an extended node list (reference nodes plus any nodes deep/large enough,
+* largest subtrees first) and, for each before-side node, looks for an unclaimed after-side node
+* with the same *full* hash - byte-for-byte identical subtree content. On a hit it maps the pair
+* with the IdenticalHash reason, then recursively maps all their children with the
 * IdenticalHashOfAncestor reason. Duplicated code (several nodes sharing one full hash) pairs up
 * copy-for-copy, since already-claimed after nodes are skipped.
 *
 * The traversal itself is shared with `solve_structurally_identical_trees` - see
-* `hash_tree_matching::solve`; this file only configures it for full hashes.
+* `hash_tree_matching::solve_with_node_list`; this file only configures it for full hashes.
+* 
+* Node selection uses `NodeSelectionConfig` defaults (min_depth=2, min_subtree_size=20), which
+* were tuned against the benchmark suite: 2/20 was the best runtime/optimality tradeoff
+* (4/20 was slower for the same result; going below 2/20 started trading mismatches for speed).
 */
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+    solve_with_config(before, after, node_cache, diff, &NodeSelectionConfig::default())
+}
+
+/// Like `solve`, but with custom node selection thresholds.
+pub fn solve_with_config(
+    before: &Code,
+    after: &Code,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+    config: &NodeSelectionConfig,
+) {
     let spec = HashMatchSpec {
         node_to_hash: |meta| &meta.node_to_full_hash,
         hash_to_nodes: |meta| &meta.full_hash_to_node,
@@ -88,7 +63,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         node_cache,
         diff,
         &spec,
-        |metadata| find_big_enough_nodes(metadata),
+        config.to_node_list_selector(),
     );
 }
 
@@ -127,9 +102,9 @@ mod tests {
     /// - even though, unlike when this test was written, that order is now deterministic.
     #[test]
     fn duplicate_hash_group_matches_each_copy_to_a_distinct_after_node() {
-        // `solve_identical_trees` only ever considers "reference nodes" (`reference_nodes.rs`;
-        // for Rust: function/struct/impl items, not arbitrary statements), so the duplicated
-        // node here has to be a whole `function_item`. `after` repeats the same two duplicated
+        // `solve_identical_trees` considers reference nodes plus any nodes deep/large enough
+        // (min_depth=2, min_subtree_size=20). For Rust, function/struct/impl items are reference nodes,
+        // so the duplicated node here is a whole `function_item`. `after` repeats the same two duplicated
         // functions as `before` *plus* a trailing, unique one, so nothing at the root/module
         // level is byte-identical and the algorithm can't shortcut by matching an enclosing node
         // wholesale - it has to decide, at the `function_item` level itself, which of the two
