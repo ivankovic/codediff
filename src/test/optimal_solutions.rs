@@ -44,6 +44,12 @@ mod cpp_add_templates;
 #[cfg(test)]
 mod cpp_fix_segfault;
 #[cfg(test)]
+mod cpp_godot_small_bugfix;
+#[cfg(test)]
+mod cpp_ladybird_refactor_variables_if_changes;
+#[cfg(test)]
+mod cpp_ollama_add_function_argument;
+#[cfg(test)]
 mod cpp_optimize_algorithm;
 #[cfg(test)]
 mod go_lazygit_add_to_if_condition;
