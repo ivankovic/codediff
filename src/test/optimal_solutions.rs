@@ -24,6 +24,10 @@ mod c_freeciv_add_parameter_to_function;
 #[cfg(test)]
 mod c_htop_remove_function_declaration;
 #[cfg(test)]
+mod c_linux_small_bugfix;
+#[cfg(test)]
+mod c_linux_small_change;
+#[cfg(test)]
 mod c_linux_small_change_struct_to_char;
 #[cfg(test)]
 mod c_microsoft_terminal_add_function;
