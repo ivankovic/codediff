@@ -29,12 +29,12 @@ build: test
 hermetic-benchmark:
 	cargo bench -- diff
 
-benchmark-hermetic:
-	cargo bench
+hermetic-benchmark-update-baseline:
+	cargo bench -- diff --save-baseline baseline
 
 # Benchmark against existing sampled pairs for all languages in benchmark_all.sh (Rust, Python, Go, Kotlin)
 # and run analysis afterwards
-benchmark-sampled: build
+benchmark-sampled:
 	@echo "Running benchmarks for all languages (Rust, Python, Go, Kotlin)..."
 	@echo "Results will be written to research/results/"
 	cd research && ./measure/benchmark_all.sh --language all --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
