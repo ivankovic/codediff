@@ -45,10 +45,12 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         &HashMatchSpec {
             node_to_hash: |meta| &meta.node_to_structural_hash,
             hash_to_nodes: |meta| &meta.structural_hash_to_node,
-            classify: |before_node, after_node, before_src, after_src| {
-                let before_value = before_node.utf8_text(before_src).unwrap_or("");
-                let after_value = after_node.utf8_text(after_src).unwrap_or("");
-                if before_value == after_value {
+            // Compare content via each side's precomputed full hash (leaf-token-driven), not raw
+            // `utf8_text()`: the latter also captures every byte of interior formatting
+            // (indentation, newlines), so a node that's purely re-indented - e.g. because an
+            // ancestor wrapper was added or removed - would wrongly compare as changed.
+            classify: |before_full_hash, after_full_hash| {
+                if before_full_hash == after_full_hash {
                     (ASTMappingOperation::Identical, 0)
                 } else {
                     (ASTMappingOperation::Update, COST_UPDATE)
@@ -78,10 +80,12 @@ pub fn solve_with_config(
         &HashMatchSpec {
             node_to_hash: |meta| &meta.node_to_structural_hash,
             hash_to_nodes: |meta| &meta.structural_hash_to_node,
-            classify: |before_node, after_node, before_src, after_src| {
-                let before_value = before_node.utf8_text(before_src).unwrap_or("");
-                let after_value = after_node.utf8_text(after_src).unwrap_or("");
-                if before_value == after_value {
+            // Compare content via each side's precomputed full hash (leaf-token-driven), not raw
+            // `utf8_text()`: the latter also captures every byte of interior formatting
+            // (indentation, newlines), so a node that's purely re-indented - e.g. because an
+            // ancestor wrapper was added or removed - would wrongly compare as changed.
+            classify: |before_full_hash, after_full_hash| {
+                if before_full_hash == after_full_hash {
                     (ASTMappingOperation::Identical, 0)
                 } else {
                     (ASTMappingOperation::Update, COST_UPDATE)

@@ -202,11 +202,9 @@ impl Diff {
 
         // This is the final, slow algorithm.
         // The more nodes are already matched, the faster it is.
-        // Requests Apted (asymptotically better than Zhang-Shasha on any non-trivial residual),
-        // but `resolve_forest` demotes back to Zhang-Shasha whenever the forest has real
-        // containment constraints to respect - `compute_delta`'s `vren` doesn't know about those
-        // yet. See `ContainmentCtx::is_trivial` and TODO.md for the follow-up that would let this
-        // use Apted unconditionally.
+        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
+        // containment-aware, so it now runs unconditionally instead of demoting itself back to
+        // Zhang-Shasha on forests with real containment constraints - see src/diff/TODO.md.
         let _ = apted::for_roots(
             before,
             after,

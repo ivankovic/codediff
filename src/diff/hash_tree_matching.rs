@@ -17,8 +17,6 @@
  */
 use std::collections::HashMap;
 
-use tree_sitter::Node;
-
 use crate::code::{ASTMetadata, Code};
 use crate::code::metadata::metadata_of;
 use crate::diff::nodes::is_reference;
@@ -106,10 +104,13 @@ pub(crate) struct HashMatchSpec {
     pub node_to_hash: fn(&ASTMetadata) -> &HashMap<usize, u64>,
     /// The corresponding reverse map on the after side.
     pub hash_to_nodes: fn(&ASTMetadata) -> &HashMap<u64, Vec<usize>>,
-    /// Classifies one paired (before, after) node: the operation and its cost. Full-hash matches
-    /// are `Identical` by construction; structural matches compare the nodes' text to decide
-    /// between `Identical` and `Update`.
-    pub classify: fn(before: Node, after: Node, before_src: &[u8], after_src: &[u8]) -> (ASTMappingOperation, u64),
+    /// Classifies one paired (before, after) node: the operation and its cost, given each side's
+    /// precomputed full hash (an O(1) map lookup the caller already has, rather than a Node +
+    /// source the callee would have to re-hash - `classify` runs once per node in every matched
+    /// subtree, so anything more than a lookup here is an easy O(n^2) trap on large subtrees).
+    /// Full-hash matches are `Identical` by construction; structural matches compare the two
+    /// full hashes to decide between `Identical` and `Update`.
+    pub classify: fn(before_full_hash: u64, after_full_hash: u64) -> (ASTMappingOperation, u64),
     /// Reason recorded on the reference node itself.
     pub root_reason: ASTMappingReason,
     /// Reason recorded on every descendant paired under it.
@@ -156,8 +157,6 @@ pub(crate) fn solve_with_node_list(
 ) {
     let before_metadata = metadata_of(before);
     let after_metadata = metadata_of(after);
-    let before_src = before.contents.as_bytes();
-    let after_src = after.contents.as_bytes();
 
     let before_node_ids = node_list_selector(&before_metadata);
     
@@ -177,14 +176,27 @@ pub(crate) fn solve_with_node_list(
             continue;
         };
 
-        // Skip after nodes already claimed - by an earlier pass, or by a previous before-node in
-        // this same hash group - so duplicated code pairs up copy-for-copy instead of stealing a
-        // match that belongs to another pair. Which unclaimed copy wins is deterministic (`Vec`
-        // in the same order `hash::hash_code` visited the nodes, not a `HashSet`'s hash-seeded
-        // bucket order), so the same input always produces the same pairing.
+        // Among after nodes not already claimed - by an earlier pass, or by a previous before-node
+        // in this same hash group - pick whichever sits closest in the file to `before_node`'s own
+        // position, rather than just the first unclaimed one in `hash::hash_code`'s visitation
+        // order. Two nodes sharing a hash aren't necessarily "the same" content that moved: since
+        // `node_to_full_hash` is content-only (kind/text of leaves), unrelated boilerplate in a
+        // different context (e.g. the same one-line loop body repeated in two different `impl`
+        // blocks) can collide on the same hash without being duplicates of each other at all. A
+        // real, unmoved match keeps roughly the same byte offset before/after, so proximity is a
+        // much better tiebreak than construction order for telling those apart - true duplicates
+        // (interchangeable by definition, see `duplicate_hash_group_matches_each_copy_to_a_distinct_after_node`)
+        // still end up paired deterministically, just by position instead of by discovery order.
         let Some(&after_node_id) = after_candidates
             .iter()
-            .find(|&&id| !diff.after_node_map.contains_key(&id))
+            .filter(|&&id| !diff.after_node_map.contains_key(&id))
+            .min_by_key(|&&id| {
+                node_cache
+                    .after
+                    .get(&id)
+                    .map(|n| n.start_byte().abs_diff(before_node.start_byte()))
+                    .unwrap_or(usize::MAX)
+            })
         else {
             continue;
         };
@@ -192,7 +204,9 @@ pub(crate) fn solve_with_node_list(
             continue;
         };
 
-        let (operation, cost) = (spec.classify)(before_node, after_node, before_src, after_src);
+        let before_full_hash = before_metadata.node_to_full_hash.get(&before_node_id).copied().unwrap_or(0);
+        let after_full_hash = after_metadata.node_to_full_hash.get(&after_node_id).copied().unwrap_or(0);
+        let (operation, cost) = (spec.classify)(before_full_hash, after_full_hash);
         diff.add_mapping(
             before_node_id,
             after_node_id,
@@ -218,8 +232,11 @@ pub(crate) fn solve_with_node_list(
                 if diff.before_node_map.contains_key(&before_child.id()) {
                     continue;
                 }
-                let (operation, cost) =
-                    (spec.classify)(before_child, after_child, before_src, after_src);
+                let before_full_hash =
+                    before_metadata.node_to_full_hash.get(&before_child.id()).copied().unwrap_or(0);
+                let after_full_hash =
+                    after_metadata.node_to_full_hash.get(&after_child.id()).copied().unwrap_or(0);
+                let (operation, cost) = (spec.classify)(before_full_hash, after_full_hash);
                 diff.add_mapping(
                     before_child.id(),
                     after_child.id(),

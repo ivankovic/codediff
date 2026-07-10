@@ -52,7 +52,7 @@ pub fn solve_with_config(
         node_to_hash: |meta| &meta.node_to_full_hash,
         hash_to_nodes: |meta| &meta.full_hash_to_node,
         // A full-hash match is byte-identical by construction, no text comparison needed.
-        classify: |_, _, _, _| (ASTMappingOperation::Identical, 0),
+        classify: |_, _| (ASTMappingOperation::Identical, 0),
         root_reason: ASTMappingReason::IdenticalHash,
         descendant_reason: ASTMappingReason::IdenticalHashOfAncestor,
     };

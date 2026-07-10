@@ -17,7 +17,6 @@
  */
 use anyhow::{Context, Result};
 use metrohash::MetroHash64;
-use std::collections::HashMap;
 use std::hash::Hasher;
 
 use crate::code::{ASTMetadata, Code};
@@ -76,12 +75,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         let node_id = node.id();
 
         // Compute full hash for this node (includes structure and values)
-        let full_hash = compute_full_hash(
-            &node,
-            &mut cursor,
-            &metadata.node_to_full_hash,
-            &code.contents,
-        );
+        let full_hash = compute_full_hash(&node, &mut cursor, code.contents.as_bytes());
 
         // Compute structural hash for this node (includes only structure, not values)
         let structural_hash = compute_structural_hash(&node, &mut cursor);
@@ -114,14 +108,24 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 }
 
 /**
-* Compute the full hash for a node, including both structure and values.
-* This is a recursive function that hashes the node type, text content, and all children.
+* Compute the full hash for a node: a Merkle hash over structure (kind, child count), each
+* child's own hash, and the "gap" text directly owned by this node but not covered by any child
+* (before the first child, between children, after the last child - and for a leaf, its entire
+* span). A node's own span can't be hashed wholesale: it would include every byte between
+* descendant tokens (indentation, newlines), making the hash change on pure reformatting (e.g. a
+* block re-indented one level deeper) even though no token actually changed. But a gap isn't
+* always just formatting - e.g. tree-sitter-r represents `"Hello, World!\n"` as a `string_content`
+* node whose only *child* is the `\n` escape sequence, with "Hello, World!" itself sitting
+* uncaptured in the gap before it - so gaps can't be dropped outright either. Splitting the
+* difference: skip a gap only when it's *entirely* whitespace (safe to assume that's formatting,
+* not content), otherwise hash it in full - never trimmed, since trimming would still lose real
+* whitespace embedded inside otherwise-meaningful gap text (e.g. two files whose only difference
+* is trailing spaces before a `\n` escape would trim down to the same gap and falsely collide).
 */
 fn compute_full_hash<'a>(
     node: &tree_sitter::Node<'a>,
     cursor: &mut tree_sitter::TreeCursor<'a>,
-    node_to_hash: &HashMap<usize, u64>,
-    source_code: &str,
+    source_code: &[u8],
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
@@ -129,19 +133,31 @@ fn compute_full_hash<'a>(
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    // Hash the actual text content of the node
-    if let Ok(text) = node.utf8_text(source_code.as_bytes()) {
-        hasher.write(text.as_bytes());
+    // We need to collect children first to avoid borrowing issues (same as compute_structural_hash).
+    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
+    let mut gap_start = node.start_byte();
+    for child in &children {
+        hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
+        let child_hash = compute_full_hash(child, cursor, source_code);
+        hasher.write(child_hash.to_le_bytes().as_slice());
+        gap_start = child.end_byte();
     }
-
-    // Add children hashes to the hash (if any)
-    for child in node.children(cursor) {
-        if let Some(&child_hash) = node_to_hash.get(&child.id()) {
-            hasher.write(child_hash.to_le_bytes().as_slice());
-        }
-    }
+    hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
 
     hasher.finish()
+}
+
+/// Hashes `source[start..end]` into `hasher`, unless that span is empty or entirely whitespace
+/// (formatting between/around structural children, not owned content - see `compute_full_hash`).
+fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
+    if start >= end {
+        return;
+    }
+    if let Ok(text) = std::str::from_utf8(&source[start..end]) {
+        if !text.trim().is_empty() {
+            hasher.write(text.as_bytes());
+        }
+    }
 }
 
 /**
