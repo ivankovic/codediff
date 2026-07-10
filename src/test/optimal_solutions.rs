@@ -48,9 +48,13 @@ mod cpp_godot_small_bugfix;
 #[cfg(test)]
 mod cpp_ladybird_refactor_variables_if_changes;
 #[cfg(test)]
+mod cpp_libreoffice_remove_return_value;
+#[cfg(test)]
 mod cpp_ollama_add_function_argument;
 #[cfg(test)]
 mod cpp_optimize_algorithm;
+#[cfg(test)]
+mod cpp_whitespace_only_change;
 #[cfg(test)]
 mod css_add_property;
 #[cfg(test)]

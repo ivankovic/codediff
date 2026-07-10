@@ -11,10 +11,10 @@ C,torvalds-linux.git,2dda6a9e09ee4f3c30ea72ba949a6ea781205e3a,arch/riscv/kvm/vcp
 C,torvalds-linux.git,e7fcc54524f04e42641de99028edd9c69dc19f8c,arch/x86/events/intel/ds.c,c-linux-small-bugfix
 CPP,LadybirdBrowser-ladybird.git,a762f623bd49a3ced2588af013ec8c76d8ef8189,Libraries/LibWeb/Layout/SVGFormattingContext.cpp,cpp-ladybird-refactor-variables-if-changes
 CPP,LadybirdBrowser-ladybird.git,cfd795f907fb2c6d94453236464db53f67ccfdaf,Libraries/LibWeb/IntersectionObserver/IntersectionObserver.cpp,
-CPP,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/cpp/preprocess.cpp,
+CPP,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/cpp/preprocess.cpp,cpp-whitespace-only-change
 CPP,godotengine-godot.git,6f86914f55a149d2b9578ba42f7f2a671f740557,scene/2d/animated_sprite_2d.cpp,cpp-godot-small-bugfix
 CPP,libreoffice,5505d3bc4dd1e7350f5d935ead1ea5161d276ad9,store/source/lockbyte.cxx,
-CPP,libreoffice,dc513684282e732c7e8ff71dde431d5632f12824,vcl/source/accessibility/accessiblelistbox.cxx,
+CPP,libreoffice,dc513684282e732c7e8ff71dde431d5632f12824,vcl/source/accessibility/accessiblelistbox.cxx,cpp-libreoffice-remove-return-value
 CPP,nextcloud-desktop.git,585b6ca32dc97c51ede2dad1c002b8a2625e12fc,test/testnextcloudpropagator.cpp,
 CPP,ollama-ollama.git,afaf7ce8c34bab8de45ca00dbd12da8cd3cc033a,ml/backend/ggml/ggml/src/ggml-metal/ggml-metal.cpp,cpp-ollama-add-function-argument
 CPP,opencv-opencv.git,fac647aaeb59c84d23d12aa8af3e8f6d09c5e5f6,modules/imgcodecs/test/test_png.cpp,
