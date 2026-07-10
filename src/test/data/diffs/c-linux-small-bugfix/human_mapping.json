@@ -75389,122 +75389,6 @@
       "before_path": [
         "function_definition:12",
         "compound_statement:1",
-        "expression_statement:3"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "|=:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        ".:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "?:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "call_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
         "expression_statement:3",
         "assignment_expression:1",
         "conditional_expression:1",
@@ -75587,37 +75471,6 @@
         "call_expression:1",
         "argument_list:1",
         "):1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "delete_with_children",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "call_expression:2"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "expression_statement:3",
-        ";:1"
       ]
     },
     {
@@ -79992,209 +79845,6 @@
         "if_statement:1",
         "compound_statement:1",
         "{:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "|=:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        ".:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "field_expression:1",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "?:1"
-      ]
-    },
-    {
-      "operation": "insert_with_children",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "call_expression:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "insert_with_children",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "conditional_expression:1",
-        "call_expression:2"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:12",
-        "compound_statement:1",
-        "if_statement:3",
-        "else_clause:1",
-        "if_statement:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        ";:1"
       ]
     },
     {
@@ -462260,6 +461910,314 @@
         "function_definition:102",
         "compound_statement:1",
         "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "|=:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "|=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "field_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "?:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "call_expression:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "call_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "::1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "call_expression:2"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1",
+        "call_expression:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1",
+        "conditional_expression:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "conditional_expression:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "expression_statement:3",
+        ";:1"
+      ],
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "else_clause:1",
+        "if_statement:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        ";:1"
       ]
     }
   ]

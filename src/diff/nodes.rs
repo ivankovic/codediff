@@ -34,134 +34,125 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
     // Language-specific reference nodes
     match language {
         Language::Rust => {
-            node_kind == "source_file" ||
-            node_kind == "function_item" ||
-            node_kind == "impl_item" ||
-            node_kind == "struct_item" ||
-            node_kind == "enum_item" ||
-            node_kind == "trait_item" ||
-            node_kind == "type_item" ||
-            node_kind == "mod_item" ||
-            node_kind == "use_declaration" ||
-            node_kind == "if_expression"
+            node_kind == "source_file"
+                || node_kind == "function_item"
+                || node_kind == "impl_item"
+                || node_kind == "struct_item"
+                || node_kind == "enum_item"
+                || node_kind == "trait_item"
+                || node_kind == "type_item"
+                || node_kind == "mod_item"
+                || node_kind == "use_declaration"
+                || node_kind == "if_expression"
         }
         Language::Python => {
-            node_kind == "module" ||
-            node_kind == "function_definition" ||
-            node_kind == "class_definition"
+            node_kind == "module"
+                || node_kind == "function_definition"
+                || node_kind == "class_definition"
         }
         Language::Java => {
-            node_kind == "program" ||
-            node_kind == "class_declaration" ||
-            node_kind == "interface_declaration" ||
-            node_kind == "enum_declaration" ||
-            node_kind == "method_declaration" ||
-            node_kind == "field_declaration"
+            node_kind == "program"
+                || node_kind == "class_declaration"
+                || node_kind == "interface_declaration"
+                || node_kind == "enum_declaration"
+                || node_kind == "method_declaration"
+                || node_kind == "field_declaration"
         }
         Language::C => {
-            node_kind == "translation_unit" ||
-            node_kind == "function_definition" ||
-            node_kind == "struct_specifier" ||
-            node_kind == "enum_specifier" ||
-            node_kind == "union_specifier" ||
-            node_kind == "typedef_declaration"
+            node_kind == "translation_unit"
+                || node_kind == "function_definition"
+                || node_kind == "struct_specifier"
+                || node_kind == "enum_specifier"
+                || node_kind == "union_specifier"
+                || node_kind == "typedef_declaration"
+                || node_kind == "preproc_function_def"
+                || node_kind == "preproc_include"
         }
         Language::CPP => {
-            node_kind == "translation_unit" ||
-            node_kind == "function_definition" ||
-            node_kind == "class_specifier" ||
-            node_kind == "struct_specifier" ||
-            node_kind == "enum_specifier" ||
-            node_kind == "union_specifier" ||
-            node_kind == "namespace_definition" ||
-            node_kind == "typedef_declaration"
+            node_kind == "translation_unit"
+                || node_kind == "function_definition"
+                || node_kind == "class_specifier"
+                || node_kind == "struct_specifier"
+                || node_kind == "enum_specifier"
+                || node_kind == "union_specifier"
+                || node_kind == "namespace_definition"
+                || node_kind == "typedef_declaration"
+                || node_kind == "preproc_function_def"
+                || node_kind == "preproc_include"
         }
         Language::Go => {
-            node_kind == "source_file" ||
-            node_kind == "function_declaration" ||
-            node_kind == "method_declaration" ||
-            node_kind == "type_spec" ||
-            node_kind == "type_alias"
+            node_kind == "source_file"
+                || node_kind == "function_declaration"
+                || node_kind == "method_declaration"
+                || node_kind == "type_spec"
+                || node_kind == "type_alias"
         }
         Language::JavaScript | Language::TypeScript | Language::TSX => {
-            node_kind == "program" ||
-            node_kind == "function_declaration" ||
-            node_kind == "function_expression" ||
-            node_kind == "arrow_function" ||
-            node_kind == "class_declaration" ||
-            node_kind == "method_definition"
+            node_kind == "program"
+                || node_kind == "function_declaration"
+                || node_kind == "function_expression"
+                || node_kind == "arrow_function"
+                || node_kind == "class_declaration"
+                || node_kind == "method_definition"
         }
         Language::PHP => {
-            node_kind == "program" ||
-            node_kind == "class_declaration" ||
-            node_kind == "function_declaration" ||
-            node_kind == "method_definition"
+            node_kind == "program"
+                || node_kind == "class_declaration"
+                || node_kind == "function_declaration"
+                || node_kind == "method_definition"
         }
         Language::Ruby => {
-            node_kind == "program" ||
-            node_kind == "class" ||
-            node_kind == "module" ||
-            node_kind == "method"
+            node_kind == "program"
+                || node_kind == "class"
+                || node_kind == "module"
+                || node_kind == "method"
         }
-        Language::R => {
-            node_kind == "program" ||
-            node_kind == "function_definition"
-        }
-        Language::ShellScript => {
-            node_kind == "program" ||
-            node_kind == "function_definition"
-        }
+        Language::R => node_kind == "program" || node_kind == "function_definition",
+        Language::ShellScript => node_kind == "program" || node_kind == "function_definition",
         Language::Swift => {
-            node_kind == "source_file" ||
-            node_kind == "function_declaration" ||
-            node_kind == "class_declaration" ||
-            node_kind == "struct_declaration" ||
-            node_kind == "enum_declaration" ||
-            node_kind == "protocol_declaration"
+            node_kind == "source_file"
+                || node_kind == "function_declaration"
+                || node_kind == "class_declaration"
+                || node_kind == "struct_declaration"
+                || node_kind == "enum_declaration"
+                || node_kind == "protocol_declaration"
         }
         Language::Kotlin => {
-            node_kind == "source_file" ||
-            node_kind == "function_declaration" ||
-            node_kind == "class_declaration" ||
-            node_kind == "object_declaration" ||
-            node_kind == "companion_object" ||
-            node_kind == "type_alias"
+            node_kind == "source_file"
+                || node_kind == "function_declaration"
+                || node_kind == "class_declaration"
+                || node_kind == "object_declaration"
+                || node_kind == "companion_object"
+                || node_kind == "type_alias"
         }
         Language::Scala => {
-            node_kind == "compilation_unit" ||
-            node_kind == "class_definition" ||
-            node_kind == "object_definition" ||
-            node_kind == "trait_definition" ||
-            node_kind == "function_definition"
+            node_kind == "compilation_unit"
+                || node_kind == "class_definition"
+                || node_kind == "object_definition"
+                || node_kind == "trait_definition"
+                || node_kind == "function_definition"
         }
         Language::CSharp => {
-            node_kind == "compilation_unit" ||
-            node_kind == "class_declaration" ||
-            node_kind == "struct_declaration" ||
-            node_kind == "enum_declaration" ||
-            node_kind == "interface_declaration" ||
-            node_kind == "method_declaration"
+            node_kind == "compilation_unit"
+                || node_kind == "class_declaration"
+                || node_kind == "struct_declaration"
+                || node_kind == "enum_declaration"
+                || node_kind == "interface_declaration"
+                || node_kind == "method_declaration"
         }
         Language::HTML => {
-            node_kind == "document" ||
-            node_kind == "element" ||
-            node_kind == "script_element" ||
-            node_kind == "style_element"
+            node_kind == "document"
+                || node_kind == "element"
+                || node_kind == "script_element"
+                || node_kind == "style_element"
         }
-        Language::CSS => {
-            node_kind == "stylesheet" ||
-            node_kind == "rule_set"
-        }
-        Language::LUA => {
-            node_kind == "chunk" ||
-            node_kind == "function_declaration"
-        }
-        Language::Vimscript => {
-            node_kind == "script_file" ||
-            node_kind == "function_definition"
-        }
+        Language::CSS => node_kind == "stylesheet" || node_kind == "rule_set",
+        Language::LUA => node_kind == "chunk" || node_kind == "function_declaration",
+        Language::Vimscript => node_kind == "script_file" || node_kind == "function_definition",
         // Data formats and configuration - root nodes only
-        Language::JSON | Language::YAML | Language::XML => node_kind == "document" || node_kind == "fragment",
+        Language::JSON | Language::YAML | Language::XML => {
+            node_kind == "document" || node_kind == "fragment"
+        }
         // Other languages - root node only as fallback
         _ => false,
     }
@@ -237,7 +228,10 @@ pub fn is_semantically_structural<'a>(
                 let type_text = type_node.utf8_text(bytes).ok()?;
                 // Strip leading `*` for pointer receivers: `*Foo` \u{2192} `Foo`
                 let receiver_type = type_text.trim_start_matches('*');
-                Some((node_kind.to_string(), format!("{receiver_type}.{method_name}")))
+                Some((
+                    node_kind.to_string(),
+                    format!("{receiver_type}.{method_name}"),
+                ))
             }
             "type_spec" | "type_alias" => node
                 .child_by_field_name("name")
@@ -297,7 +291,10 @@ pub fn is_semantically_structural<'a>(
                     }
                 };
 
-                Some((node_kind.to_string(), format!("{}{}{}", receiver_prefix, func_name, param_sig)))
+                Some((
+                    node_kind.to_string(),
+                    format!("{}{}{}", receiver_prefix, func_name, param_sig),
+                ))
             }
             "class_declaration" | "object_declaration" => node
                 .child_by_field_name("name")
@@ -353,7 +350,9 @@ const ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "//", "@"];
 const PHP_ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "."];
 
 /// Bitwise operators (including C++'s alternative keyword spellings and Go's `&^` AND-NOT).
-const BITWISE_OPS: &[&str] = &["&", "|", "^", "<<", ">>", ">>>", "&^", "bitand", "bitor", "xor"];
+const BITWISE_OPS: &[&str] = &[
+    "&", "|", "^", "<<", ">>", ">>>", "&^", "bitand", "bitor", "xor",
+];
 
 /// Logical/boolean operators, including keyword spellings and the null-coalescing/Elvis operators
 /// (`??`, `?:`), which occupy the same "fallback value" slot as `||` in these grammars.
@@ -484,9 +483,7 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
 /// language-agnostic list (unlike the operator families above) since these symbols play the same
 /// "structural glue" role in effectively every grammar - there's no language where `(` means
 /// something other than "start of a grouped/parenthesized thing".
-const GENERIC_PUNCTUATION: &[&str] = &[
-    "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", ".",
-];
+const GENERIC_PUNCTUATION: &[&str] = &["(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "."];
 
 /// True if `kind` is an identifier-like node kind (identifier, field_identifier, etc.)
 /// that represents a "name" in the code.
@@ -677,7 +674,9 @@ pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowC
 fn signature_text(container: Node, source: &[u8]) -> Option<String> {
     let start = container.start_byte();
     let guard = container.child_by_field_name("condition");
-    let end = guard.map(|g| g.start_byte()).unwrap_or_else(|| container.end_byte());
+    let end = guard
+        .map(|g| g.start_byte())
+        .unwrap_or_else(|| container.end_byte());
     if end <= start {
         return None;
     }
@@ -701,7 +700,11 @@ fn signature_text(container: Node, source: &[u8]) -> Option<String> {
 
 /// Extracts the arm/case list for a recognized flow-control container node (see
 /// [`flow_control_family`]). Returns `None` if `node`'s kind isn't a recognized container.
-pub fn flow_control_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
+pub fn flow_control_arms(
+    node: Node,
+    language: &Language,
+    source: &[u8],
+) -> Option<Vec<FlowControlArm>> {
     match flow_control_family(node.kind(), language)? {
         FlowControlFamily::Match => match_arms(node, language, source),
         FlowControlFamily::Switch => switch_arms(node, language, source),
@@ -815,7 +818,12 @@ fn switch_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<Flo
 fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
     let wraps_else_clause = matches!(
         language,
-        Language::Rust | Language::C | Language::CPP | Language::JavaScript | Language::TypeScript | Language::TSX
+        Language::Rust
+            | Language::C
+            | Language::CPP
+            | Language::JavaScript
+            | Language::TypeScript
+            | Language::TSX
     );
 
     let mut arms = Vec::new();
@@ -826,9 +834,14 @@ fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<F
         let signature = current
             .child_by_field_name("condition")
             .and_then(|condition| trimmed_text(condition, source));
-        arms.push(FlowControlArm { node_id: current.id(), signature });
+        arms.push(FlowControlArm {
+            node_id: current.id(),
+            signature,
+        });
 
-        let Some(alternative) = current.child_by_field_name("alternative") else { break };
+        let Some(alternative) = current.child_by_field_name("alternative") else {
+            break;
+        };
         let next = if wraps_else_clause {
             match alternative.named_child(0) {
                 Some(inner) => inner,
@@ -842,7 +855,10 @@ fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<F
             current = next;
         } else {
             // A bare `else { ... }`: terminal, no condition of its own.
-            arms.push(FlowControlArm { node_id: next.id(), signature: None });
+            arms.push(FlowControlArm {
+                node_id: next.id(),
+                signature: None,
+            });
             break;
         }
     }
@@ -851,7 +867,11 @@ fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<F
 
 fn trimmed_text(node: Node, source: &[u8]) -> Option<String> {
     let text = node.utf8_text(source).ok()?.trim();
-    if text.is_empty() { None } else { Some(text.to_string()) }
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
+    }
 }
 
 /// The set of non-wildcard arm signatures for a flow-control container, as used by
@@ -885,7 +905,10 @@ pub fn flow_control_similarity_of_sets(
 ///
 /// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
 /// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
-pub fn flow_control_similarity(before_arms: &[FlowControlArm], after_arms: &[FlowControlArm]) -> f64 {
+pub fn flow_control_similarity(
+    before_arms: &[FlowControlArm],
+    after_arms: &[FlowControlArm],
+) -> f64 {
     flow_control_similarity_of_sets(
         &flow_control_signature_set(before_arms),
         &flow_control_signature_set(after_arms),
@@ -899,9 +922,28 @@ pub fn flow_control_similarity(before_arms: &[FlowControlArm], after_arms: &[Flo
 /// `Fatalln` or Java/C#'s `LogError`/`LogWarning` all match via substring containment without
 /// needing one entry per per-language spelling convention.
 const DIAGNOSTIC_CALLEE_KEYWORDS: &[&str] = &[
-    "printf", "fprintf", "sprintf", "eprintln", "eprint", "panic", "bail", "unreachable", "todo",
-    "unimplemented", "assert", "log", "error", "err", "warn", "warning", "info", "debug", "trace",
-    "fatal", "critical", "die",
+    "printf",
+    "fprintf",
+    "sprintf",
+    "eprintln",
+    "eprint",
+    "panic",
+    "bail",
+    "unreachable",
+    "todo",
+    "unimplemented",
+    "assert",
+    "log",
+    "error",
+    "err",
+    "warn",
+    "warning",
+    "info",
+    "debug",
+    "trace",
+    "fatal",
+    "critical",
+    "die",
 ];
 
 /// Whether `node_kind` is a call-like node this pass should even consider - i.e. worth extracting
@@ -911,7 +953,10 @@ fn is_call_like(node_kind: &str, language: &Language) -> bool {
     matches!(
         (language, node_kind),
         (Language::Rust, "call_expression" | "macro_invocation")
-            | (Language::C | Language::CPP | Language::Go, "call_expression")
+            | (
+                Language::C | Language::CPP | Language::Go,
+                "call_expression"
+            )
             | (
                 Language::JavaScript | Language::TypeScript | Language::TSX,
                 "call_expression"
@@ -943,7 +988,9 @@ pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -
     if !is_call_like(node.kind(), language) {
         return false;
     }
-    let Some(callee) = callee_text(node, language, source) else { return false };
+    let Some(callee) = callee_text(node, language, source) else {
+        return false;
+    };
     let last_segment = callee
         .rsplit(|c: char| !(c.is_alphanumeric() || c == '_'))
         .find(|segment| !segment.is_empty())
@@ -966,26 +1013,66 @@ mod tests {
     #[test]
     fn kinds_update_allowed_same_kind_is_always_allowed() {
         assert!(kinds_update_allowed("<", "<", &Language::CPP));
-        assert!(kinds_update_allowed("identifier", "identifier", &Language::Unknown));
+        assert!(kinds_update_allowed(
+            "identifier",
+            "identifier",
+            &Language::Unknown
+        ));
     }
 
     #[test]
     fn kinds_update_allowed_cross_kind_identifiers() {
         // Test that identifier-like kinds can match each other
-        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::C));
-        assert!(kinds_update_allowed("identifier", "type_identifier", &Language::Rust));
-        assert!(kinds_update_allowed("field_identifier", "identifier", &Language::C));
-        assert!(kinds_update_allowed("type_identifier", "field_identifier", &Language::Rust));
-        assert!(kinds_update_allowed("property_identifier", "identifier", &Language::JavaScript));
-        
+        assert!(kinds_update_allowed(
+            "identifier",
+            "field_identifier",
+            &Language::C
+        ));
+        assert!(kinds_update_allowed(
+            "identifier",
+            "type_identifier",
+            &Language::Rust
+        ));
+        assert!(kinds_update_allowed(
+            "field_identifier",
+            "identifier",
+            &Language::C
+        ));
+        assert!(kinds_update_allowed(
+            "type_identifier",
+            "field_identifier",
+            &Language::Rust
+        ));
+        assert!(kinds_update_allowed(
+            "property_identifier",
+            "identifier",
+            &Language::JavaScript
+        ));
+
         // Test that it works across all languages
-        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Unknown));
-        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Java));
-        assert!(kinds_update_allowed("identifier", "field_identifier", &Language::Python));
-        
+        assert!(kinds_update_allowed(
+            "identifier",
+            "field_identifier",
+            &Language::Unknown
+        ));
+        assert!(kinds_update_allowed(
+            "identifier",
+            "field_identifier",
+            &Language::Java
+        ));
+        assert!(kinds_update_allowed(
+            "identifier",
+            "field_identifier",
+            &Language::Python
+        ));
+
         // scoped_type_identifier is NOT included in IDENTIFIER_KINDS because it represents
         // qualified names where the qualification is part of the identity
-        assert!(!kinds_update_allowed("scoped_type_identifier", "type_identifier", &Language::Rust));
+        assert!(!kinds_update_allowed(
+            "scoped_type_identifier",
+            "type_identifier",
+            &Language::Rust
+        ));
     }
 
     #[test]
@@ -993,7 +1080,11 @@ mod tests {
         // Test that identifier kinds don't match non-identifier kinds
         assert!(!kinds_update_allowed("identifier", "+", &Language::C));
         assert!(!kinds_update_allowed("field_identifier", "(", &Language::C));
-        assert!(!kinds_update_allowed("type_identifier", "string_literal", &Language::Rust));
+        assert!(!kinds_update_allowed(
+            "type_identifier",
+            "string_literal",
+            &Language::Rust
+        ));
     }
 
     fn rust_match_container(src: &str) -> Code {
@@ -1083,12 +1174,16 @@ fn f(s: &str) {
         let after_expr = find_first(after_ast.root_node(), "match_expression").unwrap();
         let before_arms =
             match_arms(before_expr, &Language::Rust, before.contents.as_bytes()).unwrap();
-        let after_arms = match_arms(after_expr, &Language::Rust, after.contents.as_bytes()).unwrap();
+        let after_arms =
+            match_arms(after_expr, &Language::Rust, after.contents.as_bytes()).unwrap();
 
         // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4). Wildcards
         // excluded from both sets entirely, so a trivial `_`<->`_` match can't inflate the score.
         let score = flow_control_similarity(&before_arms, &after_arms);
-        assert!((score - 0.5).abs() < 1e-9, "expected 2/4 = 0.5, got {score}");
+        assert!(
+            (score - 0.5).abs() < 1e-9,
+            "expected 2/4 = 0.5, got {score}"
+        );
     }
 
     #[test]
@@ -1248,9 +1343,12 @@ int f(int x) {
     #[test]
     fn matching_allowed_requires_context_for_generic_tokens_only() {
         // Same identifier kind, not a generic token: context is never even consulted.
-        assert!(matching_allowed("identifier", "identifier", &Language::CPP, || {
-            panic!("must not evaluate parents_matched for a non-generic-token kind")
-        }));
+        assert!(matching_allowed(
+            "identifier",
+            "identifier",
+            &Language::CPP,
+            || { panic!("must not evaluate parents_matched for a non-generic-token kind") }
+        ));
 
         // Generic token, kind-compatible (same kind): allowed only if context says so.
         assert!(matching_allowed("<", "<", &Language::CPP, || true));
@@ -1324,7 +1422,11 @@ int f(int x) {
 
     /// Recursively collects every semantically-structural match in `node`'s subtree (unlike
     /// `collect_matches`, which only looks at direct children of the root).
-    fn collect_semantic_matches(node: tree_sitter::Node, lang: &Language, code: &Code) -> Vec<(String, String)> {
+    fn collect_semantic_matches(
+        node: tree_sitter::Node,
+        lang: &Language,
+        code: &Code,
+    ) -> Vec<(String, String)> {
         let mut out = Vec::new();
         if let Some(m) = is_semantically_structural(&node, lang, code) {
             out.push(m);
@@ -1478,8 +1580,8 @@ class DecoratedClass:
 
     #[test]
     fn python_methods_in_class_are_pre_matched() {
-        use crate::diff::{ASTDiff, NodeCache};
         use crate::diff::solve_semantically_structural_nodes::solve;
+        use crate::diff::{ASTDiff, NodeCache};
 
         let before_src = "
 class Calculator:
@@ -1502,16 +1604,29 @@ class Calculator:
         solve(&before, &after, &node_cache, &mut diff);
 
         // Both methods should be matched.
-        let matched_names: Vec<&str> = ["add", "subtract"].iter().copied().filter(|&name| {
-            let bm = before.metadata.ast_metadata.as_ref().unwrap();
-            let am = after.metadata.ast_metadata.as_ref().unwrap();
-            let bk = ("function_definition".to_string(), name.to_string());
-            let ak = ("function_definition".to_string(), name.to_string());
-            bm.semantically_structural_nodes.get(&bk)
-                .and_then(|&bid| am.semantically_structural_nodes.get(&ak).map(|&aid| (bid, aid)))
-                .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
-        }).collect();
-        assert_eq!(matched_names.len(), 2, "both methods should be matched; got {matched_names:?}");
+        let matched_names: Vec<&str> = ["add", "subtract"]
+            .iter()
+            .copied()
+            .filter(|&name| {
+                let bm = before.metadata.ast_metadata.as_ref().unwrap();
+                let am = after.metadata.ast_metadata.as_ref().unwrap();
+                let bk = ("function_definition".to_string(), name.to_string());
+                let ak = ("function_definition".to_string(), name.to_string());
+                bm.semantically_structural_nodes
+                    .get(&bk)
+                    .and_then(|&bid| {
+                        am.semantically_structural_nodes
+                            .get(&ak)
+                            .map(|&aid| (bid, aid))
+                    })
+                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+            })
+            .collect();
+        assert_eq!(
+            matched_names.len(),
+            2,
+            "both methods should be matched; got {matched_names:?}"
+        );
     }
 
     #[test]
@@ -1547,10 +1662,7 @@ type Stringer interface { String() string }
 
         let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
 
-        for (kind, name) in &[
-            ("type_alias", "MyInt"),
-            ("type_spec", "Stringer"),
-        ] {
+        for (kind, name) in &[("type_alias", "MyInt"), ("type_spec", "Stringer")] {
             assert!(
                 matches.iter().any(|(k, n)| k == kind && n == name),
                 "missing ({kind}, {name}) in {matches:?}"
@@ -1636,15 +1748,17 @@ typealias StringList = List<String>
     fn kotlin_named_companion_object_is_matched() {
         let matches = collect_all_kotlin("class MyClass { companion object Factory {} }\n");
         assert!(
-            matches.iter().any(|(k, n)| k == "companion_object" && n == "Factory"),
+            matches
+                .iter()
+                .any(|(k, n)| k == "companion_object" && n == "Factory"),
             "missing (companion_object, Factory) in {matches:?}"
         );
     }
 
     #[test]
     fn kotlin_methods_in_class_are_pre_matched() {
-        use crate::diff::{ASTDiff, NodeCache};
         use crate::diff::solve_semantically_structural_nodes::solve;
+        use crate::diff::{ASTDiff, NodeCache};
 
         let before_src = "
 class Calculator {
@@ -1673,11 +1787,19 @@ class Calculator {
                 let key = ("function_declaration".to_string(), name.to_string());
                 bm.semantically_structural_nodes
                     .get(&key)
-                    .and_then(|&bid| am.semantically_structural_nodes.get(&key).map(|&aid| (bid, aid)))
+                    .and_then(|&bid| {
+                        am.semantically_structural_nodes
+                            .get(&key)
+                            .map(|&aid| (bid, aid))
+                    })
                     .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
-        assert_eq!(matched_names.len(), 2, "both methods should be pre-matched; got {matched_names:?}");
+        assert_eq!(
+            matched_names.len(),
+            2,
+            "both methods should be pre-matched; got {matched_names:?}"
+        );
     }
 
     #[test]
@@ -1690,7 +1812,10 @@ class Calculator {
         let source = code.contents.as_bytes();
         let bail = find_first(root, "macro_invocation").unwrap();
         let call = find_first(root, "call_expression").unwrap();
-        assert!(is_diagnostic_statement(bail, &Language::Rust, source), "bail! should be diagnostic");
+        assert!(
+            is_diagnostic_statement(bail, &Language::Rust, source),
+            "bail! should be diagnostic"
+        );
         assert!(
             !is_diagnostic_statement(call, &Language::Rust, source),
             "an ordinary call like compute(1) should not be diagnostic"
@@ -1721,7 +1846,10 @@ class Calculator {
 
     #[test]
     fn python_logging_error_is_diagnostic_via_attribute_access() {
-        let code = Code::from_string("logging.error('bad thing')\ncompute(1)\n", &Language::Python);
+        let code = Code::from_string(
+            "logging.error('bad thing')\ncompute(1)\n",
+            &Language::Python,
+        );
         let root = code.ast.as_ref().unwrap().root_node();
         let source = code.contents.as_bytes();
         let mut calls = Vec::new();
@@ -1734,8 +1862,16 @@ class Calculator {
             .iter()
             .find(|n| callee_text(**n, &Language::Python, source) == Some("compute"))
             .expect("compute call should be present");
-        assert!(is_diagnostic_statement(*log_call, &Language::Python, source));
-        assert!(!is_diagnostic_statement(*compute_call, &Language::Python, source));
+        assert!(is_diagnostic_statement(
+            *log_call,
+            &Language::Python,
+            source
+        ));
+        assert!(!is_diagnostic_statement(
+            *compute_call,
+            &Language::Python,
+            source
+        ));
     }
 
     #[test]
@@ -1757,10 +1893,18 @@ class Calculator {
             .find(|n| callee_text(**n, &Language::Go, source) == Some("compute"))
             .expect("compute call should be present");
         assert!(is_diagnostic_statement(*fatal_call, &Language::Go, source));
-        assert!(!is_diagnostic_statement(*compute_call, &Language::Go, source));
+        assert!(!is_diagnostic_statement(
+            *compute_call,
+            &Language::Go,
+            source
+        ));
     }
 
-    fn collect_all<'a>(node: tree_sitter::Node<'a>, kind: &str, out: &mut Vec<tree_sitter::Node<'a>>) {
+    fn collect_all<'a>(
+        node: tree_sitter::Node<'a>,
+        kind: &str,
+        out: &mut Vec<tree_sitter::Node<'a>>,
+    ) {
         if node.kind() == kind {
             out.push(node);
         }
