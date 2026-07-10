@@ -30,6 +30,9 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
+use std::fs::File;
+
+use csv::Writer;
 
 #[derive(Parser)]
 struct Args {
@@ -42,6 +45,10 @@ struct Args {
     /// and reason) instead of the table - the raw material for debugging a mismatch.
     #[arg(long)]
     dump: Option<String>,
+
+    /// Output results as a CSV file. Default path: "./research/optimal_solutions_benchmark.csv"
+    #[arg(long, value_name = "PATH", num_args = 0..=1)]
+    csv: Option<Option<std::path::PathBuf>>,
 }
 
 struct Row {
@@ -150,6 +157,11 @@ fn main() -> Result<()> {
         (None, None) => a.name.cmp(&b.name),
     });
 
+    if let Some(csv_path) = args.csv {
+        let path = csv_path.unwrap_or_else(|| std::path::PathBuf::from("./research/optimal_solutions_benchmark.csv"));
+        write_csv(&rows, &path)?;
+    }
+
     print_table(&rows);
     Ok(())
 }
@@ -218,4 +230,32 @@ fn print_table(rows: &[Row]) {
         total_unsolved,
         name_width = name_width
     );
+}
+
+fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
+    let file = File::create(path)?;
+    let mut wtr = Writer::from_writer(file);
+
+    wtr.write_record(["solution", "mismatches", "mismatch_pct", "total_nodes", "human_unsolved"])?;
+
+    for row in rows {
+        match row.mismatches {
+            Some((count, nodes)) => {
+                let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
+                wtr.write_record([
+                    &row.name,
+                    &count.to_string(),
+                    &format!("{:.2}", pct),
+                    &nodes.to_string(),
+                    "false",
+                ])?;
+            }
+            None => {
+                wtr.write_record([&row.name, "-", "-", "-", "true"])?;
+            }
+        }
+    }
+
+    wtr.flush()?;
+    Ok(())
 }
