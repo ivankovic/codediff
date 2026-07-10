@@ -152,6 +152,14 @@ mod rust_turbopack_persistence_tools_main;
 #[cfg(test)]
 mod rust_zed_git_panel_settings;
 #[cfg(test)]
+mod rust_zed_workspace_tasks;
+#[cfg(test)]
 mod typescript_add_error_handling;
 #[cfg(test)]
 mod typescript_add_generics;
+#[cfg(test)]
+mod typescript_add_type_annotations;
+#[cfg(test)]
+mod typescript_async_await;
+#[cfg(test)]
+mod typescript_refactor_interface;
