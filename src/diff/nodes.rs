@@ -124,6 +124,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "object_declaration"
                 || node_kind == "companion_object"
                 || node_kind == "type_alias"
+                || node_kind == "import"
         }
         Language::Scala => {
             node_kind == "compilation_unit"
