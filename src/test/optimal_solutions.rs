@@ -60,6 +60,8 @@ mod css_add_property;
 #[cfg(test)]
 mod go_lazygit_add_to_if_condition;
 #[cfg(test)]
+mod go_prometheus_single_comment_change;
+#[cfg(test)]
 mod go_user_slices_library;
 #[cfg(test)]
 mod java_add_exception_handling;
@@ -82,6 +84,8 @@ mod javascript_fix_promises;
 #[cfg(test)]
 mod javascript_refactor_arrow_func;
 #[cfg(test)]
+mod json_apache_string_change_version;
+#[cfg(test)]
 mod kotlin_add_data_class;
 #[cfg(test)]
 mod kotlin_add_null_check;
@@ -89,6 +93,8 @@ mod kotlin_add_null_check;
 mod kotlin_add_validation;
 #[cfg(test)]
 mod kotlin_fix_loop_bug;
+#[cfg(test)]
+mod kotlin_nextcloud_a_few_small_removals;
 #[cfg(test)]
 mod kotlin_nextcloud_remove_function;
 #[cfg(test)]
