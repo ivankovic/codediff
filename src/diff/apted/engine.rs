@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata};
 
-use super::common::{DeltaTable, ForestDist, PostorderIndexer, UnitCostModel};
+use super::common::{ContainmentCtx, DeltaTable, ForestDist, PostorderIndexer, UnitCostModel};
 
 /// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
 /// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
@@ -430,6 +430,30 @@ pub(crate) struct EngineCtx<'a> {
     pub(crate) before_meta: &'a ASTMetadata,
     pub(crate) after_meta: &'a ASTMetadata,
     pub(crate) cost_model: &'a UnitCostModel,
+    /// Mirrors `forest_dist`'s own `containment` parameter (Zhang-Shasha side, common.rs) - see
+    /// `vren_adjusted`, the single place every `vren` call site here routes through so a
+    /// "hollowed out" ancestor can't freely rename onto a node that would contradict where its
+    /// pruned descendant already landed. `None` whenever this forest has nothing pruned, in which
+    /// case `vren_adjusted` is a pure passthrough.
+    pub(crate) containment: Option<&'a ContainmentCtx<'a>>,
+}
+
+/// Applies `ctx.containment`'s `adjust()` to a `vren`-computed `base` cost for the real-node pair
+/// at virtual preorder ids `(before_pre, after_pre)` in the fixed global before/after orientation
+/// - the Apted-engine equivalent of the `ctx.adjust(before_id, after_id, cost_ren)` call in
+/// `forest_dist` (common.rs). A `None` id (the virtual root, or any boundary read that lands on
+/// it) is never itself pruned, so it's always left as a no-op - `vren` already prices a lone `None`
+/// side as `FORBIDDEN_PAIRING_COST` regardless.
+pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, base: u64) -> u64 {
+    let Some(containment) = ctx.containment else {
+        return base;
+    };
+    let before_id = ctx.before_idx.pre_to_node_id[before_pre as usize];
+    let after_id = ctx.after_idx.pre_to_node_id[after_pre as usize];
+    match (before_id, after_id) {
+        (Some(b), Some(a)) => containment.adjust(b, a, base),
+        _ => base,
+    }
 }
 
 /// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables (the role Java's `float[][]`
@@ -543,7 +567,9 @@ pub(crate) fn spf_a(
         let pn = vnode(path_idx, path_meta, path_pre as usize);
         let on = vnode(other_idx, other_meta, other_pre as usize);
         let (b, a) = if path_is_before { (pn, on) } else { (on, pn) };
-        vren(ctx.cost_model, b, a) as i64
+        let base = vren(ctx.cost_model, b, a);
+        let (before_pre, after_pre) = delta_order(path_pre, other_pre);
+        vren_adjusted(ctx, before_pre as i64, after_pre as i64, base) as i64
     };
     let path_subtree_del_cost = |pre: i64| -> i64 {
         (if path_is_before {
@@ -1254,15 +1280,20 @@ pub(crate) fn apted_tree_edit_dist(
             } else {
                 (other_node, path_node)
             };
-            let ren_cost = vren(ctx.cost_model, before_node, after_node);
-
-            let da = forestdist[(di - 1, dj)] + del_cost;
-            let db = forestdist[(di, dj - 1)] + ins_cost;
             let (before_pre, after_pre) = if path_is_before {
                 (path_pre, other_pre)
             } else {
                 (other_pre, path_pre)
             };
+            let ren_cost = vren_adjusted(
+                ctx,
+                before_pre as i64,
+                after_pre as i64,
+                vren(ctx.cost_model, before_node, after_node),
+            );
+
+            let da = forestdist[(di - 1, dj)] + del_cost;
+            let db = forestdist[(di, dj - 1)] + ins_cost;
 
             let aligned = path_lld == lld_i && other_lld == lld_j;
             let dc = if aligned {
@@ -1409,15 +1440,20 @@ pub(crate) fn apted_tree_edit_dist_r(
             } else {
                 (other_node, path_node)
             };
-            let ren_cost = vren(ctx.cost_model, before_node, after_node);
-
-            let da = forestdist[(di - 1, dj)] + del_cost;
-            let db = forestdist[(di, dj - 1)] + ins_cost;
             let (before_pre, after_pre) = if path_is_before {
                 (path_pre, other_pre)
             } else {
                 (other_pre, path_pre)
             };
+            let ren_cost = vren_adjusted(
+                ctx,
+                before_pre as i64,
+                after_pre as i64,
+                vren(ctx.cost_model, before_node, after_node),
+            );
+
+            let da = forestdist[(di - 1, dj)] + del_cost;
+            let db = forestdist[(di, dj - 1)] + ins_cost;
 
             let aligned = path_rld == rld_i && other_rld == rld_j;
             let dc = if aligned {
@@ -2095,6 +2131,7 @@ pub(crate) fn compute_delta(
     after_root_ids: &[usize],
     before_node_map: &HashMap<usize, usize>,
     after_node_map: &HashMap<usize, usize>,
+    containment: Option<&ContainmentCtx>,
 ) -> DeltaTable {
     let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
     if before.size == 0 || after.size == 0 {
@@ -2140,6 +2177,7 @@ pub(crate) fn compute_delta(
         before_meta,
         after_meta,
         cost_model,
+        containment,
     };
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
     ted_init(&ctx, &mut virtual_delta);
@@ -2177,6 +2215,7 @@ pub(crate) fn compute_delta_with_driver(
     after_root_ids: &[usize],
     before_node_map: &HashMap<usize, usize>,
     after_node_map: &HashMap<usize, usize>,
+    containment: Option<&ContainmentCtx>,
     drive: impl Fn(&EngineCtx, &mut DeltaTable, usize, usize) -> u64,
 ) -> DeltaTable {
     let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
@@ -2195,6 +2234,7 @@ pub(crate) fn compute_delta_with_driver(
         before_meta,
         after_meta,
         cost_model,
+        containment,
     };
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
     // Drive once per top-level real root (the virtual root's children) - exactly the
@@ -2232,6 +2272,7 @@ pub(crate) fn compute_delta_forced_right(
     after_root_ids: &[usize],
     before_node_map: &HashMap<usize, usize>,
     after_node_map: &HashMap<usize, usize>,
+    containment: Option<&ContainmentCtx>,
 ) -> DeltaTable {
     compute_delta_with_driver(
         before,
@@ -2243,6 +2284,7 @@ pub(crate) fn compute_delta_forced_right(
         after_root_ids,
         before_node_map,
         after_node_map,
+        containment,
         gted_forced_right,
     )
 }

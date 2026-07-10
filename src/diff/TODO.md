@@ -15,6 +15,34 @@ here so nobody re-discovers the same false positives.
   sharing a hash mapped onto the same after-node. Fixed (each duplicate now claims a distinct
   after-node); regression-guarded by
   `duplicate_hash_group_matches_each_copy_to_a_distinct_after_node`.
+- **`compute_delta` (apted/engine.rs) is now containment-aware (2026-07-10)** - previously the
+  biggest remaining perf lever: `Algorithm::ZhangShasha`'s classic keyroot DP is what made large,
+  mostly-rewritten pairs slow (e.g. one method pair in `rust-zed-workspace-tasks` cost >1.2s
+  alone), and `Algorithm::Apted` was asymptotically far better but fell back to Zhang-Shasha
+  whenever a forest had real pruned-descendant constraints (the common case, since
+  `pre_match_by_path`/method pre-matching is exactly what makes containment non-trivial) because
+  its `compute_delta`/`vren` never applied `ContainmentCtx`. `EngineCtx` gained a
+  `containment: Option<&ContainmentCtx>` field; `vren_adjusted` (engine.rs) is the single place
+  every real `vren` call site routes through - `spf_a`'s `ren_cost` closure (covers all 4 of its
+  invocations), plus one site each in `apted_tree_edit_dist` (spfL) and `apted_tree_edit_dist_r`
+  (spfR). `spf1`'s three `vren` calls were deliberately left unadjusted: it writes nothing to
+  `delta` and its return value is discarded at every call site (the top-level `gted(0,0)` return is
+  dropped, off-path recursion drops returns, and the vroot-expansion branches only sum into a
+  discarded total), so containment there would be dead code. `resolve_forest`'s
+  `Algorithm::ZhangShasha` fallback (the `if containment.is_trivial() { ... }` gate) is deleted -
+  Apted is now used unconditionally when selected - and `ContainmentCtx::is_trivial()` itself was
+  deleted as now-dead code.
+  Verified in three independent ways: (1) a new fuzz test,
+  `test_apted_engine_matches_oracle_fuzz_with_containment` (apted/common.rs), generates forests
+  with genuine pruned-descendant constraints (`gen_random_pruning`: random leaf-to-leaf pre-matches
+  on same-kind-attractive trees) and asserts Apted-with-containment matches
+  Zhang-Shasha-with-containment - confirmed to have teeth by individually disabling each of the 3
+  `vren_adjusted` sites and observing a real cost divergence (e.g. "new engine cost 21 != oracle
+  cost 20") before restoring; (2) a full `cargo test --lib` run before (code stashed) vs. after
+  showed **byte-identical FAILED-test sets** (14/14 match exactly, zero new regressions, one net
+  new pass from the new fuzz test itself) and **35% faster wall time** (590s vs. 902s on the dev
+  box the change was verified on); (3) `benchmark_optimal_solutions` TOTAL is unchanged, 771
+  mismatches / 0.27% / 4 unsolved, identical before and after.
 
 ## Not actual bugs (re-verified 2026-07-08)
 
@@ -52,31 +80,6 @@ here so nobody re-discovers the same false positives.
 
 ## Real, still open
 
-- **`compute_delta` (apted/engine.rs) isn't containment-aware - this is the big remaining perf
-  lever.** A 2026-07-09 perf pass found that `Algorithm::ZhangShasha`'s classic keyroot DP
-  (`compute_delta_zhang_shasha`, O(n1·n2·min(depth,leaves)₁·min(depth,leaves)₂)) is what makes
-  large, mostly-rewritten pairs slow - e.g. one single method pair in `rust-zed-workspace-tasks`
-  cost >1.2s alone. `Algorithm::Apted` is asymptotically far better and already fuzz-verified
-  correct (`test_apted_engine_matches_oracle_fuzz`, a 20k-seed shrinker) *for the
-  containment-free case*, but its `compute_delta`/`vren` never applies `ContainmentCtx` the way
-  `compute_delta_zhang_shasha`'s `forest_dist` calls do - see the comment above the
-  `ContainmentCtx::is_trivial()` gate in `resolve_forest` (apted/common.rs). That gate now falls
-  back to Zhang-Shasha whenever a forest has real pruned-descendant constraints, which is safe
-  (confirmed: identical `cargo test --lib` pass/fail set and identical
-  `benchmark_optimal_solutions` TOTAL before/after adding the gate) but means Apted is rarely
-  used in practice, since `pre_match_by_path`/method pre-matching (the common case in
-  `solve_semantically_structural_nodes`) is exactly what makes containment non-trivial. Measured
-  with the gate always tripping on the hot fixtures above, Apted's speedup fully evaporates back
-  to the Zhang-Shasha baseline.
-  Real fix: thread `Option<&ContainmentCtx>` (or just the two parent maps + pruned-target maps)
-  into `EngineCtx` and apply the same `adjust()` logic at each of `vren`'s ~6 call sites in
-  `spf_a`/`spf_l`/`spf_r`/`gted`. This changes the DP's hot inner loop in an algorithm that took
-  three real, ground-truthed bugfixes (see the comment above `compute_delta`) to get correct in
-  the containment-free case - do not ship without a dedicated containment-aware fuzz check (extend
-  the existing oracle fuzz to build forests with pruned descendants, or compare Apted-with-
-  containment against Zhang-Shasha-with-containment on such forests) alongside the existing
-  20k-seed shrinker. Once verified, the `Algorithm::ZhangShasha` fallback in the `is_trivial()`
-  gate (apted/common.rs, in `resolve_forest`) can be deleted and Apted used unconditionally.
 - **`apted::for_nodes`/`for_roots` return `Result<()>` that can never be `Err`** -
   `resolve_forest` isn't fallible, `for_nodes` just wraps its call in `Ok(())` unconditionally.
   Every call site does `let _ = apted::for_nodes(...)`, silencing an error that can't occur. The

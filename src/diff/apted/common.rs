@@ -2069,12 +2069,6 @@ impl<'a> ContainmentCtx<'a> {
         }
     }
 
-    /// True if this forest has no pruned descendants to respect on either side - i.e. `adjust()`
-    /// is a no-op for every pair, so the containment-unaware Apted `compute_delta` path is safe.
-    pub(crate) fn is_trivial(&self) -> bool {
-        self.before_pruned_targets.is_empty() && self.after_pruned_targets.is_empty()
-    }
-
     /// Adjusts a `ren()`-computed `base` cost: if matching `before_id` to `after_id` would
     /// contradict where an already-pruned descendant of either landed, escalate to
     /// `FORBIDDEN_RENAME_COST` so the DP looks elsewhere. `base` is returned unchanged whenever
@@ -2182,19 +2176,16 @@ pub(crate) fn resolve_forest(
         diff,
     );
 
-    // `compute_delta` (engine.rs) does not know about `containment` - its own `vren` has no
-    // containment-consistency check, unlike `compute_delta_zhang_shasha`'s `forest_dist` calls.
-    // `compute_edit_mapping` below always applies `containment` via `forest_dist` regardless of
-    // which branch filled `delta`, so running the Apted branch on a forest with a *real*
-    // containment constraint (some pruned descendant to respect) would let `delta` disagree with
-    // the containment-aware backtrace. `ContainmentCtx` is only non-trivial when this forest
-    // actually has pruned targets on one side, so gate the algorithm choice on that: the common
-    // case (nothing pruned in this particular forest) is provably safe for Apted since
-    // `adjust()` is then a no-op and both algorithms compute the identical containment-free
-    // optimum. See TODO.md for the plan to make `compute_delta` containment-aware and drop this
-    // gate.
-    let algorithm = if containment.is_trivial() { algorithm } else { Algorithm::ZhangShasha };
-
+    // `compute_delta` (engine.rs) is now containment-aware: `EngineCtx.containment` is threaded
+    // into every `vren` call site (`spf_a`'s `ren_cost` closure, `apted_tree_edit_dist`,
+    // `apted_tree_edit_dist_r`) via `vren_adjusted`, mirroring the `ctx.adjust(...)` call in
+    // `forest_dist`'s own `ren` computation (Zhang-Shasha side). So, unlike before, the algorithm
+    // choice below no longer needs to fall back to `Algorithm::ZhangShasha` just because this
+    // forest has real pruned-descendant constraints - both engines respect them identically.
+    // Verified via `test_apted_engine_matches_oracle_fuzz_with_containment` (fuzzes forests with
+    // genuine containment constraints, comparing Apted-with-containment against
+    // Zhang-Shasha-with-containment) plus a manual check that each of the three `vren_adjusted`
+    // sites, when individually disabled, makes that fuzz test fail on a real cost divergence.
     let mut delta = match algorithm {
         Algorithm::ZhangShasha => compute_delta_zhang_shasha(
             &before_idx,
@@ -2214,6 +2205,7 @@ pub(crate) fn resolve_forest(
             &after_root_ids,
             &diff.before_node_map,
             &diff.after_node_map,
+            Some(&containment),
         ),
     };
     let decisions = compute_edit_mapping(
@@ -2350,6 +2342,21 @@ mod tests {
     use crate::diff::{ASTMappingOperation, ASTMappingReason};
     use crate::test::helper;
 
+    /// `ContainmentCtx::adjust` walks `node_to_parent` (via `is_ancestor_or_self`) to decide
+    /// whether a candidate rename target actually contains a pruned descendant's landing spot -
+    /// left empty, every non-root node looks parentless and `adjust` degenerates to forbidding
+    /// almost everything. Derived from `node_info`'s children lists, same as
+    /// `compute_ast_metadata`'s real one.
+    fn node_to_parent_from(node_info: &HashMap<usize, ASTNodeMetadata>) -> HashMap<usize, usize> {
+        let mut parents = HashMap::new();
+        for (&id, info) in node_info {
+            for &child in &info.children {
+                parents.insert(child, id);
+            }
+        }
+        parents
+    }
+
     fn synthetic_meta(nodes: &[(usize, &str, &str, &[usize])]) -> ASTMetadata {
         let mut node_info = HashMap::new();
         for &(id, kind, text, children) in nodes {
@@ -2364,8 +2371,10 @@ mod tests {
                 },
             );
         }
+        let node_to_parent = node_to_parent_from(&node_info);
         ASTMetadata {
             node_info,
+            node_to_parent,
             ..Default::default()
         }
     }
@@ -2421,13 +2430,29 @@ mod tests {
         let before_idx = PostorderIndexer::build(before_meta, before_root_ids, before_node_map);
         let after_idx = PostorderIndexer::build(after_meta, after_root_ids, after_node_map);
 
+        // Built from the *same* pruning maps `before_idx`/`after_idx` were pruned against, so
+        // both engines below see the identical containment constraints - a differential check
+        // that only exercises `adjust()` if it's built from a real `ASTDiff`, not `None`.
+        let diff = ASTDiff {
+            before_node_map: before_node_map.clone(),
+            after_node_map: after_node_map.clone(),
+            ..Default::default()
+        };
+        let containment = ContainmentCtx::build(
+            before_root_ids,
+            after_root_ids,
+            before_meta,
+            after_meta,
+            &diff,
+        );
+
         let mut oracle_delta = compute_delta_zhang_shasha(
             &before_idx,
             &after_idx,
             before_meta,
             after_meta,
             &cost_model,
-        None,
+            Some(&containment),
         );
         let oracle_decisions = compute_edit_mapping(
             &before_idx,
@@ -2435,7 +2460,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
-            None,
+            Some(&containment),
             &mut oracle_delta,
         );
         let oracle_cost =
@@ -2451,6 +2476,7 @@ mod tests {
             after_root_ids,
             before_node_map,
             after_node_map,
+            Some(&containment),
         );
         let new_decisions = compute_edit_mapping(
             &before_idx,
@@ -2458,7 +2484,7 @@ mod tests {
             before_meta,
             after_meta,
             &cost_model,
-            None,
+            Some(&containment),
             &mut new_delta,
         );
         let new_cost = mapping_total_cost(&new_decisions, before_meta, after_meta, &cost_model);
@@ -2516,6 +2542,7 @@ mod tests {
             after_root_ids,
             &empty_map,
             &empty_map,
+            None,
         );
         let new_decisions = compute_edit_mapping(
             &before_idx,
@@ -2716,8 +2743,10 @@ mod tests {
                 },
             );
         }
+        let node_to_parent = node_to_parent_from(&node_info);
         ASTMetadata {
             node_info,
+            node_to_parent,
             ..Default::default()
         }
     }
@@ -2783,6 +2812,7 @@ mod tests {
                 &[after_root],
                 &empty_map,
                 &empty_map,
+                None,
             );
             let _ = compute_edit_mapping(
                 &before_idx,
@@ -2872,6 +2902,7 @@ mod tests {
                 &[after_root],
                 &empty_map,
                 &empty_map,
+                None,
             );
             let _ = compute_edit_mapping(
                 &before_idx,
@@ -2993,6 +3024,7 @@ mod tests {
             &[after_root],
             &empty_map,
             &empty_map,
+            None,
         );
         let new_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
             .map(|b| (0..after_idx.size).map(|a| new_delta.get(b, a)).collect())
@@ -3154,6 +3186,7 @@ mod tests {
             &[7],
             &empty_map,
             &empty_map,
+            None,
         );
         let new_decisions = compute_edit_mapping(
             &before_idx,
@@ -3313,6 +3346,126 @@ mod tests {
             if result.is_err() {
                 panic!(
                     "fuzz failure at seed {seed}\nbefore_nodes={before_nodes:?}\nafter_nodes={after_nodes:?}"
+                );
+            }
+        }
+    }
+
+    /// Fisher-Yates shuffle, used by `gen_random_pruning` to pick a random subset of leaves on
+    /// each side without repeats.
+    fn shuffle(rng: &mut Rng, v: &mut Vec<usize>) {
+        for i in (1..v.len()).rev() {
+            let j = rng.range(i + 1);
+            v.swap(i, j);
+        }
+    }
+
+    /// Builds a genuine `(before_node_map, after_node_map)` pruning constraint out of a random
+    /// pair of trees: picks 1-3 random *leaf* nodes on each side (excluding the roots, so the
+    /// forest itself never goes empty) and cross-matches them 1:1, exactly the shape
+    /// `resolve_forest` leaves behind for `ContainmentCtx` when an earlier pass has already
+    /// matched some descendants elsewhere. Leaves only (not arbitrary subtrees) keeps this
+    /// simple: the same restriction `test_apted_engine_matches_oracle_with_pruned_descendants`
+    /// uses by hand. Combined with the `["a","b","c"]`/`["x","y","z"]` generator (same-kind
+    /// candidates are always cheaply renameable under the unit cost model, so containment is the
+    /// *only* thing that can rule one out), this is what gives the fuzz test below teeth: without
+    /// `adjust()` applied at every `vren` site, the Apted engine is free to rename a pruned
+    /// ancestor onto a same-kind sibling subtree that doesn't actually contain where its
+    /// descendant landed, which the Zhang-Shasha oracle (already containment-aware via
+    /// `forest_dist`) will never do - producing a real cost divergence, not just a coincidental
+    /// match.
+    fn gen_random_pruning(
+        rng: &mut Rng,
+        before_nodes: &[(usize, String, String, Vec<usize>)],
+        after_nodes: &[(usize, String, String, Vec<usize>)],
+        before_root: usize,
+        after_root: usize,
+    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+        let mut before_leaves: Vec<usize> = before_nodes
+            .iter()
+            .filter(|(id, _, _, children)| *id != before_root && children.is_empty())
+            .map(|(id, ..)| *id)
+            .collect();
+        let mut after_leaves: Vec<usize> = after_nodes
+            .iter()
+            .filter(|(id, _, _, children)| *id != after_root && children.is_empty())
+            .map(|(id, ..)| *id)
+            .collect();
+
+        shuffle(rng, &mut before_leaves);
+        shuffle(rng, &mut after_leaves);
+
+        let max_k = before_leaves.len().min(after_leaves.len());
+        if max_k == 0 {
+            return (HashMap::new(), HashMap::new());
+        }
+        let k = 1 + rng.range(max_k.min(3));
+        let mut before_map = HashMap::new();
+        let mut after_map = HashMap::new();
+        for i in 0..k {
+            before_map.insert(before_leaves[i], after_leaves[i]);
+            after_map.insert(after_leaves[i], before_leaves[i]);
+        }
+        (before_map, after_map)
+    }
+
+    /// Extends `test_apted_engine_matches_oracle_fuzz` to the case that fuzz never exercises: a
+    /// forest with real pruned-descendant constraints (see `gen_random_pruning`). Both engines go
+    /// through `assert_distance_matches_oracle_pruned`, which now builds one shared
+    /// `ContainmentCtx` and threads it into *both* `compute_delta_zhang_shasha` (oracle) and
+    /// `compute_delta` (Apted) - a divergence here means `compute_delta`'s `vren` call sites are
+    /// missing an `adjust()` application somewhere, not just that pruning crashes something.
+    #[test]
+    fn test_apted_engine_matches_oracle_fuzz_with_containment() {
+        let kinds = ["a", "b", "c"];
+        let texts = ["x", "y", "z"];
+        for seed in 0..3000u64 {
+            let mut rng = Rng(seed.wrapping_mul(2685821657736338717).wrapping_add(23));
+            let mut before_nodes = Vec::new();
+            let mut next_id = 0usize;
+            let before_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut before_nodes,
+            );
+            let mut after_nodes = Vec::new();
+            let after_root = gen_random_tree(
+                &mut rng,
+                &mut next_id,
+                0,
+                4,
+                &kinds,
+                &texts,
+                &mut after_nodes,
+            );
+
+            let before_meta = meta_from_owned(&before_nodes);
+            let after_meta = meta_from_owned(&after_nodes);
+            let (before_node_map, after_node_map) = gen_random_pruning(
+                &mut rng,
+                &before_nodes,
+                &after_nodes,
+                before_root,
+                after_root,
+            );
+
+            let result = std::panic::catch_unwind(|| {
+                assert_distance_matches_oracle_pruned(
+                    &before_meta,
+                    &after_meta,
+                    &[before_root],
+                    &[after_root],
+                    &before_node_map,
+                    &after_node_map,
+                );
+            });
+            if result.is_err() {
+                panic!(
+                    "containment fuzz failure at seed {seed}\nbefore_nodes={before_nodes:?}\nafter_nodes={after_nodes:?}\nbefore_node_map={before_node_map:?}\nafter_node_map={after_node_map:?}"
                 );
             }
         }
