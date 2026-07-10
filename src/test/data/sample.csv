@@ -19,7 +19,7 @@ CPP,nextcloud-desktop.git,585b6ca32dc97c51ede2dad1c002b8a2625e12fc,test/testnext
 CPP,ollama-ollama.git,afaf7ce8c34bab8de45ca00dbd12da8cd3cc033a,ml/backend/ggml/ggml/src/ggml-metal/ggml-metal.cpp,cpp-ollama-add-function-argument
 CPP,opencv-opencv.git,fac647aaeb59c84d23d12aa8af3e8f6d09c5e5f6,modules/imgcodecs/test/test_png.cpp,
 CPP,tensorflow-tensorflow.git,4e38042b534e52bff29739e0a88f4276c528d435,tensorflow/core/common_runtime/buf_rendezvous.cc,
-CSS,Sonarr-Sonarr.git,f7a58aab339e2012b6bb91d0b3a38d733ec213c6,frontend/src/Activity/Queue/QueueRow.css,
+CSS,Sonarr-Sonarr.git,f7a58aab339e2012b6bb91d0b3a38d733ec213c6,frontend/src/Activity/Queue/QueueRow.css,css-add-property
 CSS,WordPress-WordPress.git,09846f8c2c34d591f31bfd2fa0464b03cf601f3a,wp-includes/css/dist/block-library/audio/theme-rtl.css,
 CSS,WordPress-WordPress.git,09846f8c2c34d591f31bfd2fa0464b03cf601f3a,wp-includes/css/dist/block-library/post-excerpt/style.css,
 CSS,WordPress-WordPress.git,1802bd631a7459c44307e408ab51e1a5732e7ae4,wp-admin/css/dashboard.min.css,

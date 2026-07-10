@@ -52,6 +52,8 @@ mod cpp_ollama_add_function_argument;
 #[cfg(test)]
 mod cpp_optimize_algorithm;
 #[cfg(test)]
+mod css_add_property;
+#[cfg(test)]
 mod go_lazygit_add_to_if_condition;
 #[cfg(test)]
 mod go_user_slices_library;

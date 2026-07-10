@@ -1,0 +1,1858 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1"
+      ],
+      "after_path": [
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2"
+      ],
+      "after_path": [
+        "rule_set:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3"
+      ],
+      "after_path": [
+        "rule_set:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4"
+      ],
+      "after_path": [
+        "rule_set:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "rule_set:5"
+      ],
+      "after_path": [
+        "rule_set:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "selectors:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "plain_value:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        "integer_value:1",
+        "unit:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:3"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:3",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:3",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:5",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:5",
+        "block:1",
+        "}:1"
+      ]
+    }
+  ]
+}

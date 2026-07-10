@@ -50,8 +50,32 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "function_definition" ||
             node_kind == "class_definition"
         }
-        Language::Java => node_kind == "program",
-        Language::C | Language::CPP => node_kind == "translation_unit",
+        Language::Java => {
+            node_kind == "program" ||
+            node_kind == "class_declaration" ||
+            node_kind == "interface_declaration" ||
+            node_kind == "enum_declaration" ||
+            node_kind == "method_declaration" ||
+            node_kind == "field_declaration"
+        }
+        Language::C => {
+            node_kind == "translation_unit" ||
+            node_kind == "function_definition" ||
+            node_kind == "struct_specifier" ||
+            node_kind == "enum_specifier" ||
+            node_kind == "union_specifier" ||
+            node_kind == "typedef_declaration"
+        }
+        Language::CPP => {
+            node_kind == "translation_unit" ||
+            node_kind == "function_definition" ||
+            node_kind == "class_specifier" ||
+            node_kind == "struct_specifier" ||
+            node_kind == "enum_specifier" ||
+            node_kind == "union_specifier" ||
+            node_kind == "namespace_definition" ||
+            node_kind == "typedef_declaration"
+        }
         Language::Go => {
             node_kind == "source_file" ||
             node_kind == "function_declaration" ||
@@ -59,14 +83,42 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "type_spec" ||
             node_kind == "type_alias"
         }
-        Language::JavaScript
-        | Language::TypeScript
-        | Language::TSX
-        | Language::PHP
-        | Language::Ruby
-        | Language::R
-        | Language::ShellScript => node_kind == "program",
-        Language::Swift => node_kind == "source_file",
+        Language::JavaScript | Language::TypeScript | Language::TSX => {
+            node_kind == "program" ||
+            node_kind == "function_declaration" ||
+            node_kind == "function_expression" ||
+            node_kind == "arrow_function" ||
+            node_kind == "class_declaration" ||
+            node_kind == "method_definition"
+        }
+        Language::PHP => {
+            node_kind == "program" ||
+            node_kind == "class_declaration" ||
+            node_kind == "function_declaration" ||
+            node_kind == "method_definition"
+        }
+        Language::Ruby => {
+            node_kind == "program" ||
+            node_kind == "class" ||
+            node_kind == "module" ||
+            node_kind == "method"
+        }
+        Language::R => {
+            node_kind == "program" ||
+            node_kind == "function_definition"
+        }
+        Language::ShellScript => {
+            node_kind == "program" ||
+            node_kind == "function_definition"
+        }
+        Language::Swift => {
+            node_kind == "source_file" ||
+            node_kind == "function_declaration" ||
+            node_kind == "class_declaration" ||
+            node_kind == "struct_declaration" ||
+            node_kind == "enum_declaration" ||
+            node_kind == "protocol_declaration"
+        }
         Language::Kotlin => {
             node_kind == "source_file" ||
             node_kind == "function_declaration" ||
@@ -75,12 +127,42 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "companion_object" ||
             node_kind == "type_alias"
         }
-        Language::Scala | Language::CSharp => node_kind == "compilation_unit",
-        Language::HTML => node_kind == "document",
-        Language::CSS => node_kind == "stylesheet",
-        Language::LUA => node_kind == "chunk",
-        Language::Vimscript => node_kind == "script_file",
-        // Add other languages as needed
+        Language::Scala => {
+            node_kind == "compilation_unit" ||
+            node_kind == "class_definition" ||
+            node_kind == "object_definition" ||
+            node_kind == "trait_definition" ||
+            node_kind == "function_definition"
+        }
+        Language::CSharp => {
+            node_kind == "compilation_unit" ||
+            node_kind == "class_declaration" ||
+            node_kind == "struct_declaration" ||
+            node_kind == "enum_declaration" ||
+            node_kind == "interface_declaration" ||
+            node_kind == "method_declaration"
+        }
+        Language::HTML => {
+            node_kind == "document" ||
+            node_kind == "element" ||
+            node_kind == "script_element" ||
+            node_kind == "style_element"
+        }
+        Language::CSS => {
+            node_kind == "stylesheet" ||
+            node_kind == "rule_set"
+        }
+        Language::LUA => {
+            node_kind == "chunk" ||
+            node_kind == "function_declaration"
+        }
+        Language::Vimscript => {
+            node_kind == "script_file" ||
+            node_kind == "function_definition"
+        }
+        // Data formats and configuration - root nodes only
+        Language::JSON | Language::YAML | Language::XML => node_kind == "document" || node_kind == "fragment",
+        // Other languages - root node only as fallback
         _ => false,
     }
 }
