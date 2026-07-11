@@ -37,6 +37,8 @@ use std::fs;
 use std::path::PathBuf;
 use tree_sitter::Node;
 
+use crate::code::ASTMetadata;
+use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMappingOperation, NodeCache};
 use crate::test::helper::{node_for_path, path_for_node};
 
@@ -227,6 +229,98 @@ fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperati
         | HumanOperation::Insert
         | HumanOperation::InsertWithChildren => None,
     }
+}
+
+/**
+* Total edit cost of a human-authored `HumanMapping` under the same unit-cost model as
+* `crate::diff::cost::diff_cost`, so the two numbers are directly comparable -
+* `benchmark_optimal_solutions` prints both per fixture.
+*
+* Reuses `operation_cost` for the per-entry cost table rather than reimplementing it, so codediff's
+* cost and the human's cost can never silently drift apart from having two separate copies of the
+* same table. `before_metadata`/`after_metadata` must come from the same parsed `Code` as
+* `before_root`/`after_root` (tree-sitter node ids are only stable within one parse - see
+* `ASTNodeMetadata::start_byte`'s doc comment) so `node_for_path`'s resolved ids can look up subtree
+* sizes in them for `DeleteWithChildren`/`InsertWithChildren` entries.
+*
+* Only sums entries actually present in `mapping` - an unannotated node contributes nothing. That's
+* fine as long as the mapping is *complete over every actual change* (every unannotated node is
+* genuinely unchanged, and therefore costs 0 whether or not it's written down): most fixtures'
+* `human_mapping.json` only has a few hundred entries against many thousands of nodes precisely
+* because the rest is untouched code, not because the human skipped grading real edits. If a fixture
+* ever *does* leave a real change unannotated, this will silently undercount the human side and
+* inflate `diff_cost - human_mapping_cost` for a reason that has nothing to do with the algorithm -
+* worth checking with `--details` before trusting a surprising gap on an unfamiliar fixture.
+*/
+pub fn human_mapping_cost(
+    mapping: &HumanMapping,
+    before_root: Node,
+    after_root: Node,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+) -> Result<u64> {
+    let mut total = 0u64;
+    for entry in &mapping.entries {
+        let (operation, subtree_size) = match entry.operation {
+            HumanOperation::Identical => (ASTMappingOperation::Identical, 1),
+            HumanOperation::Update => (ASTMappingOperation::Update, 1),
+            HumanOperation::MatchButNotIdentical => (ASTMappingOperation::MatchButNotIdentical, 1),
+            HumanOperation::Delete => (ASTMappingOperation::Delete, 1),
+            HumanOperation::Insert => (ASTMappingOperation::Insert, 1),
+            HumanOperation::DeleteWithChildren => {
+                let path = entry
+                    .before_path
+                    .as_ref()
+                    .context("DeleteWithChildren entry is missing before_path")?;
+                let node = node_for_path(before_root, &path_refs(path))
+                    .with_context(|| format!("resolving before_path {:?}", path))?;
+                let size = before_metadata
+                    .node_to_subtree_size
+                    .get(&node.id())
+                    .copied()
+                    .unwrap_or(1);
+                (ASTMappingOperation::DeleteWithChildren, size)
+            }
+            HumanOperation::InsertWithChildren => {
+                let path = entry
+                    .after_path
+                    .as_ref()
+                    .context("InsertWithChildren entry is missing after_path")?;
+                let node = node_for_path(after_root, &path_refs(path))
+                    .with_context(|| format!("resolving after_path {:?}", path))?;
+                let size = after_metadata
+                    .node_to_subtree_size
+                    .get(&node.id())
+                    .copied()
+                    .unwrap_or(1);
+                (ASTMappingOperation::InsertWithChildren, size)
+            }
+        };
+        total += operation_cost(&operation, subtree_size);
+    }
+    Ok(total)
+}
+
+/**
+* Loads the human mapping for `name` and computes its total edit cost (see
+* [`human_mapping_cost`]), resolving paths against a fresh parse of `before`/`after`.
+*
+* Convenience wrapper for callers (like `benchmark_optimal_solutions`) that only have a fixture
+* name and a `Code` pair, not an already-loaded `HumanMapping`/already-built `ASTMetadata`.
+*/
+pub fn human_mapping_cost_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<u64> {
+    let mapping = load(name)?;
+    let before_ast = before.ast.as_ref().context("Before code has no AST")?;
+    let after_ast = after.ast.as_ref().context("After code has no AST")?;
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
+    human_mapping_cost(
+        &mapping,
+        before_ast.root_node(),
+        after_ast.root_node(),
+        &before_metadata,
+        &after_metadata,
+    )
 }
 
 fn check_entry(

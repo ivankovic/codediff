@@ -30,6 +30,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use codediff::code::Code;
 use codediff::diff::ASTMappingReason;
+use codediff::diff::cost::diff_cost;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
 use std::collections::HashMap;
@@ -68,6 +69,22 @@ fn reason_counts_for(before: &Code, after: &Code) -> HashMap<ASTMappingReason, u
     counts
 }
 
+/// Total unit-cost of codediff's own mapping (see `codediff::diff::cost::diff_cost`) - independent
+/// of `human_mapping.json`, so this works for "unsolved" fixtures too, same as `reason_counts_for`.
+/// Runs `diff_code` a second time rather than sharing a run with `reason_counts_for`/
+/// `human_mapping::compute_mismatches_for`: this binary already re-diffs per computation (see
+/// `total_node_count_for`'s own re-walk), and a shared-run refactor isn't worth the complexity for
+/// a benchmark tool that's run interactively, not in a hot loop.
+fn algorithm_cost_for(before: &Code, after: &Code) -> u64 {
+    let diff = codediff::diff::diff_code(before, after);
+    let Some(diff_ast) = diff.ast else {
+        return 0;
+    };
+    let before_metadata = codediff::code::metadata::metadata_of(before);
+    let after_metadata = codediff::code::metadata::metadata_of(after);
+    diff_cost(&diff_ast, &before_metadata, &after_metadata)
+}
+
 #[derive(Parser)]
 struct Args {
     /// Print every individual mismatch for this one fixture (including the operation and
@@ -98,6 +115,15 @@ struct Row {
     /// Computed unconditionally (doesn't need `human_mapping.json`), so this is populated even
     /// for "unsolved" fixtures.
     reason_counts: HashMap<ASTMappingReason, usize>,
+    /// Total unit-cost of codediff's own mapping (`codediff::diff::cost::diff_cost`). Computed
+    /// unconditionally, same as `reason_counts` - this is "how expensive codediff's mapping is",
+    /// independent of whether there's a human mapping to compare it against.
+    algorithm_cost: u64,
+    /// Total unit-cost of the human-authored mapping (`human_mapping::human_mapping_cost_for`),
+    /// under the exact same cost model as `algorithm_cost` so the two are directly comparable.
+    /// `None` for "unsolved" fixtures (no `human_mapping.json` yet), same convention as
+    /// `mismatches`.
+    human_cost: Option<u64>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -173,21 +199,27 @@ fn main() -> Result<()> {
     for name in &names {
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
         let reason_counts = reason_counts_for(before, after);
+        let algorithm_cost = algorithm_cost_for(before, after);
 
         if !human_mapping::mapping_path(name).exists() {
             rows.push(Row {
                 name: name.clone(),
                 mismatches: None,
                 reason_counts,
+                algorithm_cost,
+                human_cost: None,
             });
             continue;
         }
         let mismatches = human_mapping::compute_mismatches_for(name, before, after)?;
         let total_nodes = human_mapping::total_node_count_for(before, after);
+        let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
         rows.push(Row {
             name: name.clone(),
             mismatches: Some((mismatches.len(), total_nodes)),
             reason_counts,
+            algorithm_cost,
+            human_cost: Some(human_cost),
         });
     }
 
@@ -219,59 +251,82 @@ fn print_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!(
-        "{:<name_width$}  {:>10}  {:>7}  {:>13}",
+        "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}",
         "Solution",
         "Mismatches",
         "Mism %",
         "Human Unsolved",
+        "Alg Cost",
+        "Hum Cost",
+        "Cost Diff",
         name_width = name_width
     );
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13));
+    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9));
 
     let mut total_mismatches = 0usize;
     let mut total_nodes = 0usize;
     let mut total_unsolved = 0usize;
+    let mut total_algorithm_cost = 0u64;
+    // Only summed over fixtures that also have a human cost, so `total_cost_diff` below compares
+    // like for like - an "unsolved" fixture's algorithm cost would otherwise inflate the TOTAL
+    // algorithm side against nothing on the human side.
+    let mut total_algorithm_cost_where_solved = 0u64;
+    let mut total_human_cost = 0u64;
     for row in rows {
-        match row.mismatches {
-            Some((count, nodes)) => {
+        total_algorithm_cost += row.algorithm_cost;
+        match (row.mismatches, row.human_cost) {
+            (Some((count, nodes)), Some(human_cost)) => {
                 total_mismatches += count;
                 total_nodes += nodes;
+                total_algorithm_cost_where_solved += row.algorithm_cost;
+                total_human_cost += human_cost;
                 let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
+                let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}",
+                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}",
                     row.name,
                     count,
                     pct,
                     "",
+                    row.algorithm_cost,
+                    human_cost,
+                    cost_diff,
                     name_width = name_width
                 );
             }
-            None => {
+            _ => {
                 total_unsolved += 1;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>7}  {:>13}",
+                    "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}",
                     row.name,
                     "-",
                     "-",
                     "yes",
+                    row.algorithm_cost,
+                    "-",
+                    "-",
                     name_width = name_width
                 );
             }
         }
     }
 
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13));
+    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9));
     let total_pct = if total_nodes > 0 {
         100.0 * total_mismatches as f64 / total_nodes as f64
     } else {
         0.0
     };
+    let total_cost_diff = total_algorithm_cost_where_solved as i64 - total_human_cost as i64;
     println!(
-        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}",
+        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}",
         "TOTAL",
         total_mismatches,
         total_pct,
         total_unsolved,
+        total_algorithm_cost,
+        total_human_cost,
+        total_cost_diff,
         name_width = name_width
     );
 }
@@ -329,7 +384,16 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let file = File::create(path)?;
     let mut wtr = Writer::from_writer(file);
 
-    let mut header = vec!["solution", "mismatches", "mismatch_pct", "total_nodes", "human_unsolved"];
+    let mut header = vec![
+        "solution",
+        "mismatches",
+        "mismatch_pct",
+        "total_nodes",
+        "human_unsolved",
+        "algorithm_cost",
+        "human_cost",
+        "cost_diff",
+    ];
     header.extend(REASONS.iter().map(|(_, label)| *label));
     wtr.write_record(&header)?;
 
@@ -338,26 +402,33 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
             .iter()
             .map(|(reason, _)| row.reason_counts.get(reason).copied().unwrap_or(0).to_string())
             .collect();
-        match row.mismatches {
-            Some((count, nodes)) => {
+        match (row.mismatches, row.human_cost) {
+            (Some((count, nodes)), Some(human_cost)) => {
                 let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
+                let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 let mut record = vec![
                     row.name.clone(),
                     count.to_string(),
                     format!("{:.2}", pct),
                     nodes.to_string(),
                     "false".to_string(),
+                    row.algorithm_cost.to_string(),
+                    human_cost.to_string(),
+                    cost_diff.to_string(),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
             }
-            None => {
+            _ => {
                 let mut record = vec![
                     row.name.clone(),
                     "-".to_string(),
                     "-".to_string(),
                     "-".to_string(),
                     "true".to_string(),
+                    row.algorithm_cost.to_string(),
+                    "-".to_string(),
+                    "-".to_string(),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
