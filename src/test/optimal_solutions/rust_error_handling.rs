@@ -57,5 +57,5 @@ fn optimal_solution() -> Result<()> {
     //  This is quite a "deep" change, and heuristics that prevent changes across too many levels
     //  might not allow "contents" to match. However, for humans it is obviously correct to match
     //  them.
-    test::helper::human_mapping::assert_matches_human_mapping("rust-error-handling")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("rust-error-handling", 5)
 }

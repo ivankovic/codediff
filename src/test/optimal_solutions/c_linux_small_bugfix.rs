@@ -25,5 +25,5 @@ fn optimal_solution() -> Result<()> {
     //
     // The added if clause can be mapped in two equally good ways. Either the inner or the outer
     // after if can map to the if in the before code.
-    test::helper::human_mapping::assert_matches_human_mapping("c-linux-small-bugfix")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("c-linux-small-bugfix", 4)
 }

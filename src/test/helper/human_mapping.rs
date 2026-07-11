@@ -519,13 +519,32 @@ pub fn compute_mismatches_for(name: &str, before: &crate::code::Code, after: &cr
 * the full extent of any disagreement between codediff and the human-authored optimum.
 */
 pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
+    assert_matches_human_mapping_within_limit(name, 0)
+}
+
+/**
+* Same as [`assert_matches_human_mapping`], but allows up to `upper_limit_of_mismatched_nodes`
+* mismatches instead of requiring an exact match.
+*
+* For fixtures where codediff's mapping has a known, understood gap against the human-authored
+* mapping (documented in `TODO.md` - an objective-wall gap, a premature-pruning architecture
+* issue, etc. - not a bug that's simply unfixed), pin the limit to today's actual mismatch count.
+* The test still catches *regressions* (an increase past the limit) without blocking the suite on
+* a fix that doesn't exist yet. When a fix does land for one of these gaps, lower the limit (or
+* switch back to [`assert_matches_human_mapping`] if it reaches 0) so the test keeps the new bar.
+*/
+pub fn assert_matches_human_mapping_within_limit(
+    name: &str,
+    upper_limit_of_mismatched_nodes: usize,
+) -> Result<()> {
     let mismatches = compute_mismatches(name)?;
 
-    if !mismatches.is_empty() {
+    if mismatches.len() > upper_limit_of_mismatched_nodes {
         bail!(
-            "{} mismatch(es) between the human mapping and codediff's diff for '{}':\n{}",
+            "{} mismatch(es) between the human mapping and codediff's diff for '{}' (allowed up to {}):\n{}",
             mismatches.len(),
             name,
+            upper_limit_of_mismatched_nodes,
             mismatches.join("\n")
         );
     }

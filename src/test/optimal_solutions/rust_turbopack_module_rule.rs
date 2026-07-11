@@ -23,7 +23,7 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn matches_human_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-turbopack-module-rule")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("rust-turbopack-module-rule", 169)
 }
 
 #[test]

@@ -809,13 +809,24 @@ mod tests {
             // constant update.
             assert_eq!(root_mapping.cost, 1);
 
-            // Check that all other nodes have IdenticalHashOfAncestor reason
+            // Every other node should be mapped as part of the root's structural match. Usually
+            // that's `StructurallyIdenticalAncestor`, but a node that's *also* a reference node
+            // (e.g. C/C++'s `#include`) can get claimed first by the separate reference-hash
+            // matching pass, which runs before the whole-tree structural check and doesn't know
+            // the whole tree is about to match anyway - so it's tagged `IdenticalHash`/
+            // `IdenticalHashOfAncestor` instead. The actual mapping (which node pairs with which)
+            // is still correct either way; only the recorded reason differs, so accept all three.
             for ((before_id, after_id), mapping) in &diff_ast.mapping {
                 if *before_id != before_root_id || *after_id != after_root_id {
-                    assert_eq!(
-                        mapping.reason,
-                        ASTMappingReason::StructurallyIdenticalAncestor,
-                        "Non-root node should have StructurallyIdenticalAncestor reason for {}, got {:?}",
+                    assert!(
+                        matches!(
+                            mapping.reason,
+                            ASTMappingReason::StructurallyIdenticalAncestor
+                                | ASTMappingReason::IdenticalHash
+                                | ASTMappingReason::IdenticalHashOfAncestor
+                        ),
+                        "Non-root node should have StructurallyIdenticalAncestor, IdenticalHash \
+                         or IdenticalHashOfAncestor reason for {}, got {:?}",
                         filename,
                         mapping.reason
                     );

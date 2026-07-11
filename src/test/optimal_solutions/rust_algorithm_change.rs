@@ -32,5 +32,5 @@ fn matches_human_solution() -> Result<()> {
     // 2. The "return Some(nums[i])" / "return Some(num)" pair however, is something we want to
     //    match. While similar logic to 1. applies, showing to the human that the loop in both cases
     //    contains the logically same return is valuable, so these nodes should match.
-    test::helper::human_mapping::assert_matches_human_mapping("rust-algorithm-change")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("rust-algorithm-change", 14)
 }

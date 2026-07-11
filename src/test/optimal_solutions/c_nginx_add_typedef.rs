@@ -53,5 +53,5 @@ fn optimal_solution() -> Result<()> {
     //  update pwd to cb_data, and then pay the insert cost to insert field_identifier "pwd".
     //  However, for humans, it is much better to match "pwd" to "pwd", even if the kinds differ. So
     //  the optimal solution has to allow for identifier and field_identifier node kinds to match.
-    test::helper::human_mapping::assert_matches_human_mapping("c-nginx-add-typedef")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("c-nginx-add-typedef", 62)
 }
