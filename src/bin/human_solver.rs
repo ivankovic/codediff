@@ -139,7 +139,7 @@ use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 use codediff::code::Code;
-use codediff::diff::{ASTDiff, diff_code};
+use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{self, HumanMapping, HumanMappingEntry, HumanOperation};
 use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node};
 
@@ -172,6 +172,8 @@ i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node
 a / A          align other panel to the human mapping / to codediff's mapping
 p              run codediff's own diff, show its verdict next to each node
+r              toggle showing the ASTMappingReason (which pass matched it) next
+                 to each node's algo verdict
 n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 
 t              view raw before/after text (not the AST tree)
@@ -591,6 +593,11 @@ struct App {
     /// `Unmarked` -- i.e. nothing left in it to review. Recomputed fresh each frame from the
     /// current mapping, so it can't drift out of sync with what's actually marked.
     hide_solved: bool,
+    /// Toggled by `r`: when true, each node's algo-verdict glyph (see `algo_diff`) is followed by
+    /// the short label of the `ASTMappingReason` codediff recorded for it (e.g. "IdHash", "APTED")
+    /// -- which pass is responsible for that mapping, not just what the mapping is. Has no effect
+    /// until `algo_diff` is populated (`p`).
+    show_reason: bool,
 }
 
 impl App {
@@ -616,6 +623,7 @@ impl App {
             should_quit: false,
             algo_diff: None,
             hide_solved: false,
+            show_reason: false,
         }
     }
 }
@@ -865,6 +873,41 @@ fn algo_status_glyph(status: AlgoStatus) -> &'static str {
         AlgoStatus::Deleted => "-",
         AlgoStatus::Inserted => "+",
         AlgoStatus::Unknown => "?",
+    }
+}
+
+/// Which pass produced the Before node's mapping entry, if any -- `diff_ast.mapping` has one entry
+/// per node (see `apted::common::add_delete_mappings`/`add_insert_mappings`), keyed by
+/// `(before_id, after_id)` with `0` standing in for "no partner" on whichever side is missing, so
+/// this looks up the entry the same way for a match, a delete, or (in principle) an unresolved
+/// node -- `None` only when `before_node_map` itself has no entry at all (`AlgoStatus::Unknown`).
+fn algo_reason_before(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
+    let after_id = *diff_ast.before_node_map.get(&node.id())?;
+    diff_ast.mapping.get(&(node.id(), after_id)).map(|m| m.reason)
+}
+
+/// Same as [`algo_reason_before`], but for the After tree.
+fn algo_reason_after(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
+    let before_id = *diff_ast.after_node_map.get(&node.id())?;
+    diff_ast.mapping.get(&(before_id, node.id())).map(|m| m.reason)
+}
+
+/// Short column-style label for an `ASTMappingReason`, matching
+/// `src/bin/benchmark_optimal_solutions.rs`'s `REASONS` table so the same abbreviation means the
+/// same thing in both tools.
+fn reason_label(reason: ASTMappingReason) -> &'static str {
+    match reason {
+        ASTMappingReason::IdenticalHash => "IdHash",
+        ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc",
+        ASTMappingReason::FullymappingSubtrees => "FullMap",
+        ASTMappingReason::StructurallyIdenticalSubtrees => "StructId",
+        ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc",
+        ASTMappingReason::OptimalIDU => "OptIDU",
+        ASTMappingReason::APTED => "APTED",
+        ASTMappingReason::FlatSequenceDiff => "FlatSeq",
+        ASTMappingReason::MovedSubtree => "Moved",
+        ASTMappingReason::CommentSibling => "Comment",
+        ASTMappingReason::BottomUpExpansion => "BottomUp",
     }
 }
 
@@ -2011,6 +2054,7 @@ fn render_panel(
     src: &[u8],
     focused: bool,
     algo_diff: Option<&ASTDiff>,
+    show_reason: bool,
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
     panel.viewport_height = inner_height;
@@ -2049,7 +2093,16 @@ fn render_panel(
                     Side::Before => algo_disagrees_before(*node, caches, diff_ast),
                     Side::After => algo_disagrees_after(*node, caches, diff_ast),
                 };
-                (format!("({})", algo_status_glyph(algo_status)), disagrees)
+                let reason_suffix = if show_reason {
+                    let reason = match side {
+                        Side::Before => algo_reason_before(*node, diff_ast),
+                        Side::After => algo_reason_after(*node, diff_ast),
+                    };
+                    reason.map(|r| format!(" {}", reason_label(r))).unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                (format!("({}{})", algo_status_glyph(algo_status), reason_suffix), disagrees)
             })
             .unwrap_or_default();
         let indent = "  ".repeat(*depth);
@@ -2121,6 +2174,7 @@ fn draw_ui(
         before_src,
         app.focus == Focus::Before,
         app.algo_diff.as_ref(),
+        app.show_reason,
     );
     render_panel(
         frame,
@@ -2133,10 +2187,11 @@ fn draw_ui(
         after_src,
         app.focus == Focus::After,
         app.algo_diff.as_ref(),
+        app.show_reason,
     );
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -2889,6 +2944,15 @@ fn handle_key(
                 "Hiding fully solved subtrees".to_string()
             } else {
                 "Showing all nodes".to_string()
+            });
+            None
+        }
+        KeyCode::Char('r') => {
+            app.show_reason = !app.show_reason;
+            app.status = Some(if app.show_reason {
+                "Showing ASTMappingReason next to each node's algo verdict".to_string()
+            } else {
+                "Hiding ASTMappingReason".to_string()
             });
             None
         }
@@ -4401,6 +4465,59 @@ mod tests {
     fn promoted_sample_sources_at_is_empty_when_file_does_not_exist() {
         let promoted = promoted_sample_sources_at(Path::new("/nonexistent/sample.csv")).unwrap();
         assert!(promoted.is_empty());
+    }
+
+    #[test]
+    fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
+        let source = "fn f() { a(); }\n";
+        let before = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
+        let after = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
+        let diff = diff_code(&before, &after);
+        let diff_ast = diff.ast.expect("diff has AST");
+
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
+
+        // Identical before/after source: the whole tree matches via a single hash comparison at
+        // the root, so both roots should report `IdenticalHash` - and nothing further down should
+        // even have its own entry (see `add_delete_mappings`'s sibling passes: a hash-matched
+        // subtree's descendants are never visited individually).
+        let before_reason = algo_reason_before(before_ast.root_node(), &diff_ast);
+        let after_reason = algo_reason_after(after_ast.root_node(), &diff_ast);
+        assert_eq!(before_reason, Some(ASTMappingReason::IdenticalHash));
+        assert_eq!(after_reason, Some(ASTMappingReason::IdenticalHash));
+        assert_eq!(reason_label(before_reason.unwrap()), "IdHash");
+    }
+
+    #[test]
+    fn algo_reason_is_none_when_the_diff_has_no_entry_for_the_node() {
+        // A fresh, unpopulated ASTDiff has no entries at all, so every lookup should miss cleanly
+        // rather than panicking - this is the state before `p` has ever been pressed.
+        let source = "fn f() {}\n";
+        let code = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
+        let root = code.ast.as_ref().unwrap().root_node();
+        let empty_diff = ASTDiff::default();
+
+        assert_eq!(algo_reason_before(root, &empty_diff), None);
+        assert_eq!(algo_reason_after(root, &empty_diff), None);
+    }
+
+    #[test]
+    fn reason_label_matches_benchmark_optimal_solutions_abbreviations() {
+        // Kept in sync by hand with `src/bin/benchmark_optimal_solutions.rs`'s `REASONS` table -
+        // this test exists so a label drift between the two tools fails loudly instead of quietly
+        // making the same abbreviation mean two different things.
+        assert_eq!(reason_label(ASTMappingReason::IdenticalHash), "IdHash");
+        assert_eq!(reason_label(ASTMappingReason::IdenticalHashOfAncestor), "IdHashAnc");
+        assert_eq!(reason_label(ASTMappingReason::FullymappingSubtrees), "FullMap");
+        assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalSubtrees), "StructId");
+        assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalAncestor), "StructAnc");
+        assert_eq!(reason_label(ASTMappingReason::OptimalIDU), "OptIDU");
+        assert_eq!(reason_label(ASTMappingReason::APTED), "APTED");
+        assert_eq!(reason_label(ASTMappingReason::FlatSequenceDiff), "FlatSeq");
+        assert_eq!(reason_label(ASTMappingReason::MovedSubtree), "Moved");
+        assert_eq!(reason_label(ASTMappingReason::CommentSibling), "Comment");
+        assert_eq!(reason_label(ASTMappingReason::BottomUpExpansion), "BottomUp");
     }
 }
 
