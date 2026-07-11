@@ -442,7 +442,7 @@ pub enum ASTMappingOperation {
 /**
 * Why were the two subtrees mapped to each other?
 */
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum ASTMappingReason {
     #[default]
     /// The hash of the nodes and their subtrees is identical and so they were matched. Note that

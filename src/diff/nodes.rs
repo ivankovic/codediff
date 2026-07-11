@@ -49,6 +49,9 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
             node_kind == "module"
                 || node_kind == "function_definition"
                 || node_kind == "class_definition"
+                || node_kind == "import_statement"
+                || node_kind == "import_from_statement"
+                || node_kind == "future_import_statement"
         }
         Language::Java => {
             node_kind == "program"
@@ -57,6 +60,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "enum_declaration"
                 || node_kind == "method_declaration"
                 || node_kind == "field_declaration"
+                || node_kind == "import_declaration"
         }
         Language::C => {
             node_kind == "translation_unit"
@@ -79,6 +83,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "typedef_declaration"
                 || node_kind == "preproc_function_def"
                 || node_kind == "preproc_include"
+                || node_kind == "using_declaration"
         }
         Language::Go => {
             node_kind == "source_file"
@@ -86,6 +91,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "method_declaration"
                 || node_kind == "type_spec"
                 || node_kind == "type_alias"
+                || node_kind == "import_declaration"
         }
         Language::JavaScript | Language::TypeScript | Language::TSX => {
             node_kind == "program"
@@ -94,12 +100,14 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "arrow_function"
                 || node_kind == "class_declaration"
                 || node_kind == "method_definition"
+                || node_kind == "import_statement"
         }
         Language::PHP => {
             node_kind == "program"
                 || node_kind == "class_declaration"
                 || node_kind == "function_declaration"
                 || node_kind == "method_definition"
+                || node_kind == "namespace_use_declaration"
         }
         Language::Ruby => {
             node_kind == "program"
@@ -116,6 +124,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "struct_declaration"
                 || node_kind == "enum_declaration"
                 || node_kind == "protocol_declaration"
+                || node_kind == "import_declaration"
         }
         Language::Kotlin => {
             node_kind == "source_file"
@@ -132,6 +141,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "object_definition"
                 || node_kind == "trait_definition"
                 || node_kind == "function_definition"
+                || node_kind == "import_declaration"
         }
         Language::CSharp => {
             node_kind == "compilation_unit"
@@ -140,6 +150,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "enum_declaration"
                 || node_kind == "interface_declaration"
                 || node_kind == "method_declaration"
+                || node_kind == "using_directive"
         }
         Language::HTML => {
             node_kind == "document"
@@ -147,7 +158,9 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
                 || node_kind == "script_element"
                 || node_kind == "style_element"
         }
-        Language::CSS => node_kind == "stylesheet" || node_kind == "rule_set",
+        Language::CSS => {
+            node_kind == "stylesheet" || node_kind == "rule_set" || node_kind == "import_statement"
+        }
         Language::LUA => node_kind == "chunk" || node_kind == "function_declaration",
         Language::Vimscript => node_kind == "script_file" || node_kind == "function_definition",
         // Data formats and configuration - root nodes only

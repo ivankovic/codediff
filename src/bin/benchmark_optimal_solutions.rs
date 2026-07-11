@@ -28,11 +28,44 @@
 
 use anyhow::{Result, bail};
 use clap::Parser;
+use codediff::code::Code;
+use codediff::diff::ASTMappingReason;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
+use std::collections::HashMap;
 use std::fs::File;
 
 use csv::Writer;
+
+/// Every `ASTMappingReason` variant, in declaration order, paired with a short column label for
+/// the terminal table. Kept as an explicit list (rather than deriving one) so the table's column
+/// order stays stable even if variants are reordered in `diff.rs`.
+const REASONS: &[(ASTMappingReason, &str)] = &[
+    (ASTMappingReason::IdenticalHash, "IdHash"),
+    (ASTMappingReason::IdenticalHashOfAncestor, "IdHashAnc"),
+    (ASTMappingReason::FullymappingSubtrees, "FullMap"),
+    (ASTMappingReason::StructurallyIdenticalSubtrees, "StructId"),
+    (ASTMappingReason::StructurallyIdenticalAncestor, "StructAnc"),
+    (ASTMappingReason::OptimalIDU, "OptIDU"),
+    (ASTMappingReason::APTED, "APTED"),
+    (ASTMappingReason::FlatSequenceDiff, "FlatSeq"),
+    (ASTMappingReason::MovedSubtree, "Moved"),
+    (ASTMappingReason::CommentSibling, "Comment"),
+];
+
+/// Runs codediff once and tallies every mapping entry (matched pairs *and* lone deletes/inserts)
+/// by its `ASTMappingReason` - i.e. which algorithm pass is responsible for how much of the
+/// diff. Independent of `human_mapping.json`, so this works for "unsolved" fixtures too.
+fn reason_counts_for(before: &Code, after: &Code) -> HashMap<ASTMappingReason, usize> {
+    let diff = codediff::diff::diff_code(before, after);
+    let mut counts = HashMap::new();
+    if let Some(diff_ast) = diff.ast {
+        for mapping in diff_ast.mapping.values() {
+            *counts.entry(mapping.reason).or_insert(0) += 1;
+        }
+    }
+    counts
+}
 
 #[derive(Parser)]
 struct Args {
@@ -59,6 +92,11 @@ struct Row {
     /// The second element of the tuple is the total node count (before + after trees combined),
     /// the denominator for the mismatch percentage - see `human_mapping::total_node_count_for`.
     mismatches: Option<(usize, usize)>,
+    /// How many mapping entries codediff produced for each `ASTMappingReason` - i.e. which pass
+    /// (hash matching, semantic-structural anchoring, APTED, ...) did how much of the work.
+    /// Computed unconditionally (doesn't need `human_mapping.json`), so this is populated even
+    /// for "unsolved" fixtures.
+    reason_counts: HashMap<ASTMappingReason, usize>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -132,19 +170,23 @@ fn main() -> Result<()> {
 
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
+        let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+        let reason_counts = reason_counts_for(before, after);
+
         if !human_mapping::mapping_path(name).exists() {
             rows.push(Row {
                 name: name.clone(),
                 mismatches: None,
+                reason_counts,
             });
             continue;
         }
-        let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
         let mismatches = human_mapping::compute_mismatches_for(name, before, after)?;
         let total_nodes = human_mapping::total_node_count_for(before, after);
         rows.push(Row {
             name: name.clone(),
             mismatches: Some((mismatches.len(), total_nodes)),
+            reason_counts,
         });
     }
 
@@ -163,6 +205,7 @@ fn main() -> Result<()> {
     }
 
     print_table(&rows);
+    print_reason_table(&rows);
     Ok(())
 }
 
@@ -232,26 +275,91 @@ fn print_table(rows: &[Row]) {
     );
 }
 
+/// Prints a fixture x reason table: how many mapping entries each algorithm pass (hash matching,
+/// semantic-structural anchoring, APTED, ...) produced for each fixture, plus a TOTAL row.
+/// Reasons that are zero for every fixture are dropped from the table to keep it narrower - the
+/// active set varies run to run depending on which passes actually fire.
+fn print_reason_table(rows: &[Row]) {
+    let name_width = rows
+        .iter()
+        .map(|r| r.name.len())
+        .chain(["Solution".len()])
+        .max()
+        .unwrap_or(0);
+
+    let active_reasons: Vec<(ASTMappingReason, &str)> = REASONS
+        .iter()
+        .copied()
+        .filter(|(reason, _)| rows.iter().any(|r| r.reason_counts.get(reason).copied().unwrap_or(0) > 0))
+        .collect();
+
+    const COL_WIDTH: usize = 9;
+    let rule_width = name_width + active_reasons.len() * (COL_WIDTH + 2);
+
+    println!();
+    println!("Mapping reasons per fixture (how much work each algorithm pass did):");
+    print!("{:<name_width$}", "Solution", name_width = name_width);
+    for (_, label) in &active_reasons {
+        print!("  {:>COL_WIDTH$}", label);
+    }
+    println!();
+    println!("{}", "-".repeat(rule_width));
+
+    let mut totals: HashMap<ASTMappingReason, usize> = HashMap::new();
+    for row in rows {
+        print!("{:<name_width$}", row.name, name_width = name_width);
+        for (reason, _) in &active_reasons {
+            let count = row.reason_counts.get(reason).copied().unwrap_or(0);
+            *totals.entry(*reason).or_insert(0) += count;
+            print!("  {:>COL_WIDTH$}", count);
+        }
+        println!();
+    }
+
+    println!("{}", "-".repeat(rule_width));
+    print!("{:<name_width$}", "TOTAL", name_width = name_width);
+    for (reason, _) in &active_reasons {
+        print!("  {:>COL_WIDTH$}", totals.get(reason).copied().unwrap_or(0));
+    }
+    println!();
+}
+
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let file = File::create(path)?;
     let mut wtr = Writer::from_writer(file);
 
-    wtr.write_record(["solution", "mismatches", "mismatch_pct", "total_nodes", "human_unsolved"])?;
+    let mut header = vec!["solution", "mismatches", "mismatch_pct", "total_nodes", "human_unsolved"];
+    header.extend(REASONS.iter().map(|(_, label)| *label));
+    wtr.write_record(&header)?;
 
     for row in rows {
+        let reason_fields: Vec<String> = REASONS
+            .iter()
+            .map(|(reason, _)| row.reason_counts.get(reason).copied().unwrap_or(0).to_string())
+            .collect();
         match row.mismatches {
             Some((count, nodes)) => {
                 let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
-                wtr.write_record([
-                    &row.name,
-                    &count.to_string(),
-                    &format!("{:.2}", pct),
-                    &nodes.to_string(),
-                    "false",
-                ])?;
+                let mut record = vec![
+                    row.name.clone(),
+                    count.to_string(),
+                    format!("{:.2}", pct),
+                    nodes.to_string(),
+                    "false".to_string(),
+                ];
+                record.extend(reason_fields);
+                wtr.write_record(&record)?;
             }
             None => {
-                wtr.write_record([&row.name, "-", "-", "-", "true"])?;
+                let mut record = vec![
+                    row.name.clone(),
+                    "-".to_string(),
+                    "-".to_string(),
+                    "-".to_string(),
+                    "true".to_string(),
+                ];
+                record.extend(reason_fields);
+                wtr.write_record(&record)?;
             }
         }
     }
