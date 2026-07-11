@@ -1,6 +1,15 @@
+# Next algorithmic improvements to implement
+
+*  After each top-down heuristic, run a bottom-up heuristic that detects nodes whose children are
+   already mapped to each other and then match those nodes too. We can use the ASTMatchinReason
+   "BottomUpExpansion". We can also set a threshold, so that the match is valid if X% of nodes
+   match. E.g. 90% to start with.
+*  Use the values more. At the moment, the node values are used in a all-or-nothing match. But we
+   could also use the value similarity to compute the cost, so that identifiers that look more alike
+   are cheaper to match in APTED.
+
 # Next features to implement
 
-*  Human Solver -> Go to next missmatch keyboard shortcut
 *  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
    script out of it.
 
@@ -15,8 +24,6 @@
 
 *  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code
    diff.rs
-*  Make all handmade test diff directories in src/test/data/diffs start with the language name, e.g.
-   not "hello-world-added-message" but "rust-hello-world-added-message" etc.
 
 # Diff algorithm accuracy (optimal_solutions gaps)
 
