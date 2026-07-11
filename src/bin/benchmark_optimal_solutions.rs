@@ -51,6 +51,7 @@ const REASONS: &[(ASTMappingReason, &str)] = &[
     (ASTMappingReason::FlatSequenceDiff, "FlatSeq"),
     (ASTMappingReason::MovedSubtree, "Moved"),
     (ASTMappingReason::CommentSibling, "Comment"),
+    (ASTMappingReason::BottomUpExpansion, "BottomUp"),
 ];
 
 /// Runs codediff once and tallies every mapping entry (matched pairs *and* lone deletes/inserts)

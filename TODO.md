@@ -1,9 +1,27 @@
 # Next algorithmic improvements to implement
 
-*  After each top-down heuristic, run a bottom-up heuristic that detects nodes whose children are
-   already mapped to each other and then match those nodes too. We can use the ASTMatchinReason
-   "BottomUpExpansion". We can also set a threshold, so that the match is valid if X% of nodes
-   match. E.g. 90% to start with.
+*  IMPLEMENTED, threshold tuned, benefit not established (2026-07-11): bottom-up heuristic that
+   detects nodes whose descendants are already mapped to each other and matches those nodes too,
+   via `ASTMappingReason::BottomUpExpansion` (`src/diff/solve_bottom_up_expansion.rs`), gated by a
+   Dice coefficient over full subtrees (a direct-children ratio was tried first and rejected - see
+   that file's doc comment). Wired into `Diff::from_code` at a single, deliberately late call site
+   (right before Pass 3's orphan blanket-delete/insert) after an earlier "after every top-down
+   heuristic" placement regressed 4 `optimal_solutions` fixtures by letting a plausible-but-wrong
+   candidate preempt a later, more precise pass.
+   `DICE_THRESHOLD` was then swept from 0.5 to 0.95 against `benchmark_optimal_solutions`: 0.8-0.95
+   all tie the 742/0 baseline exactly (identical mismatch count on every fixture); 0.78 and below
+   start regressing (0.78 -> 746, 0.75 -> 749, 0.5 -> 826), and those regressions are real content
+   mismatches (`identifier`/`scoped_identifier`/`field_initializer`, a `statement_block` matched to
+   the wrong arrow function) - not generic/punctuation-token ties (`}`, `)`) that would suggest an
+   equally-valid alternate optimal solution worth flagging for human review instead of reverting.
+   No throughput difference was measurable at any threshold either (one release-build, single-run
+   comparison at 0.85 vs. the pass disabled: within noise). Landed at 0.9 - it ties every other safe
+   value on outcome while keeping the largest margin from the ~0.79 regression cliff, and there's no
+   evidence a lower value buys anything to justify sitting closer to that cliff.
+   Same situation as `identical-statement-runs` in the memory log: implemented, correct, and now
+   tuned, but whether it's worth keeping in the pipeline at all is still a call for whoever picks
+   this up next - it has fired ~29 times across the fixture corpus without net effect on either
+   accuracy or measured speed.
 *  Use the values more. At the moment, the node values are used in a all-or-nothing match. But we
    could also use the value similarity to compute the cost, so that identifiers that look more alike
    are cheaper to match in APTED.

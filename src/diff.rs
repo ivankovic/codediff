@@ -18,6 +18,7 @@
 pub mod apted;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
+pub mod solve_bottom_up_expansion;
 pub mod solve_comment_nodes;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
@@ -188,6 +189,12 @@ impl Diff {
         // statements inside a function/impl that has no same-named counterpart - see that pass's
         // doc comment for the full reasoning.
         solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Last chance for BottomUpExpansion before Pass 3 blanket-deletes/inserts every remaining
+        // orphan wholesale - a container with no same-named counterpart but a mostly-matched body
+        // (e.g. a rename plus a small internal edit) is exactly what Pass 3 would otherwise destroy
+        // and this sweep can still rescue.
+        solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
 
         // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
         // (no same-named counterpart, and not claimed by the heuristics above) is marked as a
@@ -481,6 +488,10 @@ pub enum ASTMappingReason {
     /// A comment node that was matched because it immediately precedes a matched node on both
     /// before and after sides. See `solve_comment_nodes`.
     CommentSibling,
+    /// Neither node was matched directly, but enough of its descendants were already matched to
+    /// the other's descendants (see `DICE_THRESHOLD`) that the two nodes were matched too. See
+    /// `solve_bottom_up_expansion`.
+    BottomUpExpansion,
 }
 
 /**
