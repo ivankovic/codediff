@@ -15,9 +15,113 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use std::collections::HashMap;
+
 use tree_sitter::Node;
 
-use crate::code::{Code, Language};
+use crate::code::{ASTMetadata, Code, Language};
+use crate::diff::apted::{self, Algorithm};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason};
+
+/// Recursively maps every descendant of an already-matched pair as `Identical`/cost 0/
+/// `IdenticalHashOfAncestor`, position-by-position in lockstep (stack-based DFS, so children are
+/// visited in reverse sibling order - doesn't matter here since every child gets mapped
+/// regardless of order). Stops descending into a child whose kind doesn't match its counterpart's
+/// (can only happen if the caller's "these subtrees are identical" guarantee doesn't actually
+/// hold) or that's already mapped on the before side.
+///
+/// Shared by `solve_comment_nodes` (whose precondition - matched comment nodes' full text is
+/// byte-identical - guarantees kinds always match, making the kind check here a no-op for that
+/// caller) and `solve_identical_diagnostic_statements` (whose precondition - matched statements'
+/// full hash is identical - gives the same guarantee).
+pub fn map_identical_descendants<'a>(before_node: Node<'a>, after_node: Node<'a>, diff: &mut ASTDiff) {
+    let mut stack = vec![(before_node, after_node)];
+    while let Some((before_parent, after_parent)) = stack.pop() {
+        let mut before_cursor = before_parent.walk();
+        let mut after_cursor = after_parent.walk();
+        let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
+        let after_children: Vec<_> = after_parent.children(&mut after_cursor).collect();
+
+        for (before_child, after_child) in before_children.into_iter().zip(after_children) {
+            if before_child.kind() != after_child.kind() {
+                continue;
+            }
+            if diff.before_node_map.contains_key(&before_child.id()) {
+                continue;
+            }
+            diff.add_mapping(
+                before_child.id(),
+                after_child.id(),
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Identical,
+                    reason: ASTMappingReason::IdenticalHashOfAncestor,
+                },
+            );
+            stack.push((before_child, after_child));
+        }
+    }
+}
+
+/// Walks `root`'s subtree (stack-based DFS, so children are visited in reverse sibling order)
+/// collecting every node for which `predicate` returns true and that isn't already mapped in
+/// `mapped`. Doesn't descend into already-mapped nodes - their contents are presumed already
+/// resolved by an earlier pass - but does keep descending past a collected node itself, in case a
+/// second match is nested inside the first (e.g. one diagnostic call nested in another's
+/// arguments). Shared shape behind `solve_similar_flow_control`'s
+/// `collect_unmatched_containers` and `solve_identical_diagnostic_statements`'s
+/// `collect_unmatched_diagnostic_statements`, which differed only in their predicate.
+pub fn collect_unmatched<'a>(
+    root: Node<'a>,
+    mapped: &HashMap<usize, usize>,
+    predicate: impl Fn(Node<'a>) -> bool,
+) -> Vec<Node<'a>> {
+    let mut result = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if mapped.contains_key(&node.id()) {
+            continue;
+        }
+        if predicate(node) {
+            result.push(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    result
+}
+
+/// Proposes `(before_id, after_id)` to APTED via `apted::for_nodes` and, if it actually resolved
+/// the pair as a match (rather than a separate delete+insert - e.g. if the leftover residual
+/// outweighs reuse), relabels the resulting mapping's reason to `reason` instead of leaving it as
+/// whatever generic label `for_nodes` itself assigns. Shared "propose a pair, then stamp
+/// provenance if it stuck" idiom behind `solve_bottom_up_expansion` and
+/// `solve_greedy_anchor_blocks`, which both anchor single node pairs this same way.
+pub fn anchor_pair_via_apted(
+    before_id: usize,
+    after_id: usize,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+    source: &'static str,
+    reason: ASTMappingReason,
+    diff: &mut ASTDiff,
+) {
+    let _ = apted::for_nodes(
+        before_metadata,
+        after_metadata,
+        vec![before_id],
+        vec![after_id],
+        Algorithm::Apted,
+        source,
+        diff,
+    );
+
+    if let Some(mapping) = diff.mapping.get_mut(&(before_id, after_id)) {
+        mapping.reason = reason;
+    }
+}
 
 /**
 * Determines if a node with the given kind is a reference node for the given language.
@@ -1130,18 +1234,6 @@ mod tests {
         Code::from_string(src, &Language::Rust)
     }
 
-    fn find_first<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(found) = find_first(child, kind) {
-                return Some(found);
-            }
-        }
-        None
-    }
 
     #[test]
     fn rust_match_arms_extracts_string_literal_patterns() {
@@ -1157,7 +1249,7 @@ fn f(s: &str) {
 "#,
         );
         let ast = code.ast.as_ref().unwrap();
-        let match_expr = find_first(ast.root_node(), "match_expression").unwrap();
+        let match_expr = helper::find_first_of_kind(ast.root_node(), "match_expression").unwrap();
         let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
         let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
         assert_eq!(signatures, vec![Some("\"a\""), Some("\"b\""), None]);
@@ -1176,7 +1268,7 @@ fn f(s: i32) {
 "#,
         );
         let ast = code.ast.as_ref().unwrap();
-        let match_expr = find_first(ast.root_node(), "match_expression").unwrap();
+        let match_expr = helper::find_first_of_kind(ast.root_node(), "match_expression").unwrap();
         let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
         assert_eq!(arms[0].signature.as_deref(), Some("n"));
     }
@@ -1209,8 +1301,8 @@ fn f(s: &str) {
         );
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_expr = find_first(before_ast.root_node(), "match_expression").unwrap();
-        let after_expr = find_first(after_ast.root_node(), "match_expression").unwrap();
+        let before_expr = helper::find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
+        let after_expr = helper::find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
         let before_arms =
             match_arms(before_expr, &Language::Rust, before.contents.as_bytes()).unwrap();
         let after_arms =
@@ -1240,7 +1332,7 @@ void f(int x) {
             &Language::C,
         );
         let ast = code.ast.as_ref().unwrap();
-        let switch_stmt = find_first(ast.root_node(), "switch_statement").unwrap();
+        let switch_stmt = helper::find_first_of_kind(ast.root_node(), "switch_statement").unwrap();
         let arms = switch_arms(switch_stmt, &Language::C, code.contents.as_bytes()).unwrap();
         let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
         assert_eq!(signatures, vec![Some("1"), Some("2"), None]);
@@ -1262,7 +1354,7 @@ fn f(x: i32) -> i32 {
 "#,
         );
         let ast = code.ast.as_ref().unwrap();
-        let if_expr = find_first(ast.root_node(), "if_expression").unwrap();
+        let if_expr = helper::find_first_of_kind(ast.root_node(), "if_expression").unwrap();
         let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
         let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
         assert_eq!(signatures, vec![Some("x > 0"), Some("x < 0"), None]);
@@ -1280,7 +1372,7 @@ fn f(x: i32) {
 "#,
         );
         let ast = code.ast.as_ref().unwrap();
-        let if_expr = find_first(ast.root_node(), "if_expression").unwrap();
+        let if_expr = helper::find_first_of_kind(ast.root_node(), "if_expression").unwrap();
         let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
         let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
         assert_eq!(signatures, vec![Some("x > 0")]);
@@ -1303,7 +1395,7 @@ int f(int x) {
             &Language::C,
         );
         let ast = code.ast.as_ref().unwrap();
-        let if_stmt = find_first(ast.root_node(), "if_statement").unwrap();
+        let if_stmt = helper::find_first_of_kind(ast.root_node(), "if_statement").unwrap();
         let arms = if_chain_arms(if_stmt, &Language::C, code.contents.as_bytes()).unwrap();
         let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
         assert_eq!(signatures, vec![Some("(x > 0)"), Some("(x < 0)"), None]);
@@ -1849,8 +1941,8 @@ class Calculator {
         );
         let root = code.ast.as_ref().unwrap().root_node();
         let source = code.contents.as_bytes();
-        let bail = find_first(root, "macro_invocation").unwrap();
-        let call = find_first(root, "call_expression").unwrap();
+        let bail = helper::find_first_of_kind(root, "macro_invocation").unwrap();
+        let call = helper::find_first_of_kind(root, "call_expression").unwrap();
         assert!(
             is_diagnostic_statement(bail, &Language::Rust, source),
             "bail! should be diagnostic"

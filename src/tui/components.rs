@@ -22,11 +22,60 @@ pub mod theme_dialog;
 
 use anyhow::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
-use ratatui::{Frame, layout::Rect};
+use ratatui::{
+    Frame,
+    layout::{Constraint, Direction, Layout, Rect},
+    prelude::Stylize,
+    style::{Color, Style},
+    symbols::border,
+    text::Line,
+    widgets::{Block, Borders, List, ListItem, ListState},
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::tui::actions::Action;
 use crate::tui::events::Event;
+
+/// Moves a list-dialog selection index up (`delta < 0`) or down (`delta > 0`) by one, clamped to
+/// `[0, len)`. Shared Up/Down handler behind `ThemeDialog` and `FileDialog`.
+pub fn move_selection(selected: &mut usize, delta: i32, len: usize) {
+    if delta < 0 {
+        *selected = selected.saturating_sub(1);
+    } else if *selected + 1 < len {
+        *selected += 1;
+    }
+}
+
+/// Renders a bordered, cyan-highlighted, single-column list popup with a dim hint line below it:
+/// the shared visual scaffold behind `ThemeDialog` and `FileDialog`'s `draw`, which differ only in
+/// their title and how each row is labeled.
+pub fn render_list_dialog(
+    frame: &mut Frame,
+    area: Rect,
+    title: Line<'static>,
+    items: Vec<ListItem<'static>>,
+    selected: usize,
+    hint: &'static str,
+) {
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .split(area);
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_set(border::ROUNDED)
+        .border_style(Style::new().fg(Color::Cyan));
+
+    let mut list_state = ListState::default().with_selected(Some(selected));
+    let list = List::new(items)
+        .block(block)
+        .highlight_style(Style::new().bg(Color::Blue).bold());
+
+    frame.render_stateful_widget(list, layout[0], &mut list_state);
+    frame.render_widget(Line::from(hint).dim(), layout[1]);
+}
 
 /// A visual and interactive element of the TUI.
 pub trait Component {

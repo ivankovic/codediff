@@ -20,10 +20,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 use tempfile::tempdir;
-use tree_sitter::Parser as TSParser;
 
 use codediff::code::Code;
-use codediff::code::language::to_treesitter;
 
 /// Command line arguments for the ASCII visualizer
 #[derive(Parser, Debug)]
@@ -37,25 +35,6 @@ struct Args {
     /// Path to the file to visualize
     #[arg(value_name = "FILE")]
     file_path: PathBuf,
-}
-
-/// Parse the code and get the TreeSitter AST
-fn get_ast(code: &Code) -> Result<tree_sitter::Tree> {
-    let language = code
-        .metadata
-        .language
-        .as_ref()
-        .context("Code has no language metadata")?;
-
-    let ts_language = to_treesitter(language).context("Language not supported by TreeSitter")?;
-    let mut parser = TSParser::new();
-    parser.set_language(&ts_language)?;
-
-    let tree = parser
-        .parse(&code.contents, None)
-        .context("Failed to parse code")?;
-
-    Ok(tree)
 }
 
 /// Print the ASCII tree representation of the AST
@@ -120,8 +99,8 @@ fn main() -> Result<()> {
     println!("File size: {} bytes", code.contents.len());
     println!("\nAST Tree:");
 
-    // Get AST and print tree
-    let tree = get_ast(&code)?;
+    // Print tree from the AST Code::from_file already parsed
+    let tree = code.ast.as_ref().context("Code has no parsed AST")?;
     let root_node = tree.root_node();
     let total_nodes = print_ast_tree(root_node, 0, &code);
 

@@ -17,7 +17,7 @@
  */
 use anyhow::Result;
 use clap::Parser;
-use git2::{Delta, DiffDelta, DiffFindOptions, Oid, Repository, Sort};
+use git2::Delta;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::collections::HashMap;
@@ -26,6 +26,7 @@ use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::stats::filesystem::find_git_repositories;
+use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::Reservoir;
 use codediff::metadata;
 
@@ -163,109 +164,59 @@ fn sample_repository(
     reservoirs: &mut HashMap<(String, &'static str), Reservoir<Candidate>>,
     rng: &mut StdRng,
 ) -> Result<()> {
-    let repo = Repository::open(repo_path)?;
-    let mut walk = repo.revwalk()?;
-    // Most-recent-first: repeated shallow fetches can leave a checkout with far more local
-    // history than its nominal depth, so walking "all reachable commits" can mean walking the
-    // entire project history. Time order lets `max_commits` reliably mean "the N most recent".
-    walk.set_sorting(Sort::TIME)?;
-    walk.push_head()?;
-
-    for (visited, id) in walk.enumerate() {
-        if visited >= max_commits {
-            break;
+    walk_single_parent_commit_diffs(repo_path, max_commits, true, |repo, id, delta| {
+        if !matches!(delta.status(), Delta::Modified | Delta::Renamed) {
+            return Ok(());
         }
-        let Ok(id) = id else { continue };
-        let Ok(commit) = repo.find_commit(id) else {
-            continue;
+        // A pure rename with no content change is a trivial, not a useful, diff pair.
+        if delta.old_file().id() == delta.new_file().id() {
+            return Ok(());
+        }
+
+        let Some(path) = delta.new_file().path() else {
+            return Ok(());
+        };
+        let old_path = delta.old_file().path().unwrap_or(path);
+        if metadata::is_anomalous(path) || metadata::is_anomalous(old_path) {
+            return Ok(());
+        }
+
+        let Some(language) = language_for_path(path) else {
+            return Ok(());
+        };
+        // Only sample languages diff_code can actually parse.
+        if to_treesitter(&language).is_none() {
+            return Ok(());
+        }
+        if let Some(filter) = language_filter
+            && language.to_string() != filter
+        {
+            return Ok(());
+        }
+
+        // The larger of the before/after byte sizes decides the size bucket; `None` means either
+        // side is binary or outside the configured size bounds.
+        let size = text_len_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
+            .zip(text_len_if_in_range(repo, delta.new_file().id(), MIN_BYTES, MAX_BYTES))
+            .map(|(before_len, after_len)| before_len.max(after_len));
+        let Some(size) = size else {
+            return Ok(());
         };
 
-        // Merges mix unrelated changes and root commits have no "before" version; neither
-        // produces a clean (before, after) edit pair, so only plain single-parent commits count.
-        if commit.parents().len() != 1 {
-            continue;
-        }
-        let parent = commit.parent(0)?;
+        let candidate = Candidate {
+            repository: repository_name.to_string(),
+            commit: id.to_string(),
+            path: path.to_string_lossy().into_owned(),
+            old_path: old_path.to_string_lossy().into_owned(),
+        };
 
-        let before_tree = parent.tree()?;
-        let after_tree = commit.tree()?;
-        let mut diff = repo.diff_tree_to_tree(Some(&before_tree), Some(&after_tree), None)?;
-        // Rename detection is off by default; without it, a renamed+edited file shows up as an
-        // unrelated Added/Deleted pair instead of the single meaningful edit pair it actually is.
-        let mut find_opts = DiffFindOptions::new();
-        find_opts.renames(true);
-        diff.find_similar(Some(&mut find_opts))?;
+        reservoirs
+            .entry((language.to_string(), size_bucket(size)))
+            .or_default()
+            .offer(candidate, bucket_capacity, rng);
 
-        for delta in diff.deltas() {
-            if !matches!(delta.status(), Delta::Modified | Delta::Renamed) {
-                continue;
-            }
-            // A pure rename with no content change is a trivial, not a useful, diff pair.
-            if delta.old_file().id() == delta.new_file().id() {
-                continue;
-            }
-
-            let Some(path) = delta.new_file().path() else {
-                continue;
-            };
-            let old_path = delta.old_file().path().unwrap_or(path);
-            if metadata::is_anomalous(path) || metadata::is_anomalous(old_path) {
-                continue;
-            }
-
-            let Some(language) = language_for_path(path) else {
-                continue;
-            };
-            // Only sample languages diff_code can actually parse.
-            if to_treesitter(&language).is_none() {
-                continue;
-            }
-            if let Some(filter) = language_filter
-                && language.to_string() != filter
-            {
-                continue;
-            }
-
-            let Some(size) = text_pair_size(&repo, &delta) else {
-                continue;
-            };
-
-            let candidate = Candidate {
-                repository: repository_name.to_string(),
-                commit: id.to_string(),
-                path: path.to_string_lossy().into_owned(),
-                old_path: old_path.to_string_lossy().into_owned(),
-            };
-
-            reservoirs
-                .entry((language.to_string(), size_bucket(size)))
-                .or_default()
-                .offer(candidate, bucket_capacity, rng);
-        }
-    }
-
-    Ok(())
-}
-
-/// Returns the larger of the before/after byte sizes, or `None` if either side is binary or
-/// outside the configured size bounds. Content is not kept around any longer than the check.
-fn text_pair_size(repo: &Repository, delta: &DiffDelta) -> Option<usize> {
-    let text_len_in_range = |oid: Oid| -> Option<usize> {
-        let blob = repo.find_blob(oid).ok()?;
-        let content = blob.content();
-        if content.len() >= MIN_BYTES
-            && content.len() <= MAX_BYTES
-            && std::str::from_utf8(content).is_ok()
-        {
-            Some(content.len())
-        } else {
-            None
-        }
-    };
-
-    let before_len = text_len_in_range(delta.old_file().id())?;
-    let after_len = text_len_in_range(delta.new_file().id())?;
-    Some(before_len.max(after_len))
+        Ok(())
+    })
 }
 
 fn write_csv(path: &Path, reservoirs: &HashMap<(String, &'static str), Reservoir<Candidate>>) -> Result<()> {

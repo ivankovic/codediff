@@ -22,6 +22,25 @@ use crate::code::tip;
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Metadata};
 use crate::diff::nodes;
 
+/// Pre-order stack walk (children pushed in document order, so the LIFO stack pops them back out
+/// in reverse - fine here since `visit` doesn't care) over every node in `root`'s subtree, calling
+/// `visit` once per node. Shared by `discover_reference_nodes` and
+/// `discover_semantic_structure_nodes`, whose results don't depend on visitation order (the
+/// former sorts its collected nodes afterward; the latter keys a map by node type, and this AST
+/// has at most one node of each semantically-structural type per the type's own invariant). Not
+/// shared with `compute_node_depths` (needs each node's depth threaded through the walk) or
+/// `compute_subtree_sizes`/`compute_node_info` (need true post-order/preorder-indexed traversal).
+fn walk_preorder<'a>(root: tree_sitter::Node<'a>, mut visit: impl FnMut(tree_sitter::Node<'a>)) {
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        visit(node);
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+}
+
 /// Compute the number of columns (characters) in each row of the given code.
 ///
 /// For each line in the code, this function counts the number of characters before each newline.
@@ -243,25 +262,14 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
     // Collect reference nodes with their subtree sizes
     let mut reference_nodes_with_sizes = Vec::new();
 
-    let mut stack = Vec::new();
-    stack.push(root_node);
-
-    while let Some(node) = stack.pop() {
+    walk_preorder(root_node, |node| {
         let node_id = node.id();
-
-        // Check if this node is a reference node
         if nodes::is_reference(node.kind(), language)
             && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
         {
             reference_nodes_with_sizes.push((node_id, subtree_size));
         }
-
-        // Continue traversal - add children to stack
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
+    });
 
     // Sort reference nodes by subtree size in descending order
     reference_nodes_with_sizes.sort_by(|a, b| b.1.cmp(&a.1));
@@ -292,23 +300,11 @@ fn discover_semantic_structure_nodes(code: &Code, metadata: &mut ASTMetadata) ->
         .as_ref()
         .expect("Language must be set");
 
-    let mut stack = Vec::new();
-    stack.push(root_node);
-
-    while let Some(node) = stack.pop() {
-        let node_id = node.id();
-
-        // Check if this node is semantically structural
+    walk_preorder(root_node, |node| {
         if let Some(t) = nodes::is_semantically_structural(&node, language, code) {
-            metadata.semantically_structural_nodes.insert(t, node_id);
+            metadata.semantically_structural_nodes.insert(t, node.id());
         }
-
-        // Continue traversal - add children to stack
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
+    });
 
     Ok(())
 }

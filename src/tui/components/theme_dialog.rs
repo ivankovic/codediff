@@ -19,17 +19,15 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     prelude::Stylize,
-    style::{Color, Style},
-    symbols::border,
-    text::Line,
-    widgets::{Block, Borders, List, ListItem, ListState},
+    style::Color,
+    widgets::ListItem,
 };
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::Component;
+use super::{Component, move_selection, render_list_dialog};
 use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
 
@@ -67,13 +65,11 @@ impl Component for ThemeDialog {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         match key.code {
             KeyCode::Up => {
-                self.selected = self.selected.saturating_sub(1);
+                move_selection(&mut self.selected, -1, self.themes.len());
                 Ok(Some(Action::Render))
             }
             KeyCode::Down => {
-                if self.selected + 1 < self.themes.len() {
-                    self.selected += 1;
-                }
+                move_selection(&mut self.selected, 1, self.themes.len());
                 Ok(Some(Action::Render))
             }
             KeyCode::Enter => Ok(Some(Action::ThemeSelected(self.themes[self.selected]))),
@@ -83,30 +79,20 @@ impl Component for ThemeDialog {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(area);
-
-        let block = Block::default()
-            .title(" Color Theme ".bold().fg(Color::Cyan))
-            .borders(Borders::ALL)
-            .border_set(border::ROUNDED)
-            .border_style(Style::new().fg(Color::Cyan));
-
         let items: Vec<ListItem> = self
             .themes
             .iter()
             .map(|theme| ListItem::new(theme.to_string()))
             .collect();
 
-        let mut list_state = ListState::default().with_selected(Some(self.selected));
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(Style::new().bg(Color::Blue).bold());
-
-        frame.render_stateful_widget(list, layout[0], &mut list_state);
-        frame.render_widget(Line::from(" Enter: select | Esc: cancel ").dim(), layout[1]);
+        render_list_dialog(
+            frame,
+            area,
+            " Color Theme ".bold().fg(Color::Cyan).into(),
+            items,
+            self.selected,
+            " Enter: select | Esc: cancel ",
+        );
 
         Ok(())
     }

@@ -50,7 +50,7 @@ pub(crate) fn compute_delta_zhang_shasha(
     let mut after_keyroots = after.keyroots.clone();
     after_keyroots.sort_by_key(|&pre| after.pre_to_post[pre]);
 
-    let mut forestdist = ForestDist::new(before.size + 1, after.size + 1);
+    let mut forestdist = ForestDist::new(before.size + 1, after.size + 1, 0);
 
     for &kr1_pre in &before_keyroots {
         let kr1_boundary = before.pre_to_post[kr1_pre] + 1;

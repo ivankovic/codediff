@@ -126,11 +126,13 @@ pub fn count_nodes(root: Node) -> usize {
 /**
 * Compute per-kind occurrence counts and subtree-size histograms for every node in a TreeSitter
 * tree, in a single post-order traversal. See [`KindStats`] for the histogram bucketing scheme.
+* Also returns the total node count (the root's own subtree size), so callers that need both
+* don't have to pay for a second traversal via [`count_nodes`].
 */
-pub fn compute_kind_stats(root: Node) -> std::collections::HashMap<String, KindStats> {
+pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, KindStats>, usize) {
     let mut stats = std::collections::HashMap::new();
-    visit_for_kind_stats(root, &mut stats);
-    stats
+    let total_nodes = visit_for_kind_stats(root, &mut stats);
+    (stats, total_nodes)
 }
 
 /// Returns the subtree size (including `node` itself) so the caller can bucket it.
@@ -220,8 +222,9 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
 
                 match parser.parse(&stats.code.contents, None) {
                     Some(tree) => {
-                        stats.ast_nodes = count_nodes(tree.root_node());
-                        stats.kind_stats = compute_kind_stats(tree.root_node());
+                        let (kind_stats, total_nodes) = compute_kind_stats(tree.root_node());
+                        stats.ast_nodes = total_nodes;
+                        stats.kind_stats = kind_stats;
                     }
                     None => stats.failed_to_parse = true,
                 }
@@ -256,34 +259,31 @@ pub fn for_path(path: &std::path::Path, parser: &mut TSParser) -> CodeStats {
     stats.code.metadata.path = Some(std::path::PathBuf::from(path));
     metadata::hermetic_expand(&mut stats.code.metadata);
 
-    match stats.code.metadata.tip.as_ref() {
-        // We only read code and config files, to improve performance.
-        Some(code::Type::Code(_)) | Some(code::Type::Configuration(_)) => {
-            let f = std::fs::File::open(path);
-            match f {
-                Ok(mut f) => match f.read_to_string(&mut stats.code.contents) {
-                    Ok(_) => {
-                        if let Err(e) = expand_from_code(&mut stats, parser) {
-                            eprintln!("Failed to compute statistics: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to read file {:?}: {:?}", path, e);
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Failed to open file {:?}: {:?}", path, e);
-                }
-            }
+    // We only read code and config files, to improve performance. Anything else is either a
+    // data/documentation file we don't need stats for, or a type we couldn't determine from the
+    // path alone (TODO: fold this up and read the file to determine the type from contents).
+    if !matches!(
+        stats.code.metadata.tip,
+        Some(code::Type::Code(_)) | Some(code::Type::Configuration(_))
+    ) {
+        return stats;
+    }
+
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Failed to open file {:?}: {:?}", path, e);
+            return stats;
         }
-        None => {
-            // We were not able to determine the type from the path.
-            // TODO: Fold this up and read the file and try to determine the type based on
-            // contents.
-        }
-        _ => {
-            // It's a data or documentation file, we don't need stats for those.
-        }
+    };
+
+    if let Err(e) = f.read_to_string(&mut stats.code.contents) {
+        eprintln!("Failed to read file {:?}: {:?}", path, e);
+        return stats;
+    }
+
+    if let Err(e) = expand_from_code(&mut stats, parser) {
+        eprintln!("Failed to compute statistics: {:?}", e);
     }
 
     stats

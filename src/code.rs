@@ -152,9 +152,12 @@ impl Code {
         let mut parser = tree_sitter::Parser::new();
         code.parse(&mut parser);
 
-        // Compute AST metadata
-        if let Ok(ast_metadata) = crate::code::metadata::compute_ast_metadata(&code) {
-            code.metadata.ast_metadata = Some(ast_metadata);
+        // Compute AST metadata. `from_string` is infallible by signature (unlike `ensure_parsed`,
+        // which propagates this same error), so a failure here can't be returned - surface it
+        // instead of swallowing it silently, so a genuine `compute_ast_metadata` bug is visible.
+        match crate::code::metadata::compute_ast_metadata(&code) {
+            Ok(ast_metadata) => code.metadata.ast_metadata = Some(ast_metadata),
+            Err(e) => eprintln!("Failed to compute AST metadata: {:?}", e),
         }
 
         code

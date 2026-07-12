@@ -892,25 +892,13 @@ fn algo_reason_after(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason>
     diff_ast.mapping.get(&(before_id, node.id())).map(|m| m.reason)
 }
 
-/// Short column-style label for an `ASTMappingReason`, matching
-/// `src/bin/benchmark_optimal_solutions.rs`'s `REASON_LABELS`/`reason_label` so the same
-/// abbreviation means the same thing in both tools. Collapses `APTED`'s provenance payload to a
-/// bare "APTED" - see [`reason_detail`] for the version that shows it.
+/// Short column-style label for an `ASTMappingReason`. Thin wrapper around
+/// `ASTMappingReason::bucket_label`, shared with `src/bin/benchmark_optimal_solutions.rs`'s
+/// reason-count columns so the same abbreviation means the same thing in both tools. Collapses
+/// `APTED`'s provenance payload to a bare "APTED" - see [`reason_detail`] for the version that
+/// shows it.
 fn reason_label(reason: ASTMappingReason) -> &'static str {
-    match reason {
-        ASTMappingReason::IdenticalHash => "IdHash",
-        ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc",
-        ASTMappingReason::FullymappingSubtrees => "FullMap",
-        ASTMappingReason::StructurallyIdenticalSubtrees => "StructId",
-        ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc",
-        ASTMappingReason::OptimalIDU => "OptIDU",
-        ASTMappingReason::APTED(_) => "APTED",
-        ASTMappingReason::FlatSequenceDiff => "FlatSeq",
-        ASTMappingReason::MovedSubtree => "Moved",
-        ASTMappingReason::CommentSibling => "Comment",
-        ASTMappingReason::BottomUpExpansion => "BottomUp",
-        ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
-    }
+    reason.bucket_label()
 }
 
 /// Same short label as [`reason_label`], except for `APTED`, where it also appends the

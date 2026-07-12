@@ -31,6 +31,27 @@ use crate::code::{Code, metadata};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation};
 
 /**
+* Depth-first, includes-self search for the first node of a given `kind` at or below `node`
+* (self first, then children in order, recursively). Was independently copy-pasted as
+* `find_first`/`first_child_of_kind` in six different `solve_*.rs` test modules - consolidated
+* here since one of those six copies (`solve_bottom_up_expansion`'s old `first_child_of_kind`)
+* used *strict*-descendant semantics instead (skipping `node` itself), silently disagreeing with
+* the other five whenever called on a node that already was the target kind.
+*/
+pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+    if node.kind() == kind {
+        return Some(node);
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if let Some(found) = find_first_of_kind(child, kind) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/**
 * Follows path from the root node and returns the resulting node, if the path is valid.
 *
 * The path is a vector of strings. Each string is one of the following:

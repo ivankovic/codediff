@@ -131,11 +131,10 @@ pub(crate) struct HashMatchSpec {
 * collapsing onto one). On a hit, maps the pair with `spec.root_reason` and then descends both
 * subtrees in lockstep, pairing children by position and kind with `spec.descendant_reason`.
 * 
-* Note: This function is retained for backward compatibility. New code should use
-* `solve_with_node_list` with `NodeSelectionConfig::to_node_list_selector()` for the
-* extended node selection (reference nodes + big-enough nodes).
+* Note: `solve_structurally_identical_trees` calls this directly; `solve_identical_trees` uses
+* `solve_with_node_list` with `NodeSelectionConfig::to_node_list_selector()` for the extended
+* node selection (reference nodes + big-enough nodes) instead.
 */
-#[allow(dead_code)]
 pub(crate) fn solve(
     before: &Code,
     after: &Code,

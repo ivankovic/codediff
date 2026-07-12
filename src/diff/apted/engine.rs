@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata};
 
-use super::common::{ContainmentCtx, DeltaTable, ForestDist, PostorderIndexer, UnitCostModel};
+use super::common::{ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel};
 
 /// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
 /// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
@@ -28,24 +28,22 @@ use super::common::{ContainmentCtx, DeltaTable, ForestDist, PostorderIndexer, Un
 /// `gted` starts consuming a cell (it never needs the strategy value again after routing).
 /// Keeping them apart avoids relying on that consumption order, at the cost of one extra buffer.
 pub(crate) struct StrategyTable {
-    pub(crate) cols: usize,
-    pub(crate) data: Vec<i64>,
+    grid: Grid<i64>,
 }
 
 impl StrategyTable {
     pub(crate) fn new(rows: usize, cols: usize) -> Self {
         StrategyTable {
-            cols,
-            data: vec![0i64; rows * cols],
+            grid: Grid::new(rows, cols, 0i64),
         }
     }
 
     pub(crate) fn get(&self, pre_v: usize, pre_w: usize) -> i64 {
-        self.data[pre_v * self.cols + pre_w]
+        self.grid[(pre_v, pre_w)]
     }
 
     pub(crate) fn set(&mut self, pre_v: usize, pre_w: usize, value: i64) {
-        self.data[pre_v * self.cols + pre_w] = value;
+        self.grid[(pre_v, pre_w)] = value;
     }
 }
 
@@ -457,33 +455,8 @@ pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, ba
 }
 
 /// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables (the role Java's `float[][]`
-/// plays there). A flat `Vec` (rather than `Vec<Vec<i64>>`) avoids one allocation per row.
-pub(crate) struct Mat {
-    pub(crate) cols: usize,
-    pub(crate) data: Vec<i64>,
-}
-
-impl Mat {
-    pub(crate) fn new(rows: usize, cols: usize) -> Self {
-        Mat {
-            cols,
-            data: vec![0i64; rows * cols],
-        }
-    }
-}
-
-impl std::ops::Index<(i64, i64)> for Mat {
-    type Output = i64;
-    fn index(&self, (row, col): (i64, i64)) -> &i64 {
-        &self.data[row as usize * self.cols + col as usize]
-    }
-}
-
-impl std::ops::IndexMut<(i64, i64)> for Mat {
-    fn index_mut(&mut self, (row, col): (i64, i64)) -> &mut i64 {
-        &mut self.data[row as usize * self.cols + col as usize]
-    }
-}
+/// plays there).
+pub(crate) type Mat = Grid<i64>;
 
 /// Direct port of APTED.java's `spfA` (the general "inner path" single-path function -
 /// Algorithm 3 in the APTED paper), **specialized to `pathType == INNER`**: `gted` only ever
@@ -591,8 +564,8 @@ pub(crate) fn spf_a(
     let subtree_size1 = path_idx.sizes[path_subtree] as i64;
     let subtree_size2 = other_idx.sizes[other_subtree] as i64;
 
-    let mut t = Mat::new(subtree_size2 as usize + 1, subtree_size2 as usize + 1);
-    let mut s = Mat::new(subtree_size1 as usize + 1, subtree_size2 as usize + 1);
+    let mut t = Mat::new(subtree_size2 as usize + 1, subtree_size2 as usize + 1, 0);
+    let mut s = Mat::new(subtree_size1 as usize + 1, subtree_size2 as usize + 1, 0);
     let mut min_cost: i64 = -1;
     let max_size = (path_idx.size.max(other_idx.size)) as i64;
     let mut fna = vec![-1i64; max_size as usize + 1];
@@ -1352,7 +1325,7 @@ pub(crate) fn spf_l(
     // Sized and indexed by the same 1-based-boundary convention as `apted_tree_edit_dist`
     // (absolute, not relative to any one call's own `lld`), and reused across the whole keyroot
     // sweep below - see the comment there for why a relative scheme would be unsound here.
-    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1);
+    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0);
     for &kr in &keyroots {
         apted_tree_edit_dist(
             ctx,
@@ -1501,7 +1474,7 @@ pub(crate) fn spf_r(
     }
     keyroots.sort_by_key(|&pre| other_idx.pre_to_post_r(pre));
 
-    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1);
+    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0);
     for &kr in &keyroots {
         apted_tree_edit_dist_r(
             ctx,

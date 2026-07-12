@@ -18,8 +18,7 @@
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, Code, Language};
-use crate::diff::apted::{self, Algorithm};
-use crate::diff::nodes::is_block_container;
+use crate::diff::nodes::{anchor_pair_via_apted, is_block_container};
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
@@ -178,21 +177,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             before_used[before_pos] = true;
             after_used[after_pos] = true;
 
-            let _ = apted::for_nodes(
+            anchor_pair_via_apted(
+                before_id,
+                after_id,
                 &before_metadata,
                 &after_metadata,
-                vec![before_id],
-                vec![after_id],
-                Algorithm::Apted,
                 "greedy_anchor_block",
+                ASTMappingReason::GreedyAnchorBlock,
                 diff,
             );
-
-            // `for_nodes` may still resolve the pair as a separate delete+insert (e.g. if the
-            // leftover residual outweighs reuse) - only relabel when it actually matched them.
-            if let Some(mapping) = diff.mapping.get_mut(&(before_id, after_id)) {
-                mapping.reason = ASTMappingReason::GreedyAnchorBlock;
-            }
         }
     }
 }
@@ -365,6 +358,7 @@ mod tests {
     use super::*;
     use crate::code::Language;
     use crate::diff::ASTMappingOperation;
+    use crate::test::helper::find_first_of_kind as first_child_of_kind;
 
     #[test]
     fn identical_children_sequence_costs_nothing() {
@@ -504,16 +498,4 @@ mod tests {
         );
     }
 
-    fn first_child_of_kind<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(found) = first_child_of_kind(child, kind) {
-                return Some(found);
-            }
-        }
-        None
-    }
 }

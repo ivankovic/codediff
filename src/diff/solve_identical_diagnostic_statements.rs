@@ -17,10 +17,8 @@
  */
 use std::collections::{HashMap, VecDeque};
 
-use tree_sitter::Node;
-
-use crate::code::{Code, Language};
-use crate::diff::nodes::is_diagnostic_statement;
+use crate::code::Code;
+use crate::diff::nodes::{collect_unmatched, is_diagnostic_statement, map_identical_descendants};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 
 /**
@@ -69,18 +67,12 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let before_source = before.contents.as_bytes();
     let after_source = after.contents.as_bytes();
 
-    let before_candidates = collect_unmatched_diagnostic_statements(
-        before_ast.root_node(),
-        &language,
-        &diff.before_node_map,
-        before_source,
-    );
-    let after_candidates = collect_unmatched_diagnostic_statements(
-        after_ast.root_node(),
-        &language,
-        &diff.after_node_map,
-        after_source,
-    );
+    let before_candidates = collect_unmatched(before_ast.root_node(), &diff.before_node_map, |node| {
+        is_diagnostic_statement(node, &language, before_source)
+    });
+    let after_candidates = collect_unmatched(after_ast.root_node(), &diff.after_node_map, |node| {
+        is_diagnostic_statement(node, &language, after_source)
+    });
     if before_candidates.is_empty() || after_candidates.is_empty() {
         return;
     }
@@ -126,78 +118,17 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         // Recursively add all descendants with IdenticalHashOfAncestor reason - same idiom as
         // `solve_identical_trees`, since an identical full hash guarantees the entire subtree
         // (structure and values) is byte-for-byte identical too.
-        let mut stack = vec![(before_node, after_node)];
-        while let Some((before_parent, after_parent)) = stack.pop() {
-            let mut before_cursor = before_parent.walk();
-            let mut after_cursor = after_parent.walk();
-            let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
-            let after_children: Vec<_> = after_parent.children(&mut after_cursor).collect();
-
-            for (before_child, after_child) in before_children.into_iter().zip(after_children.into_iter()) {
-                if before_child.kind() == after_child.kind()
-                    && !diff.before_node_map.contains_key(&before_child.id())
-                {
-                    diff.add_mapping(
-                        before_child.id(),
-                        after_child.id(),
-                        ASTMapping {
-                            cost: 0,
-                            operation: ASTMappingOperation::Identical,
-                            reason: ASTMappingReason::IdenticalHashOfAncestor,
-                        },
-                    );
-                    stack.push((before_child, after_child));
-                }
-            }
-        }
+        map_identical_descendants(before_node, after_node, diff);
     }
-}
-
-/// Walks `root`'s subtree collecting every node that looks like a diagnostic call/macro (see
-/// [`is_diagnostic_statement`]) and isn't already mapped in `mapped`. Doesn't descend into
-/// already-mapped nodes - their contents are presumed already resolved by an earlier pass - but
-/// does keep descending past a collected diagnostic node itself, in case one diagnostic call is
-/// nested inside the arguments of another.
-fn collect_unmatched_diagnostic_statements<'a>(
-    root: Node<'a>,
-    language: &Language,
-    mapped: &HashMap<usize, usize>,
-    source: &[u8],
-) -> Vec<Node<'a>> {
-    let mut result = Vec::new();
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if mapped.contains_key(&node.id()) {
-            continue;
-        }
-        if is_diagnostic_statement(node, language, source) {
-            result.push(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-    result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Language;
     use crate::diff::ASTMappingOperation;
-
-    fn find_first<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(found) = find_first(child, kind) {
-                return Some(found);
-            }
-        }
-        None
-    }
+    use crate::test::helper::find_first_of_kind;
+    use tree_sitter::Node;
 
     fn find_all<'a>(node: Node<'a>, kind: &str, out: &mut Vec<Node<'a>>) {
         if node.kind() == kind {
@@ -239,8 +170,8 @@ fn parse(s: &str) -> Result<i32> {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_bail = find_first(before_ast.root_node(), "macro_invocation").unwrap();
-        let after_bail = find_first(after_ast.root_node(), "macro_invocation").unwrap();
+        let before_bail = find_first_of_kind(before_ast.root_node(), "macro_invocation").unwrap();
+        let after_bail = find_first_of_kind(after_ast.root_node(), "macro_invocation").unwrap();
 
         let mapping = diff
             .mapping
@@ -272,8 +203,8 @@ fn b() {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_log = find_first(before_ast.root_node(), "macro_invocation").unwrap();
-        let after_log = find_first(after_ast.root_node(), "macro_invocation").unwrap();
+        let before_log = find_first_of_kind(before_ast.root_node(), "macro_invocation").unwrap();
+        let after_log = find_first_of_kind(after_ast.root_node(), "macro_invocation").unwrap();
 
         assert!(
             !diff.mapping.contains_key(&(before_log.id(), after_log.id())),
@@ -304,8 +235,8 @@ fn b() {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_call = find_first(before_ast.root_node(), "call_expression").unwrap();
-        let after_call = find_first(after_ast.root_node(), "call_expression").unwrap();
+        let before_call = find_first_of_kind(before_ast.root_node(), "call_expression").unwrap();
+        let after_call = find_first_of_kind(after_ast.root_node(), "call_expression").unwrap();
 
         assert!(
             !diff.mapping.contains_key(&(before_call.id(), after_call.id())),

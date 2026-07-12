@@ -338,36 +338,9 @@ impl CodeViewerWidget {
     }
 
     /// Set the contents directly (for testing or custom content)
+    #[cfg(test)]
     pub fn with_contents(mut self, contents: String) -> Self {
         self.contents = contents;
-        self.rebuild_highlight_cache();
-        self
-    }
-
-    /// Set the file path
-    pub fn with_path(mut self, path: PathBuf) -> Self {
-        self.file_path = Some(path.clone());
-        self.language = language_for_path(&path);
-        self.rebuild_highlight_cache();
-        self
-    }
-
-    /// Set a custom title (overrides filename)
-    pub fn with_title(mut self, title: String) -> Self {
-        self.title = Some(title);
-        self
-    }
-
-    /// Set the theme for syntax highlighting
-    pub fn with_theme(mut self, theme_name: String) -> Self {
-        self.theme_name = Some(theme_name);
-        self.rebuild_highlight_cache();
-        self
-    }
-
-    /// Enable or disable syntax highlighting
-    pub fn with_syntax_highlighting(mut self, enabled: bool) -> Self {
-        self.syntax_highlighting = enabled;
         self.rebuild_highlight_cache();
         self
     }

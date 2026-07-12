@@ -19,11 +19,11 @@ use std::collections::{HashMap, VecDeque};
 
 use tree_sitter::Node;
 
-use crate::code::{ASTMetadata, Code, Language};
+use crate::code::{ASTMetadata, Code};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::nodes::{
-    FlowControlArm, flow_control_arms, flow_control_family, flow_control_signature_set,
-    flow_control_similarity_of_sets,
+    FlowControlArm, collect_unmatched, flow_control_arms, flow_control_family,
+    flow_control_signature_set, flow_control_similarity_of_sets,
 };
 use crate::diff::{ASTDiff, NodeCache};
 
@@ -66,16 +66,22 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let before_source = before.contents.as_bytes();
     let after_source = after.contents.as_bytes();
 
-    let before_candidates: Vec<(Node, Vec<FlowControlArm>)> =
-        collect_unmatched_containers(before_ast.root_node(), &language, &diff.before_node_map)
-            .into_iter()
-            .filter_map(|node| flow_control_arms(node, &language, before_source).map(|arms| (node, arms)))
-            .collect();
-    let after_candidates: Vec<(Node, Vec<FlowControlArm>)> =
-        collect_unmatched_containers(after_ast.root_node(), &language, &diff.after_node_map)
-            .into_iter()
-            .filter_map(|node| flow_control_arms(node, &language, after_source).map(|arms| (node, arms)))
-            .collect();
+    let before_candidates: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
+        before_ast.root_node(),
+        &diff.before_node_map,
+        |node| flow_control_family(node.kind(), &language).is_some(),
+    )
+    .into_iter()
+    .filter_map(|node| flow_control_arms(node, &language, before_source).map(|arms| (node, arms)))
+    .collect();
+    let after_candidates: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
+        after_ast.root_node(),
+        &diff.after_node_map,
+        |node| flow_control_family(node.kind(), &language).is_some(),
+    )
+    .into_iter()
+    .filter_map(|node| flow_control_arms(node, &language, after_source).map(|arms| (node, arms)))
+    .collect();
     if before_candidates.is_empty() || after_candidates.is_empty() {
         return;
     }
@@ -131,31 +137,6 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     }
 }
 
-/// Walks `root`'s subtree collecting every node that is a recognized flow-control container (see
-/// [`flow_control_family`]) and not already mapped in `mapped`. Doesn't descend into already-mapped
-/// nodes - their contents are presumed already resolved by an earlier pass, so there's nothing left
-/// here for this heuristic to usefully claim.
-fn collect_unmatched_containers<'a>(
-    root: Node<'a>,
-    language: &Language,
-    mapped: &HashMap<usize, usize>,
-) -> Vec<Node<'a>> {
-    let mut result = Vec::new();
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if mapped.contains_key(&node.id()) {
-            continue;
-        }
-        if flow_control_family(node.kind(), language).is_some() {
-            result.push(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-    result
-}
 
 /// Resolves each before-arm against the first not-yet-claimed after-arm with an identical
 /// (non-wildcard) signature, via a dedicated `apted::for_nodes` call per pair - the same idiom
@@ -196,8 +177,9 @@ fn anchor_matching_arms(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::code::Code;
+    use crate::code::{Code, Language};
     use crate::diff::ASTMappingOperation;
+    use crate::test::helper::find_first_of_kind;
 
     #[test]
     fn rust_match_arms_with_shared_patterns_are_anchored_across_renamed_functions() {
@@ -248,8 +230,8 @@ fn parse(s: &str) -> i32 {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_match = find_first(before_ast.root_node(), "match_expression").unwrap();
-        let after_match = find_first(after_ast.root_node(), "match_expression").unwrap();
+        let before_match = find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
+        let after_match = find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
 
         let mapping = diff
             .mapping
@@ -318,8 +300,8 @@ fn validate(x: i32) -> i32 {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_if = find_first(before_ast.root_node(), "if_expression").unwrap();
-        let after_if = find_first(after_ast.root_node(), "if_expression").unwrap();
+        let before_if = find_first_of_kind(before_ast.root_node(), "if_expression").unwrap();
+        let after_if = find_first_of_kind(after_ast.root_node(), "if_expression").unwrap();
 
         let mapping = diff
             .mapping
@@ -368,8 +350,8 @@ fn b(s: &str) -> i32 {
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_match = find_first(before_ast.root_node(), "match_expression").unwrap();
-        let after_match = find_first(after_ast.root_node(), "match_expression").unwrap();
+        let before_match = find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
+        let after_match = find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
 
         assert!(
             !diff.mapping.contains_key(&(before_match.id(), after_match.id())),
@@ -377,16 +359,4 @@ fn b(s: &str) -> i32 {
         );
     }
 
-    fn find_first<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(found) = find_first(child, kind) {
-                return Some(found);
-            }
-        }
-        None
-    }
 }

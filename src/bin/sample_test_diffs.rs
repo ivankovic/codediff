@@ -22,7 +22,7 @@
 //! each language to exactly `--count` samples rather than starting over every time.
 use anyhow::Result;
 use clap::Parser;
-use git2::{Delta, Repository, Sort};
+use git2::Delta;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::collections::{HashMap, HashSet};
@@ -32,6 +32,7 @@ use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::stats::filesystem::find_git_repositories;
+use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::Reservoir;
 use codediff::metadata;
 
@@ -200,110 +201,68 @@ fn sample_repository(
     capacities: &mut HashMap<String, usize>,
     rng: &mut StdRng,
 ) -> Result<()> {
-    let repo = Repository::open(repo_path)?;
-    let mut walk = repo.revwalk()?;
-    // Most-recent-first: repeated shallow fetches can leave a checkout with far more local
-    // history than its nominal depth, so walking "all reachable commits" can mean walking the
-    // entire project history. Time order lets `max_commits` reliably mean "the N most recent".
-    walk.set_sorting(Sort::TIME)?;
-    walk.push_head()?;
-
-    for (visited, id) in walk.enumerate() {
-        if visited >= max_commits {
-            break;
+    walk_single_parent_commit_diffs(repo_path, max_commits, false, |repo, id, delta| {
+        // Only in-place edits keep before and after at the same `path`, which is what the
+        // (repository, commit, path) schema here relies on to locate both blobs later.
+        // Rename detection is off (see the `false` above), so this also naturally excludes renames.
+        if delta.status() != Delta::Modified {
+            return Ok(());
         }
-        let Ok(id) = id else { continue };
-        let Ok(commit) = repo.find_commit(id) else {
-            continue;
+        // A no-op delta (e.g. a mode-only change) is not a useful diff pair.
+        if delta.old_file().id() == delta.new_file().id() {
+            return Ok(());
+        }
+
+        let Some(path) = delta.new_file().path() else {
+            return Ok(());
         };
-
-        // Merges mix unrelated changes and root commits have no "before" version; neither
-        // produces a clean (before, after) edit pair, so only plain single-parent commits count.
-        if commit.parents().len() != 1 {
-            continue;
+        if metadata::is_anomalous(path) {
+            return Ok(());
         }
-        let parent = commit.parent(0)?;
 
-        let before_tree = parent.tree()?;
-        let after_tree = commit.tree()?;
-        let diff = repo.diff_tree_to_tree(Some(&before_tree), Some(&after_tree), None)?;
-
-        for delta in diff.deltas() {
-            // Only in-place edits keep before and after at the same `path`, which is what the
-            // (repository, commit, path) schema here relies on to locate both blobs later.
-            // Rename detection is off by default, so this also naturally excludes renames.
-            if delta.status() != Delta::Modified {
-                continue;
-            }
-            // A no-op delta (e.g. a mode-only change) is not a useful diff pair.
-            if delta.old_file().id() == delta.new_file().id() {
-                continue;
-            }
-
-            let Some(path) = delta.new_file().path() else {
-                continue;
-            };
-            if metadata::is_anomalous(path) {
-                continue;
-            }
-
-            let Some(language) = language_for_path(path) else {
-                continue;
-            };
-            // Only sample languages diff_code can actually parse.
-            if to_treesitter(&language).is_none() {
-                continue;
-            }
-            let language = language.to_string();
-            if let Some(filter) = language_filter
-                && language != filter
-            {
-                continue;
-            }
-
-            let path = path.to_string_lossy().into_owned();
-            let key = (repository_name.to_string(), id.to_string(), path.clone());
-            if existing_keys.contains(&key) {
-                continue;
-            }
-
-            if !text_pair_in_range(&repo, delta.old_file().id(), delta.new_file().id()) {
-                continue;
-            }
-
-            let capacity = *capacities.entry(language.clone()).or_insert_with(|| {
-                target_count.saturating_sub(existing_counts.get(&language).copied().unwrap_or(0))
-            });
-
-            let row = Row {
-                language: language.clone(),
-                repository: repository_name.to_string(),
-                commit: id.to_string(),
-                path,
-                promoted_to: String::new(),
-            };
-            reservoirs
-                .entry(language)
-                .or_default()
-                .offer(row, capacity, rng);
-        }
-    }
-
-    Ok(())
-}
-
-/// True if both blobs are text and within the configured size bounds.
-fn text_pair_in_range(repo: &Repository, before_id: git2::Oid, after_id: git2::Oid) -> bool {
-    let in_range = |oid: git2::Oid| -> bool {
-        let Ok(blob) = repo.find_blob(oid) else {
-            return false;
+        let Some(language) = language_for_path(path) else {
+            return Ok(());
         };
-        let content = blob.content();
-        content.len() >= MIN_BYTES
-            && content.len() <= MAX_BYTES
-            && std::str::from_utf8(content).is_ok()
-    };
-    in_range(before_id) && in_range(after_id)
+        // Only sample languages diff_code can actually parse.
+        if to_treesitter(&language).is_none() {
+            return Ok(());
+        }
+        let language = language.to_string();
+        if let Some(filter) = language_filter
+            && language != filter
+        {
+            return Ok(());
+        }
+
+        let path = path.to_string_lossy().into_owned();
+        let key = (repository_name.to_string(), id.to_string(), path.clone());
+        if existing_keys.contains(&key) {
+            return Ok(());
+        }
+
+        let in_range = |oid: git2::Oid| text_len_if_in_range(repo, oid, MIN_BYTES, MAX_BYTES).is_some();
+        if !in_range(delta.old_file().id()) || !in_range(delta.new_file().id()) {
+            return Ok(());
+        }
+
+        let capacity = *capacities.entry(language.clone()).or_insert_with(|| {
+            target_count.saturating_sub(existing_counts.get(&language).copied().unwrap_or(0))
+        });
+
+        let row = Row {
+            language: language.clone(),
+            repository: repository_name.to_string(),
+            commit: id.to_string(),
+            path,
+            promoted_to: String::new(),
+        };
+        reservoirs
+            .entry(language)
+            .or_default()
+            .offer(row, capacity, rng);
+
+        Ok(())
+    })
 }
 
 fn write_csv(

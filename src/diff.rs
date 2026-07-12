@@ -520,6 +520,32 @@ pub enum ASTMappingReason {
     GreedyAnchorBlock,
 }
 
+impl ASTMappingReason {
+    /// Short, stable column/label abbreviation for a mapping reason, independent of `APTED`'s
+    /// provenance payload (bucketed to the bare `"APTED"`). Shared by `src/bin/human_solver.rs`'s
+    /// per-node display and `src/bin/benchmark_optimal_solutions.rs`'s reason-count columns, so
+    /// the same abbreviation means the same thing in both tools - previously two independently
+    /// hand-maintained copies of this match that could silently drift when a variant was added.
+    /// Callers that need the `APTED` provenance itself (e.g. one CSV column per call site)
+    /// should match `ASTMappingReason::APTED(source)` directly instead of using this label.
+    pub fn bucket_label(&self) -> &'static str {
+        match self {
+            ASTMappingReason::IdenticalHash => "IdHash",
+            ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc",
+            ASTMappingReason::FullymappingSubtrees => "FullMap",
+            ASTMappingReason::StructurallyIdenticalSubtrees => "StructId",
+            ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc",
+            ASTMappingReason::OptimalIDU => "OptIDU",
+            ASTMappingReason::APTED(_) => "APTED",
+            ASTMappingReason::FlatSequenceDiff => "FlatSeq",
+            ASTMappingReason::MovedSubtree => "Moved",
+            ASTMappingReason::CommentSibling => "Comment",
+            ASTMappingReason::BottomUpExpansion => "BottomUp",
+            ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
+        }
+    }
+}
+
 /**
 * Creates a Diff from two Code objects.
 *

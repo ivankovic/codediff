@@ -18,8 +18,7 @@
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, Code};
-use crate::diff::apted::{self, Algorithm};
-use crate::diff::nodes::kinds_update_allowed;
+use crate::diff::nodes::{anchor_pair_via_apted, kinds_update_allowed};
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /// BottomUpExpansion: once most of an unmatched node's descendants are already matched to the
@@ -178,21 +177,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             continue;
         }
 
-        let _ = apted::for_nodes(
+        anchor_pair_via_apted(
+            before_id,
+            after_id,
             &before_metadata,
             &after_metadata,
-            vec![before_id],
-            vec![after_id],
-            Algorithm::Apted,
             "bottom_up_expansion",
+            ASTMappingReason::BottomUpExpansion,
             diff,
         );
-
-        // `for_nodes` may occasionally still resolve the pair as a separate delete+insert (e.g. if
-        // the leftover residual outweighs reuse) - only relabel when it actually matched them.
-        if let Some(mapping) = diff.mapping.get_mut(&(before_id, after_id)) {
-            mapping.reason = ASTMappingReason::BottomUpExpansion;
-        }
     }
 }
 
@@ -238,6 +231,7 @@ mod tests {
     use super::*;
     use crate::code::{Code, Language};
     use crate::diff::ASTMappingOperation;
+    use crate::test::helper::find_first_of_kind as first_child_of_kind;
 
     #[test]
     fn renamed_function_with_mostly_matched_body_is_matched_via_bottom_up_expansion() {
@@ -323,18 +317,6 @@ mod tests {
         );
     }
 
-    fn first_child_of_kind<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if child.kind() == kind {
-                return Some(child);
-            }
-            if let Some(found) = first_child_of_kind(child, kind) {
-                return Some(found);
-            }
-        }
-        None
-    }
 
     /// Maps two nodes (and, recursively, every descendant pair at the same position) as
     /// `Identical`, unconditionally - a test-only stand-in for "some earlier pass already matched

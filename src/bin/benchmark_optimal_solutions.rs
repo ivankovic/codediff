@@ -56,32 +56,23 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
     "GreedyAnchor",
 ];
 
-/// Column label for one `ASTMappingReason`. For every variant except `APTED` this is a fixed
-/// short label (see `NON_APTED_REASON_LABELS`) - same abbreviations `src/bin/human_solver.rs`'s
-/// `reason_label` uses for its own compact per-node display, kept in sync by hand.
+/// Column label for one `ASTMappingReason`. For every variant except `APTED` this is
+/// `ASTMappingReason::bucket_label` - same abbreviations `src/bin/human_solver.rs`'s
+/// `reason_label` uses for its own compact per-node display, shared via that one method so the
+/// two can't drift.
 ///
 /// `APTED` is the deliberate exception: it does *not* bucket into one "APTED" column the way
-/// `human_solver.rs`'s `reason_label` still does for its compact glyph suffix. Each distinct
-/// provenance string (see that variant's doc comment - which pass actually invoked APTED) gets
-/// its own column instead (`"APTED:final_pass"`, `"APTED:bottom_up_expansion"`, ...): the whole
-/// point of tracking provenance was to see this breakdown in the one place built to show it, and
-/// collapsing it back down here would defeat that. The column *set* is therefore data-dependent
-/// (it's whatever provenances actually fired in this run), unlike every other, fixed column - see
-/// `all_reason_columns`, which is what discovers it.
+/// `bucket_label`/`human_solver.rs`'s `reason_label` do for their compact glyph suffix. Each
+/// distinct provenance string (see that variant's doc comment - which pass actually invoked
+/// APTED) gets its own column instead (`"APTED:final_pass"`, `"APTED:bottom_up_expansion"`, ...):
+/// the whole point of tracking provenance was to see this breakdown in the one place built to
+/// show it, and collapsing it back down here would defeat that. The column *set* is therefore
+/// data-dependent (it's whatever provenances actually fired in this run), unlike every other,
+/// fixed column - see `all_reason_columns`, which is what discovers it.
 fn reason_column_label(reason: &ASTMappingReason) -> String {
     match reason {
-        ASTMappingReason::IdenticalHash => "IdHash".to_string(),
-        ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc".to_string(),
-        ASTMappingReason::FullymappingSubtrees => "FullMap".to_string(),
-        ASTMappingReason::StructurallyIdenticalSubtrees => "StructId".to_string(),
-        ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc".to_string(),
-        ASTMappingReason::OptimalIDU => "OptIDU".to_string(),
         ASTMappingReason::APTED(source) => format!("APTED:{source}"),
-        ASTMappingReason::FlatSequenceDiff => "FlatSeq".to_string(),
-        ASTMappingReason::MovedSubtree => "Moved".to_string(),
-        ASTMappingReason::CommentSibling => "Comment".to_string(),
-        ASTMappingReason::BottomUpExpansion => "BottomUp".to_string(),
-        ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor".to_string(),
+        other => other.bucket_label().to_string(),
     }
 }
 

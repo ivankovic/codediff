@@ -22,16 +22,15 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     prelude::Stylize,
-    style::{Color, Style},
-    symbols::border,
+    style::Color,
     text::Line,
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::ListItem,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::Component;
+use super::{Component, move_selection, render_list_dialog};
 use crate::tui::actions::{Action, DirEntryInfo};
 
 /// A minimal navigable directory/file picker.
@@ -122,13 +121,11 @@ impl Component for FileDialog {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         match key.code {
             KeyCode::Up => {
-                self.selected = self.selected.saturating_sub(1);
+                move_selection(&mut self.selected, -1, self.entries.len());
                 Ok(Some(Action::Render))
             }
             KeyCode::Down => {
-                if self.selected + 1 < self.entries.len() {
-                    self.selected += 1;
-                }
+                move_selection(&mut self.selected, 1, self.entries.len());
                 Ok(Some(Action::Render))
             }
             KeyCode::Enter => match self.entries.get(self.selected).cloned() {
@@ -163,20 +160,11 @@ impl Component for FileDialog {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(area);
-
-        let block = Block::default()
-            .title(Line::from(vec![
-                self.title.clone().bold().fg(Color::Cyan),
-                " - ".into(),
-                self.current_dir.display().to_string().into(),
-            ]))
-            .borders(Borders::ALL)
-            .border_set(border::ROUNDED)
-            .border_style(Style::new().fg(Color::Cyan));
+        let title = Line::from(vec![
+            self.title.clone().bold().fg(Color::Cyan),
+            " - ".into(),
+            self.current_dir.display().to_string().into(),
+        ]);
 
         let items: Vec<ListItem> = self
             .entries
@@ -191,15 +179,13 @@ impl Component for FileDialog {
             })
             .collect();
 
-        let mut list_state = ListState::default().with_selected(Some(self.selected));
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(Style::new().bg(Color::Blue).bold());
-
-        frame.render_stateful_widget(list, layout[0], &mut list_state);
-        frame.render_widget(
-            Line::from(" Enter: select/open dir | Backspace: parent dir | Esc: cancel ").dim(),
-            layout[1],
+        render_list_dialog(
+            frame,
+            area,
+            title,
+            items,
+            self.selected,
+            " Enter: select/open dir | Backspace: parent dir | Esc: cancel ",
         );
 
         Ok(())

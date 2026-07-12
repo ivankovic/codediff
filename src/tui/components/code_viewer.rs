@@ -203,14 +203,7 @@ impl CodeViewer {
 
     /// Scroll the viewport so the cursor's row is visible.
     fn scroll_to_cursor(&mut self) {
-        let row = self.state.cursor_row;
-        if row < self.state.scroll {
-            self.state.scroll = row;
-        } else if self.state.viewport_height > 0
-            && row >= self.state.scroll + self.state.viewport_height
-        {
-            self.state.scroll = row.saturating_sub(self.state.viewport_height - 1);
-        }
+        self.scroll_to_show_row(self.state.cursor_row);
     }
 
     /// Get the filename for display
@@ -270,21 +263,6 @@ impl CodeViewer {
     /// Check if syntax highlighting is enabled
     pub fn is_syntax_highlighting_enabled(&self) -> bool {
         self.widget.is_syntax_highlighting_enabled()
-    }
-
-    /// Get mutable reference to the widget for customization
-    pub fn widget_mut(&mut self) -> &mut crate::tui::widgets::code_viewer::CodeViewerWidget {
-        &mut self.widget
-    }
-
-    /// Get reference to the widget
-    pub fn widget(&self) -> &crate::tui::widgets::code_viewer::CodeViewerWidget {
-        &self.widget
-    }
-
-    /// Get mutable reference to the state
-    pub fn state_mut(&mut self) -> &mut crate::tui::widgets::code_viewer::CodeViewerState {
-        &mut self.state
     }
 
     /// Get reference to the state

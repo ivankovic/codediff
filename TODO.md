@@ -138,6 +138,98 @@
 *  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code
    diff.rs
 
+## Code reuse / readability review (2026-07-12) - FIXED 2026-07-12
+
+Full-codebase review focused on reuse and readability (not correctness/perf), then implemented the
+same day. Verification throughout: `cargo test` (365/365 passing after every change) plus a
+benchmark quality-gate - `benchmark_optimal_solutions --csv` columns 1-8 (`mismatches`,
+`mismatch_pct`, `total_nodes`, `human_unsolved`, `algorithm_cost`, `human_cost`, `cost_diff`)
+diffed byte-for-byte against a pre-change baseline after every risky change. Note: columns 9+
+(which pass gets *credited* for a match) have pre-existing, harmless run-to-run jitter on 2/40
+fixtures (kotlin-nextcloud-a-few-small-removals, rust-sniffnet-protocol) unrelated to this work -
+don't mistake that for a regression if re-verifying later. Final gate after all changes: clean,
+0 fixtures diverged.
+
+**Collapsed:**
+*  `ForestDist`/`DeltaTable`/`StrategyTable`/`Mat` -> one generic `Grid<T>` (`common.rs`).
+   `ForestDist`/`Mat` are now pure type aliases (`Grid<u64>`/`Grid<i64>`, zero-cost);
+   `DeltaTable`/`StrategyTable` wrap `Grid` and keep their own `get`/`set` (the former's `UNSET`
+   sentinel logic is real behavior, not boilerplate, so it stays a wrapper not an alias).
+*  `collect_before_subtree_targets`/`collect_after_subtree_targets` -> shared recursive
+   `collect_subtree_targets` parameterized by a per-node classifier closure
+   (`SubtreeTargetOutcome`), in `common.rs`.
+*  `add_delete_mappings`/`add_insert_mappings` -> shared `add_prune_mappings`, parameterized over
+   the four things that actually differ (node map, mapping-key shape, operation, cost fn).
+*  `filter_before_nodes`/`filter_after_nodes` -> `filter_mapped_nodes(node_ids, node_map)`.
+*  `common.rs`'s ~1760-line `#[cfg(test)] mod tests` -> split into `common/tests.rs` (pure move,
+   zero behavior change; cut common.rs from 4143 to ~2380 lines).
+*  The 9x hand-rolled preorder-DFS stack-walk: merged the two pairs that were provably identical
+   (not just similar) - `solve_comment_nodes`/`solve_identical_diagnostic_statements`'s lockstep
+   two-tree walk -> `nodes::map_identical_descendants`; `code/metadata.rs`'s
+   `discover_reference_nodes`/`discover_semantic_structure_nodes` -> `metadata::walk_preorder`
+   (order-independent for both, verified: one sorts its output afterward, the other keys a map by
+   a type that can only occur once). Left `hash_tree_matching` (already shared, has its own
+   `classify` closure), `add_identical_subtree` (metadata-based, recursive, no already-mapped
+   check - a different shape, not just a differently-named copy), `compute_subtree_sizes`
+   (needs real post-order), and `compute_node_info` (needs a true preorder index, reverse-pushes
+   children) alone - each is a genuinely different traversal shape, not cosmetic duplication.
+*  `collect_unmatched_containers`/`collect_unmatched_diagnostic_statements` -> `nodes::collect_unmatched`.
+*  The `apted::for_nodes` + conditional-relabel idiom -> `nodes::anchor_pair_via_apted`.
+*  `sample_repository` in `sample_test_diffs.rs`/`sample_code_pairs.rs` -> shared
+   `stats::git::walk_single_parent_commit_diffs` (revwalk/commit-filter/diff machinery only; each
+   caller still does its own delta filtering, since that genuinely differs).
+*  Blob-size/UTF-8 validation -> `stats::git::text_len_if_in_range`.
+*  The two hand-maintained `ASTMappingReason -> label` matches -> `ASTMappingReason::bucket_label`
+   in `src/diff.rs`, called by both binaries (`benchmark_optimal_solutions.rs` still special-cases
+   `APTED` locally, since its per-provenance-column behavior is a deliberate divergence, not drift).
+*  `ascii_visualizer.rs::get_ast()`'s redundant reparse -> uses `code.ast` directly.
+*  `stats.rs`'s `count_nodes` + `visit_for_kind_stats` double traversal in `expand_from_code` ->
+   `compute_kind_stats` now returns the node count alongside the map (`count_nodes` itself is kept,
+   still used by `benchmark_diff_pairs.rs`).
+*  `stats.rs::for_path`'s 4-level nested match -> flattened with early returns.
+*  TUI dialog list-navigation/render duplication (`theme_dialog.rs`/`file_dialog.rs`) ->
+   `tui::components::move_selection` + `render_list_dialog`.
+*  `scroll_to_cursor`/`scroll_to_show_row` (components/code_viewer.rs) -> the former now just
+   calls the latter.
+*  Dead code removed: `CodeViewerWidget::with_path/with_title/with_theme/with_syntax_highlighting`,
+   `CodeViewer::widget_mut/widget/state_mut` (kept `state()` - it's actually used by
+   `diff_viewer.rs`'s tests, the original review's claim there was wrong, caught by grepping the
+   whole tree before deleting). Stale `#[allow(dead_code)]` comment on `hash_tree_matching::solve`
+   removed (it's actively called).
+*  Six near-copies of `find_first`/`first_child_of_kind` (all confined to `#[cfg(test)]`, one had
+   different self-inclusion semantics than the other five) -> one `test::helper::find_first_of_kind`.
+
+**Deliberately left, with why:**
+*  `emit_before_subtree`/`emit_after_subtree` (common.rs) - assessed for the `Side`
+   trait/enum collapse and rejected: ~10 orthogonal divergence points (decision-map type,
+   `has_match_below` field, node map, mapping-key shape `(id,0)`/`(0,id)`, operation, cost fn, and
+   a cross-call into the shared, *not* duplicated `emit_match` with side-dependent argument order)
+   threaded through mutual recursion. Every design attempted (trait with ~10 methods, generic
+   function with ~11 closure params passed through every recursive call) was harder to read and
+   verify than the current ~40-line mirror pair - fails the basic "abstraction should cost less
+   than the duplication" test. A future attempt should feel free to revisit if a cleaner
+   decomposition presents itself, but forcing today's designs in would have made this the exact
+   kind of code a transcription bug hides in.
+*  `before_match_target`/`after_match_target`, and the `before_has_match_below`/
+   `after_has_match_below` loop pair inside `resolve_forest` - genuinely tiny; a `Side`
+   trait/enum here would cost more lines than it saves. Left as-is.
+*  `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r`, `spf_a`'s cost-closures,
+   `resolve_forest`'s early-exit/dispatch/emission split, and the 5x inline `UnitCostModel`
+   reconstruction - not attempted this pass (time-boxed to the higher-value items above); still
+   worth doing, none looked unusually risky.
+*  `CodeViewerState::set_cursor` clamping setter - not a safe reuse cleanup on inspection:
+   `line_len`/`line_count` (needed for real content-aware clamping) live on `CodeViewerWidget`, not
+   `CodeViewerState`, so a real invariant-enforcing setter needs a design decision (pass the widget
+   in, or duplicate content-awareness into state), not a mechanical extraction.
+*  `solve_structurally_identical_trees::solve_with_config` - still has zero callers, but its own
+   doc comment says that's deliberate (kept for experimentation); left alone per that comment.
+
+**Verification gaps to be aware of:** the TUI changes (dialogs, `scroll_to_cursor`) were verified
+by `cargo test` (including the dialogs' own key-handling tests) and a clean compile, but not by
+interactively driving the TUI - no visual/rendering regression check was done. The `sample_*`
+binaries' refactor was verified by their own unit tests (which exercise `sample_repository` against
+a real git fixture) plus a clean compile, not by a manual run against a real large repo.
+
 # Diff algorithm accuracy (optimal_solutions gaps)
 
 ## Known gaps with full analysis
