@@ -38,35 +38,102 @@ use std::fs::File;
 
 use csv::Writer;
 
-/// Every `ASTMappingReason` variant, in declaration order, paired with a short column label for
-/// the terminal table. Kept as an explicit list (rather than deriving one) so the table's column
-/// order stays stable even if variants are reordered in `diff.rs`.
-const REASONS: &[(ASTMappingReason, &str)] = &[
-    (ASTMappingReason::IdenticalHash, "IdHash"),
-    (ASTMappingReason::IdenticalHashOfAncestor, "IdHashAnc"),
-    (ASTMappingReason::FullymappingSubtrees, "FullMap"),
-    (ASTMappingReason::StructurallyIdenticalSubtrees, "StructId"),
-    (ASTMappingReason::StructurallyIdenticalAncestor, "StructAnc"),
-    (ASTMappingReason::OptimalIDU, "OptIDU"),
-    (ASTMappingReason::APTED, "APTED"),
-    (ASTMappingReason::FlatSequenceDiff, "FlatSeq"),
-    (ASTMappingReason::MovedSubtree, "Moved"),
-    (ASTMappingReason::CommentSibling, "Comment"),
-    (ASTMappingReason::BottomUpExpansion, "BottomUp"),
+/// Short column label for every `ASTMappingReason` variant *except* `APTED`, in declaration order.
+/// Kept as an explicit list (rather than deriving one) so the table's column order stays stable
+/// even if variants are reordered in `diff.rs`. `APTED` is deliberately excluded: unlike every
+/// other variant, it doesn't map to one fixed column - see `reason_column_label`.
+const NON_APTED_REASON_LABELS: &[&str] = &[
+    "IdHash",
+    "IdHashAnc",
+    "FullMap",
+    "StructId",
+    "StructAnc",
+    "OptIDU",
+    "FlatSeq",
+    "Moved",
+    "Comment",
+    "BottomUp",
+    "GreedyAnchor",
 ];
 
+/// Column label for one `ASTMappingReason`. For every variant except `APTED` this is a fixed
+/// short label (see `NON_APTED_REASON_LABELS`) - same abbreviations `src/bin/human_solver.rs`'s
+/// `reason_label` uses for its own compact per-node display, kept in sync by hand.
+///
+/// `APTED` is the deliberate exception: it does *not* bucket into one "APTED" column the way
+/// `human_solver.rs`'s `reason_label` still does for its compact glyph suffix. Each distinct
+/// provenance string (see that variant's doc comment - which pass actually invoked APTED) gets
+/// its own column instead (`"APTED:final_pass"`, `"APTED:bottom_up_expansion"`, ...): the whole
+/// point of tracking provenance was to see this breakdown in the one place built to show it, and
+/// collapsing it back down here would defeat that. The column *set* is therefore data-dependent
+/// (it's whatever provenances actually fired in this run), unlike every other, fixed column - see
+/// `all_reason_columns`, which is what discovers it.
+fn reason_column_label(reason: &ASTMappingReason) -> String {
+    match reason {
+        ASTMappingReason::IdenticalHash => "IdHash".to_string(),
+        ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc".to_string(),
+        ASTMappingReason::FullymappingSubtrees => "FullMap".to_string(),
+        ASTMappingReason::StructurallyIdenticalSubtrees => "StructId".to_string(),
+        ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc".to_string(),
+        ASTMappingReason::OptimalIDU => "OptIDU".to_string(),
+        ASTMappingReason::APTED(source) => format!("APTED:{source}"),
+        ASTMappingReason::FlatSequenceDiff => "FlatSeq".to_string(),
+        ASTMappingReason::MovedSubtree => "Moved".to_string(),
+        ASTMappingReason::CommentSibling => "Comment".to_string(),
+        ASTMappingReason::BottomUpExpansion => "BottomUp".to_string(),
+        ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor".to_string(),
+    }
+}
+
 /// Runs codediff once and tallies every mapping entry (matched pairs *and* lone deletes/inserts)
-/// by its `ASTMappingReason` - i.e. which algorithm pass is responsible for how much of the
-/// diff. Independent of `human_mapping.json`, so this works for "unsolved" fixtures too.
-fn reason_counts_for(before: &Code, after: &Code) -> HashMap<ASTMappingReason, usize> {
+/// by its `ASTMappingReason` column label (see `reason_column_label`) - i.e. which algorithm pass
+/// (and, for APTED, which call site) is responsible for how much of the diff. Independent of
+/// `human_mapping.json`, so this works for "unsolved" fixtures too.
+fn reason_counts_for(before: &Code, after: &Code) -> HashMap<String, usize> {
     let diff = codediff::diff::diff_code(before, after);
     let mut counts = HashMap::new();
     if let Some(diff_ast) = diff.ast {
         for mapping in diff_ast.mapping.values() {
-            *counts.entry(mapping.reason).or_insert(0) += 1;
+            *counts.entry(reason_column_label(&mapping.reason)).or_insert(0) += 1;
         }
     }
     counts
+}
+
+/// Every reason column that exists at all: the fixed `NON_APTED_REASON_LABELS` (all 11,
+/// unconditionally - a column being zero for every fixture in the corpus doesn't mean the
+/// `ASTMappingReason` variant it names stopped existing), followed by every distinct
+/// `"APTED:<source>"` column observed across all rows, sorted alphabetically by provenance for a
+/// deterministic, readable order. The APTED-family columns are appended rather than interleaved
+/// back into their old fixed position: the set size is data-dependent (it's whichever provenances
+/// actually fired), so there's no fixed slot to put them in the way the other, always-present
+/// columns have - and unlike the fixed labels, an APTED column is never included "just in case"
+/// (there's no way to enumerate a provenance string that never appeared in the data), so this list
+/// is inherently already restricted to provenances that fired at least once somewhere.
+///
+/// Used for the CSV, which is meant to be a complete, stable-shaped record for downstream tooling
+/// (e.g. `research/analysis/matching_reasons_report.py`) - see `active_reason_columns` for the
+/// display-only variant that additionally drops always-zero columns.
+fn all_reason_columns(rows: &[Row]) -> Vec<String> {
+    let mut columns: Vec<String> = NON_APTED_REASON_LABELS.iter().map(|label| label.to_string()).collect();
+
+    let apted_columns: std::collections::BTreeSet<&String> = rows
+        .iter()
+        .flat_map(|r| r.reason_counts.keys())
+        .filter(|label| label.starts_with("APTED:"))
+        .collect();
+    columns.extend(apted_columns.into_iter().cloned());
+    columns
+}
+
+/// `all_reason_columns`, filtered down to columns that actually have a nonzero count somewhere in
+/// `rows` - keeps the interactive terminal table as narrow as the data warrants. Not used for the
+/// CSV (see `all_reason_columns`'s doc comment on why that stays complete/unfiltered).
+fn active_reason_columns(rows: &[Row]) -> Vec<String> {
+    all_reason_columns(rows)
+        .into_iter()
+        .filter(|label| rows.iter().any(|r| r.reason_counts.get(label).copied().unwrap_or(0) > 0))
+        .collect()
 }
 
 /// Total unit-cost of codediff's own mapping (see `codediff::diff::cost::diff_cost`) - independent
@@ -110,11 +177,11 @@ struct Row {
     /// The second element of the tuple is the total node count (before + after trees combined),
     /// the denominator for the mismatch percentage - see `human_mapping::total_node_count_for`.
     mismatches: Option<(usize, usize)>,
-    /// How many mapping entries codediff produced for each `ASTMappingReason` - i.e. which pass
-    /// (hash matching, semantic-structural anchoring, APTED, ...) did how much of the work.
-    /// Computed unconditionally (doesn't need `human_mapping.json`), so this is populated even
-    /// for "unsolved" fixtures.
-    reason_counts: HashMap<ASTMappingReason, usize>,
+    /// How many mapping entries codediff produced for each `ASTMappingReason` column label (see
+    /// `reason_column_label`) - i.e. which pass (hash matching, semantic-structural anchoring,
+    /// APTED, ...) did how much of the work. Computed unconditionally (doesn't need
+    /// `human_mapping.json`), so this is populated even for "unsolved" fixtures.
+    reason_counts: HashMap<String, usize>,
     /// Total unit-cost of codediff's own mapping (`codediff::diff::cost::diff_cost`). Computed
     /// unconditionally, same as `reason_counts` - this is "how expensive codediff's mapping is",
     /// independent of whether there's a human mapping to compare it against.
@@ -343,39 +410,38 @@ fn print_reason_table(rows: &[Row]) {
         .max()
         .unwrap_or(0);
 
-    let active_reasons: Vec<(ASTMappingReason, &str)> = REASONS
-        .iter()
-        .copied()
-        .filter(|(reason, _)| rows.iter().any(|r| r.reason_counts.get(reason).copied().unwrap_or(0) > 0))
-        .collect();
-
-    const COL_WIDTH: usize = 9;
-    let rule_width = name_width + active_reasons.len() * (COL_WIDTH + 2);
+    let active_reasons = active_reason_columns(rows);
+    // Column widths vary now: an `APTED:<source>` label (e.g. "APTED:bottom_up_expansion") can be
+    // much longer than the old fixed 9-char budget, and a fixed width would misalign the table
+    // the moment one appears.
+    const MIN_COL_WIDTH: usize = 9;
+    let col_widths: Vec<usize> = active_reasons.iter().map(|label| label.len().max(MIN_COL_WIDTH)).collect();
+    let rule_width = name_width + col_widths.iter().map(|w| w + 2).sum::<usize>();
 
     println!();
     println!("Mapping reasons per fixture (how much work each algorithm pass did):");
     print!("{:<name_width$}", "Solution", name_width = name_width);
-    for (_, label) in &active_reasons {
-        print!("  {:>COL_WIDTH$}", label);
+    for (label, width) in active_reasons.iter().zip(&col_widths) {
+        print!("  {:>width$}", label, width = width);
     }
     println!();
     println!("{}", "-".repeat(rule_width));
 
-    let mut totals: HashMap<ASTMappingReason, usize> = HashMap::new();
+    let mut totals: HashMap<&str, usize> = HashMap::new();
     for row in rows {
         print!("{:<name_width$}", row.name, name_width = name_width);
-        for (reason, _) in &active_reasons {
-            let count = row.reason_counts.get(reason).copied().unwrap_or(0);
-            *totals.entry(*reason).or_insert(0) += count;
-            print!("  {:>COL_WIDTH$}", count);
+        for (label, width) in active_reasons.iter().zip(&col_widths) {
+            let count = row.reason_counts.get(label).copied().unwrap_or(0);
+            *totals.entry(label.as_str()).or_insert(0) += count;
+            print!("  {:>width$}", count, width = width);
         }
         println!();
     }
 
     println!("{}", "-".repeat(rule_width));
     print!("{:<name_width$}", "TOTAL", name_width = name_width);
-    for (reason, _) in &active_reasons {
-        print!("  {:>COL_WIDTH$}", totals.get(reason).copied().unwrap_or(0));
+    for (label, width) in active_reasons.iter().zip(&col_widths) {
+        print!("  {:>width$}", totals.get(label.as_str()).copied().unwrap_or(0), width = width);
     }
     println!();
 }
@@ -383,6 +449,8 @@ fn print_reason_table(rows: &[Row]) {
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let file = File::create(path)?;
     let mut wtr = Writer::from_writer(file);
+
+    let columns = all_reason_columns(rows);
 
     let mut header = vec![
         "solution",
@@ -394,13 +462,13 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "human_cost",
         "cost_diff",
     ];
-    header.extend(REASONS.iter().map(|(_, label)| *label));
+    header.extend(columns.iter().map(String::as_str));
     wtr.write_record(&header)?;
 
     for row in rows {
-        let reason_fields: Vec<String> = REASONS
+        let reason_fields: Vec<String> = columns
             .iter()
-            .map(|(reason, _)| row.reason_counts.get(reason).copied().unwrap_or(0).to_string())
+            .map(|label| row.reason_counts.get(label).copied().unwrap_or(0).to_string())
             .collect();
         match (row.mismatches, row.human_cost) {
             (Some((count, nodes)), Some(human_cost)) => {

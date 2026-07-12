@@ -893,8 +893,9 @@ fn algo_reason_after(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason>
 }
 
 /// Short column-style label for an `ASTMappingReason`, matching
-/// `src/bin/benchmark_optimal_solutions.rs`'s `REASONS` table so the same abbreviation means the
-/// same thing in both tools.
+/// `src/bin/benchmark_optimal_solutions.rs`'s `REASON_LABELS`/`reason_label` so the same
+/// abbreviation means the same thing in both tools. Collapses `APTED`'s provenance payload to a
+/// bare "APTED" - see [`reason_detail`] for the version that shows it.
 fn reason_label(reason: ASTMappingReason) -> &'static str {
     match reason {
         ASTMappingReason::IdenticalHash => "IdHash",
@@ -903,11 +904,25 @@ fn reason_label(reason: ASTMappingReason) -> &'static str {
         ASTMappingReason::StructurallyIdenticalSubtrees => "StructId",
         ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc",
         ASTMappingReason::OptimalIDU => "OptIDU",
-        ASTMappingReason::APTED => "APTED",
+        ASTMappingReason::APTED(_) => "APTED",
         ASTMappingReason::FlatSequenceDiff => "FlatSeq",
         ASTMappingReason::MovedSubtree => "Moved",
         ASTMappingReason::CommentSibling => "Comment",
         ASTMappingReason::BottomUpExpansion => "BottomUp",
+        ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
+    }
+}
+
+/// Same short label as [`reason_label`], except for `APTED`, where it also appends the
+/// provenance payload (e.g. `"APTED:final_pass"`) - see `ASTMappingReason::APTED`'s doc comment
+/// on why that payload exists. Used for the `r`-toggle's per-node display (`render_panel`), where
+/// "which pass matched it" is exactly the point; `reason_label` stays the bare bucket label
+/// everywhere a stable, provenance-independent abbreviation is needed instead (the reason-count
+/// table this tool shares an abbreviation scheme with).
+fn reason_detail(reason: ASTMappingReason) -> String {
+    match reason {
+        ASTMappingReason::APTED(source) => format!("APTED:{source}"),
+        other => reason_label(other).to_string(),
     }
 }
 
@@ -2098,7 +2113,7 @@ fn render_panel(
                         Side::Before => algo_reason_before(*node, diff_ast),
                         Side::After => algo_reason_after(*node, diff_ast),
                     };
-                    reason.map(|r| format!(" {}", reason_label(r))).unwrap_or_default()
+                    reason.map(|r| format!(" {}", reason_detail(r))).unwrap_or_default()
                 } else {
                     String::new()
                 };
@@ -4513,11 +4528,22 @@ mod tests {
         assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalSubtrees), "StructId");
         assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalAncestor), "StructAnc");
         assert_eq!(reason_label(ASTMappingReason::OptimalIDU), "OptIDU");
-        assert_eq!(reason_label(ASTMappingReason::APTED), "APTED");
+        assert_eq!(reason_label(ASTMappingReason::APTED("final_pass")), "APTED");
         assert_eq!(reason_label(ASTMappingReason::FlatSequenceDiff), "FlatSeq");
         assert_eq!(reason_label(ASTMappingReason::MovedSubtree), "Moved");
         assert_eq!(reason_label(ASTMappingReason::CommentSibling), "Comment");
         assert_eq!(reason_label(ASTMappingReason::BottomUpExpansion), "BottomUp");
+        assert_eq!(reason_label(ASTMappingReason::GreedyAnchorBlock), "GreedyAnchor");
+    }
+
+    #[test]
+    fn reason_detail_shows_apted_provenance_but_reason_label_does_not() {
+        let reason = ASTMappingReason::APTED("bottom_up_expansion");
+        assert_eq!(reason_label(reason), "APTED");
+        assert_eq!(reason_detail(reason), "APTED:bottom_up_expansion");
+        // Every other variant has no payload to show, so `reason_detail` just falls back to the
+        // same short label as `reason_label`.
+        assert_eq!(reason_detail(ASTMappingReason::BottomUpExpansion), "BottomUp");
     }
 }
 

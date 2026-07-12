@@ -522,6 +522,9 @@ pub(crate) struct ResolveCtx<'a> {
     pub(crate) after_decision: HashMap<usize, AfterDecision>,
     pub(crate) before_has_match_below: HashMap<usize, bool>,
     pub(crate) after_has_match_below: HashMap<usize, bool>,
+    /// Provenance label for every `ASTMappingReason::APTED` entry this resolution produces - see
+    /// `for_nodes`'s doc comment.
+    pub(crate) source: &'static str,
 }
 
 pub(crate) fn compute_has_match_below(
@@ -763,7 +766,7 @@ pub(crate) fn emit_match(
         ASTMapping {
             cost: total,
             operation,
-            reason: ASTMappingReason::APTED,
+            reason: ASTMappingReason::APTED(ctx.source),
         },
     );
     total
@@ -780,7 +783,7 @@ pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut
         .copied()
         .unwrap_or(false)
     {
-        add_delete_mappings(before_id, ctx.before_meta, diff);
+        add_delete_mappings(before_id, ctx.before_meta, ctx.source, diff);
         return subtree_del_cost(
             before_id,
             ctx.before_meta,
@@ -804,7 +807,7 @@ pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut
         ASTMapping {
             cost: total,
             operation: ASTMappingOperation::Delete,
-            reason: ASTMappingReason::APTED,
+            reason: ASTMappingReason::APTED(ctx.source),
         },
     );
     total
@@ -821,7 +824,7 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
         .copied()
         .unwrap_or(false)
     {
-        add_insert_mappings(after_id, ctx.after_meta, diff);
+        add_insert_mappings(after_id, ctx.after_meta, ctx.source, diff);
         return subtree_ins_cost(
             after_id,
             ctx.after_meta,
@@ -843,7 +846,7 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
         ASTMapping {
             cost: total,
             operation: ASTMappingOperation::Insert,
-            reason: ASTMappingReason::APTED,
+            reason: ASTMappingReason::APTED(ctx.source),
         },
     );
     total
@@ -857,6 +860,7 @@ pub(crate) fn emit_identical_subtree(
     after_id: usize,
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
+    source: &'static str,
     diff: &mut ASTDiff,
 ) {
     if diff.mapping.contains_key(&(before_id, after_id)) {
@@ -868,7 +872,7 @@ pub(crate) fn emit_identical_subtree(
         ASTMapping {
             cost: 0,
             operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::APTED,
+            reason: ASTMappingReason::APTED(source),
         },
     );
     if let (Some(before_info), Some(after_info)) = (
@@ -876,13 +880,13 @@ pub(crate) fn emit_identical_subtree(
         after_meta.node_info.get(&after_id),
     ) {
         for (&bc, &ac) in before_info.children.iter().zip(after_info.children.iter()) {
-            emit_identical_subtree(bc, ac, before_meta, after_meta, diff);
+            emit_identical_subtree(bc, ac, before_meta, after_meta, source, diff);
         }
     }
 }
 
 /// Add delete mappings for an entire subtree (used when no part of it is reused elsewhere).
-pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut ASTDiff) {
+pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, source: &'static str, diff: &mut ASTDiff) {
     if node_id == 0 {
         return;
     }
@@ -903,19 +907,19 @@ pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut
             ASTMapping {
                 cost,
                 operation: ASTMappingOperation::Delete,
-                reason: ASTMappingReason::APTED,
+                reason: ASTMappingReason::APTED(source),
             },
         );
     }
     if let Some(info) = meta.node_info.get(&node_id) {
         for &child_id in &info.children {
-            add_delete_mappings(child_id, meta, diff);
+            add_delete_mappings(child_id, meta, source, diff);
         }
     }
 }
 
 /// Add insert mappings for an entire subtree (used when no part of it is reused elsewhere).
-pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut ASTDiff) {
+pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, source: &'static str, diff: &mut ASTDiff) {
     if node_id == 0 {
         return;
     }
@@ -936,13 +940,13 @@ pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, diff: &mut
             ASTMapping {
                 cost,
                 operation: ASTMappingOperation::Insert,
-                reason: ASTMappingReason::APTED,
+                reason: ASTMappingReason::APTED(source),
             },
         );
     }
     if let Some(info) = meta.node_info.get(&node_id) {
         for &child_id in &info.children {
-            add_insert_mappings(child_id, meta, diff);
+            add_insert_mappings(child_id, meta, source, diff);
         }
     }
 }
@@ -1112,6 +1116,7 @@ fn resolve_flat_tree_pair(
     after_children: Vec<usize>,
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
+    source: &'static str,
     diff: &mut ASTDiff,
 ) {
     let before_hashes: Vec<u64> = before_children
@@ -1136,27 +1141,28 @@ fn resolve_flat_tree_pair(
                     after_children[ai],
                     before_meta,
                     after_meta,
+                    source,
                     diff,
                 );
             }
             for (i, &id) in before_children.iter().enumerate() {
                 if !before_matched[i] {
-                    add_delete_mappings(id, before_meta, diff);
+                    add_delete_mappings(id, before_meta, source, diff);
                 }
             }
             for (i, &id) in after_children.iter().enumerate() {
                 if !after_matched[i] {
-                    add_insert_mappings(id, after_meta, diff);
+                    add_insert_mappings(id, after_meta, source, diff);
                 }
             }
         }
         None => {
             // Edit distance exceeds FLAT_MAX_EDIT: mark all children replaced.
             for &id in &before_children {
-                add_delete_mappings(id, before_meta, diff);
+                add_delete_mappings(id, before_meta, source, diff);
             }
             for &id in &after_children {
-                add_insert_mappings(id, after_meta, diff);
+                add_insert_mappings(id, after_meta, source, diff);
             }
         }
     }
@@ -2110,6 +2116,7 @@ pub(crate) fn resolve_forest(
     after_meta: &ASTMetadata,
     cost_model: &UnitCostModel,
     algorithm: Algorithm,
+    source: &'static str,
     diff: &mut ASTDiff,
 ) {
     let before_root_ids = filter_before_nodes(before_root_ids, diff);
@@ -2119,13 +2126,13 @@ pub(crate) fn resolve_forest(
     }
     if before_root_ids.is_empty() {
         for id in after_root_ids {
-            add_insert_mappings(id, after_meta, diff);
+            add_insert_mappings(id, after_meta, source, diff);
         }
         return;
     }
     if after_root_ids.is_empty() {
         for id in before_root_ids {
-            add_delete_mappings(id, before_meta, diff);
+            add_delete_mappings(id, before_meta, source, diff);
         }
         return;
     }
@@ -2147,7 +2154,7 @@ pub(crate) fn resolve_forest(
             .zip(after_meta.node_to_full_hash.get(&a))
             .is_some_and(|(bh, ah)| bh == ah);
         if hashes_match {
-            emit_identical_subtree(b, a, before_meta, after_meta, diff);
+            emit_identical_subtree(b, a, before_meta, after_meta, source, diff);
             return;
         }
         // Fast path: flat trees (single root, all leaf children) → Myers O(ND) sequence diff.
@@ -2157,7 +2164,7 @@ pub(crate) fn resolve_forest(
             flat_children(b, before_meta, &diff.before_node_map),
             flat_children(a, after_meta, &diff.after_node_map),
         ) {
-            resolve_flat_tree_pair(b, a, bc, ac, before_meta, after_meta, diff);
+            resolve_flat_tree_pair(b, a, bc, ac, before_meta, after_meta, source, diff);
             return;
         }
     }
@@ -2273,6 +2280,7 @@ pub(crate) fn resolve_forest(
         after_decision,
         before_has_match_below,
         after_has_match_below,
+        source,
     };
 
     for &id in &before_root_ids {
@@ -2287,12 +2295,19 @@ pub(crate) fn resolve_forest(
 
 /// Compute the optimal tree edit distance using a postorder, single-node-granularity
 /// Zhang-Shasha/APTED-style forest distance, given before/after node id lists.
+///
+/// `source` is a short, call-site-specific label (e.g. `"final_pass"`, `"bottom_up_expansion"`)
+/// recorded on every `ASTMappingReason::APTED` entry this resolution produces - see that variant's
+/// doc comment. Every caller passes a distinct literal identifying which heuristic invoked APTED,
+/// so two `APTED`-reasoned mappings can be told apart by provenance, not just by the fact that
+/// APTED produced both.
 pub fn for_nodes(
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
     before_node_ids: Vec<usize>,
     after_node_ids: Vec<usize>,
     algorithm: Algorithm,
+    source: &'static str,
     diff: &mut ASTDiff,
 ) -> Result<()> {
     let cost_model = UnitCostModel {
@@ -2305,17 +2320,20 @@ pub fn for_nodes(
         after_metadata,
         &cost_model,
         algorithm,
+        source,
         diff,
     );
     Ok(())
 }
 
 /// Compute the tree edit distance for root nodes, using whichever `algorithm` the caller picks.
+/// See `for_nodes` for what `source` records.
 pub fn for_roots(
     before: &Code,
     after: &Code,
     _node_cache: &NodeCache,
     algorithm: Algorithm,
+    source: &'static str,
     diff: &mut ASTDiff,
 ) -> Result<()> {
     // Compute metadata once at the top level
@@ -2331,6 +2349,7 @@ pub fn for_roots(
         vec![before_root_id],
         vec![after_root_id],
         algorithm,
+        source,
         diff,
     )
 }
@@ -3562,6 +3581,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3645,6 +3665,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3694,6 +3715,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3726,6 +3748,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3775,6 +3798,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3824,6 +3848,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3860,6 +3885,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -3913,6 +3939,7 @@ mod tests {
             &after,
             &node_cache,
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 
@@ -4020,6 +4047,7 @@ mod tests {
             vec![before_root],
             vec![after_root],
             Algorithm::ZhangShasha,
+            "test",
             &mut diff,
         )?;
 

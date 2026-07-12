@@ -18,8 +18,9 @@
 
 Reads optimal_solutions_benchmark.csv (produced by
 `cargo run --release --bin benchmark_optimal_solutions -- --csv`), which has one
-row per fixture and one column per raw `ASTMappingReason` variant (the count of
-matched/deleted/inserted node-pairs that pass attributed to itself). Writes two
+row per fixture and one column per `ASTMappingReason` column label (see
+`reason_column_label` in src/bin/benchmark_optimal_solutions.rs) - the count of
+matched/deleted/inserted node-pairs that pass attributed to itself. Writes two
 plots:
 
   - matching_reason_totals.png: one bar per method, total node-pairs across
@@ -33,11 +34,22 @@ Rare/experimental reasons (FullMap, StructId, OptIDU, FlatSeq - each under 1% of
 matched pairs in every run to date) are folded into "Other" so the categorical
 palette stays at 8 slots; see palette.md's "9th series" rule.
 
+APTED is not one column: the Rust side tracks exact provenance (which pass
+invoked APTED - see `ASTMappingReason::APTED`'s doc comment), so the CSV has one
+`APTED:<source>` column per distinct provenance instead of a single "APTED"
+column. Each gets its own bar, but all of them share one hue (red) at different
+shades - light to dark across the discovered provenances - so the whole APTED
+family still reads as one story at a glance while staying individually
+distinguishable (`apted_shades`, the "sequential = one hue, light->dark" rule
+from the dataviz skill, applied to a categorical sub-family instead of a
+magnitude scale).
+
 Usage (from research/):
     uv run ./analysis/matching_reasons_report.py
     uv run ./analysis/matching_reasons_report.py --csv optimal_solutions_benchmark.csv --plots-dir plots/
 """
 import argparse
+import colorsys
 import csv
 from pathlib import Path
 
@@ -55,16 +67,16 @@ BASELINE = "#c3c2b7"
 
 # Category order is fixed (never re-sorted by value - "color follows the entity,
 # never its rank"). Colors are assigned by semantic request, not palette.md's
-# derived order: APTED red, the two identical-hash reasons as a dark/light green
-# pair (same family, different shade), structural orange, moved purple, comment
-# pink, bottom-up expansion yellow, Other grey. "Other" absorbs every raw
-# ASTMappingReason column not named below.
-CATEGORY_COLUMNS: list[tuple[str, str, str]] = [
+# derived order: APTED red (see APTED_BASE_HEX/apted_shades below), the two
+# identical-hash reasons as a dark/light green pair (same family, different
+# shade), structural orange, moved purple, comment pink, bottom-up expansion
+# yellow, Other grey. "Other" absorbs every column not named below and not an
+# APTED provenance.
+BASE_CATEGORY_COLUMNS: list[tuple[str, str, str]] = [
     # (display label, hex color, raw CSV column)
     ("Identical hash", "#1a8a3c", "IdHash"),
     ("Identical hash (ancestor)", "#8fce8f", "IdHashAnc"),
     ("Structural (ancestor)", "#eb6834", "StructAnc"),
-    ("APTED", "#e34948", "APTED"),
     ("Moved subtree", "#4a3aa7", "Moved"),
     ("Comment sibling", "#e87ba4", "Comment"),
     ("Bottom-up expansion", "#eda100", "BottomUp"),
@@ -72,20 +84,74 @@ CATEGORY_COLUMNS: list[tuple[str, str, str]] = [
 OTHER_LABEL, OTHER_COLOR = "Other", "#9c9b95"
 OTHER_COLUMNS = ["FullMap", "StructId", "OptIDU", "FlatSeq"]
 
+# Base hue for the whole APTED family - the same red the single "APTED" bar used
+# to be, before provenance splintered it into multiple columns.
+APTED_BASE_HEX = "#e34948"
+# Lightness bounds for `apted_shades`: dark enough to stay readable against
+# SURFACE at the low end, light enough to stay distinct from INK_PRIMARY text at
+# the high end - never the full 0.0-1.0 range, which would wash out to white or
+# black rather than a shade of red.
+APTED_MIN_LIGHTNESS = 0.32
+APTED_MAX_LIGHTNESS = 0.72
+
 MAX_LABEL_LEN = 16
 
 
-def read_rows(csv_path: Path) -> list[dict]:
+def apted_shades(n: int) -> list[str]:
+    """`n` distinct hex shades of `APTED_BASE_HEX`, evenly spaced light -> dark: same hue and
+    saturation throughout, only lightness varies. `n == 1` returns the base hue unchanged (no
+    family to distinguish within), `n == 0` returns `[]`."""
+    if n <= 0:
+        return []
+    if n == 1:
+        return [APTED_BASE_HEX]
+    r, g, b = (int(APTED_BASE_HEX[i : i + 2], 16) / 255 for i in (1, 3, 5))
+    hue, _, saturation = colorsys.rgb_to_hls(r, g, b)
+    shades = []
+    for i in range(n):
+        lightness = APTED_MIN_LIGHTNESS + (APTED_MAX_LIGHTNESS - APTED_MIN_LIGHTNESS) * i / (n - 1)
+        sr, sg, sb = colorsys.hls_to_rgb(hue, lightness, saturation)
+        shades.append("#{:02x}{:02x}{:02x}".format(round(sr * 255), round(sg * 255), round(sb * 255)))
+    return shades
+
+
+def apted_columns(fieldnames: list[str]) -> list[str]:
+    """Every `APTED:<source>` column present in the CSV, sorted alphabetically by provenance for
+    a deterministic, readable order (matches the order
+    `src/bin/benchmark_optimal_solutions.rs`'s `active_reason_columns` produces)."""
+    return sorted(c for c in fieldnames if c.startswith("APTED:"))
+
+
+def apted_display_label(column: str) -> str:
+    """"APTED:final_pass" -> "APTED (final_pass)" for the axis tick / legend label."""
+    return f"APTED ({column.split(':', 1)[1]})"
+
+
+def category_columns(fieldnames: list[str]) -> list[tuple[str, str, str]]:
+    """`BASE_CATEGORY_COLUMNS` plus one entry per `APTED:<source>` column actually present in
+    this CSV, each shaded a distinct red (see `apted_shades`). Computed from the CSV's own
+    fieldnames rather than hardcoded, since which provenances fired - and therefore which
+    APTED columns exist at all - is data-dependent, unlike every other, always-present column."""
+    cols = apted_columns(fieldnames)
+    apted_entries = list(zip((apted_display_label(c) for c in cols), apted_shades(len(cols)), cols))
+    return BASE_CATEGORY_COLUMNS + apted_entries
+
+
+def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
     with open(csv_path, newline="") as f:
-        return list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        return reader.fieldnames or [], rows
 
 
-def category_totals(rows: list[dict]) -> tuple[list[str], list[str], list[float]]:
+def category_totals(
+    rows: list[dict], columns: list[tuple[str, str, str]]
+) -> tuple[list[str], list[str], list[float]]:
     """Returns (labels, colors, totals) across all rows, fixed order + Other last."""
-    labels = [label for label, _, _ in CATEGORY_COLUMNS] + [OTHER_LABEL]
-    colors = [color for _, color, _ in CATEGORY_COLUMNS] + [OTHER_COLOR]
+    labels = [label for label, _, _ in columns] + [OTHER_LABEL]
+    colors = [color for _, color, _ in columns] + [OTHER_COLOR]
     totals = []
-    for _, _, col in CATEGORY_COLUMNS:
+    for _, _, col in columns:
         totals.append(sum(int(row[col]) for row in rows))
     totals.append(sum(int(row[col]) for row in rows for col in OTHER_COLUMNS))
     return labels, colors, totals
@@ -95,9 +161,9 @@ def truncate_label(name: str, max_len: int = MAX_LABEL_LEN) -> str:
     return name if len(name) <= max_len else name[: max_len - 1] + "…"
 
 
-def plot_totals(rows: list[dict], output_path: Path) -> None:
+def plot_totals(rows: list[dict], columns: list[tuple[str, str, str]], output_path: Path) -> None:
     """Simple bar chart: one bar per method, total node-pairs matched (log scale)."""
-    labels, colors, totals = category_totals(rows)
+    labels, colors, totals = category_totals(rows, columns)
 
     fig, ax = plt.subplots(figsize=(9, 5.5), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
@@ -134,7 +200,7 @@ def plot_totals(rows: list[dict], output_path: Path) -> None:
     print(f"Plot saved to {output_path}")
 
 
-def plot_share_by_fixture(rows: list[dict], output_path: Path) -> None:
+def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]], output_path: Path) -> None:
     """0-100% stacked bar per fixture: each method's share of that fixture's matches."""
     names = [row["solution"] for row in rows]
     n = len(rows)
@@ -144,13 +210,13 @@ def plot_share_by_fixture(rows: list[dict], output_path: Path) -> None:
     ax.set_facecolor(SURFACE)
 
     x = np.arange(n)
-    all_columns = [col for _, _, col in CATEGORY_COLUMNS] + OTHER_COLUMNS
+    all_columns = [col for _, _, col in columns] + OTHER_COLUMNS
     row_totals = np.array(
         [sum(int(row[c]) for c in all_columns) for row in rows], dtype=float
     )
 
     bottom = np.zeros(n)
-    for label, color, col in CATEGORY_COLUMNS + [(OTHER_LABEL, OTHER_COLOR, None)]:
+    for label, color, col in columns + [(OTHER_LABEL, OTHER_COLOR, None)]:
         if col is not None:
             counts = np.array([int(row[col]) for row in rows], dtype=float)
         else:
@@ -212,9 +278,13 @@ if __name__ == "__main__":
         print("Run:  cargo run --release --bin benchmark_optimal_solutions -- --csv")
         raise SystemExit(1)
 
-    rows = read_rows(csv_path)
+    fieldnames, rows = read_rows(csv_path)
     print(f"Loaded {csv_path}: {len(rows)} fixtures")
 
+    columns = category_columns(fieldnames)
+    apted_count = len(apted_columns(fieldnames))
+    print(f"APTED provenances found: {apted_count}")
+
     plots_dir = Path(args.plots_dir)
-    plot_totals(rows, plots_dir / "matching_reason_totals.png")
-    plot_share_by_fixture(rows, plots_dir / "matching_reason_share_by_fixture.png")
+    plot_totals(rows, columns, plots_dir / "matching_reason_totals.png")
+    plot_share_by_fixture(rows, columns, plots_dir / "matching_reason_share_by_fixture.png")

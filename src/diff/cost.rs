@@ -124,7 +124,7 @@ mod tests {
     }
 
     fn mapping(operation: ASTMappingOperation) -> ASTMapping {
-        ASTMapping { cost: 0, operation, reason: ASTMappingReason::APTED }
+        ASTMapping { cost: 0, operation, reason: ASTMappingReason::APTED("test") }
     }
 
     #[test]

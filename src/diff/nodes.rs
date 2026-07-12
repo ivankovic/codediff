@@ -681,6 +681,31 @@ pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowC
     }
 }
 
+/// True if `node_kind` is a statement-sequence container ("a block") for `language`: its direct
+/// children are an ordered sequence of statements/expressions - exactly the shape
+/// `solve_greedy_anchor_blocks::sequence_edit_cost` treats each child as an opaque token of.
+/// Deliberately narrow (not "any node with several children"): an early version of that pass
+/// considered every such node a candidate and regressed 9 `optimal_solutions` fixtures by
+/// occasionally anchoring two unrelated `call_expression`/`binary_expression` nodes whose
+/// `argument_list`/operator happened to hash-match by coincidence - restricting candidates to
+/// genuine statement containers (plus the flow-control constructs themselves via
+/// [`flow_control_family`], since a whole `if`/`match`/`switch` is exactly the kind of anonymous
+/// "block" a name- or arm-based heuristic could still miss) keeps that cheap, position-blind cost
+/// estimate from firing on expression-level coincidences.
+pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
+    if flow_control_family(node_kind, language).is_some() {
+        return true;
+    }
+    matches!(
+        (language, node_kind),
+        (Language::Rust, "block")
+            | (Language::Python, "block")
+            | (Language::C | Language::CPP, "compound_statement")
+            | (Language::Java | Language::Go | Language::CSharp | Language::Kotlin, "block")
+            | (Language::JavaScript | Language::TypeScript | Language::TSX, "statement_block")
+    )
+}
+
 /// Extracts the byte range of `container`'s discriminant, excluding a trailing guard/`when`
 /// clause if the grammar attaches one directly to the pattern node under a `condition` field
 /// (Rust's `match_pattern` does this for `pattern if guard`; Python's `case_pattern` doesn't need

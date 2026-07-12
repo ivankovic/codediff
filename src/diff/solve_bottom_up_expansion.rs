@@ -184,6 +184,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             vec![before_id],
             vec![after_id],
             Algorithm::Apted,
+            "bottom_up_expansion",
             diff,
         );
 

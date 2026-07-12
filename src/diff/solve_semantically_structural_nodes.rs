@@ -210,6 +210,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                             vec![*before_method_id],
                             vec![after_method_id],
                             Algorithm::Apted,
+                            "python_method",
                             diff,
                         );
                     }
@@ -230,6 +231,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                     vec![before_class_id],
                     vec![after_class_id],
                     Algorithm::Apted,
+                    "python_class",
                     diff,
                 );
             }
@@ -272,6 +274,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                         vec![*before_method_id],
                         vec![after_method_id],
                         Algorithm::Apted,
+                        "impl_method",
                         diff,
                     );
                 }
@@ -295,6 +298,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                 vec![before_impl_id],
                 vec![after_impl_id],
                 Algorithm::Apted,
+                "impl",
                 diff,
             );
         }
@@ -327,6 +331,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                     vec![before_node_id],
                     vec![after_node_id],
                     Algorithm::Apted,
+                    "semantic_node",
                     diff,
                 );
             }
@@ -372,6 +377,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             vec![before_node_id],
             vec![],
             Algorithm::Apted,
+            "orphan_delete",
             diff,
         );
     }
@@ -390,6 +396,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             vec![],
             vec![after_node_id],
             Algorithm::Apted,
+            "orphan_insert",
             diff,
         );
     }
@@ -513,6 +520,7 @@ fn solve_flat_macro_bodies(
             vec![*before_tt_id],
             vec![after_tt_id],
             Algorithm::Apted,
+            "macro_body",
             diff,
         );
         // Diff the macro_invocation wrapper (token_tree body already in diff → pruned).
@@ -522,6 +530,7 @@ fn solve_flat_macro_bodies(
             vec![*before_macro_id],
             vec![after_macro_id],
             Algorithm::Apted,
+            "macro_invocation",
             diff,
         );
     }

@@ -125,6 +125,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
             vec![before_node.id()],
             vec![after_node.id()],
             Algorithm::Apted,
+            "flow_control_container",
             diff,
         );
     }
@@ -186,6 +187,7 @@ fn anchor_matching_arms(
             vec![arm.node_id],
             vec![after_arm_id],
             Algorithm::Apted,
+            "flow_control_arm",
             diff,
         );
     }

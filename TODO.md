@@ -1,5 +1,55 @@
 # Next algorithmic improvements to implement
 
+*  IMPLEMENTED, benefit not established (2026-07-12): a greedy, cost-estimate-driven anchor pass
+   (`ASTMappingReason::GreedyAnchorBlock`, `src/diff/solve_greedy_anchor_blocks.rs`), requested to
+   fill a real gap - every other container-pairing heuristic keys off identity (a shared name, arm
+   signatures, a Dice coefficient over already-matched descendants), so an anonymous container
+   (an `if` body, a loop body, a function body with no already-matched children) with no such
+   anchor falls through to the final APTED pass unassisted. Estimates the cost of matching a
+   candidate pair via a fast weighted longest-common-subsequence alignment over *direct* children
+   only (each child is an opaque token, equal only on identical full-subtree hash; a matched pair
+   costs 0, everything else costs the full subtree size of whichever child didn't survive - a
+   `sequence_edit_cost` DP, not a real tree edit distance, which is what keeps it cheap enough to
+   try on many more candidate pairs than APTED itself could afford). Pairs scoring at or under
+   `MAX_COST_RATIO` (cost / combined subtree size) are assigned greedily, cheapest first,
+   one-to-one within their positional group (see below). Wired in right before the final APTED call.
+   **First two attempts, both reverted before this one landed:** (1) considering *every*
+   still-unmatched node with >= 2 children and subtree size >= 4 a candidate regressed 9 fixtures by
+   up to +53 mismatches each (0 improved anywhere), because `sequence_edit_cost` only looks at a
+   pair's own direct children with no notion of surrounding context - two entirely unrelated
+   `call_expression`s (one in a `for` loop condition, one in a `return` statement) matched because
+   their `argument_list` happened to hash-identical by coincidence. (2) restricting candidates to
+   genuine statement-sequence containers (`nodes::is_block_container`: `block`/`compound_statement`/
+   `statement_block` per language, plus `flow_control_family`'s `if`/`match`/`switch`) cut that to 1
+   regressed fixture (`javascript-fix-promises`, +4), still 0 improved anywhere - and sweeping
+   `MAX_COST_RATIO` from 0.5 to 0.2 produced an **identical** result, proving the regression wasn't
+   threshold-tunable: a byte-identical `statement_block` the human mapping relocates into a newly-
+   inserted `try_statement` wrapper scored a *near-zero* cost ratio (cheapest possible match) because
+   content-only scoring has no way to tell "same content, same place" from "same content, moved".
+   **The fix that actually worked:** gate every candidate pair on a *positional* signal before cost
+   is even consulted, per a user suggestion ("what if the positional anchor was the path of the
+   nodes"). `positional_key_before`/`positional_key_after` walk each candidate up to its nearest
+   already-matched ancestor (via `ASTMetadata::node_to_parent`) and record the kind of every node
+   passed along the way (falling back to the full path from the file root if nothing above is
+   matched yet); two candidates are only ever compared if that walk lands on a *corresponding*
+   ancestor pair *and* the kind-path from that ancestor down to each candidate is identical. This
+   directly kills both regressions: the two unrelated `call_expression`s have unrelated ancestor
+   paths, so they're never compared; the relocated `statement_block`'s after-side path gains an
+   extra `try_statement` segment the before-side path doesn't have, so the pair is rejected
+   regardless of its cost score. Result at `MAX_COST_RATIO = 0.5`: **0 changed fixtures** (exact
+   742/0 baseline match, verified against a saved pre-change CSV), while still firing 24 times
+   across the 40-fixture corpus (`GreedyAnchor` column in `benchmark_optimal_solutions --csv`).
+   Verified deterministic across two independent `--release` process runs (byte-identical CSVs) -
+   group-processing order is explicitly sorted by `preorder_index` (not left to `HashMap` iteration
+   order) for exactly this reason, since group resolution order can affect which group claims a
+   shared descendant first; see the module's doc comment.
+   Same situation as `BottomUpExpansion` below: implemented, correct, verified safe (zero
+   regressions, deterministic), but zero measured benefit on the current fixture corpus - whether
+   it's worth keeping in the pipeline is a call for whoever picks this up next. Unlike
+   `BottomUpExpansion`, this fires on genuinely different content (anonymous containers with no
+   already-matched children at all), so it may earn its keep on fixtures/languages not in the
+   current corpus even without moving today's TOTAL.
+
 *  IMPLEMENTED, threshold tuned, benefit not established (2026-07-11): bottom-up heuristic that
    detects nodes whose descendants are already mapped to each other and matches those nodes too,
    via `ASTMappingReason::BottomUpExpansion` (`src/diff/solve_bottom_up_expansion.rs`), gated by a

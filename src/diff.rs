@@ -21,6 +21,7 @@ pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;
 pub mod solve_comment_nodes;
+pub mod solve_greedy_anchor_blocks;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_moved_subtrees;
@@ -208,6 +209,18 @@ impl Diff {
             &mut ast_diff,
         );
 
+        // GreedyAnchorBlock: last heuristic before the final APTED pass. Anything still unmatched
+        // here has no name, no arm structure, and no already-matched children for a Dice
+        // coefficient to count on - the cases every earlier pass above is keyed to. This pass
+        // instead estimates the edit cost of each remaining candidate pair directly (a fast
+        // sequence-alignment approximation, not a full tree edit distance), gated on a positional
+        // anchor (a shared already-matched ancestor plus a matching kind-path down to the
+        // candidate) so a cheap content score can't fire on structurally unrelated nodes, and
+        // greedily anchors whichever pairs are cheap enough. Anchoring cheaply here shrinks the
+        // residual forest the much slower exact algorithm below has to grind through - see that
+        // pass's doc comment.
+        solve_greedy_anchor_blocks::solve(before, after, &node_cache, &mut ast_diff);
+
         // This is the final, slow algorithm.
         // The more nodes are already matched, the faster it is.
         // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
@@ -218,6 +231,7 @@ impl Diff {
             after,
             &node_cache,
             apted::Algorithm::Apted,
+            "final_pass",
             &mut ast_diff,
         );
 
@@ -478,8 +492,14 @@ pub enum ASTMappingReason {
     /// Using highly modified edit distance algorithm it was determined that this is the optimal
     /// mapping if only Insert, Delete, Update and Identical operations are allowed.
     OptimalIDU,
-    /// Mapping determined by the APTED (A Preorder Tree Edit Distance) algorithm.
-    APTED,
+    /// Mapping determined by the APTED (A Preorder Tree Edit Distance) algorithm. Carries the
+    /// exact provenance: a short, call-site-specific label identifying which `apted::for_nodes`/
+    /// `for_roots` call produced this entry (e.g. `"final_pass"`, `"bottom_up_expansion"`,
+    /// `"flow_control_container"`) - threaded all the way from that call site down through
+    /// `resolve_forest`'s internal emission helpers (`emit_match`, `add_delete_mappings`, ...), so
+    /// two mappings both labeled `APTED` can still be told apart by *which* heuristic actually
+    /// invoked the tree-edit-distance algorithm to produce them, not just that one did.
+    APTED(&'static str),
     /// Mapping produced by Myers sequence diff on a flat tree (single root, all leaf children).
     FlatSequenceDiff,
     /// A fully-deleted subtree and a byte-identical fully-inserted subtree were paired up after
@@ -493,6 +513,11 @@ pub enum ASTMappingReason {
     /// the other's descendants (see `DICE_THRESHOLD`) that the two nodes were matched too. See
     /// `solve_bottom_up_expansion`.
     BottomUpExpansion,
+    /// Neither node was matched by name, arm structure, or already-matched descendants - instead
+    /// a fast sequence-alignment cost estimate over the two nodes' direct children, gated on a
+    /// shared positional anchor (see `MAX_COST_RATIO`), found them cheap enough to anchor
+    /// together, greedily. See `solve_greedy_anchor_blocks`.
+    GreedyAnchorBlock,
 }
 
 /**
