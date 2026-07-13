@@ -1,0 +1,7183 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "using:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "using:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1",
+        ";:1"
+      ],
+      "after_path": [
+        "using_directive:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:1"
+      ],
+      "after_path": [
+        "using_directive:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        "using:1"
+      ],
+      "after_path": [
+        "using_directive:2",
+        "using:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "using_directive:2",
+        "qualified_name:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:2",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2",
+        ";:1"
+      ],
+      "after_path": [
+        "using_directive:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:2"
+      ],
+      "after_path": [
+        "using_directive:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "using:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "using:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3",
+        ";:1"
+      ],
+      "after_path": [
+        "using_directive:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "using_directive:3"
+      ],
+      "after_path": [
+        "using_directive:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "namespace:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "namespace:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "qualified_name:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "qualified_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "class:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "class:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1",
+        "private:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1",
+        "private:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "set:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "accessor_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1",
+        "accessor_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        "<:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        ">:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1",
+        "type_argument_list:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "generic_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1",
+        "private:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1",
+        "private:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "set:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        "set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "accessor_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2",
+        "accessor_list:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "predefined_type:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "!:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "!:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1",
+        "invocation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1",
+        "prefix_unary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        "arrow_expression_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "predefined_type:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "&&:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "&&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "implicit_parameter:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "implicit_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "==:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "==:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4",
+        "accessor_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "predefined_type:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "get:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "&&:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "&&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "implicit_parameter:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "implicit_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "==:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "==:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1",
+        "member_access_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1",
+        "lambda_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "argument:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "invocation_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "accessor_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5",
+        "accessor_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "property_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "params:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "params:1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1",
+        "[:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1",
+        "]:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1",
+        "array_rank_specifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "array_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "=:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "=:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1",
+        "invocation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "expression_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "constructor_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:1",
+        "public:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:2",
+        "override:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:2",
+        "override:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "modifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "predefined_type:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "if:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "if:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "+:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "+:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "return_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "if_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "return:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "+:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "+:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "member_access_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "invocation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "+:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "+:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "string_literal_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "+:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "+:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "return_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1",
+        "declaration_list:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_declaration:1"
+      ],
+      "after_path": [
+        "namespace_declaration:1"
+      ]
+    }
+  ]
+}

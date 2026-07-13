@@ -2345,7 +2345,7 @@ pub fn for_nodes(
     algorithm: Algorithm,
     source: &'static str,
     diff: &mut ASTDiff,
-) -> Result<()> {
+) {
     let cost_model = UnitCostModel {
         language: before_metadata.language,
     };
@@ -2359,7 +2359,6 @@ pub fn for_nodes(
         source,
         diff,
     );
-    Ok(())
 }
 
 /// Compute the tree edit distance for root nodes, using whichever `algorithm` the caller picks.
@@ -2371,7 +2370,7 @@ pub fn for_roots(
     algorithm: Algorithm,
     source: &'static str,
     diff: &mut ASTDiff,
-) -> Result<()> {
+) {
     // Compute metadata once at the top level
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
@@ -2387,7 +2386,7 @@ pub fn for_roots(
         algorithm,
         source,
         diff,
-    )
+    );
 }
 
 #[cfg(test)]

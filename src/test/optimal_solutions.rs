@@ -48,15 +48,31 @@ mod cpp_godot_small_bugfix;
 #[cfg(test)]
 mod cpp_ladybird_refactor_variables_if_changes;
 #[cfg(test)]
+mod cpp_laydbird_change_function_signature;
+#[cfg(test)]
+mod cpp_libreoffice_add_const;
+#[cfg(test)]
 mod cpp_libreoffice_remove_return_value;
+#[cfg(test)]
+mod cpp_nextcloud_add_test_case;
 #[cfg(test)]
 mod cpp_ollama_add_function_argument;
 #[cfg(test)]
+mod cpp_opencv_add_test_case;
+#[cfg(test)]
 mod cpp_optimize_algorithm;
+#[cfg(test)]
+mod cpp_tensorflow_switch_to_primitive_types;
 #[cfg(test)]
 mod cpp_whitespace_only_change;
 #[cfg(test)]
+mod csharp_jellyfin_sql_query_fix;
+#[cfg(test)]
+mod csharp_sonarr_change_type;
+#[cfg(test)]
 mod css_add_property;
+#[cfg(test)]
+mod css_playwright_add_class_selector;
 #[cfg(test)]
 mod go_lazygit_add_to_if_condition;
 #[cfg(test)]
@@ -95,6 +111,8 @@ mod kotlin_add_validation;
 mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod kotlin_nextcloud_a_few_small_removals;
+#[cfg(test)]
+mod kotlin_nextcloud_change_function_fingerprint;
 #[cfg(test)]
 mod kotlin_nextcloud_remove_function;
 #[cfg(test)]

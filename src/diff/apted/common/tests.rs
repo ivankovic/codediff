@@ -1245,7 +1245,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         // Check if any before node appears in multiple mappings
         let mut before_node_counts = std::collections::HashMap::new();
@@ -1329,7 +1329,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         // The pre-existing match must survive untouched.
         assert_eq!(
@@ -1379,7 +1379,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1412,7 +1412,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1462,7 +1462,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1512,7 +1512,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1549,7 +1549,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1603,7 +1603,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         let before_ast = before.ast.unwrap();
         let after_ast = after.ast.unwrap();
@@ -1711,7 +1711,7 @@
             Algorithm::ZhangShasha,
             "test",
             &mut diff,
-        )?;
+        );
 
         // Root pair should be mapped via flat-tree path.
         let root_mapping = diff

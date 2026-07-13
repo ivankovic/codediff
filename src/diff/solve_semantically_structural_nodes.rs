@@ -16,10 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use std::collections::HashMap;
+use std::mem;
+use std::sync::{Arc, Mutex};
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use rayon::prelude::*;
 
 /// TUNING PARAMETERS for semantically structural node matching.
 /// For matched semantically structural node pairs, only run APTED if at least one side
@@ -178,23 +181,161 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     }
 
     // Pass 0b: Python — class pairs with method pre-matching (mirrors Rust impl recursion).
+    // Process class pairs in parallel since they are independent of each other.
     if matches!(language, Some(Language::Python)) {
-        for ((kind, identifier), &before_class_id) in
-            &before_metadata.semantically_structural_nodes
-        {
-            if kind != "class_definition" {
-                continue;
+        let class_pairs: Vec<_> = before_metadata
+            .semantically_structural_nodes
+            .iter()
+            .filter(|((kind, _), _)| *kind == "class_definition")
+            .filter_map(|((kind, identifier), &before_class_id)| {
+                after_metadata
+                    .semantically_structural_nodes
+                    .get(&(kind.clone(), identifier.clone()))
+                    .map(|&after_class_id| (before_class_id, after_class_id))
+            })
+            .collect();
+
+        if class_pairs.len() > 1 {
+            // Multiple class pairs - process in parallel for better throughput
+            // Take ownership of diff temporarily, wrap in Arc<Mutex>, process, then restore
+            let owned_diff = mem::take(diff);
+            let diff_arc = Arc::new(Mutex::new(owned_diff));
+            
+            class_pairs.par_iter().for_each(|(before_class_id, after_class_id)| {
+                let before_methods = methods_in_class(*before_class_id, &before_metadata);
+                let after_methods = methods_in_class(*after_class_id, &after_metadata);
+                
+                for (method_name, before_method_id) in &before_methods {
+                    if let Some(&after_method_id) = after_methods.get(method_name) {
+                        // Only run APTED on method pairs that warrant it
+                        if should_run_apted(
+                            *before_method_id,
+                            after_method_id,
+                            &before_metadata,
+                            &after_metadata,
+                            &before_depths,
+                            &after_depths,
+                        ) {
+                            let mut guard = diff_arc.lock().unwrap();
+                            apted::for_nodes(
+                                &before_metadata,
+                                &after_metadata,
+                                vec![*before_method_id],
+                                vec![after_method_id],
+                                Algorithm::Apted,
+                                "python_method",
+                                &mut *guard,
+                            );
+                        }
+                    }
+                }
+                // Only run APTED on class pairs that warrant it
+                if should_run_apted(
+                    *before_class_id,
+                    *after_class_id,
+                    &before_metadata,
+                    &after_metadata,
+                    &before_depths,
+                    &after_depths,
+                ) {
+                    let mut guard = diff_arc.lock().unwrap();
+                    apted::for_nodes(
+                        &before_metadata,
+                        &after_metadata,
+                        vec![*before_class_id],
+                        vec![*after_class_id],
+                        Algorithm::Apted,
+                        "python_class",
+                        &mut *guard,
+                    );
+                }
+            });
+            
+            // Extract diff back from Arc
+            *diff = Arc::try_unwrap(diff_arc).unwrap().into_inner().unwrap_or_else(|e| e.into_inner());
+        } else {
+            // Single class pair or none - process sequentially (no parallel overhead)
+            for (before_class_id, after_class_id) in class_pairs {
+                let before_methods = methods_in_class(before_class_id, &before_metadata);
+                let after_methods = methods_in_class(after_class_id, &after_metadata);
+                
+                for (method_name, before_method_id) in &before_methods {
+                    if let Some(&after_method_id) = after_methods.get(method_name) {
+                        // Only run APTED on method pairs that warrant it
+                        if should_run_apted(
+                            *before_method_id,
+                            after_method_id,
+                            &before_metadata,
+                            &after_metadata,
+                            &before_depths,
+                            &after_depths,
+                        ) {
+                            apted::for_nodes(
+                                &before_metadata,
+                                &after_metadata,
+                                vec![*before_method_id],
+                                vec![after_method_id],
+                                Algorithm::Apted,
+                                "python_method",
+                                diff,
+                            );
+                        }
+                    }
+                }
+                // Only run APTED on class pairs that warrant it
+                if should_run_apted(
+                    before_class_id,
+                    after_class_id,
+                    &before_metadata,
+                    &after_metadata,
+                    &before_depths,
+                    &after_depths,
+                ) {
+                    apted::for_nodes(
+                        &before_metadata,
+                        &after_metadata,
+                        vec![before_class_id],
+                        vec![after_class_id],
+                        Algorithm::Apted,
+                        "python_class",
+                        diff,
+                    );
+                }
             }
-            let Some(&after_class_id) = after_metadata
+        }
+    }
+
+    // Pass 1: impl_item pairs — match methods within each matched impl first, then diff the impl.
+    // This is done before the global pass so that method node_ids are in `diff` before any
+    // global function_item entries (which may include these same methods from the DFS traversal)
+    // are processed.
+    //
+    // Process impl pairs in parallel since they are independent of each other.
+    let impl_pairs: Vec<_> = before_metadata
+        .semantically_structural_nodes
+        .iter()
+        .filter(|((kind, _), _)| *kind == "impl_item")
+        .filter_map(|((kind, identifier), &before_impl_id)| {
+            after_metadata
                 .semantically_structural_nodes
                 .get(&(kind.clone(), identifier.clone()))
-            else {
-                continue;
-            };
-            let before_methods = methods_in_class(before_class_id, &before_metadata);
-            let after_methods = methods_in_class(after_class_id, &after_metadata);
+                .map(|&after_impl_id| (before_impl_id, after_impl_id))
+        })
+        .collect();
+
+    if impl_pairs.len() > 1 {
+        // Multiple impl pairs - process in parallel for better throughput
+        // Take ownership of diff temporarily, wrap in Arc<Mutex>, process, then restore
+        let owned_diff = mem::take(diff);
+        let diff_arc = Arc::new(Mutex::new(owned_diff));
+        
+        impl_pairs.par_iter().for_each(|(before_impl_id, after_impl_id)| {
+            let before_methods = methods_in_impl(*before_impl_id, &before_metadata);
+            let after_methods = methods_in_impl(*after_impl_id, &after_metadata);
+
             for (method_name, before_method_id) in &before_methods {
                 if let Some(&after_method_id) = after_methods.get(method_name) {
+                    pre_match_by_path(*before_method_id, after_method_id, &before_metadata, &after_metadata, &mut diff_arc.lock().unwrap());
                     // Only run APTED on method pairs that warrant it
                     if should_run_apted(
                         *before_method_id,
@@ -204,117 +345,153 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                         &before_depths,
                         &after_depths,
                     ) {
-                        let _ = apted::for_nodes(
+                        let mut guard = diff_arc.lock().unwrap();
+                        apted::for_nodes(
                             &before_metadata,
                             &after_metadata,
                             vec![*before_method_id],
                             vec![after_method_id],
                             Algorithm::Apted,
-                            "python_method",
-                            diff,
+                            "impl_method",
+                            &mut *guard,
                         );
                     }
                 }
             }
-            // Only run APTED on class pairs that warrant it
+
+            pre_match_by_path(*before_impl_id, *after_impl_id, &before_metadata, &after_metadata, &mut diff_arc.lock().unwrap());
+            // The method subtrees are now in `diff` and will be pruned by PostorderIndexer.
+            // Only run APTED on impl pairs that warrant it
             if should_run_apted(
-                before_class_id,
-                after_class_id,
+                *before_impl_id,
+                *after_impl_id,
                 &before_metadata,
                 &after_metadata,
                 &before_depths,
                 &after_depths,
             ) {
-                let _ = apted::for_nodes(
+                let mut guard = diff_arc.lock().unwrap();
+                apted::for_nodes(
                     &before_metadata,
                     &after_metadata,
-                    vec![before_class_id],
-                    vec![after_class_id],
+                    vec![*before_impl_id],
+                    vec![*after_impl_id],
                     Algorithm::Apted,
-                    "python_class",
+                    "impl",
+                    &mut *guard,
+                );
+            }
+        });
+        
+        // Extract diff back from Arc
+        *diff = Arc::try_unwrap(diff_arc).unwrap().into_inner().unwrap_or_else(|e| e.into_inner());
+    } else {
+        // Single impl pair or none - process sequentially (no parallel overhead)
+        for (before_impl_id, after_impl_id) in impl_pairs {
+            let before_methods = methods_in_impl(before_impl_id, &before_metadata);
+            let after_methods = methods_in_impl(after_impl_id, &after_metadata);
+
+            for (method_name, before_method_id) in &before_methods {
+                if let Some(&after_method_id) = after_methods.get(method_name) {
+                    pre_match_by_path(*before_method_id, after_method_id, &before_metadata, &after_metadata, diff);
+                    // Only run APTED on method pairs that warrant it
+                    if should_run_apted(
+                        *before_method_id,
+                        after_method_id,
+                        &before_metadata,
+                        &after_metadata,
+                        &before_depths,
+                        &after_depths,
+                    ) {
+                        apted::for_nodes(
+                            &before_metadata,
+                            &after_metadata,
+                            vec![*before_method_id],
+                            vec![after_method_id],
+                            Algorithm::Apted,
+                            "impl_method",
+                            diff,
+                        );
+                    }
+                }
+            }
+
+            pre_match_by_path(before_impl_id, after_impl_id, &before_metadata, &after_metadata, diff);
+            // The method subtrees are now in `diff` and will be pruned by PostorderIndexer.
+            // Only run APTED on impl pairs that warrant it
+            if should_run_apted(
+                before_impl_id,
+                after_impl_id,
+                &before_metadata,
+                &after_metadata,
+                &before_depths,
+                &after_depths,
+            ) {
+                apted::for_nodes(
+                    &before_metadata,
+                    &after_metadata,
+                    vec![before_impl_id],
+                    vec![after_impl_id],
+                    Algorithm::Apted,
+                    "impl",
                     diff,
                 );
             }
         }
     }
 
-    // Pass 1: impl_item pairs — match methods within each matched impl first, then diff the impl.
-    // This is done before the global pass so that method node_ids are in `diff` before any
-    // global function_item entries (which may include these same methods from the DFS traversal)
-    // are processed.
-    for ((kind, identifier), &before_impl_id) in &before_metadata.semantically_structural_nodes {
-        if kind != "impl_item" {
-            continue;
-        }
-        let Some(&after_impl_id) = after_metadata
-            .semantically_structural_nodes
-            .get(&(kind.clone(), identifier.clone()))
-        else {
-            continue;
-        };
-
-        let before_methods = methods_in_impl(before_impl_id, &before_metadata);
-        let after_methods = methods_in_impl(after_impl_id, &after_metadata);
-
-        for (method_name, before_method_id) in &before_methods {
-            if let Some(&after_method_id) = after_methods.get(method_name) {
-                pre_match_by_path(*before_method_id, after_method_id, &before_metadata, &after_metadata, diff);
-                // Only run APTED on method pairs that warrant it
-                if should_run_apted(
-                    *before_method_id,
-                    after_method_id,
-                    &before_metadata,
-                    &after_metadata,
-                    &before_depths,
-                    &after_depths,
-                ) {
-                    let _ = apted::for_nodes(
-                        &before_metadata,
-                        &after_metadata,
-                        vec![*before_method_id],
-                        vec![after_method_id],
-                        Algorithm::Apted,
-                        "impl_method",
-                        diff,
-                    );
-                }
-            }
-        }
-
-        pre_match_by_path(before_impl_id, after_impl_id, &before_metadata, &after_metadata, diff);
-        // The method subtrees are now in `diff` and will be pruned by PostorderIndexer.
-        // Only run APTED on impl pairs that warrant it
-        if should_run_apted(
-            before_impl_id,
-            after_impl_id,
-            &before_metadata,
-            &after_metadata,
-            &before_depths,
-            &after_depths,
-        ) {
-            let _ = apted::for_nodes(
-                &before_metadata,
-                &after_metadata,
-                vec![before_impl_id],
-                vec![after_impl_id],
-                Algorithm::Apted,
-                "impl",
-                diff,
-            );
-        }
-    }
-
     // Pass 2: all other matched pairs (fn, struct, enum, …).
     // Methods already matched in Pass 0b/1 are skipped via filter_before/after_nodes inside
     // for_nodes → resolve_forest.
-    for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
-        if kind == "impl_item" || kind == "class_definition" {
-            continue;
-        }
-        if let Some(&after_node_id) = after_metadata
-            .semantically_structural_nodes
-            .get(&(kind.clone(), identifier.clone()))
-        {
+    //
+    // Process semantic node pairs in parallel since they are independent of each other.
+    let other_pairs: Vec<_> = before_metadata
+        .semantically_structural_nodes
+        .iter()
+        .filter(|((kind, _), _)| *kind != "impl_item" && *kind != "class_definition")
+        .filter_map(|((kind, identifier), &before_node_id)| {
+            after_metadata
+                .semantically_structural_nodes
+                .get(&(kind.clone(), identifier.clone()))
+                .map(|&after_node_id| (before_node_id, after_node_id))
+        })
+        .collect();
+
+    if other_pairs.len() > 1 {
+        // Multiple semantic node pairs - process in parallel for better throughput
+        // Take ownership of diff temporarily, wrap in Arc<Mutex>, process, then restore
+        let owned_diff = mem::take(diff);
+        let diff_arc = Arc::new(Mutex::new(owned_diff));
+        
+        other_pairs.par_iter().for_each(|(before_node_id, after_node_id)| {
+            pre_match_by_path(*before_node_id, *after_node_id, &before_metadata, &after_metadata, &mut diff_arc.lock().unwrap());
+            // Only run APTED if the pair warrants it (big enough or structural differences)
+            if should_run_apted(
+                *before_node_id,
+                *after_node_id,
+                &before_metadata,
+                &after_metadata,
+                &before_depths,
+                &after_depths,
+            ) {
+                let mut guard = diff_arc.lock().unwrap();
+                apted::for_nodes(
+                    &before_metadata,
+                    &after_metadata,
+                    vec![*before_node_id],
+                    vec![*after_node_id],
+                    Algorithm::Apted,
+                    "semantic_node",
+                    &mut *guard,
+                );
+            }
+        });
+        
+        // Extract diff back from Arc
+        *diff = Arc::try_unwrap(diff_arc).unwrap().into_inner().unwrap_or_else(|e| e.into_inner());
+    } else {
+        // Single semantic node pair or none - process sequentially (no parallel overhead)
+        for (before_node_id, after_node_id) in other_pairs {
             pre_match_by_path(before_node_id, after_node_id, &before_metadata, &after_metadata, diff);
             // Only run APTED if the pair warrants it (big enough or structural differences)
             if should_run_apted(
@@ -325,7 +502,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                 &before_depths,
                 &after_depths,
             ) {
-                let _ = apted::for_nodes(
+                apted::for_nodes(
                     &before_metadata,
                     &after_metadata,
                     vec![before_node_id],
@@ -371,7 +548,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             continue; // Has a counterpart — handled by Pass 1/2.
         }
         // No after counterpart: mark this entire subtree as deleted.
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             &before_metadata,
             &after_metadata,
             vec![before_node_id],
@@ -390,7 +567,7 @@ pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &
             continue; // Has a counterpart — handled by Pass 1/2.
         }
         // No before counterpart: mark this entire subtree as inserted.
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             &before_metadata,
             &after_metadata,
             vec![],
@@ -514,7 +691,7 @@ fn solve_flat_macro_bodies(
         let Some(&(after_macro_id, after_tt_id)) = after_macros.get(name) else { continue };
 
         // Diff the flat token_tree bodies — the flat-tree fast path in resolve_forest picks it up.
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             before_metadata,
             after_metadata,
             vec![*before_tt_id],
@@ -524,7 +701,7 @@ fn solve_flat_macro_bodies(
             diff,
         );
         // Diff the macro_invocation wrapper (token_tree body already in diff → pruned).
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             before_metadata,
             after_metadata,
             vec![*before_macro_id],

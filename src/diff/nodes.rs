@@ -108,7 +108,7 @@ pub fn anchor_pair_via_apted(
     reason: ASTMappingReason,
     diff: &mut ASTDiff,
 ) {
-    let _ = apted::for_nodes(
+    apted::for_nodes(
         before_metadata,
         after_metadata,
         vec![before_id],

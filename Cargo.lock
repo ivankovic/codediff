@@ -286,6 +286,7 @@ dependencies = [
  "num_cpus",
  "rand",
  "ratatui",
+ "rayon",
  "regex",
  "rusqlite",
  "serde",

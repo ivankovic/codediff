@@ -125,7 +125,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 
         anchor_matching_arms(before_arms, after_arms, &before_metadata, &after_metadata, diff);
 
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             &before_metadata,
             &after_metadata,
             vec![before_node.id()],
@@ -162,7 +162,7 @@ fn anchor_matching_arms(
         let Some(queue) = after_by_signature.get_mut(signature) else { continue };
         let Some(after_arm_id) = queue.pop_front() else { continue };
 
-        let _ = apted::for_nodes(
+        apted::for_nodes(
             before_metadata,
             after_metadata,
             vec![arm.node_id],
