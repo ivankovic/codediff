@@ -126,6 +126,64 @@
    node `ren`) is untested and may still be worth trying - it wasn't what this attempt built, and
    doesn't have the same "can't distinguish near-duplicate from renamed" problem since a leaf
    rename *is* exactly the "same entity, edited" case by construction.
+   TRIED AND REVERTED (2026-07-15), the leaf-level variant flagged above as worth trying: graduated
+   `UnitCostModel::ren`'s same-kind-different-text *leaf* cost (identifiers/generic tokens) by
+   `nodes::leaf_texts_similar`'s underlying character-bigram Dice ratio (exposed as
+   `nodes::leaf_text_dice_ratio`), instead of the flat `COST_UPDATE` every such pair paid before.
+   Motivated by a real, confirmed gap: `kotlin-nextcloud-change-function-fingerprint` and
+   `kotlin-refactor-function` both exhibit a same-kind-leaf multi-candidate tie under
+   `reason APTED("final_pass")` (raw DP cost, not a named heuristic) when a parameter is inserted
+   mid-signature and every later parameter shifts by one slot.
+   **Headroom problem, found before implementing:** flat unit costs (`COST_UPDATE = 1`,
+   `COST_DELETE + COST_INSERT = 2`) leave no room to grade between "always rename" and "ties
+   replace" - a naive 2-tier integer split ties the cheap tier with outright delete+insert and
+   flips clear renames like `fetch_user` -> `fetch_user_data` (Dice ~0.78) into the penalized tier.
+   Fixed by giving `UnitCostModel::del`/`ins`/`ren` their own internal `REN_SCALE` (x100), used only
+   inside those three methods - APTED's search only ever compares costs relatively, so the absolute
+   scale is free, and this bought room to grade leaf-rename cost within `(LEAF_RENAME_MIN_COST,
+   LEAF_RENAME_MAX_COST)` while staying strictly below the rescaled `del()+ins()`.
+   **Two latent leaks the rescale surfaced, both fixed before benchmarking (still relevant if anyone
+   revisits internal cost rescaling here):** (1) `FORBIDDEN_RENAME_COST`/`ren`'s different-kinds
+   branch had been hardcoded from the raw, un-rescaled `COST_DELETE + COST_INSERT + 1` - left as-is,
+   the containment veto (`ContainmentCtx::adjust`) would have gone inert (nearly every rescaled cost
+   now exceeds the stale sentinel) or, worse, inverted into the DP's *preferred* option. (2)
+   `add_prune_mappings`'s `subtree_del_cost`/`subtree_ins_cost` and `classify_match`'s
+   disallowed-cross-kind branch called `cost_model.del/ins/ren` directly to populate *reported*
+   `ASTMapping.cost` - not just APTED's internal search - so the rescale leaked a 100x inflation
+   into real mapping costs (`cargo test`'s `test_hello_world_added_message` et al. went from
+   asserting `cost == 12` to actually getting `1200`). Fixed by pointing those reporting call sites
+   at the flat `COST_DELETE`/`COST_INSERT`/`COST_UPDATE` constants directly, decoupled from
+   `UnitCostModel`'s internal search scale - the same split `cost.rs::operation_cost` and
+   `classify_match`'s leaf-update branch already had, just extended to the two sites that had been
+   silently sharing the search-time model instead.
+   **Result:** the two motivating fixtures moved by exactly **zero** mismatches each (31->31,
+   64->64) - the graduation never engaged for them, because the human-correct pairs in both
+   (`capability`->`capability`, `showTaskActions`->`showTaskActions`) are text-*identical*, so `ren`
+   was already returning 0 under the old flat model too; the actual gap is elsewhere in how the
+   surrounding shifted structure gets scored, not in leaf-rename cost. Across the full 86-fixture
+   corpus: 5 regressed (`rust-firefox-webrenderer-borders` +8, `go-user-slices-library` +6,
+   `cpp-optimize-algorithm` 0->5, `rust-zed-workspace-tasks` +3,
+   `cpp-laydbird-change-function-signature` +1) against 2 improved (`c-nginx-add-typedef` -15,
+   `cpp-ladybird-refactor-variables-if-changes` -2) - net **+6** mismatches, and
+   `cpp-optimize-algorithm` went from a *previously-perfect* 0-mismatch fixture to 5. Checked via
+   `--details`: real content mismatches (a `return_statement` deleted wholesale despite an identical
+   counterpart existing; an `identifier` cross-matched to an unrelated `field_identifier`), not
+   punctuation ties - same failure signature as the container-level attempt above (a previously-good
+   tie-break gets upended by a signal that's live but mistargeted). Also measurably slower: the full
+   corpus benchmark went from under 2 minutes to 5.6+ minutes in `--release`, since every same-kind
+   different-text leaf comparison now does a bigram-hashset computation instead of a constant
+   lookup, on a hot path (`ren` is called extremely often during APTED's search).
+   Reverted in full (`nodes::leaf_text_dice_ratio` extraction, `UnitCostModel`'s `REN_SCALE`/graded
+   leaf branch, the reporting-path decoupling in `subtree_del_cost`/`subtree_ins_cost`/
+   `classify_match` - the last of these was only needed *because* of the rescale, so it reverts too
+   rather than being kept as drive-by cleanup). Whoever picks this up next: the mechanism itself
+   works exactly as designed (it's what produced `c-nginx-add-typedef`'s -15 and
+   `cpp-optimize-algorithm`'s regression alike) - the premise that failed is that leaf-rename cost
+   was the right place to look for the `kotlin-nextcloud-change-function-fingerprint`-style gap.
+   That gap needs a signal sensitive to the *shifted-position* structure, not leaf text similarity,
+   since the correct leaf pairs there were already free matches. Separately, `c-nginx-add-typedef`'s
+   -15 is a real, unexplained win worth investigating on its own before reusing this mechanism -
+   just not sufficient by itself to justify the net regression and perf cost of shipping it broadly.
 
 # Next features to implement
 

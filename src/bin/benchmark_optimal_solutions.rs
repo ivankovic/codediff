@@ -85,8 +85,8 @@ fn reason_column_label(reason: &ASTMappingReason) -> String {
 /// by its `ASTMappingReason` column label (see `reason_column_label`) - i.e. which algorithm pass
 /// (and, for APTED, which call site) is responsible for how much of the diff. Independent of
 /// `human_mapping.json`, so this works for "unsolved" fixtures too.
-fn reason_counts_for(before: &Code, after: &Code) -> HashMap<String, usize> {
-    let diff = codediff::diff::diff_code(before, after);
+fn reason_counts_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> HashMap<String, usize> {
+    let diff = codediff::diff::diff_code_with_config(before, after, config);
     let mut counts = HashMap::new();
     if let Some(diff_ast) = diff.ast {
         for mapping in diff_ast.mapping.values() {
@@ -138,8 +138,8 @@ fn active_reason_columns(rows: &[Row]) -> Vec<String> {
 /// `human_mapping::compute_mismatches_for`: this binary already re-diffs per computation (see
 /// `total_node_count_for`'s own re-walk), and a shared-run refactor isn't worth the complexity for
 /// a benchmark tool that's run interactively, not in a hot loop.
-fn algorithm_cost_for(before: &Code, after: &Code) -> u64 {
-    let diff = codediff::diff::diff_code(before, after);
+fn algorithm_cost_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> u64 {
+    let diff = codediff::diff::diff_code_with_config(before, after, config);
     let Some(diff_ast) = diff.ast else {
         return 0;
     };
@@ -163,6 +163,132 @@ struct Args {
     /// Output results as a CSV file. Default path: "./research/optimal_solutions_benchmark.csv"
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
+
+    /// Enable the identical-full-hash pass (default; see `--no-solver-identical-trees`).
+    #[arg(long = "solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_identical_trees")]
+    solver_identical_trees: bool,
+    /// Disable `solve_identical_trees` (byte-identical-subtree matching) for the ablation study.
+    #[arg(long = "no-solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_trees")]
+    no_solver_identical_trees: bool,
+
+    /// Enable the structural-hash pass (default; see `--no-solver-structurally-identical-trees`).
+    #[arg(long = "solver-structurally-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_structurally_identical_trees")]
+    solver_structurally_identical_trees: bool,
+    /// Disable `solve_structurally_identical_trees` (same-shape, differing-leaves matching).
+    #[arg(long = "no-solver-structurally-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_structurally_identical_trees")]
+    no_solver_structurally_identical_trees: bool,
+
+    /// Enable the commutative-structural pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-commutative-structural-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_commutative_structural_trees")]
+    solver_commutative_structural_trees: bool,
+    /// Disable `solve_commutative_structural_trees` (reordered-children matching).
+    #[arg(long = "no-solver-commutative-structural-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_commutative_structural_trees")]
+    no_solver_commutative_structural_trees: bool,
+
+    /// Enable the multi-level normalized-hash pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-multilevel-hash", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_multilevel_hash")]
+    solver_multilevel_hash: bool,
+    /// Disable `solve_multilevel_hash` (punctuation/literal/identifier-normalized matching).
+    #[arg(long = "no-solver-multilevel-hash", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_multilevel_hash")]
+    no_solver_multilevel_hash: bool,
+
+    /// Enable the import-path-normalization pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_import_nodes")]
+    solver_import_nodes: bool,
+    /// Disable `solve_import_nodes` (normalized-import-path matching).
+    #[arg(long = "no-solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_import_nodes")]
+    no_solver_import_nodes: bool,
+
+    /// Enable the comment-sibling pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-comment-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_comment_nodes")]
+    solver_comment_nodes: bool,
+    /// Disable `solve_comment_nodes` (comment-precedes-matched-node matching).
+    #[arg(long = "no-solver-comment-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_comment_nodes")]
+    no_solver_comment_nodes: bool,
+
+    /// Enable the semantically-structural (name-keyed) pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_semantically_structural_nodes")]
+    solver_semantically_structural_nodes: bool,
+    /// Disable `solve_semantically_structural_nodes` (fn/class/impl/struct/enum name matching).
+    #[arg(long = "no-solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_semantically_structural_nodes")]
+    no_solver_semantically_structural_nodes: bool,
+
+    /// Enable MatchSimilarFlowControl (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_similar_flow_control")]
+    solver_similar_flow_control: bool,
+    /// Disable `solve_similar_flow_control` (if/switch/match arm-overlap matching).
+    #[arg(long = "no-solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_similar_flow_control")]
+    no_solver_similar_flow_control: bool,
+
+    /// Enable MatchIdenticalDiagnosticStatements (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-identical-diagnostic-statements", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_identical_diagnostic_statements")]
+    solver_identical_diagnostic_statements: bool,
+    /// Disable `solve_identical_diagnostic_statements` (identical logging/bail/assert matching).
+    #[arg(long = "no-solver-identical-diagnostic-statements", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_diagnostic_statements")]
+    no_solver_identical_diagnostic_statements: bool,
+
+    /// Enable BottomUpExpansion (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_bottom_up_expansion")]
+    solver_bottom_up_expansion: bool,
+    /// Disable `solve_bottom_up_expansion` (Dice-coefficient descendant-driven matching).
+    #[arg(long = "no-solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_expansion")]
+    no_solver_bottom_up_expansion: bool,
+
+    /// Enable GreedyAnchorBlock (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-greedy-anchor-blocks", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_greedy_anchor_blocks")]
+    solver_greedy_anchor_blocks: bool,
+    /// Disable `solve_greedy_anchor_blocks` (cost-estimate anchoring of anonymous containers).
+    #[arg(long = "no-solver-greedy-anchor-blocks", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_greedy_anchor_blocks")]
+    no_solver_greedy_anchor_blocks: bool,
+
+    /// Enable the final full-tree APTED pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-final-apted", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_final_apted")]
+    solver_final_apted: bool,
+    /// Disable the final `apted::for_roots` pass. Expect mismatch counts to explode: this is the
+    /// only pass with no name/hash/positional anchor requirement, so almost everything still
+    /// unmatched by this point relies on it.
+    #[arg(long = "no-solver-final-apted", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_final_apted")]
+    no_solver_final_apted: bool,
+
+    /// Enable Pass 3's orphaned-semantic-node cleanup (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-orphaned-semantic-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_orphaned_semantic_nodes")]
+    solver_orphaned_semantic_nodes: bool,
+    /// Disable `solve_orphaned_semantic_nodes` (post-APTED semantic-node delete/insert cleanup).
+    #[arg(long = "no-solver-orphaned-semantic-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_orphaned_semantic_nodes")]
+    no_solver_orphaned_semantic_nodes: bool,
+
+    /// Enable MoveDetectionRecovery (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_moved_subtrees")]
+    solver_moved_subtrees: bool,
+    /// Disable `solve_moved_subtrees` (deleted+inserted identical-subtree move pairing).
+    #[arg(long = "no-solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_moved_subtrees")]
+    no_solver_moved_subtrees: bool,
+}
+
+/// Resolves `Args`' 14 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
+/// wins whenever the two disagree at the end of parsing (see the flag pair's `overrides_with`,
+/// verified against clap's actual last-flag-wins behavior before this was stamped out 14 times).
+fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
+    codediff::diff::HeuristicConfig {
+        solver_identical_trees: args.solver_identical_trees && !args.no_solver_identical_trees,
+        solver_structurally_identical_trees: args.solver_structurally_identical_trees
+            && !args.no_solver_structurally_identical_trees,
+        solver_commutative_structural_trees: args.solver_commutative_structural_trees
+            && !args.no_solver_commutative_structural_trees,
+        solver_multilevel_hash: args.solver_multilevel_hash && !args.no_solver_multilevel_hash,
+        solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
+        solver_comment_nodes: args.solver_comment_nodes && !args.no_solver_comment_nodes,
+        solver_semantically_structural_nodes: args.solver_semantically_structural_nodes
+            && !args.no_solver_semantically_structural_nodes,
+        solver_similar_flow_control: args.solver_similar_flow_control && !args.no_solver_similar_flow_control,
+        solver_identical_diagnostic_statements: args.solver_identical_diagnostic_statements
+            && !args.no_solver_identical_diagnostic_statements,
+        solver_bottom_up_expansion: args.solver_bottom_up_expansion && !args.no_solver_bottom_up_expansion,
+        solver_greedy_anchor_blocks: args.solver_greedy_anchor_blocks && !args.no_solver_greedy_anchor_blocks,
+        solver_final_apted: args.solver_final_apted && !args.no_solver_final_apted,
+        solver_orphaned_semantic_nodes: args.solver_orphaned_semantic_nodes && !args.no_solver_orphaned_semantic_nodes,
+        solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
+    }
 }
 
 struct Row {
@@ -191,7 +317,7 @@ struct Row {
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
 /// the before path (inserts, having none, sort last).
-fn dump_mapping(name: &str) -> Result<()> {
+fn dump_mapping(name: &str, config: &codediff::diff::HeuristicConfig) -> Result<()> {
     use codediff::test::helper::path_for_node;
 
     let test_diffs = helper::handmade_test_code_pairs()?;
@@ -200,7 +326,7 @@ fn dump_mapping(name: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("no before/after test code pair found for '{}'", name))?
         .clone();
 
-    let diff = codediff::diff::diff_code(&before, &after);
+    let diff = codediff::diff::diff_code_with_config(&before, &after, config);
     let ast = diff.ast.expect("diff has AST");
 
     let before_ast = before.ast.as_ref().expect("before parsed");
@@ -237,12 +363,13 @@ fn dump_mapping(name: &str) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    let config = config_from_args(&args);
 
     if let Some(name) = args.details {
         if !human_mapping::mapping_path(&name).exists() {
             bail!("fixture '{}' has no human_mapping.json", name);
         }
-        let mismatches = human_mapping::compute_mismatches(&name)?;
+        let mismatches = human_mapping::compute_mismatches_with_config(&name, &config)?;
         println!("{}: {} mismatch(es)", name, mismatches.len());
         for m in &mismatches {
             println!("  {}", m);
@@ -251,7 +378,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(name) = args.dump {
-        return dump_mapping(&name);
+        return dump_mapping(&name, &config);
     }
 
     let test_diffs = helper::handmade_test_code_pairs()?;
@@ -261,8 +388,8 @@ fn main() -> Result<()> {
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
-        let reason_counts = reason_counts_for(before, after);
-        let algorithm_cost = algorithm_cost_for(before, after);
+        let reason_counts = reason_counts_for(before, after, &config);
+        let algorithm_cost = algorithm_cost_for(before, after, &config);
 
         if !human_mapping::mapping_path(name).exists() {
             rows.push(Row {
@@ -274,7 +401,7 @@ fn main() -> Result<()> {
             });
             continue;
         }
-        let mismatches = human_mapping::compute_mismatches_for(name, before, after)?;
+        let mismatches = human_mapping::compute_mismatches_for_with_config(name, before, after, &config)?;
         let total_nodes = human_mapping::total_node_count_for(before, after);
         let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
         rows.push(Row {

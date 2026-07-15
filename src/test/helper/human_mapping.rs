@@ -460,13 +460,19 @@ fn check_entry(
 /// directly comparable.
 type PathKeyedMapping = HashMap<(Vec<String>, Vec<String>), ASTMappingOperation>;
 
-/// Runs `diff_code` on a *fresh* parse of `before_source`/`after_source` and returns its mapping
-/// keyed by path. Parsing fresh (rather than reusing an already-parsed `Code`) is the point: it's
-/// what actually reproduces the arena-layout variation a separate process launch would see.
-fn diff_paths(before_source: &str, after_source: &str, language: &crate::code::Language) -> PathKeyedMapping {
+/// Runs `diff_code_with_config` on a *fresh* parse of `before_source`/`after_source` and returns
+/// its mapping keyed by path. Parsing fresh (rather than reusing an already-parsed `Code`) is the
+/// point: it's what actually reproduces the arena-layout variation a separate process launch
+/// would see. See [`crate::diff::HeuristicConfig`] for what `config` is for.
+fn diff_paths_with_config(
+    before_source: &str,
+    after_source: &str,
+    language: &crate::code::Language,
+    config: &crate::diff::HeuristicConfig,
+) -> PathKeyedMapping {
     let before = crate::code::Code::from_string(before_source, language);
     let after = crate::code::Code::from_string(after_source, language);
-    let diff = crate::diff::diff_code(&before, &after);
+    let diff = crate::diff::diff_code_with_config(&before, &after, config);
     let node_cache = NodeCache::build(&before, &after);
     let diff_ast = diff.ast.expect("Diff has no AST");
 
@@ -517,15 +523,27 @@ fn describe_path_map_differences(
 
 /// Compares three independently-parsed `diff_code` runs of the same before/after source and
 /// describes every point of disagreement (empty if all three fully agree).
+#[cfg(test)]
 fn describe_nondeterminism(
     before_source: &str,
     after_source: &str,
     language: &crate::code::Language,
 ) -> Vec<String> {
-    let baseline = diff_paths(before_source, after_source, language);
+    describe_nondeterminism_with_config(before_source, after_source, language, &crate::diff::HeuristicConfig::default())
+}
+
+/// Same as [`describe_nondeterminism`], but computes each of the three independent runs via
+/// [`diff_paths_with_config`] - see [`crate::diff::HeuristicConfig`] for what `config` is for.
+fn describe_nondeterminism_with_config(
+    before_source: &str,
+    after_source: &str,
+    language: &crate::code::Language,
+    config: &crate::diff::HeuristicConfig,
+) -> Vec<String> {
+    let baseline = diff_paths_with_config(before_source, after_source, language, config);
     let mut mismatches = Vec::new();
     for run_number in 2..=3 {
-        let repeat = diff_paths(before_source, after_source, language);
+        let repeat = diff_paths_with_config(before_source, after_source, language, config);
         mismatches.extend(describe_path_map_differences(run_number, &baseline, &repeat));
     }
     mismatches
@@ -548,11 +566,18 @@ fn describe_nondeterminism(
 * fixture, not a single pass/fail).
 */
 pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
+    compute_mismatches_with_config(name, &crate::diff::HeuristicConfig::default())
+}
+
+/// Same as [`compute_mismatches`], but forwards `config` to [`compute_mismatches_for_with_config`]
+/// - see [`crate::diff::HeuristicConfig`] for what it's for. Used by
+/// `benchmark_optimal_solutions --details --no-solver-X`.
+pub fn compute_mismatches_with_config(name: &str, config: &crate::diff::HeuristicConfig) -> Result<Vec<String>> {
     let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs
         .get(name)
         .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
-    compute_mismatches_for(name, before, after)
+    compute_mismatches_for_with_config(name, before, after, config)
 }
 
 /**
@@ -577,14 +602,26 @@ pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Cod
 }
 
 pub fn compute_mismatches_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<Vec<String>> {
+    compute_mismatches_for_with_config(name, before, after, &crate::diff::HeuristicConfig::default())
+}
+
+/// Same as [`compute_mismatches_for`], but computes codediff's diff (and its determinism check)
+/// via [`crate::diff::diff_code_with_config`] - see [`crate::diff::HeuristicConfig`] for what
+/// `config` is for. Used by `benchmark_optimal_solutions --no-solver-X`'s ablation study.
+pub fn compute_mismatches_for_with_config(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<Vec<String>> {
     let mapping = load(name)?;
 
-    let diff = crate::diff::diff_code(before, after);
+    let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
 
     let node_cache = NodeCache::build(before, after);
     let language = before.metadata.language.unwrap_or_default();
-    let mut mismatches = describe_nondeterminism(&before.contents, &after.contents, &language);
+    let mut mismatches = describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config);
 
     // Check that the produced diff is valid
     if !diff_ast.is_valid(before, after, &node_cache) {

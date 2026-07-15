@@ -159,8 +159,23 @@ impl Diff {
      * This is the main entry point in the AST diffing algorithm.
      * The algorithm is encoded in the code and is intentionally not explained in the Doccomment to
      * avoid it going stale. Please see the code.
+     *
+     * Thin wrapper around [`Diff::from_code_with_config`] with every heuristic enabled - see that
+     * function for the actual pipeline and [`HeuristicConfig`] for the per-pass on/off switches.
      */
     pub fn from_code(before: &Code, after: &Code) -> Self {
+        Self::from_code_with_config(before, after, &HeuristicConfig::default())
+    }
+
+    /**
+     * Same as [`Diff::from_code`], but lets the caller disable individual passes via `config` -
+     * built for `benchmark_optimal_solutions --no-solver-X`'s ablation study (see `ablation_study.sh`),
+     * so each pass's actual contribution to accuracy can be measured by removing it and nothing
+     * else. Not intended for production use: disabling a pass changes the diff's quality, not just
+     * its performance, and later passes' doc comments (below) assume every earlier pass already
+     * ran - `HeuristicConfig::default()` (i.e. plain `from_code`) is what every real caller wants.
+     */
+    pub fn from_code_with_config(before: &Code, after: &Code, config: &HeuristicConfig) -> Self {
         // Build node cache for efficient lookup
         let node_cache = NodeCache::build(before, after);
 
@@ -171,39 +186,55 @@ impl Diff {
 
         // These are highly efficient for small diffs, and small diffs are half of all
         // diffs.
-        solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
-        solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_identical_trees {
+            solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
+        }
+        if config.solver_structurally_identical_trees {
+            solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // Commutative structural matching: match nodes that have the same structure but with children
         // in different orders (e.g., reordered enum variants, struct fields, import statements).
         // Runs after regular structural matching to catch reorderings that the strict structural
         // hash (which considers child order) would miss.
-        solve_commutative_structural_trees::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_commutative_structural_trees {
+            solve_commutative_structural_trees::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // Multi-level normalized hash matching: match nodes that have the same structure but differ
         // in punctuation, literals, or identifiers. This runs after structural matching to catch
         // cases where only these specific elements have changed.
-        solve_multilevel_hash::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_multilevel_hash {
+            solve_multilevel_hash::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // Import path normalization and matching: match import statements by normalized path
         // (quotes stripped, separators normalized, relative import prefixes handled) rather than
         // syntax. This allows the algorithm to recognize that imports with different formatting
         // but the same path are actually the same. Runs after hash matching so that
         // path-normalized matches can be established before later passes build on them.
-        solve_import_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_import_nodes {
+            solve_import_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // Match comment nodes that immediately precede already-matched nodes. Runs after hash
         // and structural matching to take advantage of nodes already matched by those passes.
         // This reduces the workload for the final, slow tree edit distance algorithm.
-        solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_comment_nodes {
+            solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // These speed up the diff, but don't guaranteed an optimal solution
-        solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_semantically_structural_nodes {
+            solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // MatchSimilarFlowControl: before orphaned semantic nodes are blanket-marked as deleted/
         // inserted below, pair up still-unmatched match/switch constructs whose arm patterns
         // overlap enough to be "the same shape", and anchor the matching arms.
-        solve_similar_flow_control::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_similar_flow_control {
+            solve_similar_flow_control::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // MatchIdenticalDiagnosticStatements: mop up any still-unmatched logging/bail/assert/debug
         // -printf style statements that are byte-for-byte identical on both sides. Runs after every
@@ -211,13 +242,17 @@ impl Diff {
         // made in one piece, but before the orphan blanket-delete below so it can still find such
         // statements inside a function/impl that has no same-named counterpart - see that pass's
         // doc comment for the full reasoning.
-        solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_identical_diagnostic_statements {
+            solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // Last chance for BottomUpExpansion before the final APTED pass. A container with no
         // same-named counterpart but a mostly-matched body (e.g. a rename plus a small internal edit)
         // is exactly what would otherwise be destroyed by the final APTED pass and this sweep can
         // still rescue.
-        solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_bottom_up_expansion {
+            solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // GreedyAnchorBlock: last heuristic before the final APTED pass. Anything still unmatched
         // here has no name, no arm structure, and no already-matched children for a Dice
@@ -229,21 +264,25 @@ impl Diff {
         // greedily anchors whichever pairs are cheap enough. Anchoring cheaply here shrinks the
         // residual forest the much slower exact algorithm below has to grind through - see that
         // pass's doc comment.
-        solve_greedy_anchor_blocks::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_greedy_anchor_blocks {
+            solve_greedy_anchor_blocks::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         // This is the final, slow algorithm.
         // The more nodes are already matched, the faster it is.
         // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
         // containment-aware, so it now runs unconditionally instead of demoting itself back to
         // Zhang-Shasha on forests with real containment constraints - see src/diff/TODO.md.
-        let _ = apted::for_roots(
-            before,
-            after,
-            &node_cache,
-            apted::Algorithm::Apted,
-            "final_pass",
-            &mut ast_diff,
-        );
+        if config.solver_final_apted {
+            let _ = apted::for_roots(
+                before,
+                after,
+                &node_cache,
+                apted::Algorithm::Apted,
+                "final_pass",
+                &mut ast_diff,
+            );
+        }
 
         // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
         // (no same-named counterpart, and not claimed by any heuristic or the final APTED pass)
@@ -257,23 +296,78 @@ impl Diff {
         // could have found a good match, but the premature orphan handling prevented this.
         //
         // Now APTED runs first, and only nodes that APTED itself couldn't match are marked as orphans.
-        solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
-            before,
-            after,
-            &node_cache,
-            &mut ast_diff,
-        );
+        if config.solver_orphaned_semantic_nodes {
+            solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
+                before,
+                after,
+                &node_cache,
+                &mut ast_diff,
+            );
+        }
 
         // MoveDetectionRecovery: dead last, after every pass above has had first claim on all
         // content - pairs up byte-identical subtrees that ended the pipeline as a wholly-deleted
         // + wholly-inserted couple (i.e. code that moved, which ordered tree edit distance can
         // only express as delete+insert). See that pass's doc comment for the guardrails.
-        solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
+        if config.solver_moved_subtrees {
+            solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
+        }
 
         Self {
             ast: Some(ast_diff),
             language: before.metadata.language.unwrap_or(Language::Unknown),
             text: None,
+        }
+    }
+}
+
+/**
+* Per-pass on/off switches for [`Diff::from_code_with_config`], one field per distinct heuristic/
+* algorithm step in the pipeline (in the same order they run). Every field defaults to `true`
+* ([`HeuristicConfig::default`]) - that default is what plain [`Diff::from_code`]/[`diff_code`]
+* use, and is the only configuration any production caller should need.
+*
+* Exists for the ablation study in `ablation_study.sh` (via `benchmark_optimal_solutions
+* --no-solver-X`): disabling exactly one pass and comparing accuracy against the all-enabled
+* baseline measures that pass's actual contribution, the way no amount of reading
+* `ASTMappingReason` counts can (several passes share a reason, or emit none of their own - see
+* that enum's doc comments).
+*/
+#[derive(Debug, Clone, Copy)]
+pub struct HeuristicConfig {
+    pub solver_identical_trees: bool,
+    pub solver_structurally_identical_trees: bool,
+    pub solver_commutative_structural_trees: bool,
+    pub solver_multilevel_hash: bool,
+    pub solver_import_nodes: bool,
+    pub solver_comment_nodes: bool,
+    pub solver_semantically_structural_nodes: bool,
+    pub solver_similar_flow_control: bool,
+    pub solver_identical_diagnostic_statements: bool,
+    pub solver_bottom_up_expansion: bool,
+    pub solver_greedy_anchor_blocks: bool,
+    pub solver_final_apted: bool,
+    pub solver_orphaned_semantic_nodes: bool,
+    pub solver_moved_subtrees: bool,
+}
+
+impl Default for HeuristicConfig {
+    fn default() -> Self {
+        Self {
+            solver_identical_trees: true,
+            solver_structurally_identical_trees: true,
+            solver_commutative_structural_trees: true,
+            solver_multilevel_hash: true,
+            solver_import_nodes: true,
+            solver_comment_nodes: true,
+            solver_semantically_structural_nodes: true,
+            solver_similar_flow_control: true,
+            solver_identical_diagnostic_statements: true,
+            solver_bottom_up_expansion: true,
+            solver_greedy_anchor_blocks: true,
+            solver_final_apted: true,
+            solver_orphaned_semantic_nodes: true,
+            solver_moved_subtrees: true,
         }
     }
 }
@@ -604,6 +698,12 @@ impl ASTMappingReason {
 */
 pub fn diff_code(before: &Code, after: &Code) -> Diff {
     Diff::from_code(before, after)
+}
+
+/// Same as [`diff_code`], but forwards `config` to [`Diff::from_code_with_config`] - see that
+/// function and [`HeuristicConfig`] for what it's for.
+pub fn diff_code_with_config(before: &Code, after: &Code, config: &HeuristicConfig) -> Diff {
+    Diff::from_code_with_config(before, after, config)
 }
 
 #[cfg(test)]
