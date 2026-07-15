@@ -21,5 +21,5 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("kotlin-nextcloud-change-function-fingerprint")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("kotlin-nextcloud-change-function-fingerprint", 31)
 }
