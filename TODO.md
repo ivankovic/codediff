@@ -379,3 +379,33 @@ a real git fixture) plus a clean compile, not by a manual run against a real lar
    suite, not just this one case), or (c) reconsider whether this particular hand-authored ground
    truth is asking for algorithmic/semantic understanding that's out of scope for an AST-structural
    differ.
+
+*  `cpp-ladybird-refactor-variables-if-changes` (optimal_solutions test, investigated 2026-07-16,
+   no code changed): same class of gap as `rust-algorithm-change` above, not a bug. Before has
+   `auto& svg_graphics_element = as<SVG::SVGGraphicsElement>(*dom_node); auto active_view_box =
+   svg_graphics_element.active_view_box();`; after replaces this with an `if`/`else if` chain
+   (`if (auto* svg_graphics_element = as_if<SVG::SVGGraphicsElement>(*dom_node)) active_view_box =
+   svg_graphics_element->active_view_box(); else if (...) ...`). The human mapping deletes the two
+   old declarations wholesale and inserts the new `if`/`else if` chain wholesale. codediff instead
+   reuses the shared type name/call shape/`*dom_node` argument, matching the old assignment into
+   the new `if` condition - cheaper under unit cost, so this is the DP finding the objectively
+   lower-cost mapping, not losing a tie. Confirmed two ways: (1) `algorithm_cost` (660) <
+   `human_cost` (711) in the benchmark CSV - codediff's mapping is provably cheaper, so a cost
+   function that better approximates true edit distance moves *away* from the human mapping here,
+   not toward it; (2) `--no-solver-greedy-anchor-blocks --details` on this fixture still gives 109
+   mismatches unchanged - the plain final-APTED pass independently finds the same reuse under the
+   same unit-cost model, so this isn't a `solve_greedy_anchor_blocks` candidate-selection bug either.
+   The actual lever would be `UnitCostModel::ren`/`del`/`ins` in `apted/common.rs` (the search-time
+   model `for_nodes` actually uses), not `cost.rs` (post-hoc reporting only, never consulted during
+   matching). Already-tried, already-reverted cost-model levers in this exact space: the leaf-text-
+   Dice-graduation attempt above and the container-dissimilarity-cost attempt (see git history/prior
+   TODO revisions) - both failed for the same reason ("text similarity can't distinguish
+   near-duplicate from same-entity-edited"), and neither would even engage here since the reused
+   text genuinely *is* near-identical (`SVG::SVGGraphicsElement`, `*dom_node`, `active_view_box` all
+   literally recur). The one untested, structurally different lever: a relocation penalty for reuse
+   across a changed control-flow-kind ancestor path (assignment -> if/else chain) - deliberately
+   sacrifices edit-distance minimality for human-diff-readability rather than better approximating
+   it, so it needs its own careful validation the same way (b) above does, not a quick tweak.
+   Decision: dropped, not pursued - single fixture, and codediff's mapping (reusing `as<T>(x)` ->
+   `as_if<T>(x)`) is arguably a defensible diff on its own merits, not obviously worse for review
+   than the human's wholesale rewrite framing.
