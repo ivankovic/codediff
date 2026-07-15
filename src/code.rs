@@ -275,6 +275,28 @@ pub struct ASTMetadata {
     /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node ids>. See
     /// `full_hash_to_node` for why this is a `Vec`, not a `HashSet`.
     pub structural_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Map of node->hash. The hash is a commutative structural hash, like structural hash but
+    /// with children sorted for commutative containers (e.g., enum variants, struct fields,
+    /// import lists). This allows matching of reordered but semantically identical containers.
+    pub node_to_commutative_structural_hash: HashMap<usize, u64>,
+    /// Reverse map to node_to_commutative_structural_hash, going from <commutative structural hash> -> <node ids>.
+    pub commutative_structural_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Multi-level normalized hashes: Level 2 - structural hash ignoring punctuation/whitespace.
+    pub node_to_normalized_punct_hash: HashMap<usize, u64>,
+    /// Reverse map for Level 2 normalized hash.
+    pub normalized_punct_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Multi-level normalized hashes: Level 3 - structural hash with normalized literals.
+    pub node_to_normalized_literal_hash: HashMap<usize, u64>,
+    /// Reverse map for Level 3 normalized hash.
+    pub normalized_literal_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Multi-level normalized hashes: Level 4 - structural hash with placeholder identifiers.
+    pub node_to_normalized_identifier_hash: HashMap<usize, u64>,
+    /// Reverse map for Level 4 normalized hash.
+    pub normalized_identifier_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Multi-level normalized hashes: Level 5 - structural hash ignoring punctuation + literals.
+    pub node_to_normalized_punct_literal_hash: HashMap<usize, u64>,
+    /// Reverse map for Level 5 normalized hash.
+    pub normalized_punct_literal_hash_to_node: HashMap<u64, Vec<usize>>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: HashMap<usize, usize>,
     /// node.id() -> depth (root = 0, its children = 1, ...)

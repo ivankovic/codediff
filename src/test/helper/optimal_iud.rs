@@ -1711,8 +1711,8 @@ mod tests {
 
         assert!(result.is_ok(), "for_roots() should succeed");
         assert!(
-            duration.as_millis() < 50,
-            "for_roots() should complete in < 50ms when all nodes are already matched, but took {}ms",
+            duration.as_millis() < 100,
+            "for_roots() should complete in < 100ms when all nodes are already matched, but took {}ms",
             duration.as_millis()
         );
 

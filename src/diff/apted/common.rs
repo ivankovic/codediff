@@ -20,7 +20,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Language};
-use crate::diff::nodes::{self, kinds_update_allowed};
+use crate::diff::nodes::{self, is_literal_kind, kinds_update_allowed};
 use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
     COST_UPDATE, NodeCache,
@@ -46,13 +46,34 @@ impl UnitCostModel {
         COST_INSERT
     }
 
+    /// Cost for renaming (matching) two nodes.
+    ///
+    /// Uses an adaptive cost model based on node kinds:
+    /// - Identical nodes: 0
+    /// - Literal nodes: 2 - medium cost for value changes
+    /// - Identifiers and generic punctuation/operators: COST_UPDATE (1) - low cost
+    /// - Internal nodes: 0 - cost is accounted for by children
+    /// - Different kinds (allowed): COST_UPDATE (1) to COST_DELETE + COST_INSERT + 1
+    ///
+    /// A prior version of this also special-cased type/field/property identifiers at cost 5, but
+    /// that branch was unreachable dead code (`is_identifier_kind`'s check above it already
+    /// matches every kind that branch checked for, per `IDENTIFIER_KINDS` in `diff::nodes`) - and
+    /// benchmarking the branch made reachable showed cost 5 for those kinds is a net regression
+    /// (APTED starts preferring delete+insert over a same-kind rename in several fixtures), so it
+    /// was removed rather than fixed. See review discussion for the reachable variant and its
+    /// benchmark impact if this is worth revisiting with a smaller cost value.
     pub(crate) fn ren(&self, node1: &ASTNodeMetadata, node2: &ASTNodeMetadata) -> u64 {
         if node1.kind == node2.kind {
             if node1.children.is_empty() && node2.children.is_empty() {
                 // Both are leaves
                 if node1.text == node2.text {
                     0 // Identical
+                } else if is_literal_kind(&node1.kind) {
+                    // Literals (strings, numbers, etc.) - medium cost
+                    2
                 } else {
+                    // Identifiers are cheap to update (common in refactorings); generic
+                    // punctuation/operators are also low cost.
                     COST_UPDATE
                 }
             } else {

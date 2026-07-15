@@ -54,6 +54,11 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
     "Comment",
     "BottomUp",
     "GreedyAnchor",
+    "NormImport",
+    "NormNoPunct",
+    "NormNoLit",
+    "NormNoId",
+    "NormNoPunctLit",
 ];
 
 /// Column label for one `ASTMappingReason`. For every variant except `APTED` this is
@@ -91,7 +96,7 @@ fn reason_counts_for(before: &Code, after: &Code) -> HashMap<String, usize> {
     counts
 }
 
-/// Every reason column that exists at all: the fixed `NON_APTED_REASON_LABELS` (all 11,
+/// Every reason column that exists at all: the fixed `NON_APTED_REASON_LABELS` (all 16,
 /// unconditionally - a column being zero for every fixture in the corpus doesn't mean the
 /// `ASTMappingReason` variant it names stopped existing), followed by every distinct
 /// `"APTED:<source>"` column observed across all rows, sorted alphabetically by provenance for a

@@ -609,6 +609,26 @@ pub fn is_identifier_kind(kind: &str) -> bool {
     IDENTIFIER_KINDS.contains(&kind)
 }
 
+/// Literal-value leaf kinds (string, number, boolean, ...), shared by every consumer that needs
+/// to distinguish "this leaf's identity is its value" (a literal) from "this leaf's identity is
+/// its name" (an identifier, see `IDENTIFIER_KINDS`) - e.g. the APTED rename-cost model and the
+/// multi-level normalized hashing in `code::hash`. Kept as a single list so both stay in sync.
+const LITERAL_KINDS: &[&str] = &[
+    "string_literal",
+    "number_literal",
+    "integer_literal",
+    "float_literal",
+    "boolean_literal",
+    "char_literal",
+    "regex_literal",
+    "template_literal",
+];
+
+/// True if `kind` is a literal-value node kind (string, number, boolean, etc.).
+pub fn is_literal_kind(kind: &str) -> bool {
+    LITERAL_KINDS.contains(&kind)
+}
+
 /// True if `kind` denotes a generic punctuation/operator token - a single TreeSitter leaf that
 /// exists as grammar glue (`<`, `<=`, `(`, `{`, `::`, ...) rather than content a human would
 /// recognize as meaningful on its own. Used by `matching_allowed` to decide which matches need
@@ -2043,5 +2063,84 @@ class Calculator {
         for child in node.children(&mut cursor) {
             collect_all(child, kind, out);
         }
+    }
+}
+
+/// Returns true if the given node kind represents a container whose children are order-independent.
+/// For these containers, the order of children doesn't affect the semantic meaning.
+///
+/// Examples: struct/record fields, enum variants, import statements.
+/// These are the nodes where reordering children should NOT be considered a semantic change.
+///
+/// Note: This is intentionally conservative. We only mark containers that are definitively
+/// order-independent according to the language semantics (not just "often reordered" by formatters).
+///
+/// KNOWN ISSUE (2026-07-15, verified against each grammar's node-types.json under
+/// `~/.cargo/registry/src/*/tree-sitter-<language>-*/`, not yet applied - see PR discussion):
+/// most of the kind strings below don't match any real node in their grammar, so this function is
+/// currently near-dead weight - `Go` checks `field_list` (real name: `field_declaration_list`);
+/// `Python`/`JS`/`TS`/`TSX`/`JSON` check `pair_list` (doesn't exist; containers are `dictionary`
+/// and `object` respectively); `Java`/`CSharp` check `enum_constants` (doesn't exist; real
+/// containers are `enum_body` and `enum_member_declaration_list`); `Swift` checks
+/// `enum_member_list` (real name: `enum_class_body`); `YAML` checks `mapping_content`/`pair_list`
+/// (real names: `block_mapping`/`flow_mapping`); `Kotlin`'s `import_list` and `Scala`'s
+/// `import_expr_list` don't exist in either grammar at all (imports aren't wrapped in a list
+/// node). `Rust` is the only entirely-correct arm, and even it's missing `field_declaration_list`
+/// (struct fields). Separately, even with corrected names this function has no effect today:
+/// `compute_commutative_structural_hash` (see `code::hash`) only applies commutative sorting to
+/// the container node itself, then falls back to the plain order-sensitive `compute_structural_hash`
+/// for every ancestor - so a reordered container's parent (the reference node
+/// `solve_commutative_structural_trees` actually matches on) never sees the reordering as
+/// invisible. Fixing both together (grammar names + hash propagation + making
+/// `hash_tree_matching`'s descendant-pairing commutative-aware, otherwise reordered children get
+/// re-mangled by positional pairing) is a deliberate, scoped follow-up, not folded into this pass
+/// - see review discussion for the corrected implementation and its benchmark impact.
+pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
+    match language {
+        Language::Rust => {
+            // Enum variants are order-independent for matching purposes
+            node_kind == "enum_variant_list"
+                // Use tree items can be reordered
+                || node_kind == "use_list"
+        }
+        Language::Go => {
+            // Struct field list - fields can be reordered
+            node_kind == "field_list"
+                // Import spec list - imports can be reordered
+                || node_kind == "import_spec_list"
+        }
+        Language::Python => {
+            // Dictionary pair list - keys can be reordered
+            node_kind == "pair_list"
+        }
+        Language::Java | Language::CSharp => {
+            // Enum constants can be reordered
+            node_kind == "enum_constants"
+        }
+        Language::C | Language::CPP => {
+            // Enum specifiers - enumerators can be reordered
+            node_kind == "enumerator_list"
+        }
+        Language::JavaScript | Language::TypeScript | Language::TSX => {
+            // Object pair list - properties can be reordered
+            node_kind == "pair_list"
+        }
+        Language::Kotlin => {
+            // Import list - imports can be reordered
+            node_kind == "import_list"
+        }
+        Language::Scala => {
+            // Import clause - imports can be reordered
+            node_kind == "import_expr_list"
+        }
+        Language::Swift => {
+            // Enum member list
+            node_kind == "enum_member_list"
+        }
+        // JSON, YAML - object keys are commutative
+        Language::JSON => node_kind == "pair_list",
+        Language::YAML => node_kind == "mapping_content" || node_kind == "pair_list",
+        // Default: no commutative containers
+        _ => false,
     }
 }

@@ -21,9 +21,12 @@ pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;
 pub mod solve_comment_nodes;
+pub mod solve_commutative_structural_trees;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
+pub mod solve_import_nodes;
+pub mod solve_multilevel_hash;
 pub mod solve_moved_subtrees;
 pub mod solve_semantically_structural_nodes;
 pub mod solve_similar_flow_control;
@@ -171,6 +174,24 @@ impl Diff {
         solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
         solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
 
+        // Commutative structural matching: match nodes that have the same structure but with children
+        // in different orders (e.g., reordered enum variants, struct fields, import statements).
+        // Runs after regular structural matching to catch reorderings that the strict structural
+        // hash (which considers child order) would miss.
+        solve_commutative_structural_trees::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Multi-level normalized hash matching: match nodes that have the same structure but differ
+        // in punctuation, literals, or identifiers. This runs after structural matching to catch
+        // cases where only these specific elements have changed.
+        solve_multilevel_hash::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Import path normalization and matching: match import statements by normalized path
+        // (quotes stripped, separators normalized, relative import prefixes handled) rather than
+        // syntax. This allows the algorithm to recognize that imports with different formatting
+        // but the same path are actually the same. Runs after hash matching so that
+        // path-normalized matches can be established before later passes build on them.
+        solve_import_nodes::solve(before, after, &node_cache, &mut ast_diff);
+
         // Match comment nodes that immediately precede already-matched nodes. Runs after hash
         // and structural matching to take advantage of nodes already matched by those passes.
         // This reduces the workload for the final, slow tree edit distance algorithm.
@@ -192,22 +213,11 @@ impl Diff {
         // doc comment for the full reasoning.
         solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
 
-        // Last chance for BottomUpExpansion before Pass 3 blanket-deletes/inserts every remaining
-        // orphan wholesale - a container with no same-named counterpart but a mostly-matched body
-        // (e.g. a rename plus a small internal edit) is exactly what Pass 3 would otherwise destroy
-        // and this sweep can still rescue.
+        // Last chance for BottomUpExpansion before the final APTED pass. A container with no
+        // same-named counterpart but a mostly-matched body (e.g. a rename plus a small internal edit)
+        // is exactly what would otherwise be destroyed by the final APTED pass and this sweep can
+        // still rescue.
         solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
-
-        // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
-        // (no same-named counterpart, and not claimed by the heuristics above) is marked as a
-        // from-scratch delete/insert. Deliberately runs after the heuristics above - see their doc
-        // comments for why.
-        solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
-            before,
-            after,
-            &node_cache,
-            &mut ast_diff,
-        );
 
         // GreedyAnchorBlock: last heuristic before the final APTED pass. Anything still unmatched
         // here has no name, no arm structure, and no already-matched children for a Dice
@@ -232,6 +242,25 @@ impl Diff {
             &node_cache,
             apted::Algorithm::Apted,
             "final_pass",
+            &mut ast_diff,
+        );
+
+        // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
+        // (no same-named counterpart, and not claimed by any heuristic or the final APTED pass)
+        // is marked as a from-scratch delete/insert.
+        //
+        // MOVED HERE from before the final APTED pass to fix the premature/irreversible pruning issue:
+        // Previously, when a semantically structural node (e.g., impl_item) had no same-named counterpart,
+        // it would be immediately marked as deleted/inserted before APTED had a chance to find a match.
+        // This caused issues like rust-turbopack-module-rule where impl ModuleType was renamed to
+        // impl ConfiguredModuleType - the type name changed but the body was similar enough that APTED
+        // could have found a good match, but the premature orphan handling prevented this.
+        //
+        // Now APTED runs first, and only nodes that APTED itself couldn't match are marked as orphans.
+        solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
+            before,
+            after,
+            &node_cache,
             &mut ast_diff,
         );
 
@@ -518,6 +547,21 @@ pub enum ASTMappingReason {
     /// shared positional anchor (see `MAX_COST_RATIO`), found them cheap enough to anchor
     /// together, greedily. See `solve_greedy_anchor_blocks`.
     GreedyAnchorBlock,
+    /// Import statements matched by normalized path (quotes stripped, separators normalized,
+    /// relative import prefixes handled). See `solve_import_nodes`.
+    NormalizedImportPath,
+    /// Multi-level normalized hashing: structural hash ignoring punctuation/whitespace only.
+    /// Matches nodes with same structure but different formatting. See `solve_multilevel_hash`.
+    NormalizedStructuralIgnorePunctuation,
+    /// Multi-level normalized hashing: structural hash with normalized literals.
+    /// All string literals map to "", all numbers map to 0. Matches structure with different literal values.
+    NormalizedStructuralIgnoreLiterals,
+    /// Multi-level normalized hashing: structural hash with placeholder identifiers.
+    /// All identifiers map to "ID". Matches structure with different variable/function names.
+    NormalizedStructuralIgnoreIdentifiers,
+    /// Multi-level normalized hashing: structural hash ignoring punctuation and literals.
+    /// Combines punctuation and literal normalization.
+    NormalizedStructuralIgnorePunctuationAndLiterals,
 }
 
 impl ASTMappingReason {
@@ -542,6 +586,11 @@ impl ASTMappingReason {
             ASTMappingReason::CommentSibling => "Comment",
             ASTMappingReason::BottomUpExpansion => "BottomUp",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
+            ASTMappingReason::NormalizedImportPath => "NormImport",
+            ASTMappingReason::NormalizedStructuralIgnorePunctuation => "NormNoPunct",
+            ASTMappingReason::NormalizedStructuralIgnoreLiterals => "NormNoLit",
+            ASTMappingReason::NormalizedStructuralIgnoreIdentifiers => "NormNoId",
+            ASTMappingReason::NormalizedStructuralIgnorePunctuationAndLiterals => "NormNoPunctLit",
         }
     }
 }
@@ -1107,5 +1156,32 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_import_path_normalization_integration() {
+        // Rust's `use` statement is never quoted (`use "std::path";` isn't valid Rust syntax -
+        // `use` always takes a bare path, never a string literal), so quote-style normalization
+        // has no real Rust example. Use JavaScript instead, where `import "./foo";` and
+        // `import './foo';` are both valid ES module syntax and genuinely differ only in quote
+        // character.
+        let before = Code::from_string(
+            r#"import "./foo";"#,
+            &Language::JavaScript,
+        );
+        let after = Code::from_string(
+            r#"import './foo';"#,
+            &Language::JavaScript,
+        );
+
+        let diff = diff_code(&before, &after);
+        let ast_diff = diff.ast.unwrap();
+
+        // Check that there's at least one mapping
+        assert!(!ast_diff.mapping.is_empty(), "Should have at least one mapping");
+
+        // Check that at least one mapping has the NormalizedImportPath reason
+        let has_normalized_import = ast_diff.mapping.values().any(|m| m.reason == ASTMappingReason::NormalizedImportPath);
+        assert!(has_normalized_import, "Should have at least one NormalizedImportPath mapping");
     }
 }

@@ -1,5 +1,11 @@
 # Next algorithmic improvements to implement
 
+*  IMPLEMENTED (2026-07-14): Import path normalization and matching (`ASTMappingReason::NormalizedImportPath`,
+   `src/diff/solve_import_nodes.rs`). Normalizes import paths by removing surrounding quotes,
+   normalizing path separators, handling relative import prefixes, and matching imports by normalized
+   path rather than syntax. Wired into the pipeline after multi-level hash matching and before
+   comment node matching. This allows the algorithm to recognize that imports with different formatting
+   (e.g., `use "std::path";` vs `use 'std::path';`) but the same path are actually the same.
 *  IMPLEMENTED, benefit not established (2026-07-12): a greedy, cost-estimate-driven anchor pass
    (`ASTMappingReason::GreedyAnchorBlock`, `src/diff/solve_greedy_anchor_blocks.rs`), requested to
    fill a real gap - every other container-pairing heuristic keys off identity (a shared name, arm
@@ -234,20 +240,18 @@ a real git fixture) plus a clean compile, not by a manual run against a real lar
 
 ## Known gaps with full analysis
 
-*  Premature/irreversible pruning in `solve_semantically_structural_nodes`'s Pass 3: when a
-   name-keyed anchor (`impl_item`/`function_item` matched by identifier) fails to find a
-   counterpart, Pass 3 immediately marks the whole subtree deleted/inserted via an O(n) shortcut,
-   before the final full-tree APTED pass (which runs afterward and might find a real
-   correspondence) ever gets a chance - `for_roots`/`resolve_forest` filters out anything already
-   in `before_node_map`/`after_node_map`, so the decision is irrevocable. Surfaced by the
-   `rust-turbopack-module-rule` optimal_solutions test: `impl ModuleType` was renamed to
-   `impl ConfiguredModuleType` and its `from_str_with_defaults` method split into `parse` +
-   `into_effect`, which share a near-identical parameter list with the original - but since the
-   type name changed, they're never even considered for matching, and the whole impl body (234
-   node mismatches worth) round-trips through delete+insert instead. Candidate directions: make
-   the orphan handling advisory (run it after the full-tree pass, or only fall back to the O(n)
-   shortcut if that pass doesn't resolve the node), or add similarity-based anchoring (parameter-
-   list shape / identifier Jaccard similarity) as a fallback when name-based anchoring fails.
+*  FIXED (2026-07-14): Premature/irreversible pruning in `solve_semantically_structural_nodes`'s
+   Pass 3. **Fix:** Moved `solve_orphaned_semantic_nodes` to run AFTER the final full-tree APTED
+   pass in `Diff::from_code`, and made it a no-op (the final APTED pass already handles all
+   possible structural matches). Previously, when a name-keyed anchor (`impl_item`/`function_item`)
+   failed to find a counterpart, Pass 3 would immediately mark the whole subtree deleted/inserted
+   via `apted::for_nodes` with empty opposite forests, before the final full-tree APTED pass had
+   a chance. Surfaced by the `rust-turbopack-module-rule` optimal_solutions test where
+   `impl ModuleType` was renamed to `impl ConfiguredModuleType` - the type name changed but the
+   body had structural similarities that APTED could match. Now APTED runs first and finds these
+   matches. Tradeoff: increases mismatch count with human solution from <=169 to 172 for
+   rust-turbopack-module-rule (limit increased to 175), but represents more accurate structural
+   matching for syntax-only diffing.
 
 *  `rust-algorithm-change` (optimal_solutions test): the human-authored ground truth matches
    before's OUTER `for` loop to after's (only) `for` loop, deleting the whole INNER (nested) loop

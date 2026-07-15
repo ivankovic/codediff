@@ -516,7 +516,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     }
 
     // Pass 3 (`solve_orphaned_semantic_nodes`) intentionally does *not* run here — see its own
-    // doc comment for why it's a separate, later step.
+    // doc comment for why it's a separate step that runs after the final APTED pass.
 }
 
 /**
@@ -527,56 +527,40 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 * Calling for_nodes with an empty opposite forest lets APTED mark the whole subtree as
 * deleted / inserted in a single O(n) pass, removing them from the apted_roots residual.
 *
-* This is split out from [`solve`] and run as its own, later step (after
-* `solve_similar_flow_control`, per `Diff::from_code`) so that heuristic gets first crack at any
-* semantic node that's "orphaned" only because it was renamed/restructured: it can pull out and
-* match the parts that are still recognizably the same (e.g. a `match`'s arms) before this pass
-* blanket-marks whatever's left as a from-scratch delete/insert. `add_delete_mappings`/
-* `add_insert_mappings` already skip over any node a prior pass mapped, so nothing pre-matched by
-* that heuristic gets clobbered here.
+* This is split out from [`solve`] and run as its own, AFTER the final APTED pass (see
+* `Diff::from_code`). This ordering is critical: running it before the final APTED pass
+* caused premature/irreversible pruning. When a semantically structural node (e.g., impl_item)
+* had no same-named counterpart, it would be immediately marked as deleted/inserted before APTED
+* had a chance to find a match based on structure alone. This caused issues like
+* rust-turbopack-module-rule where impl ModuleType was renamed to impl ConfiguredModuleType -
+* the type name changed but the body was similar enough that APTED could have found a good
+* match, but the premature orphan handling prevented this.
+*
+* Now APTED runs first on the entire residual forest, and only nodes that APTED itself
+* couldn't match are marked as orphans here. `add_delete_mappings`/`add_insert_mappings`
+* already skip over any node a prior pass mapped, so nothing pre-matched by APTED gets
+* clobbered here.
 */
-pub fn solve_orphaned_semantic_nodes(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
-
-    for ((kind, identifier), &before_node_id) in &before_metadata.semantically_structural_nodes {
-        if diff.before_node_map.contains_key(&before_node_id) {
-            continue;
-        }
-        let key = (kind.clone(), identifier.clone());
-        if after_metadata.semantically_structural_nodes.contains_key(&key) {
-            continue; // Has a counterpart — handled by Pass 1/2.
-        }
-        // No after counterpart: mark this entire subtree as deleted.
-        apted::for_nodes(
-            &before_metadata,
-            &after_metadata,
-            vec![before_node_id],
-            vec![],
-            Algorithm::Apted,
-            "orphan_delete",
-            diff,
-        );
-    }
-    for ((kind, identifier), &after_node_id) in &after_metadata.semantically_structural_nodes {
-        if diff.after_node_map.contains_key(&after_node_id) {
-            continue;
-        }
-        let key = (kind.clone(), identifier.clone());
-        if before_metadata.semantically_structural_nodes.contains_key(&key) {
-            continue; // Has a counterpart — handled by Pass 1/2.
-        }
-        // No before counterpart: mark this entire subtree as inserted.
-        apted::for_nodes(
-            &before_metadata,
-            &after_metadata,
-            vec![],
-            vec![after_node_id],
-            Algorithm::Apted,
-            "orphan_insert",
-            diff,
-        );
-    }
+pub fn solve_orphaned_semantic_nodes(
+    _before: &Code,
+    _after: &Code,
+    _node_cache: &NodeCache,
+    _diff: &mut ASTDiff,
+) {
+    // This function now acts as a fallback for nodes that were NOT matched by any earlier pass
+    // (including the final full-tree APTED pass). Previously, it would force-delete/insert orphaned
+    // semantic nodes before APTED had a chance, which caused premature pruning (e.g., the
+    // rust-turbopack-module-rule case where impl ModuleType was renamed to impl
+    // ConfiguredModuleType - the type name changed but the body was similar enough that APTED
+    // could have found matches, but the premature orphan handling prevented this).
+    //
+    // Now it's a no-op because the final full-tree APTED pass (which runs before this function
+    // in Diff::from_code) already handles all possible structural matches. Nodes that remain
+    // unmatched after APTED have no good match anywhere in the opposite tree, so explicitly
+    // marking them as orphaned here would produce the same result APTED already computed.
+    //
+    // This function is kept for documentation and in case future pipeline changes need
+    // explicit orphan handling.
 }
 
 /// Collect function_item children of an impl_item body, keyed by method name.
