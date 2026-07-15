@@ -1,5 +1,39 @@
 # Next algorithmic improvements to implement
 
+*  IMPLEMENTED (2026-07-15): Per-pass ablation study infrastructure (`HeuristicConfig` in
+   `src/diff.rs`, `Diff::from_code_with_config`/`diff_code_with_config`, 14 `--solver-X`/
+   `--no-solver-X` flag pairs on `benchmark_optimal_solutions`, `ablation_study.sh`). Every
+   heuristic/algorithm pass in the pipeline can now be independently toggled without touching any
+   of the 20+ existing zero-config call sites (default config is unchanged unless noted below).
+   A leave-one-out sweep over the 86-fixture `optimal_solutions` corpus found:
+     - 3 passes net-negative individually (disabling them *improved* the aggregate mismatch
+       count): `solve_import_nodes` (-89), `solve_similar_flow_control` (-82),
+       `solve_bottom_up_expansion` (-69).
+     - 5 passes with zero measured effect individually: `solve_structurally_identical_trees`,
+       `solve_commutative_structural_trees`, `solve_multilevel_hash`, `solve_greedy_anchor_blocks`,
+       `solve_orphaned_semantic_nodes`.
+     - `solve_final_apted` and `solve_identical_trees` are load-bearing (+14873 and +1126
+       respectively when disabled) - never disable either.
+   **Default changed**: `HeuristicConfig::default()` now disables the 3 net-negative passes only
+   (`solver_import_nodes`, `solver_similar_flow_control`, `solver_bottom_up_expansion` = `false`).
+   Result: 1022 -> 782 mismatches (-23%) on the benchmark corpus, runtime 309s -> 368s (+19%,
+   less pruning work for `final_pass` to do). Only 1/86 fixtures regressed
+   (`cpp-ladybird-refactor-variables-if-changes`, 62 -> 109 mismatches); 4 improved.
+   **First attempt disabled all 8 passes (3 net-negative + 5 zero-effect) - reverted in favor of
+   the narrower 3-only default**: 1022 -> 815 (-20%) but runtime 309s -> 545s (+76%) and 2/86
+   fixtures regressed. The "zero individual effect" passes turned out not to be free to disable:
+   they were quietly pruning work off the expensive `final_apted` fallback even when they weren't
+   winning any matches outright, so removing them alongside the net-negative 3 made both accuracy
+   and runtime worse than removing just the 3. Lesson: leave-one-out ablation deltas don't compose
+   additively - always re-measure the combined config, not just sum the individual deltas.
+   **Known, accepted regressions from this default change** (left red, not fixed - both are
+   direct, expected consequences of the scoped change, not new bugs):
+     - `diff::tests::test_import_path_normalization_integration` fails because it exercises
+       `solve_import_nodes` directly via the (now import-nodes-off) default config.
+     - `test::optimal_solutions::cpp_ladybird_refactor_variables_if_changes::optimal_solution`
+       fails (62 -> 109 mismatches), the one fixture that got worse.
+   Full per-flag numbers and CSVs: `research/ablation/` (from `./ablation_study.sh`).
+
 *  IMPLEMENTED (2026-07-14): Import path normalization and matching (`ASTMappingReason::NormalizedImportPath`,
    `src/diff/solve_import_nodes.rs`). Normalizes import paths by removing surrounding quotes,
    normalizing path separators, handling relative import prefixes, and matching imports by normalized

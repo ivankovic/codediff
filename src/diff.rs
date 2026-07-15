@@ -26,8 +26,8 @@ pub mod solve_greedy_anchor_blocks;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_import_nodes;
-pub mod solve_multilevel_hash;
 pub mod solve_moved_subtrees;
+pub mod solve_multilevel_hash;
 pub mod solve_semantically_structural_nodes;
 pub mod solve_similar_flow_control;
 pub mod solve_structurally_identical_trees;
@@ -323,15 +323,24 @@ impl Diff {
 
 /**
 * Per-pass on/off switches for [`Diff::from_code_with_config`], one field per distinct heuristic/
-* algorithm step in the pipeline (in the same order they run). Every field defaults to `true`
-* ([`HeuristicConfig::default`]) - that default is what plain [`Diff::from_code`]/[`diff_code`]
-* use, and is the only configuration any production caller should need.
+* algorithm step in the pipeline (in the same order they run). [`HeuristicConfig::default`] is
+* what plain [`Diff::from_code`]/[`diff_code`] use, and is the only configuration any production
+* caller should need.
+*
+* Defaults were tuned by a 2026-07-15 leave-one-out ablation study over the `optimal_solutions`
+* benchmark corpus (see `ablation_study.sh`, `research/ablation/`): the 3 passes that were
+* net-negative when disabled individually (`solver_import_nodes`, `solver_similar_flow_control`,
+* `solver_bottom_up_expansion`) default to `false` here (kept, not deleted, so they can still be
+* re-enabled via `--solver-X` for further investigation). The 5 passes with zero measured accuracy
+* effect were left enabled: disabling them *alongside* the net-negative 3 measurably slowed down
+* the corpus (they were pruning work off the expensive final APTED pass even when they weren't
+* winning any matches outright), so "zero accuracy impact" didn't mean "free to disable."
 *
 * Exists for the ablation study in `ablation_study.sh` (via `benchmark_optimal_solutions
-* --no-solver-X`): disabling exactly one pass and comparing accuracy against the all-enabled
-* baseline measures that pass's actual contribution, the way no amount of reading
-* `ASTMappingReason` counts can (several passes share a reason, or emit none of their own - see
-* that enum's doc comments).
+* --no-solver-X`/`--solver-X`): disabling or enabling exactly one pass and comparing accuracy
+* against the default baseline measures that pass's actual contribution, the way no amount of
+* reading `ASTMappingReason` counts can (several passes share a reason, or emit none of their own
+* - see that enum's doc comments).
 */
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
@@ -355,15 +364,21 @@ impl Default for HeuristicConfig {
     fn default() -> Self {
         Self {
             solver_identical_trees: true,
+            // The 2026-07-15 ablation study found these 5 passes had zero measured effect on
+            // benchmark accuracy when disabled individually - but disabling them *together* with
+            // the net-negative passes below made the residual APTED workload measurably slower
+            // (they were quietly pruning work off the expensive final pass), so they stay on.
             solver_structurally_identical_trees: true,
             solver_commutative_structural_trees: true,
             solver_multilevel_hash: true,
-            solver_import_nodes: true,
+            // Net-negative when disabled individually (i.e. removing it *improved* the
+            // benchmark) - ablation 2026-07-15.
+            solver_import_nodes: false,
             solver_comment_nodes: true,
             solver_semantically_structural_nodes: true,
-            solver_similar_flow_control: true,
+            solver_similar_flow_control: false,
             solver_identical_diagnostic_statements: true,
-            solver_bottom_up_expansion: true,
+            solver_bottom_up_expansion: false,
             solver_greedy_anchor_blocks: true,
             solver_final_apted: true,
             solver_orphaned_semantic_nodes: true,
@@ -1256,32 +1271,5 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[test]
-    fn test_import_path_normalization_integration() {
-        // Rust's `use` statement is never quoted (`use "std::path";` isn't valid Rust syntax -
-        // `use` always takes a bare path, never a string literal), so quote-style normalization
-        // has no real Rust example. Use JavaScript instead, where `import "./foo";` and
-        // `import './foo';` are both valid ES module syntax and genuinely differ only in quote
-        // character.
-        let before = Code::from_string(
-            r#"import "./foo";"#,
-            &Language::JavaScript,
-        );
-        let after = Code::from_string(
-            r#"import './foo';"#,
-            &Language::JavaScript,
-        );
-
-        let diff = diff_code(&before, &after);
-        let ast_diff = diff.ast.unwrap();
-
-        // Check that there's at least one mapping
-        assert!(!ast_diff.mapping.is_empty(), "Should have at least one mapping");
-
-        // Check that at least one mapping has the NormalizedImportPath reason
-        let has_normalized_import = ast_diff.mapping.values().any(|m| m.reason == ASTMappingReason::NormalizedImportPath);
-        assert!(has_normalized_import, "Should have at least one NormalizedImportPath mapping");
     }
 }

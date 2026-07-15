@@ -171,7 +171,7 @@ struct Args {
     #[arg(long = "no-solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_trees")]
     no_solver_identical_trees: bool,
 
-    /// Enable the structural-hash pass (default; see `--no-solver-structurally-identical-trees`).
+    /// Enable the structural-hash pass (default; see the `--no-solver-...` form).
     #[arg(long = "solver-structurally-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_structurally_identical_trees")]
     solver_structurally_identical_trees: bool,
     /// Disable `solve_structurally_identical_trees` (same-shape, differing-leaves matching).
@@ -192,8 +192,9 @@ struct Args {
     #[arg(long = "no-solver-multilevel-hash", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_multilevel_hash")]
     no_solver_multilevel_hash: bool,
 
-    /// Enable the import-path-normalization pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_import_nodes")]
+    /// Enable the import-path-normalization pass. Off by default: net-negative in the 2026-07-15
+    /// ablation study (disabling it individually *improved* the benchmark by 89 mismatches).
+    #[arg(long = "solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_import_nodes")]
     solver_import_nodes: bool,
     /// Disable `solve_import_nodes` (normalized-import-path matching).
     #[arg(long = "no-solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_import_nodes")]
@@ -213,8 +214,9 @@ struct Args {
     #[arg(long = "no-solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_semantically_structural_nodes")]
     no_solver_semantically_structural_nodes: bool,
 
-    /// Enable MatchSimilarFlowControl (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_similar_flow_control")]
+    /// Enable MatchSimilarFlowControl. Off by default: net-negative in the 2026-07-15 ablation
+    /// study (disabling it individually *improved* the benchmark by 82 mismatches).
+    #[arg(long = "solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_similar_flow_control")]
     solver_similar_flow_control: bool,
     /// Disable `solve_similar_flow_control` (if/switch/match arm-overlap matching).
     #[arg(long = "no-solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_similar_flow_control")]
@@ -227,8 +229,9 @@ struct Args {
     #[arg(long = "no-solver-identical-diagnostic-statements", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_diagnostic_statements")]
     no_solver_identical_diagnostic_statements: bool,
 
-    /// Enable BottomUpExpansion (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_bottom_up_expansion")]
+    /// Enable BottomUpExpansion. Off by default: net-negative in the 2026-07-15 ablation study
+    /// (disabling it individually *improved* the benchmark by 69 mismatches).
+    #[arg(long = "solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_bottom_up_expansion")]
     solver_bottom_up_expansion: bool,
     /// Disable `solve_bottom_up_expansion` (Dice-coefficient descendant-driven matching).
     #[arg(long = "no-solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_expansion")]
@@ -385,6 +388,7 @@ fn main() -> Result<()> {
     let mut names: Vec<String> = test_diffs.keys().cloned().collect();
     names.sort();
 
+    let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
@@ -422,6 +426,8 @@ fn main() -> Result<()> {
         (None, None) => a.name.cmp(&b.name),
     });
 
+    let elapsed = started.elapsed();
+
     if let Some(csv_path) = args.csv {
         let path = csv_path.unwrap_or_else(|| std::path::PathBuf::from("./research/optimal_solutions_benchmark.csv"));
         write_csv(&rows, &path)?;
@@ -429,6 +435,12 @@ fn main() -> Result<()> {
 
     print_table(&rows);
     print_reason_table(&rows);
+    println!(
+        "\nRuntime: {:.3}s total, {:.1}ms/fixture ({} fixtures)",
+        elapsed.as_secs_f64(),
+        elapsed.as_secs_f64() * 1000.0 / rows.len() as f64,
+        rows.len()
+    );
     Ok(())
 }
 
