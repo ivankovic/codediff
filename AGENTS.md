@@ -1,10 +1,10 @@
 # Developement Workflow
 
-- DO NOT USE GIT COMMIT. NEVER COMMIT. ONLY HUMANS SHOULD COMMIT.
-
 - Always read the README.md file in the root of the repository. Always.
 - Always read README.md in any directory in this repository before you read or write any files in
 that directory.
+
+* You can run benchmark_optimal_solutions binary to check the impact of any changes.
 
 ## Markdown files
 
