@@ -78,6 +78,59 @@ here so nobody re-discovers the same false positives.
   a subtree with roughly 2^32 nodes to actually overflow - not realistic for a source file AST.
   Left as is.
 
+- **`ASTMetadata::node_to_parent` and `ContainmentCtx`'s hot maps switched to `FxHashMap`
+  (2026-07-16)** - investigated "are there algorithmic runtime optimizations available" and found
+  a genuine hash-seed-dependent performance bug, not a logic bug: on `kotlin-nextcloud-a-few-
+  small-removals`, separate process invocations of the *identical* diff (same binary, same input)
+  varied 2.8s-26.4s in wall time (confirmed CPU-bound via `/usr/bin/time -v` - `User time` ≈
+  `Elapsed` on every run, ruling out scheduling/IO noise - and confirmed the *output* was
+  byte-identical every time by fingerprinting the exact set of nodes matched right before the
+  final APTED pass, sorted by stable `start_byte`, across 6 runs spanning both fast and slow
+  cases). Root cause: `ContainmentCtx::adjust` (`apted/common.rs`) calls `is_ancestor_or_self`,
+  which walks `HashMap<usize, usize>` ancestor-parent maps in a loop, on every `vren_adjusted`
+  call inside APTED's core DP - an enormous number of lookups on any fixture with real
+  containment. `std::collections::HashMap`'s default hasher (`SipHash`) is correctness-fine but
+  randomly reseeded per process, so its collision behavior for this specific integer key set
+  varies run to run. Fixed by switching `ASTMetadata::node_to_parent` and `ContainmentCtx`'s
+  `before/after_pruned_targets`/`before/after_parents` to `rustc_hash::FxHashMap` (new dependency,
+  `rustc-hash = "2.1"`, no transitive deps) - unseeded, so performance is deterministic, and
+  faster on small integer keys regardless. Verified: `benchmark_optimal_solutions` output
+  byte-identical before/after (782/782 mismatches, 0 differing fixtures across all 86), full
+  `cargo test --lib` still 336 passed/0 failed/5 ignored, and the aggregate benchmark got ~10%
+  faster (318s -> 285s) with zero change to any result.
+  **Follow-up (same day, with `perf` access after `kernel.perf_event_paranoid` was lowered to
+  1)**: this fix alone did not solve the extreme variance on `kotlin-nextcloud-a-few-small-
+  removals` (still 2.9s-28s across repeated runs after it landed). `perf record --call-graph fp`
+  on an actual slow run found the real dominant cost: 42% self-time in `__memset_avx2_unaligned_
+  erms`, called via deeply recursive `gted` -> `compute_delta` -> `resolve_forest` ->
+  `rayon_core::join::join_context` - i.e. inside `solve_semantically_structural_nodes.rs`'s
+  parallel per-pair APTED pre-matching (`class_pairs`/`impl_pairs`/`other_pairs`.
+  `par_iter().for_each`), not the final APTED pass. Root cause: all three pair lists are built by
+  iterating `semantically_structural_nodes` (a `HashMap<(String, String), usize>`) with no sort,
+  then processed in parallel while sharing (and mutating) `diff` under a single `Mutex`. Candidate
+  order is therefore hash-seeded, and since each pair's `pre_match_by_path`/`apted::for_nodes`
+  call can claim shared descendants before a later pair gets to see them, *processing order
+  controls how much APTED work gets thrown away* - confirmed by ruling out the alternative
+  (`RAYON_NUM_THREADS=1` still showed the same 2.8s-27s variance, ruling out genuine thread
+  contention) before finding this via `perf`.
+  **Tried and reverted**: sorting `class_pairs`/`impl_pairs`/`other_pairs` deterministically before
+  the parallel pass - by document position first, then by largest-subtree-first (mirroring
+  `solve_identical_trees`/`hash_tree_matching`'s own convention, on the theory that letting big
+  pairs claim shared territory first would minimize wasted small-pair work). Both eliminated the
+  *run-to-run* variance (tight, single-digit-percent band instead of 2.8s-28s) but both landed on
+  the *slow* end and made the full 86-fixture aggregate benchmark measurably worse (~400s vs. the
+  285s baseline from the `FxHashMap` fix above) - the natural hash-random order apparently lands
+  in a "wasted work" case *less* often than either fixed order tried. Correctness was unaffected
+  both times (782/782 mismatches, 0 of 86 fixtures differing) - this is a performance-only
+  regression, confirming the mechanism but not yet yielding a net-positive fix.
+  **Real fix, not yet attempted**: the pairs aren't actually order-independent despite the
+  "process ... in parallel since they are independent of each other" comment above them - a
+  proper fix would decouple them for real (give each parallel task its own private `ASTDiff`
+  scoped to just its own pair, with no shared mutable state to race on, then merge every task's
+  results back into the real `diff` in one fixed pass afterward) rather than trying to guess a
+  processing order that happens to minimize wasted work. That's a bigger, more invasive change
+  than this session had scope for.
+
 ## Real, still open
 
 - **`apted::for_nodes`/`for_roots` return `Result<()>` that can never be `Err`** -

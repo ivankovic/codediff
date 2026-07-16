@@ -125,7 +125,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         let source_container = outermost_unmapped_reference_kind(
             b,
             &before_metadata,
-            &before_parents,
+            before_parents,
             &diff.before_node_map,
             &language,
         );
@@ -133,7 +133,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             let target_container = outermost_unmapped_reference_kind(
                 a,
                 &after_metadata,
-                &after_parents,
+                after_parents,
                 &diff.after_node_map,
                 &language,
             );
@@ -156,7 +156,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 fn outermost_unmapped_reference_kind<'m>(
     node: usize,
     meta: &'m ASTMetadata,
-    parents: &HashMap<usize, usize>,
+    parents: &rustc_hash::FxHashMap<usize, usize>,
     node_map: &HashMap<usize, usize>,
     language: &Language,
 ) -> Option<&'m str> {

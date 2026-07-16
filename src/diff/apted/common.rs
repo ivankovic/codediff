@@ -688,8 +688,8 @@ struct SlotCtx<'a> {
     before_meta: &'a ASTMetadata,
     after_meta: &'a ASTMetadata,
     diff: &'a ASTDiff,
-    before_parents: &'a HashMap<usize, usize>,
-    after_parents: &'a HashMap<usize, usize>,
+    before_parents: &'a rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &'a rustc_hash::FxHashMap<usize, usize>,
     /// The before-side roots of the forest this `resolve_forest` call was invoked on. A pair
     /// whose before node is one of these has its context *outside* the forest - the caller
     /// (e.g. the name-keyed pass recursing into an anchored container's children) already vouched
@@ -1280,7 +1280,7 @@ fn after_match_target(
 fn ancestor_child_of(
     node: usize,
     ancestor: usize,
-    parents: &HashMap<usize, usize>,
+    parents: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Option<usize> {
     let mut cur = node;
     while let Some(&p) = parents.get(&cur) {
@@ -1400,8 +1400,8 @@ fn improve_slot_alignment(
     after_meta: &ASTMetadata,
     diff: &ASTDiff,
     before_root_ids: &[usize],
-    before_parents: &HashMap<usize, usize>,
-    after_parents: &HashMap<usize, usize>,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
     before_decision: &mut HashMap<usize, BeforeDecision>,
     after_decision: &mut HashMap<usize, AfterDecision>,
 ) {
@@ -1630,8 +1630,8 @@ fn pull_up_wrapped_matches(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     diff: &ASTDiff,
-    before_parents: &HashMap<usize, usize>,
-    after_parents: &HashMap<usize, usize>,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
     before_decision: &mut HashMap<usize, BeforeDecision>,
     after_decision: &mut HashMap<usize, AfterDecision>,
 ) {
@@ -1725,8 +1725,8 @@ fn slot_promotion_allowed(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     diff: &ASTDiff,
-    before_parents: &HashMap<usize, usize>,
-    after_parents: &HashMap<usize, usize>,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
     before_decision: &HashMap<usize, BeforeDecision>,
     after_decision: &HashMap<usize, AfterDecision>,
 ) -> bool {
@@ -1852,8 +1852,8 @@ fn promote_same_slot_pairs(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
     diff: &ASTDiff,
-    before_parents: &HashMap<usize, usize>,
-    after_parents: &HashMap<usize, usize>,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
     before_decision: &mut HashMap<usize, BeforeDecision>,
     after_decision: &mut HashMap<usize, AfterDecision>,
 ) {
@@ -2030,7 +2030,7 @@ fn repair_leaf_slots(
 }
 
 /// True if `node` is `ancestor` itself or a descendant of it, walking up via `parents`.
-fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &HashMap<usize, usize>) -> bool {
+fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &rustc_hash::FxHashMap<usize, usize>) -> bool {
     loop {
         if node == ancestor {
             return true;
@@ -2053,12 +2053,12 @@ fn compute_pruned_targets(
     root_ids: &[usize],
     meta: &ASTMetadata,
     node_map: &HashMap<usize, usize>,
-) -> HashMap<usize, Vec<usize>> {
+) -> rustc_hash::FxHashMap<usize, Vec<usize>> {
     fn visit(
         node_id: usize,
         meta: &ASTMetadata,
         node_map: &HashMap<usize, usize>,
-        memo: &mut HashMap<usize, Vec<usize>>,
+        memo: &mut rustc_hash::FxHashMap<usize, Vec<usize>>,
     ) -> Vec<usize> {
         if let Some(cached) = memo.get(&node_id) {
             return cached.clone();
@@ -2077,7 +2077,7 @@ fn compute_pruned_targets(
         result
     }
 
-    let mut memo = HashMap::new();
+    let mut memo = rustc_hash::FxHashMap::default();
     for &root_id in root_ids {
         visit(root_id, meta, node_map, &mut memo);
     }
@@ -2103,10 +2103,10 @@ fn compute_pruned_targets(
 /// corresponding pruned-targets map is non-empty, so the common case (nothing pruned in this
 /// particular forest) costs nothing beyond two empty-map lookups.
 pub(crate) struct ContainmentCtx<'a> {
-    before_pruned_targets: HashMap<usize, Vec<usize>>,
-    after_pruned_targets: HashMap<usize, Vec<usize>>,
-    before_parents: &'a HashMap<usize, usize>,
-    after_parents: &'a HashMap<usize, usize>,
+    before_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
+    after_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
+    before_parents: &'a rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &'a rustc_hash::FxHashMap<usize, usize>,
 }
 
 impl<'a> ContainmentCtx<'a> {

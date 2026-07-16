@@ -304,7 +304,19 @@ pub struct ASTMetadata {
     /// child node.id() -> parent node.id(), covering every non-root node. `ASTNodeMetadata` has
     /// no parent pointer, so this is derived once here from `node_info`'s children lists, rather
     /// than every ancestor/containment check re-deriving its own copy from scratch.
-    pub node_to_parent: HashMap<usize, usize>,
+    ///
+    /// `FxHashMap`, not `std::collections::HashMap`: this map backs `ContainmentCtx`'s
+    /// `is_ancestor_or_self` ancestor walk (`apted/common.rs`), which does a `.get()` per step of
+    /// an O(depth) walk on every `vren_adjusted` call inside APTED's core DP - an enormous number
+    /// of lookups on any fixture with real containment. The default hasher (`SipHash`) is
+    /// correctness-fine but randomly reseeded per process, so its collision behavior for this
+    /// specific integer key set varies run to run - confirmed empirically (2026-07-16): identical
+    /// input/output (same residual forest, fingerprinted by sorted `start_byte`, byte-identical
+    /// across runs) but wall time on `kotlin-nextcloud-a-few-small-removals` ranged 2.8s-26.4s
+    /// across separate process invocations, CPU-bound the whole time (`User time` ≈ `Elapsed`,
+    /// ruling out scheduling/IO noise). `FxHashMap` is unseeded (deterministic performance) and
+    /// faster on small integer keys regardless.
+    pub node_to_parent: rustc_hash::FxHashMap<usize, usize>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
     /// Maps a (kind, identifier) pair, for example ('function_item', 'main') to a node_id.
