@@ -1,0 +1,325 @@
+/*  This file is part of the CodeDiff code diffing tool.
+ *
+ *  Copyright (C) 2026 Marko Ivankovic
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+use std::collections::HashMap;
+
+use tree_sitter::Node;
+
+use crate::code::{Code, Language};
+use crate::code::metadata::metadata_of;
+use crate::diff::apted::{self, Algorithm};
+use crate::diff::{ASTDiff, NodeCache, nodes, solve_greedy_anchor_blocks, solve_similar_flow_control};
+
+/**
+* Phase 4 of the six-phase pipeline rework (`TODO.md`, 2026-07-17): "syntax-aware subtree
+* matching" - a redesign of `solve_semantically_structural_nodes` that generalizes name-based
+* matching to support real N:M (overloads, trait-impl duplicates) via **fully-resolved names**
+* (scope-qualified, e.g. `"Bar::new"` rather than bare `"new"` - see `collect_fully_resolved_groups`),
+* replacing today's two-tier impl/class-then-everything-else split with one flat mechanism.
+*
+* This phase absorbs three other passes as internal steps rather than separate pipeline phases
+* (see `TODO.md`'s disposition table):
+* - `solve_greedy_anchor_blocks` - positional anchoring for anonymous containers (`if` bodies, loop
+*   bodies, ...) that have no name for the signal below to key on. Reused as-is (call, not copy):
+*   its positional-key + cost-ratio + greedy-assign mechanism is exactly the "fast approximate
+*   cost -> greedy assign -> real APTED" idiom this phase is built around, just already keyed on a
+*   different candidate-grouping signal (shared matched ancestor + kind-path) than name identity.
+* - `solve_similar_flow_control` - arm-overlap-scored `if`/`match`/`switch` pairing. Also reused
+*   as-is: same greedy-assignment shape, keyed on Jaccard similarity of arm signatures instead of
+*   name or position.
+* - `solve_large_flat_subtrees` - **not** ported forward as a call at all. Per `TODO.md`: once a
+*   pair reaches `apted::for_nodes` (as every match in this phase and its two reused passes does),
+*   `resolve_forest`'s existing flat-tree fast path already detects a flat descendant and routes it
+*   to Myers - large flat containers need no dedicated pre-emptive matching of their own here, only
+*   to remain valid candidates in the pools above (which they are: `is_semantically_structural`/
+*   `is_block_container` don't exclude them by size).
+*
+* The genuinely new mechanism in this phase is [`solve_named_reference_groups`] - see its own doc
+* comment for the fully-resolved-name design and why it deliberately does *not* apply a cost-ratio
+* rejection threshold the way the two reused passes do.
+*/
+pub fn solve(
+    before: &Code,
+    after: &Code,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+    solve_similar_flow_control_enabled: bool,
+) {
+    solve_named_reference_groups(before, after, diff);
+    solve_greedy_anchor_blocks::solve(before, after, node_cache, diff);
+    if solve_similar_flow_control_enabled {
+        solve_similar_flow_control::solve(before, after, node_cache, diff);
+    }
+}
+
+/**
+* Matches `nodes::is_semantically_structural` candidates (functions, classes, structs, enums,
+* impls, ...) by **fully-resolved name**: `(kind, name)` where `name` is scope-qualified by
+* prepending every enclosing named node's own name, joined by `::` - e.g. a `new` method inside
+* `impl Bar` resolves to `"Bar::new"`, distinguishing it from `Foo::new` without the dedicated
+* impl/class method pre-pass `solve_semantically_structural_nodes` needed (Pass 0b/Pass 1 there):
+* the scope qualification *is* the disambiguation, for every kind, uniformly.
+*
+* Grouped into `HashMap<(kind, fully_resolved_name), Vec<node_id>>` (a `Vec`, not a single id) to
+* support real N:M: overloads, duplicate trait impls, or any other case where more than one
+* candidate shares the same key on one or both sides.
+*
+* Unlike the positional/arm-overlap signals this phase also uses (via `solve_greedy_anchor_blocks`/
+* `solve_similar_flow_control`), matching here is **not** gated by a cost-ratio rejection
+* threshold: the shared fully-resolved name already *is* the identity signal (this declaration
+* exists on both sides, however much its content changed - even a 100%-rewritten function body is
+* still "the same function" if the name didn't change), so cost is only used to break ties *within*
+* a multi-candidate group (deciding *which* overload pairs with which), never to reject a pair
+* outright. `solve_greedy_anchor_blocks::cost_ratio` (the same `sequence_edit_cost`-based estimate)
+* is reused for that tie-break, cheapest first, one-to-one within the group.
+*
+* Runs before the positional/arm-overlap signals in [`solve`] so a container that could be matched
+* by *either* an outer named declaration or an inner anonymous block gets the stronger, name-based
+* signal first - same "identity beats position, position beats coincidence" ordering the old
+* pipeline's Pass 1-3 already encoded.
+*/
+fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff) {
+    let before_metadata = metadata_of(before);
+    let after_metadata = metadata_of(after);
+    let language = before_metadata.language;
+
+    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else { return };
+    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else { return };
+
+    let before_groups = collect_fully_resolved_groups(before_root, &language, before);
+    let after_groups = collect_fully_resolved_groups(after_root, &language, after);
+
+    // Deterministic group processing order (see `solve_greedy_anchor_blocks`'s identical rationale
+    // on its own `active_keys.sort_by_key`): sort by the smallest member's `preorder_index`, never
+    // by `HashMap` iteration order or raw node id.
+    let mut active_keys: Vec<&(String, String)> =
+        before_groups.keys().filter(|k| after_groups.contains_key(*k)).collect();
+    active_keys.sort_by_key(|key| {
+        before_groups[*key]
+            .iter()
+            .map(|id| before_metadata.node_info.get(id).map(|i| i.preorder_index).unwrap_or(usize::MAX))
+            .min()
+            .unwrap_or(usize::MAX)
+    });
+
+    for key in active_keys {
+        let before_ids = &before_groups[key];
+        let after_ids = &after_groups[key];
+
+        // Score every not-yet-matched pair within this group; no rejection threshold (see doc
+        // comment) - cost is only a tie-break ordering among this group's own candidates.
+        let mut scored_pairs: Vec<(f64, usize, usize)> = Vec::new();
+        for (before_pos, &before_id) in before_ids.iter().enumerate() {
+            if diff.before_node_map.contains_key(&before_id) {
+                continue;
+            }
+            for (after_pos, &after_id) in after_ids.iter().enumerate() {
+                if diff.after_node_map.contains_key(&after_id) {
+                    continue;
+                }
+                let ratio = solve_greedy_anchor_blocks::cost_ratio(
+                    before_id,
+                    after_id,
+                    &before_metadata,
+                    &after_metadata,
+                )
+                .unwrap_or(0.0);
+                scored_pairs.push((ratio, before_pos, after_pos));
+            }
+        }
+        scored_pairs.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)).then_with(|| a.2.cmp(&b.2)));
+
+        let mut before_used = vec![false; before_ids.len()];
+        let mut after_used = vec![false; after_ids.len()];
+
+        for (_, before_pos, after_pos) in scored_pairs {
+            if before_used[before_pos] || after_used[after_pos] {
+                continue;
+            }
+            let before_id = before_ids[before_pos];
+            let after_id = after_ids[after_pos];
+            // Defensive re-check: an earlier-processed group may already have claimed one of
+            // these nodes while resolving a containing pair (e.g. an outer impl matched first,
+            // whose real APTED resolution already covered a nested method that's also,
+            // independently, a candidate here).
+            if diff.before_node_map.contains_key(&before_id) || diff.after_node_map.contains_key(&after_id) {
+                continue;
+            }
+            before_used[before_pos] = true;
+            after_used[after_pos] = true;
+
+            apted::for_nodes(
+                &before_metadata,
+                &after_metadata,
+                vec![before_id],
+                vec![after_id],
+                Algorithm::Apted,
+                "syntax_named",
+                diff,
+            );
+        }
+    }
+}
+
+/// Recursive top-down walk building `HashMap<(kind, fully_resolved_name), Vec<node_id>>` - see
+/// `solve_named_reference_groups`'s doc comment for what "fully resolved" means. `scope` is the
+/// stack of enclosing named nodes' own (unqualified) names, outermost first; only nodes for which
+/// `nodes::is_semantically_structural` returns a name push onto it, so intermediate structural
+/// wrappers with no name of their own (Rust's `declaration_list`, Python's class `block`, ...)
+/// don't break scope inheritance - a method two wrapper-levels under `impl Bar` still resolves to
+/// `"Bar::method"`, not `"Bar::declaration_list::method"`.
+fn collect_fully_resolved_groups(
+    root: Node,
+    language: &Language,
+    code: &Code,
+) -> HashMap<(String, String), Vec<usize>> {
+    let mut out = HashMap::new();
+    let mut scope: Vec<String> = Vec::new();
+    collect_fully_resolved_groups_rec(root, language, code, &mut scope, &mut out);
+    out
+}
+
+fn collect_fully_resolved_groups_rec(
+    node: Node,
+    language: &Language,
+    code: &Code,
+    scope: &mut Vec<String>,
+    out: &mut HashMap<(String, String), Vec<usize>>,
+) {
+    let mut pushed_scope = false;
+    if let Some((kind, name)) = nodes::is_semantically_structural(&node, language, code) {
+        let full_name =
+            if scope.is_empty() { name.clone() } else { format!("{}::{}", scope.join("::"), name) };
+        out.entry((kind, full_name)).or_default().push(node.id());
+        scope.push(name);
+        pushed_scope = true;
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_fully_resolved_groups_rec(child, language, code, scope, out);
+    }
+
+    if pushed_scope {
+        scope.pop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::code::Language;
+    use crate::diff::ASTMappingOperation;
+
+    #[test]
+    fn methods_in_different_impls_are_matched_within_their_own_impl() {
+        // Same regression guard as solve_semantically_structural_nodes' equivalent test: two
+        // impls both define `new`. Fully-resolved names ("Foo::new" vs "Bar::new") disambiguate
+        // them without any dedicated impl-scoped pre-pass.
+        let before_src = "
+struct Foo;
+struct Bar;
+impl Foo { fn new() -> Foo { Foo } }
+impl Bar { fn new() -> Bar { Bar } }
+";
+        let after_src = "
+struct Foo;
+struct Bar;
+impl Foo { fn new() -> Foo { Foo } }
+impl Bar { fn new() -> Bar { Bar::default() } }
+";
+        let before = Code::from_string(before_src, &Language::Rust);
+        let after = Code::from_string(after_src, &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        let foo_new_mapping = crate::test::helper::mapping_for_path(
+            &["impl_item:1", "declaration_list", "function_item"],
+            &["impl_item:1", "declaration_list", "function_item"],
+            before_root,
+            after_root,
+            &diff,
+        )
+        .unwrap();
+        assert_eq!(foo_new_mapping.operation, ASTMappingOperation::Identical, "Foo::new should be identical");
+
+        let bar_new_mapping = crate::test::helper::mapping_for_path(
+            &["impl_item:2", "declaration_list", "function_item"],
+            &["impl_item:2", "declaration_list", "function_item"],
+            before_root,
+            after_root,
+            &diff,
+        )
+        .unwrap();
+        assert_eq!(
+            bar_new_mapping.operation,
+            ASTMappingOperation::MatchButNotIdentical,
+            "Bar::new should be changed"
+        );
+    }
+
+    #[test]
+    fn overloaded_same_name_functions_are_matched_nm() {
+        // Two `impl_item`s for the same type (no trait) collide on plain `is_semantically_
+        // structural` keying in today's pass - a real N:M case the fully-resolved-name grouping
+        // must still handle via cost-based tie-break within the group, since both impls key to
+        // the exact same fully-resolved name ("Foo") when there's no trait to disambiguate them.
+        let before_src = "
+struct Foo;
+impl Foo { fn a() -> i32 { 1 } }
+impl Foo { fn b() -> i32 { 2 } }
+";
+        let after_src = "
+struct Foo;
+impl Foo { fn a() -> i32 { 10 } }
+impl Foo { fn b() -> i32 { 20 } }
+";
+        let before = Code::from_string(before_src, &Language::Rust);
+        let after = Code::from_string(after_src, &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        // Both `fn a` and `fn b` should end up mapped somewhere (not left as orphans) regardless
+        // of which of the two same-keyed `impl Foo` blocks they were grouped under.
+        let before_ast = before.ast.as_ref().unwrap();
+        let mapped_fn_count = before_ast
+            .root_node()
+            .children(&mut before_ast.root_node().walk())
+            .filter(|n| n.kind() == "impl_item")
+            .flat_map(|impl_node| {
+                let mut cursor = impl_node.walk();
+                impl_node
+                    .children(&mut cursor)
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .flat_map(|decl_list| {
+                        let mut c2 = decl_list.walk();
+                        decl_list.children(&mut c2).collect::<Vec<_>>()
+                    })
+                    .filter(|n| n.kind() == "function_item")
+                    .collect::<Vec<_>>()
+            })
+            .filter(|n| diff.before_node_map.contains_key(&n.id()))
+            .count();
+        assert_eq!(mapped_fn_count, 2, "both overloaded-name functions should be mapped");
+    }
+}

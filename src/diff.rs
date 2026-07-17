@@ -23,6 +23,7 @@ pub mod solve_bottom_up_expansion;
 pub mod solve_comment_nodes;
 pub mod solve_commutative_structural_trees;
 pub mod solve_greedy_anchor_blocks;
+pub mod solve_hash_descent;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_import_nodes;
@@ -32,6 +33,7 @@ pub mod solve_multilevel_hash;
 pub mod solve_semantically_structural_nodes;
 pub mod solve_similar_flow_control;
 pub mod solve_structurally_identical_trees;
+pub mod solve_syntax_aware_matching;
 pub mod text;
 pub mod text_range;
 
@@ -185,6 +187,15 @@ impl Diff {
             ..Default::default()
         };
 
+        if config.use_new_pipeline {
+            Self::run_new_pipeline(before, after, &node_cache, &mut ast_diff, config);
+            return Self {
+                ast: Some(ast_diff),
+                language: before.metadata.language.unwrap_or(Language::Unknown),
+                text: None,
+            };
+        }
+
         // These are highly efficient for small diffs, and small diffs are half of all
         // diffs.
         if config.solver_identical_trees {
@@ -328,6 +339,60 @@ impl Diff {
             text: None,
         }
     }
+
+    /**
+     * Six-phase pipeline rework (`TODO.md`, 2026-07-17), built alongside the ~15-pass pipeline
+     * above rather than replacing it in place (see `HeuristicConfig::use_new_pipeline`), so both
+     * remain independently benchmarkable until the rework is verified and the old pipeline is
+     * retired. See `TODO.md`'s "The six phases" section for what each phase replaces and why.
+     */
+    fn run_new_pipeline(
+        before: &Code,
+        after: &Code,
+        node_cache: &NodeCache,
+        ast_diff: &mut ASTDiff,
+        config: &HeuristicConfig,
+    ) {
+        // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
+        // normalized-import-path hash). The import-path hash variant is gated on
+        // `solver_import_nodes`, same as the old pipeline's `solve_import_nodes` call: the
+        // 2026-07-15 ablation study found it net-negative (-89 disabling it individually), and
+        // nothing about folding it into a hash variant changes that signal's own accuracy.
+        solve_hash_descent::solve(before, after, node_cache, ast_diff, config.solver_import_nodes);
+
+        // Phase 2: "move detection" (repurposed name - houses solve_comment_nodes and
+        // solve_identical_diagnostic_statements, not solve_moved_subtrees - see TODO.md).
+        solve_comment_nodes::solve(before, after, node_cache, ast_diff);
+        solve_identical_diagnostic_statements::solve(before, after, node_cache, ast_diff);
+
+        // Phase 3: bottom-up expansion. Gated on `solver_bottom_up_expansion`, same net-negative
+        // finding as above (-69 individually) - same knob the old pipeline uses.
+        if config.solver_bottom_up_expansion {
+            solve_bottom_up_expansion::solve(before, after, node_cache, ast_diff);
+        }
+
+        // Phase 4: syntax-aware subtree matching (redesigned solve_semantically_structural_nodes,
+        // absorbing solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally, and
+        // solve_similar_flow_control gated on `solver_similar_flow_control` - net-negative
+        // individually (-82) in the same ablation study).
+        solve_syntax_aware_matching::solve(before, after, node_cache, ast_diff, config.solver_similar_flow_control);
+
+        // Phase 5: second bottom-up expansion, now that phase 4 has produced more matched
+        // descendants for it to vote on. Same gate as phase 3.
+        if config.solver_bottom_up_expansion {
+            solve_bottom_up_expansion::solve(before, after, node_cache, ast_diff);
+        }
+
+        // Phase 6: final APTED on the whole-file residual.
+        let _ = apted::for_roots(
+            before,
+            after,
+            node_cache,
+            apted::Algorithm::Apted,
+            "final_pass",
+            ast_diff,
+        );
+    }
 }
 
 /**
@@ -353,6 +418,14 @@ impl Diff {
 */
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
+    /// Six-phase pipeline rework (`TODO.md`, 2026-07-17): when true, `Diff::from_code_with_config`
+    /// runs `Diff::run_new_pipeline` instead of the ~15-pass pipeline below, ignoring every other
+    /// field on this struct. Temporary build-alongside toggle so the new pipeline can be
+    /// benchmarked against the old one throughout the rework, per the "build alongside, delete
+    /// last" plan in `TODO.md` - not meant to survive once the rework is done and the old pipeline
+    /// is deleted (at which point this whole struct goes back to being one pipeline's ablation
+    /// switches, not two pipelines' worth).
+    pub use_new_pipeline: bool,
     pub solver_identical_trees: bool,
     pub solver_structurally_identical_trees: bool,
     pub solver_commutative_structural_trees: bool,
@@ -373,6 +446,7 @@ pub struct HeuristicConfig {
 impl Default for HeuristicConfig {
     fn default() -> Self {
         Self {
+            use_new_pipeline: false,
             solver_identical_trees: true,
             // The 2026-07-15 ablation study found these 5 passes had zero measured effect on
             // benchmark accuracy when disabled individually - but disabling them *together* with

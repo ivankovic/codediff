@@ -74,6 +74,12 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     metadata.node_to_normalized_punct_literal_hash.clear();
     metadata.normalized_punct_literal_hash_to_node.clear();
 
+    // Six-phase pipeline rework hashes (see below).
+    metadata.node_to_kind_and_value_hash.clear();
+    metadata.kind_and_value_hash_to_node.clear();
+    metadata.node_to_kind_only_hash.clear();
+    metadata.kind_only_hash_to_node.clear();
+
     let ast = code
         .ast
         .as_ref()
@@ -97,6 +103,12 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         // Compute commutative structural hash for this node (sorts children for commutative containers)
         let commutative_structural_hash = compute_commutative_structural_hash(&node, &mut cursor, language);
         
+        // Six-phase pipeline rework hashes: order-independence (per is_commutative_container)
+        // folded in at every recursion level, not bolted on as a third separate hash - see each
+        // function's doc comment.
+        let kind_and_value_hash = compute_kind_and_value_hash(&node, &mut cursor, code.contents.as_bytes(), language);
+        let kind_only_hash = compute_kind_only_hash(&node, &mut cursor, language);
+
         // Compute multi-level normalized hashes
         let norm_punct_hash = compute_normalized_punct_hash(&node, &mut cursor, code.contents.as_bytes());
         let norm_literal_hash = compute_normalized_literal_hash(&node, &mut cursor, code.contents.as_bytes());
@@ -128,6 +140,20 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         metadata
             .commutative_structural_hash_to_node
             .entry(commutative_structural_hash)
+            .or_default()
+            .push(node_id);
+
+        // Store six-phase pipeline rework hashes
+        metadata.node_to_kind_and_value_hash.insert(node_id, kind_and_value_hash);
+        metadata
+            .kind_and_value_hash_to_node
+            .entry(kind_and_value_hash)
+            .or_default()
+            .push(node_id);
+        metadata.node_to_kind_only_hash.insert(node_id, kind_only_hash);
+        metadata
+            .kind_only_hash_to_node
+            .entry(kind_only_hash)
             .or_default()
             .push(node_id);
 
@@ -314,6 +340,90 @@ fn compute_commutative_structural_hash<'a>(
         // For non-commutative nodes, use regular structural hash
         compute_structural_hash(node, cursor)
     }
+}
+
+/**
+* Six-phase pipeline rework (`TODO.md`, 2026-07-17): `KindAndValueHash` - like `compute_full_hash`
+* (kind, child count, gap text, each child's own hash, all in document order), but order-
+* independence is checked at *every* recursion level via `is_commutative_container`, not bolted on
+* as a separate third hash the way `compute_commutative_structural_hash` is. This is the fix for
+* that function's own documented propagation bug: recursing into *this same function*
+* unconditionally (instead of falling back to a plain, always-ordered hash once outside a
+* commutative container) means a reordering inside a nested commutative container changes the
+* hash of that container alone, never any ancestor above it - so a reference node wrapping a
+* reordered commutative container (e.g. an `enum_item` wrapping a reordered `enum_variant_list`)
+* still hashes identically before/after the reorder, letting phase 1's hash descent match it
+* directly instead of needing a dedicated `solve_commutative_structural_trees` pass.
+*/
+fn compute_kind_and_value_hash<'a>(
+    node: &tree_sitter::Node<'a>,
+    cursor: &mut tree_sitter::TreeCursor<'a>,
+    source_code: &[u8],
+    language: Language,
+) -> u64 {
+    let mut hasher = MetroHash64::new();
+    hasher.write(node.kind_id().to_le_bytes().as_slice());
+    hasher.write(node.child_count().to_le_bytes().as_slice());
+
+    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
+
+    if is_commutative_container(node.kind(), &language) {
+        // Order-independent: sort (child_hash) pairs, drop gap text (gap order/identity is
+        // itself a document-order artifact that doesn't make sense to preserve once children are
+        // allowed to reorder).
+        let mut child_hashes: Vec<u64> = children
+            .iter()
+            .map(|child| compute_kind_and_value_hash(child, cursor, source_code, language))
+            .collect();
+        child_hashes.sort_unstable();
+        for hash in child_hashes {
+            hasher.write(hash.to_le_bytes().as_slice());
+        }
+    } else {
+        let mut gap_start = node.start_byte();
+        for child in &children {
+            hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
+            let child_hash = compute_kind_and_value_hash(child, cursor, source_code, language);
+            hasher.write(child_hash.to_le_bytes().as_slice());
+            gap_start = child.end_byte();
+        }
+        hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
+    }
+
+    hasher.finish()
+}
+
+/**
+* Six-phase pipeline rework (`TODO.md`, 2026-07-17): `KindOnlyHash` - like `compute_structural_hash`
+* (kind, child count, each child's own hash; no leaf values, no gap text), with the same per-level
+* `is_commutative_container` order-independence fix described on `compute_kind_and_value_hash`.
+* Replaces both `compute_structural_hash` and the 4 `compute_normalized_*` variants for the new
+* pipeline: those existed to bridge different granularities between "byte-identical" and "same
+* shape, any leaf value" (ignore punctuation only, ignore literals only, ignore identifiers only,
+* ignore both) - `KindOnlyHash` collapses all of that into the single coarsest tier (any leaf
+* value, since leaf values aren't hashed at all), an accepted precision loss - see `TODO.md`.
+*/
+fn compute_kind_only_hash<'a>(
+    node: &tree_sitter::Node<'a>,
+    cursor: &mut tree_sitter::TreeCursor<'a>,
+    language: Language,
+) -> u64 {
+    let mut hasher = MetroHash64::new();
+    hasher.write(node.kind_id().to_le_bytes().as_slice());
+    hasher.write(node.child_count().to_le_bytes().as_slice());
+
+    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
+    let mut child_hashes: Vec<u64> =
+        children.iter().map(|child| compute_kind_only_hash(child, cursor, language)).collect();
+
+    if is_commutative_container(node.kind(), &language) {
+        child_hashes.sort_unstable();
+    }
+    for hash in child_hashes {
+        hasher.write(hash.to_le_bytes().as_slice());
+    }
+
+    hasher.finish()
 }
 
 /// Helper function to check if a character is punctuation

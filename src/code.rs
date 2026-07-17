@@ -297,6 +297,22 @@ pub struct ASTMetadata {
     pub node_to_normalized_punct_literal_hash: HashMap<usize, u64>,
     /// Reverse map for Level 5 normalized hash.
     pub normalized_punct_literal_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Six-phase pipeline rework (2026-07-17, `TODO.md`): kind+value hash, order-independent per
+    /// `nodes::is_commutative_container` at *every* recursion level (not just the top, unlike
+    /// `node_to_commutative_structural_hash` above - see `hash::compute_kind_and_value_hash`'s doc
+    /// comment for the propagation-bug fix this depends on). Replaces `node_to_full_hash` for the
+    /// new pipeline; kept alongside it, not instead of it, until the old pipeline is retired.
+    pub node_to_kind_and_value_hash: HashMap<usize, u64>,
+    /// Reverse map for `node_to_kind_and_value_hash`. See `full_hash_to_node` for why this is a
+    /// `Vec`, not a `HashSet`.
+    pub kind_and_value_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// Six-phase pipeline rework: structural (kind-only) hash, order-independent per
+    /// `nodes::is_commutative_container` at every recursion level. Replaces both
+    /// `node_to_structural_hash` and the 4 `node_to_normalized_*` variants for the new pipeline -
+    /// see `TODO.md`'s "New hash algorithms" section for the accepted precision-loss tradeoff.
+    pub node_to_kind_only_hash: HashMap<usize, u64>,
+    /// Reverse map for `node_to_kind_only_hash`.
+    pub kind_only_hash_to_node: HashMap<u64, Vec<usize>>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: HashMap<usize, usize>,
     /// node.id() -> `(count, node_id)` of the node with the most *direct* children found

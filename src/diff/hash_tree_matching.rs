@@ -145,6 +145,168 @@ pub(crate) fn solve(
     solve_with_node_list(before, after, node_cache, diff, spec, |metadata| metadata.reference_nodes_ordered.clone())
 }
 
+/**
+* Six-phase pipeline rework (`TODO.md`, 2026-07-17): the generalized, reusable version of
+* [`solve_with_node_list`] phase 1 is built around. The old `HashMatchSpec` reads a *named* field
+* off `ASTMetadata` via a function pointer (`|m| &m.node_to_full_hash`) - baking in "there is one
+* fixed hash per purpose" and requiring a new `HashMatchSpec` variant (plus `ASTMappingReason`
+* wiring) for every new hash algorithm. This version takes the before-side hash map and the
+* after-side reverse map directly as parameters instead: the caller computes whichever hash
+* algorithm it wants (`KindAndValueHash`, `KindOnlyHash`, a normalized-import-path hash, ...)
+* before calling in, so this function never needs to know how many hash algorithms exist.
+*
+* Classification (`Identical` vs `Update`) no longer needs a `classify` function pointer either:
+* regardless of which hash matched the pair, whether the match is byte-identical is answered by
+* comparing `node_to_kind_and_value_hash` directly (always available - it's the finest-grained
+* hash in the new pipeline) rather than threading a second, matcher-specific hash through the
+* caller.
+*/
+pub(crate) fn solve_with_hash_map(
+    before: &Code,
+    after: &Code,
+    node_cache: &NodeCache,
+    diff: &mut ASTDiff,
+    before_hash: &HashMap<usize, u64>,
+    after_hash_to_nodes: &HashMap<u64, Vec<usize>>,
+    root_reason: ASTMappingReason,
+    descendant_reason: ASTMappingReason,
+    node_list_selector: impl Fn(&ASTMetadata) -> Vec<usize>,
+) {
+    let before_metadata = metadata_of(before);
+    let after_metadata = metadata_of(after);
+
+    let classify = |before_id: usize, after_id: usize| -> (ASTMappingOperation, u64) {
+        let before_kv = before_metadata.node_to_kind_and_value_hash.get(&before_id);
+        let after_kv = after_metadata.node_to_kind_and_value_hash.get(&after_id);
+        if before_kv.is_some() && before_kv == after_kv {
+            (ASTMappingOperation::Identical, 0)
+        } else {
+            (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
+        }
+    };
+
+    let before_node_ids = node_list_selector(&before_metadata);
+
+    for &before_node_id in &before_node_ids {
+        if diff.before_node_map.contains_key(&before_node_id) {
+            continue;
+        }
+        let Some(&before_node) = node_cache.before.get(&before_node_id) else { continue };
+        let Some(before_hash_value) = before_hash.get(&before_node_id) else { continue };
+        let Some(after_candidates) = after_hash_to_nodes.get(before_hash_value) else { continue };
+
+        // Same tiebreak rationale as `solve_with_node_list`: proximity in the file, not discovery
+        // order, is what tells true duplicates apart from unrelated hash collisions.
+        let Some(&after_node_id) = after_candidates
+            .iter()
+            .filter(|&&id| !diff.after_node_map.contains_key(&id))
+            .min_by_key(|&&id| {
+                node_cache
+                    .after
+                    .get(&id)
+                    .map(|n| n.start_byte().abs_diff(before_node.start_byte()))
+                    .unwrap_or(usize::MAX)
+            })
+        else {
+            continue;
+        };
+        let Some(&after_node) = node_cache.after.get(&after_node_id) else { continue };
+
+        let (operation, cost) = classify(before_node_id, after_node_id);
+        diff.add_mapping(
+            before_node_id,
+            after_node_id,
+            ASTMapping { cost, operation, reason: root_reason.clone() },
+        );
+
+        // Descend both subtrees in lockstep, pairing children by position and kind - except
+        // under a commutative container, where children must be paired by hash instead (see
+        // `pair_children_for_descent`'s doc comment for why a positional `zip` is wrong there).
+        let mut stack = vec![(before_node, after_node)];
+        while let Some((before_parent, after_parent)) = stack.pop() {
+            for (before_child, after_child) in
+                pair_children_for_descent(before_parent, after_parent, &before_metadata, &after_metadata)
+            {
+                if diff.before_node_map.contains_key(&before_child.id()) {
+                    continue;
+                }
+                let (operation, cost) = classify(before_child.id(), after_child.id());
+                diff.add_mapping(
+                    before_child.id(),
+                    after_child.id(),
+                    ASTMapping { cost, operation, reason: descendant_reason.clone() },
+                );
+                stack.push((before_child, after_child));
+            }
+        }
+    }
+}
+
+/**
+* Pairs `before_parent`'s and `after_parent`'s children for the hash-descent engine's lockstep
+* walk. Ordinary containers pair positionally (`zip`, filtered to matching kinds) - safe because
+* the parent's own hash match (`KindAndValueHash`/`KindOnlyHash`) was computed in document order,
+* so equal hashes already imply position-for-position correspondence.
+*
+* Under a `nodes::is_commutative_container` parent, that assumption breaks: both new hashes hash a
+* commutative container's children *unordered* (sorted), so two containers can hash equal while
+* their children sit in completely different positions (a same-name reorder is exactly what
+* `is_commutative_container` exists to match). A positional `zip` there would silently mis-pair
+* reordered children - the exact bug `code::hash::compute_commutative_structural_hash`'s own doc
+* comment warned about ("reordered children get re-mangled by the shared engine's positional
+* zip"). Fix: pair by `node_to_kind_only_hash` instead (multiset equality between the two child
+* lists is guaranteed here, by construction, whenever the parent hash matched - the sorted-hash
+* combination that produced the parent's own hash could only be equal if the *multiset* of child
+* hashes is equal), breaking ties among same-hash candidates by document proximity, the same
+* tiebreak the top-level match itself uses.
+*/
+fn pair_children_for_descent<'a>(
+    before_parent: tree_sitter::Node<'a>,
+    after_parent: tree_sitter::Node<'a>,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+) -> Vec<(tree_sitter::Node<'a>, tree_sitter::Node<'a>)> {
+    let mut before_cursor = before_parent.walk();
+    let mut after_cursor = after_parent.walk();
+    let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
+    let after_children: Vec<_> = after_parent.children(&mut after_cursor).collect();
+
+    let language = before_metadata.language;
+    if !crate::diff::nodes::is_commutative_container(before_parent.kind(), &language) {
+        return before_children
+            .into_iter()
+            .zip(after_children)
+            .filter(|(b, a)| b.kind() == a.kind())
+            .collect();
+    }
+
+    let mut after_by_hash: HashMap<u64, Vec<tree_sitter::Node<'a>>> = HashMap::new();
+    for &child in &after_children {
+        let hash = after_metadata.node_to_kind_only_hash.get(&child.id()).copied().unwrap_or(0);
+        after_by_hash.entry(hash).or_default().push(child);
+    }
+
+    let mut used = std::collections::HashSet::new();
+    let mut pairs = Vec::new();
+    for before_child in before_children {
+        let hash = before_metadata.node_to_kind_only_hash.get(&before_child.id()).copied().unwrap_or(0);
+        let Some(candidates) = after_by_hash.get(&hash) else { continue };
+        let Some(best) = candidates
+            .iter()
+            .filter(|c| !used.contains(&c.id()))
+            .min_by_key(|c| c.start_byte().abs_diff(before_child.start_byte()))
+        else {
+            continue;
+        };
+        if best.kind() != before_child.kind() {
+            continue;
+        }
+        used.insert(best.id());
+        pairs.push((before_child, *best));
+    }
+    pairs
+}
+
 /// Generic version of solve that accepts a custom node list selector
 pub(crate) fn solve_with_node_list(
     before: &Code,

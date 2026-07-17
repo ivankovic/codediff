@@ -27,7 +27,7 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 /// - Handling relative imports (./, ../ prefixes)
 ///
 /// This allows matching imports that have different formatting but refer to the same path.
-fn normalize_import_path(path: &str) -> String {
+pub(crate) fn normalize_import_path(path: &str) -> String {
     // Trim whitespace, remove surrounding quotes, and trim again
     let trimmed = path.trim();
     let unquoted = trimmed.trim_matches('"').trim_matches('\'').trim();
@@ -58,7 +58,7 @@ fn normalize_import_path(path: &str) -> String {
 /// matching a bare keyword here would treat every occurrence of that keyword in the file as its
 /// own "import" with a bogus path derived from the keyword text, causing spurious cross-statement
 /// matches. Verified against each language's node-types.json.
-fn is_import_node(node_kind: &str, language: &Language) -> bool {
+pub(crate) fn is_import_node(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => node_kind == "use_declaration" || node_kind == "extern_crate_declaration",
         Language::Go => node_kind == "import_spec" || node_kind == "import_declaration",
@@ -96,7 +96,7 @@ fn is_string_literal_kind(kind: &str) -> bool {
 }
 
 /// Extracts the import path text from a node's children
-fn extract_import_path(node_id: usize, metadata: &ASTMetadata) -> Option<String> {
+pub(crate) fn extract_import_path(node_id: usize, metadata: &ASTMetadata) -> Option<String> {
     let node_info = metadata.node_info.get(&node_id)?;
 
     // First, check if the node itself is a string literal or scoped identifier

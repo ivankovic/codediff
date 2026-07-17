@@ -275,7 +275,7 @@ fn collect_candidates(
 /// higher means more of the block had to be paid for as a delete or an insert. Returns `None` if
 /// either node's subtree size is missing (should not happen for a `collect_candidates` output) or
 /// zero (nothing to compare).
-fn cost_ratio(
+pub(crate) fn cost_ratio(
     before_id: usize,
     after_id: usize,
     before_metadata: &ASTMetadata,

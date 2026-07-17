@@ -164,6 +164,12 @@ struct Args {
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
 
+    /// Six-phase pipeline rework (`TODO.md`, 2026-07-17): run the new pipeline instead of the
+    /// default ~15-pass one, for A/B benchmarking during the rework. Overrides every
+    /// `--solver-X`/`--no-solver-X` flag below.
+    #[arg(long = "new-pipeline")]
+    new_pipeline: bool,
+
     /// Enable the identical-full-hash pass (default; see `--no-solver-identical-trees`).
     #[arg(long = "solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_identical_trees")]
     solver_identical_trees: bool,
@@ -280,6 +286,7 @@ struct Args {
 /// verified against clap's actual last-flag-wins behavior before this was stamped out 14 times).
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
     codediff::diff::HeuristicConfig {
+        use_new_pipeline: args.new_pipeline,
         solver_identical_trees: args.solver_identical_trees && !args.no_solver_identical_trees,
         solver_structurally_identical_trees: args.solver_structurally_identical_trees
             && !args.no_solver_structurally_identical_trees,
