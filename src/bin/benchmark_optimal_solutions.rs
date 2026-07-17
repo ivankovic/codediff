@@ -207,6 +207,13 @@ struct Args {
     #[arg(long = "no-solver-comment-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_comment_nodes")]
     no_solver_comment_nodes: bool,
 
+    /// Enable the large-flat-subtree Myers pre-match pass (default; see the `--no-solver-...` form).
+    #[arg(long = "solver-large-flat-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_large_flat_subtrees")]
+    solver_large_flat_subtrees: bool,
+    /// Disable `solve_large_flat_subtrees` (top-level-item flat-descendant Myers pre-match).
+    #[arg(long = "no-solver-large-flat-subtrees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_large_flat_subtrees")]
+    no_solver_large_flat_subtrees: bool,
+
     /// Enable the semantically-structural (name-keyed) pass (default; see the `--no-solver-...` form).
     #[arg(long = "solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_semantically_structural_nodes")]
     solver_semantically_structural_nodes: bool,
@@ -281,6 +288,7 @@ fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
         solver_multilevel_hash: args.solver_multilevel_hash && !args.no_solver_multilevel_hash,
         solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
         solver_comment_nodes: args.solver_comment_nodes && !args.no_solver_comment_nodes,
+        solver_large_flat_subtrees: args.solver_large_flat_subtrees && !args.no_solver_large_flat_subtrees,
         solver_semantically_structural_nodes: args.solver_semantically_structural_nodes
             && !args.no_solver_semantically_structural_nodes,
         solver_similar_flow_control: args.solver_similar_flow_control && !args.no_solver_similar_flow_control,

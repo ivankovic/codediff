@@ -108,6 +108,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     crate::code::hash::hash_code(code, &mut metadata)?;
     compute_subtree_sizes(code, &mut metadata)?;
     compute_node_info(code, &mut metadata)?;
+    compute_widest_subtree_node(code, &mut metadata);
     compute_node_depths(code, &mut metadata)?;
     compute_node_parents(&mut metadata);
     discover_reference_nodes(code, &mut metadata)?;
@@ -223,6 +224,42 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Compute `ASTMetadata::node_to_widest_subtree_node` (see its doc comment) via a bottom-up
+/// (post-order) pass over `node_info`, already populated by `compute_node_info` - id-based, no
+/// second walk of the raw tree-sitter AST needed beyond reading the root id.
+fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
+    let Some(ast) = code.ast.as_ref() else { return };
+    let root_id = ast.root_node().id();
+
+    // Post-order via the same (id, processed) stack idiom `compute_subtree_sizes` uses, just
+    // operating on `node_info.children` instead of raw tree-sitter nodes.
+    let mut stack = vec![(root_id, false)];
+    while let Some((node_id, processed)) = stack.pop() {
+        if processed {
+            let Some(children) = metadata.node_info.get(&node_id).map(|info| info.children.clone()) else {
+                continue;
+            };
+            let mut best = (children.len(), node_id);
+            for &child_id in &children {
+                if let Some(&(child_best_count, child_best_id)) =
+                    metadata.node_to_widest_subtree_node.get(&child_id)
+                    && child_best_count > best.0
+                {
+                    best = (child_best_count, child_best_id);
+                }
+            }
+            metadata.node_to_widest_subtree_node.insert(node_id, best);
+        } else {
+            stack.push((node_id, true));
+            if let Some(info) = metadata.node_info.get(&node_id) {
+                for &child_id in &info.children.clone() {
+                    stack.push((child_id, false));
+                }
+            }
+        }
+    }
 }
 
 /// Compute the depth of every node (root = 0, its children = 1, ...).

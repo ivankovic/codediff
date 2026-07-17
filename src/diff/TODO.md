@@ -130,6 +130,62 @@ here so nobody re-discovers the same false positives.
   results back into the real `diff` in one fixed pass afterward) rather than trying to guess a
   processing order that happens to minimize wasted work. That's a bigger, more invasive change
   than this session had scope for.
+  **`rayon`/`Arc<Mutex<_>>` removed from `solve_semantically_structural_nodes.rs`, made fully
+  single-threaded (2026-07-17)**: requested explicitly as a simplification, with the variance
+  finding above already in hand as a caveat going in. Confirmed exactly as predicted: the
+  candidate-order bug is unrelated to threading (candidate lists still come from unsorted
+  `HashMap` iteration, just processed on one thread now instead of several), so the same
+  `kotlin-nextcloud-a-few-small-removals` variance persisted after this change (2.68s-20.99s
+  across repeated runs). Correctness unaffected (782/782 mismatches, 0 of 86 fixtures differing;
+  full `cargo test --lib` still 336 passed/0 failed/5 ignored). Cost: the full 86-fixture
+  aggregate benchmark got ~20% *slower* (285s -> 344s) - fixtures with multiple impl/class/
+  function pairs lost real parallel throughput they were previously getting, with nothing gained
+  to offset it since removing threading doesn't touch the actual bug. Kept anyway (explicit
+  choice): simpler code (no `Arc`/`Mutex`/`rayon` plumbing, ~130 fewer lines) now, real fix
+  (private per-pair diffs, see directly above) can build on top of this simplified version later
+  without also having to unwind the parallel-processing machinery at the same time.
+  **Unrelated idea surfaced while discussing this (NOT a fix for the above)**: GumTree
+  (Falleri et al., ASE 2014) never runs an exact tree-edit-distance algorithm (it uses RTED,
+  APTED's predecessor) on anything but a small residual inside an already-matched container - its
+  bottom-up phase's Dice-coefficient threshold is a hard gate on *when* exact TED is worth paying
+  for at all; anything that doesn't clear it just gets left as a plain delete+insert instead of an
+  expensive search. This codebase's `final_pass` does the opposite - full APTED on *whatever's
+  left over* after every heuristic pass, uncapped by size. Capping it (fall back to something
+  cheap above some residual-size threshold) would bound `final_pass`'s own worst case, which is a
+  real, separate, already-documented risk (see "Zhang-Shasha blowup on large residuals" in
+  [[diff-perf-pass-2026-07-09]]) - but it is explicitly **not** a fix for the bug documented just
+  above: that bug lives in `solve_semantically_structural_nodes.rs`'s *parallel, per-pair* APTED
+  calls (each already on a small, single-container subtree, nowhere near `final_pass`'s uncapped
+  whole-residual call), so a size cap on `final_pass` wouldn't touch it at all. Worth doing on its
+  own merits, not as a substitute for the real fix noted directly above.
+
+- **`solve_flat_macro_bodies` extracted into its own module, `solve_large_flat_subtrees.rs`, and
+  generalized from "Rust `macro_invocation`, matched by macro name" to any top-level item in any
+  supported language (2026-07-17)**: first step of a larger, explicitly-requested rework of
+  `solve_semantically_structural_nodes.rs`. New identity mechanism: `nodes::is_semantically_
+  structural`'s existing cross-language (kind, name) extraction, falling back to the original
+  macro-callee-name extraction for `macro_invocation` specifically (the one kind `is_semantically_
+  structural` doesn't cover - it's about compiler-enforced-unique declarations, a macro invocation
+  is neither). For each matched top-level pair, finds the single largest-by-direct-child-count
+  descendant on each side (any kind, not just `token_tree`); if both exist, diffs that flat pair
+  first (triggers `resolve_forest`'s existing Myers fast path), then the top-level pair itself
+  (flat descendant already in `diff` -> pruned). Wired in as its own `solver_large_flat_subtrees`
+  pipeline step (default on), running before `solve_semantically_structural_nodes` so an impl/
+  class that also contains a large flat blob gets it pre-empted first.
+  **Performance regression found and fixed in the same session**: the naive version (BFS every
+  candidate's full subtree, unconditionally) made the full 86-fixture benchmark ~4% slower overall
+  (344s -> 358s) despite firing on only 1 of 86 fixtures (`kotlin-nextcloud-remove-function`) -
+  scanning cost paid by every fixture, benefit realized by almost none. A `node_to_subtree_size`
+  pre-filter (skip descending into subtrees too small to possibly qualify) barely helped (358s ->
+  355s): most real functions/impls have well over 50 *total* AST nodes even though no single node
+  inside has 50 *direct* children, so that filter's early-exit almost never fired. Real fix: added
+  `ASTMetadata::node_to_widest_subtree_node` (`code.rs`/`code/metadata.rs`), a new field
+  precomputed once per file (bottom-up, alongside `node_to_subtree_size`) giving every node the
+  `(count, node_id)` of the node with the most direct children anywhere in its own subtree -
+  turns `largest_flat_container_in` from an O(subtree size) BFS into an O(1) lookup. Result: 318s,
+  at or below every earlier baseline this session, correctness unchanged throughout (782/782
+  mismatches, 0 of 86 fixtures differing at every step; full `cargo test --lib` 338 passed/0
+  failed/5 ignored, +2 from the new module's own tests).
 
 ## Real, still open
 

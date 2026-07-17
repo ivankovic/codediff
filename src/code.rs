@@ -299,6 +299,15 @@ pub struct ASTMetadata {
     pub normalized_punct_literal_hash_to_node: HashMap<u64, Vec<usize>>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: HashMap<usize, usize>,
+    /// node.id() -> `(count, node_id)` of the node with the most *direct* children found
+    /// anywhere in this node's own subtree (inclusive of itself). Lets
+    /// `solve_large_flat_subtrees::largest_flat_container_in` answer "does this subtree contain
+    /// a node with >= N direct children, and which one" in O(1) instead of a per-query BFS -
+    /// `node_to_subtree_size` alone isn't enough for that (a node's *total* descendant count
+    /// says nothing about whether any single one of them has many *direct* children; a subtree
+    /// can easily have hundreds of nodes while every individual node in it has only 2-3
+    /// children).
+    pub node_to_widest_subtree_node: HashMap<usize, (usize, usize)>,
     /// node.id() -> depth (root = 0, its children = 1, ...)
     pub node_to_depth: HashMap<usize, usize>,
     /// child node.id() -> parent node.id(), covering every non-root node. `ASTNodeMetadata` has

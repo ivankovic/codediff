@@ -1,4 +1,141 @@
-# Next algorithmic improvements to implement
+# Major pipeline rework (PLANNING, 2026-07-17, not started)
+
+Requested by the user 2026-07-17: replace the current ~15-pass pipeline (see `Diff::from_code_
+with_config` in `src/diff.rs`) with a smaller, six-phase one, as a **clean replacement** (delete
+superseded modules/reasons/config fields directly - no side-by-side A/B period). All design
+questions below were asked live and answered the same day; this is the resolved plan. Still open:
+exact "fully resolved name" resolution scheme per kind/language, exact cost function for phase 4's
+approximate-cost step, and phase 5's exact parameters (same as phase 3, or loosened?) - these are
+implementation-time decisions, not blocking further planning.
+
+## The six phases
+
+1. **Hash-based, largest-subtree-first descent** - a generalized, reusable version of what
+   `solve_identical_trees`/`solve_structurally_identical_trees` already do via `hash_tree_
+   matching.rs`'s `HashMatchSpec`/`solve_with_node_list`: walk candidate nodes largest-subtree-
+   first, and for each still-unmatched node, look up an after-side node sharing its hash, claim
+   the match, then pair descendants positionally. The rework: make this genuinely reusable rather
+   than the current `HashMatchSpec` (which reads a *named* field off `ASTMetadata` via a function
+   pointer, e.g. `|m| &m.node_to_full_hash`) - the caller precomputes a node-id -> hash map with
+   whichever hash algorithm it wants *before* invoking the engine, and passes that map plus an
+   `ASTMappingReason` straight in as parameters. Called multiple times, once per hash algorithm:
+   - `KindAndValueHash` (replaces `solve_identical_trees`/`IdenticalHash`)
+   - `KindOnlyHash` (replaces `solve_structurally_identical_trees`/`StructurallyIdenticalSubtrees`,
+     **and** `solve_multilevel_hash`'s 4 `Normalized*` variants - punctuation/literal/identifier-
+     insensitive matching folds into this one coarser hash rather than 4 separate ones. Known,
+     accepted tradeoff: this loses the 2 intermediate granularities `solve_multilevel_hash` had
+     - e.g. "same structure and literals, renamed identifiers only" no longer gets its own
+     matching tier, just falls to the same coarse kind-only bucket as everything else. Worth
+     checking the accuracy impact via `benchmark_optimal_solutions` once implemented, even though
+     this isn't gated behind a flag for A/B comparison per the "clean replacement" decision.)
+   - A normalized-import-path variant (replaces `solve_import_nodes` - folded in as a hash variant
+     rather than kept as its own phase, per the same "reusable hash descent" engine).
+   `solve_commutative_structural_trees` is removed outright (see below - order-independence is now
+   inherent to both primary hashes, not a bolted-on third one).
+
+2. **"Move detection"** - repurposed name/slot, **not** `solve_moved_subtrees.rs` (that module is
+   deleted outright - the user confirmed "remove solve_moved_subtrees"). Phase 2 instead houses
+   `solve_comment_nodes` (comment-precedes-matched-node matching) and `solve_identical_diagnostic_
+   statements` (identical logging/bail/assert/printf matching) - both are, in the user's framing,
+   a form of "detecting where already-known content re-lands" rather than literal subtree-move
+   recovery. Kept the phase name as given; noted here so a future reader isn't confused about why
+   a phase named "move detection" contains neither move detection nor `solve_moved_subtrees`.
+
+3. **Bottom-up expansion** - `solve_bottom_up_expansion.rs` as it exists today (Dice-coefficient
+   vote-then-verify matching of containers via already-matched descendants), unchanged.
+
+4. **Syntax-aware subtree matching** - a redesign of `solve_semantically_structural_nodes.rs`,
+   generalized to also absorb `solve_greedy_anchor_blocks`'s job (confirmed: "phase 4 also handles
+   anonymous containers") and `solve_large_flat_subtrees`'s job (confirmed: "a special case of the
+   greedy solver" - once a pair is accepted and handed to `apted::for_nodes`, `resolve_forest`'s
+   existing flat-tree fast path already routes to Myers automatically when applicable, so this
+   likely needs no dedicated code of its own beyond making sure large flat containers are valid
+   candidates in the same pool - not a separate pre-emptive phase).
+   Candidates: reference nodes (`nodes::is_reference`'s per-language kind list - broader/coarser
+   than the current pass's `nodes::is_semantically_structural`) matched by `(kind, fully-resolved
+   name)` **when a name is resolvable**, falling back to positional anchoring (shared matched
+   ancestor + kind-path, `solve_greedy_anchor_blocks`'s existing mechanism) for anonymous
+   containers with no name at all (if-bodies, loop bodies, ...) - one unified greedy matcher
+   covering both today's name-keyed pass and today's positionally-anchored one.
+   "Fully resolved name" is new: today, `semantically_structural_nodes: HashMap<(String, String),
+   usize>` stores at most *one* node per `(kind, name)` key and needs a separate impl/class-scoped
+   pre-pass (Pass 1/Pass 0b in the current module) specifically because a bare method name like
+   `new` collides across every `impl` in the file - "fully resolved" means encoding that scope
+   into the name itself (e.g. `"Bar::new"` instead of bare `"new"`), letting one flat matching
+   mechanism replace today's two-tier impl/class-then-everything-else split. **Confirmed: real
+   N:M cases matter** (overloads, trait-impl duplicates), not just the common 1:1 case - the
+   candidate-grouping data structure needs to hold a `Vec` per `(kind, name)` key, not a single id.
+   Matching mechanism: for every candidate group, compute a **fast, approximate** cost for all
+   valid before/after pairs in that group (same spirit as `solve_greedy_anchor_blocks`'s `sequence_
+   edit_cost` - a direct-children-only estimate, not real tree edit distance), then greedily assign
+   pairs whose cost clears a similarity threshold, cheapest first - mirroring `solve_greedy_anchor_
+   blocks`'s `scored_pairs.sort_by(...)` + greedy claim loop, generalized from "compete within one
+   positional-key group" to "compete within one (kind, name)-or-positional group." Once a pair is
+   accepted, run **real APTED** on it (`apted::for_nodes`) to produce the actual mapping - same
+   "pre-match via a cheap signal, diff for real" idiom every current heuristic pass already uses;
+   `PostorderIndexer` already skips anything an earlier phase claimed, so nothing new needed there.
+
+5. **Second bottom-up expansion** - phase 3 run again, after phase 4 has produced more matched
+   descendants for it to vote on. Exact parameters (same as phase 3, or a looser Dice threshold
+   the second time) TBD at implementation time.
+
+6. **Final APTED** - `solve_final_apted`/`apted::for_roots` on the whole-file residual, unchanged.
+   `solve_orphaned_semantic_nodes` (Pass 3, which currently runs *after* this) is deleted outright
+   - confirmed: it's already a no-op today, kept only for documentation, so there's nothing to
+   port forward.
+
+## New hash algorithms: `KindAndValueHash` and `KindOnlyHash`
+
+Replace `IdenticalHash` (today's full hash, `compute_full_hash`) and `StructurallyIdenticalSubtrees`
+(today's structural hash, `compute_structural_hash`) - **and**, per the "fold it in too" decision
+above, `solve_multilevel_hash`'s 4 normalized variants - with two algorithms of the same basic
+shape as today's first two (kind+value = byte-identical subtree; kind-only = same shape, different
+leaf values), but both gain a property neither current hash has cleanly: **order-independence
+folded in per node kind**, not bolted on as a third, separate hash variant the way `compute_
+commutative_structural_hash` is today. Concretely: consult `nodes::is_commutative_container(kind,
+language)` (already exists, already per-language - enum variant lists, use-lists, struct field
+lists, etc.) while hashing; if a node's own kind is commutative, hash its children's hashes
+*unordered* (sort child hashes before combining) instead of in document order.
+
+This directly fixes a bug already found and documented in `compute_commutative_structural_hash`'s
+own doc comment (`code/hash.rs`, dated 2026-07-15, never applied): today, order-independence does
+not propagate past the commutative container itself, because the non-commutative branch delegates
+to plain `compute_structural_hash` instead of recursing back into itself - so a reordering-only
+change still changes the hash of every *ancestor* of the reordered container (e.g. the `enum_item`
+wrapping a reordered `enum_variant_list`), meaning `solve_commutative_structural_trees` (which
+matches on the ancestor reference node, not the bare container) never actually fires for its own
+documented use case. Building both new hashes to recurse into themselves unconditionally, checking
+`is_commutative_container` at every level rather than only at the top, fixes this by construction.
+
+`solve_commutative_structural_trees.rs` and its dedicated hash field/reason (`FullymappingSubtrees`)
+are removed outright, since order-independence is now inherent to both primary hashes.
+
+## Disposition of every currently-existing pass (resolved 2026-07-17)
+
+| Pass | Fate |
+|---|---|
+| `solve_identical_trees` | replaced by phase 1 w/ `KindAndValueHash` |
+| `solve_structurally_identical_trees` | replaced by phase 1 w/ `KindOnlyHash` |
+| `solve_commutative_structural_trees` | **removed** - folded into both new hashes |
+| `solve_multilevel_hash` | **removed** - folded into `KindOnlyHash` (accepted precision loss, see above) |
+| `solve_import_nodes` | **removed** - folded into phase 1 as a hash variant |
+| `solve_comment_nodes` | moved into phase 2 ("move detection"), unchanged internally |
+| `solve_identical_diagnostic_statements` | moved into phase 2 ("move detection"), unchanged internally |
+| `solve_moved_subtrees` | **removed** outright |
+| `solve_bottom_up_expansion` | phases 3 and 5, unchanged internally |
+| `solve_semantically_structural_nodes` | replaced by phase 4 (redesigned) |
+| `solve_similar_flow_control` | folded into phase 4 - arm-overlap scoring becomes another candidate-grouping signal in the generalized greedy matcher, alongside name-based and positional anchoring |
+| `solve_greedy_anchor_blocks` | **removed** - absorbed into phase 4 (anonymous-container handling) |
+| `solve_large_flat_subtrees` | **removed** as a standalone phase - becomes an implicit special case inside phase 4 |
+| `solve_orphaned_semantic_nodes` (Pass 3) | **removed** outright (dead code, already a no-op) |
+| `solve_final_apted` | phase 6, unchanged |
+
+Phase 4 is now the single largest consolidation point in the rework: it absorbs `solve_
+semantically_structural_nodes` (name-based matching), `solve_greedy_anchor_blocks` (positional
+matching for anonymous containers), `solve_large_flat_subtrees` (flat-subtree special case), and
+`solve_similar_flow_control` (arm-overlap candidate grouping) into one generalized greedy matcher
+with several different candidate-grouping signals feeding the same "approximate cost -> greedy
+assign -> real APTED" mechanism.
 
 *  IMPLEMENTED (2026-07-15): Per-pass ablation study infrastructure (`HeuristicConfig` in
    `src/diff.rs`, `Diff::from_code_with_config`/`diff_code_with_config`, 14 `--solver-X`/

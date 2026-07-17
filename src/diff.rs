@@ -26,6 +26,7 @@ pub mod solve_greedy_anchor_blocks;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_identical_trees;
 pub mod solve_import_nodes;
+pub mod solve_large_flat_subtrees;
 pub mod solve_moved_subtrees;
 pub mod solve_multilevel_hash;
 pub mod solve_semantically_structural_nodes;
@@ -224,6 +225,14 @@ impl Diff {
             solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
         }
 
+        // Pre-match top-level items with a large flat descendant (e.g. a Rust macro's token_tree
+        // body) via Myers sequence diff, before anything else buries them inside a much larger,
+        // non-flat comparison. Runs before solve_semantically_structural_nodes so an impl/class
+        // that also happens to contain a large flat blob gets that blob pre-empted first.
+        if config.solver_large_flat_subtrees {
+            solve_large_flat_subtrees::solve(before, after, &mut ast_diff);
+        }
+
         // These speed up the diff, but don't guaranteed an optimal solution
         if config.solver_semantically_structural_nodes {
             solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
@@ -350,6 +359,7 @@ pub struct HeuristicConfig {
     pub solver_multilevel_hash: bool,
     pub solver_import_nodes: bool,
     pub solver_comment_nodes: bool,
+    pub solver_large_flat_subtrees: bool,
     pub solver_semantically_structural_nodes: bool,
     pub solver_similar_flow_control: bool,
     pub solver_identical_diagnostic_statements: bool,
@@ -375,6 +385,7 @@ impl Default for HeuristicConfig {
             // benchmark) - ablation 2026-07-15.
             solver_import_nodes: false,
             solver_comment_nodes: true,
+            solver_large_flat_subtrees: true,
             solver_semantically_structural_nodes: true,
             solver_similar_flow_control: false,
             solver_identical_diagnostic_statements: true,
