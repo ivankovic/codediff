@@ -94,12 +94,49 @@ module-rule` 86 -> 52). A full old-vs-new per-fixture diff of all 86 fixtures no
 one** remaining difference: `rust-next-font-imports-generator` (22 -> 29, +7 - the entire remaining
 gap). `--details` on that fixture shows the extra mismatches are all "codediff chose Identical,
 human mapping expected MatchButNotIdentical" on a reordered `use_list` (Rust's commutative-container
-kind) and a restructured `if`-chain - i.e. very plausibly the `KindAndValueHash`/`KindOnlyHash`
-commutative-hash propagation-bug fix (see above) now correctly recognizing the reordered import
-list as unchanged, which the recorded human ground truth doesn't credit. Not confirmed as "the new
-pipeline is actually more correct here" (would need re-running `human_solver` against this fixture
-to be sure), but plausible enough that this was not chased further this session - flagged for
-whoever picks this up next. Full test suite (340 tests, 5 ignored) still green.
+kind) and a restructured `if`-chain - confirmed (see next section) to be the commutative-hash
+propagation-bug fix correctly recognizing the reordered import list as unchanged, which the
+recorded human ground truth doesn't credit.
+
+## Distinguishing reordered from truly identical (added 2026-07-18)
+
+User request: "we do need a way to distinguish between truly identical and reordered." Confirmed
+the diagnosis above was right, and that it's a real, general gap: folding order-independence
+directly into `KindAndValueHash`/`KindOnlyHash` fixed the propagation bug but also meant a
+reordered-but-otherwise-unchanged commutative container is indistinguishable from a genuinely
+untouched one - both get plain `IdenticalHash`/`IdenticalHashOfAncestor`. The old, now-removed
+`solve_commutative_structural_trees` kept this distinguishable via its own dedicated reason
+(`FullymappingSubtrees`); the new hash-descent engine had no equivalent.
+
+Fix: `ASTMappingReason::FullymappingSubtrees` (already existed, was slated for removal, **not
+removed after all** - repurposed) now gets applied by the new engine too.
+`hash_tree_matching::pair_children_for_descent` returns a `reordered` flag (true if any child's
+after-side document-order index differs from its before-side index within a commutative parent),
+and `solve_with_hash_map` patches that parent's already-added mapping to `FullymappingSubtrees`
+once its children are examined. Operation/cost are unchanged (reordering-only stays free, matching
+the old pass's precedent) - only the *reason* now differs, so downstream consumers (a diff viewer,
+`human_solver`, `benchmark_optimal_solutions`'s reason-count columns) can tell the two cases apart.
+
+Fixing this surfaced a second, independent bug in the same function (introduced earlier this
+session, not by the original commutative-pairing fix's intent): child pairing always used
+`node_to_kind_only_hash`, which is too coarse whenever the *outer* match came from
+`KindAndValueHash` - same-kind, different-value leaves (e.g. three plain `identifier`s named
+`a`/`b`/`c`) all hash equal under kind-only, so the nearest-by-position tiebreak could silently
+"recover" a pairing that looks unreordered even when it wasn't, breaking reorder detection itself.
+Fixed with a two-tier match: exact `kind_and_value_hash` first (correct whenever the outer match
+guarantees kind+value multiset equality), `kind_only_hash` fallback for whatever's left unpaired
+(needed for `KindOnlyHash`-driven outer matches, where content values may legitimately differ).
+
+New test (`solve_hash_descent.rs::reordered_commutative_container_is_distinguished_from_truly_
+identical`) verifies a reordered Rust `use_list` gets `FullymappingSubtrees` while an untouched
+sibling function does not.
+
+**Result: 789 -> 787 mismatches vs. the 782 baseline.** `rust-next-font-imports-generator` improved
+29 -> 27 but the fixture-level gap isn't fully closed: the benchmark's mismatch detection compares
+`ASTMappingOperation`, not `ASTMappingReason`, and the human ground truth expects `MatchButNot
+Identical` operation for these reordered pairs, not just a distinguishing reason - a cost-model
+question (should a pure reorder cost more than 0, and should its operation differ from `Identical`?)
+that's separate from what was asked and wasn't changed. Full test suite (341 tests, 5 ignored) green.
 
 At this point the new pipeline is close enough to parity that the remaining work is: (1) decide
 whether the `rust-next-font-imports-generator` gap is a real regression or an alternate-optimal-
