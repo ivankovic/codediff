@@ -138,10 +138,33 @@ Identical` operation for these reordered pairs, not just a distinguishing reason
 question (should a pure reorder cost more than 0, and should its operation differ from `Identical`?)
 that's separate from what was asked and wasn't changed. Full test suite (341 tests, 5 ignored) green.
 
-At this point the new pipeline is close enough to parity that the remaining work is: (1) decide
-whether the `rust-next-font-imports-generator` gap is a real regression or an alternate-optimal-
-solution artifact worth re-solving in `human_solver`, then (2) proceed to the "final cleanup" step
-above.
+## Reordering cost + operation (added 2026-07-18)
+
+Immediate follow-up user request: "make reordering cost more than 0 and change operation to
+MatchButNotIdentical." The reordered container itself (`FullymappingSubtrees`) now gets
+`ASTMappingOperation::MatchButNotIdentical` / `COST_UPDATE` instead of `Identical` / 0.
+
+That alone still left every non-commutative *ancestor* of a reordered container (e.g.
+`use_declaration`/`scoped_use_list` wrapping a reordered `use_list`) reporting `Identical`, since
+they aren't commutative containers themselves and `pair_children_for_descent`'s reorder detection
+only fires on the container that actually reordered. Fixed by collecting every reordered node's id
+during the descent and, once a hash-descent root match's whole subtree is processed, walking each
+one's ancestor chain (via `node_to_parent`) up to the match's own root, downgrading every
+`Identical` ancestor along the way to `MatchButNotIdentical` - a container is never a true no-op
+match if anything inside it, at any depth, wasn't. Ancestors keep their existing reason (only the
+actual commutative container gets `FullymappingSubtrees`); only operation/cost change.
+
+**Result: 787 -> 778 mismatches - now *below* the 782 baseline.** `rust-next-font-imports-generator`
+flipped from a +5 regression to a **-4 improvement** (18 vs. the old pipeline's 22): the ancestor-
+propagation logic catches cases `solve_commutative_structural_trees`'s single-level
+`FullymappingSubtrees` reason never did (it never propagated non-identical status up through
+non-commutative wrapper ancestors either). The full 86-fixture old-vs-new diff now shows **zero**
+fixtures where the new pipeline is worse than the old one, and one where it's measurably better.
+Full test suite (341 tests, 5 ignored) green.
+
+The new pipeline is now at least as accurate as the old one on every fixture in the corpus. Next
+step is the "final cleanup" above: flip the `use_new_pipeline` default, delete the ~9 superseded
+modules/reasons/config fields, remove the toggle.
 
 ---
 
