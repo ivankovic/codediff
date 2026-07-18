@@ -15,13 +15,14 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
 use crate::code::{Code, Language};
 use crate::code::metadata::metadata_of;
 use crate::diff::apted::{self, Algorithm};
+use crate::diff::nodes::flow_control_similarity_of_sets;
 use crate::diff::{
     ASTDiff, NodeCache, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks, solve_large_flat_subtrees,
     solve_similar_flow_control,
@@ -61,6 +62,7 @@ pub fn solve(
 ) {
     solve_large_flat_subtrees::solve(before, after, diff);
     solve_named_reference_groups(before, after, diff);
+    solve_import_list_overlap(before, after, diff);
     solve_greedy_anchor_blocks::solve(before, after, node_cache, diff);
     if solve_similar_flow_control_enabled {
         solve_similar_flow_control::solve(before, after, node_cache, diff);
@@ -184,11 +186,126 @@ fn collect_fully_resolved_groups_rec(
     }
 }
 
+/// Minimum accepted Jaccard similarity (imported-symbol-set overlap) for a candidate pair of
+/// same-base-path Rust `use foo::{...}` statements - see [`solve_import_list_overlap`].
+const IMPORT_LIST_SIMILARITY_THRESHOLD: f64 = 0.5;
+
+/**
+* Phase 4 expansion candidate #2 (`TODO.md`, 2026-07-18): multi-symbol Rust `use` statements
+* (`use foo::{a, b, c}`) whose imported-symbol *set* changed (a symbol added or removed, not just
+* reordered) don't hash-match via phase 1 - `KindOnlyHash` requires the same *multiset* of child
+* hashes, which changes with membership, not just order - and have no other identity signal to key
+* on. This groups candidate `use_declaration`s with a multi-symbol `use_list` by their base import
+* path (`std::collections` in `use std::collections::{HashMap, HashSet}`), scores same-path pairs
+* by Jaccard similarity of their imported symbol sets (same shape as `solve_similar_flow_control`'s
+* arm-overlap scoring, reusing its generic `flow_control_similarity_of_sets` helper), and hands
+* accepted pairs to real APTED.
+*
+* Deliberately matches the *whole* `use_declaration` in one `apted::for_nodes` call, never an
+* individual imported symbol - expansion candidate #1 (field/variant-level named matching, tried
+* and reverted, see `TODO.md`) found that matching a single list *member* in isolation fragments
+* the parent list's own generic comma-token assignment, which needs list-wide context to get right.
+* Handing the whole statement to APTED in one call lets it resolve the `{...}` list's comma
+* assignment holistically instead.
+*
+* Rust-only: `scoped_use_list`/`use_list` are Rust-specific grammar node kinds.
+*/
+fn solve_import_list_overlap(before: &Code, after: &Code, diff: &mut ASTDiff) {
+    let before_metadata = metadata_of(before);
+    let after_metadata = metadata_of(after);
+    if before_metadata.language != Language::Rust {
+        return;
+    }
+
+    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else { return };
+    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else { return };
+
+    let before_items = collect_rust_grouped_use_declarations(before_root, before, &diff.before_node_map);
+    let after_items = collect_rust_grouped_use_declarations(after_root, after, &diff.after_node_map);
+    if before_items.is_empty() || after_items.is_empty() {
+        return;
+    }
+
+    let before_candidates: Vec<(usize, String)> =
+        before_items.iter().map(|(id, path, _)| (*id, path.clone())).collect();
+    let after_candidates: Vec<(usize, String)> =
+        after_items.iter().map(|(id, path, _)| (*id, path.clone())).collect();
+    let before_symbols: HashMap<usize, &HashSet<&str>> =
+        before_items.iter().map(|(id, _, symbols)| (*id, symbols)).collect();
+    let after_symbols: HashMap<usize, &HashSet<&str>> =
+        after_items.iter().map(|(id, _, symbols)| (*id, symbols)).collect();
+
+    grouped_greedy_matcher::solve(
+        diff,
+        &before_candidates,
+        &after_candidates,
+        |before_id, after_id| 1.0 - flow_control_similarity_of_sets(before_symbols[&before_id], after_symbols[&after_id]),
+        Some(1.0 - IMPORT_LIST_SIMILARITY_THRESHOLD),
+        |before_id, after_id, diff| {
+            apted::for_nodes(
+                &before_metadata,
+                &after_metadata,
+                vec![before_id],
+                vec![after_id],
+                Algorithm::Apted,
+                "syntax_import_list",
+                diff,
+            );
+        },
+    );
+}
+
+/// `(use_declaration node id, base import path text, imported symbol set)` for every not-yet-
+/// matched Rust `use_declaration` in `root`'s subtree whose argument is a multi-symbol
+/// `scoped_use_list` (i.e. the `use foo::{a, b, ...}` form, not a bare `use foo::bar;`) - a
+/// single-symbol import has nothing for Jaccard scoring to compare against, and already-hash-
+/// matches or doesn't via phase 1 with nothing this pass could add.
+fn collect_rust_grouped_use_declarations<'a>(
+    root: Node<'a>,
+    code: &'a Code,
+    mapped: &HashMap<usize, usize>,
+) -> Vec<(usize, String, HashSet<&'a str>)> {
+    let bytes = code.contents.as_bytes();
+    let mut out = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if node.kind() == "use_declaration" && !mapped.contains_key(&node.id()) {
+            if let Some(scoped_use_list) = node.child_by_field_name("argument")
+                && scoped_use_list.kind() == "scoped_use_list"
+                && let Some(path_node) = scoped_use_list.child_by_field_name("path")
+                && let Some(list_node) = scoped_use_list.child_by_field_name("list")
+                && list_node.kind() == "use_list"
+                && let Ok(path_text) = path_node.utf8_text(bytes)
+            {
+                let mut symbols = HashSet::new();
+                let mut cursor = list_node.walk();
+                for child in list_node.named_children(&mut cursor) {
+                    if let Ok(text) = child.utf8_text(bytes) {
+                        symbols.insert(text);
+                    }
+                }
+                if !symbols.is_empty() {
+                    out.push((node.id(), path_text.to_string(), symbols));
+                }
+            }
+            // Don't descend into a use_declaration's own subtree - it has no nested
+            // use_declarations of its own.
+            continue;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::code::Language;
     use crate::diff::ASTMappingOperation;
+    use crate::test::helper::find_first_of_kind;
 
     #[test]
     fn methods_in_different_impls_are_matched_within_their_own_impl() {
@@ -286,5 +403,44 @@ impl Foo { fn b() -> i32 { 20 } }
             .filter(|n| diff.before_node_map.contains_key(&n.id()))
             .count();
         assert_eq!(mapped_fn_count, 2, "both overloaded-name functions should be mapped");
+    }
+
+    #[test]
+    fn grouped_use_statement_survives_symbol_set_churn() {
+        // Same base path (`std::collections`), but the symbol set changed enough (one removed,
+        // one added) that the whole use_list no longer hash-matches - only 2 of 3 symbols
+        // overlap, comfortably above IMPORT_LIST_SIMILARITY_THRESHOLD (0.5).
+        let before_src = "use std::collections::{HashMap, HashSet, BTreeMap};\nfn f() {}\n";
+        let after_src = "use std::collections::{HashMap, HashSet, VecDeque};\nfn f() {}\n";
+        let before = Code::from_string(before_src, &Language::Rust);
+        let after = Code::from_string(after_src, &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_use = find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
+        let after_use = find_first_of_kind(after.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
+        assert_eq!(
+            diff.before_node_map.get(&before_use.id()),
+            Some(&after_use.id()),
+            "use statements with the same base path and mostly-overlapping symbols should be matched"
+        );
+    }
+
+    #[test]
+    fn grouped_use_statements_with_no_symbol_overlap_are_not_matched() {
+        let before_src = "use std::collections::{HashMap, HashSet};\n";
+        let after_src = "use std::collections::{VecDeque, BinaryHeap};\n";
+        let before = Code::from_string(before_src, &Language::Rust);
+        let after = Code::from_string(after_src, &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_use = find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
+        assert!(
+            !diff.before_node_map.contains_key(&before_use.id()),
+            "use statements with zero symbol overlap should not be matched by this pass"
+        );
     }
 }
