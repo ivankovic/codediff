@@ -1,4 +1,20 @@
-# Major pipeline rework (IMPLEMENTED end-to-end, 2026-07-17, gap analyzed - see status below)
+# Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
+
+## Final cleanup (2026-07-18)
+
+Old ~15-pass pipeline deleted outright. `Diff::from_code_with_config` now runs the seven phases
+directly - no more `HeuristicConfig::use_new_pipeline` toggle, no more parallel branch. Deleted:
+`solve_identical_trees.rs`, `solve_structurally_identical_trees.rs`, `solve_commutative_structural_
+trees.rs`, `solve_multilevel_hash.rs`, `solve_semantically_structural_nodes.rs`, `solve_import_
+nodes.rs` (its 4 reused helpers moved into `solve_hash_descent.rs`). `HeuristicConfig` shrank to
+the 4 fields that still gate a real decision (`solver_import_nodes`, `solver_similar_flow_control`,
+`solver_bottom_up_expansion`, `solver_moved_subtrees`); the 4 now-unproducible `NormalizedStructural
+Ignore*` reason variants and their backing `ASTMetadata` hash fields were removed too, along with
+the now-fully-unused `semantically_structural_nodes` metadata field (phase 4 walks the tree
+directly instead). `ablation_study.sh` and `benchmark_optimal_solutions.rs`'s CLI flags updated to
+match (14 flag pairs -> 4). Verified: full workspace build clean, 331 lib tests green, benchmark
+re-confirms **TOTAL 778** exactly - identical to the last pre-cleanup run, zero behavior change.
+Net -2,345 lines. This closes out the rework - see the sections below for the full design history.
 
 ## Implementation status (2026-07-17)
 
