@@ -164,68 +164,14 @@ struct Args {
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
 
-    /// Six-phase pipeline rework (`TODO.md`, 2026-07-17): run the new pipeline instead of the
-    /// default ~15-pass one, for A/B benchmarking during the rework. Overrides every
-    /// `--solver-X`/`--no-solver-X` flag below.
-    #[arg(long = "new-pipeline")]
-    new_pipeline: bool,
-
-    /// Enable the identical-full-hash pass (default; see `--no-solver-identical-trees`).
-    #[arg(long = "solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_identical_trees")]
-    solver_identical_trees: bool,
-    /// Disable `solve_identical_trees` (byte-identical-subtree matching) for the ablation study.
-    #[arg(long = "no-solver-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_trees")]
-    no_solver_identical_trees: bool,
-
-    /// Enable the structural-hash pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-structurally-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_structurally_identical_trees")]
-    solver_structurally_identical_trees: bool,
-    /// Disable `solve_structurally_identical_trees` (same-shape, differing-leaves matching).
-    #[arg(long = "no-solver-structurally-identical-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_structurally_identical_trees")]
-    no_solver_structurally_identical_trees: bool,
-
-    /// Enable the commutative-structural pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-commutative-structural-trees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_commutative_structural_trees")]
-    solver_commutative_structural_trees: bool,
-    /// Disable `solve_commutative_structural_trees` (reordered-children matching).
-    #[arg(long = "no-solver-commutative-structural-trees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_commutative_structural_trees")]
-    no_solver_commutative_structural_trees: bool,
-
-    /// Enable the multi-level normalized-hash pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-multilevel-hash", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_multilevel_hash")]
-    solver_multilevel_hash: bool,
-    /// Disable `solve_multilevel_hash` (punctuation/literal/identifier-normalized matching).
-    #[arg(long = "no-solver-multilevel-hash", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_multilevel_hash")]
-    no_solver_multilevel_hash: bool,
-
-    /// Enable the import-path-normalization pass. Off by default: net-negative in the 2026-07-15
-    /// ablation study (disabling it individually *improved* the benchmark by 89 mismatches).
+    /// Enable the import-path-normalization hash variant. Off by default: net-negative in the
+    /// 2026-07-15 ablation study (disabling it individually *improved* the benchmark by 89
+    /// mismatches).
     #[arg(long = "solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_import_nodes")]
     solver_import_nodes: bool,
-    /// Disable `solve_import_nodes` (normalized-import-path matching).
+    /// Disable the import-path-normalization hash variant (`solve_hash_descent`'s phase 1 step).
     #[arg(long = "no-solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_import_nodes")]
     no_solver_import_nodes: bool,
-
-    /// Enable the comment-sibling pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-comment-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_comment_nodes")]
-    solver_comment_nodes: bool,
-    /// Disable `solve_comment_nodes` (comment-precedes-matched-node matching).
-    #[arg(long = "no-solver-comment-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_comment_nodes")]
-    no_solver_comment_nodes: bool,
-
-    /// Enable the large-flat-subtree Myers pre-match pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-large-flat-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_large_flat_subtrees")]
-    solver_large_flat_subtrees: bool,
-    /// Disable `solve_large_flat_subtrees` (top-level-item flat-descendant Myers pre-match).
-    #[arg(long = "no-solver-large-flat-subtrees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_large_flat_subtrees")]
-    no_solver_large_flat_subtrees: bool,
-
-    /// Enable the semantically-structural (name-keyed) pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_semantically_structural_nodes")]
-    solver_semantically_structural_nodes: bool,
-    /// Disable `solve_semantically_structural_nodes` (fn/class/impl/struct/enum name matching).
-    #[arg(long = "no-solver-semantically-structural-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_semantically_structural_nodes")]
-    no_solver_semantically_structural_nodes: bool,
 
     /// Enable MatchSimilarFlowControl. Off by default: net-negative in the 2026-07-15 ablation
     /// study (disabling it individually *improved* the benchmark by 82 mismatches).
@@ -235,45 +181,16 @@ struct Args {
     #[arg(long = "no-solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_similar_flow_control")]
     no_solver_similar_flow_control: bool,
 
-    /// Enable MatchIdenticalDiagnosticStatements (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-identical-diagnostic-statements", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_identical_diagnostic_statements")]
-    solver_identical_diagnostic_statements: bool,
-    /// Disable `solve_identical_diagnostic_statements` (identical logging/bail/assert matching).
-    #[arg(long = "no-solver-identical-diagnostic-statements", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_identical_diagnostic_statements")]
-    no_solver_identical_diagnostic_statements: bool,
-
     /// Enable BottomUpExpansion. Off by default: net-negative in the 2026-07-15 ablation study
-    /// (disabling it individually *improved* the benchmark by 69 mismatches).
+    /// (disabling it individually *improved* the benchmark by 69 mismatches). Gates both phase 3
+    /// and phase 5 (bottom-up expansion runs twice in the pipeline).
     #[arg(long = "solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_bottom_up_expansion")]
     solver_bottom_up_expansion: bool,
     /// Disable `solve_bottom_up_expansion` (Dice-coefficient descendant-driven matching).
     #[arg(long = "no-solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_expansion")]
     no_solver_bottom_up_expansion: bool,
 
-    /// Enable GreedyAnchorBlock (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-greedy-anchor-blocks", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_greedy_anchor_blocks")]
-    solver_greedy_anchor_blocks: bool,
-    /// Disable `solve_greedy_anchor_blocks` (cost-estimate anchoring of anonymous containers).
-    #[arg(long = "no-solver-greedy-anchor-blocks", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_greedy_anchor_blocks")]
-    no_solver_greedy_anchor_blocks: bool,
-
-    /// Enable the final full-tree APTED pass (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-final-apted", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_final_apted")]
-    solver_final_apted: bool,
-    /// Disable the final `apted::for_roots` pass. Expect mismatch counts to explode: this is the
-    /// only pass with no name/hash/positional anchor requirement, so almost everything still
-    /// unmatched by this point relies on it.
-    #[arg(long = "no-solver-final-apted", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_final_apted")]
-    no_solver_final_apted: bool,
-
-    /// Enable Pass 3's orphaned-semantic-node cleanup (default; see the `--no-solver-...` form).
-    #[arg(long = "solver-orphaned-semantic-nodes", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_orphaned_semantic_nodes")]
-    solver_orphaned_semantic_nodes: bool,
-    /// Disable `solve_orphaned_semantic_nodes` (post-APTED semantic-node delete/insert cleanup).
-    #[arg(long = "no-solver-orphaned-semantic-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_orphaned_semantic_nodes")]
-    no_solver_orphaned_semantic_nodes: bool,
-
-    /// Enable MoveDetectionRecovery (default; see the `--no-solver-...` form).
+    /// Enable MoveDetectionRecovery / phase 7 (default; see the `--no-solver-...` form).
     #[arg(long = "solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_moved_subtrees")]
     solver_moved_subtrees: bool,
     /// Disable `solve_moved_subtrees` (deleted+inserted identical-subtree move pairing).
@@ -281,30 +198,14 @@ struct Args {
     no_solver_moved_subtrees: bool,
 }
 
-/// Resolves `Args`' 14 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
+/// Resolves `Args`' 4 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
 /// wins whenever the two disagree at the end of parsing (see the flag pair's `overrides_with`,
-/// verified against clap's actual last-flag-wins behavior before this was stamped out 14 times).
+/// verified against clap's actual last-flag-wins behavior).
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
     codediff::diff::HeuristicConfig {
-        use_new_pipeline: args.new_pipeline,
-        solver_identical_trees: args.solver_identical_trees && !args.no_solver_identical_trees,
-        solver_structurally_identical_trees: args.solver_structurally_identical_trees
-            && !args.no_solver_structurally_identical_trees,
-        solver_commutative_structural_trees: args.solver_commutative_structural_trees
-            && !args.no_solver_commutative_structural_trees,
-        solver_multilevel_hash: args.solver_multilevel_hash && !args.no_solver_multilevel_hash,
         solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
-        solver_comment_nodes: args.solver_comment_nodes && !args.no_solver_comment_nodes,
-        solver_large_flat_subtrees: args.solver_large_flat_subtrees && !args.no_solver_large_flat_subtrees,
-        solver_semantically_structural_nodes: args.solver_semantically_structural_nodes
-            && !args.no_solver_semantically_structural_nodes,
         solver_similar_flow_control: args.solver_similar_flow_control && !args.no_solver_similar_flow_control,
-        solver_identical_diagnostic_statements: args.solver_identical_diagnostic_statements
-            && !args.no_solver_identical_diagnostic_statements,
         solver_bottom_up_expansion: args.solver_bottom_up_expansion && !args.no_solver_bottom_up_expansion,
-        solver_greedy_anchor_blocks: args.solver_greedy_anchor_blocks && !args.no_solver_greedy_anchor_blocks,
-        solver_final_apted: args.solver_final_apted && !args.no_solver_final_apted,
-        solver_orphaned_semantic_nodes: args.solver_orphaned_semantic_nodes && !args.no_solver_orphaned_semantic_nodes,
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
     }
 }

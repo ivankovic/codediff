@@ -17,34 +17,31 @@
  */
 use std::collections::HashMap;
 
-use crate::code::Code;
+use crate::code::{ASTMetadata, Code, Language};
 use crate::code::metadata::metadata_of;
 use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
-use crate::diff::solve_import_nodes::{extract_import_path, is_import_node};
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
-* Phase 1 of the six-phase pipeline rework (`TODO.md`, 2026-07-17): "hash-based, largest-subtree-
+* Phase 1 of the seven-phase pipeline (`TODO.md`, 2026-07-17/18): "hash-based, largest-subtree-
 * first descent". Runs the generalized `hash_tree_matching::solve_with_hash_map` engine three
 * times, once per hash algorithm - each call finds and matches whatever it can, then the next call
 * only sees whatever's left unmatched (`PostorderIndexer`/the engine's own `before_node_map` check
 * skip anything already claimed):
 *
-* 1. `KindAndValueHash` - byte-identical subtrees (replaces `solve_identical_trees`). Extended node
-*    selection (reference nodes + big-enough nodes), matching `solve_identical_trees`' tuning.
-* 2. `KindOnlyHash` - same shape, any leaf value (replaces `solve_structurally_identical_trees`,
-*    and folds in `solve_multilevel_hash`'s 4 normalized variants - see `TODO.md`'s accepted
-*    precision-loss tradeoff). Reference nodes only, matching `solve_structurally_identical_trees`'
-*    narrower selection.
-* 3. Normalized import path hash - import statements matched by normalized path rather than syntax
-*    (replaces `solve_import_nodes`, folded in as a hash variant instead of its own phase/pass).
-*    Reference nodes only; the hash is computed only for recognized import-statement kinds
-*    (`solve_import_nodes::is_import_node`), so non-import nodes never collide into this map.
+* 1. `KindAndValueHash` - byte-identical subtrees. Extended node selection (reference nodes +
+*    big-enough nodes).
+* 2. `KindOnlyHash` - same shape, any leaf value. Reference nodes only. Deliberately one coarse
+*    tier rather than several intermediate granularities (ignore punctuation only, literals only,
+*    identifiers only, ...) - see `TODO.md`'s accepted precision-loss tradeoff.
+* 3. Normalized import path hash - import statements matched by normalized path rather than
+*    syntax, folded in as a hash variant instead of its own pass. Reference nodes only; the hash
+*    is computed only for recognized import-statement kinds (`is_import_node`, below), so
+*    non-import nodes never collide into this map.
 *
 * Both `KindAndValueHash` and `KindOnlyHash` are order-independent per `nodes::is_commutative_
 * container` at *every* recursion level (see `code::hash::compute_kind_and_value_hash`'s doc
-* comment), so `solve_commutative_structural_trees` is not ported forward here - order-independence
-* is now inherent to both hashes, not a bolted-on third one.
+* comment) - order-independence is inherent to both hashes, not a bolted-on third one.
 */
 pub fn solve(
     before: &Code,
@@ -123,7 +120,7 @@ fn solve_import_path_hash(before: &Code, after: &Code, node_cache: &NodeCache, d
     );
 }
 
-fn import_path_hash_map(metadata: &crate::code::ASTMetadata) -> HashMap<usize, u64> {
+fn import_path_hash_map(metadata: &ASTMetadata) -> HashMap<usize, u64> {
     use std::hash::{Hash, Hasher};
     let language = metadata.language;
     let mut result = HashMap::new();
@@ -137,6 +134,138 @@ fn import_path_hash_map(metadata: &crate::code::ASTMetadata) -> HashMap<usize, u
         result.insert(node_id, hasher.finish());
     }
     result
+}
+
+/// Normalizes an import path by:
+/// - Removing surrounding quotes (" or ')
+/// - Normalizing path separators (both / and \ to /)
+/// - Trimming whitespace
+/// - Handling relative imports (./, ../ prefixes)
+///
+/// This allows matching imports that have different formatting but refer to the same path.
+fn normalize_import_path(path: &str) -> String {
+    // Trim whitespace, remove surrounding quotes, and trim again
+    let trimmed = path.trim();
+    let unquoted = trimmed.trim_matches('"').trim_matches('\'').trim();
+
+    // Normalize path separators
+    let normalized_separators = unquoted.replace('\\', "/");
+
+    // Normalize relative path prefixes
+    // Handle ./prefix and ../prefix
+    if normalized_separators.starts_with("./") {
+        normalized_separators[2..].to_string()
+    } else {
+        // Keep ../ as-is - it changes the meaning.
+        normalized_separators
+    }
+}
+
+/// Returns true if the node kind represents an import statement for a given language
+///
+/// Every kind checked here must be a *named* tree-sitter node, never a bare keyword token
+/// (e.g. Rust's `use` keyword, or PHP's `include`/`require` keywords are anonymous leaves with
+/// `named: false` in each grammar's `node-types.json` - not the import statement itself), since
+/// this is checked against every node in `metadata.node_info`, which includes anonymous nodes -
+/// matching a bare keyword here would treat every occurrence of that keyword in the file as its
+/// own "import" with a bogus path derived from the keyword text, causing spurious cross-statement
+/// matches. Verified against each language's node-types.json.
+fn is_import_node(node_kind: &str, language: &Language) -> bool {
+    match language {
+        Language::Rust => node_kind == "use_declaration" || node_kind == "extern_crate_declaration",
+        Language::Go => node_kind == "import_spec" || node_kind == "import_declaration",
+        Language::Python => node_kind == "import_statement" || node_kind == "import_from_statement",
+        Language::Java | Language::CSharp => node_kind == "import_declaration",
+        Language::JavaScript | Language::TypeScript | Language::TSX => {
+            node_kind == "import_statement" || node_kind == "import_expression"
+        }
+        Language::C | Language::CPP => node_kind == "preproc_include",
+        Language::Kotlin => node_kind == "import",
+        Language::Scala => node_kind == "import_declaration",
+        Language::Swift => node_kind == "import_declaration",
+        Language::PHP => {
+            node_kind == "include_expression"
+                || node_kind == "include_once_expression"
+                || node_kind == "require_expression"
+                || node_kind == "require_once_expression"
+        }
+        // Ruby's `require "foo"` parses as a plain method `call` node, not a dedicated import
+        // node kind, so it can't be distinguished from any other method call by kind alone -
+        // left unmatched rather than risking false positives on arbitrary calls.
+        _ => false,
+    }
+}
+
+/// True if `kind` is a string-literal node kind in any grammar this pass supports. Deliberately
+/// broader than any single language's spelling: Rust/C/C++/Java/C#/Kotlin/Swift/PHP call it
+/// `string_literal`, Go calls it `interpreted_string_literal` (plus `raw_string_literal` for
+/// backtick strings, shared with Rust's raw strings), and JS/TS/JSON/PHP call it plain `string` -
+/// verified against each grammar's node-types.json. Checking only `string_literal` silently
+/// breaks path extraction for Go and JS/TS/JSON imports, falling through to using the whole
+/// import statement's raw text as the "path" instead.
+fn is_string_literal_kind(kind: &str) -> bool {
+    matches!(kind, "string_literal" | "raw_string_literal" | "interpreted_string_literal" | "string")
+}
+
+/// Extracts the import path text from a node's children
+fn extract_import_path(node_id: usize, metadata: &ASTMetadata) -> Option<String> {
+    let node_info = metadata.node_info.get(&node_id)?;
+
+    // First, check if the node itself is a string literal or scoped identifier
+    if is_string_literal_kind(&node_info.kind) {
+        return Some(normalize_import_path(&node_info.text));
+    }
+
+    // Check if the node itself is a scoped identifier
+    if node_info.kind == "scoped_identifier" {
+        // Collect identifiers in preorder (left to right)
+        let mut path_parts = Vec::new();
+        let mut stack = vec![node_id];
+        while let Some(id) = stack.pop() {
+            if let Some(info) = metadata.node_info.get(&id) {
+                // Visit children in order (left to right)
+                // To maintain order with a stack, push them in reverse order
+                for &child in info.children.iter().rev() {
+                    stack.push(child);
+                }
+                // If this node is an identifier, add its text
+                if info.kind == "identifier" {
+                    path_parts.push(info.text.clone());
+                }
+            }
+        }
+        if !path_parts.is_empty() {
+            return Some(path_parts.join("::"));
+        }
+    }
+
+    // Try to find a string literal or identifier child that contains the path
+    for &child_id in &node_info.children {
+        if let Some(child_info) = metadata.node_info.get(&child_id) {
+            // For string literals, return the text content
+            if is_string_literal_kind(&child_info.kind) {
+                // Get the text, which includes quotes - normalize it
+                return Some(normalize_import_path(&child_info.text));
+            }
+            // For identifier nodes in import statements (e.g., `use std::path` in Rust)
+            if child_info.kind == "identifier" {
+                return Some(normalize_import_path(&child_info.text));
+            }
+            // For scoped identifiers, recurse
+            if child_info.kind == "scoped_identifier"
+                && let Some(path) = extract_import_path(child_id, metadata)
+            {
+                return Some(path);
+            }
+        }
+    }
+
+    // If no specific child found, try the node's own text
+    if !node_info.text.is_empty() {
+        return Some(normalize_import_path(&node_info.text));
+    }
+
+    None
 }
 
 #[cfg(test)]

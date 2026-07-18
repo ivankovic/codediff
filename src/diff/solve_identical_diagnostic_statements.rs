@@ -28,17 +28,16 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 * is byte-for-byte identical on both sides. See [`crate::diff::nodes::is_diagnostic_statement`] for
 * exactly what counts.
 *
-* This runs after every bigger/coarser pass (`solve_identical_trees`, `solve_structurally_identical_trees`,
-* `solve_semantically_structural_nodes`, `solve_similar_flow_control`) and before
-* `solve_semantically_structural_nodes::solve_orphaned_semantic_nodes` blanket-deletes whatever is
-* still orphaned. That ordering is deliberate in both directions:
-*   - Running it *after* the bigger passes means it only ever picks up statements those passes left
-*     behind, so it can't fragment a match a bigger/more-reliable pass would otherwise have made in
-*     one piece (e.g. matching a whole function wholesale, or a `match` arm by pattern) into a
-*     smaller one anchored on some incidental identical `log::debug!(...)` call inside it.
-*   - Running it *before* the orphan blanket-delete means it can still find a diagnostic statement
-*     buried inside a function/impl that has no same-named counterpart on the other side - exactly
-*     the same reasoning `solve_similar_flow_control` documents for its own placement.
+* Runs as part of phase 2 in the seven-phase pipeline (`TODO.md`, 2026-07-17/18), right after
+* phase 1's hash descent and before phases 3-7 (bottom-up expansion, syntax-aware matching, final
+* APTED, the move-detection fallback). Running it after phase 1 means it only ever picks up
+* statements phase 1's byte-identical/structural hash matching left behind, so it can't fragment a
+* match a bigger/more-reliable pass would otherwise have made in one piece (e.g. matching a whole
+* function wholesale) into a smaller one anchored on some incidental identical `log::debug!(...)`
+* call inside it. Running it before the later phases means it can still find a diagnostic
+* statement buried inside a function/impl that has no same-named counterpart on the other side -
+* exactly the same reasoning `solve_similar_flow_control` documents for its own placement inside
+* phase 4.
 *
 * Note this pass has no effect on the `rust-turbopack-module-rule` fixture that motivated
 * `solve_similar_flow_control`: its one `bail!(...)` isn't byte-identical between before/after (the

@@ -112,7 +112,6 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     compute_node_depths(code, &mut metadata)?;
     compute_node_parents(&mut metadata);
     discover_reference_nodes(code, &mut metadata)?;
-    discover_semantic_structure_nodes(code, &mut metadata)?;
     Ok(metadata)
 }
 
@@ -320,32 +319,6 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
     Ok(())
 }
 
-/**
-* Discover all semantically structural nodes in the AST.
-*
-* semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
-* typically enforced by the compiler in some way. For example, there can only ever be ONE
-* 'fn main()' in main.rs in a Rust project. It is sensible for the algorithm to match such nodes
-* immediately.
-*/
-fn discover_semantic_structure_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    let ast = code.ast.as_ref().expect("AST must be parsed");
-    let root_node = ast.root_node();
-    let language = code
-        .metadata
-        .language
-        .as_ref()
-        .expect("Language must be set");
-
-    walk_preorder(root_node, |node| {
-        if let Some(t) = nodes::is_semantically_structural(&node, language, code) {
-            metadata.semantically_structural_nodes.insert(t, node.id());
-        }
-    });
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,15 +399,15 @@ mod tests {
         assert!(!ast_metadata.node_to_structural_hash.is_empty());
         assert!(!ast_metadata.structural_hash_to_node.is_empty());
         assert!(!ast_metadata.reference_nodes_ordered.is_empty());
-        assert!(!ast_metadata.semantically_structural_nodes.is_empty());
 
         for &node_id in &ast_metadata.reference_nodes_ordered {
             assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
         }
 
         // Reference nodes must be ordered by subtree size, descending (largest first) - this is
-        // what lets `solve_identical_trees` process the biggest duplicated subtrees before their
-        // descendants, so the descendants' own matches don't need to be decided independently.
+        // what lets `solve_hash_descent`'s phase 1 process the biggest duplicated subtrees before
+        // their descendants, so the descendants' own matches don't need to be decided
+        // independently.
         let sizes: Vec<usize> = ast_metadata
             .reference_nodes_ordered
             .iter()
@@ -448,12 +421,6 @@ mod tests {
         assert!(
             sizes.is_sorted_by(|a, b| a >= b),
             "reference_nodes_ordered must be sorted by subtree size descending, got {sizes:?}"
-        );
-
-        assert!(
-            ast_metadata
-                .semantically_structural_nodes
-                .contains_key(&(String::from("function_item"), String::from("main")))
         );
 
         Ok(())

@@ -275,41 +275,21 @@ pub struct ASTMetadata {
     /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node ids>. See
     /// `full_hash_to_node` for why this is a `Vec`, not a `HashSet`.
     pub structural_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Map of node->hash. The hash is a commutative structural hash, like structural hash but
-    /// with children sorted for commutative containers (e.g., enum variants, struct fields,
-    /// import lists). This allows matching of reordered but semantically identical containers.
-    pub node_to_commutative_structural_hash: HashMap<usize, u64>,
-    /// Reverse map to node_to_commutative_structural_hash, going from <commutative structural hash> -> <node ids>.
-    pub commutative_structural_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Multi-level normalized hashes: Level 2 - structural hash ignoring punctuation/whitespace.
-    pub node_to_normalized_punct_hash: HashMap<usize, u64>,
-    /// Reverse map for Level 2 normalized hash.
-    pub normalized_punct_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Multi-level normalized hashes: Level 3 - structural hash with normalized literals.
-    pub node_to_normalized_literal_hash: HashMap<usize, u64>,
-    /// Reverse map for Level 3 normalized hash.
-    pub normalized_literal_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Multi-level normalized hashes: Level 4 - structural hash with placeholder identifiers.
-    pub node_to_normalized_identifier_hash: HashMap<usize, u64>,
-    /// Reverse map for Level 4 normalized hash.
-    pub normalized_identifier_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Multi-level normalized hashes: Level 5 - structural hash ignoring punctuation + literals.
-    pub node_to_normalized_punct_literal_hash: HashMap<usize, u64>,
-    /// Reverse map for Level 5 normalized hash.
-    pub normalized_punct_literal_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Six-phase pipeline rework (2026-07-17, `TODO.md`): kind+value hash, order-independent per
-    /// `nodes::is_commutative_container` at *every* recursion level (not just the top, unlike
-    /// `node_to_commutative_structural_hash` above - see `hash::compute_kind_and_value_hash`'s doc
-    /// comment for the propagation-bug fix this depends on). Replaces `node_to_full_hash` for the
-    /// new pipeline; kept alongside it, not instead of it, until the old pipeline is retired.
+    /// Kind+value hash, order-independent per `nodes::is_commutative_container` at *every*
+    /// recursion level (not just the top - see `hash::compute_kind_and_value_hash`'s doc comment
+    /// for the propagation-bug fix this depends on, and `TODO.md` for the pipeline rework this
+    /// hash was built for). Used for byte-identical-subtree matching (`solve_hash_descent`),
+    /// alongside `node_to_full_hash` (the order-*dependent* full hash, still used wherever
+    /// document-order-sensitive content equality is needed - APTED's own cost model
+    /// (`apted/common.rs`), `solve_moved_subtrees`, `solve_greedy_anchor_blocks`,
+    /// `solve_identical_diagnostic_statements`).
     pub node_to_kind_and_value_hash: HashMap<usize, u64>,
     /// Reverse map for `node_to_kind_and_value_hash`. See `full_hash_to_node` for why this is a
     /// `Vec`, not a `HashSet`.
     pub kind_and_value_hash_to_node: HashMap<u64, Vec<usize>>,
-    /// Six-phase pipeline rework: structural (kind-only) hash, order-independent per
-    /// `nodes::is_commutative_container` at every recursion level. Replaces both
-    /// `node_to_structural_hash` and the 4 `node_to_normalized_*` variants for the new pipeline -
-    /// see `TODO.md`'s "New hash algorithms" section for the accepted precision-loss tradeoff.
+    /// Structural (kind-only) hash, order-independent per `nodes::is_commutative_container` at
+    /// every recursion level. Used for same-shape/differing-leaves matching (`solve_hash_descent`)
+    /// - see `TODO.md`'s "New hash algorithms" section for the design.
     pub node_to_kind_only_hash: HashMap<usize, u64>,
     /// Reverse map for `node_to_kind_only_hash`.
     pub kind_only_hash_to_node: HashMap<u64, Vec<usize>>,
@@ -344,8 +324,6 @@ pub struct ASTMetadata {
     pub node_to_parent: rustc_hash::FxHashMap<usize, usize>,
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
-    /// Maps a (kind, identifier) pair, for example ('function_item', 'main') to a node_id.
-    pub semantically_structural_nodes: HashMap<(String, String), usize>,
     /// Node information for each node, indexed by node_id.
     pub node_info: HashMap<usize, ASTNodeMetadata>,
     /// The language this tree was parsed as, so the cost model can consult

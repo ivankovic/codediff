@@ -20,7 +20,7 @@ use metrohash::MetroHash64;
 use std::hash::Hasher;
 
 use crate::code::{ASTMetadata, Code, Language};
-use crate::diff::nodes::{is_commutative_container, is_identifier_kind, is_literal_kind};
+use crate::diff::nodes::is_commutative_container;
 
 /**
 * Compute hashes for the given TreeSitter tree from the given root node.
@@ -61,20 +61,6 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     metadata.full_hash_to_node.clear();
     metadata.node_to_structural_hash.clear();
     metadata.structural_hash_to_node.clear();
-    metadata.node_to_commutative_structural_hash.clear();
-    metadata.commutative_structural_hash_to_node.clear();
-    
-    // Multi-level normalized hashes
-    metadata.node_to_normalized_punct_hash.clear();
-    metadata.normalized_punct_hash_to_node.clear();
-    metadata.node_to_normalized_literal_hash.clear();
-    metadata.normalized_literal_hash_to_node.clear();
-    metadata.node_to_normalized_identifier_hash.clear();
-    metadata.normalized_identifier_hash_to_node.clear();
-    metadata.node_to_normalized_punct_literal_hash.clear();
-    metadata.normalized_punct_literal_hash_to_node.clear();
-
-    // Six-phase pipeline rework hashes (see below).
     metadata.node_to_kind_and_value_hash.clear();
     metadata.kind_and_value_hash_to_node.clear();
     metadata.node_to_kind_only_hash.clear();
@@ -100,20 +86,10 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         // Compute structural hash for this node (includes only structure, not values)
         let structural_hash = compute_structural_hash(&node, &mut cursor);
 
-        // Compute commutative structural hash for this node (sorts children for commutative containers)
-        let commutative_structural_hash = compute_commutative_structural_hash(&node, &mut cursor, language);
-        
-        // Six-phase pipeline rework hashes: order-independence (per is_commutative_container)
-        // folded in at every recursion level, not bolted on as a third separate hash - see each
-        // function's doc comment.
+        // Order-independence (per is_commutative_container) folded in at every recursion level,
+        // not bolted on as a third separate hash - see each function's doc comment.
         let kind_and_value_hash = compute_kind_and_value_hash(&node, &mut cursor, code.contents.as_bytes(), language);
         let kind_only_hash = compute_kind_only_hash(&node, &mut cursor, language);
-
-        // Compute multi-level normalized hashes
-        let norm_punct_hash = compute_normalized_punct_hash(&node, &mut cursor, code.contents.as_bytes());
-        let norm_literal_hash = compute_normalized_literal_hash(&node, &mut cursor, code.contents.as_bytes());
-        let norm_identifier_hash = compute_normalized_identifier_hash(&node, &mut cursor, code.contents.as_bytes());
-        let norm_punct_literal_hash = compute_normalized_punct_literal_hash(&node, &mut cursor, code.contents.as_bytes());
 
         // Store full hash mappings
         metadata.node_to_full_hash.insert(node_id, full_hash);
@@ -133,17 +109,6 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             .or_default()
             .push(node_id);
 
-        // Store commutative structural hash mappings
-        metadata
-            .node_to_commutative_structural_hash
-            .insert(node_id, commutative_structural_hash);
-        metadata
-            .commutative_structural_hash_to_node
-            .entry(commutative_structural_hash)
-            .or_default()
-            .push(node_id);
-
-        // Store six-phase pipeline rework hashes
         metadata.node_to_kind_and_value_hash.insert(node_id, kind_and_value_hash);
         metadata
             .kind_and_value_hash_to_node
@@ -154,43 +119,6 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         metadata
             .kind_only_hash_to_node
             .entry(kind_only_hash)
-            .or_default()
-            .push(node_id);
-
-        // Store multi-level normalized hashes
-        metadata
-            .node_to_normalized_punct_hash
-            .insert(node_id, norm_punct_hash);
-        metadata
-            .normalized_punct_hash_to_node
-            .entry(norm_punct_hash)
-            .or_default()
-            .push(node_id);
-
-        metadata
-            .node_to_normalized_literal_hash
-            .insert(node_id, norm_literal_hash);
-        metadata
-            .normalized_literal_hash_to_node
-            .entry(norm_literal_hash)
-            .or_default()
-            .push(node_id);
-
-        metadata
-            .node_to_normalized_identifier_hash
-            .insert(node_id, norm_identifier_hash);
-        metadata
-            .normalized_identifier_hash_to_node
-            .entry(norm_identifier_hash)
-            .or_default()
-            .push(node_id);
-
-        metadata
-            .node_to_normalized_punct_literal_hash
-            .insert(node_id, norm_punct_literal_hash);
-        metadata
-            .normalized_punct_literal_hash_to_node
-            .entry(norm_punct_literal_hash)
             .or_default()
             .push(node_id);
 
@@ -282,78 +210,21 @@ fn compute_structural_hash<'a>(
     hasher.finish()
 }
 
-/// Compute the commutative structural hash for a node.
-///
-/// This is like structural hash but sorts children for commutative containers.
-/// For commutative containers (e.g., enum variants, struct fields, import lists),
-/// the children are sorted by their hash before hashing, making the hash invariant
-/// to child reordering.
-///
-/// For non-commutative containers, this falls back to regular structural hash.
-///
-/// KNOWN ISSUE (2026-07-15, not yet applied - see review discussion for the fix and its
-/// benchmark impact): delegating the non-commutative case to `compute_structural_hash` means
-/// order-invariance never propagates past the commutative container itself. `compute_structural_hash`
-/// recurses into itself, never back into this function, so any ancestor of a commutative container
-/// (e.g. the `enum_item` wrapping a reordered `enum_variant_list`) hashes identically to its plain
-/// structural hash - a reordering-only change still makes the ancestor's hash differ before/after,
-/// so `solve_commutative_structural_trees` (which matches on reference nodes like `enum_item`, not
-/// the bare container) never actually fires for its documented use case. The fix is to recurse
-/// into this same function unconditionally and only sort a node's own children when the node
-/// itself is a commutative container; that in turn requires `hash_tree_matching`'s descendant
-/// pairing to be commutative-aware too (see review discussion), or reordered children get
-/// re-mangled by the shared engine's positional `zip`.
-fn compute_commutative_structural_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    language: Language,
-) -> u64 {
-    let node_kind = node.kind();
-
-    // For commutative containers, sort children by their hash before hashing
-    if is_commutative_container(node_kind, &language) {
-        let mut hasher = MetroHash64::new();
-
-        // Hash node type and child count (same as structural hash)
-        hasher.write(node.kind_id().to_le_bytes().as_slice());
-        hasher.write(node.child_count().to_le_bytes().as_slice());
-
-        // Collect children and their hashes
-        let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-        let mut child_hashes: Vec<u64> = Vec::with_capacity(children.len());
-
-        for child in &children {
-            let child_hash = compute_commutative_structural_hash(child, cursor, language);
-            child_hashes.push(child_hash);
-        }
-
-        // Sort child hashes for commutative containers
-        child_hashes.sort();
-
-        // Hash the sorted child hashes
-        for hash in child_hashes {
-            hasher.write(hash.to_le_bytes().as_slice());
-        }
-
-        hasher.finish()
-    } else {
-        // For non-commutative nodes, use regular structural hash
-        compute_structural_hash(node, cursor)
-    }
-}
-
 /**
-* Six-phase pipeline rework (`TODO.md`, 2026-07-17): `KindAndValueHash` - like `compute_full_hash`
-* (kind, child count, gap text, each child's own hash, all in document order), but order-
-* independence is checked at *every* recursion level via `is_commutative_container`, not bolted on
-* as a separate third hash the way `compute_commutative_structural_hash` is. This is the fix for
-* that function's own documented propagation bug: recursing into *this same function*
-* unconditionally (instead of falling back to a plain, always-ordered hash once outside a
-* commutative container) means a reordering inside a nested commutative container changes the
-* hash of that container alone, never any ancestor above it - so a reference node wrapping a
-* reordered commutative container (e.g. an `enum_item` wrapping a reordered `enum_variant_list`)
-* still hashes identically before/after the reorder, letting phase 1's hash descent match it
-* directly instead of needing a dedicated `solve_commutative_structural_trees` pass.
+* `KindAndValueHash` - like `compute_full_hash` (kind, child count, gap text, each child's own
+* hash, all in document order), but order-independence is checked at *every* recursion level via
+* `is_commutative_container`, not bolted on as a separate third hash the way an earlier,
+* now-removed `compute_commutative_structural_hash` was: that function's non-commutative branch
+* delegated to plain `compute_structural_hash` instead of recursing back into itself, so order-
+* invariance never propagated past the commutative container itself - an ancestor of a reordered
+* container (e.g. the `enum_item` wrapping a reordered `enum_variant_list`) still hashed
+* identically to its plain structural hash before/after the reorder, so a pass matching on the
+* ancestor reference node (rather than the bare container) never actually fired for its documented
+* use case. Recursing into *this same function* unconditionally, instead of falling back once
+* outside a commutative container, fixes that by construction: a reordered commutative container's
+* ancestors hash identically before/after too, so hash-descent matches them directly. This in turn
+* requires `hash_tree_matching`'s descendant pairing to be commutative-aware (see
+* `pair_children_for_descent`), or reordered children get re-mangled by a positional `zip`.
 */
 fn compute_kind_and_value_hash<'a>(
     node: &tree_sitter::Node<'a>,
@@ -422,157 +293,6 @@ fn compute_kind_only_hash<'a>(
     for hash in child_hashes {
         hasher.write(hash.to_le_bytes().as_slice());
     }
-
-    hasher.finish()
-}
-
-/// Helper function to check if a character is punctuation
-fn is_punctuation(c: char) -> bool {
-    matches!(c, ';' | ',' | '.' | ':' | '(' | ')' | '[' | ']' | '{' | '}' | '!' | '?' | '<' | '>' | '=' | '+' | '-' | '*' | '/' | '%' | '&' | '|' | '^' | '~' | '`' | '@' | '#' | '$' | '\\' | '"' | '\'')
-}
-
-/// Hashes gap text for normalized punctuation hash - skips all punctuation characters
-fn hash_gap_normalized_punct(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
-    if start >= end {
-        return;
-    }
-    if let Ok(text) = std::str::from_utf8(&source[start..end]) {
-        let normalized: String = text.chars().filter(|c| !is_punctuation(*c)).collect();
-        if !normalized.trim().is_empty() {
-            hasher.write(normalized.as_bytes());
-        }
-    }
-}
-
-
-
-/// Compute normalized hash ignoring punctuation/whitespace in gaps.
-/// This is similar to structural hash but treats punctuation as insignificant.
-fn compute_normalized_punct_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    source_code: &[u8],
-) -> u64 {
-    let mut hasher = MetroHash64::new();
-
-    // Hash node type and child count
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
-
-    // Collect children first
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    let mut gap_start = node.start_byte();
-    for child in &children {
-        hash_gap_normalized_punct(&mut hasher, source_code, gap_start, child.start_byte());
-        let child_hash = compute_normalized_punct_hash(child, cursor, source_code);
-        hasher.write(child_hash.to_le_bytes().as_slice());
-        gap_start = child.end_byte();
-    }
-    hash_gap_normalized_punct(&mut hasher, source_code, gap_start, node.end_byte());
-
-    hasher.finish()
-}
-
-/// Compute normalized hash with normalized literals (strings become "", numbers become 0).
-/// This allows matching code with same structure but different literal values.
-fn compute_normalized_literal_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    source_code: &[u8],
-) -> u64 {
-    let mut hasher = MetroHash64::new();
-    let node_kind = node.kind();
-
-    // Hash node type and child count
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
-
-    // For literal nodes, use a placeholder hash
-    if is_literal_kind(node_kind) {
-        // Use a placeholder representation for all literals
-        hasher.write(b"LITERAL");
-        return hasher.finish();
-    }
-
-    // Collect children first
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    let mut gap_start = node.start_byte();
-    for child in &children {
-        hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
-        let child_hash = compute_normalized_literal_hash(&child, cursor, source_code);
-        hasher.write(child_hash.to_le_bytes().as_slice());
-        gap_start = child.end_byte();
-    }
-    hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
-
-    hasher.finish()
-}
-
-/// Compute normalized hash with placeholder identifiers.
-/// All identifiers map to "ID" to match code with same structure but different names.
-fn compute_normalized_identifier_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    source_code: &[u8],
-) -> u64 {
-    let mut hasher = MetroHash64::new();
-    let node_kind = node.kind();
-
-    // Hash node type and child count
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
-
-    // For identifier nodes, use a placeholder hash
-    if is_identifier_kind(node_kind) {
-        // Use a placeholder representation for all identifiers
-        hasher.write(b"ID");
-        return hasher.finish();
-    }
-
-    // Collect children first
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    let mut gap_start = node.start_byte();
-    for child in &children {
-        hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
-        let child_hash = compute_normalized_identifier_hash(&child, cursor, source_code);
-        hasher.write(child_hash.to_le_bytes().as_slice());
-        gap_start = child.end_byte();
-    }
-    hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
-
-    hasher.finish()
-}
-
-/// Compute normalized hash ignoring both punctuation and literals.
-/// Combines the normalization of punctuation ignoring and literal normalization.
-fn compute_normalized_punct_literal_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    source_code: &[u8],
-) -> u64 {
-    let mut hasher = MetroHash64::new();
-    let node_kind = node.kind();
-
-    // Hash node type and child count
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
-
-    // For literal nodes, use a placeholder hash
-    if is_literal_kind(node_kind) {
-        hasher.write(b"LITERAL");
-        return hasher.finish();
-    }
-
-    // Collect children first
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    let mut gap_start = node.start_byte();
-    for child in &children {
-        hash_gap_normalized_punct(&mut hasher, source_code, gap_start, child.start_byte());
-        let child_hash = compute_normalized_punct_literal_hash(&child, cursor, source_code);
-        hasher.write(child_hash.to_le_bytes().as_slice());
-        gap_start = child.end_byte();
-    }
-    hash_gap_normalized_punct(&mut hasher, source_code, gap_start, node.end_byte());
 
     hasher.finish()
 }

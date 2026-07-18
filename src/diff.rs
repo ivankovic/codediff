@@ -21,18 +21,12 @@ pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;
 pub mod solve_comment_nodes;
-pub mod solve_commutative_structural_trees;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_hash_descent;
 pub mod solve_identical_diagnostic_statements;
-pub mod solve_identical_trees;
-pub mod solve_import_nodes;
 pub mod solve_large_flat_subtrees;
 pub mod solve_moved_subtrees;
-pub mod solve_multilevel_hash;
-pub mod solve_semantically_structural_nodes;
 pub mod solve_similar_flow_control;
-pub mod solve_structurally_identical_trees;
 pub mod solve_syntax_aware_matching;
 pub mod text;
 pub mod text_range;
@@ -187,213 +181,61 @@ impl Diff {
             ..Default::default()
         };
 
-        if config.use_new_pipeline {
-            Self::run_new_pipeline(before, after, &node_cache, &mut ast_diff, config);
-            return Self {
-                ast: Some(ast_diff),
-                language: before.metadata.language.unwrap_or(Language::Unknown),
-                text: None,
-            };
-        }
+        // Seven-phase pipeline (`TODO.md`, 2026-07-17/18) - replaced the previous ~15-pass
+        // pipeline outright once verified to be at least as accurate on every fixture in the
+        // `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782 mismatches, zero
+        // fixtures worse). See `TODO.md` for the full design history, the accuracy gap that had
+        // to be closed first, and why phase 7 exists despite phase 2 being repurposed away from
+        // move detection.
 
-        // These are highly efficient for small diffs, and small diffs are half of all
-        // diffs.
-        if config.solver_identical_trees {
-            solve_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
-        }
-        if config.solver_structurally_identical_trees {
-            solve_structurally_identical_trees::solve(before, after, &node_cache, &mut ast_diff);
-        }
+        // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
+        // normalized-import-path hash). The import-path hash variant is gated on
+        // `solver_import_nodes`: the 2026-07-15 ablation study found it net-negative (-89
+        // disabling it individually), and nothing about folding it into a hash variant changes
+        // that signal's own accuracy.
+        solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff, config.solver_import_nodes);
 
-        // Commutative structural matching: match nodes that have the same structure but with children
-        // in different orders (e.g., reordered enum variants, struct fields, import statements).
-        // Runs after regular structural matching to catch reorderings that the strict structural
-        // hash (which considers child order) would miss.
-        if config.solver_commutative_structural_trees {
-            solve_commutative_structural_trees::solve(before, after, &node_cache, &mut ast_diff);
-        }
+        // Phase 2: "move detection" (repurposed name - houses solve_comment_nodes and
+        // solve_identical_diagnostic_statements, not solve_moved_subtrees, which is phase 7 - see
+        // TODO.md for why the name stuck despite the contents changing).
+        solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
 
-        // Multi-level normalized hash matching: match nodes that have the same structure but differ
-        // in punctuation, literals, or identifiers. This runs after structural matching to catch
-        // cases where only these specific elements have changed.
-        if config.solver_multilevel_hash {
-            solve_multilevel_hash::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // Import path normalization and matching: match import statements by normalized path
-        // (quotes stripped, separators normalized, relative import prefixes handled) rather than
-        // syntax. This allows the algorithm to recognize that imports with different formatting
-        // but the same path are actually the same. Runs after hash matching so that
-        // path-normalized matches can be established before later passes build on them.
-        if config.solver_import_nodes {
-            solve_import_nodes::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // Match comment nodes that immediately precede already-matched nodes. Runs after hash
-        // and structural matching to take advantage of nodes already matched by those passes.
-        // This reduces the workload for the final, slow tree edit distance algorithm.
-        if config.solver_comment_nodes {
-            solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // Pre-match top-level items with a large flat descendant (e.g. a Rust macro's token_tree
-        // body) via Myers sequence diff, before anything else buries them inside a much larger,
-        // non-flat comparison. Runs before solve_semantically_structural_nodes so an impl/class
-        // that also happens to contain a large flat blob gets that blob pre-empted first.
-        if config.solver_large_flat_subtrees {
-            solve_large_flat_subtrees::solve(before, after, &mut ast_diff);
-        }
-
-        // These speed up the diff, but don't guaranteed an optimal solution
-        if config.solver_semantically_structural_nodes {
-            solve_semantically_structural_nodes::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // MatchSimilarFlowControl: before orphaned semantic nodes are blanket-marked as deleted/
-        // inserted below, pair up still-unmatched match/switch constructs whose arm patterns
-        // overlap enough to be "the same shape", and anchor the matching arms.
-        if config.solver_similar_flow_control {
-            solve_similar_flow_control::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // MatchIdenticalDiagnosticStatements: mop up any still-unmatched logging/bail/assert/debug
-        // -printf style statements that are byte-for-byte identical on both sides. Runs after every
-        // bigger/coarser pass above so it can't fragment a match one of them would otherwise have
-        // made in one piece, but before the orphan blanket-delete below so it can still find such
-        // statements inside a function/impl that has no same-named counterpart - see that pass's
-        // doc comment for the full reasoning.
-        if config.solver_identical_diagnostic_statements {
-            solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // Last chance for BottomUpExpansion before the final APTED pass. A container with no
-        // same-named counterpart but a mostly-matched body (e.g. a rename plus a small internal edit)
-        // is exactly what would otherwise be destroyed by the final APTED pass and this sweep can
-        // still rescue.
+        // Phase 3: bottom-up expansion. Gated on `solver_bottom_up_expansion`, same net-negative
+        // finding as above (-69 individually).
         if config.solver_bottom_up_expansion {
             solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        // GreedyAnchorBlock: last heuristic before the final APTED pass. Anything still unmatched
-        // here has no name, no arm structure, and no already-matched children for a Dice
-        // coefficient to count on - the cases every earlier pass above is keyed to. This pass
-        // instead estimates the edit cost of each remaining candidate pair directly (a fast
-        // sequence-alignment approximation, not a full tree edit distance), gated on a positional
-        // anchor (a shared already-matched ancestor plus a matching kind-path down to the
-        // candidate) so a cheap content score can't fire on structurally unrelated nodes, and
-        // greedily anchors whichever pairs are cheap enough. Anchoring cheaply here shrinks the
-        // residual forest the much slower exact algorithm below has to grind through - see that
-        // pass's doc comment.
-        if config.solver_greedy_anchor_blocks {
-            solve_greedy_anchor_blocks::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        // This is the final, slow algorithm.
-        // The more nodes are already matched, the faster it is.
-        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
-        // containment-aware, so it now runs unconditionally instead of demoting itself back to
-        // Zhang-Shasha on forests with real containment constraints - see src/diff/TODO.md.
-        if config.solver_final_apted {
-            let _ = apted::for_roots(
-                before,
-                after,
-                &node_cache,
-                apted::Algorithm::Apted,
-                "final_pass",
-                &mut ast_diff,
-            );
-        }
-
-        // Pass 3 of solve_semantically_structural_nodes: anything still orphaned at this point
-        // (no same-named counterpart, and not claimed by any heuristic or the final APTED pass)
-        // is marked as a from-scratch delete/insert.
-        //
-        // MOVED HERE from before the final APTED pass to fix the premature/irreversible pruning issue:
-        // Previously, when a semantically structural node (e.g., impl_item) had no same-named counterpart,
-        // it would be immediately marked as deleted/inserted before APTED had a chance to find a match.
-        // This caused issues like rust-turbopack-module-rule where impl ModuleType was renamed to
-        // impl ConfiguredModuleType - the type name changed but the body was similar enough that APTED
-        // could have found a good match, but the premature orphan handling prevented this.
-        //
-        // Now APTED runs first, and only nodes that APTED itself couldn't match are marked as orphans.
-        if config.solver_orphaned_semantic_nodes {
-            solve_semantically_structural_nodes::solve_orphaned_semantic_nodes(
-                before,
-                after,
-                &node_cache,
-                &mut ast_diff,
-            );
-        }
-
-        // MoveDetectionRecovery: dead last, after every pass above has had first claim on all
-        // content - pairs up byte-identical subtrees that ended the pipeline as a wholly-deleted
-        // + wholly-inserted couple (i.e. code that moved, which ordered tree edit distance can
-        // only express as delete+insert). See that pass's doc comment for the guardrails.
-        if config.solver_moved_subtrees {
-            solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
-        }
-
-        Self {
-            ast: Some(ast_diff),
-            language: before.metadata.language.unwrap_or(Language::Unknown),
-            text: None,
-        }
-    }
-
-    /**
-     * Six-phase pipeline rework (`TODO.md`, 2026-07-17) plus a phase 7 fallback added
-     * 2026-07-18, built alongside the ~15-pass pipeline above rather than replacing it in place
-     * (see `HeuristicConfig::use_new_pipeline`), so both remain independently benchmarkable until
-     * the rework is verified and the old pipeline is retired. See `TODO.md`'s "The six phases"
-     * section for what each phase replaces and why, and its `solve_moved_subtrees` vs. phase 4
-     * comparison for why phase 7 exists despite the original plan's explicit "remove
-     * solve_moved_subtrees" decision.
-     */
-    fn run_new_pipeline(
-        before: &Code,
-        after: &Code,
-        node_cache: &NodeCache,
-        ast_diff: &mut ASTDiff,
-        config: &HeuristicConfig,
-    ) {
-        // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
-        // normalized-import-path hash). The import-path hash variant is gated on
-        // `solver_import_nodes`, same as the old pipeline's `solve_import_nodes` call: the
-        // 2026-07-15 ablation study found it net-negative (-89 disabling it individually), and
-        // nothing about folding it into a hash variant changes that signal's own accuracy.
-        solve_hash_descent::solve(before, after, node_cache, ast_diff, config.solver_import_nodes);
-
-        // Phase 2: "move detection" (repurposed name - houses solve_comment_nodes and
-        // solve_identical_diagnostic_statements, not solve_moved_subtrees - see TODO.md).
-        solve_comment_nodes::solve(before, after, node_cache, ast_diff);
-        solve_identical_diagnostic_statements::solve(before, after, node_cache, ast_diff);
-
-        // Phase 3: bottom-up expansion. Gated on `solver_bottom_up_expansion`, same net-negative
-        // finding as above (-69 individually) - same knob the old pipeline uses.
-        if config.solver_bottom_up_expansion {
-            solve_bottom_up_expansion::solve(before, after, node_cache, ast_diff);
-        }
-
-        // Phase 4: syntax-aware subtree matching (redesigned solve_semantically_structural_nodes,
-        // absorbing solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally, and
+        // Phase 4: syntax-aware subtree matching (fully-resolved-name N:M matching, absorbing
+        // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally, and
         // solve_similar_flow_control gated on `solver_similar_flow_control` - net-negative
         // individually (-82) in the same ablation study).
-        solve_syntax_aware_matching::solve(before, after, node_cache, ast_diff, config.solver_similar_flow_control);
+        solve_syntax_aware_matching::solve(
+            before,
+            after,
+            &node_cache,
+            &mut ast_diff,
+            config.solver_similar_flow_control,
+        );
 
         // Phase 5: second bottom-up expansion, now that phase 4 has produced more matched
         // descendants for it to vote on. Same gate as phase 3.
         if config.solver_bottom_up_expansion {
-            solve_bottom_up_expansion::solve(before, after, node_cache, ast_diff);
+            solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
         }
 
         // Phase 6: final APTED on the whole-file residual.
+        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
+        // containment-aware, so it now runs unconditionally instead of demoting itself back to
+        // Zhang-Shasha on forests with real containment constraints - see src/diff/TODO.md.
         let _ = apted::for_roots(
             before,
             after,
-            node_cache,
+            &node_cache,
             apted::Algorithm::Apted,
             "final_pass",
-            ast_diff,
+            &mut ast_diff,
         );
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
@@ -408,28 +250,34 @@ impl Diff {
         // (phase 6) structurally cannot express a cross-tree relocation as anything but
         // delete+insert either - this is the only phase that can still convert that into a match.
         // See TODO.md's `solve_moved_subtrees` vs. phase 4 comparison for why phase 4's four
-        // anchor-requiring mechanisms can't substitute for this, and the c-cpython-autogenerated-
-        // code / rust-turbopack-module-rule regressions this phase exists to recover.
+        // anchor-requiring mechanisms can't substitute for this.
         if config.solver_moved_subtrees {
-            solve_moved_subtrees::solve(before, after, node_cache, ast_diff);
+            solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
+        }
+
+        Self {
+            ast: Some(ast_diff),
+            language: before.metadata.language.unwrap_or(Language::Unknown),
+            text: None,
         }
     }
 }
 
 /**
-* Per-pass on/off switches for [`Diff::from_code_with_config`], one field per distinct heuristic/
-* algorithm step in the pipeline (in the same order they run). [`HeuristicConfig::default`] is
-* what plain [`Diff::from_code`]/[`diff_code`] use, and is the only configuration any production
-* caller should need.
+* Per-pass on/off switches for [`Diff::from_code_with_config`]'s seven-phase pipeline, for the
+* passes whose accuracy contribution is ambiguous enough to be worth re-measuring independently.
+* [`HeuristicConfig::default`] is what plain [`Diff::from_code`]/[`diff_code`] use, and is the
+* only configuration any production caller should need.
 *
 * Defaults were tuned by a 2026-07-15 leave-one-out ablation study over the `optimal_solutions`
-* benchmark corpus (see `ablation_study.sh`, `research/ablation/`): the 3 passes that were
-* net-negative when disabled individually (`solver_import_nodes`, `solver_similar_flow_control`,
-* `solver_bottom_up_expansion`) default to `false` here (kept, not deleted, so they can still be
-* re-enabled via `--solver-X` for further investigation). The 5 passes with zero measured accuracy
-* effect were left enabled: disabling them *alongside* the net-negative 3 measurably slowed down
-* the corpus (they were pruning work off the expensive final APTED pass even when they weren't
-* winning any matches outright), so "zero accuracy impact" didn't mean "free to disable."
+* benchmark corpus (see `ablation_study.sh`, `research/ablation/`), run against the pipeline that
+* existed at the time: all 4 fields here default to `false` because each was found net-negative
+* when disabled individually (i.e. removing it *improved* the benchmark) - `solver_import_nodes`
+* (-89), `solver_similar_flow_control` (-82), `solver_bottom_up_expansion` (-69, gates both of
+* phases 3 and 5). The seven-phase pipeline rework (`TODO.md`, 2026-07-17/18) that replaced the
+* original ~15-pass pipeline these were tuned against kept exactly these 4 knobs, on the same
+* passes, at the same defaults - nothing about the rework changes any of these 4 signals' own
+* accuracy contribution.
 *
 * Exists for the ablation study in `ablation_study.sh` (via `benchmark_optimal_solutions
 * --no-solver-X`/`--solver-X`): disabling or enabling exactly one pass and comparing accuracy
@@ -439,55 +287,20 @@ impl Diff {
 */
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
-    /// Six-phase pipeline rework (`TODO.md`, 2026-07-17): when true, `Diff::from_code_with_config`
-    /// runs `Diff::run_new_pipeline` instead of the ~15-pass pipeline below, ignoring every other
-    /// field on this struct. Temporary build-alongside toggle so the new pipeline can be
-    /// benchmarked against the old one throughout the rework, per the "build alongside, delete
-    /// last" plan in `TODO.md` - not meant to survive once the rework is done and the old pipeline
-    /// is deleted (at which point this whole struct goes back to being one pipeline's ablation
-    /// switches, not two pipelines' worth).
-    pub use_new_pipeline: bool,
-    pub solver_identical_trees: bool,
-    pub solver_structurally_identical_trees: bool,
-    pub solver_commutative_structural_trees: bool,
-    pub solver_multilevel_hash: bool,
     pub solver_import_nodes: bool,
-    pub solver_comment_nodes: bool,
-    pub solver_large_flat_subtrees: bool,
-    pub solver_semantically_structural_nodes: bool,
     pub solver_similar_flow_control: bool,
-    pub solver_identical_diagnostic_statements: bool,
     pub solver_bottom_up_expansion: bool,
-    pub solver_greedy_anchor_blocks: bool,
-    pub solver_final_apted: bool,
-    pub solver_orphaned_semantic_nodes: bool,
     pub solver_moved_subtrees: bool,
 }
 
 impl Default for HeuristicConfig {
     fn default() -> Self {
         Self {
-            use_new_pipeline: false,
-            solver_identical_trees: true,
-            // The 2026-07-15 ablation study found these 5 passes had zero measured effect on
-            // benchmark accuracy when disabled individually - but disabling them *together* with
-            // the net-negative passes below made the residual APTED workload measurably slower
-            // (they were quietly pruning work off the expensive final pass), so they stay on.
-            solver_structurally_identical_trees: true,
-            solver_commutative_structural_trees: true,
-            solver_multilevel_hash: true,
             // Net-negative when disabled individually (i.e. removing it *improved* the
             // benchmark) - ablation 2026-07-15.
             solver_import_nodes: false,
-            solver_comment_nodes: true,
-            solver_large_flat_subtrees: true,
-            solver_semantically_structural_nodes: true,
             solver_similar_flow_control: false,
-            solver_identical_diagnostic_statements: true,
             solver_bottom_up_expansion: false,
-            solver_greedy_anchor_blocks: true,
-            solver_final_apted: true,
-            solver_orphaned_semantic_nodes: true,
             solver_moved_subtrees: true,
         }
     }
@@ -775,20 +588,8 @@ pub enum ASTMappingReason {
     /// together, greedily. See `solve_greedy_anchor_blocks`.
     GreedyAnchorBlock,
     /// Import statements matched by normalized path (quotes stripped, separators normalized,
-    /// relative import prefixes handled). See `solve_import_nodes`.
+    /// relative import prefixes handled) - a `KindAndValueHash` variant, see `solve_hash_descent`.
     NormalizedImportPath,
-    /// Multi-level normalized hashing: structural hash ignoring punctuation/whitespace only.
-    /// Matches nodes with same structure but different formatting. See `solve_multilevel_hash`.
-    NormalizedStructuralIgnorePunctuation,
-    /// Multi-level normalized hashing: structural hash with normalized literals.
-    /// All string literals map to "", all numbers map to 0. Matches structure with different literal values.
-    NormalizedStructuralIgnoreLiterals,
-    /// Multi-level normalized hashing: structural hash with placeholder identifiers.
-    /// All identifiers map to "ID". Matches structure with different variable/function names.
-    NormalizedStructuralIgnoreIdentifiers,
-    /// Multi-level normalized hashing: structural hash ignoring punctuation and literals.
-    /// Combines punctuation and literal normalization.
-    NormalizedStructuralIgnorePunctuationAndLiterals,
 }
 
 impl ASTMappingReason {
@@ -814,10 +615,6 @@ impl ASTMappingReason {
             ASTMappingReason::BottomUpExpansion => "BottomUp",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
             ASTMappingReason::NormalizedImportPath => "NormImport",
-            ASTMappingReason::NormalizedStructuralIgnorePunctuation => "NormNoPunct",
-            ASTMappingReason::NormalizedStructuralIgnoreLiterals => "NormNoLit",
-            ASTMappingReason::NormalizedStructuralIgnoreIdentifiers => "NormNoId",
-            ASTMappingReason::NormalizedStructuralIgnorePunctuationAndLiterals => "NormNoPunctLit",
         }
     }
 }

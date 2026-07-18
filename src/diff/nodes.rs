@@ -1729,9 +1729,26 @@ class DecoratedClass:
         assert!(is_semantically_structural(&ast.root_node(), &Language::Python, &code).is_none());
     }
 
+    /// Node id of the first `(kind, name)` semantic match found in `root`'s subtree, or `None`.
+    /// Test-only helper for looking up a specific named declaration without depending on the
+    /// precomputed `ASTMetadata::semantically_structural_nodes` map (which the pipeline itself no
+    /// longer populates or reads - see `TODO.md`'s final-cleanup notes).
+    fn find_semantic_node(
+        root: tree_sitter::Node,
+        lang: &Language,
+        code: &Code,
+        target: &(String, String),
+    ) -> Option<usize> {
+        if is_semantically_structural(&root, lang, code).as_ref() == Some(target) {
+            return Some(root.id());
+        }
+        let mut cursor = root.walk();
+        root.children(&mut cursor).find_map(|child| find_semantic_node(child, lang, code, target))
+    }
+
     #[test]
     fn python_methods_in_class_are_pre_matched() {
-        use crate::diff::solve_semantically_structural_nodes::solve;
+        use crate::diff::solve_syntax_aware_matching::solve;
         use crate::diff::{ASTDiff, NodeCache};
 
         let before_src = "
@@ -1752,25 +1769,20 @@ class Calculator:
         let after = Code::from_string(after_src, &Language::Python);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
 
         // Both methods should be matched.
         let matched_names: Vec<&str> = ["add", "subtract"]
             .iter()
             .copied()
             .filter(|&name| {
-                let bm = before.metadata.ast_metadata.as_ref().unwrap();
-                let am = after.metadata.ast_metadata.as_ref().unwrap();
-                let bk = ("function_definition".to_string(), name.to_string());
-                let ak = ("function_definition".to_string(), name.to_string());
-                bm.semantically_structural_nodes
-                    .get(&bk)
-                    .and_then(|&bid| {
-                        am.semantically_structural_nodes
-                            .get(&ak)
-                            .map(|&aid| (bid, aid))
-                    })
-                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                let key = ("function_definition".to_string(), name.to_string());
+                let bid = find_semantic_node(before_root, &Language::Python, &before, &key);
+                let aid = find_semantic_node(after_root, &Language::Python, &after, &key);
+                bid.zip(aid).map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(
@@ -1908,7 +1920,7 @@ typealias StringList = List<String>
 
     #[test]
     fn kotlin_methods_in_class_are_pre_matched() {
-        use crate::diff::solve_semantically_structural_nodes::solve;
+        use crate::diff::solve_syntax_aware_matching::solve;
         use crate::diff::{ASTDiff, NodeCache};
 
         let before_src = "
@@ -1927,23 +1939,19 @@ class Calculator {
         let after = Code::from_string(after_src, &Language::Kotlin);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
 
         let matched_names: Vec<&str> = ["add(Int,Int)", "subtract(Int,Int)"]
             .iter()
             .copied()
             .filter(|&name| {
-                let bm = before.metadata.ast_metadata.as_ref().unwrap();
-                let am = after.metadata.ast_metadata.as_ref().unwrap();
                 let key = ("function_declaration".to_string(), name.to_string());
-                bm.semantically_structural_nodes
-                    .get(&key)
-                    .and_then(|&bid| {
-                        am.semantically_structural_nodes
-                            .get(&key)
-                            .map(|&aid| (bid, aid))
-                    })
-                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                let bid = find_semantic_node(before_root, &Language::Kotlin, &before, &key);
+                let aid = find_semantic_node(after_root, &Language::Kotlin, &after, &key);
+                bid.zip(aid).map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(

@@ -41,22 +41,13 @@ if ! cargo build --release --bin benchmark_optimal_solutions; then
 fi
 
 # Keep this list in sync with the --no-solver-X flags in src/bin/benchmark_optimal_solutions.rs
-# (which in turn mirror HeuristicConfig's fields in src/diff.rs, one per pass in
-# Diff::from_code_with_config's pipeline order).
+# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Only 4 passes have their own
+# on/off knob post-rework (TODO.md, 2026-07-17/18) - the seven-phase pipeline's other steps run
+# unconditionally, so there's nothing left to ablate for them.
 FLAGS=(
-  solver-identical-trees
-  solver-structurally-identical-trees
-  solver-commutative-structural-trees
-  solver-multilevel-hash
   solver-import-nodes
-  solver-comment-nodes
-  solver-semantically-structural-nodes
   solver-similar-flow-control
-  solver-identical-diagnostic-statements
   solver-bottom-up-expansion
-  solver-greedy-anchor-blocks
-  solver-final-apted
-  solver-orphaned-semantic-nodes
   solver-moved-subtrees
 )
 
