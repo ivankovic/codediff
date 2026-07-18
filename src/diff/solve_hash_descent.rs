@@ -143,12 +143,13 @@ fn import_path_hash_map(metadata: &crate::code::ASTMetadata) -> HashMap<usize, u
 mod tests {
     use super::*;
     use crate::code::Language;
-    use crate::diff::ASTMappingReason;
+    use crate::diff::{ASTMappingOperation, ASTMappingReason, COST_UPDATE};
     use crate::test::helper::find_first_of_kind;
 
     /// Reordering a Rust `use_list` (a `nodes::is_commutative_container` kind) with no other
     /// change must be distinguishable from a genuinely untouched one - see the user request this
-    /// responds to ("we do need a way to distinguish between truly identical and reordered") and
+    /// responds to ("we do need a way to distinguish between truly identical and reordered", then
+    /// "make reordering cost more than 0 and change operation to MatchButNotIdentical") and
     /// `ASTMappingReason::FullymappingSubtrees`'s doc comment.
     #[test]
     fn reordered_commutative_container_is_distinguished_from_truly_identical() {
@@ -173,6 +174,15 @@ mod tests {
             ASTMappingReason::FullymappingSubtrees,
             "a reordered-but-unchanged use_list must be tagged FullymappingSubtrees, not plain IdenticalHash"
         );
+        assert_eq!(
+            mapping.operation,
+            ASTMappingOperation::MatchButNotIdentical,
+            "a pure reorder is not a no-op - operation must be MatchButNotIdentical, not Identical"
+        );
+        assert_eq!(
+            mapping.cost, COST_UPDATE,
+            "a pure reorder must cost more than 0"
+        );
 
         // The unrelated, untouched `fn f() {}` must NOT get relabeled - only the actually-
         // reordered node should carry the distinguishing reason.
@@ -184,5 +194,21 @@ mod tests {
             ASTMappingReason::FullymappingSubtrees,
             "an untouched, non-reordered node must not be tagged FullymappingSubtrees"
         );
+
+        // `use_declaration` and `scoped_use_list` wrap `use_list` but aren't commutative
+        // containers themselves - a reorder several levels down must still downgrade them from
+        // Identical, since neither is a true no-op match either.
+        let before_use_decl = find_first_of_kind(before_root, "use_declaration").unwrap();
+        let after_use_decl = find_first_of_kind(after_root, "use_declaration").unwrap();
+        let use_decl_mapping = diff.mapping.get(&(before_use_decl.id(), after_use_decl.id())).unwrap();
+        assert_eq!(
+            use_decl_mapping.operation,
+            ASTMappingOperation::MatchButNotIdentical,
+            "an ancestor of a reordered container must also be downgraded from Identical"
+        );
+        assert_eq!(use_decl_mapping.cost, COST_UPDATE);
+        // The ancestor itself didn't reorder anything - only the actual commutative container
+        // gets tagged FullymappingSubtrees.
+        assert_ne!(use_decl_mapping.reason, ASTMappingReason::FullymappingSubtrees);
     }
 }

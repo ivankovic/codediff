@@ -222,6 +222,12 @@ pub(crate) fn solve_with_hash_map(
         // Descend both subtrees in lockstep, pairing children by position and kind - except
         // under a commutative container, where children must be paired by hash instead (see
         // `pair_children_for_descent`'s doc comment for why a positional `zip` is wrong there).
+        // `reordered_ids` collects every before-side node whose *own* children were found
+        // reordered, so their ancestors (up to this match's own root) can be downgraded from
+        // `Identical` afterward - a reorder several levels down (e.g. a `use_list` nested inside
+        // `scoped_use_list`/`use_declaration`) means none of its ancestors are a true no-op match
+        // either, even though none of *them* are commutative containers themselves.
+        let mut reordered_ids: Vec<usize> = Vec::new();
         let mut stack = vec![(before_node, after_node)];
         while let Some((before_parent, after_parent)) = stack.pop() {
             let (pairs, reordered) =
@@ -230,11 +236,18 @@ pub(crate) fn solve_with_hash_map(
             // `before_parent`/`after_parent`'s own mapping was already added (either as the root
             // match above, or as a `descendant_reason`-tagged child pair in an earlier iteration
             // of this same loop) before we could know whether *its* children turned out to be
-            // reordered - patch the reason now that we know, rather than looking ahead.
-            if reordered
-                && let Some(mapping) = diff.mapping.get_mut(&(before_parent.id(), after_parent.id()))
-            {
-                mapping.reason = ASTMappingReason::FullymappingSubtrees;
+            // reordered - patch it now that we know, rather than looking ahead. A pure reorder is
+            // not a no-op: children's content is unchanged, but their positions are, so it's
+            // recorded as `MatchButNotIdentical` at `COST_UPDATE`, not `Identical` at cost 0 -
+            // matching the human-authored ground truth's own convention for these pairs (see
+            // `TODO.md`'s "Distinguishing reordered from truly identical" section).
+            if reordered {
+                if let Some(mapping) = diff.mapping.get_mut(&(before_parent.id(), after_parent.id())) {
+                    mapping.reason = ASTMappingReason::FullymappingSubtrees;
+                    mapping.operation = ASTMappingOperation::MatchButNotIdentical;
+                    mapping.cost = crate::diff::COST_UPDATE;
+                }
+                reordered_ids.push(before_parent.id());
             }
 
             for (before_child, after_child) in pairs {
@@ -248,6 +261,30 @@ pub(crate) fn solve_with_hash_map(
                     ASTMapping { cost, operation, reason: descendant_reason.clone() },
                 );
                 stack.push((before_child, after_child));
+            }
+        }
+
+        // Propagate: every ancestor between a reordered node and this match's own root
+        // (inclusive) is downgraded from `Identical` to `MatchButNotIdentical` too - a container
+        // is never a true no-op match if anything inside it, at any depth, wasn't. Reason is left
+        // alone for these ancestors (only the node that's actually a commutative container with
+        // reordered children gets `FullymappingSubtrees` - see above); they didn't reorder
+        // anything themselves, they just aren't a pure `Identical` match anymore either.
+        for reordered_id in reordered_ids {
+            let mut cur = reordered_id;
+            loop {
+                let Some(&parent_id) = before_metadata.node_to_parent.get(&cur) else { break };
+                let Some(&after_parent_id) = diff.before_node_map.get(&parent_id) else { break };
+                if let Some(mapping) = diff.mapping.get_mut(&(parent_id, after_parent_id))
+                    && mapping.operation == ASTMappingOperation::Identical
+                {
+                    mapping.operation = ASTMappingOperation::MatchButNotIdentical;
+                    mapping.cost = crate::diff::COST_UPDATE;
+                }
+                if parent_id == before_node_id {
+                    break;
+                }
+                cur = parent_id;
             }
         }
     }
