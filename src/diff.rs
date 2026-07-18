@@ -184,9 +184,8 @@ impl Diff {
         // Seven-phase pipeline (`TODO.md`, 2026-07-17/18) - replaced the previous ~15-pass
         // pipeline outright once verified to be at least as accurate on every fixture in the
         // `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782 mismatches, zero
-        // fixtures worse). See `TODO.md` for the full design history, the accuracy gap that had
-        // to be closed first, and why phase 7 exists despite phase 2 being repurposed away from
-        // move detection.
+        // fixtures worse). See `TODO.md` for the full design history and the accuracy gap that
+        // had to be closed first.
 
         // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
         // normalized-import-path hash). The import-path hash variant is gated on
@@ -195,9 +194,13 @@ impl Diff {
         // that signal's own accuracy.
         solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff, config.solver_import_nodes);
 
-        // Phase 2: "move detection" (repurposed name - houses solve_comment_nodes and
-        // solve_identical_diagnostic_statements, not solve_moved_subtrees, which is phase 7 - see
-        // TODO.md for why the name stuck despite the contents changing).
+        // Phase 2: contextual exact matching - houses solve_comment_nodes (comment-precedes-
+        // matched-node) and solve_identical_diagnostic_statements (byte-identical logging/bail/
+        // assert/printf statements). Both are cheap, high-confidence exact matches that phase 1's
+        // structural hash descent doesn't reach on its own (comments aren't part of the hashed
+        // AST shape; diagnostic statements are deliberately held back from phase 1 to avoid
+        // fragmenting a bigger match), mopping up leftovers right after phase 1 before the
+        // fuzzier phases below start guessing. Not `solve_moved_subtrees` - that's phase 7.
         solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
         solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
 

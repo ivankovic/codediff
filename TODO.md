@@ -99,8 +99,8 @@ the one case none of phase 4's four mechanisms can reach, because every one of t
 anchor (a hash, a name, a shared matched ancestor, an arm-signature overlap) and a true cross-tree
 relocation has none of those on either side until the rest of the pipeline, including final APTED,
 has already given up. This does **not** reopen the "remove `solve_moved_subtrees`" decision from
-the original planning - that removal was about phase 2 ("move detection" repurposed to mean
-something else, see above); phase 7 reuses the `solve_moved_subtrees` module itself, called once
+the original planning - that removal was about phase 2 ("contextual exact matching", repurposed
+to mean something else, see above); phase 7 reuses the `solve_moved_subtrees` module itself, called once
 more, in its original dead-last position, now the pipeline's 7th and final step. Gated on
 `config.solver_moved_subtrees`, same knob the old pipeline uses (default `true`).
 
@@ -218,13 +218,13 @@ implementation-time decisions, not blocking further planning.
    `solve_commutative_structural_trees` is removed outright (see below - order-independence is now
    inherent to both primary hashes, not a bolted-on third one).
 
-2. **"Move detection"** - repurposed name/slot, **not** `solve_moved_subtrees.rs` (that module is
-   deleted outright - the user confirmed "remove solve_moved_subtrees"). Phase 2 instead houses
-   `solve_comment_nodes` (comment-precedes-matched-node matching) and `solve_identical_diagnostic_
-   statements` (identical logging/bail/assert/printf matching) - both are, in the user's framing,
-   a form of "detecting where already-known content re-lands" rather than literal subtree-move
-   recovery. Kept the phase name as given; noted here so a future reader isn't confused about why
-   a phase named "move detection" contains neither move detection nor `solve_moved_subtrees`.
+2. **"Move detection"** (originally named this in planning; renamed to **"contextual exact
+   matching"** 2026-07-18, see below) - repurposed name/slot, **not** `solve_moved_subtrees.rs`
+   (that module is deleted outright - the user confirmed "remove solve_moved_subtrees"). Phase 2
+   instead houses `solve_comment_nodes` (comment-precedes-matched-node matching) and `solve_
+   identical_diagnostic_statements` (identical logging/bail/assert/printf matching) - both are, in
+   the user's framing, a form of "detecting where already-known content re-lands" rather than
+   literal subtree-move recovery.
 
 3. **Bottom-up expansion** - `solve_bottom_up_expansion.rs` as it exists today (Dice-coefficient
    vote-then-verify matching of containers via already-matched descendants), unchanged.
@@ -304,8 +304,8 @@ are removed outright, since order-independence is now inherent to both primary h
 | `solve_commutative_structural_trees` | **removed** - folded into both new hashes |
 | `solve_multilevel_hash` | **removed** - folded into `KindOnlyHash` (accepted precision loss, see above) |
 | `solve_import_nodes` | **removed** - folded into phase 1 as a hash variant |
-| `solve_comment_nodes` | moved into phase 2 ("move detection"), unchanged internally |
-| `solve_identical_diagnostic_statements` | moved into phase 2 ("move detection"), unchanged internally |
+| `solve_comment_nodes` | moved into phase 2 ("contextual exact matching"), unchanged internally |
+| `solve_identical_diagnostic_statements` | moved into phase 2 ("contextual exact matching"), unchanged internally |
 | `solve_moved_subtrees` | **removed** outright |
 | `solve_bottom_up_expansion` | phases 3 and 5, unchanged internally |
 | `solve_semantically_structural_nodes` | replaced by phase 4 (redesigned) |
