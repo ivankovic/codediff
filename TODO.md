@@ -1,5 +1,30 @@
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 
+## Phase 4 generalized into one shared engine (2026-07-18)
+
+User question: "what is the generalization of all current phase 4 heuristics?" Answer: three of
+phase 4's four mechanisms - named-group matching, positional anchoring (`solve_greedy_anchor_
+blocks`), and flow-control arm-overlap (`solve_similar_flow_control`) - are the same algorithm:
+partition candidates into buckets by an exact compatibility key, score same-key pairs with a cheap
+cost function, greedily accept cheapest-first (optionally above a threshold), hand accepted pairs
+to real APTED. They differed only in three pluggable pieces (candidate predicate, key type, cost
+function). `solve_large_flat_subtrees` (the fourth mechanism) doesn't fit this shape at all - no
+competing candidates, no scoring, just a deterministic lookup pre-empting part of an already-
+established pair's own APTED call - and stays a separate, directly-called pass.
+
+Built `src/diff/grouped_greedy_matcher.rs` as the one shared engine (mirrors how `hash_tree_
+matching::solve_with_hash_map` already generalized phase 1's three hash algorithms the same way)
+and re-pointed all three call sites at it. Notable transform: flow-control's Jaccard similarity
+("higher is better") had to be converted to the engine's "lower cost is better" convention via
+`1.0 - similarity`, both for the cost function and the threshold. `FlowControlFamily` gained a
+`Hash` derive to serve directly as the engine's compatibility key.
+
+Verified: full lib test suite green (331 tests, including positional-anchoring's false-positive
+regression guards and the N:M overload test), benchmark re-confirms **TOTAL 778 exactly** - pure
+refactor, zero behavior change. Unexpected bonus: aggregate benchmark runtime dropped from ~327s to
+**175s** (nearly 2x), because flow-control's previous O(before x after) all-pairs family filter now
+benefits from the same O(candidates) key-bucketing the other two mechanisms already had.
+
 ## Final cleanup (2026-07-18)
 
 Old ~15-pass pipeline deleted outright. `Diff::from_code_with_config` now runs the seven phases
