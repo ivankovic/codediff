@@ -37,11 +37,16 @@ but that was only known because each was actually measured, not assumed).
    solve the underlying generic-token-in-isolated-APTED-call problem generally, since it would
    likely also matter for future candidates like #3/#4 below.
 
-2. **Import-list arm-overlap matching** - same shape as `solve_similar_flow_control`'s Jaccard-
-   over-arm-signatures, but for multi-symbol imports (`use foo::{a, b, c}` -> `use foo::{a, c,
-   d}`): group by import path, score by imported-symbol-set overlap. Mechanically this is flow-
-   control arm-overlap wearing different clothes - a new candidate predicate + signature function
-   plugged into the same `grouped_greedy_matcher` engine, nothing structurally new.
+2. **Import-list arm-overlap matching** - **tried 2026-07-18, kept, neutral.** `solve_import_
+   list_overlap`: groups candidate Rust `use_declaration`s (multi-symbol `use foo::{a, b, c}` form
+   only) by base import path, scores same-path pairs by Jaccard similarity of imported-symbol sets
+   (reusing `solve_similar_flow_control`'s generic `flow_control_similarity_of_sets` helper),
+   matches the *whole* `use_declaration` in one `apted::for_nodes` call (never an individual
+   symbol - applying #1's lesson directly). Benchmark: **TOTAL 778 exactly unchanged, zero
+   fixtures differ** - the new `APTED:syntax_import_list` reason fired 76 times with no net effect
+   on mismatches. Kept anyway (same call as `solve_greedy_anchor_blocks` previously): zero
+   regression, 2 passing unit tests, plausibly useful on real-world grouped-import churn this
+   86-fixture corpus doesn't happen to exercise.
 
 3. **Call-site matching by callee identity** - group `call_expression`/method-invocation candidates
    by callee name (+ maybe arg count), cost-scored by argument similarity. Catches a specific call
