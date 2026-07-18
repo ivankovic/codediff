@@ -17,6 +17,7 @@
  */
 pub mod apted;
 pub mod cost;
+pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;

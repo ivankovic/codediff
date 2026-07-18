@@ -15,8 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::HashMap;
-
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::nodes::{anchor_pair_via_apted, is_block_container};
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
@@ -63,33 +61,28 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 * their full path from the file root, which is the same idea one level up: "no better anchor exists,
 * so require literal structural correspondence from the top."
 *
-* This also turns candidate generation from an O(before-candidates x after-candidates) search into
-* an O(candidates) grouping followed by small per-group comparisons (see `solve`): candidates only
-* ever compete with the (usually handful of) other candidates sharing the same positional key.
+* Candidate generation (`collect_candidates` + the two `positional_key_*` functions above) is this
+* pass's own; the grouping, scoring, greedy assignment, and defensive re-check against pairs
+* claimed mid-run by an earlier accepted pair's real APTED resolution are all handled generically
+* by `grouped_greedy_matcher::solve` (`TODO.md`'s "generalization of phase 4" analysis, 2026-07-18)
+* - this pass just supplies the positional key as `grouped_greedy_matcher`'s compatibility key `K`
+* and `cost_ratio` as its cost function, gated by `MAX_COST_RATIO`.
 *
-* Runs last among the heuristics, right before the final full-tree APTED pass: by this point every
-* named/keyed anchor has already had its chance (Pass 1-3 above), so whatever's left is genuinely
-* anonymous containers - exactly the case this pass targets. Placing it before rather than after the
-* final APTED pass lets it anchor big blocks cheaply first, shrinking the residual forest that the
+* Called from phase 4 (`solve_syntax_aware_matching`), after named-group matching has had its
+* chance: by that point every named/keyed anchor is already resolved, so whatever's left is
+* genuinely anonymous containers - exactly the case this pass targets. Running before the final
+* full-tree APTED pass lets it anchor big blocks cheaply first, shrinking the residual forest the
 * much slower exact tree edit distance then has to grind through - the same "the more nodes are
 * already matched, the faster it is" rationale documented on the APTED call site in `diff.rs`.
 *
-* Accepted pairs are handed to `apted::for_nodes`, the same "pre-match, then diff for real" idiom
-* every other heuristic pass uses: it guarantees a real edit-distance-based cost/operation instead
-* of an invented one, and guarantees completeness (nothing under the pair is left unmapped for a
-* later pass to miss). Only the `reason` on the resulting root mapping is overwritten afterward, to
-* `GreedyAnchorBlock`, for provenance/explainability - and only when `for_nodes` actually matched
-* the pair (it may still choose a from-scratch delete+insert if the true edit-distance cost turns
-* out cheaper than reuse, in which case there's no root mapping entry to relabel).
-*
-* Positional keys are computed once, from a snapshot of `diff` taken *before* this pass makes any
-* of its own matches - a group processed later in the (arbitrary, `HashMap`-ordered) iteration below
-* may find one of its candidates was already claimed as part of resolving an *earlier*-processed
-* group's pair (e.g. an outer block matched first, whose real tree-edit-distance resolution already
-* covered a nested block that was also, independently, a candidate here). `solve` rechecks
-* `before_node_map`/`after_node_map` immediately before every `for_nodes` call for exactly this
-* reason - the same defensive re-check `solve_bottom_up_expansion` does per candidate even though
-* its candidate list was also built from an upfront snapshot.
+* Accepted pairs are handed to `apted::for_nodes` (via `anchor_pair_via_apted`), the same
+* "pre-match, then diff for real" idiom every other heuristic pass uses: it guarantees a real
+* edit-distance-based cost/operation instead of an invented one, and guarantees completeness
+* (nothing under the pair is left unmapped for a later pass to miss). Only the `reason` on the
+* resulting root mapping is overwritten afterward, to `GreedyAnchorBlock`, for provenance/
+* explainability - and only when `for_nodes` actually matched the pair (it may still choose a
+* from-scratch delete+insert if the true edit-distance cost turns out cheaper than reuse, in which
+* case there's no root mapping entry to relabel).
 */
 const MIN_CHILDREN: usize = 2;
 const MIN_SUBTREE_SIZE: usize = 4;
@@ -107,76 +100,32 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let after_metadata = crate::code::metadata::metadata_of(after);
     let language = before_metadata.language;
 
-    let before_candidates = collect_candidates(&before_metadata, &diff.before_node_map, &language);
-    let after_candidates = collect_candidates(&after_metadata, &diff.after_node_map, &language);
-    if before_candidates.is_empty() || after_candidates.is_empty() {
+    let before_candidate_ids = collect_candidates(&before_metadata, &diff.before_node_map, &language);
+    let after_candidate_ids = collect_candidates(&after_metadata, &diff.after_node_map, &language);
+    if before_candidate_ids.is_empty() || after_candidate_ids.is_empty() {
         return;
     }
 
-    // Group candidates by positional key (see the module doc comment) - a `before` candidate and
-    // an `after` candidate are only ever compared if they land in the same group.
-    let mut before_groups: HashMap<PositionalKey, Vec<usize>> = HashMap::new();
-    for &id in &before_candidates {
-        before_groups.entry(positional_key_before(id, &before_metadata, diff)).or_default().push(id);
-    }
-    let mut after_groups: HashMap<PositionalKey, Vec<usize>> = HashMap::new();
-    for &id in &after_candidates {
-        after_groups.entry(positional_key_after(id, &after_metadata, diff)).or_default().push(id);
-    }
+    // (id, positional key) pairs, in `collect_candidates`' preorder-sorted order - satisfies
+    // `grouped_greedy_matcher`'s determinism contract directly, no extra sort needed here.
+    let before_candidates: Vec<(usize, PositionalKey)> = before_candidate_ids
+        .iter()
+        .map(|&id| (id, positional_key_before(id, &before_metadata, diff)))
+        .collect();
+    let after_candidates: Vec<(usize, PositionalKey)> = after_candidate_ids
+        .iter()
+        .map(|&id| (id, positional_key_after(id, &after_metadata, diff)))
+        .collect();
 
-    // Deterministic group processing order: sort by the smallest member's `preorder_index` (a pure
-    // function of the before-tree's shape, unlike raw node ids - see
-    // `ASTNodeMetadata::start_byte`'s doc comment), not `HashMap` iteration order. Group-to-group
-    // processing order can change *which* group's `for_nodes` call claims a shared descendant
-    // first (see the module doc comment's note on the defensive re-check), so leaving this to an
-    // unspecified hash order would make output depend on the hasher's per-process random seed -
-    // exactly the class of bug documented on `ASTNodeMetadata::start_byte`.
-    let mut active_keys: Vec<&PositionalKey> = before_groups.keys().filter(|k| after_groups.contains_key(*k)).collect();
-    active_keys.sort_by_key(|key| {
-        before_groups[*key]
-            .iter()
-            .map(|id| before_metadata.node_info.get(id).map(|i| i.preorder_index).unwrap_or(usize::MAX))
-            .min()
-            .unwrap_or(usize::MAX)
-    });
-
-    for key in active_keys {
-        let before_ids = &before_groups[key];
-        let after_ids = &after_groups[key];
-
-        // Score every pair within this group, keep the ones clearing the cost-ratio bar. Indices
-        // into `before_ids`/`after_ids` (not raw node ids) are what get sorted/greedily assigned -
-        // see the sort comment above on why raw ids must never be a sort/tiebreak key.
-        let mut scored_pairs: Vec<(f64, usize, usize)> = Vec::new();
-        for (before_pos, &before_id) in before_ids.iter().enumerate() {
-            for (after_pos, &after_id) in after_ids.iter().enumerate() {
-                let Some(ratio) = cost_ratio(before_id, after_id, &before_metadata, &after_metadata) else {
-                    continue;
-                };
-                if ratio <= MAX_COST_RATIO {
-                    scored_pairs.push((ratio, before_pos, after_pos));
-                }
-            }
-        }
-        scored_pairs.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)).then_with(|| a.2.cmp(&b.2)));
-
-        let mut before_used = vec![false; before_ids.len()];
-        let mut after_used = vec![false; after_ids.len()];
-
-        for (_, before_pos, after_pos) in scored_pairs {
-            if before_used[before_pos] || after_used[after_pos] {
-                continue;
-            }
-            let before_id = before_ids[before_pos];
-            let after_id = after_ids[after_pos];
-            // Defensive re-check (see module doc comment): an earlier-processed group may already
-            // have claimed one of these nodes as part of resolving a containing pair.
-            if diff.before_node_map.contains_key(&before_id) || diff.after_node_map.contains_key(&after_id) {
-                continue;
-            }
-            before_used[before_pos] = true;
-            after_used[after_pos] = true;
-
+    crate::diff::grouped_greedy_matcher::solve(
+        diff,
+        &before_candidates,
+        &after_candidates,
+        |before_id, after_id| {
+            cost_ratio(before_id, after_id, &before_metadata, &after_metadata).unwrap_or(f64::INFINITY)
+        },
+        Some(MAX_COST_RATIO),
+        |before_id, after_id, diff| {
             anchor_pair_via_apted(
                 before_id,
                 after_id,
@@ -186,8 +135,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
                 ASTMappingReason::GreedyAnchorBlock,
                 diff,
             );
-        }
-    }
+        },
+    );
 }
 
 /// `(nearest already-matched ancestor - expressed as an after-side id, or `None` if the walk

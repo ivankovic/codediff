@@ -748,8 +748,9 @@ pub fn matching_allowed(
 }
 
 /// A flow-control construct family, used to keep `MatchSimilarFlowControl` from ever pairing a
-/// `match` against a `switch`, etc.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// `match` against a `switch`, etc. `Hash` (alongside `Eq`) so it can serve directly as
+/// `grouped_greedy_matcher`'s compatibility key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlowControlFamily {
     Match,
     Switch,

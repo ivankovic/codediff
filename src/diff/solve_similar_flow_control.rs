@@ -15,12 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code};
 use crate::diff::apted::{self, Algorithm};
+use crate::diff::grouped_greedy_matcher;
 use crate::diff::nodes::{
     FlowControlArm, collect_unmatched, flow_control_arms, flow_control_family,
     flow_control_signature_set, flow_control_similarity_of_sets,
@@ -33,21 +34,24 @@ use crate::diff::{ASTDiff, NodeCache};
 * "this is basically the same branching logic" instead of the whole construct being torn down as a
 * delete+insert.
 *
-* This runs after `solve_semantically_structural_nodes` (name-based matching) and before the final
-* APTED pass. Without it, a construct whose enclosing function/impl has no same-named counterpart
-* on the other side is left for the final pass to swallow into a from-scratch subtree delete/insert,
-* even when its arms are clearly the same set of cases, just moved to a differently-named container
-* (e.g. logic hoisted from one function into another as part of a rename/restructure).
+* Called from phase 4 (`solve_syntax_aware_matching`), after named-group matching has had its
+* chance, and before the final APTED pass. Without it, a construct whose enclosing function/impl
+* has no same-named counterpart on the other side is left for the final pass to swallow into a
+* from-scratch subtree delete/insert, even when its arms are clearly the same set of cases, just
+* moved to a differently-named container (e.g. logic hoisted from one function into another as
+* part of a rename/restructure).
 *
 * See [`crate::diff::nodes::FlowControlFamily`] for exactly which constructs are recognized per
 * language (Python's `if` is the one notable gap - its flat `elif`/`else` fields don't fit the
-* recursive `if`/`else if` shape this pass relies on). Candidates are scored by the Jaccard
-* similarity of their non-wildcard arm signatures and paired off greedily, highest score first;
-* accepted pairs (>=75% shared signatures) have their identical-signature arms individually
-* resolved via APTED, then the container itself is diffed so any leftover value expression, added
-* arms or removed arms are handled normally. For `if` chains specifically, this per-arm resolution
-* is naturally recursive: a matched non-terminal branch's own subtree already contains the rest of
-* the chain, so resolving it resolves every branch nested inside it too.
+* recursive `if`/`else if` shape this pass relies on). Candidate collection and the Jaccard-
+* similarity cost function are this pass's own; grouping by family, greedy assignment, and the
+* threshold check (>=75% shared signatures) are handled generically by `grouped_greedy_matcher::
+* solve` (`TODO.md`'s "generalization of phase 4" analysis, 2026-07-18) - `FlowControlFamily`
+* serves directly as its compatibility key. Accepted pairs have their identical-signature arms
+* individually resolved via APTED first, then the container itself is diffed so any leftover value
+* expression, added arms or removed arms are handled normally. For `if` chains specifically, this
+* per-arm resolution is naturally recursive: a matched non-terminal branch's own subtree already
+* contains the rest of the chain, so resolving it resolves every branch nested inside it too.
 *
 * This is a heuristic for reducing spurious delete+insert pairs, not a general moved-code detector:
 * it only pairs the *matching-signature* arms of a container pair it already decided to pair. Content
@@ -66,7 +70,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let before_source = before.contents.as_bytes();
     let after_source = after.contents.as_bytes();
 
-    let before_candidates: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
+    let before_items: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
         before_ast.root_node(),
         &diff.before_node_map,
         |node| flow_control_family(node.kind(), &language).is_some(),
@@ -74,7 +78,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     .into_iter()
     .filter_map(|node| flow_control_arms(node, &language, before_source).map(|arms| (node, arms)))
     .collect();
-    let after_candidates: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
+    let after_items: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
         after_ast.root_node(),
         &diff.after_node_map,
         |node| flow_control_family(node.kind(), &language).is_some(),
@@ -82,59 +86,66 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     .into_iter()
     .filter_map(|node| flow_control_arms(node, &language, after_source).map(|arms| (node, arms)))
     .collect();
-    if before_candidates.is_empty() || after_candidates.is_empty() {
+    if before_items.is_empty() || after_items.is_empty() {
         return;
     }
 
-    // Precompute each candidate's signature set once - the all-pairs scoring below would
-    // otherwise rebuild both HashSets from scratch on every one of the B*A comparisons.
-    let before_sets: Vec<_> =
-        before_candidates.iter().map(|(_, arms)| flow_control_signature_set(arms)).collect();
-    let after_sets: Vec<_> =
-        after_candidates.iter().map(|(_, arms)| flow_control_signature_set(arms)).collect();
+    // Precompute each candidate's signature set once (keyed by node id) - `grouped_greedy_
+    // matcher`'s cost function is called once per same-family pair, and would otherwise rebuild
+    // both `HashSet`s from scratch every time.
+    let before_sets: HashMap<usize, HashSet<&str>> =
+        before_items.iter().map(|(node, arms)| (node.id(), flow_control_signature_set(arms))).collect();
+    let after_sets: HashMap<usize, HashSet<&str>> =
+        after_items.iter().map(|(node, arms)| (node.id(), flow_control_signature_set(arms))).collect();
+    // Same idea for the arms themselves, needed by `anchor_matching_arms` on accept.
+    let before_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> =
+        before_items.iter().map(|(node, arms)| (node.id(), arms)).collect();
+    let after_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> =
+        after_items.iter().map(|(node, arms)| (node.id(), arms)).collect();
 
-    // Score every same-family candidate pair, keep the ones clearing the threshold.
-    let mut scored_pairs: Vec<(f64, usize, usize)> = Vec::new();
-    for (before_idx, (before_node, _)) in before_candidates.iter().enumerate() {
-        let before_family = flow_control_family(before_node.kind(), &language);
-        for (after_idx, (after_node, _)) in after_candidates.iter().enumerate() {
-            if before_family != flow_control_family(after_node.kind(), &language) {
-                continue;
-            }
-            let score = flow_control_similarity_of_sets(&before_sets[before_idx], &after_sets[after_idx]);
-            if score >= SIMILARITY_THRESHOLD {
-                scored_pairs.push((score, before_idx, after_idx));
-            }
-        }
-    }
-    // Greedy one-to-one assignment, highest-similarity pair first.
-    scored_pairs.sort_by(|a, b| b.0.total_cmp(&a.0));
+    // (id, family) candidate lists - `collect_unmatched`'s stack-based DFS order is deterministic
+    // run-to-run (satisfying `grouped_greedy_matcher`'s determinism contract) even though it isn't
+    // preorder per se.
+    let before_candidates: Vec<(usize, crate::diff::nodes::FlowControlFamily)> = before_items
+        .iter()
+        .map(|(node, _)| (node.id(), flow_control_family(node.kind(), &language).expect("collect_unmatched already filtered to flow-control kinds")))
+        .collect();
+    let after_candidates: Vec<(usize, crate::diff::nodes::FlowControlFamily)> = after_items
+        .iter()
+        .map(|(node, _)| (node.id(), flow_control_family(node.kind(), &language).expect("collect_unmatched already filtered to flow-control kinds")))
+        .collect();
 
-    let mut before_used = vec![false; before_candidates.len()];
-    let mut after_used = vec![false; after_candidates.len()];
+    // `grouped_greedy_matcher` works in "lower cost is better" terms; Jaccard similarity is
+    // "higher is better", so the transform is `1.0 - similarity` both for the cost function and
+    // the acceptance threshold (`score >= SIMILARITY_THRESHOLD` <=> `1.0 - score <= 1.0 -
+    // SIMILARITY_THRESHOLD`), preserving both the ordering (highest similarity first) and the
+    // rejection rule exactly.
+    grouped_greedy_matcher::solve(
+        diff,
+        &before_candidates,
+        &after_candidates,
+        |before_id, after_id| 1.0 - flow_control_similarity_of_sets(&before_sets[&before_id], &after_sets[&after_id]),
+        Some(1.0 - SIMILARITY_THRESHOLD),
+        |before_id, after_id, diff| {
+            anchor_matching_arms(
+                before_arms_by_id[&before_id],
+                after_arms_by_id[&after_id],
+                &before_metadata,
+                &after_metadata,
+                diff,
+            );
 
-    for (_, before_idx, after_idx) in scored_pairs {
-        if before_used[before_idx] || after_used[after_idx] {
-            continue;
-        }
-        before_used[before_idx] = true;
-        after_used[after_idx] = true;
-
-        let (before_node, before_arms) = &before_candidates[before_idx];
-        let (after_node, after_arms) = &after_candidates[after_idx];
-
-        anchor_matching_arms(before_arms, after_arms, &before_metadata, &after_metadata, diff);
-
-        apted::for_nodes(
-            &before_metadata,
-            &after_metadata,
-            vec![before_node.id()],
-            vec![after_node.id()],
-            Algorithm::Apted,
-            "flow_control_container",
-            diff,
-        );
-    }
+            apted::for_nodes(
+                &before_metadata,
+                &after_metadata,
+                vec![before_id],
+                vec![after_id],
+                Algorithm::Apted,
+                "flow_control_container",
+                diff,
+            );
+        },
+    );
 }
 
 
