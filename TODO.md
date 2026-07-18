@@ -12,15 +12,30 @@ reasonable and turned out net-negative alone** (`solve_similar_flow_control`, `s
 expansion`, import-path hashing all shipped anyway because they're net-positive *in combination*,
 but that was only known because each was actually measured, not assumed).
 
-1. **Field/variant-level named matching** - extends `solve_named_reference_groups`, not a new
-   mechanism: its candidate predicate (`nodes::is_semantically_structural`) only covers top-level
-   declarations (functions, classes, structs, impls, ...), not struct fields/enum variants/class
-   properties. When a struct changes enough that phase 1's hash-descent doesn't catch it whole,
-   its individual fields currently fall through to positional anchoring or final APTED instead of
-   being matched by name. Widening the predicate to also treat named fields/variants as candidates
-   (field name as the leaf of the scope-qualified key, e.g. `"Foo::age"`) would let `age: i32 ->
-   age: i64` match by name even when siblings were added/removed/reordered around it. Lowest risk:
-   same key type, same engine, just a broader predicate.
+1. **Field/variant-level named matching** - **tried 2026-07-18, reverted, net-negative.** Extended
+   `solve_named_reference_groups`'s candidate predicate with a new `nodes::is_named_field`
+   (Rust `field_declaration`/`enum_variant`, Go `field_declaration`, Java `field_declaration`, C/C++
+   `field_declaration` when not pointer/array-wrapped - each verified against real grammar output,
+   4 passing unit tests). Worked exactly as designed in isolation (new end-to-end test confirmed
+   `age: i32` matches by name across sibling field churn) but regressed the benchmark: **785 vs. the
+   778 baseline (+7), 3 fixtures worse (`rust-add-value-to-enum` 0->2, `rust-hash-optimization`
+   0->2, `rust-turbopack-module-rule` 52->55), 0 improved anywhere.**
+   **Root cause, confirmed via `--details` on all 3 regressions - the same failure mode every
+   time:** calling `apted::for_nodes` on a single matched field/variant pair causes that call's own
+   comma assignment (commas are *siblings* of `field_declaration`/`enum_variant` in their parent
+   list, a classic generic/interchangeable token) to disagree with how the *parent* list
+   (`field_declaration_list`/`enum_variant_list`) would have assigned commas holistically across
+   all its children at once. Matching one field in isolation fragments a decision that needs
+   list-wide context to get right - individual field identity and the list's own generic-token
+   assignment are in tension, and this implementation had no way to reconcile them. Every
+   regression was a comma-only mismatch (not a real content/structure error), so this is milder
+   than it looks, but it's still a measured net-negative by the strict TOTAL count this whole
+   session has used as the bar. Not chased further (would need either scoping `apted::for_nodes`
+   to include the parent list's generic tokens, or gating the predicate away from fields whose
+   parent is a `nodes::is_commutative_container` where this tension is sharpest) - reverted
+   cleanly (`git checkout`), zero trace left in the codebase. Revisit if a future session wants to
+   solve the underlying generic-token-in-isolated-APTED-call problem generally, since it would
+   likely also matter for future candidates like #3/#4 below.
 
 2. **Import-list arm-overlap matching** - same shape as `solve_similar_flow_control`'s Jaccard-
    over-arm-signatures, but for multi-symbol imports (`use foo::{a, b, c}` -> `use foo::{a, c,
