@@ -70,10 +70,44 @@ but that was only known because each was actually measured, not assumed).
    need - don't resurrect by loosening thresholds, since that trades away the false-positive
    protection to manufacture firings.
 
-4. **Named/keyword-argument matching** - for Python/Kotlin/Swift-style keyword arguments, match by
-   argument name within a call's argument list, independent of position. Same idea as #1 one level
-   further down (an even smaller-grained named-group match), language-scoped to grammars that
-   actually have keyword-argument syntax.
+4. **Named/keyword-argument matching** - **tried 2026-07-18, reverted, zero firings.** The
+   originally-proposed framing ("match a keyword argument independent of position within a call")
+   is exactly candidate #1's individual-list-member form one level further down the tree, and would
+   hit the identical comma-fragmentation failure #1 measured. Adapted instead (advisor-reviewed
+   before implementing) into `solve_keyword_argument_calls`: group still-unmatched Python `call` /
+   Kotlin `call_expression` candidates (verified against each grammar directly - Python has real
+   `function`/`arguments`/`name`/`value` fields, Kotlin's `tree-sitter-kotlin-ng` grammar has *no*
+   fields at all on `call_expression`/`value_argument`, so callee and keyword-name extraction there
+   is purely positional) by `(callee name, sorted keyword-argument-name set)` - a stronger,
+   more collision-resistant identity signal than candidate #3's `(callee, arg count)`, since
+   keyword names are caller-chosen and self-describing. Matches the *whole* call in one
+   `apted::for_nodes` call, never an individual argument (applying #1's lesson). Hit and fixed one
+   real bug along the way: `solve_greedy_anchor_blocks::cost_ratio` only compares a node's *direct*
+   children by exact hash, and a call's direct children are just `(callee, arguments)` - scoring on
+   the whole call read one changed keyword value as "100% different" (ratio 0.91, above any sane
+   threshold) regardless of how much the argument list actually shared; fixed by scoring on the
+   *arguments* sub-node specifically instead (same fix candidate #3 already needed and documented).
+   Both a Python and a Kotlin unit test pass end-to-end (call matched across a position shift plus
+   one changed keyword value), proving the mechanism works when the pattern is present. Benchmark:
+   **TOTAL 778 exactly unchanged, zero fixtures differ - but `APTED:syntax_keyword_args` fired 0
+   times anywhere in the 86-fixture corpus** (which does include multiple Python and Kotlin
+   fixtures), the same zero-firing outcome as candidate #3. Reverted cleanly (`git checkout`,
+   confirmed zero diff) for the same reason: unconditional, always-on code with no measured benefit
+   and an unexercised false-positive-collision risk shouldn't ship just because it's mechanically
+   correct. Revisit only if a future fixture demonstrates the need - not by loosening thresholds.
+   The narrower position-independent-*within-an-already-matched-call* gap (this candidate's
+   original framing) stays genuinely unaddressed, same deferred status as candidate #1's fragmented-
+   comma-token problem - solving both together (matching a single list member without breaking the
+   parent list's own generic-token assignment) is the real unlock, and remains future work.
+
+   **Phase 4 expansion candidates: final tally (2026-07-18).** All four tried one by one, each
+   measured independently against the 778 baseline: **#1 reverted** (measured regression, 785).
+   **#2 kept** (neutral, fires 76x on real fixtures). **#3 reverted** (neutral, 0 firings -
+   unvalidated). **#4 reverted** (neutral, 0 firings - unvalidated). Net result: one net-positive
+   addition shipped (`solve_import_list_overlap`), three speculative extensions tried in good faith
+   and cleanly discarded when the evidence didn't support keeping them. No open follow-up work is
+   in flight from this exercise - the deferred generic-token-in-isolated-APTED-call problem (#1's
+   root cause, also blocking a real fix for #4's original framing) is noted above but not scheduled.
 
 ## Phase 4 generalized into one shared engine (2026-07-18)
 
