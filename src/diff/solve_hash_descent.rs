@@ -138,3 +138,51 @@ fn import_path_hash_map(metadata: &crate::code::ASTMetadata) -> HashMap<usize, u
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::code::Language;
+    use crate::diff::ASTMappingReason;
+    use crate::test::helper::find_first_of_kind;
+
+    /// Reordering a Rust `use_list` (a `nodes::is_commutative_container` kind) with no other
+    /// change must be distinguishable from a genuinely untouched one - see the user request this
+    /// responds to ("we do need a way to distinguish between truly identical and reordered") and
+    /// `ASTMappingReason::FullymappingSubtrees`'s doc comment.
+    #[test]
+    fn reordered_commutative_container_is_distinguished_from_truly_identical() {
+        let before = Code::from_string("use std::{a, b, c};\nfn f() {}\n", &Language::Rust);
+        let after = Code::from_string("use std::{c, a, b};\nfn f() {}\n", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_use_list = find_first_of_kind(before_root, "use_list").unwrap();
+        let after_use_list = find_first_of_kind(after_root, "use_list").unwrap();
+
+        let mapping = diff
+            .mapping
+            .get(&(before_use_list.id(), after_use_list.id()))
+            .expect("reordered use_list should still be matched");
+        assert_eq!(
+            mapping.reason,
+            ASTMappingReason::FullymappingSubtrees,
+            "a reordered-but-unchanged use_list must be tagged FullymappingSubtrees, not plain IdenticalHash"
+        );
+
+        // The unrelated, untouched `fn f() {}` must NOT get relabeled - only the actually-
+        // reordered node should carry the distinguishing reason.
+        let before_fn = find_first_of_kind(before_root, "function_item").unwrap();
+        let after_fn = find_first_of_kind(after_root, "function_item").unwrap();
+        let fn_mapping = diff.mapping.get(&(before_fn.id(), after_fn.id())).unwrap();
+        assert_ne!(
+            fn_mapping.reason,
+            ASTMappingReason::FullymappingSubtrees,
+            "an untouched, non-reordered node must not be tagged FullymappingSubtrees"
+        );
+    }
+}

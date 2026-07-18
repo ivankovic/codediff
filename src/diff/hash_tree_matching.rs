@@ -224,9 +224,20 @@ pub(crate) fn solve_with_hash_map(
         // `pair_children_for_descent`'s doc comment for why a positional `zip` is wrong there).
         let mut stack = vec![(before_node, after_node)];
         while let Some((before_parent, after_parent)) = stack.pop() {
-            for (before_child, after_child) in
-                pair_children_for_descent(before_parent, after_parent, &before_metadata, &after_metadata)
+            let (pairs, reordered) =
+                pair_children_for_descent(before_parent, after_parent, &before_metadata, &after_metadata);
+
+            // `before_parent`/`after_parent`'s own mapping was already added (either as the root
+            // match above, or as a `descendant_reason`-tagged child pair in an earlier iteration
+            // of this same loop) before we could know whether *its* children turned out to be
+            // reordered - patch the reason now that we know, rather than looking ahead.
+            if reordered
+                && let Some(mapping) = diff.mapping.get_mut(&(before_parent.id(), after_parent.id()))
             {
+                mapping.reason = ASTMappingReason::FullymappingSubtrees;
+            }
+
+            for (before_child, after_child) in pairs {
                 if diff.before_node_map.contains_key(&before_child.id()) {
                     continue;
                 }
@@ -254,18 +265,43 @@ pub(crate) fn solve_with_hash_map(
 * `is_commutative_container` exists to match). A positional `zip` there would silently mis-pair
 * reordered children - the exact bug `code::hash::compute_commutative_structural_hash`'s own doc
 * comment warned about ("reordered children get re-mangled by the shared engine's positional
-* zip"). Fix: pair by `node_to_kind_only_hash` instead (multiset equality between the two child
-* lists is guaranteed here, by construction, whenever the parent hash matched - the sorted-hash
-* combination that produced the parent's own hash could only be equal if the *multiset* of child
-* hashes is equal), breaking ties among same-hash candidates by document proximity, the same
-* tiebreak the top-level match itself uses.
+* zip").
+*
+* Fix: pair by hash instead of position, in two tiers - **not** `node_to_kind_only_hash` alone
+* (an earlier version of this function did that unconditionally, which is wrong whenever the
+* *outer* match came from `KindAndValueHash`: `kind_only_hash` ignores leaf text, so e.g. three
+* plain `identifier` children with different names all hash equal, and the nearest-by-position
+* tiebreak can silently "recover" a pairing that looks unreordered even though the identifiers
+* actually did move - which also breaks reorder detection below, since it works from whichever
+* pairing this function returns).
+* 1. `node_to_kind_and_value_hash` first (exact - correctly distinguishes same-kind, different-
+*    value children like `a`/`b`/`c` above). Multiset equality here is guaranteed whenever the
+*    outer match was itself `KindAndValueHash`-driven (the sorted-hash combination that produced
+*    the parent's own hash could only be equal if the multiset of child hashes is equal); may
+*    leave some children unpaired when the outer match was `KindOnlyHash`-driven instead (content
+*    values may legitimately differ there), which tier 2 picks up.
+* 2. `node_to_kind_only_hash` as a fallback, for whatever tier 1 left unpaired - the coarser
+*    guarantee that *does* hold unconditionally (a `KindOnlyHash` match only guarantees kind-level
+*    multiset equality), same tiebreak methodology.
+*
+* Either tier breaks ties among same-hash candidates by document proximity, the same tiebreak the
+* top-level match itself uses.
+*
+* Returns the pairs plus a `reordered` flag: true if `before_parent` is a commutative container
+* and at least one pair's after-side document-order index differs from its before-side index -
+* i.e. content-wise nothing changed, but the children's actual order did. The caller uses this to
+* distinguish `FullymappingSubtrees` (matched via order-independence, order genuinely changed)
+* from a plain `IdenticalHash`/`StructurallyIdenticalSubtrees` match (order-independence didn't
+* need to do anything, because nothing moved) - see the user request this responds to ("we do need
+* a way to distinguish between truly identical and reordered") and `ASTMappingReason::
+* FullymappingSubtrees`'s doc comment.
 */
 fn pair_children_for_descent<'a>(
     before_parent: tree_sitter::Node<'a>,
     after_parent: tree_sitter::Node<'a>,
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
-) -> Vec<(tree_sitter::Node<'a>, tree_sitter::Node<'a>)> {
+) -> (Vec<(tree_sitter::Node<'a>, tree_sitter::Node<'a>)>, bool) {
     let mut before_cursor = before_parent.walk();
     let mut after_cursor = after_parent.walk();
     let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
@@ -273,38 +309,73 @@ fn pair_children_for_descent<'a>(
 
     let language = before_metadata.language;
     if !crate::diff::nodes::is_commutative_container(before_parent.kind(), &language) {
-        return before_children
+        let pairs = before_children
             .into_iter()
             .zip(after_children)
             .filter(|(b, a)| b.kind() == a.kind())
             .collect();
+        return (pairs, false);
     }
 
-    let mut after_by_hash: HashMap<u64, Vec<tree_sitter::Node<'a>>> = HashMap::new();
-    for &child in &after_children {
-        let hash = after_metadata.node_to_kind_only_hash.get(&child.id()).copied().unwrap_or(0);
-        after_by_hash.entry(hash).or_default().push(child);
-    }
+    let index_by_hash = |children: &[tree_sitter::Node<'a>], hash_map: &HashMap<usize, u64>| {
+        let mut by_hash: HashMap<u64, Vec<(usize, tree_sitter::Node<'a>)>> = HashMap::new();
+        for (index, &child) in children.iter().enumerate() {
+            let hash = hash_map.get(&child.id()).copied().unwrap_or(0);
+            by_hash.entry(hash).or_default().push((index, child));
+        }
+        by_hash
+    };
+    let after_by_kv = index_by_hash(&after_children, &after_metadata.node_to_kind_and_value_hash);
+    let after_by_ko = index_by_hash(&after_children, &after_metadata.node_to_kind_only_hash);
 
     let mut used = std::collections::HashSet::new();
     let mut pairs = Vec::new();
-    for before_child in before_children {
-        let hash = before_metadata.node_to_kind_only_hash.get(&before_child.id()).copied().unwrap_or(0);
-        let Some(candidates) = after_by_hash.get(&hash) else { continue };
-        let Some(best) = candidates
+    let mut reordered = false;
+    let mut unmatched_before: Vec<(usize, tree_sitter::Node<'a>)> = Vec::new();
+
+    for (before_index, before_child) in before_children.into_iter().enumerate() {
+        let kv_hash = before_metadata.node_to_kind_and_value_hash.get(&before_child.id()).copied().unwrap_or(0);
+        let found = after_by_kv
+            .get(&kv_hash)
+            .and_then(|candidates| {
+                candidates
+                    .iter()
+                    .filter(|(_, c)| !used.contains(&c.id()) && c.kind() == before_child.kind())
+                    .min_by_key(|(_, c)| c.start_byte().abs_diff(before_child.start_byte()))
+            })
+            .copied();
+        match found {
+            Some((after_index, best)) => {
+                used.insert(best.id());
+                if after_index != before_index {
+                    reordered = true;
+                }
+                pairs.push((before_child, best));
+            }
+            None => unmatched_before.push((before_index, before_child)),
+        }
+    }
+
+    // Tier 2: kind-only fallback for whatever tier 1 (exact kind+value) couldn't pair - covers a
+    // `KindOnlyHash`-driven outer match, where children may legitimately differ in value.
+    for (before_index, before_child) in unmatched_before {
+        let ko_hash = before_metadata.node_to_kind_only_hash.get(&before_child.id()).copied().unwrap_or(0);
+        let Some(candidates) = after_by_ko.get(&ko_hash) else { continue };
+        let Some(&(after_index, best)) = candidates
             .iter()
-            .filter(|c| !used.contains(&c.id()))
-            .min_by_key(|c| c.start_byte().abs_diff(before_child.start_byte()))
+            .filter(|(_, c)| !used.contains(&c.id()) && c.kind() == before_child.kind())
+            .min_by_key(|(_, c)| c.start_byte().abs_diff(before_child.start_byte()))
         else {
             continue;
         };
-        if best.kind() != before_child.kind() {
-            continue;
-        }
         used.insert(best.id());
-        pairs.push((before_child, *best));
+        if after_index != before_index {
+            reordered = true;
+        }
+        pairs.push((before_child, best));
     }
-    pairs
+
+    (pairs, reordered)
 }
 
 /// Generic version of solve that accepts a custom node list selector

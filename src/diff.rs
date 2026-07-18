@@ -720,9 +720,21 @@ pub enum ASTMappingReason {
     /// identical hashes, but we want to differentiate between the two for debugging, visualization
     /// and explainability.
     IdenticalHashOfAncestor,
-    /// The hash of the nodes is *not* the same, but their subtrees fully match each-other.
-    /// The common situation where this happens is refactoring order-independent blocks, e.g.
-    /// fields definitions in a struct.
+    /// The node's children were reordered inside a `nodes::is_commutative_container` parent (e.g.
+    /// enum variants, struct fields, import lists) but are otherwise unchanged - distinguishes
+    /// "this is genuinely untouched" (`IdenticalHash`/`StructurallyIdenticalSubtrees`) from "this
+    /// matched only because the new pipeline's hashes are order-independent for commutative
+    /// containers, and the order actually did change" (this variant). Before the six-phase
+    /// pipeline rework (`TODO.md`, 2026-07-17/18), this reason was produced by the now-removed
+    /// `solve_commutative_structural_trees` pass, which used a separate third hash dedicated to
+    /// order-independence; the rework folded that order-independence directly into
+    /// `KindAndValueHash`/`KindOnlyHash` (see `code::hash::compute_kind_and_value_hash`'s doc
+    /// comment), which fixed a real propagation bug but also meant a reordered-but-unchanged
+    /// container would otherwise silently collapse into the same `IdenticalHash` reason as a
+    /// container that didn't change at all - undetectable by a diff viewer. Repurposed
+    /// (2026-07-18, at the user's request: "we do need a way to distinguish between truly
+    /// identical and reordered") to keep making that distinction under the new mechanism - see
+    /// `hash_tree_matching::pair_children_for_descent`'s reorder detection.
     FullymappingSubtrees,
     /// The subtrees of the nodes are structurally identical, but the values of leaf nodes differ.
     /// E.g., a constant value was changed but the code structure is identical.
