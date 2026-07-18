@@ -48,15 +48,27 @@ but that was only known because each was actually measured, not assumed).
    regression, 2 passing unit tests, plausibly useful on real-world grouped-import churn this
    86-fixture corpus doesn't happen to exercise.
 
-3. **Call-site matching by callee identity** - group `call_expression`/method-invocation candidates
-   by callee name (+ maybe arg count), cost-scored by argument similarity. Catches a specific call
-   that moved position within a function or had its arguments changed, which neither hash-matching
-   (content changed) nor positional anchoring (position changed) handles well alone. More
-   speculative than 1-2: callee names collide a lot (every `println!` call would group together),
-   so this needs a narrow candidate filter to avoid the "stray `;` matches a random other `;`"
-   disease `solve_greedy_anchor_blocks`'s own doc comment documents hitting before (`nodes::is_
-   block_container` was the fix there; this needs its own equivalent narrowing, likely a minimum
-   argument-list size or a callee-name exclusion list for generic/common calls).
+3. **Call-site matching by callee identity** - **tried 2026-07-18, reverted, zero firings.**
+   `solve_call_site_by_callee`: grouped still-unmatched Rust `call_expression` candidates by
+   `(callee name, argument count)`, cost-scored by how much of the *argument list* specifically
+   changed (`solve_greedy_anchor_blocks::cost_ratio` applied to the two candidates' `arguments`
+   nodes), narrowed via `CALL_SITE_MIN_ARGS`/`CALL_SITE_MIN_SUBTREE_SIZE`/`CALL_SITE_MAX_COST_RATIO`
+   to avoid the generic-callee-collision risk flagged below, matched the whole `call_expression` in
+   one `apted::for_nodes` call (applying #1's lesson). Compiled clean, 1 new unit test passed
+   end-to-end (`process_item(a, b, 1)` matched across both a position shift and an arg-value
+   change), full lib suite green (334 passed). Benchmark: **TOTAL 778 exactly unchanged, zero
+   fixtures differ - but unlike #2, `APTED:syntax_call_site` fired 0 times anywhere in the 86-fixture
+   corpus.** Distinct outcome from both #1 (measured regression) and #2 (fired 76x, neutral): this
+   is *unvalidated*, not *validated-neutral* - the pass never ran on real input, so its flagged
+   false-positive risk (common callee names colliding) was never actually exercised either way, and
+   it would have shipped unconditionally (not behind a config gate). Reverted cleanly (`git
+   checkout`, confirmed zero diff) rather than keep unexercised complexity with no measured benefit.
+   Zero firings across ~15-20 Rust fixtures is itself mild evidence this specific edit pattern
+   (callee unchanged, but call moved position *and* had args edited) is rare in practice, which
+   undercuts the original "useful on real-world code this corpus doesn't happen to exercise"
+   argument that justified keeping #2. Revisit only if a future fixture actually demonstrates the
+   need - don't resurrect by loosening thresholds, since that trades away the false-positive
+   protection to manufacture firings.
 
 4. **Named/keyword-argument matching** - for Python/Kotlin/Swift-style keyword arguments, match by
    argument name within a call's argument list, independent of position. Same idea as #1 one level
