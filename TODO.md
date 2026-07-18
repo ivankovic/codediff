@@ -1,5 +1,76 @@
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 
+## `final_pass` forced-root-pairing cost gate - tried 2026-07-18, reverted, net-negative
+
+Follow-up investigation after the phase 4 expansion candidates above: examined the top-6
+highest-mismatch fixtures in the 778-mismatch corpus and found two distinct, separable root
+causes behind most of their failures (full analysis not otherwise written down - see this entry
+for the summary). **Root cause A**: real APTED tree-edit-distance, when a large region is
+extensively rewritten, has no secondary objective to prefer preserving small byte-identical
+islands over an equal-or-near-equal-cost alternative alignment (`rust-zed-workspace-tasks`'s
+`self.terminal_provider` dropped inside a heavily-rewritten `if` block). **Root cause B**: a node
+the human ground truth says should be deleted outright instead gets matched to an unrelated
+same-kind node elsewhere, because `final_pass` (`apted::for_roots`, phase 6's whole-file-residual
+catch-all) diffs exactly one file root against exactly one file root unconditionally, and
+`island_match_supported`'s "immediate parent is matched" context-validation shortcut is trivially
+true for *every* top-level declaration once the file root is (necessarily) matched to the file
+root - "the file matches the file" is forced, not evidenced, but the validation code can't tell
+that apart from a real evidenced anchor (e.g. `syntax_named`'s own name-matched forest roots).
+
+Prototyped a fix for root cause B only (lower-risk of the two, and directly actionable): added
+`is_forced_root_pairing` (`src/diff/apted/common.rs`) - true when a candidate match pair's parents
+are both exactly the forest roots of a `source == "final_pass"` resolution - and gated on it in
+two places: `island_match_supported` (withholds the trivial "parent matched"/"nearby matched
+ancestor" shortcuts there, requiring either byte-identical content or a `solve_greedy_anchor_
+blocks::cost_ratio` bound instead), and `promote_same_slot_pairs`'s LCS `weight` closure (same
+cost-ratio requirement for internal same-kind slot promotions under a forced root pairing - this
+turned out to be **necessary**, not optional: `island_match_supported` alone left the exact same
+wrong pairing to be silently re-introduced by `promote_same_slot_pairs`'s independent "same slot,
+so this must be an edit" mechanism one step later in `improve_slot_alignment`, since that
+mechanism has its own, much weaker escape hatch - `LARGE_SLOT_SUBTREE`/`share_descendant_hash` -
+that only blocks promotion for bodies over 20 nodes with *zero* shared descendant hash, which real
+mismatched functions routinely have by coincidence).
+
+Two new unit tests (`final_pass_does_not_match_unrelated_top_level_functions`, `final_pass_still_
+matches_renamed_function_with_modest_body_change`) passed - the mechanism worked exactly as
+designed on synthetic small functions. But full lib suite: **32 failures**, many in previously-
+*exact* (0-mismatch) fixtures (`python-added-if-block`, `java-add-logging`, several `cpp-*`/
+`typescript-*` ones). Benchmark: **TOTAL 832 vs. the 778 baseline (+54), and none of the 6
+originally-targeted fixtures improved at all** (`kotlin-refactor-function`/`kotlin-remove-function`
+unchanged, `cpp-ladybird-refactor-variables-if-changes`/`cpp-laydbird-change-function-signature`/
+`c-nginx-add-typedef` slightly *worse*) - a pure net-negative with zero offsetting benefit even on
+its own target fixtures.
+
+Two things went wrong, both real lessons for next time:
+1. **The cost-ratio threshold was too blunt for legitimate large single-candidate edits.**
+   `python-added-if-block`'s regression is the clearest case: a lone top-level `if_statement` had
+   a whole new nested `if` added inside it - a real, unambiguous edit (nothing else on either side
+   could plausibly be its counterpart) - but `solve_greedy_anchor_blocks::cost_ratio`'s coarse
+   whole-direct-child-hash-equality comparison (the same limitation candidate #3/#4's `TODO.md`
+   entries above already flagged for calls) scored it as too expensive and rejected the match,
+   converting a correct identity match into a wrong delete+insert. The gate has no way to
+   distinguish "this pairing is genuinely ambiguous, cost-check it" from "this is the only
+   candidate on either side, cost is irrelevant" - it should have been skipped entirely whenever
+   there's no competing candidate to be wrong *about*.
+2. **The targeted fixtures likely never even reached the modified code paths.** None of the 6
+   fixtures the whole investigation was aimed at moved at all (not even in the wrong direction,
+   which would at least confirm the gate was reachable and just mistuned) - the more likely
+   explanation is `resolve_forest`'s flat-tree fast path (`flat_children`, `FLAT_MIN_CHILDREN =
+   50`: files whose root has 50+ unmatched direct top-level children route through Myers O(ND)
+   sequence diff instead of `compute_edit_mapping`/`improve_slot_alignment` entirely) intercepted
+   these larger, real-world files before `island_match_supported`/`promote_same_slot_pairs` ever
+   ran, meaning the actual root-cause-B mismatches diagnosed in those fixtures are produced by a
+   different mechanism than the one this fix touched. Not confirmed further - reverted before
+   chasing that down.
+
+Reverted cleanly (`git checkout -- src/diff/apted/common.rs src/diff/apted/common/tests.rs`,
+confirmed zero diff, lib build green). Revisit only with both lessons addressed: (a) skip the
+cost-ratio requirement entirely when there is no competing candidate on either side (only real
+ambiguity needs adjudicating), and (b) first confirm which code path *actually* produces the
+kotlin-refactor-function/cpp-ladybird-style mismatches - likely by instrumenting or by checking
+whether those files' root child counts cross `FLAT_MIN_CHILDREN` - before spending more effort
+tuning a gate that may not even be reachable for the fixtures it's meant to fix.
+
 ## Phase 4 expansion candidates (PLANNING, 2026-07-18 - being tried one by one)
 
 User request after the phase 4 generalization above: "what are some other similar heuristics or
