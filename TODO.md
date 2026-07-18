@@ -1,5 +1,48 @@
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 
+## Phase 4 expansion candidates (PLANNING, 2026-07-18 - being tried one by one)
+
+User request after the phase 4 generalization above: "what are some other similar heuristics or
+expansions we can do to phase 4?" then "write them all in todo and try them one by one." Four
+candidates, in the order they'll be tried (roughly confidence-ordered, cheapest/lowest-risk
+first). Each gets the same treatment every heuristic in this codebase's history has: implement,
+`cargo test --lib`, full `benchmark_optimal_solutions` run against the current baseline, keep only
+if it helps or is neutral - **the ablation history in this file is full of heuristics that looked
+reasonable and turned out net-negative alone** (`solve_similar_flow_control`, `solve_bottom_up_
+expansion`, import-path hashing all shipped anyway because they're net-positive *in combination*,
+but that was only known because each was actually measured, not assumed).
+
+1. **Field/variant-level named matching** - extends `solve_named_reference_groups`, not a new
+   mechanism: its candidate predicate (`nodes::is_semantically_structural`) only covers top-level
+   declarations (functions, classes, structs, impls, ...), not struct fields/enum variants/class
+   properties. When a struct changes enough that phase 1's hash-descent doesn't catch it whole,
+   its individual fields currently fall through to positional anchoring or final APTED instead of
+   being matched by name. Widening the predicate to also treat named fields/variants as candidates
+   (field name as the leaf of the scope-qualified key, e.g. `"Foo::age"`) would let `age: i32 ->
+   age: i64` match by name even when siblings were added/removed/reordered around it. Lowest risk:
+   same key type, same engine, just a broader predicate.
+
+2. **Import-list arm-overlap matching** - same shape as `solve_similar_flow_control`'s Jaccard-
+   over-arm-signatures, but for multi-symbol imports (`use foo::{a, b, c}` -> `use foo::{a, c,
+   d}`): group by import path, score by imported-symbol-set overlap. Mechanically this is flow-
+   control arm-overlap wearing different clothes - a new candidate predicate + signature function
+   plugged into the same `grouped_greedy_matcher` engine, nothing structurally new.
+
+3. **Call-site matching by callee identity** - group `call_expression`/method-invocation candidates
+   by callee name (+ maybe arg count), cost-scored by argument similarity. Catches a specific call
+   that moved position within a function or had its arguments changed, which neither hash-matching
+   (content changed) nor positional anchoring (position changed) handles well alone. More
+   speculative than 1-2: callee names collide a lot (every `println!` call would group together),
+   so this needs a narrow candidate filter to avoid the "stray `;` matches a random other `;`"
+   disease `solve_greedy_anchor_blocks`'s own doc comment documents hitting before (`nodes::is_
+   block_container` was the fix there; this needs its own equivalent narrowing, likely a minimum
+   argument-list size or a callee-name exclusion list for generic/common calls).
+
+4. **Named/keyword-argument matching** - for Python/Kotlin/Swift-style keyword arguments, match by
+   argument name within a call's argument list, independent of position. Same idea as #1 one level
+   further down (an even smaller-grained named-group match), language-scoped to grammars that
+   actually have keyword-argument syntax.
+
 ## Phase 4 generalized into one shared engine (2026-07-18)
 
 User question: "what is the generalization of all current phase 4 heuristics?" Answer: three of
