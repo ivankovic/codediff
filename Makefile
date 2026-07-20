@@ -42,6 +42,23 @@ benchmark-sampled:
 	@echo "Running analysis..."
 	cd research && uv run ./analysis/benchmark_report.py
 
+# Benchmark with extended language set (14 languages) and higher node limit
+benchmark-sampled-extended:
+	@echo "Running extended benchmarks for all supported languages (14 langs)..."
+	@echo "Results will be written to research/results/"
+	@echo "Using 20000 node limit, max 100 commits per repo"
+	cd research && ./measure/benchmark_all_extended.sh \
+		--language all \
+		--repos-dir /var/tmp/research/small/repositories/ \
+		--bin-dir ../target/release \
+		--limit 20000 \
+		--max-commits 100 \
+		--timeout-min 120 \
+		--continue-on-error
+	@echo ""
+	@echo "Running analysis..."
+	cd research && uv run ./analysis/benchmark_report.py
+
 # Fetch repositories using the current mode
 fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
 	$(SCRIPTS_FETCH_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)
@@ -72,6 +89,25 @@ sample-pairs-rust: build
 
 benchmark-pairs-rust: build
 	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark_rust.csv
+
+# Extended language targets with 20000 node limit
+sample-pairs-java: build
+	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_java.csv --language Java --count 1000 --max-commits-per-repo 100
+
+benchmark-pairs-java: build
+	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_java.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_java.csv --max-combined-nodes 20000
+
+sample-pairs-javascript: build
+	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_javascript.csv --language JavaScript --count 1000 --max-commits-per-repo 100
+
+benchmark-pairs-javascript: build
+	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_javascript.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_javascript.csv --max-combined-nodes 20000
+
+sample-pairs-typescript: build
+	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_typescript.csv --language TypeScript --count 1000 --max-commits-per-repo 100
+
+benchmark-pairs-typescript: build
+	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_typescript.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_typescript.csv --max-combined-nodes 20000
 
 # Analysis target that respects current mode
 analyze: file-stats

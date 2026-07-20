@@ -1,0 +1,8 @@
+language,size_bucket,repository,commit,path,bytes_before,bytes_after,ast_nodes_before,ast_nodes_after,status,elapsed_ms,peak_memory_bytes,total_allocated_bytes,mapping_operations
+Java,large,Genymobile-scrcpy.git,9cfa5b197a1b94acc7cece4b91c4173c5fe1c181,server/src/main/java/com/genymobile/scrcpy/Workarounds.java,16253,16129,2744,2709,ok,22.741179,1055836,5313827,2750
+Java,large,protocolbuffers-protobuf.git,bf85e910654985b6538f89270b1a7083fb9cbe70,java/core/src/main/java/com/google/protobuf/SchemaUtil.java,32844,32829,8881,8873,ok,36.328210999999996,3270800,8125226,8881
+Java,medium,Genymobile-scrcpy.git,5b51396a8c60f2c0d198569b05d589bd34d9ce9c,server/src/main/java/com/genymobile/scrcpy/FakeContext.java,3830,3951,786,801,ok,16.116988,608580,5649537,801
+Java,medium,Genymobile-scrcpy.git,7e66062086aaf085f9315a89f60b170bb105dc72,server/src/main/java/com/genymobile/scrcpy/opengl/OpenGLRunner.java,8887,8568,1989,1926,ok,210.367782,4160586,373262150,2060
+Java,medium,opencv-opencv.git,1610602884f492b9d82fde3b258b0a4e28573753,modules/highgui/misc/java/src/java/highgui+HighGui.java,5771,5747,1546,1511,ok,92.39512900000001,2308882,97702250,1604
+Java,medium,protocolbuffers-protobuf.git,06f6808811dc4d9074702eea389a579973354531,java/core/src/main/java/com/google/protobuf/AbstractProtobufList.java,4073,4189,987,1008,ok,20.629182,1018302,12989626,1014
+Java,medium,protocolbuffers-protobuf.git,f2de306d9527c6e6bd7f4af76e3f66fa6be3f21d,java/core/src/main/java/com/google/protobuf/AbstractProtobufList.java,4067,4073,986,987,ok,10.867211999999999,696166,5433387,987

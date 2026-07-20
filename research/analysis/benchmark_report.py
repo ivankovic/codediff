@@ -35,10 +35,20 @@ import matplotlib.ticker as ticker
 
 # Language display order, display names, and hex colours.
 LANG_META = {
-    "rust":   ("Rust",   "#CE422B"),
-    "python": ("Python", "#3572A5"),
-    "go":     ("Go",     "#00ADD8"),
-    "kotlin": ("Kotlin", "#A97BFF"),
+    "rust":        ("Rust",        "#CE422B"),
+    "python":      ("Python",      "#3572A5"),
+    "go":          ("Go",          "#00ADD8"),
+    "kotlin":      ("Kotlin",      "#A97BFF"),
+    "java":        ("Java",        "#B07219"),
+    "javascript":  ("JavaScript",  "#F1E05A"),
+    "typescript":   ("TypeScript",   "#089484"),
+    "c":           ("C",           "#555555"),
+    "cpp":         ("C++",         "#00599C"),
+    "ruby":        ("Ruby",        "#701516"),
+    "php":         ("PHP",         "#4F5D95"),
+    "swift":       ("Swift",       "#FA7343"),
+    "scala":       ("Scala",       "#DC322F"),
+    "lua":         ("Lua",         "#000080"),
 }
 
 

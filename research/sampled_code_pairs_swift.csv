@@ -1,0 +1,50 @@
+language,size_bucket,repository,commit,path,old_path
+Swift,large,immich-app-immich.git,a9666d2cef1913ccd065b13b919b1cd4f48f55b1,mobile/ios/Runner/Core/URLSessionManager.swift,mobile/ios/Runner/Core/URLSessionManager.swift
+Swift,large,nextcloud-desktop.git,b279a24892a619fb26821beff10041c1e225ea24,admin/osx/mac-crafter/Sources/Commands/Build.swift,admin/osx/mac-crafter/Sources/Commands/Build.swift
+Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,admin/osx/mac-crafter/Sources/Utils/Signer.swift,admin/osx/mac-crafter/Sources/Utils/Signer.swift
+Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension.swift,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension.swift
+Swift,large,nextcloud-ios.git,2182c197852415618729e5d3590ec5dd15b0a01a,iOSClient/AppDelegate.swift,iOSClient/AppDelegate.swift
+Swift,large,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/DownloadLimitUITests.swift,Tests/NextcloudUITests/DownloadLimitUITests.swift
+Swift,large,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,iOSClient/Data/NCManageDatabase+Metadata.swift,iOSClient/Data/NCManageDatabase+Metadata.swift
+Swift,large,nextcloud-ios.git,375944f6ebeaa22ea01139ed38fee80954c6e745,iOSClient/AppDelegate.swift,iOSClient/AppDelegate.swift
+Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/Main/Collection Common/Cell/NCListCell.swift,iOSClient/Main/Collection Common/Cell/NCListCell.swift
+Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/More/NCMore.swift,iOSClient/More/NCMore.swift
+Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/AppDelegate.swift,iOSClient/AppDelegate.swift
+Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/Data/NCManageDatabase+Account.swift,iOSClient/Data/NCManageDatabase+Account.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Data/NCManageDatabase+Metadata.swift,iOSClient/Data/NCManageDatabase+Metadata.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCCellMain.swift,iOSClient/Main/Collection Common/Cell/NCCellMain.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCGridCell.swift,iOSClient/Main/Collection Common/Cell/NCGridCell.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCListCell.swift,iOSClient/Main/Collection Common/Cell/NCListCell.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Networking/NCNetworking+WebDAV.swift,iOSClient/Networking/NCNetworking+WebDAV.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Networking/NCNetworkingProcess.swift,iOSClient/Networking/NCNetworkingProcess.swift
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Select/NCSelect.swift,iOSClient/Select/NCSelect.swift
+Swift,large,nextcloud-ios.git,9efbff8c1c13919a9c4c87bff62a4e817cc95e6d,iOSClient/Utility/NCUtility+Image.swift,iOSClient/Utility/NCUtility+Image.swift
+Swift,large,nextcloud-ios.git,d894f20be6fd14190c13668e320f12b0607d638d,iOSClient/NCGlobal.swift,iOSClient/NCGlobal.swift
+Swift,large,nextcloud-ios.git,e1e5e537dadb3817b837f82de3aeb3185a336a9b,iOSClient/Share/Advanced/NCShareCells.swift,iOSClient/Share/Advanced/NCShareCells.swift
+Swift,large,nextcloud-ios.git,f52721a79402e2aa07a1e667fb17c1212ac7dc42,File Provider Extension/FileProviderEnumerator.swift,File Provider Extension/FileProviderEnumerator.swift
+Swift,large,nextcloud-ios.git,f52721a79402e2aa07a1e667fb17c1212ac7dc42,iOSClient/Main/Collection Common/Cell/NCListCell.swift,iOSClient/Main/Collection Common/Cell/NCListCell.swift
+Swift,large,swiftlang-swift.git,4b9cb8a32ece8b18b4aad1ada0d6423de1a1046d,test/Concurrency/Runtime/async_stream.swift,test/Concurrency/Runtime/async_stream.swift
+Swift,large,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Interop/Cxx/class/invalid-members/stdlib-containers-of-incomplete.swift,test/Interop/Cxx/class/invalid-members/stdlib-containers-of-incomplete.swift
+Swift,large,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Reflection/typeref_lowering_packs.swift,test/Reflection/typeref_lowering_packs.swift
+Swift,medium,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSFileProviderServicing.swift,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSFileProviderServicing.swift
+Swift,medium,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSXPCListenerDelegate.swift,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSXPCListenerDelegate.swift
+Swift,medium,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/AssistantUITests.swift,Tests/NextcloudUITests/AssistantUITests.swift
+Swift,medium,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/AutoUploadUITests.swift,Tests/NextcloudUITests/AutoUploadUITests.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,Share/NCShareExtension+DataSource.swift,Share/NCShareExtension+DataSource.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCRecommendationsCell.swift,iOSClient/Main/Collection Common/Cell/NCRecommendationsCell.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Section Header Footer/NCSectionFooter.swift,iOSClient/Main/Collection Common/Section Header Footer/NCSectionFooter.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashCellProtocol.swift,iOSClient/Trash/Cell/NCTrashCellProtocol.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashGridCell.swift,iOSClient/Trash/Cell/NCTrashGridCell.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashListCell.swift,iOSClient/Trash/Cell/NCTrashListCell.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+CollectionView.swift,iOSClient/Trash/NCTrash+CollectionView.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+Networking.swift,iOSClient/Trash/NCTrash+Networking.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+SelectTabBarDelegate.swift,iOSClient/Trash/NCTrash+SelectTabBarDelegate.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash.swift,iOSClient/Trash/NCTrash.swift
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrashSelectTabBar.swift,iOSClient/Trash/NCTrashSelectTabBar.swift
+Swift,medium,nextcloud-ios.git,d894f20be6fd14190c13668e320f12b0607d638d,iOSClient/Assistant/Chat/NCAssistantChatModel.swift,iOSClient/Assistant/Chat/NCAssistantChatModel.swift
+Swift,medium,nextcloud-ios.git,ddf92256c03781d67a2b403222e9b0f56ba05e01,iOSClient/Main/Collection Common/Cell/UIView+BlurVibrancy.swift,iOSClient/Main/Collection Common/Cell/UIView+BlurVibrancy.swift
+Swift,medium,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Reflection/typeref_decoding_packs.swift,test/Reflection/typeref_decoding_packs.swift
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/Sema/strict_access_control.swift,test/Sema/strict_access_control.swift
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/attr/attr_inlinable_strict.swift,test/attr/attr_inlinable_strict.swift
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/decl/protocol/conforms/access_corner_case_strict.swift,test/decl/protocol/conforms/access_corner_case_strict.swift
+Swift,small,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/IRGen/availability_android.swift,test/IRGen/availability_android.swift
