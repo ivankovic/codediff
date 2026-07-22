@@ -66,6 +66,8 @@ mod cpp_tensorflow_switch_to_primitive_types;
 #[cfg(test)]
 mod cpp_whitespace_only_change;
 #[cfg(test)]
+mod csharp_jellyfin_add_function;
+#[cfg(test)]
 mod csharp_jellyfin_sql_query_fix;
 #[cfg(test)]
 mod csharp_sonarr_change_type;
@@ -74,7 +76,17 @@ mod css_add_property;
 #[cfg(test)]
 mod css_playwright_add_class_selector;
 #[cfg(test)]
+mod go_caddy_rename_type;
+#[cfg(test)]
+mod go_gin_add_function;
+#[cfg(test)]
+mod go_gin_change_import;
+#[cfg(test)]
+mod go_gin_constant_change;
+#[cfg(test)]
 mod go_lazygit_add_to_if_condition;
+#[cfg(test)]
+mod go_lazygit_switch_to_strings;
 #[cfg(test)]
 mod go_prometheus_single_comment_change;
 #[cfg(test)]
