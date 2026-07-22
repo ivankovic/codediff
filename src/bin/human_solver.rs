@@ -2139,6 +2139,11 @@ fn render_panel(
     frame.render_widget(List::new(items).block(block), area);
 }
 
+/// Below this terminal width, `draw_ui` shows only the focused Before/After panel at full width
+/// instead of splitting the screen 50/50 - two half-width panels wrap almost every line and
+/// become unreadable on a narrow terminal.
+const SINGLE_PANEL_WIDTH_THRESHOLD: u16 = 240;
+
 fn draw_ui(
     frame: &mut Frame,
     app: &mut App,
@@ -2161,37 +2166,74 @@ fn draw_ui(
         chunks[0],
     );
 
-    let panels = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[1]);
+    // Below `SINGLE_PANEL_WIDTH_THRESHOLD` columns, two 50%-wide panels wrap every line and become
+    // unreadable, so show only the focused panel at full width instead - `Tab` (which already
+    // toggles `app.focus`) becomes the way to see the other side.
+    let single_panel = size.width < SINGLE_PANEL_WIDTH_THRESHOLD;
 
-    render_panel(
-        frame,
-        panels[0],
-        "Before",
-        before_flat,
-        &mut app.before,
-        caches,
-        Side::Before,
-        before_src,
-        app.focus == Focus::Before,
-        app.algo_diff.as_ref(),
-        app.show_reason,
-    );
-    render_panel(
-        frame,
-        panels[1],
-        "After",
-        after_flat,
-        &mut app.after,
-        caches,
-        Side::After,
-        after_src,
-        app.focus == Focus::After,
-        app.algo_diff.as_ref(),
-        app.show_reason,
-    );
+    if single_panel {
+        let panel_area = chunks[1];
+        match app.focus {
+            Focus::Before => render_panel(
+                frame,
+                panel_area,
+                "Before",
+                before_flat,
+                &mut app.before,
+                caches,
+                Side::Before,
+                before_src,
+                true,
+                app.algo_diff.as_ref(),
+                app.show_reason,
+            ),
+            Focus::After => render_panel(
+                frame,
+                panel_area,
+                "After",
+                after_flat,
+                &mut app.after,
+                caches,
+                Side::After,
+                after_src,
+                true,
+                app.algo_diff.as_ref(),
+                app.show_reason,
+            ),
+        }
+    } else {
+        let panels = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[1]);
+
+        render_panel(
+            frame,
+            panels[0],
+            "Before",
+            before_flat,
+            &mut app.before,
+            caches,
+            Side::Before,
+            before_src,
+            app.focus == Focus::Before,
+            app.algo_diff.as_ref(),
+            app.show_reason,
+        );
+        render_panel(
+            frame,
+            panels[1],
+            "After",
+            after_flat,
+            &mut app.after,
+            caches,
+            Side::After,
+            after_src,
+            app.focus == Focus::After,
+            app.algo_diff.as_ref(),
+            app.show_reason,
+        );
+    }
 
     let footer = format!(
         "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
@@ -3725,6 +3767,74 @@ mod tests {
             Some(OpenTarget::Sample(name)) => assert_eq!(name, "unsolved-two"),
             other => panic!("expected OpenTarget::Sample(\"unsolved-two\"), got {other:?}"),
         }
+    }
+
+    #[test]
+    fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold() {
+        let before_source = "fn before_marker() {}\n";
+        let after_source = "fn after_marker() {}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+
+        // Narrower than `SINGLE_PANEL_WIDTH_THRESHOLD`: only the focused (Before, by
+        // `App::new`'s default) panel should render, and the After panel's content shouldn't
+        // appear anywhere on screen.
+        let backend = ratatui::backend::TestBackend::new(SINGLE_PANEL_WIDTH_THRESHOLD - 1, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                draw_ui(
+                    f,
+                    &mut app,
+                    &before_flat,
+                    &after_flat,
+                    &caches,
+                    before_source.as_bytes(),
+                    after_source.as_bytes(),
+                    "test",
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(text.contains("before_marker"), "focused panel missing from render: {text}");
+        assert!(
+            !text.contains("after_marker"),
+            "unfocused panel should not render in single-panel mode: {text}"
+        );
+
+        // At or above the threshold, both panels render side by side.
+        let backend = ratatui::backend::TestBackend::new(SINGLE_PANEL_WIDTH_THRESHOLD, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                draw_ui(
+                    f,
+                    &mut app,
+                    &before_flat,
+                    &after_flat,
+                    &caches,
+                    before_source.as_bytes(),
+                    after_source.as_bytes(),
+                    "test",
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(text.contains("before_marker"), "before panel missing from wide render: {text}");
+        assert!(text.contains("after_marker"), "after panel missing from wide render: {text}");
     }
 
     #[test]
