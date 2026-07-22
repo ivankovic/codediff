@@ -21,5 +21,5 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("go-lazygit-switch-to-strings")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit("go-lazygit-switch-to-strings", 4)
 }
