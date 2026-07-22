@@ -131,6 +131,63 @@ shown with a thicker border and an inverted title, since the two panels are othe
 identical (border color is fixed per side: red for Before, green for After) and there would
 otherwise be no way to tell which one `Tab` last selected.
 
+## Git integration
+
+The plain `codediff BEFORE AFTER` CLI (`src/main.rs`) doubles as a `git difftool` backend:
+`git config difftool.codediff.cmd 'codediff "$LOCAL" "$REMOTE"'` needs no translation layer,
+because git already substitutes `$LOCAL`/`$REMOTE` with real file paths before invoking the
+command - temp copies of blobs for a commit-vs-commit diff, or the real working-tree file
+directly when one side is the worktree - and (verified empirically against git 2.43, see
+`Args::paths`' doc comment in `main.rs`) those temp copies keep the original basename/extension,
+so `code::language::language_for_path` detects the language correctly with no extra plumbing.
+
+`main.rs`'s `Args::paths` is a variable-length positional `Vec<PathBuf>` rather than two fixed
+`Option<PathBuf>` fields specifically so a second calling convention can be recognized by argument
+count alone: git's `GIT_EXTERNAL_DIFF` (invoked directly by `git diff`/`git log -p`/etc., not just
+`difftool`) calls the external diff command with 7 positional arguments, `path old-file old-hex
+old-mode new-file new-hex new-mode` - `resolve_before_after` picks `old-file`/`new-file` (indices 1
+and 4) out of that shape and ignores the rest, tested in `main.rs`'s `tests::resolve_before_after_*`.
+
+Both conventions can hand codediff `/dev/null` for one side, representing an added or deleted
+file (git's own behavior, not something either integration path chooses). `/dev/null` reads back
+as valid, empty content, but has no extension for `language_for_path` to key off, so `compute_diff`
+(`tui/app.rs`) special-cases an empty, language-less side: it re-parses that side as empty content
+in the *other* side's already-detected language instead of bailing with "unsupported or
+unrecognized file type", which turns into a normal whole-file insert/delete in the resulting diff.
+(`Code::from_string` also had to stop unconditionally calling `compute_ast_metadata` for a
+language-less, unparsed `Code` - it's an expected state here, not a bug, and the unconditional call
+logged a spurious "Failed to compute AST metadata" line to stderr on every such diff.)
+
+### Headless/text mode: `tui::headless`
+
+git's default pager means a full-screen TUI can't just be used as `GIT_EXTERNAL_DIFF` unmodified:
+git pipes its own stdout through the pager, so codediff's stdout is a pipe, not a real terminal,
+and a full-screen TUI cannot draw onto a pipe. `git difftool` doesn't have this problem (it never
+involves a pager in the first place, which is the main reason it was implemented first) - but
+`GIT_EXTERNAL_DIFF` does, and so does any other non-interactive invocation (`codediff a b > out`,
+CI, ...). Rather than requiring the caller to know to pass `--no-pager`/`GIT_PAGER=cat`, `main.rs`
+detects this itself: `should_run_headless` checks `std::io::stdout().is_terminal()` (in addition to
+the pre-existing explicit `--headless`/`--mode headless` flags) and falls back to `tui::headless`
+whenever stdout isn't a real terminal, regardless of *why* it isn't - the tty check is the actual
+root cause, not any git-specific signal, so it covers every non-interactive case uniformly.
+
+`tui::headless::run` calls the exact same `app::compute_diff` the TUI uses (same parsing, same
+`ASTDiff`, same `TextDiff`) and renders the result as text instead of drawing it. The renderer
+(`render_text_diff`/`render_side`/`row_operations`) is deliberately row-granular, not the TUI's
+column-precise overlay: `diff::text`'s ranges are whitespace-insensitive and can leave small gaps
+(see `python_leetcode_1_added_if_block_all_ranges` in `diff/text.rs`), so reconstructing exact
+sub-line spans for a plain-text renderer would be fragile. Each output line gets whichever
+non-`Identical` operation touches its row (`row_operations`'s precedence rule exists specifically
+so that an `Identical` range sharing a row with a real change - e.g. the punctuation around a
+renamed single token - can't silently overwrite that change back to plain; caught by an end-to-end
+smoke test against the built binary, not code review). Colors match the TUI's own convention
+(insert green, delete red, move yellow, update magenta) via ANSI escapes, on by default since the
+main use case (piping into git's pager) is generally able to render them - the `NO_COLOR`
+convention (<https://no-color.org>) is the escape hatch for callers that don't want that, e.g.
+redirecting to a file. Not implemented (rendering a true interleaved unified-diff hunk format
+merging both sides into one stream) since it would need to invent new merge semantics on top of
+`diff::text`'s bespoke range model beyond what either integration path actually requires today.
+
 ## Performance note
 
 CPU usage should be judged from a `--release` build, not a debug build: idle CPU usage for an

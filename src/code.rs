@@ -152,12 +152,23 @@ impl Code {
         let mut parser = tree_sitter::Parser::new();
         code.parse(&mut parser);
 
-        // Compute AST metadata. `from_string` is infallible by signature (unlike `ensure_parsed`,
-        // which propagates this same error), so a failure here can't be returned - surface it
-        // instead of swallowing it silently, so a genuine `compute_ast_metadata` bug is visible.
-        match crate::code::metadata::compute_ast_metadata(&code) {
-            Ok(ast_metadata) => code.metadata.ast_metadata = Some(ast_metadata),
-            Err(e) => eprintln!("Failed to compute AST metadata: {:?}", e),
+        // Compute AST metadata, but only once there's an AST to compute it from: an unrecognized
+        // language (or a grammar `to_treesitter` doesn't map, see `Code::parse`) leaves `ast` as
+        // `None`, which is an expected, valid state - not a bug - and matches how `ensure_parsed`
+        // and `metadata::metadata_of` both already treat a parse-less `Code` elsewhere. Before this
+        // guard, every `Code::from_string`/`from_file` call for such a language unconditionally
+        // logged "Failed to compute AST metadata: AST must be parsed before hashing" to stderr,
+        // even though nothing had actually gone wrong.
+        //
+        // `from_string` is infallible by signature (unlike `ensure_parsed`, which propagates this
+        // same error), so a genuine failure here still can't be returned - it's surfaced via
+        // `eprintln!` instead of being swallowed silently, so a real `compute_ast_metadata` bug
+        // (as opposed to this expected no-AST case) stays visible.
+        if code.ast.is_some() {
+            match crate::code::metadata::compute_ast_metadata(&code) {
+                Ok(ast_metadata) => code.metadata.ast_metadata = Some(ast_metadata),
+                Err(e) => eprintln!("Failed to compute AST metadata: {:?}", e),
+            }
         }
 
         code
@@ -418,6 +429,21 @@ mod tests {
         assert_eq!(code.metadata.language, Some(Language::Rust));
 
         assert!(code.ast.is_some());
+    }
+
+    /// `Language::Unknown` has no tree-sitter grammar (`to_treesitter` returns `None`), so
+    /// `Code::parse` leaves `ast` unset - an expected, valid outcome (e.g. every add/delete-file
+    /// diff run through `tui::app::compute_diff`'s `/dev/null` fallback starts from exactly this
+    /// state before it's corrected to the other side's language). `compute_ast_metadata` must not
+    /// even be attempted in that case: it requires a parsed AST and previously logged a spurious
+    /// "Failed to compute AST metadata" error to stderr on every such call despite nothing being
+    /// actually wrong.
+    #[test]
+    fn code_from_string_skips_ast_metadata_when_the_language_has_no_grammar() {
+        let code = Code::from_string("", &Language::Unknown);
+
+        assert!(code.ast.is_none());
+        assert!(code.metadata.ast_metadata.is_none());
     }
 
     #[test]

@@ -403,9 +403,37 @@ impl App {
 }
 
 /// Parse both files, diff them, and compute the textual ranges needed to display the result.
-fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionData> {
-    let before_code = Code::from_file(before)?;
-    let after_code = Code::from_file(after)?;
+///
+/// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
+/// terminal-independent diff computation either way - only what happens to the result (draw it
+/// interactively vs. print it as text) differs between the two modes.
+pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionData> {
+    let mut before_code = Code::from_file(before)?;
+    let mut after_code = Code::from_file(after)?;
+
+    // git's `difftool`/`GIT_EXTERNAL_DIFF` integration represents an added or deleted file by
+    // handing us `/dev/null` for the missing side (see README's "Git integration" section).
+    // `/dev/null` reads back as empty content with no extension, so `Code::from_file` can't
+    // detect a language for it and leaves `ast` unset - re-parse that side as empty content in
+    // the *other* side's language instead of failing outright, so the diff shows a normal
+    // whole-file insert/delete rather than an "unrecognized file type" error. This is the only
+    // situation where the two sides may legitimately disagree on detected language, so it's safe
+    // to only kick in when the empty side's own language genuinely couldn't be determined.
+    let before_language = before_code.metadata.language;
+    let after_language = after_code.metadata.language;
+    if before_code.ast.is_none() && before_code.contents.is_empty() {
+        if let Some(language) = after_language {
+            before_code = Code::from_string("", &language);
+            before_code.metadata.path = Some(before.to_path_buf());
+        }
+    }
+    if after_code.ast.is_none() && after_code.contents.is_empty() {
+        if let Some(language) = before_language {
+            after_code = Code::from_string("", &language);
+            after_code.metadata.path = Some(after.to_path_buf());
+        }
+    }
+
     if before_code.ast.is_none() {
         anyhow::bail!(
             "unsupported or unrecognized file type: {}",
@@ -498,6 +526,61 @@ mod tests {
             Action::StartDiff(before.path().to_path_buf(), after.path().to_path_buf())
         );
         Ok(())
+    }
+
+    /// Regression guard for `git`'s add/delete convention (`difftool`/`GIT_EXTERNAL_DIFF` both
+    /// hand codediff `/dev/null` for the missing side of an added or deleted file): before this
+    /// fallback, `Code::from_file("/dev/null")` detected no language (no extension) and left
+    /// `ast` unset, so `compute_diff` bailed with "unsupported or unrecognized file type" even
+    /// though the other side parsed fine.
+    #[test]
+    fn compute_diff_treats_dev_null_before_as_an_empty_file_in_the_afters_language() -> Result<()> {
+        let after = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(after.path(), "fn main() {}\n").expect("write temp file");
+
+        let data = compute_diff(Path::new("/dev/null"), after.path())?;
+
+        assert_eq!(data.before_contents, "");
+        assert_eq!(data.after_contents, "fn main() {}\n");
+        assert!(
+            !data.after_ranges.is_empty(),
+            "the whole after-file should show up as inserted"
+        );
+        Ok(())
+    }
+
+    /// Same as above, mirrored: the *after* side is `/dev/null` (a deleted file).
+    #[test]
+    fn compute_diff_treats_dev_null_after_as_an_empty_file_in_the_befores_language() -> Result<()> {
+        let before = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
+
+        let data = compute_diff(before.path(), Path::new("/dev/null"))?;
+
+        assert_eq!(data.before_contents, "fn main() {}\n");
+        assert_eq!(data.after_contents, "");
+        assert!(
+            !data.before_ranges.is_empty(),
+            "the whole before-file should show up as deleted"
+        );
+        Ok(())
+    }
+
+    /// The `/dev/null` fallback only kicks in for a genuinely empty, language-less side - it must
+    /// not paper over the case where neither side has a recognizable language at all.
+    #[test]
+    fn compute_diff_still_fails_when_neither_side_has_a_recognizable_language() {
+        let before = write_temp_file("hello");
+        let after = write_temp_file("world");
+
+        let result = compute_diff(before.path(), after.path());
+        assert!(result.is_err(), "both sides unrecognized should still bail");
     }
 
     #[test]
