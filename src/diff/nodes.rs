@@ -377,16 +377,11 @@ pub fn is_semantically_structural<'a>(
                 let spec = node
                     .named_children(&mut cursor)
                     .find(|c| c.kind() == "var_spec" || c.kind() == "const_spec")?;
-                spec.child_by_field_name("name")
-                    .filter(|n| n.kind() == "identifier")
-                    .and_then(|n| n.utf8_text(bytes).ok())
-                    .map(|name| (node_kind.to_string(), name.to_string()))
+                go_spec_identifier_name(spec, bytes).map(|name| (node_kind.to_string(), name.to_string()))
             }
-            "var_spec" | "const_spec" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "var_spec" | "const_spec" => {
+                go_spec_identifier_name(*node, bytes).map(|name| (node_kind.to_string(), name.to_string()))
+            }
             "call_expression" => {
                 go_subtest_call_name(node, bytes).map(|name| (node_kind.to_string(), name))
             }
@@ -487,6 +482,14 @@ pub fn is_semantically_structural<'a>(
 /// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
 /// quality (a coincidental non-test `.Run("...")` call getting grouped as if it had an identity),
 /// never correctness - `solve_named_reference_groups` still runs real APTED on whatever it groups.
+/// The `identifier` name of a Go `var_spec`/`const_spec` (or, for a grouped `var (...)`/`const
+/// (...)` declaration, the same lookup applied to its first spec child).
+fn go_spec_identifier_name<'a>(spec: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
+    spec.child_by_field_name("name")
+        .filter(|n| n.kind() == "identifier")
+        .and_then(|n| n.utf8_text(bytes).ok())
+}
+
 fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
     let function = node.child_by_field_name("function")?;
     if function.kind() != "selector_expression" {

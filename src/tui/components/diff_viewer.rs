@@ -30,6 +30,11 @@ use super::{Component, code_viewer::CodeViewer};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::theme::OverlayTheme;
 
+/// Below this terminal width, two side-by-side panels would each be too narrow to read code in,
+/// so callers fall back to showing a single panel at full width. Shared with `human_solver`'s
+/// own before/after panel layout, which has the same readability constraint.
+pub const SINGLE_PANEL_THRESHOLD: u16 = 220;
+
 /// A component that displays the before/after files side by side for diffing
 #[derive(Default)]
 pub struct DiffViewer {
@@ -187,8 +192,6 @@ impl DiffViewer {
 
     /// Update display mode based on available width
     pub fn update_display_mode(&mut self, width: u16) {
-        // Below this width, two side-by-side panels would each be too narrow to read code in.
-        const SINGLE_PANEL_THRESHOLD: u16 = 220;
         self.display_mode = if width < SINGLE_PANEL_THRESHOLD {
             DisplayMode::Single
         } else {

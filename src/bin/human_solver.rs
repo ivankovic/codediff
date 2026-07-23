@@ -2045,7 +2045,6 @@ fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn render_panel(
     frame: &mut Frame,
     area: Rect,
@@ -2141,8 +2140,9 @@ fn render_panel(
 
 /// Below this terminal width, `draw_ui` shows only the focused Before/After panel at full width
 /// instead of splitting the screen 50/50 - two half-width panels wrap almost every line and
-/// become unreadable on a narrow terminal.
-const SINGLE_PANEL_WIDTH_THRESHOLD: u16 = 240;
+/// become unreadable on a narrow terminal. Shared with the main TUI's `DiffViewer`, which faces
+/// the same readability constraint.
+const SINGLE_PANEL_WIDTH_THRESHOLD: u16 = codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
 fn draw_ui(
     frame: &mut Frame,
@@ -2173,34 +2173,23 @@ fn draw_ui(
 
     if single_panel {
         let panel_area = chunks[1];
-        match app.focus {
-            Focus::Before => render_panel(
-                frame,
-                panel_area,
-                "Before",
-                before_flat,
-                &mut app.before,
-                caches,
-                Side::Before,
-                before_src,
-                true,
-                app.algo_diff.as_ref(),
-                app.show_reason,
-            ),
-            Focus::After => render_panel(
-                frame,
-                panel_area,
-                "After",
-                after_flat,
-                &mut app.after,
-                caches,
-                Side::After,
-                after_src,
-                true,
-                app.algo_diff.as_ref(),
-                app.show_reason,
-            ),
-        }
+        let (title, flat, panel, side, src) = match app.focus {
+            Focus::Before => ("Before", before_flat, &mut app.before, Side::Before, before_src),
+            Focus::After => ("After", after_flat, &mut app.after, Side::After, after_src),
+        };
+        render_panel(
+            frame,
+            panel_area,
+            title,
+            flat,
+            panel,
+            caches,
+            side,
+            src,
+            true,
+            app.algo_diff.as_ref(),
+            app.show_reason,
+        );
     } else {
         let panels = Layout::default()
             .direction(Direction::Horizontal)

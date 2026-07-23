@@ -29,6 +29,7 @@ use anyhow::Result;
 use crate::diff::text::{RangeMatch, TextOperation};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
+use crate::tui::widgets::code_viewer::is_empty_range;
 
 /// ANSI SGR color for each `TextOperation`, matching the TUI's own convention (see "Diff overlay
 /// and cursor model" in `SPECS.md`): insert green, delete red, move yellow, update magenta.
@@ -74,7 +75,7 @@ fn row_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOperation
     let mut ops = vec![TextOperation::Identical; line_count];
     for rm in ranges {
         let r = &rm.source;
-        if r.start_row == r.end_row && r.start_column == r.end_column {
+        if is_empty_range(r) {
             // Zero-width placeholder: nothing on this side for this diff unit (see
             // `TextRange`'s doc comment on symmetric insert/delete placeholders).
             continue;

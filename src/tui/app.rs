@@ -27,7 +27,7 @@ use tracing::{debug, error};
 
 use std::path::{Path, PathBuf};
 
-use crate::code::Code;
+use crate::code::{Code, Language};
 use crate::diff::{Diff, NodeCache, text::TextDiff};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
@@ -421,18 +421,8 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionDat
     // to only kick in when the empty side's own language genuinely couldn't be determined.
     let before_language = before_code.metadata.language;
     let after_language = after_code.metadata.language;
-    if before_code.ast.is_none() && before_code.contents.is_empty() {
-        if let Some(language) = after_language {
-            before_code = Code::from_string("", &language);
-            before_code.metadata.path = Some(before.to_path_buf());
-        }
-    }
-    if after_code.ast.is_none() && after_code.contents.is_empty() {
-        if let Some(language) = before_language {
-            after_code = Code::from_string("", &language);
-            after_code.metadata.path = Some(after.to_path_buf());
-        }
-    }
+    substitute_missing_language(&mut before_code, after_language, before);
+    substitute_missing_language(&mut after_code, before_language, after);
 
     if before_code.ast.is_none() {
         anyhow::bail!(
@@ -456,6 +446,18 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionDat
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
     })
+}
+
+/// If `code` has no detected language and no content (the `/dev/null` case handled by
+/// `compute_diff`), re-parse it as empty content in `fallback_language` instead of leaving it
+/// unsupported.
+fn substitute_missing_language(code: &mut Code, fallback_language: Option<Language>, path: &Path) {
+    if code.ast.is_none() && code.contents.is_empty() {
+        if let Some(language) = fallback_language {
+            *code = Code::from_string("", &language);
+            code.metadata.path = Some(path.to_path_buf());
+        }
+    }
 }
 
 /// Extract a human-readable message from a caught panic payload.

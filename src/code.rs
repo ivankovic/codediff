@@ -343,6 +343,15 @@ pub struct ASTMetadata {
     pub language: Language,
 }
 
+impl ASTMetadata {
+    /// Whether `id` is a leaf (has no children) in this tree. `false` for an id with no
+    /// `node_info` entry, matching the conservative default every existing call site already
+    /// used before this helper was extracted.
+    pub fn is_leaf(&self, id: usize) -> bool {
+        self.node_info.get(&id).is_some_and(|info| info.children.is_empty())
+    }
+}
+
 /**
 * The programming language.
 *

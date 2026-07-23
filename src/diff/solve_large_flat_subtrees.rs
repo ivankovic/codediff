@@ -236,6 +236,13 @@ fn largest_flat_container_in(root_id: usize, meta: &ASTMetadata, language: &Lang
 /// walk `solve_large_flat_subtrees` did everywhere before the O(1) precomputation existed, just
 /// scoped down to the kinds that actually need it.
 fn widest_data_literal_container(root_id: usize, meta: &ASTMetadata, language: &Language) -> Option<usize> {
+    // `is_data_literal_container` is only ever true for `Language::Go`, so for every other
+    // language this walk is guaranteed to return `None` - skip paying for it on the common case
+    // (every non-Go top-level item that didn't already qualify via the O(1) widest-subtree check
+    // above).
+    if !matches!(language, Language::Go) {
+        return None;
+    }
     let mut best: Option<(usize, usize)> = None;
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {

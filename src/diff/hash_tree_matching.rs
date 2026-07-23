@@ -142,11 +142,7 @@ pub(crate) fn solve_with_hash_map(
         // every one of them was mislabeled `Update` instead of `MatchButNotIdentical` - every
         // mismatch in that fixture has an identical before/after path, so this was purely an
         // operation-label bug, not a matching/pairing one.
-        let before_is_leaf =
-            before_metadata.node_info.get(&before_id).is_some_and(|info| info.children.is_empty());
-        let after_is_leaf =
-            after_metadata.node_info.get(&after_id).is_some_and(|info| info.children.is_empty());
-        if before_is_leaf && after_is_leaf {
+        if before_metadata.is_leaf(before_id) && after_metadata.is_leaf(after_id) {
             (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
         } else {
             (ASTMappingOperation::MatchButNotIdentical, 0)
