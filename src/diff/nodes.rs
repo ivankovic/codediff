@@ -356,6 +356,40 @@ pub fn is_semantically_structural<'a>(
                 .filter(|n| n.kind() == "type_identifier")
                 .and_then(|n| n.utf8_text(bytes).ok())
                 .map(|name| (node_kind.to_string(), name.to_string())),
+            // A top-level `var tests = []T{...}` (or `const`) declaration is exactly as common a
+            // home for a large, table-driven data literal as a named function is, but had no
+            // identity signal at all before this - confirmed via a live case
+            // (jesseduffield/lazygit's `test_list.go`, a single `var tests = []*IntegrationTest{
+            // ...}`): with no name for `solve_large_flat_subtrees`'s `top_level_identities` (which
+            // only looks at direct children of the file root, not arbitrary depth) to key off, the
+            // file's entire ~2,600-node content fell through every pass onto `final_pass`'s
+            // unconstrained tree-edit-distance on every edit (4.6s). Keyed on the *declaration*
+            // itself (not its `var_spec`/`const_spec` child) specifically so `top_level_identities`
+            // can see it without recursing; a grouped `var (a = 1; b = 2)` block is keyed by its
+            // first name only (a simplification, not a correctness issue - the group is still
+            // matched as one unit across before/after as long as that first name is unchanged).
+            // `var_spec`/`const_spec` are *also* matched independently below, for
+            // `solve_named_reference_groups`'s fully-recursive, finer-grained walk - the two
+            // consumers have different needs (direct-children-only vs. any depth), so both arms
+            // are useful rather than redundant.
+            "var_declaration" | "const_declaration" => {
+                let mut cursor = node.walk();
+                let spec = node
+                    .named_children(&mut cursor)
+                    .find(|c| c.kind() == "var_spec" || c.kind() == "const_spec")?;
+                spec.child_by_field_name("name")
+                    .filter(|n| n.kind() == "identifier")
+                    .and_then(|n| n.utf8_text(bytes).ok())
+                    .map(|name| (node_kind.to_string(), name.to_string()))
+            }
+            "var_spec" | "const_spec" => node
+                .child_by_field_name("name")
+                .filter(|n| n.kind() == "identifier")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "call_expression" => {
+                go_subtest_call_name(node, bytes).map(|name| (node_kind.to_string(), name))
+            }
             _ => None,
         },
         Language::Kotlin => match node_kind {
@@ -434,6 +468,42 @@ pub fn is_semantically_structural<'a>(
         },
         _ => None,
     }
+}
+
+/// Recognizes Go's ubiquitous subtest idiom - `t.Run("name", func(t *testing.T) {...})`
+/// (`testing.T`/`testing.B`), and the same shape from popular third-party test frameworks that
+/// mirror it (quicktest's `c.Run`, testify's `suite.Run`, ...) - by structure alone: a call whose
+/// callee is `<anything>.Run` and whose first argument is a string literal. The receiver name is
+/// deliberately not checked (it varies: `t`, `c`, `s`, `suite`, ...); "a `.Run(\"literal\", ...)`"
+/// call is itself already a strong, low-false-positive signal.
+///
+/// Confirmed via a live case (`gohugoio/hugo`'s `securitypolicies_test.go`): a single test
+/// function's 12 subtests, individually renamed/restructured internally but keeping the same 12
+/// subtest names, had no identity signal at all before this - `call_expression` isn't a
+/// declaration `is_semantically_structural` otherwise recognizes - so the *entire* surrounding
+/// test function (whichever one happened to contain them) fell to `final_apted` as one 3,286-node
+/// blob on every edit (24s wall-clock) instead of 12 small, independently-anchored ~130-270-node
+/// diffs. Only a mismatched (wrong-position, wrong-content) false positive elsewhere could make
+/// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
+/// quality (a coincidental non-test `.Run("...")` call getting grouped as if it had an identity),
+/// never correctness - `solve_named_reference_groups` still runs real APTED on whatever it groups.
+fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
+    let function = node.child_by_field_name("function")?;
+    if function.kind() != "selector_expression" {
+        return None;
+    }
+    let method = function.child_by_field_name("field")?;
+    if method.utf8_text(bytes).ok()? != "Run" {
+        return None;
+    }
+    let arguments = node.child_by_field_name("arguments")?;
+    let mut cursor = arguments.walk();
+    let first_arg = arguments.named_children(&mut cursor).next()?;
+    if !matches!(first_arg.kind(), "interpreted_string_literal" | "raw_string_literal") {
+        return None;
+    }
+    let text = first_arg.utf8_text(bytes).ok()?;
+    Some(text.trim_matches(|c| c == '"' || c == '`').to_string())
 }
 
 // Families of single-token operator kinds that occupy the same grammatical "slot" in a
@@ -1683,6 +1753,94 @@ type Handler interface { Handle() }
         assert!(is_semantically_structural(&ast.root_node(), &Language::Go, &code).is_none());
     }
 
+    /// Regression guard for the 2026-07-23 fix (`go_subtest_call_name`): `t.Run("literal", ...)`-
+    /// shaped calls (Go's standard subtest idiom, also used by quicktest/testify) get their own
+    /// identity keyed on the literal name, regardless of which variable the call is made through.
+    #[test]
+    fn go_subtest_run_calls_are_matched_by_their_literal_name() {
+        let src = r#"
+package main
+
+func TestThings(t *testing.T) {
+	t.Run("first case", func(t *testing.T) {})
+	c.Run("second case", func(c *qt.C) {})
+	suite.Run("third case", func(t *testing.T) {})
+}
+"#;
+        let code = Code::from_string(src, &Language::Go);
+        let ast = code.ast.as_ref().expect("AST should parse");
+
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
+
+        for (kind, name) in &[
+            ("call_expression", "first case"),
+            ("call_expression", "second case"),
+            ("call_expression", "third case"),
+        ] {
+            assert!(
+                matches.iter().any(|(k, n)| k == kind && n == name),
+                "missing ({kind}, {name}) in {matches:?}"
+            );
+        }
+    }
+
+    /// Only a `.Run("string literal", ...)` call qualifies - a `.Run` call with a non-literal
+    /// (variable) first argument, the table-driven-test idiom (`t.Run(tc.name, ...)`), and an
+    /// unrelated call to some other method must not be misidentified as a named subtest.
+    #[test]
+    fn go_calls_that_are_not_literal_named_subtests_are_not_matched() {
+        let src = r#"
+package main
+
+func TestThings(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {})
+	}
+	fmt.Println("not a subtest")
+}
+"#;
+        let code = Code::from_string(src, &Language::Go);
+        let ast = code.ast.as_ref().expect("AST should parse");
+
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
+
+        assert!(
+            !matches.iter().any(|(k, _)| k == "call_expression"),
+            "no call_expression should have matched: {matches:?}"
+        );
+    }
+
+    /// Regression guard for the 2026-07-23 fix: a top-level `var`/`const` declaration gets an
+    /// identity keyed on its own name (not just its `var_spec`/`const_spec` child), so
+    /// `solve_large_flat_subtrees`'s direct-children-only `top_level_identities` can see it - a
+    /// large data literal assigned to a top-level `var` (Go's common table-driven-test-data
+    /// idiom, e.g. `var tests = []T{...}`) previously had no identity signal at all.
+    #[test]
+    fn go_top_level_var_and_const_declarations_are_matched() {
+        let src = r#"
+package main
+
+var tests = []int{1, 2, 3}
+const MaxRetries = 5
+var a, b = 1, 2
+"#;
+        let code = Code::from_string(src, &Language::Go);
+        let ast = code.ast.as_ref().expect("AST should parse");
+
+        let matches = collect_semantic_matches(ast.root_node(), &Language::Go, &code);
+
+        for (kind, name) in &[
+            ("var_declaration", "tests"),
+            ("const_declaration", "MaxRetries"),
+            ("var_declaration", "a"),
+        ] {
+            assert!(
+                matches.iter().any(|(k, n)| k == kind && n == name),
+                "missing ({kind}, {name}) in {matches:?}"
+            );
+        }
+    }
+
     #[test]
     fn python_functions_and_classes_are_matched() {
         let src = "
@@ -2084,26 +2242,31 @@ class Calculator {
 /// Note: This is intentionally conservative. We only mark containers that are definitively
 /// order-independent according to the language semantics (not just "often reordered" by formatters).
 ///
-/// KNOWN ISSUE (2026-07-15, verified against each grammar's node-types.json under
-/// `~/.cargo/registry/src/*/tree-sitter-<language>-*/`, not yet applied - see PR discussion):
-/// most of the kind strings below don't match any real node in their grammar, so this function is
-/// currently near-dead weight - `Go` checks `field_list` (real name: `field_declaration_list`);
-/// `Python`/`JS`/`TS`/`TSX`/`JSON` check `pair_list` (doesn't exist; containers are `dictionary`
-/// and `object` respectively); `Java`/`CSharp` check `enum_constants` (doesn't exist; real
-/// containers are `enum_body` and `enum_member_declaration_list`); `Swift` checks
-/// `enum_member_list` (real name: `enum_class_body`); `YAML` checks `mapping_content`/`pair_list`
-/// (real names: `block_mapping`/`flow_mapping`); `Kotlin`'s `import_list` and `Scala`'s
-/// `import_expr_list` don't exist in either grammar at all (imports aren't wrapped in a list
-/// node). `Rust` is the only entirely-correct arm, and even it's missing `field_declaration_list`
-/// (struct fields). Separately, even with corrected names this function has no effect today:
-/// `compute_commutative_structural_hash` (see `code::hash`) only applies commutative sorting to
-/// the container node itself, then falls back to the plain order-sensitive `compute_structural_hash`
-/// for every ancestor - so a reordered container's parent (the reference node
-/// `solve_commutative_structural_trees` actually matches on) never sees the reordering as
-/// invisible. Fixing both together (grammar names + hash propagation + making
-/// `hash_tree_matching`'s descendant-pairing commutative-aware, otherwise reordered children get
-/// re-mangled by positional pairing) is a deliberate, scoped follow-up, not folded into this pass
-/// - see review discussion for the corrected implementation and its benchmark impact.
+/// KNOWN ISSUE, JSON/YAML fixed 2026-07-23, others still open (originally logged 2026-07-15,
+/// verified against each grammar's node-types.json under
+/// `~/.cargo/registry/src/*/tree-sitter-<language>-*/`): most of the kind strings below don't
+/// match any real node in their grammar, so most of this function is still near-dead weight -
+/// `Go` checks `field_list` (real name: `field_declaration_list`); `Python`/`JS`/`TS`/`TSX` check
+/// `pair_list` (doesn't exist; real containers are `dictionary` and `object` respectively);
+/// `Java`/`CSharp` check `enum_constants` (doesn't exist; real containers are `enum_body` and
+/// `enum_member_declaration_list`); `Swift` checks `enum_member_list` (real name:
+/// `enum_class_body`); `Kotlin`'s `import_list` and `Scala`'s `import_expr_list` don't exist in
+/// either grammar at all (imports aren't wrapped in a list node). `Rust` is the only originally-
+/// correct arm, and even it's missing `field_declaration_list` (struct fields).
+///
+/// The 2026-07-15 version of this comment additionally claimed that even corrected strings would
+/// have no effect, because `compute_commutative_structural_hash` (a separate, bolted-on third
+/// hash) only applied commutative sorting to the container node itself, not to its ancestors, and
+/// `hash_tree_matching`'s descendant-pairing wasn't commutative-aware either. Both of those are
+/// now stale: the 2026-07-17/18 pipeline rework replaced that separate hash with `is_commutative_
+/// container` support folded directly into `compute_kind_and_value_hash`/`compute_kind_only_hash`
+/// at every recursion level (`code::hash`), and `pair_children_for_descent`
+/// (`hash_tree_matching.rs`) now checks `is_commutative_container` itself when pairing children.
+/// Nobody circled back to fix the actual strings at the same time, though - so JSON/YAML (fixed
+/// here, confirmed against a real 3,075-node case: a single deleted key in a ~140-key localization
+/// JSON object was landing 100% of its mapping on the expensive `APTED` fallback before this fix,
+/// vs. instantly beforehand) is very likely representative of what fixing the rest would do too,
+/// now that the plumbing actually respects this function's answer.
 pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {
@@ -2146,9 +2309,22 @@ pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
             // Enum member list
             node_kind == "enum_member_list"
         }
-        // JSON, YAML - object keys are commutative
-        Language::JSON => node_kind == "pair_list",
-        Language::YAML => node_kind == "mapping_content" || node_kind == "pair_list",
+        // JSON, YAML - object/mapping keys are commutative. Verified directly against
+        // tree-sitter-json/tree-sitter-yaml's actual parse trees (2026-07-23) - the previous
+        // strings here ("pair_list", "mapping_content") don't exist in either grammar at all (see
+        // this function's doc comment), so this arm was pure dead code: `is_commutative_container`
+        // always returned `false` for JSON/YAML, meaning `pair_children_for_descent`
+        // (`hash_tree_matching.rs`) always took the plain positional-zip path for every JSON object
+        // and YAML mapping. A single inserted/deleted key anywhere in a large flat object (e.g. one
+        // new string added to a localization file) then desyncs every subsequent key's position,
+        // orphaning the whole rest of the object onto the expensive `final_apted` fallback - this is
+        // confirmed to be the exact mechanism behind a real observed case (jellyfin-jellyfin's
+        // `cs.json`, one deleted key out of ~140: 1.2s and 100% `APTED`-attributed mappings for a
+        // 3,075-combined-node file before this fix).
+        Language::JSON => node_kind == "object",
+        // YAML has two mapping shapes: `block_mapping` (the common indented `key: value` form) and
+        // `flow_mapping` (the JSON-style inline `{key: value}` form) - both are order-independent.
+        Language::YAML => node_kind == "block_mapping" || node_kind == "flow_mapping",
         // Default: no commutative containers
         _ => false,
     }

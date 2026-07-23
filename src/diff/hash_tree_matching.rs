@@ -124,9 +124,32 @@ pub(crate) fn solve_with_hash_map(
         let before_kv = before_metadata.node_to_kind_and_value_hash.get(&before_id);
         let after_kv = after_metadata.node_to_kind_and_value_hash.get(&after_id);
         if before_kv.is_some() && before_kv == after_kv {
-            (ASTMappingOperation::Identical, 0)
-        } else {
+            return (ASTMappingOperation::Identical, 0);
+        }
+        // Same leaf-vs-interior distinction as the canonical rule in
+        // `apted::common::classify_match`: `Update` means a *leaf's own value* changed; an
+        // interior node whose `kind_and_value_hash` differs only because some descendant differs
+        // (not necessarily this node's own text) is `MatchButNotIdentical` instead - cost 0 here,
+        // matching `classify_match`'s own convention, since the children responsible for the
+        // actual difference get their own separate classify() call (and their own cost) via this
+        // same recursive descent, so charging COST_UPDATE again at every ancestor would double-
+        // count it.
+        //
+        // This closure previously always returned `Update` regardless of leaf-vs-interior -
+        // confirmed against a live case (`go-caddy-rename-type`, all 69 mismatches) that a single
+        // renamed identifier deep inside several declarations bubbles its hash mismatch up to
+        // every ancestor (`const_declaration`, `var_declaration`, `method_declaration`, ...), and
+        // every one of them was mislabeled `Update` instead of `MatchButNotIdentical` - every
+        // mismatch in that fixture has an identical before/after path, so this was purely an
+        // operation-label bug, not a matching/pairing one.
+        let before_is_leaf =
+            before_metadata.node_info.get(&before_id).is_some_and(|info| info.children.is_empty());
+        let after_is_leaf =
+            after_metadata.node_info.get(&after_id).is_some_and(|info| info.children.is_empty());
+        if before_is_leaf && after_is_leaf {
             (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
+        } else {
+            (ASTMappingOperation::MatchButNotIdentical, 0)
         }
     };
 

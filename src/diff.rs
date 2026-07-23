@@ -951,9 +951,18 @@ mod tests {
                 filename
             );
 
-            // Cost should always be exactly 1, since in all languages it is a simple string
-            // constant update.
-            assert_eq!(root_mapping.cost, 1);
+            // The root is an interior node (it has children), so per the leaf-vs-interior rule
+            // `classify`/`classify_match` both use (2026-07-23 fix - see `hash_tree_matching.rs`'s
+            // `classify` closure doc comment), it's `MatchButNotIdentical` at cost 0, not `Update`:
+            // `Update` is reserved for a *leaf's own* value changing, and the cost of that one
+            // translated string literal is carried by the leaf itself, not double-counted here too.
+            assert_eq!(
+                root_mapping.operation,
+                ASTMappingOperation::MatchButNotIdentical,
+                "Root node (an interior node) should be MatchButNotIdentical, not Update, for {}",
+                filename
+            );
+            assert_eq!(root_mapping.cost, 0);
 
             // Every other node should be mapped as part of the root's structural match. Usually
             // that's `StructurallyIdenticalAncestor`, but a node that's *also* a reference node

@@ -60,7 +60,7 @@ pub fn solve(
     diff: &mut ASTDiff,
     solve_similar_flow_control_enabled: bool,
 ) {
-    solve_large_flat_subtrees::solve(before, after, diff);
+    solve_large_flat_subtrees::solve(before, after, node_cache, diff);
     solve_named_reference_groups(before, after, diff);
     solve_import_list_overlap(before, after, diff);
     solve_greedy_anchor_blocks::solve(before, after, node_cache, diff);
@@ -106,6 +106,56 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
     let before_groups = collect_fully_resolved_groups(before_root, &language, before);
     let after_groups = collect_fully_resolved_groups(after_root, &language, after);
 
+    match_named_groups(before_groups, after_groups, &before_metadata, &after_metadata, diff);
+}
+
+/// Same matching as [`solve_named_reference_groups`], but scoped to an arbitrary `(before_root,
+/// after_root)` pair instead of always the whole file, and excluding the roots' *own* identity
+/// from the search (only nested content is matched - the caller already knows `before_root`/
+/// `after_root` correspond, that's not what this is for).
+///
+/// Used by `solve_large_flat_subtrees` to pre-match named content (e.g. Go's literal-named
+/// `t.Run(...)` subtest calls, `nodes::go_subtest_call_name`) *inside* a top-level item that also
+/// contains a large flat data literal, before that item's own container-wide APTED call -
+/// confirmed against live cases (cockroachdb's `api_v2_grants_test.go`, jesseduffield/lazygit's
+/// `graph_test.go`/`commit_loader_test.go`) that without this, such content pays full,
+/// unconstrained tree-edit-distance instead of the cheap name-based match it would otherwise get
+/// from `solve_named_reference_groups` - which runs *after* `solve_large_flat_subtrees` and so
+/// never gets the chance (see `solve_large_flat_subtrees`'s own doc comment for why that ordering
+/// can't simply be reversed).
+pub(crate) fn solve_named_reference_groups_within(
+    before_root: Node,
+    before_root_id: usize,
+    after_root: Node,
+    after_root_id: usize,
+    before_metadata: &crate::code::ASTMetadata,
+    after_metadata: &crate::code::ASTMetadata,
+    before_code: &Code,
+    after_code: &Code,
+    diff: &mut ASTDiff,
+) {
+    let language = before_metadata.language;
+
+    let before_groups =
+        collect_fully_resolved_groups_excluding_root(before_root, before_root_id, &language, before_code);
+    let after_groups =
+        collect_fully_resolved_groups_excluding_root(after_root, after_root_id, &language, after_code);
+
+    match_named_groups(before_groups, after_groups, before_metadata, after_metadata, diff);
+}
+
+/// Shared by [`solve_named_reference_groups`] and [`solve_named_reference_groups_within`]: flatten
+/// both sides' `(kind, fully_resolved_name) -> [node_id]` groups into candidate lists and run
+/// `grouped_greedy_matcher` over them - see `solve_named_reference_groups`'s doc comment for the
+/// matching rules (fully-resolved name is the identity signal, cost only tie-breaks within a
+/// multi-candidate group).
+fn match_named_groups(
+    before_groups: HashMap<(String, String), Vec<usize>>,
+    after_groups: HashMap<(String, String), Vec<usize>>,
+    before_metadata: &crate::code::ASTMetadata,
+    after_metadata: &crate::code::ASTMetadata,
+    diff: &mut ASTDiff,
+) {
     // Flatten into (id, key) candidate lists for `grouped_greedy_matcher`, sorted by
     // `preorder_index` to satisfy its determinism contract - `collect_fully_resolved_groups`'
     // per-key `Vec`s are already in document order, but the flattened union across keys needs
@@ -124,14 +174,14 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
         &before_candidates,
         &after_candidates,
         |before_id, after_id| {
-            solve_greedy_anchor_blocks::cost_ratio(before_id, after_id, &before_metadata, &after_metadata)
+            solve_greedy_anchor_blocks::cost_ratio(before_id, after_id, before_metadata, after_metadata)
                 .unwrap_or(0.0)
         },
         None,
         |before_id, after_id, diff| {
             apted::for_nodes(
-                &before_metadata,
-                &after_metadata,
+                before_metadata,
+                after_metadata,
                 vec![before_id],
                 vec![after_id],
                 Algorithm::Apted,
@@ -158,6 +208,26 @@ fn collect_fully_resolved_groups(
     let mut scope: Vec<String> = Vec::new();
     collect_fully_resolved_groups_rec(root, language, code, &mut scope, &mut out);
     out
+}
+
+/// Same as [`collect_fully_resolved_groups`], but drops `root_id` itself from the result - for
+/// [`solve_named_reference_groups_within`], where `root` is an already-established match (not
+/// something being searched for) and only its *nested* content is of interest. `root`'s own
+/// `is_semantically_structural` match (if any) still contributes to scope-qualifying its
+/// children's names (e.g. a subtest call inside `func TestThings` still resolves to
+/// `"TestThings::<subtest name>"`), it's just excluded from the returned groups afterward.
+fn collect_fully_resolved_groups_excluding_root(
+    root: Node,
+    root_id: usize,
+    language: &Language,
+    code: &Code,
+) -> HashMap<(String, String), Vec<usize>> {
+    let mut groups = collect_fully_resolved_groups(root, language, code);
+    for ids in groups.values_mut() {
+        ids.retain(|&id| id != root_id);
+    }
+    groups.retain(|_, ids| !ids.is_empty());
+    groups
 }
 
 fn collect_fully_resolved_groups_rec(
@@ -355,6 +425,46 @@ impl Bar { fn new() -> Bar { Bar::default() } }
             bar_new_mapping.operation,
             ASTMappingOperation::MatchButNotIdentical,
             "Bar::new should be changed"
+        );
+    }
+
+    /// Regression guard for the 2026-07-23 fix (`nodes::go_subtest_call_name`): each
+    /// `t.Run("literal name", ...)` subtest call gets its own fully-resolved identity
+    /// (`"TestThings::alpha"`, `"TestThings::beta"`) and is individually matched here, rather than
+    /// having no identity signal at all and falling through to whatever handles the surrounding
+    /// test function as one undifferentiated blob.
+    #[test]
+    fn go_subtests_named_by_literal_are_individually_matched_via_syntax_named() {
+        let before_src = "
+package main
+
+func TestThings(t *testing.T) {
+	t.Run(\"alpha\", func(t *testing.T) { old() })
+	t.Run(\"beta\", func(t *testing.T) { old() })
+}
+";
+        let after_src = "
+package main
+
+func TestThings(t *testing.T) {
+	t.Run(\"alpha\", func(t *testing.T) { newImpl() })
+	t.Run(\"beta\", func(t *testing.T) { newImpl() })
+}
+";
+        let before = Code::from_string(before_src, &Language::Go);
+        let after = Code::from_string(after_src, &Language::Go);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(&before, &after, &node_cache, &mut diff, true);
+
+        let syntax_named_count = diff
+            .mapping
+            .values()
+            .filter(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("syntax_named")))
+            .count();
+        assert!(
+            syntax_named_count >= 2,
+            "expected each named subtest call to be independently matched via syntax_named, got {syntax_named_count}"
         );
     }
 
