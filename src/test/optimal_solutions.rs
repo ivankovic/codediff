@@ -70,6 +70,8 @@ mod csharp_jellyfin_add_function;
 #[cfg(test)]
 mod csharp_jellyfin_sql_query_fix;
 #[cfg(test)]
+mod csharp_lidarr_add_function;
+#[cfg(test)]
 mod csharp_sonarr_change_type;
 #[cfg(test)]
 mod css_add_property;

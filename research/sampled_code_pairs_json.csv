@@ -1,0 +1,1001 @@
+language,size_bucket,repository,commit,path,old_path
+JSON,large,LadybirdBrowser-ladybird.git,81cb968beba4960f5405821735e1b79c2ca3318a,Libraries/LibWeb/CSS/Enums.json,Libraries/LibWeb/CSS/Enums.json
+JSON,large,Lidarr-Lidarr.git,0be9d639d97cbabbb9712ff5d895efb5206835ba,src/NzbDrone.Core/Localization/Core/bg.json,src/NzbDrone.Core/Localization/Core/bg.json
+JSON,large,Lidarr-Lidarr.git,0be9d639d97cbabbb9712ff5d895efb5206835ba,src/NzbDrone.Core/Localization/Core/hu.json,src/NzbDrone.Core/Localization/Core/hu.json
+JSON,large,Lidarr-Lidarr.git,b8121759a76119b9c1d03c0fb94a7d3a51202477,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,large,Lidarr-Lidarr.git,f8664bf2f1a4b8f84339d3d6fe461adac8c6b776,src/NzbDrone.Core/Localization/Core/nl.json,src/NzbDrone.Core/Localization/Core/nl.json
+JSON,large,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/hr.json,src/NzbDrone.Core/Localization/Core/hr.json
+JSON,large,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/sv.json,src/NzbDrone.Core/Localization/Core/sv.json
+JSON,large,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/cs.json,src/NzbDrone.Core/Localization/Core/cs.json
+JSON,large,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/hr.json,src/NzbDrone.Core/Localization/Core/hr.json
+JSON,large,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/ro.json,src/NzbDrone.Core/Localization/Core/ro.json
+JSON,large,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/it.json,src/NzbDrone.Core/Localization/Core/it.json
+JSON,large,apache-superset.git,0d9db04df05ceda84eb2bbd8ae8c0459f53d9649,superset-frontend/package.json,superset-frontend/package.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/az-AZ.json,packages/excalidraw/locales/az-AZ.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/el-GR.json,packages/excalidraw/locales/el-GR.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/fa-IR.json,packages/excalidraw/locales/fa-IR.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/he-IL.json,packages/excalidraw/locales/he-IL.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/it-IT.json,packages/excalidraw/locales/it-IT.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/kab-KAB.json,packages/excalidraw/locales/kab-KAB.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/pa-IN.json,packages/excalidraw/locales/pa-IN.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/ru-RU.json,packages/excalidraw/locales/ru-RU.json
+JSON,large,excalidraw-excalidraw.git,51ad8951d4d804190647eafcb448d58516047ade,packages/excalidraw/locales/ta-IN.json,packages/excalidraw/locales/ta-IN.json
+JSON,large,excalidraw-excalidraw.git,8013eb5e1628293ee671e431c52184dc576fe293,packages/excalidraw/locales/en.json,packages/excalidraw/locales/en.json
+JSON,large,excalidraw-excalidraw.git,b5fc873323e16f181860a4e731c731b4e40badd1,packages/excalidraw/locales/de-DE.json,packages/excalidraw/locales/de-DE.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/ar-SA.json,packages/excalidraw/locales/ar-SA.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/bg-BG.json,packages/excalidraw/locales/bg-BG.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/bn-BD.json,packages/excalidraw/locales/bn-BD.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/fi-FI.json,packages/excalidraw/locales/fi-FI.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/fr-FR.json,packages/excalidraw/locales/fr-FR.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/it-IT.json,packages/excalidraw/locales/it-IT.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/kaa.json,packages/excalidraw/locales/kaa.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/km-KH.json,packages/excalidraw/locales/km-KH.json
+JSON,large,excalidraw-excalidraw.git,d1f39823f1218b5663ffcba8b9ca0cf2098b6ea6,packages/excalidraw/locales/nb-NO.json,packages/excalidraw/locales/nb-NO.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/az-AZ.json,packages/excalidraw/locales/az-AZ.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/bn-IN.json,packages/excalidraw/locales/bn-IN.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/da-DK.json,packages/excalidraw/locales/da-DK.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/de-DE.json,packages/excalidraw/locales/de-DE.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/el-GR.json,packages/excalidraw/locales/el-GR.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/fa-IR.json,packages/excalidraw/locales/fa-IR.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/fi-FI.json,packages/excalidraw/locales/fi-FI.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/hu-HU.json,packages/excalidraw/locales/hu-HU.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/ja-JP.json,packages/excalidraw/locales/ja-JP.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/kk-KZ.json,packages/excalidraw/locales/kk-KZ.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/ku-TR.json,packages/excalidraw/locales/ku-TR.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/mr-IN.json,packages/excalidraw/locales/mr-IN.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/nb-NO.json,packages/excalidraw/locales/nb-NO.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/pa-IN.json,packages/excalidraw/locales/pa-IN.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/pl-PL.json,packages/excalidraw/locales/pl-PL.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/pt-BR.json,packages/excalidraw/locales/pt-BR.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/sk-SK.json,packages/excalidraw/locales/sk-SK.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/sv-SE.json,packages/excalidraw/locales/sv-SE.json
+JSON,large,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/tr-TR.json,packages/excalidraw/locales/tr-TR.json
+JSON,large,gorhill-uBlock.git,00b79d9023a4c77f446e22fa630aa8a30b6a3415,assets/assets.dev.json,assets/assets.dev.json
+JSON,large,gorhill-uBlock.git,00b79d9023a4c77f446e22fa630aa8a30b6a3415,assets/assets.json,assets/assets.json
+JSON,large,gorhill-uBlock.git,08b7eafd261310cb120632c129f9703c14f96566,platform/mv3/extension/_locales/id/messages.json,platform/mv3/extension/_locales/id/messages.json
+JSON,large,gorhill-uBlock.git,08b7eafd261310cb120632c129f9703c14f96566,platform/mv3/extension/_locales/ja/messages.json,platform/mv3/extension/_locales/ja/messages.json
+JSON,large,gorhill-uBlock.git,3c1c84df5070d5ea24278448495cb1f4ab6b3a7b,platform/mv3/extension/_locales/sq/messages.json,platform/mv3/extension/_locales/sq/messages.json
+JSON,large,gorhill-uBlock.git,3c1c84df5070d5ea24278448495cb1f4ab6b3a7b,platform/mv3/extension/_locales/uk/messages.json,platform/mv3/extension/_locales/uk/messages.json
+JSON,large,gorhill-uBlock.git,3c1c84df5070d5ea24278448495cb1f4ab6b3a7b,platform/mv3/extension/_locales/zh_CN/messages.json,platform/mv3/extension/_locales/zh_CN/messages.json
+JSON,large,gorhill-uBlock.git,719798329b4a592a8471f6d4760e7c14bcff34c6,src/_locales/cv/messages.json,src/_locales/cv/messages.json
+JSON,large,gorhill-uBlock.git,719798329b4a592a8471f6d4760e7c14bcff34c6,src/_locales/cy/messages.json,src/_locales/cy/messages.json
+JSON,large,gorhill-uBlock.git,719798329b4a592a8471f6d4760e7c14bcff34c6,src/_locales/gu/messages.json,src/_locales/gu/messages.json
+JSON,large,gorhill-uBlock.git,74b838cc0367fc3d5d2e538325f9d85eec71615c,platform/mv3/extension/_locales/fi/messages.json,platform/mv3/extension/_locales/fi/messages.json
+JSON,large,gorhill-uBlock.git,74b838cc0367fc3d5d2e538325f9d85eec71615c,src/_locales/ta/messages.json,src/_locales/ta/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/az/messages.json,src/_locales/az/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/bn/messages.json,src/_locales/bn/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/cy/messages.json,src/_locales/cy/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/en/messages.json,src/_locales/en/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/gu/messages.json,src/_locales/gu/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/hr/messages.json,src/_locales/hr/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/ja/messages.json,src/_locales/ja/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/kk/messages.json,src/_locales/kk/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/lt/messages.json,src/_locales/lt/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/nb/messages.json,src/_locales/nb/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/ro/messages.json,src/_locales/ro/messages.json
+JSON,large,gorhill-uBlock.git,7a69bf06d8b511b8b51364079b7273fbbff18b58,src/_locales/ru/messages.json,src/_locales/ru/messages.json
+JSON,large,gorhill-uBlock.git,81448c3ca7f745c44a5ab5d3fb739acc4dd08e03,platform/mv3/extension/_locales/mk/messages.json,platform/mv3/extension/_locales/mk/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/ar/messages.json,platform/mv3/extension/_locales/ar/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/az/messages.json,platform/mv3/extension/_locales/az/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/bg/messages.json,platform/mv3/extension/_locales/bg/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/bn/messages.json,platform/mv3/extension/_locales/bn/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/ca/messages.json,platform/mv3/extension/_locales/ca/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/cy/messages.json,platform/mv3/extension/_locales/cy/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/el/messages.json,platform/mv3/extension/_locales/el/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/et/messages.json,platform/mv3/extension/_locales/et/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/eu/messages.json,platform/mv3/extension/_locales/eu/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/fa/messages.json,platform/mv3/extension/_locales/fa/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/fy/messages.json,platform/mv3/extension/_locales/fy/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/id/messages.json,platform/mv3/extension/_locales/id/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/ka/messages.json,platform/mv3/extension/_locales/ka/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/kn/messages.json,platform/mv3/extension/_locales/kn/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/lv/messages.json,platform/mv3/extension/_locales/lv/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/ml/messages.json,platform/mv3/extension/_locales/ml/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/mr/messages.json,platform/mv3/extension/_locales/mr/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/pl/messages.json,platform/mv3/extension/_locales/pl/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/so/messages.json,platform/mv3/extension/_locales/so/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/sq/messages.json,platform/mv3/extension/_locales/sq/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/ta/messages.json,platform/mv3/extension/_locales/ta/messages.json
+JSON,large,gorhill-uBlock.git,9cf8a0fe7c0aa8abc4892004b8e9b0490c2d2069,platform/mv3/extension/_locales/te/messages.json,platform/mv3/extension/_locales/te/messages.json
+JSON,large,gorhill-uBlock.git,a0a7a99675189569d8da4fc60682a5f14e98445e,assets/assets.dev.json,assets/assets.dev.json
+JSON,large,gorhill-uBlock.git,a85fc33ce8ba8de5ae8f400cc6473243803deae6,src/_locales/ko/messages.json,src/_locales/ko/messages.json
+JSON,large,gorhill-uBlock.git,c8c29faab4245255df7d358c1b6762602ae47128,platform/mv3/extension/_locales/lv/messages.json,platform/mv3/extension/_locales/lv/messages.json
+JSON,large,gorhill-uBlock.git,d136c0871097252f31d1cbf562b136a4ab2b2442,platform/mv3/extension/_locales/bs/messages.json,platform/mv3/extension/_locales/bs/messages.json
+JSON,large,gorhill-uBlock.git,d136c0871097252f31d1cbf562b136a4ab2b2442,src/_locales/ro/messages.json,src/_locales/ro/messages.json
+JSON,large,gorhill-uBlock.git,e0fcb8485a2055899541b8ba0fb9aa2ad89466c3,platform/mv3/extension/_locales/sq/messages.json,platform/mv3/extension/_locales/sq/messages.json
+JSON,large,gorhill-uBlock.git,e7f91cdd95077692edd3faa29bb50b75a0e9a1d6,platform/mv3/extension/_locales/fr/messages.json,platform/mv3/extension/_locales/fr/messages.json
+JSON,large,gorhill-uBlock.git,e7f91cdd95077692edd3faa29bb50b75a0e9a1d6,platform/mv3/extension/_locales/ko/messages.json,platform/mv3/extension/_locales/ko/messages.json
+JSON,large,gorhill-uBlock.git,e7f91cdd95077692edd3faa29bb50b75a0e9a1d6,platform/mv3/extension/_locales/ru/messages.json,platform/mv3/extension/_locales/ru/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/bs/messages.json,platform/mv3/extension/_locales/bs/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/da/messages.json,platform/mv3/extension/_locales/da/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/eo/messages.json,platform/mv3/extension/_locales/eo/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/fr/messages.json,platform/mv3/extension/_locales/fr/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/gl/messages.json,platform/mv3/extension/_locales/gl/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/hi/messages.json,platform/mv3/extension/_locales/hi/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/hu/messages.json,platform/mv3/extension/_locales/hu/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/ml/messages.json,platform/mv3/extension/_locales/ml/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/ms/messages.json,platform/mv3/extension/_locales/ms/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/pa/messages.json,platform/mv3/extension/_locales/pa/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/sw/messages.json,platform/mv3/extension/_locales/sw/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/ta/messages.json,platform/mv3/extension/_locales/ta/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/tr/messages.json,platform/mv3/extension/_locales/tr/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/uk/messages.json,platform/mv3/extension/_locales/uk/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/ur/messages.json,platform/mv3/extension/_locales/ur/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/vi/messages.json,platform/mv3/extension/_locales/vi/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,platform/mv3/extension/_locales/zh_CN/messages.json,platform/mv3/extension/_locales/zh_CN/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/az/messages.json,src/_locales/az/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/de/messages.json,src/_locales/de/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/es/messages.json,src/_locales/es/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/et/messages.json,src/_locales/et/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/fa/messages.json,src/_locales/fa/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/fil/messages.json,src/_locales/fil/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/fy/messages.json,src/_locales/fy/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/gu/messages.json,src/_locales/gu/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/hu/messages.json,src/_locales/hu/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/ko/messages.json,src/_locales/ko/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/lv/messages.json,src/_locales/lv/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/nb/messages.json,src/_locales/nb/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/pl/messages.json,src/_locales/pl/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/sk/messages.json,src/_locales/sk/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/sl/messages.json,src/_locales/sl/messages.json
+JSON,large,gorhill-uBlock.git,ede231b9c233a11feca468623f4e66c47bdfbd43,src/_locales/th/messages.json,src/_locales/th/messages.json
+JSON,large,gorhill-uBlock.git,f4c3c823fba90ecbe4f326994e24d9024404c293,assets/assets.dev.json,assets/assets.dev.json
+JSON,large,gorhill-uBlock.git,f4c3c823fba90ecbe4f326994e24d9024404c293,assets/assets.json,assets/assets.json
+JSON,large,jellyfin-jellyfin.git,56a469d8c3c0eed0d809d42a60d847e67ab61671,Emby.Server.Implementations/Localization/Core/ja.json,Emby.Server.Implementations/Localization/Core/ja.json
+JSON,large,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/bg-BG.json,Emby.Server.Implementations/Localization/Core/bg-BG.json
+JSON,large,jellyfin-jellyfin.git,e8232d31ab5367de015a85e4c52f18e1b883297d,Emby.Server.Implementations/Localization/Core/be.json,Emby.Server.Implementations/Localization/Core/be.json
+JSON,large,jesseduffield-lazygit.git,463e81f19707c20c61c2d885d8f0df3b3c5bd846,pkg/i18n/translations/ja.json,pkg/i18n/translations/ja.json
+JSON,large,jesseduffield-lazygit.git,463e81f19707c20c61c2d885d8f0df3b3c5bd846,pkg/i18n/translations/ko.json,pkg/i18n/translations/ko.json
+JSON,large,jesseduffield-lazygit.git,62913ee25d9c976ac8bc4fe408695f01ce0fbeeb,schema-master/config.json,schema-master/config.json
+JSON,large,kovidgoyal-calibre.git,5be7a6658d3a3979be2856152fce081384de56e2,bypy/sources.json,bypy/sources.json
+JSON,large,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Ingestion.json,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Ingestion.json
+JSON,large,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/lfx/tests/data/starter_projects_1_6_0/Basic Prompting.json,src/lfx/tests/data/starter_projects_1_6_0/Basic Prompting.json
+JSON,large,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/lfx/tests/data/starter_projects_1_6_0/Search agent.json,src/lfx/tests/data/starter_projects_1_6_0/Search agent.json
+JSON,large,langflow-ai-langflow.git,22607cc081976239ad6f3a708ec3e943458893c9,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompting.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompting.json
+JSON,large,langflow-ai-langflow.git,2d67402b1dbaefcbce85a244d4a6cd5e4bda1cfe,src/lfx/src/lfx/_assets/stable_hash_history.json,src/lfx/src/lfx/_assets/stable_hash_history.json
+JSON,large,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json
+JSON,large,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/SaaS Pricing.json,src/backend/base/langflow/initial_setup/starter_projects/SaaS Pricing.json
+JSON,large,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/SaaS Pricing.json,src/backend/base/langflow/initial_setup/starter_projects/SaaS Pricing.json
+JSON,large,langflow-ai-langflow.git,6f9de60dda0478048083b7603988a33ad54afd29,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json
+JSON,large,langflow-ai-langflow.git,7c43e4c4e5959a5fbdde7423ca6054c70e6d385e,src/frontend/tests/assets/outdated_flow.json,src/frontend/tests/assets/outdated_flow.json
+JSON,large,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompting.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompting.json
+JSON,large,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json
+JSON,large,langflow-ai-langflow.git,a691fdb22db7ce523a697298e031f02eb9a794c3,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Ingestion.json,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Ingestion.json
+JSON,large,langflow-ai-langflow.git,c20918fe32e3d3fa282dfcc393cba4ac4d80e368,src/lfx/src/lfx/_assets/stable_hash_history.json,src/lfx/src/lfx/_assets/stable_hash_history.json
+JSON,large,langflow-ai-langflow.git,cb225422f40e638d8e9cfb49ce8f911ebb129f66,src/lfx/src/lfx/_assets/stable_hash_history.json,src/lfx/src/lfx/_assets/stable_hash_history.json
+JSON,large,langflow-ai-langflow.git,cea60b84612bd8930cac3250052c96d9246a9b6a,src/lfx/src/lfx/_assets/stable_hash_history.json,src/lfx/src/lfx/_assets/stable_hash_history.json
+JSON,large,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Retrieval.json,src/backend/base/langflow/initial_setup/starter_projects/Knowledge Retrieval.json
+JSON,large,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json,src/backend/base/langflow/initial_setup/starter_projects/Search agent.json
+JSON,large,louislam-uptime-kuma.git,019b4b7503f40bf6be2a5624b4d72ba67547af8b,src/lang/en.json,src/lang/en.json
+JSON,large,louislam-uptime-kuma.git,593037ac026a01d7f44a48792fc17dbf202d4446,src/lang/en.json,src/lang/en.json
+JSON,large,louislam-uptime-kuma.git,593435c3cb0132c58d94118f5569824243c83ec9,src/lang/en.json,src/lang/en.json
+JSON,large,louislam-uptime-kuma.git,aca6d02dc16dd2120118a11bf4483555f4ec71af,src/lang/en.json,src/lang/en.json
+JSON,large,louislam-uptime-kuma.git,ba71a349b1acb9c25700efa99747ba356ab934e3,src/lang/cs-CZ.json,src/lang/cs-CZ.json
+JSON,large,louislam-uptime-kuma.git,f63047ef2a8ac37c1ddd3f62540ade3cb70fa318,src/lang/nb-NO.json,src/lang/nb-NO.json
+JSON,large,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,"tests/baselines/reference/bundlerDirectoryModule(module=nodenext,moduleresolution=nodenext).trace.json","tests/baselines/reference/bundlerDirectoryModule(module=nodenext,moduleresolution=nodenext).trace.json"
+JSON,large,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/libTypeScriptOverrideSimple.trace.json,tests/baselines/reference/libTypeScriptOverrideSimple.trace.json
+JSON,large,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/libTypeScriptOverrideSimpleConfig.trace.json,tests/baselines/reference/libTypeScriptOverrideSimpleConfig.trace.json
+JSON,large,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/nodeModulesPackagePatternExportsTrailers(module=nodenext).trace.json,tests/baselines/reference/nodeModulesPackagePatternExportsTrailers(module=nodenext).trace.json
+JSON,large,microsoft-vscode.git,0005b2dcc9169487c0480f31aa2227487114e68d,extensions/json-language-features/package-lock.json,extensions/json-language-features/package-lock.json
+JSON,large,microsoft-vscode.git,d013e8cdaaa3816f69eb59fc81e967c421bd8d6c,extensions/npm/package.json,extensions/npm/package.json
+JSON,large,microsoft-vscode.git,ea2dc89c51d0d7c46841f39e945040cfe61be5bb,extensions/theme-2026/themes/2026-light.json,extensions/theme-2026/themes/2026-light.json
+JSON,large,microsoft-vscode.git,f8edf625b8b5b7fd9717c31ec834c8e8a062f885,package.json,package.json
+JSON,large,mozilla-firefox-firefox.git,4fffb3f86f99aa84a8d22b1249aa7f1c867ce3d9,browser/locales/l10n-changesets.json,browser/locales/l10n-changesets.json
+JSON,large,nextcloud-server.git,343144118083cb909656fcd085550e5d94d85205,apps/files/l10n/tr.json,apps/files/l10n/tr.json
+JSON,large,nextcloud-server.git,b4b328cf61c9970e0816f50d80ebb0b00fb133c8,apps/files_sharing/l10n/mk.json,apps/files_sharing/l10n/mk.json
+JSON,large,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/files_external/l10n/da.json,apps/files_external/l10n/da.json
+JSON,large,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/files_sharing/l10n/el.json,apps/files_sharing/l10n/el.json
+JSON,large,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/files_sharing/l10n/mn.json,apps/files_sharing/l10n/mn.json
+JSON,large,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/theming/l10n/mn.json,apps/theming/l10n/mn.json
+JSON,large,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,core/l10n/mn.json,core/l10n/mn.json
+JSON,large,nextcloud-server.git,c4eddb5947e757d7e8aadf80e5c431f654018cff,apps/settings/l10n/nl.json,apps/settings/l10n/nl.json
+JSON,large,nextcloud-server.git,d758f64a18b14f20a1e5a4ff7dded92f579ddde0,apps/files_sharing/l10n/gl.json,apps/files_sharing/l10n/gl.json
+JSON,large,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/files/l10n/mn.json,apps/files/l10n/mn.json
+JSON,large,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/systemtags/l10n/mn.json,apps/systemtags/l10n/mn.json
+JSON,large,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,lib/l10n/mn.json,lib/l10n/mn.json
+JSON,large,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/en-GB/translation.json,src/lib/i18n/locales/en-GB/translation.json
+JSON,large,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/lt-LT/translation.json,src/lib/i18n/locales/lt-LT/translation.json
+JSON,large,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ro-RO/translation.json,src/lib/i18n/locales/ro-RO/translation.json
+JSON,large,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/sr-RS/translation.json,src/lib/i18n/locales/sr-RS/translation.json
+JSON,large,puppeteer-puppeteer.git,0bb4703fed0e6fcd7b40899d1b81a54d4b5c48c7,test/TestExpectations.json,test/TestExpectations.json
+JSON,large,puppeteer-puppeteer.git,603fc9eaf89027d91d6e39ecf26f3fc6a31374f1,test/TestExpectations.json,test/TestExpectations.json
+JSON,large,puppeteer-puppeteer.git,6624d1dceae3c1ac0778b95e77810dd8c39df7a5,versions.json,versions.json
+JSON,large,puppeteer-puppeteer.git,a51345c0aa6fadab942f8ee49cbf1ba9b8fec7c5,test/TestExpectations.json,test/TestExpectations.json
+JSON,large,puppeteer-puppeteer.git,b0c66a0ae309ecf066bb58a2d07a3ce750eb9f16,test/TestExpectations.json,test/TestExpectations.json
+JSON,large,puppeteer-puppeteer.git,c5fdc0c57ddc736439ed8f20a2ccc24647a896ff,versions.json,versions.json
+JSON,large,puppeteer-puppeteer.git,f71d8cbc029e76ccaeaf7b427ac6e930bdd2ae85,test/TestExpectations.json,test/TestExpectations.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/chart.json,apps/v4/public/r/styles/base-lyra/chart.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/dropdown-menu.json,apps/v4/public/r/styles/base-lyra/dropdown-menu.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/field-example.json,apps/v4/public/r/styles/base-lyra/field-example.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/preview.json,apps/v4/public/r/styles/base-lyra/preview.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/chart.json,apps/v4/public/r/styles/base-nova/chart.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/combobox.json,apps/v4/public/r/styles/base-nova/combobox.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/preview.json,apps/v4/public/r/styles/base-nova/preview.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/registry.json,apps/v4/public/r/styles/base-nova/registry.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/field-example.json,apps/v4/public/r/styles/base-vega/field-example.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/preview.json,apps/v4/public/r/styles/base-vega/preview.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/sidebar.json,apps/v4/public/r/styles/base-vega/sidebar.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/sidebar.json,apps/v4/public/r/styles/radix-lyra/sidebar.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/dropdown-menu.json,apps/v4/public/r/styles/radix-maia/dropdown-menu.json
+JSON,large,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/combobox.json,apps/v4/public/r/styles/radix-nova/combobox.json
+JSON,large,shadcn-ui-ui.git,01d5f034b9c1fb20d01f713bb04317811b22bcf7,apps/v4/public/r/registries.json,apps/v4/public/r/registries.json
+JSON,large,shadcn-ui-ui.git,4069c3367122d25828c359d9532cc589a7104b3c,apps/v4/public/r/registries.json,apps/v4/public/r/registries.json
+JSON,large,shadcn-ui-ui.git,46631fc4d4b8bc61507a052241b0d67df16a78c3,apps/v4/public/r/styles/base-nova/toggle-group-example.json,apps/v4/public/r/styles/base-nova/toggle-group-example.json
+JSON,large,shadcn-ui-ui.git,46631fc4d4b8bc61507a052241b0d67df16a78c3,apps/v4/public/r/styles/radix-nova/toggle-group-example.json,apps/v4/public/r/styles/radix-nova/toggle-group-example.json
+JSON,large,shadcn-ui-ui.git,474d461b1c269c662d0a3c2a364c0f5b0d13db95,apps/v4/public/r/registries.json,apps/v4/public/r/registries.json
+JSON,large,shadcn-ui-ui.git,6e2efb4b55549ce1f4193a44ad19c1f873e1f08a,apps/v4/public/r/registries.json,apps/v4/public/r/registries.json
+JSON,large,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/radix-mira/registry.json,apps/v4/public/r/styles/radix-mira/registry.json
+JSON,large,shadcn-ui-ui.git,f076420e68f31407b8354c2028045dfcdff538ec,apps/v4/public/r/styles/radix-lyra/toggle-group-example.json,apps/v4/public/r/styles/radix-lyra/toggle-group-example.json
+JSON,large,shadcn-ui-ui.git,f076420e68f31407b8354c2028045dfcdff538ec,apps/v4/public/r/styles/radix-nova/toggle-group-example.json,apps/v4/public/r/styles/radix-nova/toggle-group-example.json
+JSON,large,sherlock-project-sherlock.git,1898a0c4a964beb7d14e39496fc846b9506b6a52,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,1be2abb056bb10f4d438823b42cd874c967ff953,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,472c08680508fd978d661e1f17060723f606c0be,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,828c47109d5ede852b9ff3c61700551eba8bd995,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,8797fcd51754fc8ac4565e28772ed9f2a0c9a66c,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,a4aab3890159818da8e4bfdb1c30bc9ac4b74bcd,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,deebe7137c8dd0f0012597915533a9ac52f10958,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,sherlock-project-sherlock.git,eff869906ac0117c613de63bbcffdb5824c1d22c,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,large,twbs-bootstrap.git,07b3816da566b9ed03943b4081180fdd8623355e,package.json,package.json
+JSON,large,twbs-bootstrap.git,0aa4f69a0766428827df81191fe8eb1b5ceb49ba,package.json,package.json
+JSON,large,twbs-bootstrap.git,21d19a9a6af9c9fe0c89a285530cb6fcb614c880,package.json,package.json
+JSON,large,twbs-bootstrap.git,35858ff363eb139e88a2c8bca6192c24a630f25a,package.json,package.json
+JSON,large,twbs-bootstrap.git,68afc562952bb60dc6de9a1da1d379eee5c62c2f,package.json,package.json
+JSON,large,twbs-bootstrap.git,6ad25a7102bbcea048f076dbb140a2ee667292d0,package.json,package.json
+JSON,large,twbs-bootstrap.git,90baf94dac46b950ed67d848cfd7f3b9b68fd463,package.json,package.json
+JSON,large,twbs-bootstrap.git,b4a1d28dc9add71066cfb735bfc2683b480dbec6,package.json,package.json
+JSON,large,twbs-bootstrap.git,c38c6cb6c208c9d0ea26db9a558510a49322b312,package.json,package.json
+JSON,large,twbs-bootstrap.git,c985f821a779abda2d4790320dcee9d298d120d4,package.json,package.json
+JSON,large,twbs-bootstrap.git,c9e83a12b5e8c7438eb2d548c404f962602dde76,package.json,package.json
+JSON,large,twbs-bootstrap.git,e52e3b1c95e82127391c76c7c3c846410aec51d3,package.json,package.json
+JSON,large,twbs-bootstrap.git,ec7a45b8f3d3af80b891f8c385bb26f3afab4f8f,package.json,package.json
+JSON,large,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/next/package.json,packages/next/package.json
+JSON,medium,OpenHands-OpenHands.git,d2fd54a0838636d3d642821eac117bdb789051c4,frontend/package.json,frontend/package.json
+JSON,medium,Sonarr-Sonarr.git,0d521c078b516489c870fdd165bf5edc2051bad4,src/NzbDrone.Core/Localization/Core/hr.json,src/NzbDrone.Core/Localization/Core/hr.json
+JSON,medium,Sonarr-Sonarr.git,5487aa74f5306bbec980432e9a5293d4bf19c903,src/NzbDrone.Core/Localization/Core/pl.json,src/NzbDrone.Core/Localization/Core/pl.json
+JSON,medium,WordPress-WordPress.git,ec445010208a60af54853c3bfba3675ca43f1c78,wp-includes/blocks/post-comments-form/block.json,wp-includes/blocks/post-comments-form/block.json
+JSON,medium,WordPress-WordPress.git,ec445010208a60af54853c3bfba3675ca43f1c78,wp-includes/blocks/post-excerpt/block.json,wp-includes/blocks/post-excerpt/block.json
+JSON,medium,WordPress-WordPress.git,ec445010208a60af54853c3bfba3675ca43f1c78,wp-includes/blocks/post-terms/block.json,wp-includes/blocks/post-terms/block.json
+JSON,medium,apache-superset.git,d039172013379fe9172b7a024d6991190fba8954,docs/package.json,docs/package.json
+JSON,medium,axios-axios.git,29f75425f0c9f73021f5eedc869c176e30e05fe7,package.json,package.json
+JSON,medium,axios-axios.git,335b79ffb6d67336b2c6836893848eb247568b6a,package.json,package.json
+JSON,medium,axios-axios.git,472c631e86e5ba056065e972932c6b85af05c796,package.json,package.json
+JSON,medium,axios-axios.git,99d588dceaf20e8a2a2ab99c9188b4212f9f30b2,package.json,package.json
+JSON,medium,d3-d3.git,c834894ee2052f9b1d476536901444e1022c7cdd,package.json,package.json
+JSON,medium,electron-electron.git,3a5f9e0a337a5d7b7dcb9984dde9876be725ddf7,script/node-disabled-tests.json,script/node-disabled-tests.json
+JSON,medium,electron-electron.git,469b2af0c05012f08a096a39e6531c8d0b90f0a8,package.json,package.json
+JSON,medium,electron-electron.git,dec7f937ae20ac926e2c3ff51d5d01f99b5e3ea5,package.json,package.json
+JSON,medium,electron-electron.git,e9faa14cc0c57aad3e446cf32a6ae3599f94b9df,package.json,package.json
+JSON,medium,electron-electron.git,efb3fd98c665d4b45ab35963af1a8e7932a9d7c6,package.json,package.json
+JSON,medium,eslint-eslint.git,0bd54976080936ce080ee2552d504180105593b4,docs/package.json,docs/package.json
+JSON,medium,eslint-eslint.git,0bd54976080936ce080ee2552d504180105593b4,package.json,package.json
+JSON,medium,eslint-eslint.git,1d1ca45370c1ed3bab3d93e480fe9c22af0bb196,docs/package.json,docs/package.json
+JSON,medium,eslint-eslint.git,436b82f3c0a8cfa2fdc17d173e95ea11d5d3ee03,package.json,package.json
+JSON,medium,eslint-eslint.git,4e6c4ac042e321da8fc29ce53ed03c86dcaa44a7,package.json,package.json
+JSON,medium,eslint-eslint.git,55122d6f971119607c85b0df8e62942171c939f7,package.json,package.json
+JSON,medium,eslint-eslint.git,6aa1afe6694f3fd7f82116109a5ef2ad18ece074,packages/eslint-config-eslint/package.json,packages/eslint-config-eslint/package.json
+JSON,medium,eslint-eslint.git,8f360ad6a7a743d33a83eed8973ee4a50731e55b,docs/package.json,docs/package.json
+JSON,medium,eslint-eslint.git,8f360ad6a7a743d33a83eed8973ee4a50731e55b,package.json,package.json
+JSON,medium,eslint-eslint.git,afc06817bbd0625c7b0a46bdc81c38dab0c99441,docs/package.json,docs/package.json
+JSON,medium,eslint-eslint.git,ba71baa87265888b582f314163df1d727441e2f1,package.json,package.json
+JSON,medium,eslint-eslint.git,f9c3e7adf7550441341e05dc60ab23bd5307d568,docs/package.json,docs/package.json
+JSON,medium,eslint-eslint.git,f9c3e7adf7550441341e05dc60ab23bd5307d568,package.json,package.json
+JSON,medium,excalidraw-excalidraw.git,063533aede8365bf18b8f08ec949a1e93697c17d,packages/excalidraw/package.json,packages/excalidraw/package.json
+JSON,medium,excalidraw-excalidraw.git,8fd970320e1d754d1c76bc31abc440b9d88aafab,package.json,package.json
+JSON,medium,excalidraw-excalidraw.git,b9a255407fc5e68893016de56057614da26df50c,packages/utils/package.json,packages/utils/package.json
+JSON,medium,excalidraw-excalidraw.git,c141960ada4869ee6a3bb8a665e75c0c18ad7f19,packages/excalidraw/package.json,packages/excalidraw/package.json
+JSON,medium,excalidraw-excalidraw.git,d080833f4d359e808cd12acdc7dd1c9187c956e5,package.json,package.json
+JSON,medium,fatedier-frp.git,36718d88e4e832cd4b03deb03d7cc3e1538b6846,web/frps/package.json,web/frps/package.json
+JSON,medium,fatedier-frp.git,479e9f50c2f7c94d2a7c875c4bdf2cac4ba2cec0,web/frpc/package.json,web/frpc/package.json
+JSON,medium,gohugoio-hugo.git,8f3c066d23f431fb2c53d97ea489e4c28b42bd82,.cspell.json,.cspell.json
+JSON,medium,jellyfin-jellyfin.git,32d80861211031e5ee66d5068679f43335e2bcbd,Emby.Server.Implementations/Localization/Core/pt.json,Emby.Server.Implementations/Localization/Core/pt.json
+JSON,medium,jellyfin-jellyfin.git,411a6cced1f27c846009d5c00e313ddd12daf267,Emby.Server.Implementations/Localization/Core/zh-CN.json,Emby.Server.Implementations/Localization/Core/zh-CN.json
+JSON,medium,jellyfin-jellyfin.git,62474af0c0aece2bd33d7e43b010680d57c90c40,Emby.Server.Implementations/Localization/Core/tr.json,Emby.Server.Implementations/Localization/Core/tr.json
+JSON,medium,jellyfin-jellyfin.git,6b8400cc3da0095fbce4f3f481464244b3ccf608,Emby.Server.Implementations/Localization/Core/it.json,Emby.Server.Implementations/Localization/Core/it.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/ca.json,Emby.Server.Implementations/Localization/Core/ca.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/cs.json,Emby.Server.Implementations/Localization/Core/cs.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/en-GB.json,Emby.Server.Implementations/Localization/Core/en-GB.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/es-MX.json,Emby.Server.Implementations/Localization/Core/es-MX.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/hr.json,Emby.Server.Implementations/Localization/Core/hr.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/hu.json,Emby.Server.Implementations/Localization/Core/hu.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/nb.json,Emby.Server.Implementations/Localization/Core/nb.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/pl.json,Emby.Server.Implementations/Localization/Core/pl.json
+JSON,medium,jellyfin-jellyfin.git,b9e5cce3838ec0cc89c67c48d8c2c40348bebc6f,Emby.Server.Implementations/Localization/Core/zh-HK.json,Emby.Server.Implementations/Localization/Core/zh-HK.json
+JSON,medium,jellyfin-jellyfin.git,ccd042750df8389c1622aaa049997c771f32f181,Emby.Server.Implementations/Localization/Core/hr.json,Emby.Server.Implementations/Localization/Core/hr.json
+JSON,medium,jellyfin-jellyfin.git,fa4d51c5e67550a99bb67e915f676c2c2b8ab993,.devcontainer/devcontainer.json,.devcontainer/devcontainer.json
+JSON,medium,langflow-ai-langflow.git,7c43e4c4e5959a5fbdde7423ca6054c70e6d385e,src/frontend/package.json,src/frontend/package.json
+JSON,medium,mermaid-js-mermaid.git,72433401a8c9d90d6753b7592d556122ecb953ca,packages/parser/package.json,packages/parser/package.json
+JSON,medium,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/typeReferenceDirectives11.trace.json,tests/baselines/reference/typeReferenceDirectives11.trace.json
+JSON,medium,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/typeReferenceDirectives12.trace.json,tests/baselines/reference/typeReferenceDirectives12.trace.json
+JSON,medium,microsoft-TypeScript.git,5e4281fdf21da7c282ceaf016440992e1fad2565,src/lib/libs.json,src/lib/libs.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderSpecifyOutputDirectory/amd/mapRootAbsolutePathModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderSpecifyOutputDirectory/amd/mapRootAbsolutePathModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputDirectory/node/mapRootRelativePathModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputDirectory/node/mapRootRelativePathModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleMultifolderSpecifyOutputDirectory/node/maprootUrlModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlModuleMultifolderSpecifyOutputDirectory/node/maprootUrlModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootAbsolutePathModuleMultifolderSpecifyOutputDirectory/amd/sourceRootAbsolutePathModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourceRootAbsolutePathModuleMultifolderSpecifyOutputDirectory/amd/sourceRootAbsolutePathModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory/amd/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory/amd/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory/node/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory/node/sourceRootRelativePathModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleMultifolderSpecifyOutputDirectory/node/sourcemapModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourcemapModuleMultifolderSpecifyOutputDirectory/node/sourcemapModuleMultifolderSpecifyOutputDirectory.json
+JSON,medium,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/library-reference-8.trace.json,tests/baselines/reference/library-reference-8.trace.json
+JSON,medium,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/reactJsxReactResolvedNodeNextEsm.trace.json,tests/baselines/reference/reactJsxReactResolvedNodeNextEsm.trace.json
+JSON,medium,microsoft-playwright.git,66137fd17d4453d199b086df26aece65f0169cf1,packages/playwright-core/browsers.json,packages/playwright-core/browsers.json
+JSON,medium,microsoft-terminal.git,c05cb107e5d792edde8f322525509f01975e53a7,vcpkg.json,vcpkg.json
+JSON,medium,mui-material-ui.git,11b3a3685b15a65dce2cf3e44b6659ce2c3b7f00,packages/mui-docs/package.json,packages/mui-docs/package.json
+JSON,medium,mui-material-ui.git,1682b6cfea85951e503c9c2a812b7bbad8055af1,packages-internal/scripts/package.json,packages-internal/scripts/package.json
+JSON,medium,mui-material-ui.git,1ee94a27b931d20b23dab5dc55b35421ba4b8c55,packages/markdown/package.json,packages/markdown/package.json
+JSON,medium,mui-material-ui.git,1ee94a27b931d20b23dab5dc55b35421ba4b8c55,packages/mui-material-nextjs/package.json,packages/mui-material-nextjs/package.json
+JSON,medium,mui-material-ui.git,1ee94a27b931d20b23dab5dc55b35421ba4b8c55,packages/mui-types/package.json,packages/mui-types/package.json
+JSON,medium,mui-material-ui.git,28d01ffdc27fee9c95cf72199add253a1c7ace96,docs/pages/material-ui/api/dialog.json,docs/pages/material-ui/api/dialog.json
+JSON,medium,mui-material-ui.git,28d01ffdc27fee9c95cf72199add253a1c7ace96,docs/pages/material-ui/api/modal.json,docs/pages/material-ui/api/modal.json
+JSON,medium,mui-material-ui.git,28d01ffdc27fee9c95cf72199add253a1c7ace96,docs/translations/api-docs/dialog/dialog.json,docs/translations/api-docs/dialog/dialog.json
+JSON,medium,mui-material-ui.git,600ea849c3a238c97ca0eb0c9e06da7f1cd2f366,docs/translations/api-docs-joy/avatar-group/avatar-group.json,docs/translations/api-docs-joy/avatar-group/avatar-group.json
+JSON,medium,mui-material-ui.git,600ea849c3a238c97ca0eb0c9e06da7f1cd2f366,docs/translations/api-docs-joy/select/select.json,docs/translations/api-docs-joy/select/select.json
+JSON,medium,mui-material-ui.git,64a8d53e09de6f0e8baa02749faec653ea6fe533,docs/package.json,docs/package.json
+JSON,medium,mui-material-ui.git,64a8d53e09de6f0e8baa02749faec653ea6fe533,packages/mui-codemod/package.json,packages/mui-codemod/package.json
+JSON,medium,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages-internal/scripts/package.json,packages-internal/scripts/package.json
+JSON,medium,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages/mui-material-nextjs/package.json,packages/mui-material-nextjs/package.json
+JSON,medium,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages/mui-material/package.json,packages/mui-material/package.json
+JSON,medium,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages/mui-stylis-plugin-rtl/package.json,packages/mui-stylis-plugin-rtl/package.json
+JSON,medium,mui-material-ui.git,79d45bdec7f38fed95ecb276fcea63e5b122ff07,package.json,package.json
+JSON,medium,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-icons-material/package.json,packages/mui-icons-material/package.json
+JSON,medium,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-stylis-plugin-rtl/package.json,packages/mui-stylis-plugin-rtl/package.json
+JSON,medium,mui-material-ui.git,b6395bff46e3f3d01d49ede22370cbc155d133de,package.json,package.json
+JSON,medium,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,package.json,package.json
+JSON,medium,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,packages/mui-icons-material/package.json,packages/mui-icons-material/package.json
+JSON,medium,mui-material-ui.git,c8f05e11ce52f50e8b622312d439ea8337d84683,packages/mui-types/package.json,packages/mui-types/package.json
+JSON,medium,mui-material-ui.git,d8781247e4215bd73b00072c0b90827a99e9fd64,docs/package.json,docs/package.json
+JSON,medium,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,packages/mui-joy/package.json,packages/mui-joy/package.json
+JSON,medium,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,packages/mui-styled-engine-sc/package.json,packages/mui-styled-engine-sc/package.json
+JSON,medium,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,packages/mui-system/package.json,packages/mui-system/package.json
+JSON,medium,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,packages/mui-types/package.json,packages/mui-types/package.json
+JSON,medium,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,test/package.json,test/package.json
+JSON,medium,mui-material-ui.git,e73ad82a008c00308c45312d542ab448ada8ce03,docs/package.json,docs/package.json
+JSON,medium,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/theming/l10n/fi.json,apps/theming/l10n/fi.json
+JSON,medium,nextcloud-server.git,c4eddb5947e757d7e8aadf80e5c431f654018cff,apps/updatenotification/l10n/de.json,apps/updatenotification/l10n/de.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/dashboard/l10n/mn.json,apps/dashboard/l10n/mn.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/files_reminders/l10n/mn.json,apps/files_reminders/l10n/mn.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/files_versions/l10n/mn.json,apps/files_versions/l10n/mn.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/cs.json,apps/profile/l10n/cs.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/gl.json,apps/profile/l10n/gl.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/ko.json,apps/profile/l10n/ko.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/nl.json,apps/profile/l10n/nl.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/tr.json,apps/profile/l10n/tr.json
+JSON,medium,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/ug.json,apps/profile/l10n/ug.json
+JSON,medium,nvm-sh-nvm.git,5c12680a62cbe88b57cc243913373096b0f35647,package.json,package.json
+JSON,medium,nvm-sh-nvm.git,deac4e0932eb3031656cdcbe12f0a7be2cacb69f,package.json,package.json
+JSON,medium,nvm-sh-nvm.git,ff7634577bc6d3cc2c7fe059018aa18b7ed32686,package.json,package.json
+JSON,medium,open-webui-open-webui.git,ffcf97e3e1908c5c0879f5663f670981828d471c,package.json,package.json
+JSON,medium,prettier-prettier.git,0b0a147bfcd8e68c46c01ed5ddacb732554d2329,package.json,package.json
+JSON,medium,prettier-prettier.git,2c623081f4ba417dc1e44a0a10758056c794a777,package.json,package.json
+JSON,medium,prettier-prettier.git,88ee8a5b3e5db04f012c18be28aec11ed23ba849,package.json,package.json
+JSON,medium,prettier-prettier.git,96596de06d9421e8cfffce21430b904ffbea73f1,package.json,package.json
+JSON,medium,prometheus-prometheus.git,54e010926b0a270cadb22be1113ad45fe9bcb90a,web/ui/module/lezer-promql/package.json,web/ui/module/lezer-promql/package.json
+JSON,medium,prometheus-prometheus.git,5bd0d00f8ca1ec808015b30f30b3cf1dba656518,cmd/prometheus/testdata/features.json,cmd/prometheus/testdata/features.json
+JSON,medium,prometheus-prometheus.git,b494365aa7488fe46a5893689c20bdc3fcc2cdf2,web/ui/module/lezer-promql/package.json,web/ui/module/lezer-promql/package.json
+JSON,medium,prometheus-prometheus.git,ce30ae49f314cc5dce4b04678f5f0c9cf17eb688,cmd/prometheus/testdata/features.json,cmd/prometheus/testdata/features.json
+JSON,medium,prometheus-prometheus.git,d66944d856ca675d0eb826b058a93b1d7b07dc95,renovate.json,renovate.json
+JSON,medium,prometheus-prometheus.git,decde0b3648ad9ececb868a8b7a3e298db0cbf4b,web/ui/module/lezer-promql/package.json,web/ui/module/lezer-promql/package.json
+JSON,medium,puppeteer-puppeteer.git,451550ca7690b23443c2a37faadbdf32594b27a5,packages/puppeteer-core/package.json,packages/puppeteer-core/package.json
+JSON,medium,puppeteer-puppeteer.git,451550ca7690b23443c2a37faadbdf32594b27a5,packages/puppeteer/package.json,packages/puppeteer/package.json
+JSON,medium,puppeteer-puppeteer.git,5d820f2872cdec366fbf6069d03ebc094d8b97f2,packages/puppeteer/package.json,packages/puppeteer/package.json
+JSON,medium,puppeteer-puppeteer.git,5dc0f3c7e67da8d4f965795dd2bd64396e00d6fd,packages/puppeteer/package.json,packages/puppeteer/package.json
+JSON,medium,puppeteer-puppeteer.git,a04852664202ca7c6d9bf49079edad7b9f6a7cb1,package.json,package.json
+JSON,medium,puppeteer-puppeteer.git,a63847d707db3b948267078bbaf44dbd87023d7e,test/CanaryTestExpectations.json,test/CanaryTestExpectations.json
+JSON,medium,puppeteer-puppeteer.git,b0aa4dd35da756d9f706b5efb49b745d27553c42,packages/puppeteer-core/package.json,packages/puppeteer-core/package.json
+JSON,medium,puppeteer-puppeteer.git,b163ce4593a8f014b86d67d53825fbeb679045ca,packages/puppeteer-core/package.json,packages/puppeteer-core/package.json
+JSON,medium,puppeteer-puppeteer.git,eee111bedbbf719ce27f356f4f5307646b13b0eb,packages/browsers/package.json,packages/browsers/package.json
+JSON,medium,puppeteer-puppeteer.git,eee111bedbbf719ce27f356f4f5307646b13b0eb,packages/puppeteer-core/package.json,packages/puppeteer-core/package.json
+JSON,medium,puppeteer-puppeteer.git,f0e14f0f5019fafb6cff80038bf10fb75a9de17e,packages/puppeteer-core/package.json,packages/puppeteer-core/package.json
+JSON,medium,puppeteer-puppeteer.git,fcb37e3b3a4f6b55b6f81a40811243260bcea16f,packages/puppeteer/package.json,packages/puppeteer/package.json
+JSON,medium,puppeteer-puppeteer.git,fcb37e3b3a4f6b55b6f81a40811243260bcea16f,website/versionsArchived.json,website/versionsArchived.json
+JSON,medium,redis-redis.git,b6ea0dd2a312dc7d2170324559df7d8ddeebcb81,src/commands/xcfgset.json,src/commands/xcfgset.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/config.json,apps/v4/public/r/config.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/alert.json,apps/v4/public/r/styles/base-lyra/alert.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/dialog.json,apps/v4/public/r/styles/base-lyra/dialog.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/input-otp.json,apps/v4/public/r/styles/base-lyra/input-otp.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/input.json,apps/v4/public/r/styles/base-lyra/input.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/pagination.json,apps/v4/public/r/styles/base-lyra/pagination.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/radio-group.json,apps/v4/public/r/styles/base-lyra/radio-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/resizable.json,apps/v4/public/r/styles/base-lyra/resizable.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/switch.json,apps/v4/public/r/styles/base-lyra/switch.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/tabs.json,apps/v4/public/r/styles/base-lyra/tabs.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/textarea.json,apps/v4/public/r/styles/base-lyra/textarea.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/badge.json,apps/v4/public/r/styles/base-maia/badge.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/carousel.json,apps/v4/public/r/styles/base-maia/carousel.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/dialog.json,apps/v4/public/r/styles/base-maia/dialog.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/input-group.json,apps/v4/public/r/styles/base-maia/input-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/radio-group-example.json,apps/v4/public/r/styles/base-maia/radio-group-example.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/radio-group.json,apps/v4/public/r/styles/base-maia/radio-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/table.json,apps/v4/public/r/styles/base-maia/table.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/tabs.json,apps/v4/public/r/styles/base-maia/tabs.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/accordion.json,apps/v4/public/r/styles/base-mira/accordion.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/alert-dialog.json,apps/v4/public/r/styles/base-mira/alert-dialog.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/navigation-menu.json,apps/v4/public/r/styles/base-mira/navigation-menu.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/popover.json,apps/v4/public/r/styles/base-mira/popover.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/scroll-area.json,apps/v4/public/r/styles/base-mira/scroll-area.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/select.json,apps/v4/public/r/styles/base-mira/select.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/switch.json,apps/v4/public/r/styles/base-mira/switch.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/tabs.json,apps/v4/public/r/styles/base-mira/tabs.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/toggle-group.json,apps/v4/public/r/styles/base-mira/toggle-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/tooltip.json,apps/v4/public/r/styles/base-mira/tooltip.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/avatar.json,apps/v4/public/r/styles/base-nova/avatar.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/input-group.json,apps/v4/public/r/styles/base-nova/input-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/input-otp.json,apps/v4/public/r/styles/base-nova/input-otp.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/item.json,apps/v4/public/r/styles/base-nova/item.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/native-select.json,apps/v4/public/r/styles/base-nova/native-select.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/navigation-menu.json,apps/v4/public/r/styles/base-nova/navigation-menu.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/pagination.json,apps/v4/public/r/styles/base-nova/pagination.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/radio-group-example.json,apps/v4/public/r/styles/base-nova/radio-group-example.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/table.json,apps/v4/public/r/styles/base-nova/table.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/tabs.json,apps/v4/public/r/styles/base-nova/tabs.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/accordion.json,apps/v4/public/r/styles/base-vega/accordion.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/alert-dialog.json,apps/v4/public/r/styles/base-vega/alert-dialog.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/alert.json,apps/v4/public/r/styles/base-vega/alert.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/breadcrumb.json,apps/v4/public/r/styles/base-vega/breadcrumb.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/item.json,apps/v4/public/r/styles/base-vega/item.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/progress.json,apps/v4/public/r/styles/base-vega/progress.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/alert.json,apps/v4/public/r/styles/radix-lyra/alert.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/breadcrumb.json,apps/v4/public/r/styles/radix-lyra/breadcrumb.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/command.json,apps/v4/public/r/styles/radix-lyra/command.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/hover-card.json,apps/v4/public/r/styles/radix-lyra/hover-card.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/input-group.json,apps/v4/public/r/styles/radix-lyra/input-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/input-otp.json,apps/v4/public/r/styles/radix-lyra/input-otp.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/item.json,apps/v4/public/r/styles/radix-lyra/item.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/native-select.json,apps/v4/public/r/styles/radix-lyra/native-select.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/card.json,apps/v4/public/r/styles/radix-maia/card.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/carousel.json,apps/v4/public/r/styles/radix-maia/carousel.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/item.json,apps/v4/public/r/styles/radix-maia/item.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/menubar.json,apps/v4/public/r/styles/radix-maia/menubar.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/sheet.json,apps/v4/public/r/styles/radix-maia/sheet.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/alert-dialog.json,apps/v4/public/r/styles/radix-mira/alert-dialog.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/badge.json,apps/v4/public/r/styles/radix-mira/badge.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/calendar.json,apps/v4/public/r/styles/radix-mira/calendar.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/input-otp.json,apps/v4/public/r/styles/radix-mira/input-otp.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/native-select.json,apps/v4/public/r/styles/radix-mira/native-select.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/popover.json,apps/v4/public/r/styles/radix-mira/popover.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/radio-group.json,apps/v4/public/r/styles/radix-mira/radio-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/textarea.json,apps/v4/public/r/styles/radix-mira/textarea.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/alert.json,apps/v4/public/r/styles/radix-nova/alert.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/avatar.json,apps/v4/public/r/styles/radix-nova/avatar.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/button-group.json,apps/v4/public/r/styles/radix-nova/button-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/empty.json,apps/v4/public/r/styles/radix-nova/empty.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/field.json,apps/v4/public/r/styles/radix-nova/field.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/hover-card.json,apps/v4/public/r/styles/radix-nova/hover-card.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/pagination.json,apps/v4/public/r/styles/radix-nova/pagination.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/progress.json,apps/v4/public/r/styles/radix-nova/progress.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/table.json,apps/v4/public/r/styles/radix-nova/table.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/toggle-group.json,apps/v4/public/r/styles/radix-nova/toggle-group.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/alert.json,apps/v4/public/r/styles/radix-vega/alert.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/badge.json,apps/v4/public/r/styles/radix-vega/badge.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/button.json,apps/v4/public/r/styles/radix-vega/button.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/calendar.json,apps/v4/public/r/styles/radix-vega/calendar.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/drawer.json,apps/v4/public/r/styles/radix-vega/drawer.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/input-otp.json,apps/v4/public/r/styles/radix-vega/input-otp.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/item.json,apps/v4/public/r/styles/radix-vega/item.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/progress.json,apps/v4/public/r/styles/radix-vega/progress.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/resizable.json,apps/v4/public/r/styles/radix-vega/resizable.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/sheet.json,apps/v4/public/r/styles/radix-vega/sheet.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/textarea.json,apps/v4/public/r/styles/radix-vega/textarea.json
+JSON,medium,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/toggle-group.json,apps/v4/public/r/styles/radix-vega/toggle-group.json
+JSON,medium,shadcn-ui-ui.git,6a75b60b4feb3dc03cfc86b335e3144b5a6fb7cb,apps/v4/public/r/styles/new-york-v4/form-tanstack-checkbox.json,apps/v4/public/r/styles/new-york-v4/form-tanstack-checkbox.json
+JSON,medium,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/public/r/styles/base-lyra/radio-group.json,apps/v4/public/r/styles/base-lyra/radio-group.json
+JSON,medium,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/public/r/styles/base-maia/radio-group.json,apps/v4/public/r/styles/base-maia/radio-group.json
+JSON,medium,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/public/r/styles/radix-lyra/radio-group.json,apps/v4/public/r/styles/radix-lyra/radio-group.json
+JSON,medium,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/public/r/styles/radix-maia/radio-group.json,apps/v4/public/r/styles/radix-maia/radio-group.json
+JSON,medium,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/public/r/styles/radix-nova/radio-group.json,apps/v4/public/r/styles/radix-nova/radio-group.json
+JSON,medium,shadcn-ui-ui.git,a22aec8694706300fa9f9cb49758f2488cf2d572,apps/v4/public/r/styles/new-york-v4/form-tanstack-checkbox.json,apps/v4/public/r/styles/new-york-v4/form-tanstack-checkbox.json
+JSON,medium,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/base-lyra/tooltip.json,apps/v4/public/r/styles/base-lyra/tooltip.json
+JSON,medium,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/base-maia/tooltip.json,apps/v4/public/r/styles/base-maia/tooltip.json
+JSON,medium,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/base-nova/tooltip.json,apps/v4/public/r/styles/base-nova/tooltip.json
+JSON,medium,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/new-york-v4/tooltip.json,apps/v4/public/r/styles/new-york-v4/tooltip.json
+JSON,medium,shadcn-ui-ui.git,c759f460d5543f8209bb799e2e53ea13dad5143b,apps/v4/public/r/styles/radix-nova/tooltip.json,apps/v4/public/r/styles/radix-nova/tooltip.json
+JSON,medium,tauri-apps-tauri.git,03514414d93c1f77409e4978a3e3cde7fc1c7498,packages/api/package.json,packages/api/package.json
+JSON,medium,tauri-apps-tauri.git,4408f72af66c4827799c7fad80e9d9a73a4973a6,packages/cli/package.json,packages/cli/package.json
+JSON,medium,tauri-apps-tauri.git,4794a6ba22ae8a587a7cb6c870a27fb6c9b1fcf8,packages/api/package.json,packages/api/package.json
+JSON,medium,tauri-apps-tauri.git,51a0d6d66d1a8c8366503dc2378aa8a28a8264e9,packages/api/package.json,packages/api/package.json
+JSON,medium,tauri-apps-tauri.git,8d67af37b6d3fc0aedaab58549b1bca5b34fda19,packages/cli/package.json,packages/cli/package.json
+JSON,medium,tauri-apps-tauri.git,9a53c84ec0a41ea1d784e02e13aa90b94a4c8a8e,packages/api/package.json,packages/api/package.json
+JSON,medium,tauri-apps-tauri.git,aa0bf8bd190d6705c9d19e2010a62c847a0fded5,packages/api/package.json,packages/api/package.json
+JSON,medium,tauri-apps-tauri.git,afdd288eab7d8473fd6ad2796571a24c4873a8db,packages/cli/package.json,packages/cli/package.json
+JSON,medium,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/create-next-app/package.json,packages/create-next-app/package.json
+JSON,medium,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/eslint-config-next/package.json,packages/eslint-config-next/package.json
+JSON,medium,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/next-swc/package.json,packages/next-swc/package.json
+JSON,medium,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/create-next-app/package.json,packages/create-next-app/package.json
+JSON,small,Homebrew-brew.git,c8e0f5250d7d37c58688d6d8518dfeb2e1a26605,.claude/settings.json,.claude/settings.json
+JSON,small,Homebrew-brew.git,c8e0f5250d7d37c58688d6d8518dfeb2e1a26605,.cursor/hooks.json,.cursor/hooks.json
+JSON,small,Lidarr-Lidarr.git,96328b8d957ed7816648e9d6358af06958c8507c,.devcontainer/devcontainer.json,.devcontainer/devcontainer.json
+JSON,small,Radarr-Radarr.git,2235823af313ea1f39fd1189b69a75fc5d380c41,.devcontainer/devcontainer.json,.devcontainer/devcontainer.json
+JSON,small,angular-angular.git,3bc095d508653982a48b337afd51bfedbbde1f87,packages/core/schematics/migrations.json,packages/core/schematics/migrations.json
+JSON,small,axios-axios.git,08b84b52d5835d0c7b81049c365c3d271ade8bff,bower.json,bower.json
+JSON,small,axios-axios.git,29f75425f0c9f73021f5eedc869c176e30e05fe7,bower.json,bower.json
+JSON,small,axios-axios.git,7108c8877f9dc05f7aba8beb2b9e522537f9a9a7,bower.json,bower.json
+JSON,small,axios-axios.git,9ead04d8abbcd53718dbc31b1250ea74300921c8,bower.json,bower.json
+JSON,small,axios-axios.git,ab06109b40e129e43096f9c75aaa21bc74ef9fc8,bower.json,bower.json
+JSON,small,axios-axios.git,ef3711d1b3a3c1eb4f11dc43e8db38e9c5342448,test/module/cjs/package.json,test/module/cjs/package.json
+JSON,small,axios-axios.git,ef3711d1b3a3c1eb4f11dc43e8db38e9c5342448,test/module/ts-require/package.json,test/module/ts-require/package.json
+JSON,small,axios-axios.git,ef3711d1b3a3c1eb4f11dc43e8db38e9c5342448,test/module/typings/esm/package.json,test/module/typings/esm/package.json
+JSON,small,cockroachdb-cockroach.git,9755e3cc63596e3570ab7cf3e6b3553d925080e9,build/packer/teamcity-agent-x86.json,build/packer/teamcity-agent-x86.json
+JSON,small,electron-electron.git,19d0c072d5cbf1247efc5b838ead7f123d6a36a7,npm/package.json,npm/package.json
+JSON,small,eslint-eslint.git,0bd54976080936ce080ee2552d504180105593b4,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,1d1ca45370c1ed3bab3d93e480fe9c22af0bb196,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,55122d6f971119607c85b0df8e62942171c939f7,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,84fb885d49ac810e79a9491276b4828b53d913e5,packages/js/package.json,packages/js/package.json
+JSON,small,eslint-eslint.git,85405a3aed9cd17f9de9d6c2c24d7729e3fd73c6,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,8f360ad6a7a743d33a83eed8973ee4a50731e55b,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,b4b3127f8542c599ce2dea804b6582ebc40c993d,packages/js/package.json,packages/js/package.json
+JSON,small,eslint-eslint.git,e5c281ffd038a3a7a3e5364db0b9378e0ad83020,docs/src/_data/versions.json,docs/src/_data/versions.json
+JSON,small,eslint-eslint.git,e80485fcd27196fa0b6f6b5c7ac8cf49ad4b079d,tools/typescript-eslint-parser/package.json,tools/typescript-eslint-parser/package.json
+JSON,small,eslint-eslint.git,efc5aef2f9a05f01d5cad53dcb91e7f2c575e295,packages/eslint-config-eslint/tsconfig.json,packages/eslint-config-eslint/tsconfig.json
+JSON,small,eslint-eslint.git,f3fbc2f60cbe2c718364feb8c3fc0452c0df3c56,packages/js/package.json,packages/js/package.json
+JSON,small,excalidraw-excalidraw.git,b5fc873323e16f181860a4e731c731b4e40badd1,packages/excalidraw/locales/percentages.json,packages/excalidraw/locales/percentages.json
+JSON,small,gorhill-uBlock.git,cd558406b3d42b675f42967180063320f5dbe292,dist/firefox/updates.json,dist/firefox/updates.json
+JSON,small,gorhill-uBlock.git,f1689a9ab30ae5aece3db6d7a67dbde90f6e69df,dist/firefox/updates.json,dist/firefox/updates.json
+JSON,small,jellyfin-jellyfin.git,5aad260767161fc4a134df270fac04e146cc6142,.config/dotnet-tools.json,.config/dotnet-tools.json
+JSON,small,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/config/showConfig/Show TSConfig with compileOnSave and more/tsconfig.json,tests/baselines/reference/config/showConfig/Show TSConfig with compileOnSave and more/tsconfig.json
+JSON,small,microsoft-TypeScript.git,95e3aaa90341b516e868bf2300b1da5d07103f1e,tests/baselines/reference/config/showConfig/Show TSConfig with compileOnSave and more/tsconfig.json,tests/baselines/reference/config/showConfig/Show TSConfig with compileOnSave and more/tsconfig.json
+JSON,small,microsoft-TypeScript.git,95e3aaa90341b516e868bf2300b1da5d07103f1e,tests/baselines/reference/config/showConfig/Show TSConfig with paths and more/tsconfig.json,tests/baselines/reference/config/showConfig/Show TSConfig with paths and more/tsconfig.json
+JSON,small,microsoft-TypeScript.git,95e3aaa90341b516e868bf2300b1da5d07103f1e,tests/baselines/reference/config/showConfig/Show TSConfig with transitively implied options/tsconfig.json,tests/baselines/reference/config/showConfig/Show TSConfig with transitively implied options/tsconfig.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderNoOutdir/amd/mapRootAbsolutePathModuleMultifolderNoOutdir.json,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderNoOutdir/amd/mapRootAbsolutePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderNoOutdir/node/mapRootAbsolutePathModuleMultifolderNoOutdir.json,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderNoOutdir/node/mapRootAbsolutePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderSpecifyOutputFile/node/mapRootAbsolutePathModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootAbsolutePathModuleMultifolderSpecifyOutputFile/node/mapRootAbsolutePathModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleSimpleNoOutdir/node/mapRootAbsolutePathModuleSimpleNoOutdir.json,tests/baselines/reference/project/mapRootAbsolutePathModuleSimpleNoOutdir/node/mapRootAbsolutePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory/amd/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory/amd/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderNoOutdir/amd/mapRootAbsolutePathModuleSubfolderNoOutdir.json,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderNoOutdir/amd/mapRootAbsolutePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderNoOutdir/node/mapRootAbsolutePathModuleSubfolderNoOutdir.json,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderNoOutdir/node/mapRootAbsolutePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile/node/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile/node/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderNoOutdir/amd/mapRootRelativePathModuleMultifolderNoOutdir.json,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderNoOutdir/amd/mapRootRelativePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderNoOutdir/node/mapRootRelativePathModuleMultifolderNoOutdir.json,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderNoOutdir/node/mapRootRelativePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputFile/amd/mapRootRelativePathModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputFile/amd/mapRootRelativePathModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputFile/node/mapRootRelativePathModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleMultifolderSpecifyOutputFile/node/mapRootRelativePathModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSimpleNoOutdir/amd/mapRootRelativePathModuleSimpleNoOutdir.json,tests/baselines/reference/project/mapRootRelativePathModuleSimpleNoOutdir/amd/mapRootRelativePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputDirectory/amd/mapRootRelativePathModuleSimpleSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputDirectory/amd/mapRootRelativePathModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputFile/amd/mapRootRelativePathModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputFile/amd/mapRootRelativePathModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputFile/node/mapRootRelativePathModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleSimpleSpecifyOutputFile/node/mapRootRelativePathModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderNoOutdir/amd/mapRootRelativePathModuleSubfolderNoOutdir.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderNoOutdir/amd/mapRootRelativePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderNoOutdir/node/mapRootRelativePathModuleSubfolderNoOutdir.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderNoOutdir/node/mapRootRelativePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory/amd/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory/amd/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory/node/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory/node/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile/amd/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile/amd/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile/node/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile/node/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleMultifolderNoOutdir/amd/maprootUrlModuleMultifolderNoOutdir.json,tests/baselines/reference/project/maprootUrlModuleMultifolderNoOutdir/amd/maprootUrlModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleMultifolderSpecifyOutputFile/node/maprootUrlModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/maprootUrlModuleMultifolderSpecifyOutputFile/node/maprootUrlModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSimpleNoOutdir/amd/maprootUrlModuleSimpleNoOutdir.json,tests/baselines/reference/project/maprootUrlModuleSimpleNoOutdir/amd/maprootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSimpleSpecifyOutputFile/amd/maprootUrlModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/maprootUrlModuleSimpleSpecifyOutputFile/amd/maprootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSimpleSpecifyOutputFile/node/maprootUrlModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/maprootUrlModuleSimpleSpecifyOutputFile/node/maprootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSubfolderNoOutdir/amd/maprootUrlModuleSubfolderNoOutdir.json,tests/baselines/reference/project/maprootUrlModuleSubfolderNoOutdir/amd/maprootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSubfolderSpecifyOutputDirectory/amd/maprootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlModuleSubfolderSpecifyOutputDirectory/amd/maprootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlModuleSubfolderSpecifyOutputDirectory/node/maprootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlModuleSubfolderSpecifyOutputDirectory/node/maprootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderNoOutdir/amd/maprootUrlsourcerootUrlModuleMultifolderNoOutdir.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderNoOutdir/amd/maprootUrlsourcerootUrlModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderNoOutdir/node/maprootUrlsourcerootUrlModuleMultifolderNoOutdir.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderNoOutdir/node/maprootUrlsourcerootUrlModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputFile/amd/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputFile/amd/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleNoOutdir/node/maprootUrlsourcerootUrlModuleSimpleNoOutdir.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleNoOutdir/node/maprootUrlsourcerootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory/amd/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory/amd/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory/node/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory/node/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir/amd/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir/amd/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir/node/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir/node/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory/amd/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory/amd/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory/node/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory/node/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile/amd/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile/amd/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleMultifolderNoOutdir/amd/outModuleMultifolderNoOutdir.json,tests/baselines/reference/project/outModuleMultifolderNoOutdir/amd/outModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleMultifolderNoOutdir/node/outModuleMultifolderNoOutdir.json,tests/baselines/reference/project/outModuleMultifolderNoOutdir/node/outModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleMultifolderSpecifyOutputDirectory/node/outModuleMultifolderSpecifyOutputDirectory.json,tests/baselines/reference/project/outModuleMultifolderSpecifyOutputDirectory/node/outModuleMultifolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleSimpleNoOutdir/amd/outModuleSimpleNoOutdir.json,tests/baselines/reference/project/outModuleSimpleNoOutdir/amd/outModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleSimpleSpecifyOutputFile/node/outModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/outModuleSimpleSpecifyOutputFile/node/outModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleSubfolderNoOutdir/amd/outModuleSubfolderNoOutdir.json,tests/baselines/reference/project/outModuleSubfolderNoOutdir/amd/outModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/outModuleSubfolderSpecifyOutputFile/node/outModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/outModuleSubfolderSpecifyOutputFile/node/outModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/relativeNested/amd/relativeNested.json,tests/baselines/reference/project/relativeNested/amd/relativeNested.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/relativeNested/node/relativeNested.json,tests/baselines/reference/project/relativeNested/node/relativeNested.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootAbsolutePathModuleMultifolderSpecifyOutputFile/node/sourceRootAbsolutePathModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootAbsolutePathModuleMultifolderSpecifyOutputFile/node/sourceRootAbsolutePathModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootAbsolutePathModuleSimpleNoOutdir/node/sourceRootAbsolutePathModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourceRootAbsolutePathModuleSimpleNoOutdir/node/sourceRootAbsolutePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootAbsolutePathModuleSimpleSpecifyOutputFile/amd/sourceRootAbsolutePathModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootAbsolutePathModuleSimpleSpecifyOutputFile/amd/sourceRootAbsolutePathModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootAbsolutePathModuleSubfolderNoOutdir/node/sourceRootAbsolutePathModuleSubfolderNoOutdir.json,tests/baselines/reference/project/sourceRootAbsolutePathModuleSubfolderNoOutdir/node/sourceRootAbsolutePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputFile/node/sourceRootRelativePathModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootRelativePathModuleMultifolderSpecifyOutputFile/node/sourceRootRelativePathModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleNoOutdir/amd/sourceRootRelativePathModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleNoOutdir/amd/sourceRootRelativePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleNoOutdir/node/sourceRootRelativePathModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleNoOutdir/node/sourceRootRelativePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleSpecifyOutputFile/node/sourceRootRelativePathModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootRelativePathModuleSimpleSpecifyOutputFile/node/sourceRootRelativePathModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory/amd/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory/amd/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory/node/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory/node/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputFile/amd/sourceRootRelativePathModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputFile/amd/sourceRootRelativePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputFile/node/sourceRootRelativePathModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourceRootRelativePathModuleSubfolderSpecifyOutputFile/node/sourceRootRelativePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleMultifolderNoOutdir/amd/sourcemapModuleMultifolderNoOutdir.json,tests/baselines/reference/project/sourcemapModuleMultifolderNoOutdir/amd/sourcemapModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleMultifolderNoOutdir/node/sourcemapModuleMultifolderNoOutdir.json,tests/baselines/reference/project/sourcemapModuleMultifolderNoOutdir/node/sourcemapModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleMultifolderSpecifyOutputFile/node/sourcemapModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcemapModuleMultifolderSpecifyOutputFile/node/sourcemapModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSimpleNoOutdir/amd/sourcemapModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourcemapModuleSimpleNoOutdir/amd/sourcemapModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSimpleSpecifyOutputFile/amd/sourcemapModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/sourcemapModuleSimpleSpecifyOutputFile/amd/sourcemapModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSimpleSpecifyOutputFile/node/sourcemapModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/sourcemapModuleSimpleSpecifyOutputFile/node/sourcemapModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSubfolderNoOutdir/amd/sourcemapModuleSubfolderNoOutdir.json,tests/baselines/reference/project/sourcemapModuleSubfolderNoOutdir/amd/sourcemapModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputDirectory/amd/sourcemapModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputDirectory/amd/sourcemapModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputFile/amd/sourcemapModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputFile/amd/sourcemapModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputFile/node/sourcemapModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcemapModuleSubfolderSpecifyOutputFile/node/sourcemapModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleMultifolderNoOutdir/amd/sourcerootUrlModuleMultifolderNoOutdir.json,tests/baselines/reference/project/sourcerootUrlModuleMultifolderNoOutdir/amd/sourcerootUrlModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleMultifolderSpecifyOutputFile/amd/sourcerootUrlModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcerootUrlModuleMultifolderSpecifyOutputFile/amd/sourcerootUrlModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleMultifolderSpecifyOutputFile/node/sourcerootUrlModuleMultifolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcerootUrlModuleMultifolderSpecifyOutputFile/node/sourcerootUrlModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSimpleNoOutdir/amd/sourcerootUrlModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourcerootUrlModuleSimpleNoOutdir/amd/sourcerootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSimpleNoOutdir/node/sourcerootUrlModuleSimpleNoOutdir.json,tests/baselines/reference/project/sourcerootUrlModuleSimpleNoOutdir/node/sourcerootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSimpleSpecifyOutputDirectory/amd/sourcerootUrlModuleSimpleSpecifyOutputDirectory.json,tests/baselines/reference/project/sourcerootUrlModuleSimpleSpecifyOutputDirectory/amd/sourcerootUrlModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSimpleSpecifyOutputFile/node/sourcerootUrlModuleSimpleSpecifyOutputFile.json,tests/baselines/reference/project/sourcerootUrlModuleSimpleSpecifyOutputFile/node/sourcerootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSubfolderNoOutdir/node/sourcerootUrlModuleSubfolderNoOutdir.json,tests/baselines/reference/project/sourcerootUrlModuleSubfolderNoOutdir/node/sourcerootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputDirectory/amd/sourcerootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputDirectory/amd/sourcerootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputDirectory/node/sourcerootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputDirectory/node/sourcerootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputFile/amd/sourcerootUrlModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputFile/amd/sourcerootUrlModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputFile/node/sourcerootUrlModuleSubfolderSpecifyOutputFile.json,tests/baselines/reference/project/sourcerootUrlModuleSubfolderSpecifyOutputFile/node/sourcerootUrlModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/baselines/reference/project/visibilityOfTypeUsedAcrossModules/node/visibilityOfTypeUsedAcrossModules.json,tests/baselines/reference/project/visibilityOfTypeUsedAcrossModules/node/visibilityOfTypeUsedAcrossModules.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootAbsolutePathModuleSimpleNoOutdir.json,tests/cases/project/mapRootAbsolutePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/mapRootAbsolutePathModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootAbsolutePathModuleSubfolderNoOutdir.json,tests/cases/project/mapRootAbsolutePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile.json,tests/cases/project/mapRootAbsolutePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootRelativePathModuleMultifolderNoOutdir.json,tests/cases/project/mapRootRelativePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootRelativePathModuleSimpleNoOutdir.json,tests/cases/project/mapRootRelativePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootRelativePathModuleSubfolderNoOutdir.json,tests/cases/project/mapRootRelativePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/mapRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json,tests/cases/project/mapRootRelativePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleMultifolderSpecifyOutputDirectory.json,tests/cases/project/maprootUrlModuleMultifolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleSimpleNoOutdir.json,tests/cases/project/maprootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleSimpleSpecifyOutputFile.json,tests/cases/project/maprootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleSubfolderNoOutdir.json,tests/cases/project/maprootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/maprootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlModuleSubfolderSpecifyOutputFile.json,tests/cases/project/maprootUrlModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputDirectory.json,tests/cases/project/maprootUrlsourcerootUrlModuleMultifolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleNoOutdir.json,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputFile.json,tests/cases/project/maprootUrlsourcerootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile.json,tests/cases/project/maprootUrlsourcerootUrlModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleMultifolderSpecifyOutputDirectory.json,tests/cases/project/outModuleMultifolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleMultifolderSpecifyOutputFile.json,tests/cases/project/outModuleMultifolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/outModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleSimpleSpecifyOutputFile.json,tests/cases/project/outModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/outModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/outModuleSubfolderSpecifyOutputFile.json,tests/cases/project/outModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootAbsolutePathModuleMultifolderNoOutdir.json,tests/cases/project/sourceRootAbsolutePathModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootAbsolutePathModuleSimpleNoOutdir.json,tests/cases/project/sourceRootAbsolutePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootAbsolutePathModuleSubfolderNoOutdir.json,tests/cases/project/sourceRootAbsolutePathModuleSubfolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootAbsolutePathModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/sourceRootAbsolutePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootAbsolutePathModuleSubfolderSpecifyOutputFile.json,tests/cases/project/sourceRootAbsolutePathModuleSubfolderSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootRelativePathModuleSimpleNoOutdir.json,tests/cases/project/sourceRootRelativePathModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootRelativePathModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/sourceRootRelativePathModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json,tests/cases/project/sourceRootRelativePathModuleSubfolderSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcemapModuleMultifolderNoOutdir.json,tests/cases/project/sourcemapModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcemapModuleSimpleNoOutdir.json,tests/cases/project/sourcemapModuleSimpleNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcemapModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/sourcemapModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcemapModuleSimpleSpecifyOutputFile.json,tests/cases/project/sourcemapModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcerootUrlModuleMultifolderNoOutdir.json,tests/cases/project/sourcerootUrlModuleMultifolderNoOutdir.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcerootUrlModuleSimpleSpecifyOutputDirectory.json,tests/cases/project/sourcerootUrlModuleSimpleSpecifyOutputDirectory.json
+JSON,small,microsoft-TypeScript.git,e6fac66a7225a1c5976025e6377a2a4b06b3b85a,tests/cases/project/sourcerootUrlModuleSimpleSpecifyOutputFile.json,tests/cases/project/sourcerootUrlModuleSimpleSpecifyOutputFile.json
+JSON,small,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/typeReferenceDirectives1.trace.json,tests/baselines/reference/typeReferenceDirectives1.trace.json
+JSON,small,microsoft-playwright.git,d3575225e40cdc8341a1f7728f837f4ae62ba113,packages/playwright-core/bundles/utils/package.json,packages/playwright-core/bundles/utils/package.json
+JSON,small,microsoft-terminal.git,c05cb107e5d792edde8f322525509f01975e53a7,dep/vcpkg-overlay-ports/fmt/vcpkg.json,dep/vcpkg-overlay-ports/fmt/vcpkg.json
+JSON,small,microsoft-vscode.git,77044e33d814b919dd9d4439bfa161c30c2be540,extensions/github-authentication/tsconfig.json,extensions/github-authentication/tsconfig.json
+JSON,small,mui-material-ui.git,1682b6cfea85951e503c9c2a812b7bbad8055af1,packages/api-docs-builder-core/package.json,packages/api-docs-builder-core/package.json
+JSON,small,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages-internal/docs-utils/package.json,packages-internal/docs-utils/package.json
+JSON,small,mui-material-ui.git,712bfa9c3d37f07da94b00953e5f677473eced4e,packages/mui-core-downloads-tracker/package.json,packages/mui-core-downloads-tracker/package.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-envinfo/package.json,packages/mui-envinfo/package.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-joy/tsconfig.build.json,packages/mui-joy/tsconfig.build.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-lab/tsconfig.build.json,packages/mui-lab/tsconfig.build.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-material-pigment-css/tsconfig.build.json,packages/mui-material-pigment-css/tsconfig.build.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-material/tsconfig.build.json,packages/mui-material/tsconfig.build.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-stylis-plugin-rtl/tsconfig.build.json,packages/mui-stylis-plugin-rtl/tsconfig.build.json
+JSON,small,mui-material-ui.git,89071b1d31e4a440579fb9299be9d43859ebb151,packages/mui-types/tsconfig.build.json,packages/mui-types/tsconfig.build.json
+JSON,small,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,examples/material-ui-nextjs/package.json,examples/material-ui-nextjs/package.json
+JSON,small,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,examples/material-ui-pigment-css-nextjs-ts/package.json,examples/material-ui-pigment-css-nextjs-ts/package.json
+JSON,small,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,examples/material-ui-react-router-ts/package.json,examples/material-ui-react-router-ts/package.json
+JSON,small,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,examples/material-ui-vite-ts/package.json,examples/material-ui-vite-ts/package.json
+JSON,small,mui-material-ui.git,c2f850655ee14d11f6ef35638bd3cd2332c683ec,packages-internal/docs-utils/package.json,packages-internal/docs-utils/package.json
+JSON,small,mui-material-ui.git,c8f05e11ce52f50e8b622312d439ea8337d84683,packages-internal/docs-utils/package.json,packages-internal/docs-utils/package.json
+JSON,small,mui-material-ui.git,c8f05e11ce52f50e8b622312d439ea8337d84683,packages/mui-core-downloads-tracker/package.json,packages/mui-core-downloads-tracker/package.json
+JSON,small,mui-material-ui.git,c8f05e11ce52f50e8b622312d439ea8337d84683,packages/mui-envinfo/package.json,packages/mui-envinfo/package.json
+JSON,small,mui-material-ui.git,e22f0452dbc1c53184d9982c20255a865bcda198,packages/mui-envinfo/test/package.json,packages/mui-envinfo/test/package.json
+JSON,small,nextcloud-server.git,be5dd03f9257e3d301f9d25e57b86e2ae92ee9d2,apps/user_picker/l10n/fr.json,apps/user_picker/l10n/fr.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/admin_audit/l10n/mn.json,apps/admin_audit/l10n/mn.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/cloud_federation_api/l10n/mn.json,apps/cloud_federation_api/l10n/mn.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/es_EC.json,apps/profile/l10n/es_EC.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/eu.json,apps/profile/l10n/eu.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/fa.json,apps/profile/l10n/fa.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/ja.json,apps/profile/l10n/ja.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/nb.json,apps/profile/l10n/nb.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/sw.json,apps/profile/l10n/sw.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/th.json,apps/profile/l10n/th.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/uz.json,apps/profile/l10n/uz.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/vi.json,apps/profile/l10n/vi.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,apps/profile/l10n/zh_CN.json,apps/profile/l10n/zh_CN.json
+JSON,small,nextcloud-server.git,e61f0074f02f67f6c5c25a6cbba06854a5111d24,lib/l10n/kab.json,lib/l10n/kab.json
+JSON,small,prettier-prettier.git,88ee8a5b3e5db04f012c18be28aec11ed23ba849,.vscode/settings.example.json,.vscode/settings.example.json
+JSON,small,prometheus-prometheus.git,decde0b3648ad9ececb868a8b7a3e298db0cbf4b,web/ui/package.json,web/ui/package.json
+JSON,small,puppeteer-puppeteer.git,49e01f4a19c34fdfd59141d6402768048fbfbaa8,tools/docgen/package.json,tools/docgen/package.json
+JSON,small,puppeteer-puppeteer.git,49e01f4a19c34fdfd59141d6402768048fbfbaa8,tools/doctest/package.json,tools/doctest/package.json
+JSON,small,puppeteer-puppeteer.git,5d820f2872cdec366fbf6069d03ebc094d8b97f2,.release-please-manifest.json,.release-please-manifest.json
+JSON,small,puppeteer-puppeteer.git,5dc0f3c7e67da8d4f965795dd2bd64396e00d6fd,website/versions.json,website/versions.json
+JSON,small,puppeteer-puppeteer.git,733158b80c0a79bca4edd0c27c92eaca59c4db49,examples/puppeteer-in-browser/package.json,examples/puppeteer-in-browser/package.json
+JSON,small,puppeteer-puppeteer.git,a04852664202ca7c6d9bf49079edad7b9f6a7cb1,tools/docgen/package.json,tools/docgen/package.json
+JSON,small,puppeteer-puppeteer.git,b163ce4593a8f014b86d67d53825fbeb679045ca,website/versions.json,website/versions.json
+JSON,small,puppeteer-puppeteer.git,c5fdc0c57ddc736439ed8f20a2ccc24647a896ff,.release-please-manifest.json,.release-please-manifest.json
+JSON,small,puppeteer-puppeteer.git,c5fdc0c57ddc736439ed8f20a2ccc24647a896ff,website/versions.json,website/versions.json
+JSON,small,puppeteer-puppeteer.git,eee111bedbbf719ce27f356f4f5307646b13b0eb,.release-please-manifest.json,.release-please-manifest.json
+JSON,small,puppeteer-puppeteer.git,eee111bedbbf719ce27f356f4f5307646b13b0eb,website/versions.json,website/versions.json
+JSON,small,puppeteer-puppeteer.git,f09b945e5f6259967a914e5ba4a25c95f4483fe7,tools/doctest/package.json,tools/doctest/package.json
+JSON,small,puppeteer-puppeteer.git,fcb37e3b3a4f6b55b6f81a40811243260bcea16f,website/versions.json,website/versions.json
+JSON,small,redis-redis.git,b5a37c0e4241b087e4dcefc6f951335257c90cbf,src/commands/hotkeys-stop.json,src/commands/hotkeys-stop.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-lyra/label.json,apps/v4/public/r/styles/base-lyra/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-maia/label.json,apps/v4/public/r/styles/base-maia/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-mira/label.json,apps/v4/public/r/styles/base-mira/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/label.json,apps/v4/public/r/styles/base-nova/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-nova/skeleton.json,apps/v4/public/r/styles/base-nova/skeleton.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/base-vega/label.json,apps/v4/public/r/styles/base-vega/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-lyra/label.json,apps/v4/public/r/styles/radix-lyra/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/label.json,apps/v4/public/r/styles/radix-maia/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-maia/skeleton.json,apps/v4/public/r/styles/radix-maia/skeleton.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-mira/label.json,apps/v4/public/r/styles/radix-mira/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-nova/label.json,apps/v4/public/r/styles/radix-nova/label.json
+JSON,small,shadcn-ui-ui.git,0008c487e920a2c4effc3d6c1941458ee152b730,apps/v4/public/r/styles/radix-vega/skeleton.json,apps/v4/public/r/styles/radix-vega/skeleton.json
+JSON,small,shadcn-ui-ui.git,f235a5d951b631b4c2a202622482489b5c217ae2,apps/v4/public/r/styles/new-york-v4/index.json,apps/v4/public/r/styles/new-york-v4/index.json
+JSON,small,shadcn-ui-ui.git,f235a5d951b631b4c2a202622482489b5c217ae2,apps/v4/public/r/styles/new-york-v4/style.json,apps/v4/public/r/styles/new-york-v4/style.json
+JSON,small,tauri-apps-tauri.git,731dd5bfdc62505c904bf8e7262bb5c1428b5a5a,crates/tests/acl/fixtures/capabilities/scope-extended/cap.json,crates/tests/acl/fixtures/capabilities/scope-extended/cap.json
+JSON,small,tauri-apps-tauri.git,7782c5525af206a49849764a0430254dc4e7b632,examples/api/package.json,examples/api/package.json
+JSON,small,tauri-apps-tauri.git,8d67af37b6d3fc0aedaab58549b1bca5b34fda19,crates/tauri-cli/metadata-v2.json,crates/tauri-cli/metadata-v2.json
+JSON,small,tauri-apps-tauri.git,c37368f339f04d6716888214d1ea3438651e5554,crates/tauri-cli/metadata-v2.json,crates/tauri-cli/metadata-v2.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,lerna.json,lerna.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/eslint-plugin-internal/package.json,packages/eslint-plugin-internal/package.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/eslint-plugin-next/package.json,packages/eslint-plugin-next/package.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/next-plugin-storybook/package.json,packages/next-plugin-storybook/package.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/next-polyfill-nomodule/package.json,packages/next-polyfill-nomodule/package.json
+JSON,small,vercel-next.js.git,2071a816f4040f54c27dc4373671c799ab3fe8d7,packages/next-rspack/package.json,packages/next-rspack/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,lerna.json,lerna.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/eslint-plugin-internal/package.json,packages/eslint-plugin-internal/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/eslint-plugin-next/package.json,packages/eslint-plugin-next/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-env/package.json,packages/next-env/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-mdx/package.json,packages/next-mdx/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-playwright/package.json,packages/next-playwright/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-polyfill-module/package.json,packages/next-polyfill-module/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-polyfill-nomodule/package.json,packages/next-polyfill-nomodule/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/next-rspack/package.json,packages/next-rspack/package.json
+JSON,small,vercel-next.js.git,39e8fb2a48d444105b9a8baa93a6e3112fe4fd22,packages/third-parties/package.json,packages/third-parties/package.json
+JSON,xlarge,Homebrew-brew.git,5652b8b4b124e87da0ade65642951761c50b8b20,Library/Homebrew/data/spdx/spdx_licenses.json,Library/Homebrew/data/spdx/spdx_licenses.json
+JSON,xlarge,Lidarr-Lidarr.git,3e2858439ff35b372d0af00bcea1b0a357572d26,src/Lidarr.Api.V1/openapi.json,src/Lidarr.Api.V1/openapi.json
+JSON,xlarge,Lidarr-Lidarr.git,bed907e720843a506f4cd0742962baf20096b2ea,src/Lidarr.Api.V1/openapi.json,src/Lidarr.Api.V1/openapi.json
+JSON,xlarge,OpenHands-OpenHands.git,402fa4742227180bd111cbdd4d70219c286ab443,frontend/package-lock.json,frontend/package-lock.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/el.json,src/NzbDrone.Core/Localization/Core/el.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/hu.json,src/NzbDrone.Core/Localization/Core/hu.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/tr.json,src/NzbDrone.Core/Localization/Core/tr.json
+JSON,xlarge,Radarr-Radarr.git,2dac2dd35bed9ae6ff56689fff64f5ff07a95dd5,src/NzbDrone.Core/Localization/Core/uk.json,src/NzbDrone.Core/Localization/Core/uk.json
+JSON,xlarge,Radarr-Radarr.git,308c58f7296f3f74670dd4b87745dbc3bdfe253e,src/NzbDrone.Core/Localization/Core/bg.json,src/NzbDrone.Core/Localization/Core/bg.json
+JSON,xlarge,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/ca.json,src/NzbDrone.Core/Localization/Core/ca.json
+JSON,xlarge,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/it.json,src/NzbDrone.Core/Localization/Core/it.json
+JSON,xlarge,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/ko.json,src/NzbDrone.Core/Localization/Core/ko.json
+JSON,xlarge,Radarr-Radarr.git,4d22bf1cebb48521db4ea57cfa1b894d6371eab4,src/NzbDrone.Core/Localization/Core/tr.json,src/NzbDrone.Core/Localization/Core/tr.json
+JSON,xlarge,Radarr-Radarr.git,81bbaf8946e7d540acd09856209928cd40f9dc93,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Radarr-Radarr.git,8b4288fa1869500652583334f6929e31e4ca5be3,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Radarr-Radarr.git,8bef9b4da790da54b43708716de8f481bfb1b61a,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Radarr-Radarr.git,9aa3061e8eca2c247ecd720ea2ccedee99a46f3c,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Radarr-Radarr.git,b6bad2398c8a1a0f7975f5d384d3dbafc971538b,src/NzbDrone.Core/Localization/Core/ca.json,src/NzbDrone.Core/Localization/Core/ca.json
+JSON,xlarge,Radarr-Radarr.git,b6bad2398c8a1a0f7975f5d384d3dbafc971538b,src/NzbDrone.Core/Localization/Core/th.json,src/NzbDrone.Core/Localization/Core/th.json
+JSON,xlarge,Radarr-Radarr.git,b6bad2398c8a1a0f7975f5d384d3dbafc971538b,src/NzbDrone.Core/Localization/Core/zh_CN.json,src/NzbDrone.Core/Localization/Core/zh_CN.json
+JSON,xlarge,Radarr-Radarr.git,c0d70485c3a9bfafc59c0bce1796f3fada7a97fc,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Radarr-Radarr.git,d93c1d7808c0197328dbe801807be778693570ba,src/Radarr.Api.V3/openapi.json,src/Radarr.Api.V3/openapi.json
+JSON,xlarge,Radarr-Radarr.git,e7bddaeeddb6b566c9911af98b60ee0ca2caa180,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Radarr-Radarr.git,f99162b8ee24d72db7037a49f0a2873011c43cb0,src/NzbDrone.Core/Localization/Core/es.json,src/NzbDrone.Core/Localization/Core/es.json
+JSON,xlarge,Radarr-Radarr.git,f99162b8ee24d72db7037a49f0a2873011c43cb0,src/NzbDrone.Core/Localization/Core/zh_CN.json,src/NzbDrone.Core/Localization/Core/zh_CN.json
+JSON,xlarge,Sonarr-Sonarr.git,0d521c078b516489c870fdd165bf5edc2051bad4,src/NzbDrone.Core/Localization/Core/zh_CN.json,src/NzbDrone.Core/Localization/Core/zh_CN.json
+JSON,xlarge,Sonarr-Sonarr.git,15fb99959781d7de17379593010da990f7366632,src/NzbDrone.Core/Localization/Core/pt_BR.json,src/NzbDrone.Core/Localization/Core/pt_BR.json
+JSON,xlarge,Sonarr-Sonarr.git,1839aa7907448da005819b377c0bc13977fe3009,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Sonarr-Sonarr.git,3977d8766cfa322f1c9cdbe8aaa87d33bc90df50,src/Sonarr.Api.V5/openapi.json,src/Sonarr.Api.V5/openapi.json
+JSON,xlarge,Sonarr-Sonarr.git,3e22ad59c3ebdc710a08cff990c21de59b08aef8,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Sonarr-Sonarr.git,3e8a85ad26ded2a65dd90a49dc2d20f331f06e79,src/NzbDrone.Core/Localization/Core/fi.json,src/NzbDrone.Core/Localization/Core/fi.json
+JSON,xlarge,Sonarr-Sonarr.git,3e8a85ad26ded2a65dd90a49dc2d20f331f06e79,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Sonarr-Sonarr.git,3f098c601b041bb4abace03d9123334fc37a4b64,src/NzbDrone.Core/Localization/Core/ca.json,src/NzbDrone.Core/Localization/Core/ca.json
+JSON,xlarge,Sonarr-Sonarr.git,3f098c601b041bb4abace03d9123334fc37a4b64,src/NzbDrone.Core/Localization/Core/es.json,src/NzbDrone.Core/Localization/Core/es.json
+JSON,xlarge,Sonarr-Sonarr.git,3f098c601b041bb4abace03d9123334fc37a4b64,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Sonarr-Sonarr.git,3f098c601b041bb4abace03d9123334fc37a4b64,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Sonarr-Sonarr.git,6a6639105ededc4d24ebc963bb8be4e677792a0d,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Sonarr-Sonarr.git,8b438c21975f58872c7a5044da4479b950e6c5f8,src/NzbDrone.Core/Localization/Core/ca.json,src/NzbDrone.Core/Localization/Core/ca.json
+JSON,xlarge,Sonarr-Sonarr.git,8b438c21975f58872c7a5044da4479b950e6c5f8,src/NzbDrone.Core/Localization/Core/fi.json,src/NzbDrone.Core/Localization/Core/fi.json
+JSON,xlarge,Sonarr-Sonarr.git,8b438c21975f58872c7a5044da4479b950e6c5f8,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Sonarr-Sonarr.git,8b438c21975f58872c7a5044da4479b950e6c5f8,src/NzbDrone.Core/Localization/Core/hu.json,src/NzbDrone.Core/Localization/Core/hu.json
+JSON,xlarge,Sonarr-Sonarr.git,8fa16e35425eefe705af951d57c27e8db4d64803,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/fr.json,src/NzbDrone.Core/Localization/Core/fr.json
+JSON,xlarge,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/hu.json,src/NzbDrone.Core/Localization/Core/hu.json
+JSON,xlarge,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/ru.json,src/NzbDrone.Core/Localization/Core/ru.json
+JSON,xlarge,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/uk.json,src/NzbDrone.Core/Localization/Core/uk.json
+JSON,xlarge,Sonarr-Sonarr.git,ac5b9b14eeb87b8c95db3ed1d43742fc1076c63d,src/NzbDrone.Core/Localization/Core/zh_CN.json,src/NzbDrone.Core/Localization/Core/zh_CN.json
+JSON,xlarge,Sonarr-Sonarr.git,cf593b1f5d1441a31cb74e5d3ee43a2b4aae21b7,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Sonarr-Sonarr.git,e20b4c4f5da8597a4f3bc5cf198ab82a447f2d15,src/NzbDrone.Core/Localization/Core/de.json,src/NzbDrone.Core/Localization/Core/de.json
+JSON,xlarge,Sonarr-Sonarr.git,e20b4c4f5da8597a4f3bc5cf198ab82a447f2d15,src/NzbDrone.Core/Localization/Core/en.json,src/NzbDrone.Core/Localization/Core/en.json
+JSON,xlarge,Sonarr-Sonarr.git,e20b4c4f5da8597a4f3bc5cf198ab82a447f2d15,src/NzbDrone.Core/Localization/Core/ko.json,src/NzbDrone.Core/Localization/Core/ko.json
+JSON,xlarge,Sonarr-Sonarr.git,e20b4c4f5da8597a4f3bc5cf198ab82a447f2d15,src/NzbDrone.Core/Localization/Core/pt_BR.json,src/NzbDrone.Core/Localization/Core/pt_BR.json
+JSON,xlarge,Sonarr-Sonarr.git,e20b4c4f5da8597a4f3bc5cf198ab82a447f2d15,src/NzbDrone.Core/Localization/Core/zh_CN.json,src/NzbDrone.Core/Localization/Core/zh_CN.json
+JSON,xlarge,apache-echarts.git,0b99fb0799ec31d6668a59c7fb4a7bf12d450554,package-lock.json,package-lock.json
+JSON,xlarge,apache-echarts.git,2e280ee8f551a6142b47d0ea3ca27a95c4a7d628,package-lock.json,package-lock.json
+JSON,xlarge,apache-echarts.git,79f355a89bb3df132d1cb966030ccd17b9e6601b,package-lock.json,package-lock.json
+JSON,xlarge,apache-echarts.git,c7cd5e4dd230d015a5de0cb889a9b36eec8b60fd,test/runTest/package-lock.json,test/runTest/package-lock.json
+JSON,xlarge,apache-echarts.git,ef67cbcce072bd7bcce20996fbec03bbc7f5f7dd,package-lock.json,package-lock.json
+JSON,xlarge,apache-superset.git,a849802a2b1898d90ea5e942d10ddb00acb1bbbe,superset-websocket/package-lock.json,superset-websocket/package-lock.json
+JSON,xlarge,axios-axios.git,f17a787026a2ab19bdf54feabb1252543aebc9ea,package-lock.json,package-lock.json
+JSON,xlarge,fatedier-frp.git,266c492b5d2af900176ea57beff4f1f0c98bafbb,web/frps/package-lock.json,web/frps/package-lock.json
+JSON,xlarge,fatedier-frp.git,9634fd99d1be11b08fa5524bacf30a95d58058af,web/frpc/package-lock.json,web/frpc/package-lock.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/de-DE/grafana.json,public/locales/de-DE/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/fr-FR/grafana.json,public/locales/fr-FR/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/hu-HU/grafana.json,public/locales/hu-HU/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/it-IT/grafana.json,public/locales/it-IT/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/ja-JP/grafana.json,public/locales/ja-JP/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/pt-BR/grafana.json,public/locales/pt-BR/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/sv-SE/grafana.json,public/locales/sv-SE/grafana.json
+JSON,xlarge,grafana-grafana.git,f50804c3ab73ea83d505f3907fc090a131349c05,public/locales/zh-Hans/grafana.json,public/locales/zh-Hans/grafana.json
+JSON,xlarge,kubernetes-kubernetes.git,aa1e24659ee18378426fa3b83616c7d96e098bbe,api/openapi-spec/v3/apis__batch__v1_openapi.json,api/openapi-spec/v3/apis__batch__v1_openapi.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Pokédex Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Pokédex Agent.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/lfx/tests/data/starter_projects_1_6_0/Invoice Summarizer.json,src/lfx/tests/data/starter_projects_1_6_0/Invoice Summarizer.json
+JSON,xlarge,langflow-ai-langflow.git,0283f5d7e1c56c06e5786128f4b034a3ab3b15e6,src/lfx/tests/data/starter_projects_1_6_0/Vector Store RAG.json,src/lfx/tests/data/starter_projects_1_6_0/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,07fa033c9213ebf6869d764f23ca9ea2a878c9a0,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json
+JSON,xlarge,langflow-ai-langflow.git,07fa033c9213ebf6869d764f23ca9ea2a878c9a0,src/frontend/package-lock.json,src/frontend/package-lock.json
+JSON,xlarge,langflow-ai-langflow.git,22607cc081976239ad6f3a708ec3e943458893c9,src/lfx/tests/data/starter_projects_1_6_0/Custom Component Generator.json,src/lfx/tests/data/starter_projects_1_6_0/Custom Component Generator.json
+JSON,xlarge,langflow-ai-langflow.git,2d67402b1dbaefcbce85a244d4a6cd5e4bda1cfe,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json
+JSON,xlarge,langflow-ai-langflow.git,2d67402b1dbaefcbce85a244d4a6cd5e4bda1cfe,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json
+JSON,xlarge,langflow-ai-langflow.git,2d67402b1dbaefcbce85a244d4a6cd5e4bda1cfe,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,2d67402b1dbaefcbce85a244d4a6cd5e4bda1cfe,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Market Research.json,src/backend/base/langflow/initial_setup/starter_projects/Market Research.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Price Deal Finder.json,src/backend/base/langflow/initial_setup/starter_projects/Price Deal Finder.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,2f4b7d6b2e8729e8c82b55c49c86426825deecd2,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Invoice Summarizer.json,src/backend/base/langflow/initial_setup/starter_projects/Invoice Summarizer.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Market Research.json,src/backend/base/langflow/initial_setup/starter_projects/Market Research.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Social Media Agent.json
+JSON,xlarge,langflow-ai-langflow.git,4063abdc36529fd5efa8a4d7dbca3b40a97929ba,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,47728f5816f77dba87f3c0490ea6fed0b35c0d45,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json
+JSON,xlarge,langflow-ai-langflow.git,52479fbe33728b05e5d2fe7b108673dd90ec0d7c,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,655aee4c0c0a43f22f24cb371d1aea81a90455e4,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json
+JSON,xlarge,langflow-ai-langflow.git,655aee4c0c0a43f22f24cb371d1aea81a90455e4,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,6f9de60dda0478048083b7603988a33ad54afd29,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,6f9de60dda0478048083b7603988a33ad54afd29,src/backend/base/langflow/initial_setup/starter_projects/News Aggregator.json,src/backend/base/langflow/initial_setup/starter_projects/News Aggregator.json
+JSON,xlarge,langflow-ai-langflow.git,6f9de60dda0478048083b7603988a33ad54afd29,src/backend/base/langflow/initial_setup/starter_projects/Sequential Tasks Agents.json,src/backend/base/langflow/initial_setup/starter_projects/Sequential Tasks Agents.json
+JSON,xlarge,langflow-ai-langflow.git,6f9de60dda0478048083b7603988a33ad54afd29,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json
+JSON,xlarge,langflow-ai-langflow.git,7be8a9ac47d406e0eadb724cd38dcebd4c01fe85,src/frontend/package-lock.json,src/frontend/package-lock.json
+JSON,xlarge,langflow-ai-langflow.git,7e148bcf565189fa11ed842b1db5cae7e74708ba,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Custom Component Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Custom Component Generator.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/News Aggregator.json,src/backend/base/langflow/initial_setup/starter_projects/News Aggregator.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Sequential Tasks Agents.json,src/backend/base/langflow/initial_setup/starter_projects/Sequential Tasks Agents.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json,src/backend/base/langflow/initial_setup/starter_projects/Travel Planning Agents.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,86078b23aeed42fae92688d49c13568521eb319c,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,a691fdb22db7ce523a697298e031f02eb9a794c3,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Blog Writer.json,src/backend/base/langflow/initial_setup/starter_projects/Blog Writer.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Custom Component Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Custom Component Generator.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json,src/backend/base/langflow/initial_setup/starter_projects/Document Q&A.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Text Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Twitter Thread Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Twitter Thread Generator.json
+JSON,xlarge,langflow-ai-langflow.git,ae00c031542fa7a4183b3a82813ddecb7b15096e,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Vector Store RAG.json
+JSON,xlarge,langflow-ai-langflow.git,cfb2a8eb1f57160aca750358bd198ae3f056830a,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,cfb2a8eb1f57160aca750358bd198ae3f056830a,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json
+JSON,xlarge,langflow-ai-langflow.git,cfb2a8eb1f57160aca750358bd198ae3f056830a,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Portfolio Website Code Generator.json
+JSON,xlarge,langflow-ai-langflow.git,cfb2a8eb1f57160aca750358bd198ae3f056830a,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json
+JSON,xlarge,langflow-ai-langflow.git,cfb2a8eb1f57160aca750358bd198ae3f056830a,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json,src/backend/base/langflow/initial_setup/starter_projects/Research Translation Loop.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Blog Writer.json,src/backend/base/langflow/initial_setup/starter_projects/Blog Writer.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json,src/backend/base/langflow/initial_setup/starter_projects/Hybrid Search RAG.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Image Sentiment Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json,src/backend/base/langflow/initial_setup/starter_projects/Instagram Copywriter.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Invoice Summarizer.json,src/backend/base/langflow/initial_setup/starter_projects/Invoice Summarizer.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json,src/backend/base/langflow/initial_setup/starter_projects/Meeting Summary.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json,src/backend/base/langflow/initial_setup/starter_projects/Nvidia Remix.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Pokédex Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Pokédex Agent.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Research Agent.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json,src/backend/base/langflow/initial_setup/starter_projects/Simple Agent.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Twitter Thread Generator.json,src/backend/base/langflow/initial_setup/starter_projects/Twitter Thread Generator.json
+JSON,xlarge,langflow-ai-langflow.git,e601eadf9b35e7f3f946bca8043939a0d5bcd4ff,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json,src/backend/base/langflow/initial_setup/starter_projects/Youtube Analysis.json
+JSON,xlarge,langflow-ai-langflow.git,e87870735974e3b7bde18aee86c4d496c2ff558b,docs/openapi/openapi.json,docs/openapi/openapi.json
+JSON,xlarge,louislam-uptime-kuma.git,1960aa67ed1b916cd1d7fea40463327bfaeb74be,src/lang/de-DE.json,src/lang/de-DE.json
+JSON,xlarge,louislam-uptime-kuma.git,315d2d1f33b4c39ce38e405878ddc02813861bda,src/lang/de-DE.json,src/lang/de-DE.json
+JSON,xlarge,louislam-uptime-kuma.git,49f2633c9babc70504435cb0a4b955c89be0bb09,package-lock.json,package-lock.json
+JSON,xlarge,louislam-uptime-kuma.git,4a2fe1e7e8df7c0136801d0250cf7c1307b58abb,src/lang/bg-BG.json,src/lang/bg-BG.json
+JSON,xlarge,louislam-uptime-kuma.git,7db3b587b88c3ca52b08136ffd41f999100968d7,package-lock.json,package-lock.json
+JSON,xlarge,louislam-uptime-kuma.git,83703a0085b5cebf50f6827ab7c0a6ef2e12798b,src/lang/de-DE.json,src/lang/de-DE.json
+JSON,xlarge,louislam-uptime-kuma.git,85573832fb44a57eb0e0ca7b42d6bf3c485d7ed1,src/lang/sk.json,src/lang/sk.json
+JSON,xlarge,louislam-uptime-kuma.git,ab1dc957afc5c2cd6f88283ea548a209181d1274,src/lang/de-DE.json,src/lang/de-DE.json
+JSON,xlarge,louislam-uptime-kuma.git,b18a4bfc92cc18051663b401d30c70e61f8b7ace,src/lang/fr-FR.json,src/lang/fr-FR.json
+JSON,xlarge,louislam-uptime-kuma.git,b4f72bf840db4d2cadab7c0503440ee75034d098,src/lang/fr-FR.json,src/lang/fr-FR.json
+JSON,xlarge,louislam-uptime-kuma.git,cddfffa6095064ce6040c1286f339346bda6a69d,package-lock.json,package-lock.json
+JSON,xlarge,louislam-uptime-kuma.git,e4cffb384b4cde82c6a235df7d62ea896f10b48e,package-lock.json,package-lock.json
+JSON,xlarge,louislam-uptime-kuma.git,ea8805728b63c2b24c2217d1965813d5bba1dca4,src/lang/bg-BG.json,src/lang/bg-BG.json
+JSON,xlarge,microsoft-TypeScript.git,0208948c95817bd7491111b40d6cf05013b21c4a,src/compiler/diagnosticMessages.json,src/compiler/diagnosticMessages.json
+JSON,xlarge,microsoft-TypeScript.git,0c801e6efb80ee590785272ac0840bba1b485df5,package-lock.json,package-lock.json
+JSON,xlarge,microsoft-TypeScript.git,16b933fb7bff04371fe9ec8525a8e90afa3174d4,src/compiler/diagnosticMessages.json,src/compiler/diagnosticMessages.json
+JSON,xlarge,microsoft-TypeScript.git,60e99ecee46767e9f37e6f60dd48b71cd45c099a,src/compiler/diagnosticMessages.json,src/compiler/diagnosticMessages.json
+JSON,xlarge,microsoft-TypeScript.git,669c25c091ad4d32298d0f33b0e4e681d46de3ea,src/compiler/diagnosticMessages.json,src/compiler/diagnosticMessages.json
+JSON,xlarge,microsoft-TypeScript.git,e018d8ca9eb002e5737b8bb8d6b63b82a5b05c38,tests/baselines/reference/libReplacement(libreplacement=true).trace.json,tests/baselines/reference/libReplacement(libreplacement=true).trace.json
+JSON,xlarge,microsoft-vscode.git,98ad6b67c2a79c2c1d75b99b89e48c7e2d57d6e0,package-lock.json,package-lock.json
+JSON,xlarge,mozilla-pdf.js.git,81479fe9420052e049ec3912cc32caca14abb98d,package-lock.json,package-lock.json
+JSON,xlarge,mozilla-pdf.js.git,8fa6ef36e4789d68df1b6f4b5183c1b9eeccaa3b,test/test_manifest.json,test/test_manifest.json
+JSON,xlarge,n8n-io-n8n.git,f7c36840fb112039ae54423c40f1976dc6cb1f19,packages/frontend/@n8n/i18n/src/locales/en.json,packages/frontend/@n8n/i18n/src/locales/en.json
+JSON,xlarge,nextcloud-server.git,00125882522dcc8d12986709ce6bf5cdef60b297,package-lock.json,package-lock.json
+JSON,xlarge,nextcloud-server.git,265ecc1c29aa0c17fc9f10a991fdd2f97270e559,build/frontend-legacy/package-lock.json,build/frontend-legacy/package-lock.json
+JSON,xlarge,nextcloud-server.git,343144118083cb909656fcd085550e5d94d85205,apps/settings/l10n/pt_BR.json,apps/settings/l10n/pt_BR.json
+JSON,xlarge,nextcloud-server.git,343144118083cb909656fcd085550e5d94d85205,apps/settings/l10n/tr.json,apps/settings/l10n/tr.json
+JSON,xlarge,nextcloud-server.git,bff343be2f3c55dbcd6b27a367063728497657d1,package-lock.json,package-lock.json
+JSON,xlarge,nextcloud-server.git,d758f64a18b14f20a1e5a4ff7dded92f579ddde0,apps/settings/l10n/gl.json,apps/settings/l10n/gl.json
+JSON,xlarge,nextcloud-server.git,d758f64a18b14f20a1e5a4ff7dded92f579ddde0,apps/settings/l10n/tr.json,apps/settings/l10n/tr.json
+JSON,xlarge,open-webui-open-webui.git,7043751ca48d1ec412e7608ebe7188fd981684cc,src/lib/i18n/locales/zh-TW/translation.json,src/lib/i18n/locales/zh-TW/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ar/translation.json,src/lib/i18n/locales/ar/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/bg-BG/translation.json,src/lib/i18n/locales/bg-BG/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ca-ES/translation.json,src/lib/i18n/locales/ca-ES/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/de-DE/translation.json,src/lib/i18n/locales/de-DE/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/fi-FI/translation.json,src/lib/i18n/locales/fi-FI/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/fr-CA/translation.json,src/lib/i18n/locales/fr-CA/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ie-GA/translation.json,src/lib/i18n/locales/ie-GA/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ka-GE/translation.json,src/lib/i18n/locales/ka-GE/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/kab-DZ/translation.json,src/lib/i18n/locales/kab-DZ/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/lv-LV/translation.json,src/lib/i18n/locales/lv-LV/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ru-RU/translation.json,src/lib/i18n/locales/ru-RU/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/tr-TR/translation.json,src/lib/i18n/locales/tr-TR/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/uk-UA/translation.json,src/lib/i18n/locales/uk-UA/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/ur-PK/translation.json,src/lib/i18n/locales/ur-PK/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/vi-VN/translation.json,src/lib/i18n/locales/vi-VN/translation.json
+JSON,xlarge,open-webui-open-webui.git,9044abf3bb78eb6ce139102191b79b98cee654f1,src/lib/i18n/locales/zh-CN/translation.json,src/lib/i18n/locales/zh-CN/translation.json
+JSON,xlarge,prometheus-prometheus.git,decde0b3648ad9ececb868a8b7a3e298db0cbf4b,web/ui/package-lock.json,web/ui/package-lock.json
+JSON,xlarge,puppeteer-puppeteer.git,5a327991885ec17b5c9fa95bd4a3b321c1fa4200,website/package-lock.json,website/package-lock.json
+JSON,xlarge,puppeteer-puppeteer.git,905f1abbe3742e7610f48a8df3f8f2d61e2bdfd7,website/package-lock.json,website/package-lock.json
+JSON,xlarge,shadcn-ui-ui.git,082af1f82c765c482ab7b8b275d42f2abf14ef52,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,shadcn-ui-ui.git,3aa0f138693afd5322ee8eda99c68c887e93b223,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,shadcn-ui-ui.git,4069c3367122d25828c359d9532cc589a7104b3c,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,shadcn-ui-ui.git,474d461b1c269c662d0a3c2a364c0f5b0d13db95,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,shadcn-ui-ui.git,9c39e1ddc979b32e983d2b7d17296a093519d48a,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,shadcn-ui-ui.git,f235a5d951b631b4c2a202622482489b5c217ae2,apps/v4/public/r/styles/new-york-v4/registry.json,apps/v4/public/r/styles/new-york-v4/registry.json
+JSON,xlarge,shadcn-ui-ui.git,f6dc35c9a1c75271119807652e4cc96bba5f273b,apps/v4/registry/directory.json,apps/v4/registry/directory.json
+JSON,xlarge,sherlock-project-sherlock.git,0995d4d669616cdfe58dafcdf6ea96c2bfa4105f,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,sherlock-project-sherlock.git,331b68d909578653eaa8e0445e3794cf0547c268,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,sherlock-project-sherlock.git,8c3e093561084cd7f0dceba49b1d93230fb57eec,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,sherlock-project-sherlock.git,906287b30565b1699d5f4c451397afd7f0c5f380,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,sherlock-project-sherlock.git,91c1964918d398718a90161205446f8c470615e5,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,sherlock-project-sherlock.git,e0002779b442dd025d854908589a20311dd13f6b,sherlock_project/resources/data.json,sherlock_project/resources/data.json
+JSON,xlarge,tauri-apps-tauri.git,0650852d147ae4ac427411c9f4cd5d7f4596b010,crates/tauri-cli/config.schema.json,crates/tauri-cli/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,0650852d147ae4ac427411c9f4cd5d7f4596b010,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,19ded696de4cff0e8d2413772fe760a8efa1d3e3,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,4408f72af66c4827799c7fad80e9d9a73a4973a6,crates/tauri-cli/config.schema.json,crates/tauri-cli/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,51f0fcb69cf969cbb5d47b3d92a914d897919ca0,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,8d67af37b6d3fc0aedaab58549b1bca5b34fda19,crates/tauri-cli/config.schema.json,crates/tauri-cli/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,8d67af37b6d3fc0aedaab58549b1bca5b34fda19,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,c37368f339f04d6716888214d1ea3438651e5554,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,dcd1a6588948bf42d31ddab94109068605965337,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,tauri-apps-tauri.git,f2e0405dc2d8bae949de6bb5e479bbf3cde401b6,crates/tauri-schema-generator/schemas/config.schema.json,crates/tauri-schema-generator/schemas/config.schema.json
+JSON,xlarge,twbs-bootstrap.git,0458e76ec1e51c3b8edcecfeb43feea58143f36d,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,14672e570c370240ff751acfddbaab12ece82d37,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,21d19a9a6af9c9fe0c89a285530cb6fcb614c880,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,2acf59d89b7cb22707b3ed85932b37528b573cf1,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,380a1d738b221fecc964260add053997399be4d4,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,3b9a4167acf2a5d4e4b95fcafe2dd0459ef637a8,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,3ec3e20440295e71e472053fa0d7cb3810f4e001,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,6f4d51f6eaf31adadd2b2e5745f153ce4bb75d0c,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,8d9e3d122e07ae3d9e5c600dc638cf6de50090d1,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,a484f5a56f805a1fdcf1db8ddd3e9be0ce0df49d,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,c38c6cb6c208c9d0ea26db9a558510a49322b312,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,c5776857089d117763dce31652ab4ce08e2fe300,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,cb79d4726af6eb7e7b67894b61dd0fd676aee721,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,cfe66330e85bc967914d9ee4bf2728aba38aaa18,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,ddb974aa4a9786a9320e76561e8d1b569b450053,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,ec7a45b8f3d3af80b891f8c385bb26f3afab4f8f,package-lock.json,package-lock.json
+JSON,xlarge,twbs-bootstrap.git,f29a71b1cf0e222d0b712b02bc6aa9a3aa4dee5e,package-lock.json,package-lock.json

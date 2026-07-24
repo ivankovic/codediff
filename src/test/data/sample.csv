@@ -29,7 +29,7 @@ CSS,WordPress-WordPress.git,db567e7f82022f0bfae34e83c52e2c12f11d6e46,wp-includes
 CSS,microsoft-playwright.git,5d5b28f782e17b2a74f208aa0d532a2e10e50651,packages/html-reporter/src/testFileView.css,css-playwright-add-class-selector
 CSS,mozilla-firefox-firefox.git,4305a8c706562bebf669267f5de8984053285fe4,toolkit/themes/shared/global-shared.css,
 CSS,shadcn-ui-ui.git,b75796ed76882f30aa86da90c71fbad14a10ccd8,apps/v4/registry/styles/style-maia.css,
-CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,
+CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,csharp-lidarr-add-function
 CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs,
 CSharp,Lidarr-Lidarr.git,a4af75b60cdc531c2280d994a1ef1141bb7c830e,src/Lidarr.Api.V1/Calendar/CalendarController.cs,
 CSharp,Lidarr-Lidarr.git,fb75b28cb18b4a00db7fbd5fdae2266ac999cc30,src/NzbDrone.Core/HealthCheck/Checks/UpdateCheck.cs,
