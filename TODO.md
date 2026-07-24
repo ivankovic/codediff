@@ -1,5 +1,78 @@
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 
+## Locality tie-break in `solve_moved_subtrees` - tried 2026-07-22, reverted, zero effect; plus a cost-comparison analysis of the 800-mismatch corpus
+
+Follow-up to the 2026-07-22 session that landed 7 fixes (919 -> 800 mismatches, commit `d74667a`).
+Investigated whether a locality-based tie-break (`preorder_index`/`start_byte` proximity) could
+close more of the gap, motivated by a design discussion about fitting the cost function so the
+human-authored mapping is provably optimal (structured/margin-based learning framing).
+
+**First considered**: adding a small positional tie-break term directly inside
+`apted::common::UnitCostModel::ren`. Ruled out before writing it, once the actual blast radius was
+mapped: `COST_INSERT`/`COST_DELETE`/`COST_UPDATE` are read directly (not just via `ren`) by ~20
+existing tests that hardcode exact expected costs, so any rescale to make integer headroom for a
+tie-break would require updating all of them - and worse, the bugs motivating this (APTED
+preferring a byte-identical-but-distant node over the correct nearby one) live entirely in `ren`'s
+*0-cost* tiers (`Identical` leaf match, same-kind internal match). Those tiers must stay exactly 0
+- a subtree can legitimately relocate to a very different absolute file position and still be
+100% correctly "the same code, just moved" (that's what `COST_MOVE = 0` encodes, and what many
+tests assert: `test_rust_add_if`'s `assert_eq!(mapping.cost, 23)` relies on the entire reused
+if/else costing exactly 0 despite moving one level deeper). A pointwise cost function can't tell
+"legitimately relocated" apart from "coincidentally identical to something unrelated" - it only
+ever sees one candidate pair at a time, never the competing alternatives. Any tie-break large
+enough to matter would make legitimate whole-subtree moves stop costing 0.
+
+**Pivoted to**: `hash_tree_matching.rs` already establishes exactly this tie-break pattern at every
+one of its candidate-selection sites (`solve_with_hash_map`, both tiers of
+`pair_children_for_descent`) - `min_by_key` on `start_byte().abs_diff(source.start_byte())` among
+same-hash candidates. `solve_moved_subtrees.rs` was the odd one out: its candidate sort broke ties
+by absolute earliest-in-file position (`sort_unstable_by_key(|a| ... start_byte())`), not proximity
+to the deleted node's own position - inconsistent with the established convention and a plausible
+match for the "byte-identical-elsewhere preferred" failure mode. Changed it to
+`start_byte().abs_diff(b_start_byte)`, matching the sibling sites exactly.
+
+Validated: full `cargo test --lib` (356/356 passed), full `benchmark_optimal_solutions` with a
+proper per-fixture CSV comparison (not just aggregate - see `TODO.md`'s standing lesson about
+that). Result: **zero effect**, at every level - aggregate 800 -> 800, 0 fixtures improved, 0
+regressed, and the total count of `Moved`-reason mappings across the *entire* corpus was identical
+before/after (236 -> 236). Root cause: `solve_moved_subtrees`'s existing container-identity-
+agreement filter (outermost unmapped reference-node kind must match) already narrows candidates to
+at most one survivor in every case in this corpus - the ambiguity this tie-break targets never
+actually arises here. Also corrected a stale claim: `cpp-ladybird-refactor-variables-if-changes`'s
+109 mismatches are `APTED:final_pass`/`APTED:greedy_anchor_block`-attributed, not `Moved` - it was
+never `solve_moved_subtrees`'s doing. Reverted cleanly (`git checkout -- src/diff/solve_moved_
+subtrees.rs`, confirmed clean via `git status`). The fix is still *correct* (consistency with the
+established tie-break convention, zero risk) - just not reachable on this corpus. Worth re-applying
+if a future corpus fixture actually exercises the ambiguity.
+
+**Cost-comparison analysis** (the more useful output of this round): asked whether the human
+ground-truth mapping is itself always "correct," given APTED finds a provably cost-optimal mapping
+under whatever cost model it's given - if the human's mapping isn't the unique optimum, a
+"mismatch" may just be a different, equally-valid tie-break rather than a codediff defect. Checked
+this directly using `benchmark_optimal_solutions --csv`'s `algorithm_cost`/`human_cost`/`cost_diff`
+columns (mirrors `UnitCostModel`'s costs via `cost.rs::operation_cost`, independent of the tie-break
+work above) across all 26 mismatched fixtures (800 total mismatches):
+
+- **320 mismatches (40%), concentrated in 4-6 fixtures** - codediff's mapping costs *the same or
+  less* than the human's own, e.g. `cpp-ladybird-refactor-variables-if-changes` (algo 660 vs. human
+  711), `kotlin-refactor-function` (100 vs. 162), `kotlin-remove-function` (168 vs. 225), `cpp-
+  laydbird-change-function-signature` (174 vs. 192). For these, the human's answer is demonstrably
+  *not* the unique cost-optimal mapping - a cheaper or equal alternative provably exists (codediff
+  found it). Calling these "wrong" is questionable; they may be legitimate alternative optima the
+  human just didn't happen to pick.
+- **480 mismatches (60%), across 20 fixtures** - codediff's mapping is *strictly more expensive*
+  than the human's, even by the algorithm's own yardstick, e.g. `csharp-jellyfin-add-function` (209
+  vs. 117), `c-postgres-real-logic-change` (484 vs. 49), `rust-turbopack-module-rule` (601 vs. 424).
+  This is the more actionable bucket: if a strictly cheaper alternative demonstrably exists (the
+  human's), codediff isn't finding *its own* optimum, let alone the human's - which traces back to
+  the pipeline's architecture, not a cost-model tie-break. Earlier greedy phases (hash descent,
+  bottom-up expansion, syntax-named matching) commit matches before the true-optimal APTED
+  (`final_pass`) ever sees the residual, so the overall pipeline result is not globally
+  cost-optimal even though each individual phase is locally sound. This is where real, provable
+  headroom remains; the 40% bucket above may be an irreducible floor unless the cost model is
+  taught the human's specific tie-break preference (which is exactly the harder problem the ruled-
+  out `ren` approach ran into).
+
 ## `final_pass` forced-root-pairing cost gate - tried 2026-07-18, reverted, net-negative
 
 Follow-up investigation after the phase 4 expansion candidates above: examined the top-6

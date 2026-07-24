@@ -58,4 +58,4 @@ Loaded 59 sampled pairs
 [57/59] mastodon-mastodon.git@2a4b205c app/services/revoke_collection_item_service.rb (ok=54 skipped_too_large=3 timed_out=0 panicked=0 failed_to_read=0)
 [58/59] mastodon-mastodon.git@664efcf4 spec/controllers/concerns/settings/export_controller_concern_spec.rb (ok=55 skipped_too_large=3 timed_out=0 panicked=0 failed_to_read=0)
 [59/59] mastodon-mastodon.git@d9db4779 app/services/delete_collection_item_service.rb (ok=56 skipped_too_large=3 timed_out=0 panicked=0 failed_to_read=0)
-Measured 59 pairs into "/home/m/src/codediff/research/results/benchmark_ruby.csv": ok=56 skipped_too_large=3 timed_out=0 panicked=0 failed_to_read=0
+Measured 59 pairs into "/home/marko/src/codediff/research/results/benchmark_ruby.csv": ok=56 skipped_too_large=3 timed_out=0 panicked=0 failed_to_read=0

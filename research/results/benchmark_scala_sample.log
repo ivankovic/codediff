@@ -99,4 +99,4 @@ Scanning twbs-bootstrap.git... done
 Scanning vercel-next.js.git... done
 Scanning ytdl-org-youtube-dl.git... done
 Scanning zed-industries-zed.git... done
-Sampled 0 pairs across 0 languages into "/home/m/src/codediff/research/sampled_code_pairs_scala.csv"
+Sampled 0 pairs across 0 languages into "/home/marko/src/codediff/research/sampled_code_pairs_scala.csv"

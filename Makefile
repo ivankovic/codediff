@@ -42,9 +42,10 @@ benchmark-sampled:
 	@echo "Running analysis..."
 	cd research && uv run ./analysis/benchmark_report.py
 
-# Benchmark with extended language set (14 languages) and higher node limit
+# Benchmark with extended language set (every language with a tree-sitter grammar - see
+# ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit
 benchmark-sampled-extended:
-	@echo "Running extended benchmarks for all supported languages (14 langs)..."
+	@echo "Running extended benchmarks for all supported languages..."
 	@echo "Results will be written to research/results/"
 	@echo "Using 20000 node limit, max 100 commits per repo"
 	cd research && ./measure/benchmark_all_extended.sh \

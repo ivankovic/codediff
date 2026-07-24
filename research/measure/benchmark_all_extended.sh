@@ -29,8 +29,10 @@
 #
 # Options:
 #   --language LANG       Language or 'all' (default: all)
-#                       Supported: Rust, Python, Go, Kotlin, Java, JavaScript, 
-#                       TypeScript, C, CPP, Ruby, PHP, Swift, Scala, Lua
+#                       Supported: every language with a tree-sitter grammar wired into
+#                       code/language.rs's to_treesitter (see ALL_LANGUAGES below) - Rust, Python,
+#                       Go, Kotlin, Java, JavaScript, TypeScript, TSX, C, CPP, CSharp, Ruby, PHP,
+#                       Swift, Scala, LUA, CSS, HTML, JSON, R, ShellScript, Vimscript, XML, YAML
 #   --limit N             Max combined AST nodes to attempt (default: 20000)
 #   --count N             Pairs to sample when no sample file exists (default: 1000)
 #   --repos-dir DIR       Root of checked-out git repositories
@@ -86,7 +88,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── supported languages ──────────────────────────────────────────────────────
-ALL_LANGUAGES=("Rust" "Python" "Go" "Kotlin" "Java" "JavaScript" "TypeScript" "C" "CPP" "Ruby" "PHP" "Swift" "Scala" "Lua")
+# Every language `code/language.rs`'s `to_treesitter` maps to a real grammar - i.e. every language
+# `sample_code_pairs`/`benchmark_diff_pairs` can actually produce a parsed AST (and therefore a
+# real diff_code timing) for. Language names must match `Language`'s Debug/Display name exactly
+# (sample_code_pairs filters with a plain string comparison against it, case-sensitively) - this
+# previously listed "Lua" instead of "LUA", which silently sampled 0 pairs every run (confirmed via
+# results/benchmark_lua_sample.log: "Sampled 0 pairs" despite ~1700 .lua files across the sampled
+# repos). CSS, CSharp, HTML, JSON, R, ShellScript, TSX, Vimscript, XML, and YAML were simply never
+# added even though they've had grammars all along - added here for full coverage. Bazel, Dart,
+# MarkDown, ProtoBuf, and SQL are deliberately excluded: `to_treesitter` has no grammar for them
+# (they fall through to its `_ => None` arm), so they'd never produce anything to benchmark.
+ALL_LANGUAGES=("Rust" "Python" "Go" "Kotlin" "Java" "JavaScript" "TypeScript" "TSX" "C" "CPP" "CSharp" "Ruby" "PHP" "Swift" "Scala" "LUA" "CSS" "HTML" "JSON" "R" "ShellScript" "Vimscript" "XML" "YAML")
 
 # ── resolve language list ────────────────────────────────────────────────────
 if [[ "$LANGUAGE" == "all" ]]; then

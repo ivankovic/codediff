@@ -49,6 +49,16 @@ LANG_META = {
     "swift":       ("Swift",       "#FA7343"),
     "scala":       ("Scala",       "#DC322F"),
     "lua":         ("Lua",         "#000080"),
+    "tsx":         ("TSX",         "#3178C6"),
+    "csharp":      ("C#",          "#178600"),
+    "css":         ("CSS",         "#663399"),
+    "html":        ("HTML",        "#E34C26"),
+    "json":        ("JSON",        "#292929"),
+    "r":           ("R",           "#198CE7"),
+    "shellscript": ("Shell",       "#89E051"),
+    "vimscript":   ("Vim Script",  "#199F4B"),
+    "xml":         ("XML",         "#0060AC"),
+    "yaml":        ("YAML",        "#CB171E"),
 }
 
 

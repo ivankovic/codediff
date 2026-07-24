@@ -1,21 +1,50 @@
 language,size_bucket,repository,commit,path,bytes_before,bytes_after,ast_nodes_before,ast_nodes_after,status,elapsed_ms,peak_memory_bytes,total_allocated_bytes,mapping_operations
-Swift,large,immich-app-immich.git,a9666d2cef1913ccd065b13b919b1cd4f48f55b1,mobile/ios/Runner/Core/URLSessionManager.swift,10346,10302,2917,2908,ok,278.680613,7839154,5553920993,2917
+Swift,large,immich-app-immich.git,a9666d2cef1913ccd065b13b919b1cd4f48f55b1,mobile/ios/Runner/Core/URLSessionManager.swift,10346,10302,2917,2908,ok,249.54789,7839154,5553920993,2917
 Swift,large,nextcloud-desktop.git,b279a24892a619fb26821beff10041c1e225ea24,admin/osx/mac-crafter/Sources/Commands/Build.swift,19231,22929,4414,5090,timed_out,,,,
-Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,admin/osx/mac-crafter/Sources/Utils/Signer.swift,13313,13496,3066,3115,ok,57.293126,2528570,116658593,3115
-Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension.swift,27356,26482,5944,5710,ok,1772.744963,21278688,41232416150,5944
-Swift,large,nextcloud-ios.git,2182c197852415618729e5d3590ec5dd15b0a01a,iOSClient/AppDelegate.swift,24011,23805,5651,5601,ok,128.45891,4698532,1305006692,5651
-Swift,large,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/DownloadLimitUITests.swift,15906,16874,3943,485,ok,782.282408,78589796,129081408,4413
+Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,admin/osx/mac-crafter/Sources/Utils/Signer.swift,13313,13496,3066,3115,ok,46.221137000000006,2528570,116658593,3115
+Swift,large,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension.swift,27356,26482,5944,5710,ok,1235.197722,21278688,41232416150,5944
+Swift,large,nextcloud-ios.git,2182c197852415618729e5d3590ec5dd15b0a01a,iOSClient/AppDelegate.swift,24011,23805,5651,5601,ok,103.979157,4698532,1305006692,5651
+Swift,large,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/DownloadLimitUITests.swift,15906,16874,3943,485,ok,670.028099,78589796,129081408,4413
 Swift,large,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,iOSClient/Data/NCManageDatabase+Metadata.swift,52738,53210,14046,14048,skipped_too_large,,,,
-Swift,large,nextcloud-ios.git,375944f6ebeaa22ea01139ed38fee80954c6e745,iOSClient/AppDelegate.swift,23726,23805,5590,5601,ok,65.96046899999999,3623634,506494289,5601
-Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/Main/Collection Common/Cell/NCListCell.swift,20256,20255,5429,5429,ok,23.780936,1651648,4210380,5429
-Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/More/NCMore.swift,17826,17823,4355,4355,ok,20.447502999999998,1634464,4048364,4355
-Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/AppDelegate.swift,23805,24011,5601,5651,ok,109.060295,4696532,1147596236,5651
-Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/Data/NCManageDatabase+Account.swift,25329,25654,6524,6637,ok,30.112750000000002,1668704,5465075,6637
+Swift,large,nextcloud-ios.git,375944f6ebeaa22ea01139ed38fee80954c6e745,iOSClient/AppDelegate.swift,23726,23805,5590,5601,ok,57.538450999999995,3623634,506494289,5601
+Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/Main/Collection Common/Cell/NCListCell.swift,20256,20255,5429,5429,ok,19.521639,1651648,4210380,5429
+Swift,large,nextcloud-ios.git,42675138b915c2aa65d21d52415776e8ca838607,iOSClient/More/NCMore.swift,17826,17823,4355,4355,ok,17.674729,1634464,4048364,4355
+Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/AppDelegate.swift,23805,24011,5601,5651,ok,99.090484,4696532,1147596236,5651
+Swift,large,nextcloud-ios.git,8f924af42585045c6f3ea8b345f3b4d799b44b97,iOSClient/Data/NCManageDatabase+Account.swift,25329,25654,6524,6637,ok,25.516648,1668704,5465075,6637
 Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Data/NCManageDatabase+Metadata.swift,52409,52738,13944,14046,skipped_too_large,,,,
-Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCCellMain.swift,10725,10602,3463,3417,ok,130.69169,4165376,1775532598,3463
-Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCGridCell.swift,12266,12151,3096,3044,ok,127.58033199999998,3786576,668122134,3096
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCCellMain.swift,10725,10602,3463,3417,ok,115.973169,4165376,1775532598,3463
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCGridCell.swift,12266,12151,3096,3044,ok,111.14312199999999,3786576,668122134,3096
 Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCListCell.swift,20255,19981,5429,5325,timed_out,,,,
 Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Networking/NCNetworking+WebDAV.swift,44610,44502,10085,10045,skipped_too_large,,,,
-Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Networking/NCNetworkingProcess.swift,24460,25338,5540,5747,ok,3889.686799,27937642,67152562269,5747
-Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Select/NCSelect.swift,33567,33045,8941,8752,ok,340.67739600000004,9300010,2992943933,8947
-Swift,large,nextcloud-ios.git,9efbff8c1c13919a9c4c87bff62a4e817cc95e6d,iOSClient/Utility/NCUtility+Image.swift,20920,21086,6242,6250,ok,139.53738900000002,3942132,561657172,6254
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Networking/NCNetworkingProcess.swift,24460,25338,5540,5747,ok,2517.2912859999997,27937642,67152562269,5747
+Swift,large,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Select/NCSelect.swift,33567,33045,8941,8752,ok,291.124446,9300010,2992943933,8947
+Swift,large,nextcloud-ios.git,9efbff8c1c13919a9c4c87bff62a4e817cc95e6d,iOSClient/Utility/NCUtility+Image.swift,20920,21086,6242,6250,ok,107.050542,3942132,561657172,6254
+Swift,large,nextcloud-ios.git,d894f20be6fd14190c13668e320f12b0607d638d,iOSClient/NCGlobal.swift,19572,19626,3086,3097,timed_out,,,,
+Swift,large,nextcloud-ios.git,e1e5e537dadb3817b837f82de3aeb3185a336a9b,iOSClient/Share/Advanced/NCShareCells.swift,11159,11384,3023,3093,ok,117.827073,4947676,1528134484,3101
+Swift,large,nextcloud-ios.git,f52721a79402e2aa07a1e667fb17c1212ac7dc42,File Provider Extension/FileProviderEnumerator.swift,12548,12577,2893,2893,ok,10.348671,828736,2217932,2893
+Swift,large,nextcloud-ios.git,f52721a79402e2aa07a1e667fb17c1212ac7dc42,iOSClient/Main/Collection Common/Cell/NCListCell.swift,19981,19981,5325,5325,ok,20.771300999999998,1649984,4274828,5325
+Swift,large,swiftlang-swift.git,4b9cb8a32ece8b18b4aad1ada0d6423de1a1046d,test/Concurrency/Runtime/async_stream.swift,43136,17927,12842,5571,ok,1487.225556,28534238,24740022771,12842
+Swift,large,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Interop/Cxx/class/invalid-members/stdlib-containers-of-incomplete.swift,10627,10737,1462,1464,ok,3.928511,405840,1066980,1464
+Swift,large,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Reflection/typeref_lowering_packs.swift,22966,23058,318,320,ok,0.35775599999999996,121384,400032,320
+Swift,medium,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSFileProviderServicing.swift,1254,1222,245,241,ok,1.1091790000000001,131836,507776,245
+Swift,medium,nextcloud-desktop.git,c447fdbcb49011680602fc9eb2e55006c4aa20e2,shell_integration/MacOSX/NextcloudIntegration/FileProviderExt/FileProviderExtension+NSXPCListenerDelegate.swift,1519,1661,349,372,ok,58.964106,2093622,231375147,372
+Swift,medium,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/AssistantUITests.swift,4752,5058,1526,154,ok,71.58605899999999,10132108,17070744,1668
+Swift,medium,nextcloud-ios.git,306b400f2bc70cf398d2666f2770e3eee522b6d1,Tests/NextcloudUITests/AutoUploadUITests.swift,5393,5647,1190,128,ok,50.173569,6727768,11621386,1310
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,Share/NCShareExtension+DataSource.swift,9372,8854,2660,2471,ok,341.74437800000004,8393790,4092936679,2666
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Cell/NCRecommendationsCell.swift,4368,4367,939,939,ok,3.1225150000000004,406304,1005172,939
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Main/Collection Common/Section Header Footer/NCSectionFooter.swift,3034,4277,794,842,ok,55.627836,2710104,606550642,842
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashCellProtocol.swift,2956,2213,675,656,ok,2.034611,206128,574681,675
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashGridCell.swift,7637,6896,1524,1505,ok,6.369137,415344,1187841,1524
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/Cell/NCTrashListCell.swift,6227,5373,1238,1217,ok,4.210014,410688,1106839,1238
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+CollectionView.swift,8481,7743,2030,2011,ok,7.487673,814576,2016593,2030
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+Networking.swift,7715,7035,1858,1841,ok,7.140259,811840,1969651,1858
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash+SelectTabBarDelegate.swift,3079,2389,703,686,ok,2.274072,206608,577579,703
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrash.swift,8230,7384,1994,1973,ok,7.561458,813952,2010095,1994
+Swift,medium,nextcloud-ios.git,95df919491606a2d15f0070b7dc31298d2742f04,iOSClient/Trash/NCTrashSelectTabBar.swift,5519,4838,1416,1399,ok,12.674649,475006,1476895,1416
+Swift,medium,nextcloud-ios.git,d894f20be6fd14190c13668e320f12b0607d638d,iOSClient/Assistant/Chat/NCAssistantChatModel.swift,7310,7457,1797,1819,ok,131.739309,5287516,2622055088,1819
+Swift,medium,nextcloud-ios.git,ddf92256c03781d67a2b403222e9b0f56ba05e01,iOSClient/Main/Collection Common/Cell/UIView+BlurVibrancy.swift,4079,2530,733,390,ok,225.651294,6281282,3012124885,761
+Swift,medium,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/Reflection/typeref_decoding_packs.swift,6136,6228,158,160,ok,0.195803,61736,200744,160
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/Sema/strict_access_control.swift,1515,1519,152,152,ok,0.404532,51440,142724,152
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/attr/attr_inlinable_strict.swift,1509,1513,335,335,ok,0.8780049999999999,103264,268116,335
+Swift,medium,swiftlang-swift.git,9a25399f81f455c6f15dbad4cb3b61b1b4e5a8db,test/decl/protocol/conforms/access_corner_case_strict.swift,2987,2991,515,515,ok,1.4988359999999998,203936,539108,515
+Swift,small,swiftlang-swift.git,7eb94c9204c22ad4dcc2de6140c8d1ab3c007398,test/IRGen/availability_android.swift,719,665,46,46,ok,0.127606,13536,39324,46
