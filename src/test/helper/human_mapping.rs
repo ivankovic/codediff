@@ -39,7 +39,7 @@ use tree_sitter::Node;
 
 use crate::code::ASTMetadata;
 use crate::diff::cost::operation_cost;
-use crate::diff::{ASTDiff, ASTMappingOperation, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 use crate::test::helper::{node_for_path, path_for_node};
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
@@ -321,6 +321,61 @@ pub fn human_mapping_cost_for(name: &str, before: &crate::code::Code, after: &cr
         &before_metadata,
         &after_metadata,
     )
+}
+
+/// Builds a synthetic `ASTDiff` from `name`'s human mapping, resolving every entry's path(s)
+/// against a fresh parse of `before`/`after` and feeding them through `ASTDiff::add_mapping` -
+/// same shape as `human_mapping_cost`, but producing the full `ASTDiff` rather than just a total
+/// cost, so any machinery that only knows how to consume a real `ASTDiff` (e.g.
+/// `diff::text::TextDiff`) can treat the human-authored mapping exactly like codediff's own
+/// output. Used by `benchmark_other` to project the human mapping down to per-line labels via the
+/// same `TextDiff`/`line_operations` path codediff's own diff goes through, so the two are
+/// comparable on equal footing.
+///
+/// `cost`/`reason` on the resulting `ASTMapping`s are placeholders - nothing that consumes a
+/// synthetic diff built this way needs them, only `operation` and the node-id maps
+/// (`ASTDiff::mapping_for_node`, which `diff::text::ranges` walks, only reads `operation`).
+pub fn as_ast_diff(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<ASTDiff> {
+    let mapping = load(name)?;
+    let before_ast = before.ast.as_ref().context("Before code has no AST")?;
+    let after_ast = after.ast.as_ref().context("After code has no AST")?;
+    let before_root = before_ast.root_node();
+    let after_root = after_ast.root_node();
+
+    let mut diff = ASTDiff::default();
+    for entry in &mapping.entries {
+        let before_id = match &entry.before_path {
+            Some(path) => node_for_path(before_root, &path_refs(path))
+                .with_context(|| format!("resolving before_path {:?}", path))?
+                .id(),
+            None => 0,
+        };
+        let after_id = match &entry.after_path {
+            Some(path) => node_for_path(after_root, &path_refs(path))
+                .with_context(|| format!("resolving after_path {:?}", path))?
+                .id(),
+            None => 0,
+        };
+        let operation = match entry.operation {
+            HumanOperation::Identical => ASTMappingOperation::Identical,
+            HumanOperation::Update => ASTMappingOperation::Update,
+            HumanOperation::MatchButNotIdentical => ASTMappingOperation::MatchButNotIdentical,
+            HumanOperation::Delete => ASTMappingOperation::Delete,
+            HumanOperation::DeleteWithChildren => ASTMappingOperation::DeleteWithChildren,
+            HumanOperation::Insert => ASTMappingOperation::Insert,
+            HumanOperation::InsertWithChildren => ASTMappingOperation::InsertWithChildren,
+        };
+        diff.add_mapping(
+            before_id,
+            after_id,
+            ASTMapping {
+                cost: 0,
+                operation,
+                reason: ASTMappingReason::default(),
+            },
+        );
+    }
+    Ok(diff)
 }
 
 fn check_entry(

@@ -103,6 +103,14 @@ impl TextRange {
         self.start_row == 0 && self.start_column == 0 && self.end_row == 0 && self.end_column == 0
     }
 
+    /// Returns true if this range spans no text at all (`start == end`), regardless of position -
+    /// unlike [`Self::is_zero`], which only recognizes the `(0,0)-(0,0)` sentinel specifically.
+    /// Used to detect the symmetric insert/delete placeholder ranges `diff::text` emits for the
+    /// side with nothing to show.
+    pub fn is_empty(&self) -> bool {
+        self.start_row == self.end_row && self.start_column == self.end_column
+    }
+
     /// Create a new TextRange from a TreeSitter Range.
     ///
     /// TreeSitter ranges are already right-open, so no adjustment is needed.

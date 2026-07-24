@@ -107,11 +107,6 @@ fn background_for_operation(operation: &TextOperation, palette: &OverlayPalette)
     }
 }
 
-/// A range is a pure alignment marker (no real text on this side) when it has no width.
-pub fn is_empty_range(range: &TextRange) -> bool {
-    range.start_row == range.end_row && range.start_column == range.end_column
-}
-
 /// Build indices into `ranges`, sorted by source start position (end position as a secondary
 /// key, so a zero-width marker sharing a start with a real range sorts *before* it). This is
 /// what lets `range_at` binary search instead of scanning every range on every cursor move.
@@ -239,7 +234,7 @@ impl CodeViewerState {
             .range_order
             .iter()
             .map(|&i| &self.ranges[i])
-            .find(|range_match| !is_empty_range(&range_match.source));
+            .find(|range_match| !range_match.source.is_empty());
         let (row, col) = first_navigable
             .map(|range_match| {
                 (

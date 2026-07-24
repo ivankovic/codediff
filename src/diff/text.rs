@@ -388,12 +388,90 @@ pub enum TextOperation {
     Delete,
 }
 
+/// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
+/// (`TextDiff::all`).
+///
+/// Deliberately row-granular, not column-precise: a range's column bounds are only used to decide
+/// whether it's a zero-width placeholder, never to split a single line between two operations.
+/// `diff::text` ranges are whitespace-insensitive and can leave small gaps (e.g. leading
+/// indentation - see `python_leetcode_1_added_if_block_all_ranges` below), so lining up exact
+/// sub-line spans for a plain-text consumer would be fragile; whole-line coloring instead picks,
+/// for each row, the *most specific* operation among all the ranges that touch it (see the
+/// precedence comment below). Used by both `tui::headless` (its plain-text fallback renderer -
+/// the TUI itself stays column-precise) and `benchmark_other` (reducing any `ASTDiff` - codediff's
+/// own or a synthetic one built from a human mapping - to a per-line signal comparable against an
+/// external line-based tool like Unix `diff`).
+pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOperation> {
+    let mut ops = vec![TextOperation::Identical; line_count];
+    for rm in ranges {
+        let r = &rm.source;
+        if r.is_empty() {
+            // Zero-width placeholder: nothing on this side for this diff unit (see
+            // `TextRange`'s doc comment on symmetric insert/delete placeholders).
+            continue;
+        }
+        // `TextRange`'s convention: an end column of 0 already means "up to, not including, this
+        // row", so only a genuinely mid-row end column needs the extra +1.
+        let end_row = if r.end_column == 0 { r.end_row } else { r.end_row + 1 };
+        for row in r.start_row..end_row.min(line_count) {
+            // A row can legitimately be touched by more than one range (e.g. a changed token
+            // shares its row with the identical whitespace/punctuation around it). Whichever
+            // range for that row is *not* Identical wins, regardless of iteration order -
+            // otherwise an Identical range for the same row ordered after the real change would
+            // silently overwrite it back to plain, hiding the change entirely. Two non-Identical
+            // ranges touching the same row is not expected to happen in practice (ranges are
+            // built from a non-overlapping tree traversal, see `diff/text.rs`), so last-wins
+            // between two of those is an arbitrary but harmless tiebreak.
+            if rm.operation != TextOperation::Identical || ops[row] == TextOperation::Identical {
+                ops[row] = rm.operation.clone();
+            }
+        }
+    }
+    ops
+}
+
 #[cfg(test)]
 mod tests {
     use crate::test;
     use anyhow::Result;
 
     use super::*;
+
+    /// Regression guard: a real one-token change (e.g. renaming a call inside an otherwise
+    /// unchanged statement) can leave the same row covered by both an Update range (the token)
+    /// and an Identical range (the rest of the line/its surrounding punctuation). If the Identical
+    /// range for that row happens to come *after* the Update range in `ranges`' order, a naive
+    /// last-write-wins would silently overwrite the row back to `Identical`, hiding the change -
+    /// this is exactly what a real end-to-end smoke test against the built binary caught.
+    #[test]
+    fn line_operations_does_not_let_a_same_row_identical_range_hide_a_real_change() {
+        let ranges = vec![
+            RangeMatch {
+                source: TextRange::new(0, 4, 0, 12),
+                destination: TextRange::new(0, 4, 0, 12),
+                operation: TextOperation::Update,
+            },
+            // Ordered *after* the Update above on purpose - this is the ordering that triggered
+            // the bug.
+            RangeMatch {
+                source: TextRange::new(0, 12, 1, 0),
+                destination: TextRange::new(0, 12, 1, 0),
+                operation: TextOperation::Identical,
+            },
+        ];
+        assert_eq!(line_operations(&ranges, 1), vec![TextOperation::Update]);
+    }
+
+    #[test]
+    fn line_operations_treats_a_zero_width_range_as_a_placeholder_not_a_real_row() {
+        let ranges = vec![RangeMatch {
+            source: TextRange::new(1, 0, 1, 0),
+            destination: TextRange::new(1, 0, 2, 0),
+            operation: TextOperation::Delete,
+        }];
+        let ops = line_operations(&ranges, 3);
+        assert_eq!(ops, vec![TextOperation::Identical; 3]);
+    }
 
     #[test]
     fn no_change_all_ranges() -> Result<()> {

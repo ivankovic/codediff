@@ -26,10 +26,9 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::diff::text::{RangeMatch, TextOperation};
+use crate::diff::text::{RangeMatch, TextOperation, line_operations};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
-use crate::tui::widgets::code_viewer::is_empty_range;
 
 /// ANSI SGR color for each `TextOperation`, matching the TUI's own convention (see "Diff overlay
 /// and cursor model" in `SPECS.md`): insert green, delete red, move yellow, update magenta.
@@ -60,50 +59,10 @@ fn marker(operation: &TextOperation, side_is_before: bool) -> &'static str {
     }
 }
 
-/// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
-/// (`diff::text::TextDiff::all`).
-///
-/// Deliberately row-granular, not column-precise: a range's column bounds are only used to decide
-/// whether it's a zero-width placeholder, never to split a single line between two operations.
-/// `diff::text` ranges are whitespace-insensitive and can leave small gaps (e.g. leading
-/// indentation - see `python_leetcode_1_added_if_block_all_ranges` in `diff/text.rs`), so lining
-/// up exact sub-line spans for a plain-text renderer would be fragile; whole-line coloring instead
-/// picks, for each row, the *most specific* operation among all the ranges that touch it (see the
-/// precedence comment below). The TUI remains the column-precise view for anyone who needs that;
-/// this is a fallback for contexts where the TUI can't run at all, not a replacement for it.
-fn row_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOperation> {
-    let mut ops = vec![TextOperation::Identical; line_count];
-    for rm in ranges {
-        let r = &rm.source;
-        if is_empty_range(r) {
-            // Zero-width placeholder: nothing on this side for this diff unit (see
-            // `TextRange`'s doc comment on symmetric insert/delete placeholders).
-            continue;
-        }
-        // `TextRange`'s convention: an end column of 0 already means "up to, not including, this
-        // row", so only a genuinely mid-row end column needs the extra +1.
-        let end_row = if r.end_column == 0 { r.end_row } else { r.end_row + 1 };
-        for row in r.start_row..end_row.min(line_count) {
-            // A row can legitimately be touched by more than one range (e.g. a changed token
-            // shares its row with the identical whitespace/punctuation around it). Whichever
-            // range for that row is *not* Identical wins, regardless of iteration order -
-            // otherwise an Identical range for the same row ordered after the real change would
-            // silently overwrite it back to plain, hiding the change entirely. Two non-Identical
-            // ranges touching the same row is not expected to happen in practice (ranges are
-            // built from a non-overlapping tree traversal, see `diff/text.rs`), so last-wins
-            // between two of those is an arbitrary but harmless tiebreak.
-            if rm.operation != TextOperation::Identical || ops[row] == TextOperation::Identical {
-                ops[row] = rm.operation.clone();
-            }
-        }
-    }
-    ops
-}
-
 /// Renders one side (before or after) of a diff as colored, marker-prefixed lines.
 fn render_side(contents: &str, ranges: &[RangeMatch], side_is_before: bool, use_color: bool) -> String {
     let lines: Vec<&str> = contents.split('\n').collect();
-    let ops = row_operations(ranges, lines.len());
+    let ops = line_operations(ranges, lines.len());
 
     let mut out = String::new();
     for (line, operation) in lines.iter().zip(ops.iter()) {
@@ -122,8 +81,8 @@ fn render_side(contents: &str, ranges: &[RangeMatch], side_is_before: bool, use_
 
 /// Renders a full diff session as plain text: the "before" side (deletions/updates/moves
 /// highlighted), then the "after" side (insertions/updates/moves highlighted). See
-/// `row_operations`'s doc comment for why this is row-granular rather than a true interleaved
-/// unified-diff hunk format.
+/// `diff::text::line_operations`'s doc comment for why this is row-granular rather than a true
+/// interleaved unified-diff hunk format.
 pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> String {
     let mut out = String::new();
     out.push_str(&format!("=== before: {} ===\n", data.before_path.display()));
@@ -232,42 +191,6 @@ mod tests {
             text.contains(&format!("\n{}{}\n", "  ", "fn main() {")),
             "identical lines must stay uncolored: {text}"
         );
-    }
-
-    /// Regression guard: a real one-token change (e.g. renaming a call inside an otherwise
-    /// unchanged statement) can leave the same row covered by both an Update range (the token)
-    /// and an Identical range (the rest of the line/its surrounding punctuation). If the Identical
-    /// range for that row happens to come *after* the Update range in `ranges`' order, a naive
-    /// last-write-wins would silently overwrite the row back to `Identical`, hiding the change -
-    /// this is exactly what a real end-to-end smoke test against the built binary caught.
-    #[test]
-    fn row_operations_does_not_let_a_same_row_identical_range_hide_a_real_change() {
-        let ranges = vec![
-            RangeMatch {
-                source: crate::diff::text_range::TextRange::new(0, 4, 0, 12),
-                destination: crate::diff::text_range::TextRange::new(0, 4, 0, 12),
-                operation: TextOperation::Update,
-            },
-            // Ordered *after* the Update above on purpose - this is the ordering that triggered
-            // the bug.
-            RangeMatch {
-                source: crate::diff::text_range::TextRange::new(0, 12, 1, 0),
-                destination: crate::diff::text_range::TextRange::new(0, 12, 1, 0),
-                operation: TextOperation::Identical,
-            },
-        ];
-        assert_eq!(row_operations(&ranges, 1), vec![TextOperation::Update]);
-    }
-
-    #[test]
-    fn row_operations_treats_a_zero_width_range_as_a_placeholder_not_a_real_row() {
-        let ranges = vec![RangeMatch {
-            source: crate::diff::text_range::TextRange::new(1, 0, 1, 0),
-            destination: crate::diff::text_range::TextRange::new(1, 0, 2, 0),
-            operation: TextOperation::Delete,
-        }];
-        let ops = row_operations(&ranges, 3);
-        assert_eq!(ops, vec![TextOperation::Identical; 3]);
     }
 
     #[test]
