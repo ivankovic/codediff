@@ -32,10 +32,10 @@ CSS,shadcn-ui-ui.git,b75796ed76882f30aa86da90c71fbad14a10ccd8,apps/v4/registry/s
 CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,csharp-lidarr-add-function
 CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs,csharp-lidarr-call-different-function
 CSharp,Lidarr-Lidarr.git,a4af75b60cdc531c2280d994a1ef1141bb7c830e,src/Lidarr.Api.V1/Calendar/CalendarController.cs,csharp-lidarr-new-feature
-CSharp,Lidarr-Lidarr.git,fb75b28cb18b4a00db7fbd5fdae2266ac999cc30,src/NzbDrone.Core/HealthCheck/Checks/UpdateCheck.cs,
-CSharp,Radarr-Radarr.git,219477273675b23a426554896a145d553fc9a319,src/NzbDrone.Core/Parser/IsoLanguages.cs,
+CSharp,Lidarr-Lidarr.git,fb75b28cb18b4a00db7fbd5fdae2266ac999cc30,src/NzbDrone.Core/HealthCheck/Checks/UpdateCheck.cs,csharp-lidarr-condition-change
+CSharp,Radarr-Radarr.git,219477273675b23a426554896a145d553fc9a319,src/NzbDrone.Core/Parser/IsoLanguages.cs,csharp-radarr-add-object-instance
 CSharp,Sonarr-Sonarr.git,8c67a3bdee65aa35bdd82ac8614be875236d88de,src/NzbDrone.Core/DecisionEngine/DownloadDecision.cs,csharp-sonarr-change-type
-CSharp,Sonarr-Sonarr.git,8ee10adbd4b53fba5be6a870291d3107c1962436,src/Sonarr.Api.V3/Calendar/CalendarFeedController.cs,
+CSharp,Sonarr-Sonarr.git,8ee10adbd4b53fba5be6a870291d3107c1962436,src/Sonarr.Api.V3/Calendar/CalendarFeedController.cs,csharp-sonarr-add-true-to-function-call
 CSharp,Sonarr-Sonarr.git,9a69222c9a1c42c2571f21e2d4a2e02b90216248,src/NzbDrone.Core/DataAugmentation/Scene/SceneMappingService.cs,
 CSharp,jellyfin-jellyfin.git,7ba77804c414d012df311f9a5d644078dfa4a94a,MediaBrowser.Controller/LibraryTaskScheduler/LimitedConcurrencyLibraryScheduler.cs,csharp-jellyfin-add-function
 CSharp,jellyfin-jellyfin.git,c8d2f436608c631e94461e70c3a7511031d32f58,Jellyfin.Server/Migrations/Routines/ReseedFolderFlag.cs,csharp-jellyfin-sql-query-fix

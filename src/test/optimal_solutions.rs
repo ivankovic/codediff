@@ -74,7 +74,13 @@ mod csharp_lidarr_add_function;
 #[cfg(test)]
 mod csharp_lidarr_call_different_function;
 #[cfg(test)]
+mod csharp_lidarr_condition_change;
+#[cfg(test)]
 mod csharp_lidarr_new_feature;
+#[cfg(test)]
+mod csharp_radarr_add_object_instance;
+#[cfg(test)]
+mod csharp_sonarr_add_true_to_function_call;
 #[cfg(test)]
 mod csharp_sonarr_change_type;
 #[cfg(test)]
