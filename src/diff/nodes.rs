@@ -461,6 +461,88 @@ pub fn is_semantically_structural<'a>(
                 .map(|name| (node_kind.to_string(), name.to_string())),
             _ => None,
         },
+        // Previously entirely unhandled here (confirmed empirically 2026-07-25, chasing a
+        // 30s-on-235-lines pathology in `csharp-radarr-add-object-instance`): `is_reference`
+        // above already lists these C# kinds for hash-candidate selection, but nothing extracted
+        // a *name* from them, so `solve_named_reference_groups`/`solve_large_flat_subtrees` (both
+        // keyed on `is_semantically_structural`) silently treated every C# file as having zero
+        // named declarations - no class, method, or field ever got the cheap identity-based match
+        // every other supported language gets. The 49-vs-50-entry `new IsoLanguage(...)` list in
+        // that fixture's one field was too small to qualify for `NodeSelectionConfig`'s
+        // exact-hash candidate list (`min_subtree_size: 45`, each entry ~30 nodes) and never
+        // reached `solve_large_flat_subtrees`'s Myers fast path either (scoped to *named*
+        // top-level items only, and C# had none) - so the whole ~2,300-node file fell to
+        // `final_pass`'s unconstrained tree-edit-distance on every edit: 30.6s, of which 30.3s
+        // was that one pass (profiled - see `TODO.md`'s speed-tuning entry). Field names verified
+        // empirically against the real grammar (a throwaway binary dumping `child_by_field_name`
+        // results on this fixture), not assumed from other C-family grammars.
+        Language::CSharp => match node_kind {
+            "class_declaration" | "struct_declaration" | "interface_declaration" | "enum_declaration"
+            | "record_declaration" | "method_declaration" | "namespace_declaration" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            // No direct "name" field (unlike the kinds above) - wraps a `variable_declaration`
+            // holding one or more `variable_declarator`s (`int a, b;` is one `field_declaration`
+            // naming two variables). Keyed on the *first* declarator only, same simplification
+            // Go's grouped `var (...)`/`const (...)` handling above already uses: not a
+            // correctness issue, the field is still matched as one unit as long as its first
+            // name is unchanged.
+            "field_declaration" => {
+                let mut cursor = node.walk();
+                let variable_declaration =
+                    node.named_children(&mut cursor).find(|c| c.kind() == "variable_declaration")?;
+                let mut declarator_cursor = variable_declaration.walk();
+                let declarator = variable_declaration
+                    .named_children(&mut declarator_cursor)
+                    .find(|c| c.kind() == "variable_declarator")?;
+                declarator
+                    .child_by_field_name("name")
+                    .and_then(|n| n.utf8_text(bytes).ok())
+                    .map(|name| (node_kind.to_string(), name.to_string()))
+            }
+            _ => None,
+        },
+        // Same 2026-07-25 gap as the CSharp arm above, found chasing the same class of pathology
+        // once it turned out C and C++ dominate the remaining slow outliers even after the C# fix
+        // (6 of the corpus's 10 slowest fixtures are C/C++). `function_definition`'s name isn't a
+        // direct field - C/C++ grammars nest it inside a chain of declarator wrappers
+        // (`pointer_declarator`/`array_declarator`/... for return-type modifiers, `function_
+        // declarator` for the parameter list itself), terminating in the actual name node -
+        // `c_family_declarator_name` walks that chain. Verified empirically against real fixtures
+        // (`c-nginx-add-typedef`: `pointer_declarator -> function_declarator -> identifier`;
+        // `cpp-ladybird-refactor-variables-if-changes`: `function_declarator ->
+        // qualified_identifier`, which already carries full `Class::method` scoping - no separate
+        // impl/class pre-pass needed the way Rust's `impl_item` handling has one).
+        Language::C => match node_kind {
+            "function_definition" => node
+                .child_by_field_name("declarator")
+                .and_then(|d| c_family_declarator_name(d, bytes))
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "struct_specifier" | "enum_specifier" | "union_specifier" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::CPP => match node_kind {
+            "function_definition" => node
+                .child_by_field_name("declarator")
+                .and_then(|d| c_family_declarator_name(d, bytes))
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            // Already returns a fully-qualified name for `namespace A::B { ... }` (a
+            // `nested_namespace_specifier`, not a plain `namespace_identifier`) - confirmed
+            // empirically, no extra unwrapping needed unlike `function_definition` above.
+            "namespace_definition" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -488,6 +570,26 @@ fn go_spec_identifier_name<'a>(spec: Node<'a>, bytes: &'a [u8]) -> Option<&'a st
     spec.child_by_field_name("name")
         .filter(|n| n.kind() == "identifier")
         .and_then(|n| n.utf8_text(bytes).ok())
+}
+
+/// Unwraps a C/C++ `function_definition`'s `declarator` field chain down to the actual name -
+/// `pointer_declarator`/`array_declarator`/`parenthesized_declarator`/`reference_declarator` are
+/// return-type/reference modifiers wrapping a nested `declarator` field of their own, terminating
+/// in `function_declarator`, whose own `declarator` field is finally the real name node
+/// (`identifier` in C; `identifier`/`qualified_identifier`/`destructor_name`/`operator_name` in
+/// C++ - a `qualified_identifier` already carries full `Class::method` scoping, verified
+/// empirically against `cpp-ladybird-refactor-variables-if-changes`). Verified against real C
+/// fixtures too: `c-nginx-add-typedef` nests exactly one `pointer_declarator` before its
+/// `function_declarator` for every pointer-returning function.
+fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
+    match node.kind() {
+        "identifier" | "field_identifier" | "qualified_identifier" | "destructor_name" | "operator_name" => {
+            node.utf8_text(bytes).ok()
+        }
+        "function_declarator" | "pointer_declarator" | "array_declarator" | "parenthesized_declarator"
+        | "reference_declarator" => node.child_by_field_name("declarator").and_then(|d| c_family_declarator_name(d, bytes)),
+        _ => None,
+    }
 }
 
 fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {

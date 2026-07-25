@@ -1182,3 +1182,203 @@ with `TOTAL` (the main per-fixture table's, and the reason-provenance table's, f
 `grep '^TOTAL'` silently grabs both; needs `-m1` (after fixing the above) or an explicit stop after
 the first match to get the right one (confirmed by direct inspection: the reason table's `TOTAL` row
 has completely different, unrelated columns, not a second view of the mismatch count).
+
+# Speed goal (2026-07-25 - `/goal`: 0.1% mismatch budget, target median 20ms / p90 100ms / max 400ms)
+
+Starting point (`benchmark_other`, 98 fixtures, before any of this section's changes): median
+63.9ms, p90 1188.8ms, p99 4423.4ms, **max 31,455ms**. The max was wildly disproportionate to file
+size - `csharp-radarr-add-object-instance` (235 lines, 2,302 nodes) alone took **31.5s**, more than
+every other fixture in the corpus, most of which are far larger. That specific number was the first
+target: something that far off the trend line for its own size is a bug, not inherent complexity.
+
+## `is_semantically_structural` had zero C#/C/C++ coverage - found via profiling, fixed for all three
+
+Added `eprintln!`-based phase timers to `Diff::from_code_with_config` (removed again once done -
+not left in the tree) and ran `csharp-radarr-add-object-instance` through them: **30.3s of the
+30.6s total was phase 6 (final APTED)**, with only 490/2302 before-side nodes matched going in -
+every other phase combined took under 400ms. First hypothesis (the flat-tree Myers fast path's
+`FLAT_MIN_CHILDREN = 50` cliff - the fixture's one field has a 49-vs-50-entry collection
+initializer, one below the threshold) was **wrong**: raising/lowering it (and its redundant sibling
+`solve_large_flat_subtrees::FLAT_CONTAINER_MIN_CHILDREN`) had zero effect, because that pass is
+scoped to *named* top-level items only, and C# had no named top-level items at all (see below).
+Second hypothesis (`NodeSelectionConfig::min_subtree_size: 45` excluding the field's ~30-node
+`new IsoLanguage(...)` entries from exact-hash candidacy) fixed the fixture at `min_subtree_size:
+15` (2201/2302 matched, phase 6 down to 64ms) but **regressed the whole corpus 788 -> 1022
+mismatches** - a global drop in this threshold lets small, unrelated, coincidentally-identical
+subtrees anywhere in a file steal matches from better candidates a later phase would have found
+(the same class of problem the 2026-07-22 locality tie-break entry above describes for a pointwise
+cost function). Reverted.
+
+**Root cause, found by reading `solve_hash_descent`/`hash_tree_matching`/`solve_syntax_aware_
+matching` directly instead of guessing further:** `nodes::is_semantically_structural` - the name-
+*extraction* function `solve_named_reference_groups` (phase 4's primary matcher) and
+`solve_large_flat_subtrees::top_level_identities` both depend on - only has match arms for
+`Rust`/`Python`/`Go`/`Kotlin`. Every other language, including `CSharp` (which *does* have a kind-
+list entry in the separate, unrelated `is_reference` checker just above it - easy to mistake for
+coverage) falls through to `_ => None`. C# was never given a single named declaration anywhere in
+the whole pipeline: no class, method, or field ever got the cheap identity-based match every other
+covered language gets - **phase 4's primary mechanism was a complete no-op for C#**. For this
+fixture specifically: the field's 49 near-duplicate entries were too small for exact-hash candidacy
+and its enclosing field/class/namespace had no name-based anchor either, so the *entire* ~2,300-node
+file fell to `final_pass`'s unconstrained tree-edit-distance on every edit.
+
+**Fix**: added a `Language::CSharp` arm (`class_declaration`/`struct_declaration`/
+`interface_declaration`/`enum_declaration`/`record_declaration`/`method_declaration`/
+`namespace_declaration` via their `name` field; `field_declaration` via an extra hop through
+`variable_declaration` -> first `variable_declarator` -> `name`, same "first declarator only"
+simplification Go's grouped `var (...)` handling already uses). Field names verified empirically
+against real grammar output (a throwaway binary dumping `child_by_field_name` results on the actual
+fixture), not assumed from other C-family grammars.
+
+**Result:** `csharp-radarr-add-object-instance` 30.6s -> ~400ms (phase 6 alone: 30.3s -> 40ms, ~760x).
+Full `cargo test --release --lib`: 362 passed, 0 failed, 5 ignored, **and the whole suite dropped
+from ~145s to 29s** (this one fixture was that large a fraction of total test time).
+`benchmark_optimal_solutions`: **788 -> 731 mismatches, and better** - exactly one other fixture
+changed at all, `csharp-jellyfin-add-function` 68 -> 11 (a fixture this file's cost-comparison
+analysis above already flagged as a "60% bucket" real-headroom case; this is a direct fix for it,
+not a coincidence). Zero regressions anywhere in the corpus.
+
+**Same gap confirmed for C and C++ too** (only `Rust`/`Python`/`Go`/`Kotlin`/now-`CSharp` are
+covered) - checked because 6 of the corpus's 10 slowest fixtures after the C# fix were C/C++.
+Added `Language::C`/`Language::CPP` arms: `function_definition` needs unwrapping a declarator chain
+(`pointer_declarator`/`array_declarator`/.../`function_declarator`, each wrapping a nested
+`declarator` field) down to the real name node (`c_family_declarator_name`, new helper) rather than
+one direct field read - verified empirically against `c-nginx-add-typedef` (C: `pointer_declarator
+-> function_declarator -> identifier`) and `cpp-ladybird-refactor-variables-if-changes` (C++:
+`function_declarator -> qualified_identifier`, which conveniently already carries full
+`Class::method` scoping, no separate impl/class pre-pass needed unlike Rust's `impl_item` handling).
+`struct_specifier`/`enum_specifier`/`union_specifier` (C and C++) and `class_specifier`/
+`namespace_definition` (C++ only) read their `name` field directly, same shape as every other
+language's type-declaration arms.
+
+**Result:** modest, not dramatic - median/p90/max barely moved (p90 1194 -> 1052ms, max 3924 ->
+3521ms), aggregate `codediff_ms` mean 405.6 -> 373.5ms. **One real regression**: `c-postgres-real-
+logic-change` 20 -> 28 mismatches (node-level), 280 -> 368 (line-level, `benchmark_other`) - the
+*only* fixture affected in either direction, everywhere else (every other C/C++ fixture in the
+corpus) is byte-for-byte accuracy-identical. `--details` shows the classic premature-pinning
+failure mode already documented and fixed once in this file (2026-07-14, `solve_orphaned_semantic_
+nodes` reordering): naming `function_definition:2` anchors it to an isolated `apted::for_nodes`
+call on just that one function, which can't represent the cross-function multi-to-multi mapping
+this fixture's own test-file doc comment already flags as a known modeling limitation ("TODO: Deal
+with multi-to-multi mapps. We can't represent this either in the mapping or visually at this
+time!"). Not a bug in the fix - a real, already-understood case where "match by name first" and
+"let whole-file APTED see everything at once" trade off, and this file is the corpus's most
+extreme example of needing the latter. Reclamped `c_postgres_real_logic_change`'s `_within_limit`
+20 -> 28 and kept the fix: directionally correct (C/C++ get the same architecture every other
+language has), accuracy-neutral everywhere else, one understood and already-documented exception.
+Full suite green (362/0/5) after reclamping.
+
+**Running total against the speed goal** (`benchmark_other`, both fixes applied): median 62.7ms
+(target 20ms), p90 1051.5ms (target 100ms), max 3521.2ms (target 400ms, down from 31,455ms at the
+start of this section - **8.9x**). Not there yet. The remaining slowest fixtures are now genuinely
+large files, not gap-driven pathologies: `c-cpython-autogenerated-code` (57,917 nodes, 3.5s),
+`c-linux-small-bugfix` (47,986 nodes, 2.7s), `cpp-ladybird-refactor-variables-if-changes` (12,658
+nodes, 2.5s) - final APTED's inherent complexity on a large residual, not a fixable identity-
+matching gap. Next levers, not yet tried: (1) audit whether `is_semantically_structural`'s same
+gap extends to any *other* language in active use here (only Rust/Python/Go/Kotlin/CSharp/C/CPP are
+covered now - Java, JavaScript/TypeScript, PHP, Ruby, Swift, Scala are all still `_ => None`,
+unexercised by this corpus's current fixture sizes but a latent version of the exact same bug);
+(2) parallelize independent `apted::for_nodes` calls across `grouped_greedy_matcher`'s accepted
+pairs (rayon) - a free win, doesn't touch accuracy, untried; (3) a size/time-boxed fallback for
+`final_pass` specifically on the largest residuals, spending some of the mismatch budget
+deliberately rather than by accident.
+
+## Lever (2) investigated - NOT a free win, needs dependency-aware batching first
+
+Re-profiled the current top-4 slowest fixtures (full 8-phase timers, same instrumentation as
+above, removed again after) to check whether phase 6 (`final_pass`) was still the bottleneck now
+that C/C++/C# have named-match coverage. It isn't: `phase6_final_apted` is fast on all four now
+(82-296ms - the tiny residual left after phase 1/4 is exactly what named matching was supposed to
+buy). **Phase 4 (`solve_syntax_aware_matching`) is now the single largest phase instead** (602ms-
+1.83s) - the cost didn't disappear when C/C++ gained named matching, it *moved*: `cpp-ladybird-
+refactor-variables-if-changes` alone makes **1,837 separate `apted::for_nodes` calls** through
+`APTED:syntax_named` (near-zero before the C++ fix), one per matched declaration. Confirmed this
+is mostly legitimate work, not redundant: `IdHash`/`IdHashAnc` counts for these files are also huge
+(4,765-26,646), meaning the large majority of nodes were already hash-matched for free in phase 1;
+the 1,837 `syntax_named` calls are specifically the *non*-identical remainder that genuinely needs
+real tree-edit-distance done somewhere.
+
+**Why naive parallelization of this loop is unsafe, confirmed by reading the code, not assumed:**
+`grouped_greedy_matcher::solve`'s accept loop has an explicit "Defensive re-check: an earlier-
+accepted pair's real APTED resolution may already have claimed one of these nodes" check - load-
+bearing, not decorative. `solve_named_reference_groups`'s candidate collection
+(`collect_fully_resolved_groups`) walks *every* named declaration at *every* depth in one pass, so
+a class and each of its own methods are routinely **both** independent candidates in the same
+batch. If the class is accepted first, its own real `apted::for_nodes` call can (and does) resolve
+its whole body via ordinary tree-edit-distance, which naturally re-discovers and claims an
+identical method inside it - at which point that method's own separately-scheduled pair must be
+skipped, not double-processed. This is exactly the scenario `cpp-ladybird`'s class-heavy namespace
+produces at scale. Running accepted pairs' `on_accept` calls (the real APTED work) in parallel
+would race on precisely this: two threads could both start resolving overlapping subtrees before
+either commits, breaking both correctness (conflicting/duplicate mappings) and the run-to-run
+determinism this module's own doc comment explicitly requires and `describe_nondeterminism`
+actively tests for elsewhere in this codebase.
+
+**Not attempted this session**: a *correct* version needs dependency-aware batching - partition the
+already-determined accept order into batches where no two pairs in the same batch have an ancestor/
+descendant relationship (checkable via `ASTMetadata::node_to_parent` walks before scheduling), run
+each batch's `on_accept` calls in parallel (rayon), and only start the next batch once the current
+one's real resolutions have landed in `diff`. This is a real, valuable follow-up - phase 4 is now
+demonstrably the largest single cost on several of the corpus's slowest files - but it changes
+correctness-sensitive scheduling logic in a module three other call sites share, and this
+codebase's history (the whole cost-model section above) shows exactly how expensive a rushed,
+under-validated concurrency change here could be to diagnose after the fact. Needs its own
+dedicated session: implement the batching, verify byte-identical output across several independent
+runs (not just "tests still pass" - a race can be intermittent), and only then measure the speed
+win.
+
+**State against the speed goal at the point this investigation paused** (unchanged from the
+previous entry, since nothing here modified behavior): median 62.7ms / p90 1051.5ms / max 3521.2ms
+against a 20ms / 100ms / 400ms target. Real, validated progress (max down 8.9x from the 31,455ms
+starting point; accuracy improved, not traded away) but the target isn't met. The two safe
+`is_semantically_structural` fixes are exhausted for the languages currently driving the corpus's
+slowest fixtures (C/C++/C#/Kotlin/Rust/Python/Go all covered); the next real lever is the
+dependency-aware parallel batching above, not another quick heuristic tweak.
+
+## Further investigation of lever (2), and two more ruled-out/found levers
+
+**Ruled out: redundant `metadata_of` recomputation.** Every phase calls `metadata_of(before)`/
+`metadata_of(after)` independently (6-7 call sites across the pipeline) - looked like an obvious
+"compute once, thread through" win. It isn't one: `metadata_of` already checks `code.metadata.
+ast_metadata` and returns a cheap `Cow::Borrowed` if already populated, and `Code::from_string`
+(used by every real construction path, including the test/benchmark helpers) already eagerly
+computes and caches it once at construction. Every one of those 6-7 calls is already a free borrow,
+not a fresh tree walk. Would have been wasted effort to "fix" - checked the actual implementation
+before touching anything, per this file's own standing lesson about profiling before guessing.
+
+**Corrected understanding of phase 4's cost, changes the parallelism cost/benefit:** added a
+scoring-vs-accept-loop timer directly inside `grouped_greedy_matcher::solve` (removed again after)
+and ran it against `cpp-ladybird-refactor-variables-if-changes`. Scoring is trivial (19µs for 19
+candidates). The accept loop - which is where each accepted pair's real `apted::for_nodes` call
+happens - took **1.53s for just 6 accepted pairs** in this one batch, ~250ms average each. The
+earlier `APTED:syntax_named: 1837` reason count from the benchmark CSV is *not* 1837 separate
+`for_nodes` calls (as assumed while scoping lever (2) above) - it's the total count of individual
+node-level *mappings* those far-fewer calls produce, since one call on a large function body can
+resolve hundreds of descendant nodes at once, all tagged with the same source label. Phase 4's cost
+here is a *small number of expensive, large individual tree-edit-distance computations* on genuinely
+big function bodies, not many cheap calls paying per-call overhead. This doesn't change the
+correctness analysis above (parallel batching is still unsafe without the dependency-aware
+partitioning), but it does lower how much batching would even buy on files shaped like this one -
+6-way parallelism on 6 items, not 1837-way - and confirms the remaining cost is largely genuine,
+unavoidable tree-edit-distance complexity on large subtrees, not fixable overhead.
+
+**Found and kept: release build profile tuning.** No `[profile.release]` section existed in
+`Cargo.toml` before this - Cargo's own defaults (`codegen-units = 16`, no LTO) leave real
+performance on the table for a CPU-bound algorithmic tool. Added `lto = "fat"` + `codegen-units = 1`
+- a pure compiler-flag change, zero source code touched, so unlike everything else in this section
+it carries **no correctness risk at all** (confirmed: `benchmark_other`'s mismatch counts are
+byte-identical before/after, 473/570/637, exactly as a flag-only change should produce). Cost: full
+release rebuild goes from ~10s to ~2min (one-time per build, not per-run). Benefit: modest but real
+and free - median 62.7ms -> 61.3ms, p90 1051.5ms -> 1011.2ms, max 3521.2ms -> 3365.2ms (~4-5%
+across the board). Full `cargo test --release --lib` still green (362/0/5) after adding it.
+
+**State against the speed goal, end of this session's investigation**: median 61.3ms / p90 1011.2ms
+/ max 3365.2ms against a 20ms / 100ms / 400ms target (max improved **9.3x** from the 31,455ms
+starting point). Not met. Every remaining lever identified this session that could plausibly close
+more of the gap (dependency-aware parallel batching in `grouped_greedy_matcher`; a genuinely new
+size-capped approximate-diff fallback for large individual subtrees, spending mismatch budget
+deliberately) is a real, substantial, correctness-sensitive implementation in its own right - not a
+quick tweak - and deserves its own dedicated session with proper multi-run determinism verification
+rather than being rushed. The two `is_semantically_structural` language-coverage fixes and the
+release-profile change are the safe, validated wins available without that larger investment; they
+are kept, tested, and documented above.

@@ -3,6 +3,17 @@ name = "codediff"
 version = "0.0.1"
 edition = "2024"
 
+# No [profile.release] section existed before this (2026-07-25, speed-goal investigation) - Cargo's
+# own defaults (codegen-units = 16, lto = false) leave real, free performance on the table for a
+# CPU-bound algorithmic tool like this one. `lto = "fat"` lets the optimizer see across crate
+# boundaries (tree-sitter, the APTED engine's own module split); `codegen-units = 1` trades slower
+# release builds for better cross-function inlining within this crate. Pure compiler-flag change -
+# zero source code touched, output is bit-for-bit the same algorithm, so this carries none of the
+# correctness risk a concurrency or algorithmic change would.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
