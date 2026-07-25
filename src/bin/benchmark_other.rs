@@ -34,6 +34,21 @@
 //! that its line position changed - that's expected, not a bug in the scoring. The point of this
 //! benchmark isn't "is codediff line-perfect," it's "how much of the corpus can a line-only tool
 //! not even see," which is exactly what the codediff-vs-tool gap on each row shows.
+//!
+//! Alongside the tools, every fixture also gets a `treesitter_parse_ms` reference lower bound -
+//! see `treesitter_parse_ms` - the cost of tree-sitter parsing alone, with no diffing or AST
+//! mapping on top. It's not an `ExternalTool` (nothing to score for accuracy), just context for
+//! reading `codediff_ms`/`tool_ms`: the minimum any AST-aware tool in this comparison must pay
+//! before its own work can even start.
+//!
+//! GumTree also gets a second, optional timing column, `gumtree_warm_ms` - see
+//! `gumtree_warm_batch`. `ExternalTool::GumTree`'s own `gumtree_ms` spawns a fresh `gumtree`
+//! subprocess per fixture, so it includes JVM startup/JIT warmup on every single fixture; that
+//! overhead dominates the number for small files (see `benchmark_other_runtime.png`'s gumtree
+//! violin sitting almost flat regardless of file size). `gumtree_warm_ms` runs the same algorithm
+//! against every fixture through one persistent JVM (`research/drivers/gumtree-batch/`), so it
+//! isolates GumTree's own cost from process-spawn overhead. Both numbers are kept - one is "cost
+//! of invoking the CLI the way most users would," the other is "cost of the algorithm alone."
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -271,6 +286,15 @@ fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bo
     }
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).context("parsing gumtree JSON output")?;
+    gumtree_touched_from_json(before, after, &json)
+}
+
+/// Shared by both ways of running GumTree - the CLI subprocess (`gumtree_line_labels`) and the
+/// batch driver (`gumtree_warm_batch`) - since both emit the exact same `{"matches": [...],
+/// "actions": [...]}` schema (the driver reuses GumTree's own `ActionsIoUtils.toJson`, see
+/// `research/drivers/gumtree-batch/BatchDriver.java`'s doc comment). See `gumtree_line_labels`'s
+/// doc comment for what `matches`/`actions` mean.
+fn gumtree_touched_from_json(before: &Code, after: &Code, json: &serde_json::Value) -> Result<(Vec<bool>, Vec<bool>)> {
     let matches = json["matches"].as_array().context("gumtree JSON has no `matches` array")?;
     let actions = json["actions"].as_array().context("gumtree JSON has no `actions` array")?;
 
@@ -313,6 +337,99 @@ fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bo
     }
 
     Ok((before_touched, after_touched))
+}
+
+/// Runs every GumTree-supported fixture through one persistent JVM instead of one `gumtree
+/// textdiff` subprocess per fixture (`gumtree_line_labels`) - see
+/// `research/drivers/gumtree-batch/BatchDriver.java`'s doc comment for why: a fresh subprocess
+/// pays JVM startup/JIT warmup on every single invocation, which dominates `gumtree_ms` for small
+/// files (see `benchmark_other_runtime.png`'s gumtree violin sitting almost flat regardless of
+/// file size). This isolates GumTree's own parse+match+edit-script cost from that overhead, as a
+/// second, additional timing column - not a replacement for `gumtree_ms`, which is still an honest
+/// number for "cost of invoking the CLI the way most users would."
+///
+/// Returns `Ok(None)` (not an error) when the batch driver isn't available - `GUMTREE_BIN` unset,
+/// or `research/drivers/gumtree-batch/build.sh` hasn't been run yet - since this is an optional
+/// second data point on top of the required `ExternalTool::GumTree` pass, unlike `gumtree_bin()`'s
+/// own hard failure when a fixture claims GumTree support but its CLI binary is missing entirely.
+///
+/// Feeds the whole batch through the driver's stdin/stdout in one process (see the driver's doc
+/// comment for the line-delimited-JSON protocol), writing the request body from a second thread so
+/// a response stream larger than the OS pipe buffer can't deadlock against still-unwritten
+/// request lines - `Command::wait_with_output` already reads stdout/stderr off background threads
+/// for the same reason, this just extends that to stdin.
+fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMap<String, f64>>> {
+    let Ok(gumtree) = gumtree_bin() else {
+        return Ok(None);
+    };
+    let Some(gumtree_dir) = gumtree.parent().and_then(|bin| bin.parent()) else {
+        return Ok(None);
+    };
+    let jar = gumtree_dir.join("lib/gumtree.jar");
+    let driver_out = std::path::Path::new("research/drivers/gumtree-batch/out");
+    if !jar.is_file() || !driver_out.join("BatchDriver.class").is_file() {
+        eprintln!(
+            "gumtree_warm_ms: skipping (build the batch driver first: GUMTREE_BIN=... research/drivers/gumtree-batch/build.sh)"
+        );
+        return Ok(None);
+    }
+
+    // Kept alive until the JVM process below has read every one of them - the driver reads these
+    // paths lazily off its stdin, well after this loop returns.
+    let mut before_files = Vec::with_capacity(fixtures.len());
+    let mut after_files = Vec::with_capacity(fixtures.len());
+    let mut requests = String::new();
+    for (name, before, after) in fixtures {
+        let language = before.metadata.language.unwrap_or_default();
+        let Some((generator, ext)) = gumtree_generator(language) else {
+            continue;
+        };
+        let mut before_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
+        let mut after_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
+        before_file.write_all(before.contents.as_bytes()).context("writing before temp file")?;
+        after_file.write_all(after.contents.as_bytes()).context("writing after temp file")?;
+        requests.push_str(&serde_json::json!({
+            "id": name,
+            "generator": generator,
+            "before": before_file.path().display().to_string(),
+            "after": after_file.path().display().to_string(),
+        }).to_string());
+        requests.push('\n');
+        before_files.push(before_file);
+        after_files.push(after_file);
+    }
+
+    let mut child = Command::new("java")
+        .args(["-cp", &format!("{}:{}", jar.display(), driver_out.display()), "BatchDriver"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("spawning the GumTree batch driver (is `java` on PATH?)")?;
+    let mut stdin = child.stdin.take().context("batch driver child has no stdin")?;
+    let writer = std::thread::spawn(move || stdin.write_all(requests.as_bytes()));
+    let output = child.wait_with_output().context("waiting for the GumTree batch driver")?;
+    writer.join().expect("batch driver stdin-writer thread panicked").context("writing batch driver stdin")?;
+    if !output.status.success() {
+        bail!(
+            "GumTree batch driver exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let mut results = HashMap::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let json: serde_json::Value =
+            serde_json::from_str(line).with_context(|| format!("parsing batch driver response line {line:?}"))?;
+        let id = json["id"].as_str().context("batch driver response missing `id`")?.to_string();
+        if let Some(error) = json["error"].as_str() {
+            bail!("GumTree batch driver failed on {id:?}: {error}");
+        }
+        let ms = json["ms"].as_f64().context("batch driver response missing `ms`")?;
+        results.insert(id, ms);
+    }
+    Ok(Some(results))
 }
 
 /// Parses the `[start,end]` character-offset suffix off a GumTree node-reference string like
@@ -361,6 +478,23 @@ fn disagreement_count(a: &[bool], b: &[bool]) -> usize {
     a.iter().zip(b).filter(|(x, y)| x != y).count()
 }
 
+/// Milliseconds tree-sitter alone takes to parse `source`'s contents into an AST - a reference
+/// lower bound, not an `ExternalTool`: it produces no line labels and is never scored for
+/// accuracy, only timed. Every AST-aware tool in this benchmark (codediff included) must pay at
+/// least this cost before any diffing work can start, so it puts `codediff_ms`/`tool_ms` in
+/// context rather than competing with them.
+///
+/// `source` already carries a parsed `ast` (every fixture in the corpus was parsed once by
+/// `helper::handmade_test_code_pairs()`), so this clones it, clears `ast` back to `None`, and
+/// times a fresh `Code::parse` call - reparsing from scratch, not reading the cached tree.
+fn treesitter_parse_ms(source: &Code, parser: &mut tree_sitter::Parser) -> f64 {
+    let mut code = source.clone();
+    code.ast = None;
+    let started = std::time::Instant::now();
+    code.parse(parser);
+    started.elapsed().as_secs_f64() * 1000.0
+}
+
 struct Row {
     name: String,
     /// (mismatched lines, total lines across before+after) for codediff against the
@@ -380,9 +514,23 @@ struct Row {
     /// produces line-level labels directly, so no extra projection step to include). `None` in
     /// lockstep with `tools`.
     tool_ms: Vec<Option<f64>>,
+    /// Milliseconds tree-sitter alone spends parsing `before` and `after` into ASTs (summed across
+    /// both sides, like `codediff_ms`/`tool_ms` are) - see `treesitter_parse_ms`. A reference lower
+    /// bound, not a competing tool: always present (every corpus language parses), never scored for
+    /// accuracy.
+    treesitter_ms: f64,
+    /// Milliseconds GumTree itself (parse+match+edit-script, no process-spawn/JVM-startup
+    /// overhead) spent on this fixture inside the persistent batch driver - see
+    /// `gumtree_warm_batch`. `None` when the batch driver wasn't available for this run (in
+    /// lockstep across every row, not per-fixture like `tool_ms`'s `None`) or - same as
+    /// `tools`/`tool_ms` - when this fixture's language is outside GumTree's scope. Accuracy is
+    /// identical to the CLI-based `gumtree` entry in `tools` (same algorithm, same generator, same
+    /// JSON schema - see `gumtree_touched_from_json`), so there's no separate mismatch count here,
+    /// only a second timing.
+    gumtree_warm_ms: Option<f64>,
 }
 
-fn score_fixture(name: &str, before: &Code, after: &Code) -> Result<Row> {
+fn score_fixture(name: &str, before: &Code, after: &Code, gumtree_warm_ms: Option<f64>) -> Result<Row> {
     let language = before.metadata.language.unwrap_or_default();
     let human_diff = human_mapping::as_ast_diff(name, before, after)?;
     let node_cache = NodeCache::build(before, after);
@@ -413,12 +561,17 @@ fn score_fixture(name: &str, before: &Code, after: &Code) -> Result<Row> {
         tools.push(Some((mismatches, total_lines)));
     }
 
+    let mut parser = tree_sitter::Parser::new();
+    let treesitter_ms = treesitter_parse_ms(before, &mut parser) + treesitter_parse_ms(after, &mut parser);
+
     Ok(Row {
         name: name.to_string(),
         codediff: (codediff_mismatches, total_lines),
         tools,
         codediff_ms,
         tool_ms,
+        treesitter_ms,
+        gumtree_warm_ms,
     })
 }
 
@@ -479,11 +632,21 @@ fn main() -> Result<()> {
         .collect();
     names.sort();
 
+    let warm_fixtures: Vec<(&str, &Code, &Code)> = names
+        .iter()
+        .map(|name| {
+            let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+            (name.as_str(), before, after)
+        })
+        .collect();
+    let gumtree_warm = gumtree_warm_batch(&warm_fixtures)?;
+
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
-        rows.push(score_fixture(name, before, after)?);
+        let warm_ms = gumtree_warm.as_ref().and_then(|results| results.get(name)).copied();
+        rows.push(score_fixture(name, before, after, warm_ms)?);
     }
     let elapsed = started.elapsed();
 
@@ -577,12 +740,29 @@ fn pct(mismatches: usize, total: usize) -> f64 {
 /// (see `Row::codediff_ms`/`tool_ms`'s doc comments) so the totals are directly comparable.
 fn print_runtime_table(rows: &[Row]) {
     let tool_names: Vec<&str> = ExternalTool::ALL.iter().map(|t| t.name()).collect();
-    let label_width = ["codediff"].iter().chain(&tool_names).map(|s| s.len()).max().unwrap_or(0);
+    let label_width = ["codediff", "treesitter_parse", "gumtree_warm"]
+        .iter()
+        .chain(&tool_names)
+        .map(|s| s.len())
+        .max()
+        .unwrap_or(0);
 
     println!();
     println!("Per-tool runtime (time to produce line-level touched/untouched labels):");
     println!("{:<label_width$}  {:>10}  {:>10}", "Tool", "Total ms", "Mean ms", label_width = label_width);
     println!("{}", "-".repeat(label_width + 2 + 10 + 2 + 10));
+
+    // Printed first, above codediff, since it's a lower bound every other row's cost sits on top
+    // of, not another tool competing with them.
+    let treesitter_total: f64 = rows.iter().map(|r| r.treesitter_ms).sum();
+    println!(
+        "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})  <- tree-sitter parse only, reference lower bound",
+        "treesitter_parse",
+        treesitter_total,
+        treesitter_total / rows.len().max(1) as f64,
+        rows.len(),
+        label_width = label_width
+    );
 
     let codediff_total: f64 = rows.iter().map(|r| r.codediff_ms).sum();
     println!(
@@ -608,6 +788,21 @@ fn print_runtime_table(rows: &[Row]) {
             label_width = label_width
         );
     }
+
+    // Only printed when the batch driver actually ran - see `gumtree_warm_batch`'s doc comment for
+    // when that's `None` across every row.
+    let warm: Vec<f64> = rows.iter().filter_map(|r| r.gumtree_warm_ms).collect();
+    if !warm.is_empty() {
+        let total: f64 = warm.iter().sum();
+        println!(
+            "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})  <- same algorithm as gumtree, warm JVM (see research/drivers/gumtree-batch)",
+            "gumtree_warm",
+            total,
+            total / warm.len() as f64,
+            warm.len(),
+            label_width = label_width
+        );
+    }
 }
 
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
@@ -619,13 +814,20 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "total_lines".to_string(),
         "codediff_mismatches".to_string(),
         "codediff_ms".to_string(),
+        "treesitter_parse_ms".to_string(),
     ];
     header.extend(ExternalTool::ALL.iter().flat_map(|t| [format!("{}_mismatches", t.name()), format!("{}_ms", t.name())]));
+    header.push("gumtree_warm_ms".to_string());
     wtr.write_record(&header)?;
 
     for row in rows {
-        let mut record =
-            vec![row.name.clone(), row.codediff.1.to_string(), row.codediff.0.to_string(), row.codediff_ms.to_string()];
+        let mut record = vec![
+            row.name.clone(),
+            row.codediff.1.to_string(),
+            row.codediff.0.to_string(),
+            row.codediff_ms.to_string(),
+            row.treesitter_ms.to_string(),
+        ];
         // Empty field, not "0" - a tool this fixture is out of scope for (`ExternalTool::supports`
         // was false) didn't score 0 mismatches, it wasn't scored at all. Downstream readers
         // (`benchmark_other_report.py`) must treat a blank the same way pandas/csv already do:
@@ -633,6 +835,11 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         record.extend(row.tools.iter().zip(&row.tool_ms).flat_map(|(cell, ms)| {
             [cell.map(|(mismatches, _)| mismatches.to_string()).unwrap_or_default(), ms.map(|v| v.to_string()).unwrap_or_default()]
         }));
+        // Blank whenever the batch driver wasn't available for this run at all (see
+        // `gumtree_warm_batch`'s doc comment), same "blank means not scored" convention as above -
+        // not blank per-fixture the way `tool_ms` can be, since GumTree's language scope already
+        // determines that before the batch driver even runs.
+        record.push(row.gumtree_warm_ms.map(|v| v.to_string()).unwrap_or_default());
         wtr.write_record(&record)?;
     }
     wtr.flush()?;

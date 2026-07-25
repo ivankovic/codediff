@@ -31,9 +31,11 @@ Writes two plots:
     higher is better and 100% means every line matched the human mapping), bucketed into fixed
     10-point-wide bins spanning the full 0-100% axis - one color per tool, sharing the same bins,
     so the two distributions sit side by side within each bucket.
-  - benchmark_other_runtime.png: full per-fixture runtime distribution, one violin per tool
-    (log-scale y-axis, KDE computed in log10-space - codediff's per-fixture times span ~3 orders
-    of magnitude, so a single mean bar hides exactly the shape that matters here).
+  - benchmark_other_runtime.png: full per-fixture runtime distribution, one violin per tool plus a
+    `treesitter_parse_ms` reference violin (log-scale y-axis, KDE computed in log10-space -
+    codediff's per-fixture times span ~3 orders of magnitude, so a single mean bar hides exactly
+    the shape that matters here). The reference violin is tree-sitter parsing alone, with no
+    diffing on top - the lower bound every other series must clear before its own work starts.
 
 Usage (from research/):
     uv run ./analysis/benchmark_other_report.py
@@ -56,13 +58,18 @@ INK_MUTED = "#898781"
 GRIDLINE = "#e1e0d9"
 BASELINE = "#c3c2b7"
 
-# Categorical slots 1 (blue), 2 (orange), 7 (violet) from the dataviz skill's reference palette -
-# validated colorblind-safe as a trio via validate_palette.js (light mode, all PASS). Each tool
-# keeps one fixed slot regardless of which subset of tools a given chart shows - "color follows
-# the entity, never its rank" - so `gumtree` is always violet whether it's plotted alongside
-# `unix_diff` or alone.
+# Categorical slots 1 (blue), 2 (orange), 7 (violet), 6 (green), 8 (red) from the dataviz skill's
+# reference palette - validated colorblind-safe as a fivesome via validate_palette.js (light + dark
+# mode, all PASS) *in this exact left-to-right order* (green, blue, orange, violet, red) - the
+# validator checks adjacent pairs, so re-ordering the x-axis without re-validating could silently
+# reintroduce a CVD collision (green next to orange, tried first, failed at ΔE 3.2 protan). Each
+# series keeps one fixed slot regardless of which subset a given chart shows - "color follows the
+# entity, never its rank" - so `gumtree` is always violet and `gumtree_warm` is always red, whether
+# plotted alongside every other series or alone.
 CODEDIFF_COLOR = "#2a78d6"
 TOOL_COLORS = {"unix_diff": "#eb6834", "gumtree": "#4a3aa7"}
+TREESITTER_COLOR = "#008300"
+GUMTREE_WARM_COLOR = "#e34948"
 
 
 def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
@@ -156,6 +163,10 @@ def plot_accuracy(rows: list[dict], tools: list[str], output_path: Path) -> None
     only a small slice, give it a second, separately-scaled panel instead of folding it into these
     bars (see git history around 2026-07 for the two-panel version this replaced, back when GumTree
     covered only 5 of 93 fixtures).
+
+    `treesitter_parse` never appears here, unlike in `plot_runtime` - it produces no line labels,
+    so it has nothing to agree or disagree with the human mapping about; it's a runtime reference
+    only.
     """
     labels = ["codediff"] + tools
     colors = [CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
@@ -175,21 +186,47 @@ def plot_accuracy(rows: list[dict], tools: list[str], output_path: Path) -> None
 
 
 def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
-    """One violin per tool, full per-fixture distribution rather than just the mean - codediff's
-    93 per-fixture times span ~3 orders of magnitude (3ms to 3.9s, dominated by file size), so a
-    single bar hides exactly the shape that matters here. `violinplot` runs its KDE in log10-space
-    (matplotlib's own kernel bandwidth assumes a linear axis, so feeding it raw ms on a log-scaled
-    axis would misshape the KDE) - the y-axis ticks are then relabeled back to real ms.
+    """One violin per tool, plus a `treesitter_parse` reference violin and (when present in the
+    CSV) a `gumtree_warm` reference violin, full per-fixture distribution rather than just the mean
+    - codediff's 93 per-fixture times span ~3 orders of magnitude (3ms to 3.9s, dominated by file
+    size), so a single bar hides exactly the shape that matters here. `violinplot` runs its KDE in
+    log10-space (matplotlib's own kernel bandwidth assumes a linear axis, so feeding it raw ms on a
+    log-scaled axis would misshape the KDE) - the y-axis ticks are then relabeled back to real ms.
+
+    `treesitter_parse` goes first, ahead of codediff: it's not a competing tool (no accuracy to
+    score, see `plot_accuracy`'s doc comment for why it's absent there), it's the reference lower
+    bound every AST-aware series to its right must pay before their own work even starts - reading
+    left to right is reading the cost stack from the ground up.
+
+    `gumtree_warm` goes last, right after `gumtree`: same algorithm, same accuracy, timed inside a
+    persistent JVM instead of a fresh subprocess per fixture (`research/drivers/gumtree-batch/`) -
+    it isolates GumTree's own cost from the JVM-startup overhead `gumtree`'s own violin includes.
+    `benchmark_other.rs` only fills this column in when the batch driver was actually available for
+    that run (see `gumtree_warm_batch`'s doc comment) - every cell blank means the whole column is
+    absent, not scored per-fixture like `gumtree_ms` can be, so `tools` (built from `_mismatches`
+    columns) never lists it and it needs its own opt-in check here.
 
     Each tool's violin is built from its own `applicable_rows` (see that function's doc comment) -
     a language-scoped tool like GumTree has far fewer points than codediff/unix_diff, so its violin
     is necessarily noisier and its x-tick carries an explicit "(n=...)" rather than implying the
-    same sample size as everything else on the axis."""
-    labels = ["codediff"] + tools
-    colors = [CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
-    sample_sizes = [len(rows)] + [len(applicable_rows(rows, tool)) for tool in tools]
-    series_ms = [np.array([float(r["codediff_ms"]) for r in rows])]
+    same sample size as everything else on the axis. `treesitter_parse_ms` has no scope gaps (every
+    corpus language parses), so it's always full sample size, same as codediff."""
+    labels = ["treesitter_parse", "codediff"] + tools
+    colors = [TREESITTER_COLOR, CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
+    sample_sizes = [len(rows), len(rows)] + [len(applicable_rows(rows, tool)) for tool in tools]
+    series_ms = [
+        np.array([float(r["treesitter_parse_ms"]) for r in rows]),
+        np.array([float(r["codediff_ms"]) for r in rows]),
+    ]
     series_ms += [np.array([float(r[f"{tool}_ms"]) for r in applicable_rows(rows, tool)]) for tool in tools]
+
+    if rows and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows):
+        warm_rows = [r for r in rows if r["gumtree_warm_ms"] != ""]
+        labels.append("gumtree_warm")
+        colors.append(GUMTREE_WARM_COLOR)
+        sample_sizes.append(len(warm_rows))
+        series_ms.append(np.array([float(r["gumtree_warm_ms"]) for r in warm_rows]))
+
     series_log = [np.log10(s) for s in series_ms]
 
     fig, ax = plt.subplots(figsize=(3 + 2 * len(labels), 5.5), facecolor=SURFACE)
