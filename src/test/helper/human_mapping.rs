@@ -155,7 +155,7 @@ fn node_kind_for_id(root: Node, node_id: usize) -> String {
 /// (i.e. deleted, if `node` is in the before tree, or inserted, if in the after tree) in `node_map`.
 fn check_subtree_maps_to_zero(
     node: Node,
-    node_map: &HashMap<usize, usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
     context: &str,
     mismatches: &mut Vec<String>,
     lookup_root: Node,

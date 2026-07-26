@@ -91,8 +91,8 @@
             after_meta,
             before_root_ids,
             after_root_ids,
-            &HashMap::new(),
-            &HashMap::new(),
+            &rustc_hash::FxHashMap::default(),
+            &rustc_hash::FxHashMap::default(),
         );
     }
 
@@ -101,8 +101,8 @@
         after_meta: &ASTMetadata,
         before_root_ids: &[usize],
         after_root_ids: &[usize],
-        before_node_map: &HashMap<usize, usize>,
-        after_node_map: &HashMap<usize, usize>,
+        before_node_map: &rustc_hash::FxHashMap<usize, usize>,
+        after_node_map: &rustc_hash::FxHashMap<usize, usize>,
     ) {
         let cost_model = UnitCostModel {
             language: Language::Unknown,
@@ -188,7 +188,7 @@
         let cost_model = UnitCostModel {
             language: Language::Unknown,
         };
-        let empty_map = HashMap::new();
+        let empty_map = rustc_hash::FxHashMap::default();
 
         let before_idx = PostorderIndexer::build(before_meta, before_root_ids, &empty_map);
         let after_idx = PostorderIndexer::build(after_meta, after_root_ids, &empty_map);
@@ -463,7 +463,7 @@
         let cost_model = UnitCostModel {
             language: Language::Unknown,
         };
-        let empty_map = HashMap::new();
+        let empty_map = rustc_hash::FxHashMap::default();
 
         for depth in [9usize, 10, 11, 12, 14] {
             let mut before_nodes = Vec::new();
@@ -540,7 +540,7 @@
         let cost_model = UnitCostModel {
             language: Language::Unknown,
         };
-        let empty_map = HashMap::new();
+        let empty_map = rustc_hash::FxHashMap::default();
 
         for depth in [8usize, 9, 10] {
             let mut rng = Rng(depth as u64 * 7919 + 1);
@@ -669,7 +669,7 @@
         let cost_model = UnitCostModel {
             language: Language::Unknown,
         };
-        let empty_map = HashMap::new();
+        let empty_map = rustc_hash::FxHashMap::default();
         let before_idx = PostorderIndexer::build(before, &[before_root], &empty_map);
         let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
 
@@ -840,7 +840,7 @@
         let cost_model = UnitCostModel {
             language: Language::Unknown,
         };
-        let empty_map = HashMap::new();
+        let empty_map = rustc_hash::FxHashMap::default();
         let before_idx = PostorderIndexer::build(&before, &[0], &empty_map);
         let after_idx = PostorderIndexer::build(&after, &[7], &empty_map);
 
@@ -1061,7 +1061,7 @@
         after_nodes: &[(usize, String, String, Vec<usize>)],
         before_root: usize,
         after_root: usize,
-    ) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
+    ) -> (rustc_hash::FxHashMap<usize, usize>, rustc_hash::FxHashMap<usize, usize>) {
         let mut before_leaves: Vec<usize> = before_nodes
             .iter()
             .filter(|(id, _, _, children)| *id != before_root && children.is_empty())
@@ -1078,11 +1078,11 @@
 
         let max_k = before_leaves.len().min(after_leaves.len());
         if max_k == 0 {
-            return (HashMap::new(), HashMap::new());
+            return (rustc_hash::FxHashMap::default(), rustc_hash::FxHashMap::default());
         }
         let k = 1 + rng.range(max_k.min(3));
-        let mut before_map = HashMap::new();
-        let mut after_map = HashMap::new();
+        let mut before_map = rustc_hash::FxHashMap::default();
+        let mut after_map = rustc_hash::FxHashMap::default();
         for i in 0..k {
             before_map.insert(before_leaves[i], after_leaves[i]);
             after_map.insert(after_leaves[i], before_leaves[i]);
@@ -1171,8 +1171,8 @@
             (13, "leaf", "c", &[]),
             (14, "leaf", "y", &[]),
         ]);
-        let before_map: HashMap<usize, usize> = [(2, 12), (4, 14)].into_iter().collect();
-        let after_map: HashMap<usize, usize> = [(12, 2), (14, 4)].into_iter().collect();
+        let before_map: rustc_hash::FxHashMap<usize, usize> = [(2, 12), (4, 14)].into_iter().collect();
+        let after_map: rustc_hash::FxHashMap<usize, usize> = [(12, 2), (14, 4)].into_iter().collect();
         assert_distance_matches_oracle_pruned(
             &before,
             &after,

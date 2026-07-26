@@ -201,8 +201,8 @@ impl Solution {
 */
 fn count_unmatched_nodes(
     node_id: usize,
-    node_cache: &HashMap<usize, tree_sitter::Node<'static>>,
-    mapped_nodes: &HashMap<usize, usize>,
+    node_cache: &rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>>,
+    mapped_nodes: &rustc_hash::FxHashMap<usize, usize>,
 ) -> usize {
     // Get the node from cache
     let node = match node_cache.get(&node_id) {

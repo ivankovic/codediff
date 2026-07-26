@@ -21,7 +21,6 @@ pub mod metadata;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
 
 use anyhow::{Result, anyhow};
-use std::collections::HashMap;
 use std::fmt;
 
 /**

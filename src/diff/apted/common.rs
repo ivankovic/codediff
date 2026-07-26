@@ -125,14 +125,14 @@ impl PostorderIndexer {
     pub(crate) fn build(
         metadata: &ASTMetadata,
         root_ids: &[usize],
-        node_map: &HashMap<usize, usize>,
+        node_map: &rustc_hash::FxHashMap<usize, usize>,
     ) -> Self {
         fn visit(
             node_id: usize,
             metadata: &ASTMetadata,
-            node_map: &HashMap<usize, usize>,
+            node_map: &rustc_hash::FxHashMap<usize, usize>,
             pre_to_node_id: &mut Vec<usize>,
-            node_id_to_pre: &mut HashMap<usize, usize>,
+            node_id_to_pre: &mut rustc_hash::FxHashMap<usize, usize>,
         ) {
             if node_map.contains_key(&node_id) {
                 return;
@@ -149,7 +149,7 @@ impl PostorderIndexer {
         }
 
         let mut pre_to_node_id: Vec<usize> = Vec::new();
-        let mut node_id_to_pre: HashMap<usize, usize> = HashMap::new();
+        let mut node_id_to_pre: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
         let mut root_pres: Vec<usize> = Vec::new();
 
         for &root_id in root_ids {
@@ -941,7 +941,7 @@ fn add_prune_mappings(
     meta: &ASTMetadata,
     source: &'static str,
     diff: &mut ASTDiff,
-    node_map: fn(&ASTDiff) -> &HashMap<usize, usize>,
+    node_map: fn(&ASTDiff) -> &rustc_hash::FxHashMap<usize, usize>,
     mapping_key: fn(usize) -> (usize, usize),
     operation: &ASTMappingOperation,
     subtree_cost: fn(usize, &ASTMetadata, &UnitCostModel) -> u64,
@@ -1058,7 +1058,7 @@ const FLAT_MAX_EDIT: usize = 1000;
 fn flat_children(
     root_id: usize,
     meta: &ASTMetadata,
-    node_map: &HashMap<usize, usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Option<Vec<usize>> {
     let info = meta.node_info.get(&root_id)?;
     let children: Vec<usize> = info
@@ -1235,7 +1235,7 @@ fn resolve_flat_tree_pair(
 
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/
 /// `diff.after_node_map` for the before/after side respectively).
-pub(crate) fn filter_mapped_nodes(node_ids: Vec<usize>, node_map: &HashMap<usize, usize>) -> Vec<usize> {
+pub(crate) fn filter_mapped_nodes(node_ids: Vec<usize>, node_map: &rustc_hash::FxHashMap<usize, usize>) -> Vec<usize> {
     node_ids.into_iter().filter(|node_id| !node_map.contains_key(node_id)).collect()
 }
 
@@ -2052,12 +2052,12 @@ fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &rustc_hash::F
 fn compute_pruned_targets(
     root_ids: &[usize],
     meta: &ASTMetadata,
-    node_map: &HashMap<usize, usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> rustc_hash::FxHashMap<usize, Vec<usize>> {
     fn visit(
         node_id: usize,
         meta: &ASTMetadata,
-        node_map: &HashMap<usize, usize>,
+        node_map: &rustc_hash::FxHashMap<usize, usize>,
         memo: &mut rustc_hash::FxHashMap<usize, Vec<usize>>,
     ) -> Vec<usize> {
         if let Some(cached) = memo.get(&node_id) {

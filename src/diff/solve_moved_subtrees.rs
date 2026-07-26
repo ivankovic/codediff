@@ -49,7 +49,7 @@
 //!   function's `width * height` re-surfacing inside a new `data class`'s method - reads as new
 //!   code that happens to spell the same (kotlin-refactor-function's ground truth deletes it).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::nodes::is_reference;
@@ -157,7 +157,7 @@ fn outermost_unmapped_reference_kind<'m>(
     node: usize,
     meta: &'m ASTMetadata,
     parents: &rustc_hash::FxHashMap<usize, usize>,
-    node_map: &HashMap<usize, usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
     language: &Language,
 ) -> Option<&'m str> {
     let mut outermost = None;
@@ -184,7 +184,7 @@ fn outermost_unmapped_reference_kind<'m>(
 fn subtree_fully_unmapped(
     root: usize,
     meta: &ASTMetadata,
-    node_map: &std::collections::HashMap<usize, usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> bool {
     if node_map.get(&root) != Some(&0) {
         return false;

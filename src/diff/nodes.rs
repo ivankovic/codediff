@@ -15,8 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::HashMap;
-
 use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code, Language};
@@ -73,7 +71,7 @@ pub fn map_identical_descendants<'a>(before_node: Node<'a>, after_node: Node<'a>
 /// `collect_unmatched_diagnostic_statements`, which differed only in their predicate.
 pub fn collect_unmatched<'a>(
     root: Node<'a>,
-    mapped: &HashMap<usize, usize>,
+    mapped: &rustc_hash::FxHashMap<usize, usize>,
     predicate: impl Fn(Node<'a>) -> bool,
 ) -> Vec<Node<'a>> {
     let mut result = Vec::new();

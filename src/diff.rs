@@ -54,9 +54,15 @@ use crate::diff::text::TextDiff;
 /// `Code` it was derived from would be silent undefined behavior, not a compile error or panic.
 pub struct NodeCache {
     /// Cache of nodes from the before Code object, keyed by node ID.
-    pub before: HashMap<usize, tree_sitter::Node<'static>>,
+    ///
+    /// `FxHashMap`, not `std::collections::HashMap` - same rationale as `ASTMetadata::
+    /// node_to_parent` (`code.rs`): a small-integer-keyed map read on every node lookup in every
+    /// pipeline phase, where SipHash's per-process random reseed is pure overhead with no
+    /// adversarial-input benefit. Converted 2026-07-26 alongside `ASTMetadata`'s remaining maps
+    /// and `ASTDiff::mapping`/`before_node_map`/`after_node_map`.
+    pub before: rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>>,
     /// Cache of nodes from the after Code object, keyed by node ID.
-    pub after: HashMap<usize, tree_sitter::Node<'static>>,
+    pub after: rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>>,
 }
 
 impl NodeCache {
@@ -74,11 +80,11 @@ impl NodeCache {
 
     /// Every node of `code`'s AST, keyed by node ID, under the erased `'static` lifetime
     /// described on `NodeCache`. Empty if `code` has no AST.
-    fn cache_for(code: &Code) -> HashMap<usize, tree_sitter::Node<'static>> {
+    fn cache_for(code: &Code) -> rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>> {
         code.ast
             .as_ref()
             .map(|ast| {
-                let mut cache = HashMap::new();
+                let mut cache = rustc_hash::FxHashMap::default();
                 let mut stack = vec![ast.root_node()];
 
                 while let Some(node) = stack.pop() {
@@ -316,13 +322,23 @@ impl Default for HeuristicConfig {
 #[derive(Debug, Clone, Default)]
 pub struct ASTDiff {
     /// Map of AST nodes from the before AST to the after AST.
-    pub mapping: HashMap<(usize, usize), ASTMapping>,
+    ///
+    /// `FxHashMap`, not `std::collections::HashMap` on this and the two maps below - same
+    /// rationale as `ASTMetadata::node_to_parent` (`code.rs`): read via `.contains_key()`/`.get()`
+    /// on every candidate node considered by every pipeline phase, so SipHash's per-process random
+    /// reseed is pure overhead here. Converted 2026-07-26 alongside `ASTMetadata`'s remaining maps
+    /// and `NodeCache`. Direct iteration of all three (not just `.get()`/`.contains_key()`) was
+    /// audited first: every call site either only exists in `#[test]`s doing order-independent
+    /// assertions, or (like `solve_comment_nodes::solve`'s `current_mappings` snapshot) is
+    /// provably order-independent by construction - each entry's outcome depends only on a fixed
+    /// pre-computed snapshot, never on what an earlier same-loop iteration did.
+    pub mapping: rustc_hash::FxHashMap<(usize, usize), ASTMapping>,
     /// Map of nodes from the before tree to the after tree, or 0 if it is a delete.
     /// Useful if you are walking the before tree and need to look up the mapping.
-    pub before_node_map: HashMap<usize, usize>,
+    pub before_node_map: rustc_hash::FxHashMap<usize, usize>,
     /// Map of nodes from the after tree to the before tree, or 0 if it is an insert.
     /// Useful if you are walking the after tree and need to look up the mapping.
-    pub after_node_map: HashMap<usize, usize>,
+    pub after_node_map: rustc_hash::FxHashMap<usize, usize>,
 }
 
 impl ASTDiff {

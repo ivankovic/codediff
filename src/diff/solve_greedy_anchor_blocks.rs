@@ -212,7 +212,7 @@ fn node_kind(id: usize, metadata: &ASTMetadata) -> String {
 /// run to run regardless of the `HashMap` iteration order this starts from.
 fn collect_candidates(
     metadata: &ASTMetadata,
-    mapped: &std::collections::HashMap<usize, usize>,
+    mapped: &rustc_hash::FxHashMap<usize, usize>,
     language: &Language,
 ) -> Vec<usize> {
     let mut candidates: Vec<usize> = metadata

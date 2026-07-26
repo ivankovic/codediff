@@ -333,7 +333,7 @@ fn solve_import_list_overlap(before: &Code, after: &Code, diff: &mut ASTDiff) {
 fn collect_rust_grouped_use_declarations<'a>(
     root: Node<'a>,
     code: &'a Code,
-    mapped: &HashMap<usize, usize>,
+    mapped: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Vec<(usize, String, HashSet<&'a str>)> {
     let bytes = code.contents.as_bytes();
     let mut out = Vec::new();

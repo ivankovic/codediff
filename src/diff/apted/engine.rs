@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
-
 use crate::code::{ASTMetadata, ASTNodeMetadata};
 
 use super::common::{ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel};
@@ -117,13 +115,13 @@ impl AptedIndexer {
     pub(crate) fn build(
         metadata: &ASTMetadata,
         root_ids: &[usize],
-        node_map: &HashMap<usize, usize>,
+        node_map: &rustc_hash::FxHashMap<usize, usize>,
     ) -> Self {
         fn visit(
             node_id: usize,
             parent_pre: usize,
             metadata: &ASTMetadata,
-            node_map: &HashMap<usize, usize>,
+            node_map: &rustc_hash::FxHashMap<usize, usize>,
             pre_to_node_id: &mut Vec<Option<usize>>,
             parents: &mut Vec<i64>,
             children: &mut Vec<Vec<usize>>,
@@ -2102,8 +2100,8 @@ pub(crate) fn compute_delta(
     cost_model: &UnitCostModel,
     before_root_ids: &[usize],
     after_root_ids: &[usize],
-    before_node_map: &HashMap<usize, usize>,
-    after_node_map: &HashMap<usize, usize>,
+    before_node_map: &rustc_hash::FxHashMap<usize, usize>,
+    after_node_map: &rustc_hash::FxHashMap<usize, usize>,
     containment: Option<&ContainmentCtx>,
 ) -> DeltaTable {
     let mut real_delta = DeltaTable::new(before.size.max(1), after.size.max(1));
@@ -2186,8 +2184,8 @@ pub(crate) fn compute_delta_with_driver(
     cost_model: &UnitCostModel,
     before_root_ids: &[usize],
     after_root_ids: &[usize],
-    before_node_map: &HashMap<usize, usize>,
-    after_node_map: &HashMap<usize, usize>,
+    before_node_map: &rustc_hash::FxHashMap<usize, usize>,
+    after_node_map: &rustc_hash::FxHashMap<usize, usize>,
     containment: Option<&ContainmentCtx>,
     drive: impl Fn(&EngineCtx, &mut DeltaTable, usize, usize) -> u64,
 ) -> DeltaTable {
@@ -2243,8 +2241,8 @@ pub(crate) fn compute_delta_forced_right(
     cost_model: &UnitCostModel,
     before_root_ids: &[usize],
     after_root_ids: &[usize],
-    before_node_map: &HashMap<usize, usize>,
-    after_node_map: &HashMap<usize, usize>,
+    before_node_map: &rustc_hash::FxHashMap<usize, usize>,
+    after_node_map: &rustc_hash::FxHashMap<usize, usize>,
     containment: Option<&ContainmentCtx>,
 ) -> DeltaTable {
     compute_delta_with_driver(

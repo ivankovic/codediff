@@ -15,8 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use std::collections::HashMap;
-
 use crate::code::{ASTMetadata, Code, Language};
 use crate::code::metadata::metadata_of;
 use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
