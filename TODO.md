@@ -1787,3 +1787,59 @@ maps get proportionally more benefit from a cheaper hash function than many smal
 this round did nothing. Kept on the same zero-risk basis as the first round, not oversold as a
 second big win - the honest finding is "no regression, unclear additional gain," and that's what's
 recorded here rather than a fabricated speedup number.
+
+## `benchmark_other --repeats N`: fixed the measurement noise directly, added a per-tool variance chart - 2026-07-26 (user-requested)
+
+The noise flagged in the round above (`benchmark_other`'s own median/p90/max swinging ~+-10%
+between back-to-back single-shot runs) made it impossible to tell a real speed change from ambient
+system load using a single run. User asked to fix this properly: run every measurement 3x, report
+all of them, chart the variance per tool, and regenerate the existing plots against real repeated
+data.
+
+**`benchmark_other.rs` changes**: added `--repeats <N>` (default 3). Mismatch/accuracy counts are
+computed once per fixture (deterministic - re-deriving them per repeat would be wasted work, not a
+second independent measurement); only wall-clock timing (`codediff_ms`, each `tool_ms`,
+`treesitter_parse_ms`, `gumtree_warm_ms`) is re-measured `--repeats` times. `gumtree_warm_ms` in
+particular required repeating the *whole-corpus* `gumtree_warm_batch` JVM call `--repeats` times
+(it's called once for the whole corpus, not per-fixture), not just looping inside the per-fixture
+loop like the others. `Row`'s timing fields became `Vec<f64>` (one entry per repeat);
+`benchmark_other.csv`'s timing columns now hold every repeat `;`-joined in one field (`join_ms`) -
+`"12.3;13.1;12.8"` for 3 repeats - rather than adding new numbered columns, so the CSV's shape
+(column count) stays stable regardless of `--repeats`, and `--repeats 1` produces a CSV
+byte-for-byte compatible with "no repeats" (a one-element list). `print_runtime_table` gained a
+"CoV %" column (`mean_coefficient_of_variation`: per-fixture stddev/mean averaged across fixtures)
+so the noise problem is visible directly in the console table, not just in the CSV/plots.
+
+**`benchmark_other_report.py` changes**: `ms_values`/`ms_median` parse the new `;`-joined columns.
+`plot_runtime` now plots every individual repeat as its own point (294 = 98 fixtures x 3 repeats
+for codediff/unix_diff/treesitter, fewer for GumTree's language-scoped n=97) instead of one point
+per fixture - a real increase in the honest sample size, not just re-plotting the same data.
+`plot_variance` is the new third chart (`benchmark_other_variance.png`): one box (+ jittered strip)
+per tool of `coefficients_of_variation` (per-fixture stddev/mean %, matching the console table's
+new column), answering "how much should a single run's number be trusted" as a companion to the
+runtime plot's "what does the full distribution look like." A tool with fewer than 3 usable
+multi-repeat fixtures is dropped from this chart rather than drawing a misleading box from 1-2
+points (mirrors `applicable_rows`' existing "drop, don't zero-fill" convention).
+
+**Real result, run against the full 98-fixture corpus with `--repeats 3`**: per-fixture-then-
+averaged CoV was **codediff 2.5% median / 5.1% mean** - far tighter than the ~10% swings seen
+comparing *whole-corpus aggregate* percentiles between separate single-shot runs (that comparison
+was conflating per-fixture noise with which specific fixtures happened to land near a percentile
+boundary in the flattened distribution - two different things, and per-fixture CoV is the more
+honest one to trust for "how noisy is codediff specifically"). `treesitter_parse` was noisiest
+(11.6% median CoV - unsurprising, its absolute times are the smallest in the whole benchmark, ~1ms,
+so fixed overhead dominates the measurement); `unix_diff` 7.9%; `gumtree`/`gumtree_warm` (subprocess
++ JVM) 3.9%/2.6%.
+
+**Trustworthy `codediff_ms` numbers from this run** (294 flattened samples, or 98 per-fixture
+medians-of-3 - both given since they answer slightly different questions and landed close together,
+confirming the noise problem really is fixed): flattened median 46.73ms / p90 1028.9ms / max
+3162.1ms; per-fixture-median median 46.34ms / p90 950.7ms / max 3147.9ms. Still well short of the
+`/goal` targets (20ms/100ms/400ms), but for the first time these numbers are actually trustworthy
+enough to compare a future change's before/after against, rather than needing a "this might just be
+noise" caveat attached to every single-run number.
+
+**Validated**: `cargo test --release` (every target): all green, 362 lib tests + every other
+binary, 0 failures (this touched `benchmark_other.rs`'s scoring/CSV/table logic non-trivially, so
+re-ran the full suite even though nothing in the library itself changed). `research/benchmark_
+other.csv` and all three PNGs in `research/plots/` regenerated from this real run and committed.

@@ -73,6 +73,17 @@ struct Args {
     /// Output results as a CSV file. Default path: "./research/benchmark_other.csv"
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
+
+    /// How many times to re-run every timing measurement (codediff, each `ExternalTool`,
+    /// `treesitter_parse`, and - via `gumtree_warm_batch` - `gumtree_warm`) per fixture. Accuracy/
+    /// mismatch counts are deterministic (same algorithm, same input, every run) and are only ever
+    /// computed once regardless of this value - only wall-clock timing is repeated. Default 3:
+    /// this benchmark's own runtime numbers were found (2026-07-26) to swing by roughly +-10%
+    /// between back-to-back single-shot runs on a loaded machine, which is noise a single sample
+    /// can't distinguish from a real regression - `write_csv` records every repeat, not just a
+    /// mean, so downstream analysis can see the actual spread rather than a single point estimate.
+    #[arg(long, default_value_t = 3)]
+    repeats: usize,
 }
 
 /// An external, non-codediff diff tool being scored against the human-authored mapping. Adding a
@@ -508,17 +519,19 @@ struct Row {
     /// Milliseconds to go from `before`/`after` to codediff's per-line touched labels
     /// (`diff::diff_code` plus the `touched_lines` projection) - timed the same way as each
     /// `ExternalTool`, so the two are comparable: "cost to produce a line-level touched/untouched
-    /// verdict," not just "cost to run the underlying algorithm."
-    codediff_ms: f64,
+    /// verdict," not just "cost to run the underlying algorithm." One entry per `--repeats`
+    /// iteration (default 3, see `Args::repeats`) - kept as the full sample, not collapsed to a
+    /// mean, so a noisy fixture is visible as noise rather than silently averaged away.
+    codediff_ms: Vec<f64>,
     /// Same shape as `tools`: milliseconds inside `ExternalTool::line_labels` (which already
-    /// produces line-level labels directly, so no extra projection step to include). `None` in
-    /// lockstep with `tools`.
-    tool_ms: Vec<Option<f64>>,
+    /// produces line-level labels directly, so no extra projection step to include), `Some(one
+    /// entry per repeat)` in lockstep with `tools`' `Some`, `None` when `tools`' entry is `None`.
+    tool_ms: Vec<Option<Vec<f64>>>,
     /// Milliseconds tree-sitter alone spends parsing `before` and `after` into ASTs (summed across
     /// both sides, like `codediff_ms`/`tool_ms` are) - see `treesitter_parse_ms`. A reference lower
     /// bound, not a competing tool: always present (every corpus language parses), never scored for
-    /// accuracy.
-    treesitter_ms: f64,
+    /// accuracy. One entry per repeat, same as `codediff_ms`.
+    treesitter_ms: Vec<f64>,
     /// Milliseconds GumTree itself (parse+match+edit-script, no process-spawn/JVM-startup
     /// overhead) spent on this fixture inside the persistent batch driver - see
     /// `gumtree_warm_batch`. `None` when the batch driver wasn't available for this run (in
@@ -526,24 +539,42 @@ struct Row {
     /// `tools`/`tool_ms` - when this fixture's language is outside GumTree's scope. Accuracy is
     /// identical to the CLI-based `gumtree` entry in `tools` (same algorithm, same generator, same
     /// JSON schema - see `gumtree_touched_from_json`), so there's no separate mismatch count here,
-    /// only a second timing.
-    gumtree_warm_ms: Option<f64>,
+    /// only a second timing. One entry per repeat when present - `main` re-runs the whole-corpus
+    /// batch driver `--repeats` times (see `gumtree_warm_batch`'s call site), same all-or-nothing
+    /// availability as before, just repeated.
+    gumtree_warm_ms: Option<Vec<f64>>,
 }
 
-fn score_fixture(name: &str, before: &Code, after: &Code, gumtree_warm_ms: Option<f64>) -> Result<Row> {
+fn score_fixture(
+    name: &str,
+    before: &Code,
+    after: &Code,
+    repeats: usize,
+    gumtree_warm_ms: Option<Vec<f64>>,
+) -> Result<Row> {
     let language = before.metadata.language.unwrap_or_default();
     let human_diff = human_mapping::as_ast_diff(name, before, after)?;
     let node_cache = NodeCache::build(before, after);
     let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
     let total_lines = human_before.len() + human_after.len();
 
-    let started = std::time::Instant::now();
-    let codediff_diff = diff::diff_code(before, after);
-    let codediff_ast = codediff_diff.ast.context("codediff produced no AST mapping")?;
-    let (codediff_before, codediff_after) = touched_lines(before, after, &codediff_ast, &node_cache);
-    let codediff_ms = started.elapsed().as_secs_f64() * 1000.0;
-    let codediff_mismatches =
-        disagreement_count(&human_before, &codediff_before) + disagreement_count(&human_after, &codediff_after);
+    // Mismatch/accuracy counts are computed once, on the first repeat only - the algorithms under
+    // test are all deterministic (same input, same output, every call), so re-deriving them on
+    // every repeat would be pure wasted work, not a second independent measurement the way timing
+    // is. Only wall-clock time is re-measured `repeats` times below.
+    let mut codediff_mismatches = 0usize;
+    let mut codediff_ms = Vec::with_capacity(repeats);
+    for i in 0..repeats {
+        let started = std::time::Instant::now();
+        let codediff_diff = diff::diff_code(before, after);
+        let codediff_ast = codediff_diff.ast.context("codediff produced no AST mapping")?;
+        let (codediff_before, codediff_after) = touched_lines(before, after, &codediff_ast, &node_cache);
+        codediff_ms.push(started.elapsed().as_secs_f64() * 1000.0);
+        if i == 0 {
+            codediff_mismatches = disagreement_count(&human_before, &codediff_before)
+                + disagreement_count(&human_after, &codediff_after);
+        }
+    }
 
     let mut tools = Vec::with_capacity(ExternalTool::ALL.len());
     let mut tool_ms = Vec::with_capacity(ExternalTool::ALL.len());
@@ -553,16 +584,25 @@ fn score_fixture(name: &str, before: &Code, after: &Code, gumtree_warm_ms: Optio
             tool_ms.push(None);
             continue;
         }
-        let started = std::time::Instant::now();
-        let (tool_before, tool_after) = tool.line_labels(before, after)?;
-        tool_ms.push(Some(started.elapsed().as_secs_f64() * 1000.0));
-        let mismatches =
-            disagreement_count(&human_before, &tool_before) + disagreement_count(&human_after, &tool_after);
+        let mut mismatches = 0usize;
+        let mut ms = Vec::with_capacity(repeats);
+        for i in 0..repeats {
+            let started = std::time::Instant::now();
+            let (tool_before, tool_after) = tool.line_labels(before, after)?;
+            ms.push(started.elapsed().as_secs_f64() * 1000.0);
+            if i == 0 {
+                mismatches = disagreement_count(&human_before, &tool_before)
+                    + disagreement_count(&human_after, &tool_after);
+            }
+        }
+        tool_ms.push(Some(ms));
         tools.push(Some((mismatches, total_lines)));
     }
 
     let mut parser = tree_sitter::Parser::new();
-    let treesitter_ms = treesitter_parse_ms(before, &mut parser) + treesitter_parse_ms(after, &mut parser);
+    let treesitter_ms = (0..repeats)
+        .map(|_| treesitter_parse_ms(before, &mut parser) + treesitter_parse_ms(after, &mut parser))
+        .collect();
 
     Ok(Row {
         name: name.to_string(),
@@ -639,14 +679,34 @@ fn main() -> Result<()> {
             (name.as_str(), before, after)
         })
         .collect();
-    let gumtree_warm = gumtree_warm_batch(&warm_fixtures)?;
+    // Repeated `args.repeats` times, same as every other timing below (see `Args::repeats`) -
+    // `gumtree_warm_batch` re-parses/re-diffs the whole corpus inside one persistent JVM per call,
+    // so each repeat here is a genuine independent wall-clock sample, not a cached replay.
+    let mut gumtree_warm_runs: Vec<HashMap<String, f64>> = Vec::with_capacity(args.repeats);
+    for _ in 0..args.repeats {
+        match gumtree_warm_batch(&warm_fixtures)? {
+            Some(results) => gumtree_warm_runs.push(results),
+            // All-or-nothing per `Row::gumtree_warm_ms`'s doc comment: if the batch driver isn't
+            // available at all, every repeat will report the same `None`, so bail out of the loop
+            // on the first miss rather than repeating a doomed call `args.repeats` times.
+            None => break,
+        }
+    }
+    let gumtree_warm_available = gumtree_warm_runs.len() == args.repeats && args.repeats > 0;
 
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
         let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
-        let warm_ms = gumtree_warm.as_ref().and_then(|results| results.get(name)).copied();
-        rows.push(score_fixture(name, before, after, warm_ms)?);
+        let warm_ms = gumtree_warm_available.then(|| {
+            gumtree_warm_runs.iter().filter_map(|results| results.get(name).copied()).collect::<Vec<f64>>()
+        });
+        // A fixture outside GumTree's language scope has no entry in any repeat's batch results
+        // (see `gumtree_warm_batch`) - `Some(vec![])` there would misrepresent "not applicable" as
+        // "applicable but somehow always empty," so collapse it back to `None` per-fixture, same
+        // as `tool_ms`'s per-fixture `None` for an out-of-scope tool.
+        let warm_ms = warm_ms.filter(|v| !v.is_empty());
+        rows.push(score_fixture(name, before, after, args.repeats, warm_ms)?);
     }
     let elapsed = started.elapsed();
 
@@ -738,6 +798,26 @@ fn pct(mismatches: usize, total: usize) -> f64 {
 
 /// Per-tool timing: total and mean milliseconds across every fixture, each tool timed identically
 /// (see `Row::codediff_ms`/`tool_ms`'s doc comments) so the totals are directly comparable.
+/// Mean per-fixture coefficient of variation (stddev / mean, expressed as a percentage) across
+/// `samples`' repeats - one value per fixture that had at least 2 repeats, then averaged. Answers
+/// "how noisy is a typical single measurement for this tool," as a single summary number
+/// alongside the full per-repeat spread `write_csv` records - a fixture with only 1 repeat
+/// contributes nothing (there's no spread to measure from a single sample).
+fn mean_coefficient_of_variation<'a>(samples: impl Iterator<Item = &'a [f64]>) -> Option<f64> {
+    let cvs: Vec<f64> = samples
+        .filter(|s| s.len() >= 2)
+        .filter_map(|s| {
+            let mean = s.iter().sum::<f64>() / s.len() as f64;
+            if mean <= 0.0 {
+                return None;
+            }
+            let variance = s.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / s.len() as f64;
+            Some(100.0 * variance.sqrt() / mean)
+        })
+        .collect();
+    if cvs.is_empty() { None } else { Some(cvs.iter().sum::<f64>() / cvs.len() as f64) }
+}
+
 fn print_runtime_table(rows: &[Row]) {
     let tool_names: Vec<&str> = ExternalTool::ALL.iter().map(|t| t.name()).collect();
     let label_width = ["codediff", "treesitter_parse", "gumtree_warm"]
@@ -748,61 +828,91 @@ fn print_runtime_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!();
-    println!("Per-tool runtime (time to produce line-level touched/untouched labels):");
-    println!("{:<label_width$}  {:>10}  {:>10}", "Tool", "Total ms", "Mean ms", label_width = label_width);
-    println!("{}", "-".repeat(label_width + 2 + 10 + 2 + 10));
+    println!("Per-tool runtime (time to produce line-level touched/untouched labels, {} repeat(s)/fixture):",
+        rows.first().map(|r| r.codediff_ms.len()).unwrap_or(0));
+    println!(
+        "{:<label_width$}  {:>10}  {:>10}  {:>8}",
+        "Tool", "Total ms", "Mean ms", "CoV %", label_width = label_width
+    );
+    println!("{}", "-".repeat(label_width + 2 + 10 + 2 + 10 + 2 + 8));
 
     // Printed first, above codediff, since it's a lower bound every other row's cost sits on top
-    // of, not another tool competing with them.
-    let treesitter_total: f64 = rows.iter().map(|r| r.treesitter_ms).sum();
+    // of, not another tool competing with them. "Total"/"Mean"/n now flatten every repeat into one
+    // sample (n = fixtures * repeats), same convention for every row below - "CoV %" is the
+    // separate per-fixture-then-averaged spread measure (see `mean_coefficient_of_variation`),
+    // not derivable from the flattened total/mean alone.
+    let treesitter_flat: Vec<f64> = rows.iter().flat_map(|r| r.treesitter_ms.iter().copied()).collect();
+    let treesitter_total: f64 = treesitter_flat.iter().sum();
     println!(
-        "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})  <- tree-sitter parse only, reference lower bound",
+        "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})  <- tree-sitter parse only, reference lower bound",
         "treesitter_parse",
         treesitter_total,
-        treesitter_total / rows.len().max(1) as f64,
-        rows.len(),
+        treesitter_total / treesitter_flat.len().max(1) as f64,
+        mean_coefficient_of_variation(rows.iter().map(|r| r.treesitter_ms.as_slice()))
+            .map(|cv| format!("{cv:.1}"))
+            .unwrap_or_else(|| "-".to_string()),
+        treesitter_flat.len(),
         label_width = label_width
     );
 
-    let codediff_total: f64 = rows.iter().map(|r| r.codediff_ms).sum();
+    let codediff_flat: Vec<f64> = rows.iter().flat_map(|r| r.codediff_ms.iter().copied()).collect();
+    let codediff_total: f64 = codediff_flat.iter().sum();
     println!(
-        "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})",
+        "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})",
         "codediff",
         codediff_total,
-        codediff_total / rows.len().max(1) as f64,
-        rows.len(),
+        codediff_total / codediff_flat.len().max(1) as f64,
+        mean_coefficient_of_variation(rows.iter().map(|r| r.codediff_ms.as_slice()))
+            .map(|cv| format!("{cv:.1}"))
+            .unwrap_or_else(|| "-".to_string()),
+        codediff_flat.len(),
         label_width = label_width
     );
     for (i, tool_name) in tool_names.iter().enumerate() {
         // Mean is over fixtures this tool was actually scored on, not every fixture in the
         // corpus - dividing by `rows.len()` would understate a language-scoped tool's real
         // per-fixture cost by mixing in zero-cost "not applicable" fixtures it never ran on.
-        let scored: Vec<f64> = rows.iter().filter_map(|r| r.tool_ms[i]).collect();
-        let total: f64 = scored.iter().sum();
+        let scored: Vec<&[f64]> = rows.iter().filter_map(|r| r.tool_ms[i].as_deref()).collect();
+        let flat: Vec<f64> = scored.iter().flat_map(|s| s.iter().copied()).collect();
+        let total: f64 = flat.iter().sum();
         println!(
-            "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})",
+            "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})",
             tool_name,
             total,
-            total / scored.len().max(1) as f64,
-            scored.len(),
+            total / flat.len().max(1) as f64,
+            mean_coefficient_of_variation(scored.iter().copied()).map(|cv| format!("{cv:.1}")).unwrap_or_else(|| "-".to_string()),
+            flat.len(),
             label_width = label_width
         );
     }
 
     // Only printed when the batch driver actually ran - see `gumtree_warm_batch`'s doc comment for
     // when that's `None` across every row.
-    let warm: Vec<f64> = rows.iter().filter_map(|r| r.gumtree_warm_ms).collect();
-    if !warm.is_empty() {
-        let total: f64 = warm.iter().sum();
+    let warm: Vec<&[f64]> = rows.iter().filter_map(|r| r.gumtree_warm_ms.as_deref()).collect();
+    let warm_flat: Vec<f64> = warm.iter().flat_map(|s| s.iter().copied()).collect();
+    if !warm_flat.is_empty() {
+        let total: f64 = warm_flat.iter().sum();
         println!(
-            "{:<label_width$}  {:>10.1}  {:>10.3}  (n={})  <- same algorithm as gumtree, warm JVM (see research/drivers/gumtree-batch)",
+            "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})  <- same algorithm as gumtree, warm JVM (see research/drivers/gumtree-batch)",
             "gumtree_warm",
             total,
-            total / warm.len() as f64,
-            warm.len(),
+            total / warm_flat.len() as f64,
+            mean_coefficient_of_variation(warm.iter().copied()).map(|cv| format!("{cv:.1}")).unwrap_or_else(|| "-".to_string()),
+            warm_flat.len(),
             label_width = label_width
         );
     }
+}
+
+/// Serializes a repeat-timing sample as a single CSV field: every repeat's value, in run order,
+/// joined by `;` - e.g. `"12.3;13.1;12.8"` for 3 repeats. Keeps `benchmark_other.csv`'s column
+/// count and shape stable regardless of `--repeats` (1 column per metric, same as before repeats
+/// existed) while still recording every individual measurement, not a mean - `benchmark_other_
+/// report.py` splits this back into a `list[float]` per fixture. A single-repeat run (`--repeats
+/// 1`) produces a one-element field, so the format is a strict superset of the old single-float
+/// column, not a breaking change to what "no repeats" output looks like.
+fn join_ms(values: &[f64]) -> String {
+    values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(";")
 }
 
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
@@ -825,21 +935,24 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
             row.name.clone(),
             row.codediff.1.to_string(),
             row.codediff.0.to_string(),
-            row.codediff_ms.to_string(),
-            row.treesitter_ms.to_string(),
+            join_ms(&row.codediff_ms),
+            join_ms(&row.treesitter_ms),
         ];
         // Empty field, not "0" - a tool this fixture is out of scope for (`ExternalTool::supports`
         // was false) didn't score 0 mismatches, it wasn't scored at all. Downstream readers
         // (`benchmark_other_report.py`) must treat a blank the same way pandas/csv already do:
         // excluded from that tool's aggregate, not coerced to zero.
         record.extend(row.tools.iter().zip(&row.tool_ms).flat_map(|(cell, ms)| {
-            [cell.map(|(mismatches, _)| mismatches.to_string()).unwrap_or_default(), ms.map(|v| v.to_string()).unwrap_or_default()]
+            [
+                cell.map(|(mismatches, _)| mismatches.to_string()).unwrap_or_default(),
+                ms.as_deref().map(join_ms).unwrap_or_default(),
+            ]
         }));
         // Blank whenever the batch driver wasn't available for this run at all (see
         // `gumtree_warm_batch`'s doc comment), same "blank means not scored" convention as above -
         // not blank per-fixture the way `tool_ms` can be, since GumTree's language scope already
         // determines that before the batch driver even runs.
-        record.push(row.gumtree_warm_ms.map(|v| v.to_string()).unwrap_or_default());
+        record.push(row.gumtree_warm_ms.as_deref().map(join_ms).unwrap_or_default());
         wtr.write_record(&record)?;
     }
     wtr.flush()?;

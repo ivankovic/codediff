@@ -19,23 +19,33 @@
 runtime.
 
 Reads benchmark_other.csv (produced by
-`cargo run --release --bin benchmark_other -- --csv`), one row per fixture with
-`<tool>_mismatches`/`<tool>_ms` columns for codediff and every `ExternalTool` - see that binary's
-own doc comment for what "mismatch" means (a line where the tool's touched/untouched call
-disagrees with the human mapping projected down to lines - the only signal a line-based tool like
-Unix diff can produce at all, so it's the fairest common ground, not node-level accuracy).
+`cargo run --release --bin benchmark_other -- --csv --repeats N`), one row per fixture with
+`<tool>_mismatches` (a single count - deterministic, only ever computed once) and `<tool>_ms`
+(every one of the `--repeats` timing measurements for that fixture, `;`-joined into one field -
+see `ms_values`) columns for codediff and every `ExternalTool`. See that binary's own doc comment
+for what "mismatch" means (a line where the tool's touched/untouched call disagrees with the human
+mapping projected down to lines - the only signal a line-based tool like Unix diff can produce at
+all, so it's the fairest common ground, not node-level accuracy). A CSV from a pre-`--repeats`
+build (or `--repeats 1`) still reads fine - each `_ms` field is just a one-element list then.
 
-Writes two plots:
+Writes three plots:
 
   - benchmark_other_accuracy.png: grouped histogram of *agreement* rate (100 - mismatch rate, so
     higher is better and 100% means every line matched the human mapping), bucketed into fixed
     10-point-wide bins spanning the full 0-100% axis - one color per tool, sharing the same bins,
     so the two distributions sit side by side within each bucket.
-  - benchmark_other_runtime.png: full per-fixture runtime distribution, one violin per tool plus a
-    `treesitter_parse_ms` reference violin (log-scale y-axis, KDE computed in log10-space -
-    codediff's per-fixture times span ~3 orders of magnitude, so a single mean bar hides exactly
-    the shape that matters here). The reference violin is tree-sitter parsing alone, with no
-    diffing on top - the lower bound every other series must clear before its own work starts.
+  - benchmark_other_runtime.png: full runtime distribution (every individual repeat, not a
+    per-fixture mean), one violin per tool plus a `treesitter_parse_ms` reference violin (log-scale
+    y-axis, KDE computed in log10-space - codediff's per-fixture times span ~3 orders of magnitude,
+    so a single mean bar hides exactly the shape that matters here). The reference violin is
+    tree-sitter parsing alone, with no diffing on top - the lower bound every other series must pay
+    before its own work even starts.
+  - benchmark_other_variance.png: per-fixture coefficient of variation (stddev/mean across that
+    fixture's repeats, as a %) distribution, one box per tool - added 2026-07-26 after
+    `benchmark_other`'s own aggregate median/p90/max turned out to swing by roughly +-10% between
+    back-to-back single-shot runs on a loaded machine, making a single run's numbers untrustworthy
+    for judging a real speed change. Answers "how much should one run's number be trusted" as a
+    companion to the runtime plot's "what does the distribution look like."
 
 Usage (from research/):
     uv run ./analysis/benchmark_other_report.py
@@ -88,6 +98,27 @@ def tool_names(fieldnames: list[str]) -> list[str]:
 
 def pct(mismatches: np.ndarray, total: np.ndarray) -> np.ndarray:
     return np.divide(mismatches * 100, total, out=np.zeros_like(mismatches, dtype=float), where=total > 0)
+
+
+def ms_values(row: dict, column: str) -> list[float]:
+    """Parses a `benchmark_other.rs` timing column - `write_csv`'s `join_ms` writes every
+    `--repeats` measurement for that fixture as a single `;`-joined field (e.g. `"12.3;13.1;12.8"`
+    for 3 repeats), not a mean, so the actual per-repeat spread survives into this report rather
+    than being collapsed before it's ever plotted. Empty string (tool not applicable to this
+    fixture's language, or the field is genuinely absent) returns `[]`, same "not scored" meaning
+    `applicable_rows` already uses for the sibling `_mismatches` column."""
+    raw = row.get(column, "")
+    return [float(v) for v in raw.split(";")] if raw else []
+
+
+def ms_median(row: dict, column: str) -> float | None:
+    """The single representative value for `row[column]`'s repeats, used wherever a plot needs one
+    number per fixture rather than the full spread (e.g. the accuracy histogram's bucketing is
+    unaffected by timing at all, but a future per-fixture summary would want this) - median, not
+    mean, so one slow outlier repeat (a GC pause, a scheduler hiccup) doesn't move the summary as
+    much as it would move a mean."""
+    values = ms_values(row, column)
+    return float(np.median(values)) if values else None
 
 
 def applicable_rows(rows: list[dict], tool: str) -> list[dict]:
@@ -210,22 +241,34 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     a language-scoped tool like GumTree has far fewer points than codediff/unix_diff, so its violin
     is necessarily noisier and its x-tick carries an explicit "(n=...)" rather than implying the
     same sample size as everything else on the axis. `treesitter_parse_ms` has no scope gaps (every
-    corpus language parses), so it's always full sample size, same as codediff."""
+    corpus language parses), so it's always full sample size, same as codediff.
+
+    Every point plotted is one individual `--repeats` measurement, not a per-fixture mean/median -
+    `ms_values` splits `benchmark_other.rs`'s `;`-joined column back into its full sample, so a
+    fixture run with 3 repeats contributes 3 points to the violin/strip, not 1. This is what makes
+    the shape here directly comparable to `plot_variance`'s per-fixture spread: both read from the
+    same underlying repeats, just aggregated differently. `n` in each x-tick counts *fixtures*
+    (matching `sample_sizes`' pre-existing meaning), not the larger flattened point count - the
+    fixture count is what determines each violin's real independence (3 repeats of the same
+    fixture are correlated with each other, not 3 independent fixtures), so it stays the honest
+    number to report as "n"."""
     labels = ["treesitter_parse", "codediff"] + tools
     colors = [TREESITTER_COLOR, CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
     sample_sizes = [len(rows), len(rows)] + [len(applicable_rows(rows, tool)) for tool in tools]
     series_ms = [
-        np.array([float(r["treesitter_parse_ms"]) for r in rows]),
-        np.array([float(r["codediff_ms"]) for r in rows]),
+        np.array([v for r in rows for v in ms_values(r, "treesitter_parse_ms")]),
+        np.array([v for r in rows for v in ms_values(r, "codediff_ms")]),
     ]
-    series_ms += [np.array([float(r[f"{tool}_ms"]) for r in applicable_rows(rows, tool)]) for tool in tools]
+    series_ms += [
+        np.array([v for r in applicable_rows(rows, tool) for v in ms_values(r, f"{tool}_ms")]) for tool in tools
+    ]
 
     if rows and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows):
         warm_rows = [r for r in rows if r["gumtree_warm_ms"] != ""]
         labels.append("gumtree_warm")
         colors.append(GUMTREE_WARM_COLOR)
         sample_sizes.append(len(warm_rows))
-        series_ms.append(np.array([float(r["gumtree_warm_ms"]) for r in warm_rows]))
+        series_ms.append(np.array([v for r in warm_rows for v in ms_values(r, "gumtree_warm_ms")]))
 
     series_log = [np.log10(s) for s in series_ms]
 
@@ -290,6 +333,114 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     print(f"Plot saved to {output_path}")
 
 
+def coefficients_of_variation(rows: list[dict], column: str) -> np.ndarray:
+    """Per-fixture coefficient of variation (stddev / mean, as a percentage) for `column`'s
+    `--repeats` measurements - one value per fixture that had >= 2 repeats and a positive mean
+    (a fixture run with `--repeats 1`, or a tool not applicable to it, contributes nothing: there's
+    no spread to measure from a single sample). This is the same summary statistic `benchmark_
+    other.rs`'s own `mean_coefficient_of_variation` prints in its console table, computed here
+    directly from the CSV instead of trusting the console output, so this plot and that table can
+    be cross-checked against each other."""
+    out = []
+    for r in rows:
+        values = ms_values(r, column)
+        if len(values) < 2:
+            continue
+        mean = float(np.mean(values))
+        if mean <= 0:
+            continue
+        out.append(100.0 * float(np.std(values)) / mean)
+    return np.array(out)
+
+
+def plot_variance(rows: list[dict], tools: list[str], output_path: Path) -> None:
+    """How noisy is a single timing measurement, per tool - directly motivated by
+    `benchmark_other.rs`'s own aggregate median/p90/max swinging by roughly +-10% between
+    back-to-back single-shot runs on a loaded machine (2026-07-26), which made it impossible to
+    tell a real speed regression/improvement from ambient noise using a single run. One box (plus
+    a jittered strip of the underlying per-fixture points) per tool, `coefficients_of_variation`'s
+    per-fixture CoV% distribution - not the same shape as `plot_runtime`'s absolute-ms violins,
+    this is entirely about *relative* run-to-run spread, so a fast tool and a slow tool can be
+    compared on equal footing here even though their raw ms distributions are incomparable in
+    `plot_runtime`.
+
+    Same label/color/ordering convention as `plot_runtime` (`treesitter_parse`, `codediff`, then
+    every `ExternalTool`, then `gumtree_warm` last if present) so the two plots read as a matched
+    pair - "here's the distribution" next to "here's how much any single draw from that
+    distribution can be trusted."."""
+    labels = ["treesitter_parse", "codediff"] + tools
+    colors = [TREESITTER_COLOR, CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
+    series = [
+        coefficients_of_variation(rows, "treesitter_parse_ms"),
+        coefficients_of_variation(rows, "codediff_ms"),
+    ]
+    series += [coefficients_of_variation(applicable_rows(rows, tool), f"{tool}_ms") for tool in tools]
+
+    if rows and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows):
+        labels.append("gumtree_warm")
+        colors.append(GUMTREE_WARM_COLOR)
+        series.append(coefficients_of_variation(rows, "gumtree_warm_ms"))
+
+    # A tool scored on too few multi-repeat fixtures (e.g. GumTree on a corpus with only 1-2
+    # fixtures in its language scope) can't support a meaningful box - drop it rather than draw a
+    # misleading box from 1-2 points, same spirit as `applicable_rows` dropping out-of-scope rows
+    # entirely instead of coercing them to a misleading value.
+    keep = [i for i, s in enumerate(series) if len(s) >= 3]
+    labels = [labels[i] for i in keep]
+    colors = [colors[i] for i in keep]
+    series = [series[i] for i in keep]
+
+    fig, ax = plt.subplots(figsize=(3 + 1.8 * len(labels), 5.5), facecolor=SURFACE)
+    ax.set_facecolor(SURFACE)
+
+    x = np.arange(len(labels))
+    rng = np.random.default_rng(0)
+    for xi, vals in zip(x, series):
+        jitter = rng.uniform(-0.12, 0.12, size=len(vals))
+        ax.scatter(
+            np.full(len(vals), xi) + jitter, vals, s=10, alpha=0.35,
+            color=INK_MUTED, linewidth=0, zorder=2,
+        )
+
+    box = ax.boxplot(
+        series, positions=x, widths=0.5, showfliers=False, patch_artist=True, zorder=3,
+        medianprops={"color": INK_PRIMARY, "linewidth": 2},
+        whiskerprops={"color": BASELINE}, capprops={"color": BASELINE},
+    )
+    for patch, color in zip(box["boxes"], colors):
+        patch.set_facecolor(color)
+        patch.set_edgecolor(color)
+        patch.set_alpha(0.55)
+
+    for xi, vals, color in zip(x, series, colors):
+        median = float(np.median(vals))
+        ax.text(
+            xi + 0.32, median, f"median {median:.1f}%",
+            ha="left", va="center", fontsize=9, color=INK_SECONDARY, zorder=4,
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{label}\n(n={len(s)})" for label, s in zip(labels, series)], fontsize=10, color=INK_MUTED)
+    ax.set_xlim(-0.6, len(labels) - 1 + 1.1)
+    ax.set_ylim(bottom=0)
+    ax.set_ylabel("Per-fixture coefficient of variation (%)", fontsize=11, color=INK_SECONDARY)
+    ax.set_title(
+        "Timing noise per tool: spread across repeated measurements of the same fixture (lower = more trustworthy single run)",
+        fontsize=12.5, color=INK_PRIMARY, loc="left", pad=12,
+    )
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
+    ax.tick_params(axis="y", colors=INK_MUTED, labelsize=9)
+    ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0, which="major")
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["bottom"].set_color(BASELINE)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
+    plt.close(fig)
+    print(f"Plot saved to {output_path}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare codediff against other diff tools from benchmark_other.csv.")
     parser.add_argument("--csv", default="benchmark_other.csv", help="Path to the benchmark CSV (default: benchmark_other.csv)")
@@ -311,3 +462,4 @@ if __name__ == "__main__":
     plots_dir = Path(args.plots_dir)
     plot_accuracy(rows, tools, plots_dir / "benchmark_other_accuracy.png")
     plot_runtime(rows, tools, plots_dir / "benchmark_other_runtime.png")
+    plot_variance(rows, tools, plots_dir / "benchmark_other_variance.png")
