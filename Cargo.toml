@@ -2,6 +2,18 @@
 name = "codediff"
 version = "0.0.1"
 edition = "2024"
+rust-version = "1.85"
+description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/ivankovic/codediff"
+readme = "README.md"
+keywords = ["diff", "ast", "tree-sitter", "cli", "git"]
+categories = ["command-line-utilities", "development-tools", "text-processing"]
+exclude = [
+    "research/**",
+    "src/bin/**",
+    "src/test/data/**",
+]
 
 # No [profile.release] section existed before this (2026-07-25, speed-goal investigation) - Cargo's
 # own defaults (codegen-units = 16, lto = false) leave real, free performance on the table for a
@@ -21,7 +33,7 @@ confy = "2.0.0"
 crossbeam-channel = "0.5.15"
 rayon = "1.10"
 csv = "1.4.0"
-git2 = "0.20.3"
+git2 = { version = "0.20.3", optional = true }
 indoc = "2.0.7"
 infer = "0.19.0"
 libc = "0.2"
@@ -73,6 +85,44 @@ syntect = { version = "5.2", features = ["default-fancy"] }
 [dev-dependencies]
 tempfile = "3.10.1"
 insta = "1.38.0"
+
+[features]
+default = []
+# Pulls in git2 (and its openssl/libssh2 build-time deps) for the git-history
+# stats/sampling tools in src/bin/. Not needed by the main codediff binary or
+# TUI, so it's opt-in to keep `cargo install codediff` and library consumers
+# free of that dependency chain by default.
+stats = ["dep:git2"]
+
+[[bin]]
+name = "commit_stats"
+path = "src/bin/commit_stats.rs"
+required-features = ["stats"]
+
+[[bin]]
+name = "materialize_test_diffs"
+path = "src/bin/materialize_test_diffs.rs"
+required-features = ["stats"]
+
+[[bin]]
+name = "benchmark_diff_pairs"
+path = "src/bin/benchmark_diff_pairs.rs"
+required-features = ["stats"]
+
+[[bin]]
+name = "file_stats"
+path = "src/bin/file_stats.rs"
+required-features = ["stats"]
+
+[[bin]]
+name = "sample_test_diffs"
+path = "src/bin/sample_test_diffs.rs"
+required-features = ["stats"]
+
+[[bin]]
+name = "sample_code_pairs"
+path = "src/bin/sample_code_pairs.rs"
+required-features = ["stats"]
 
 [[bench]]
 name = "hash_benchmark"

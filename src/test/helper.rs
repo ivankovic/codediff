@@ -19,6 +19,7 @@ pub mod human_mapping;
 pub mod optimal_iud;
 
 use anyhow::{Result, bail};
+#[cfg(feature = "stats")]
 use git2::{Repository, Signature};
 use std::collections::HashMap;
 use std::fs;
@@ -591,6 +592,7 @@ pub fn handmade_test_diffs(
 *
 * The repository contains handmade commits to be used in tests.
 */
+#[cfg(feature = "stats")]
 pub fn handmade_git_repository() -> Result<PathBuf> {
     let (repo_path, repo) = initialize_repository()?;
     let dirs = read_fake_git_repo_testdata()?;
@@ -598,6 +600,7 @@ pub fn handmade_git_repository() -> Result<PathBuf> {
     Ok(repo_path)
 }
 
+#[cfg(feature = "stats")]
 fn initialize_repository() -> Result<(PathBuf, Repository)> {
     let temp_dir = tempdir().expect("Failed to create temporary directory");
     let repo_path = temp_dir.path().to_path_buf();
@@ -608,6 +611,7 @@ fn initialize_repository() -> Result<(PathBuf, Repository)> {
     Ok((repo_path, repo))
 }
 
+#[cfg(feature = "stats")]
 fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
     let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -637,6 +641,7 @@ fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
     Ok(dirs)
 }
 
+#[cfg(feature = "stats")]
 fn add_commits(repo: &Repository, repo_path: &Path, dirs: Vec<(u32, PathBuf)>) -> Result<()> {
     let signature =
         Signature::now("Test Author", "test@example.com").expect("Failed to create signature");
@@ -648,6 +653,7 @@ fn add_commits(repo: &Repository, repo_path: &Path, dirs: Vec<(u32, PathBuf)>) -
     Ok(())
 }
 
+#[cfg(feature = "stats")]
 /// Copy test files from source directory to repository, transforming paths
 fn copy_test_files_to_repo(dir_path: &Path, commit_num: u32, repo_path: &Path) -> Result<()> {
     let files: Vec<_> = fs::read_dir(dir_path)
@@ -675,6 +681,7 @@ fn copy_test_files_to_repo(dir_path: &Path, commit_num: u32, repo_path: &Path) -
     Ok(())
 }
 
+#[cfg(feature = "stats")]
 fn path_in_repo(file_path: &Path, commit_num: u32, repo_path: &Path) -> PathBuf {
     let test_data_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -691,6 +698,7 @@ fn path_in_repo(file_path: &Path, commit_num: u32, repo_path: &Path) -> PathBuf 
     repo_path.join(relative_path)
 }
 
+#[cfg(feature = "stats")]
 /// Create a git commit for the current repository state
 fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> Result<()> {
     let commit_message = format!("Commit {}", commit_num);
@@ -857,6 +865,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "stats")]
     fn test_path_to_repo_path() -> Result<()> {
         let test_data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("src")

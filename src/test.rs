@@ -34,6 +34,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "stats")]
     fn handmade_git_repository_loads() -> Result<()> {
         let test_git_repo_path = helper::handmade_git_repository()?;
 

@@ -18,6 +18,7 @@
 pub mod code;
 pub mod diff;
 pub mod metadata;
+#[cfg(feature = "stats")]
 pub mod stats;
 pub mod tui;
 
