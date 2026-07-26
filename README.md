@@ -2,6 +2,22 @@
 
 Fast, robust, syntax aware code diffing.
 
+# Installation
+
+```
+cargo install codediff
+```
+
+This builds from source, so you'll need a C compiler on `PATH` alongside a Rust toolchain
+(edition 2024, so rustc 1.85+) - the bundled SQLite and the tree-sitter grammars are all compiled
+from C during the build. The first `cargo install` will take a couple of minutes because of this
+plus the `lto = "fat"` release profile.
+
+The git-history analysis tools in `src/bin/` (not installed by `cargo install`, only relevant if
+you're building from a checkout) sit behind an off-by-default `stats` feature, since they pull in
+git2 and its own OpenSSL/libssh2 build dependencies that the diffing tool itself doesn't need. Build
+them with `cargo build --features stats`.
+
 # Guiding principles
 
 ## Robust
