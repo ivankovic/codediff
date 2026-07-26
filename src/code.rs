@@ -34,7 +34,7 @@ use std::fmt;
 * leaf fields should be wrapped in Option. Ideally, the only non-Option wrapped field is the code
 * itself.
 */
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Code {
     /// The actual code.
     pub contents: String,
@@ -42,6 +42,39 @@ pub struct Code {
     pub metadata: Metadata,
     /// The AST.
     pub ast: Option<tree_sitter::Tree>,
+}
+
+/**
+* Hand-written, not `#[derive(Clone)]`: `tree_sitter::Tree::clone()` does not preserve the root
+* node's `id()` (confirmed empirically 2026-07-26 - out of 33 nodes in a small fixture, exactly 32
+* kept their id across a clone; only the root changed, every time, deterministically). Every other
+* `Metadata` field is a pure function of `contents`/the parsed structure, so it survives a clone
+* fine, but `ast_metadata` is a `HashMap`-of-maps keyed by node id (`ASTMetadata::node_info` and
+* friends) - if it were cloned verbatim alongside a freshly-recloned `ast`, its cached root-id
+* entries would silently point at a node that no longer exists in the clone's own tree, corrupting
+* any lookup keyed on the old root id (this is exactly what `diff_identical_rust_code` and 111
+* other tests caught when `ensure_parsed` was first tried in the test fixture loader - see
+* TODO.md's "Found the real bottleneck" entry).
+*
+* Dropping `ast_metadata` back to `None` on every clone makes "an `ast_metadata`'s node ids always
+* match its own `ast`'s node ids" hold by construction, for every one of this codebase's ~85 call
+* sites, rather than trusting each one individually to re-derive metadata after cloning. The cost:
+* a clone that goes on to get diffed pays one `ensure_parsed`-style recompute the first time
+* `metadata_of` needs it (same as an un-cached `Code` always has) - callers that never clone at all
+* (e.g. `benchmark_other`'s hot path, which reads `&Code` straight out of its fixture cache) are
+* unaffected and keep the full caching benefit.
+*/
+impl Clone for Code {
+    fn clone(&self) -> Self {
+        Code {
+            contents: self.contents.clone(),
+            metadata: Metadata {
+                ast_metadata: None,
+                ..self.metadata.clone()
+            },
+            ast: self.ast.clone(),
+        }
+    }
 }
 
 impl Code {

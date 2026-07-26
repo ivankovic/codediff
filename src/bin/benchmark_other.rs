@@ -657,7 +657,29 @@ fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let test_diffs = helper::handmade_test_code_pairs()?;
+    let mut test_diffs = helper::handmade_test_code_pairs()?;
+
+    // `handmade_test_code_pairs` always hands back a fresh `.clone()` of its internal cache (see
+    // its own doc comment), and `Code`'s hand-written `Clone` deliberately drops `ast_metadata`
+    // back to `None` on every clone (see `Code`'s doc comment for why - a cloned `tree_sitter::
+    // Tree` doesn't preserve its root node's id, so carrying stale metadata across a clone would
+    // silently corrupt lookups). That means every `Code` here arrives metadata-less regardless of
+    // what the on-disk fixture loader itself does, and - since `metadata_of` only ever *borrows*,
+    // never writes back through a `&Code` - nothing downstream can ever populate it once `main`
+    // only holds shared references. Call `ensure_parsed` once per fixture, here, before any
+    // scoring/timing begins: every one of `score_fixture`'s (possibly `--repeats`-many) `diff_code`
+    // calls below reads the *same* `Code` value (no further cloning happens in this file), so this
+    // one-time cost is paid once per fixture for the whole run, not once per `metadata_of` call
+    // per phase per repeat (confirmed 2026-07-26: that was 20 recomputes for a single diff before
+    // this fix - see TODO.md's "Found the real bottleneck" entry).
+    for (before, after) in test_diffs.values_mut() {
+        if before.metadata.language.is_some() {
+            before.ensure_parsed()?;
+        }
+        if after.metadata.language.is_some() {
+            after.ensure_parsed()?;
+        }
+    }
 
     if let Some(name) = args.details {
         let (before, after) =

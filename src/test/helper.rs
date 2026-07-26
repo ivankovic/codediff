@@ -303,16 +303,20 @@ pub fn was_tree_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Re
 pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     let mut codes = handmade_unparsed_test_code()?;
 
-    let mut parser = tree_sitter::Parser::new();
-
+    // `ensure_parsed`, not the bare `parse`+manual-hasher-setup this used to do: `parse` alone
+    // only sets `code.ast`, leaving `code.metadata.ast_metadata` at `None` - every downstream
+    // `metadata_of` call on a `Code` from this function then has nothing to borrow and silently
+    // recomputes the whole thing from scratch, every single time it's called anywhere in the
+    // pipeline (confirmed 2026-07-26: 20 separate `compute_ast_metadata` calls for one `diff_code`
+    // call on a single fixture pair, ~10 per side, one per pipeline phase that touches metadata -
+    // see TODO.md). `ensure_parsed` parses *and* caches metadata in one idempotent call, matching
+    // what every real caller (`Code::from_string`/`from_file`) already does. Safe now that
+    // `Code`'s hand-written `Clone` drops `ast_metadata` back to `None` on every clone (see its
+    // doc comment) - a caller of this function that clones a returned `Code` before diffing gets a
+    // correct, if uncached, copy rather than one with stale root-id-keyed metadata.
     for (_, code) in codes.iter_mut() {
-        if let Some(language) = &code.metadata.language {
-            let ts_language = crate::code::language::to_treesitter(language)
-                .expect("Handmade test code for unknown language?");
-
-            parser.set_language(&ts_language)?;
-
-            code.parse(&mut parser);
+        if code.metadata.language.is_some() {
+            code.ensure_parsed()?;
         }
     }
 
@@ -513,20 +517,18 @@ pub fn code_pair_from_dir(path: &Path, parser: &mut tree_sitter::Parser) -> Resu
         return Ok(None);
     };
 
-    if let Some(language) = &before.metadata.language {
-        let ts_language = crate::code::language::to_treesitter(language)
-            .expect("Handmade test code for unknown language?");
-
-        parser.set_language(&ts_language)?;
-        before.parse(parser);
+    // `ensure_parsed`, not `parse` - see `handmade_test_code`'s doc comment for why leaving
+    // `ast_metadata` uncached here silently turns every downstream `metadata_of` call into a full
+    // recompute, and why this is now safe against the stale-root-id hazard that blocked the first
+    // attempt at this fix. `parser` (still accepted for signature compatibility with existing
+    // callers) is no longer used - `ensure_parsed` builds its own short-lived `tree_sitter::Parser`
+    // internally.
+    let _ = &parser;
+    if before.metadata.language.is_some() {
+        before.ensure_parsed()?;
     }
-
-    if let Some(language) = &after.metadata.language {
-        let ts_language = crate::code::language::to_treesitter(language)
-            .expect("Handmade test code for unknown language?");
-
-        parser.set_language(&ts_language)?;
-        after.parse(parser);
+    if after.metadata.language.is_some() {
+        after.ensure_parsed()?;
     }
 
     Ok(Some((before, after)))
