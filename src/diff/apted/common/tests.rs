@@ -28,7 +28,7 @@
     /// left empty, every non-root node looks parentless and `adjust` degenerates to forbidding
     /// almost everything. Derived from `node_info`'s children lists, same as
     /// `compute_ast_metadata`'s real one.
-    fn node_to_parent_from(node_info: &HashMap<usize, ASTNodeMetadata>) -> rustc_hash::FxHashMap<usize, usize> {
+    fn node_to_parent_from(node_info: &rustc_hash::FxHashMap<usize, ASTNodeMetadata>) -> rustc_hash::FxHashMap<usize, usize> {
         let mut parents = rustc_hash::FxHashMap::default();
         for (&id, info) in node_info {
             for &child in &info.children {
@@ -39,7 +39,7 @@
     }
 
     fn synthetic_meta(nodes: &[(usize, &str, &str, &[usize])]) -> ASTMetadata {
-        let mut node_info = HashMap::new();
+        let mut node_info = rustc_hash::FxHashMap::default();
         for &(id, kind, text, children) in nodes {
             node_info.insert(
                 id,
@@ -411,7 +411,7 @@
     }
 
     fn meta_from_owned(nodes: &[(usize, String, String, Vec<usize>)]) -> ASTMetadata {
-        let mut node_info = HashMap::new();
+        let mut node_info = rustc_hash::FxHashMap::default();
         for (id, kind, text, children) in nodes {
             node_info.insert(
                 *id,

@@ -94,7 +94,7 @@ fn solve_import_path_hash(before: &Code, after: &Code, node_cache: &NodeCache, d
     let before_hash = import_path_hash_map(&before_metadata);
     let after_hash = import_path_hash_map(&after_metadata);
 
-    let mut after_reverse: HashMap<u64, Vec<usize>> = HashMap::new();
+    let mut after_reverse: rustc_hash::FxHashMap<u64, Vec<usize>> = rustc_hash::FxHashMap::default();
     for (&node_id, &hash) in &after_hash {
         after_reverse.entry(hash).or_default().push(node_id);
     }
@@ -120,10 +120,10 @@ fn solve_import_path_hash(before: &Code, after: &Code, node_cache: &NodeCache, d
     );
 }
 
-fn import_path_hash_map(metadata: &ASTMetadata) -> HashMap<usize, u64> {
+fn import_path_hash_map(metadata: &ASTMetadata) -> rustc_hash::FxHashMap<usize, u64> {
     use std::hash::{Hash, Hasher};
     let language = metadata.language;
-    let mut result = HashMap::new();
+    let mut result = rustc_hash::FxHashMap::default();
     for (&node_id, info) in &metadata.node_info {
         if !is_import_node(&info.kind, &language) {
             continue;

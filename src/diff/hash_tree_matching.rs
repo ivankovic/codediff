@@ -111,8 +111,8 @@ pub(crate) fn solve_with_hash_map(
     after: &Code,
     node_cache: &NodeCache,
     diff: &mut ASTDiff,
-    before_hash: &HashMap<usize, u64>,
-    after_hash_to_nodes: &HashMap<u64, Vec<usize>>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash_to_nodes: &rustc_hash::FxHashMap<u64, Vec<usize>>,
     root_reason: ASTMappingReason,
     descendant_reason: ASTMappingReason,
     node_list_selector: impl Fn(&ASTMetadata) -> Vec<usize>,
@@ -318,7 +318,7 @@ fn pair_children_for_descent<'a>(
         return (pairs, false);
     }
 
-    let index_by_hash = |children: &[tree_sitter::Node<'a>], hash_map: &HashMap<usize, u64>| {
+    let index_by_hash = |children: &[tree_sitter::Node<'a>], hash_map: &rustc_hash::FxHashMap<usize, u64>| {
         let mut by_hash: HashMap<u64, Vec<(usize, tree_sitter::Node<'a>)>> = HashMap::new();
         for (index, &child) in children.iter().enumerate() {
             let hash = hash_map.get(&child.id()).copied().unwrap_or(0);

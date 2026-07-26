@@ -264,7 +264,14 @@ pub struct ASTMetadata {
     /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
     /// values of the node and it's entire subtree, in order. The nodes are identified by their
     /// treesitter node id.
-    pub node_to_full_hash: HashMap<usize, u64>,
+    ///
+    /// `FxHashMap`, not `std::collections::HashMap`: see `node_to_parent`'s doc comment below for
+    /// the measured rationale (SipHash's per-process random reseed causes real, confirmed 10x
+    /// run-to-run wall-time variance on this exact key shape). Every `ASTMetadata` map keyed by
+    /// node id or hash value shares that same small-integer-key shape, so all of them got the same
+    /// treatment (2026-07-26) once the pattern was found not to be applied consistently -
+    /// `node_to_parent` was the only one converted at the time the variance was first diagnosed.
+    pub node_to_full_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node ids>.
     /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
     /// declaration called "i" will hash to the same hash. Therefore, the map is actually going from
@@ -277,15 +284,18 @@ pub struct ASTMetadata {
     /// seed, silently changing codediff's output between otherwise-identical runs whenever a hash
     /// had more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).
     /// There are never true duplicate entries within one list (each node is visited exactly once),
-    /// so this loses nothing a `HashSet` provided.
-    pub full_hash_to_node: HashMap<u64, Vec<usize>>,
+    /// so this loses nothing a `HashSet` provided. See `node_to_full_hash` for why the outer map
+    /// itself is `FxHashMap` - the *values* being `Vec`s (not `HashSet`s) is what already made the
+    /// *content* order-independent-safe; nothing here ever iterates the outer map directly in an
+    /// order-sensitive way (checked 2026-07-26 before converting).
+    pub full_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
     /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
     /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
     /// changes. The nodes are identified by their treesitter node id.
-    pub node_to_structural_hash: HashMap<usize, u64>,
+    pub node_to_structural_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node ids>. See
     /// `full_hash_to_node` for why this is a `Vec`, not a `HashSet`.
-    pub structural_hash_to_node: HashMap<u64, Vec<usize>>,
+    pub structural_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
     /// Kind+value hash, order-independent per `nodes::is_commutative_container` at *every*
     /// recursion level (not just the top - see `hash::compute_kind_and_value_hash`'s doc comment
     /// for the propagation-bug fix this depends on, and `TODO.md` for the pipeline rework this
@@ -294,18 +304,18 @@ pub struct ASTMetadata {
     /// document-order-sensitive content equality is needed - APTED's own cost model
     /// (`apted/common.rs`), `solve_moved_subtrees`, `solve_greedy_anchor_blocks`,
     /// `solve_identical_diagnostic_statements`).
-    pub node_to_kind_and_value_hash: HashMap<usize, u64>,
+    pub node_to_kind_and_value_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map for `node_to_kind_and_value_hash`. See `full_hash_to_node` for why this is a
     /// `Vec`, not a `HashSet`.
-    pub kind_and_value_hash_to_node: HashMap<u64, Vec<usize>>,
+    pub kind_and_value_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
     /// Structural (kind-only) hash, order-independent per `nodes::is_commutative_container` at
     /// every recursion level. Used for same-shape/differing-leaves matching (`solve_hash_descent`)
     /// - see `TODO.md`'s "New hash algorithms" section for the design.
-    pub node_to_kind_only_hash: HashMap<usize, u64>,
+    pub node_to_kind_only_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map for `node_to_kind_only_hash`.
-    pub kind_only_hash_to_node: HashMap<u64, Vec<usize>>,
+    pub kind_only_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
     /// node.id() -> subtree size
-    pub node_to_subtree_size: HashMap<usize, usize>,
+    pub node_to_subtree_size: rustc_hash::FxHashMap<usize, usize>,
     /// node.id() -> `(count, node_id)` of the node with the most *direct* children found
     /// anywhere in this node's own subtree (inclusive of itself). Lets
     /// `solve_large_flat_subtrees::largest_flat_container_in` answer "does this subtree contain
@@ -314,9 +324,9 @@ pub struct ASTMetadata {
     /// says nothing about whether any single one of them has many *direct* children; a subtree
     /// can easily have hundreds of nodes while every individual node in it has only 2-3
     /// children).
-    pub node_to_widest_subtree_node: HashMap<usize, (usize, usize)>,
+    pub node_to_widest_subtree_node: rustc_hash::FxHashMap<usize, (usize, usize)>,
     /// node.id() -> depth (root = 0, its children = 1, ...)
-    pub node_to_depth: HashMap<usize, usize>,
+    pub node_to_depth: rustc_hash::FxHashMap<usize, usize>,
     /// child node.id() -> parent node.id(), covering every non-root node. `ASTNodeMetadata` has
     /// no parent pointer, so this is derived once here from `node_info`'s children lists, rather
     /// than every ancestor/containment check re-deriving its own copy from scratch.
@@ -336,7 +346,7 @@ pub struct ASTMetadata {
     /// Set of reference nodes in this tree, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
     /// Node information for each node, indexed by node_id.
-    pub node_info: HashMap<usize, ASTNodeMetadata>,
+    pub node_info: rustc_hash::FxHashMap<usize, ASTNodeMetadata>,
     /// The language this tree was parsed as, so the cost model can consult
     /// [`crate::diff::nodes::kinds_update_allowed`] without threading a separate parameter
     /// through every APTED call site.

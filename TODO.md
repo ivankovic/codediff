@@ -1539,3 +1539,190 @@ language the codebase claims to support, before it has the chance to produce ano
 outlier the way C# silently did until a large enough fixture happened to expose it. Zero risk to
 ship - purely additive match arms behind an exhaustive `language` match, can't affect any language
 that already had coverage.
+
+## APTED branch-and-bound / A*-style admissible-cost pruning - scoped 2026-07-26 (user-requested), ruled out at the design stage, nothing implemented
+
+Follow-up to the `computeOptStrategy` pruning investigation above (found strategy selection is
+only ~1.2% of cost, so proposed the real 98.8% - `gted`/`spf_a`/`spf_l`/`spf_r`, the DP engine
+itself - as the actual target). Framing: could an A*-style admissible lower bound let the DP
+early-exit/prune cells whose cost is already provably worse than some threshold, the way graph
+search discards dominated branches, *without* sacrificing exactness (unlike the two prior reverted
+attempts, which both traded away correctness for speed)? User said "Start scoping."
+
+**Scoping process**: read the existing oracle-fuzz validation harness first, since any prototype
+would need to survive it - `test_apted_engine_matches_oracle_fuzz` (3000 random-tree seeds,
+`compute_delta` vs the Zhang-Shasha oracle `compute_delta_zhang_shasha`, compared via actual
+*traceback* cost through `compute_edit_mapping`, not just the raw distance number) and
+`test_apted_engine_matches_oracle_fuzz_with_containment` (same, plus `gen_random_pruning`'s
+realistic `ContainmentCtx` constraints, seeded to make sure `adjust()` is exercised at every `vren`
+call site). Good harness for this class of change - would have caught the kind of silent
+corruption a bad prune could cause.
+
+**Why it doesn't have a safe application point, found before writing any prototype code**:
+
+1. **No competing candidates to discard.** A*/branch-and-bound saves work by abandoning a search
+   branch once its cost provably exceeds a known-better incumbent. APTED's `DeltaTable` has no
+   such branches - the optimal-strategy selection (already confirmed near-optimal, see above)
+   picks a fixed, minimal set of keyroot-pair cells to compute, and every one of them is a
+   *required* intermediate value for exactly one later computation, not one of several competing
+   alternative solutions.
+2. **The natural admissible bound is already inside the recurrence's base case.** The obvious
+   admissible upper bound for any subforest pair is "delete everything on one side, insert
+   everything on the other" (`sum_del_cost`/`sum_ins_cost`). But `engine.rs`'s `delta` base-case
+   initialization (~line 1908-1914) already sets exactly that as the starting value for every
+   cell before the DP recurrence ever runs. So no cell's true value can ever exceed that bound in
+   the first place - there is no slack above the bound to prune away.
+3. **Cells are read back by the same in-flight computation, not just by an external caller.**
+   Checked directly: `delta.get(b, a)` calls appear *inside* `spf_a`/`spf_l`/`spf_r` themselves
+   (`engine.rs` lines 740, 770, 981, 1009, 1277, 1437), reading cells that were `delta.set()` for
+   smaller keyroot pairs earlier in the *same* `gted` call, while computing larger keyroot pairs
+   later in that same call. Skipping or approximating one cell doesn't just produce a locally
+   worse answer for that subproblem - it feeds a wrong value into a later cell's computation
+   within the same run, silently corrupting the final root-to-root distance. Same failure shape as
+   the reverted parallel-batching bug, for a different underlying reason.
+4. **No dead/unread cells to eliminate either**, which would have been a legitimate zero-risk win
+   if it existed. APTED's optimal-strategy selection is precisely the published result (Pawlik &
+   Augsten) that the algorithm already computes the minimum *sufficient* set of forest-distance
+   cells for the chosen decomposition - there's no slack computation sitting on top of that
+   already-tight bound to cut.
+
+**Conclusion**: this isn't "risky, needs extra care" the way parallel batching was - it's
+structurally inapplicable to this DP's dependency shape (matrix-chain-style reuse within a single
+call, not independent search branches with discardable alternatives). Nothing was implemented;
+the oracle-fuzz harness was read but not modified, `engine.rs`/`common.rs` are untouched. Not
+reverted because nothing was changed - ruled out at the design stage instead, before writing a
+prototype that the analysis already shows can't work. Remaining real levers for the `/goal` speed
+target, if any exist, are more likely in reducing *residual size* fed into the DP (fewer/smaller
+subtree pairs reaching `apted::for_nodes` at all, e.g. via earlier-phase matching improvements)
+than in trying to make the DP engine itself asymptotically cheaper per cell - `matches` was found
+to drive cost roughly quadratically (see the correlation analysis above), so shrinking `matches`
+before APTED ever runs is the lever with headroom, not pruning within APTED once it's running.
+
+## Bounded-error (1%-of-optimal) pruning - investigated 2026-07-26 (user follow-up question), size-difference banding ruled out by data, nothing implemented
+
+Direct follow-up: if we don't need the *exact* answer, only one within 1% of optimal, does that
+change the "no slack above the bound" conclusion above? Structurally, yes in principle - accepting
+bounded error is exactly what unlocks the standard technique for this class of problem: threshold/
+band-limited edit distance (Ukkonen-style for strings; the tree analogue restricts the DP to
+keyroot pairs whose subtree sizes don't differ by more than the acceptable distance budget, since
+`|size1 - size2|` is always an admissible *lower* bound on true edit distance - a size mismatch of
+`k` requires at least `k` inserts/deletes no matter what). This removes objection #2 from the exact
+case (no slack above the trivial bound) because now cells that provably lie *outside* the tolerance
+band around a target threshold can be skipped rather than needing their exact value.
+
+**Checked against real data before assuming this helps**: re-instrumented `resolve_forest`
+(`common.rs`, temporary, reverted immediately after) to log `size1`/`size2`/`|size1-size2|`/
+`elapsed_ms` for every `apted::for_nodes` call >=2ms on the full `benchmark_other` corpus
+(GUMTREE_BIN pointed at the local `/var/tmp/gumtree-installed` build) - 124 samples, 23 of them
+>100ms. Result: **`|size1-size2|` (or the ratio `|size1-size2|/max(size1,size2)`) essentially does
+not predict runtime** - log-log Pearson correlation of `|size1-size2|` vs `elapsed_ms` is only
+0.30 (vs. 0.93 for raw `max(size1,size2)`), and the ratio-vs-`log(elapsed_ms)` correlation is
+-0.03, indistinguishable from zero. Concretely: 43% of the >100ms cases have `|size1-size2|` under
+5% of the larger tree's size - e.g. 728 vs 738 nodes (10 different, ratio 0.014) taking 916ms, 508
+vs 516 (ratio 0.016) taking 596ms, 436 vs 438 (ratio 0.005) taking 339ms. These are same-size trees
+with heavy internal restructuring (matches-driven cost, consistent with the earlier `matches^2.0`
+regression finding), not size-mismatched trees. A size-difference band would have to span nearly
+the *entire* width to avoid excluding cells the true optimal mapping actually needs on exactly the
+cases that are slow - i.e. the one bounded-error technique this problem shape normally unlocks
+doesn't apply to *this* corpus's pathological cases, this isn't speculation, it's what the data
+says.
+
+**What's left, and why it's a bigger lift than worth prototyping speculatively**: the only other
+bounded-error lever would be clamping DP propagation once a running partial cost already exceeds
+`(1+epsilon)` times a *fast heuristic* upper bound for the whole pair (not the trivial delete-all/
+insert-all bound already baked into the recurrence - a real one would need its own approximate
+matcher to seed it, e.g. a greedy same-hash/same-kind pre-match). That needs: (a) a new fast
+heuristic matcher good enough to produce a useful upper bound cheaply, (b) a correctness proof
+that epsilon-error propagates boundedly through the matrix-chain cell reuse confirmed above (not
+obviously true - an epsilon-error substituted into an earlier cell and then summed into several
+later cells could compound past epsilon if not handled carefully), and (c) a different validation
+methodology entirely (`assert_distance_matches_oracle` asserts exact equality; a bounded-error
+variant needs a new harness asserting `new_cost <= oracle_cost * 1.01` instead, plus a proof - not
+just fuzz-testing - that this is what compounds to in the worst case). Given the track record here
+(two prior approximation attempts both reverted - size/dissimilarity-capped fallback found no
+configuration with a real win, parallel batching found a real correctness bug), this is a real
+option but a much larger, uncertain-payoff engineering effort, not a quick prototype - flagged for
+the user to decide whether it's worth the investment rather than started speculatively. Nothing
+implemented; `common.rs` instrumentation was added and reverted (`git checkout --`) in the same
+step, working tree confirmed clean.
+
+## `ASTMetadata`'s remaining `HashMap`s converted to `FxHashMap` - 2026-07-26 (user-requested: "let's focus on reducing the residual"), KEPT: real, broad, zero-risk win found via profiling, not where the investigation started looking
+
+User asked to focus on reducing the *residual* fed into APTED (phase 6), following the earlier
+`matches`-drives-cost regression finding. Investigated by profiling one of the worst offenders
+end to end rather than guessing which phase to target.
+
+**Investigation** (temporary `eprintln!` instrumentation throughout `diff.rs`/`solve_syntax_aware_
+matching.rs`/`solve_greedy_anchor_blocks.rs`/`apted/common.rs`, all reverted via `git checkout --`
+once each measurement was taken): picked `c-cpython-autogenerated-code` (the current worst
+offender at 3377ms `codediff_ms`, a 4150-line autogenerated CPython bytecode-interpreter dispatch
+table where only one ~40-line `case` arm actually changed). First surprise: **APTED itself (phase
+6) is not the bottleneck for this fixture at all** - only 2 real DP calls happen (28.6ms + 3.3ms,
+~32ms total), the other 99 top-level candidate pairs all take the bit-identical-hash fast path
+(`emit_identical_subtree`). This directly falsified the working hypothesis that "reduce the
+residual" meant "shrink what reaches APTED" for this fixture - the residual was already tiny.
+
+Added phase-level timers instead and found every phase costs roughly the same regardless of what
+it actually does: phase1 (hash descent) 888ms, phase2 325-344ms, phase4's four sub-mechanisms
+272-355ms *each* (flat subtrees, named groups, import-list overlap, greedy anchor blocks), phase6
+269-289ms (only ~32ms of which is real APTED work per above), phase7 272-282ms. The smoking gun:
+`solve_import_list_overlap` is Rust-only (`if before_metadata.language != Language::Rust { return;
+}` as its first line) yet still cost ~275ms on this **C** file - a function that provably does
+nothing for this language was exactly as slow as functions that do real work, meaning the cost
+wasn't in any phase's own logic at all.
+
+Checked `ASTMetadata`'s field types (`src/code.rs`) and found the actual cause: 11 of its 12
+`HashMap`s (`node_to_full_hash`, `full_hash_to_node`, `node_to_structural_hash`,
+`structural_hash_to_node`, `node_to_kind_and_value_hash`, `kind_and_value_hash_to_node`,
+`node_to_kind_only_hash`, `kind_only_hash_to_node`, `node_to_subtree_size`,
+`node_to_widest_subtree_node`, `node_to_depth`, `node_info`) still used
+`std::collections::HashMap` (SipHash) despite `node_to_parent` already having been converted to
+`rustc_hash::FxHashMap` back on 2026-07-16, with a doc comment describing *exactly* this class of
+bug already confirmed once: SipHash's per-process random reseed caused measured 2.8s-26.4s (~10x)
+run-to-run variance on `kotlin-nextcloud-a-few-small-removals`, CPU-bound the whole time. That fix
+was never generalized to the rest of `ASTMetadata`'s equally hot, equally small-integer-keyed maps
+- exactly the ~29,000-entry-per-side maps every phase above queries repeatedly via `metadata_of`.
+
+**Before converting, checked every direct iteration (not just `.get()` lookups) of these 12 fields
+for order-sensitivity**, since switching hashers changes `HashMap` iteration order and this
+codebase has explicit, previously-hard-won determinism requirements (`full_hash_to_node`'s `Vec`-
+not-`HashSet` choice, `grouped_greedy_matcher`'s determinism contract, `describe_nondeterminism` in
+`test/helper/human_mapping.rs`). Found 8 direct-iteration call sites total (`hash.rs` x4,
+`solve_bottom_up_expansion.rs` x1, `solve_hash_descent.rs` x1, `hash_tree_matching.rs` x1,
+`metadata.rs` x1) - 4 are inside `#[test]` functions doing order-independent assertions (set
+membership, size comparisons), and the other 4 all immediately collect into a `Vec` and sort by a
+document-position-derived key (`preorder_index`, `start_byte`) before using the result, exactly the
+existing "sort by `start_byte`, never raw node id or map order" convention this codebase already
+follows elsewhere. None depend on raw iteration order, so the conversion is safe.
+
+**Change**: all 11 remaining fields converted from `std::collections::HashMap` to
+`rustc_hash::FxHashMap`, following `node_to_parent`'s already-established precedent exactly. A
+handful of call sites had explicit `HashMap<usize, u64>`/`HashMap<u64, Vec<usize>>` type
+annotations that needed generalizing to match (`hash_tree_matching::solve_with_hash_map` and its
+`index_by_hash` closure, `solve_hash_descent::import_path_hash_map` and its local `after_reverse`,
+two `human_solver.rs` helpers - `handle_key`'s params and 7 test-local `no_hashes` bindings - and
+two `apted/common/tests.rs` synthetic-metadata builders). No behavior changes, purely widening
+type annotations to match the now-generic field types.
+
+**Validated**: `cargo build --release --all-targets` clean (only pre-existing, unrelated warnings).
+`cargo test --release` (every target, not just `--lib`): **all green** - 362 lib tests + every
+other test binary, 0 failures. `benchmark_optimal_solutions`: **739 mismatches (0.19%), identical
+to the pre-change baseline** - confirms zero accuracy impact, as expected for a pure hasher swap.
+`benchmark_other` (full 98-fixture corpus, `codediff_ms`): median **61.3ms -> 49.3ms** (-19.5%),
+p90 **1011.2ms -> 860.9ms** (-14.9%), max **3365.2ms -> 3195.1ms** (-5.1%). Per-fixture spot check
+(`c-cpython-autogenerated-code`, `kotlin-nextcloud-a-few-small-removals`, `c-linux-small-bugfix`,
+6 repeated in-process runs each via a throwaway `variance_test` binary, deleted after use): each
+~6-10% faster and consistently so, run to run - notably, none of the three reproduced anything like
+the dramatic 10x SipHash-reseed variance `node_to_parent`'s original fix documented, so today's win
+looks like straightforward FxHash-is-cheaper-per-op, not this session getting lucky/unlucky on
+reseed variance. Real, broad, zero-risk (same computation, different hasher, iteration-order
+dependence checked and ruled out above), and unlike every other speed lever tried this session,
+found by actually profiling a slow fixture end to end rather than guessing where the cost was -
+the residual/`matches` framing that motivated the search turned out not to be this fixture's actual
+bottleneck at all, which is itself worth remembering next time a slow fixture needs diagnosing:
+profile before assuming the pipeline stage a general theory points to is the one actually at fault.
+
+Still well short of the `/goal` targets (median 20ms, p90 100ms, max 400ms) - this is a broad,
+foundational win, not a silver bullet. Worth checking whether `NodeCache` (`diff.rs`) or other
+hot-path `HashMap`s outside `ASTMetadata` have the same untreated SipHash tax before assuming this
+lever is exhausted.

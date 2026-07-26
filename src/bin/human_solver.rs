@@ -1357,8 +1357,8 @@ fn apply_match_entry(
 fn subtree_match_operation(
     before_id: usize,
     after_id: usize,
-    before_hash: &HashMap<usize, u64>,
-    after_hash: &HashMap<usize, u64>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
 ) -> HumanOperation {
     let identical = matches!(
         (before_hash.get(&before_id), after_hash.get(&after_id)),
@@ -1383,8 +1383,8 @@ fn action_match(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-    before_hash: &HashMap<usize, u64>,
-    after_hash: &HashMap<usize, u64>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
 ) -> Result<ActionOutcome> {
     let before_node =
         find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
@@ -1462,8 +1462,8 @@ fn action_match_to_end(
     after_root: Node,
     before_src: &[u8],
     after_src: &[u8],
-    before_hash: &HashMap<usize, u64>,
-    after_hash: &HashMap<usize, u64>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
 ) -> Result<ActionOutcome> {
     let mut matched = 0usize;
     let mut caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
@@ -1600,8 +1600,8 @@ fn action_match_subtree(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-    before_hash: &HashMap<usize, u64>,
-    after_hash: &HashMap<usize, u64>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
     before_collapsed: &mut std::collections::HashSet<usize>,
     after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> Result<ActionOutcome> {
@@ -2742,8 +2742,8 @@ fn handle_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-    before_hash: &HashMap<usize, u64>,
-    after_hash: &HashMap<usize, u64>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
     before: &Code,
     after: &Code,
 ) {
@@ -4001,7 +4001,7 @@ mod tests {
         );
         let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
         let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
             &mut app,
@@ -4065,7 +4065,7 @@ mod tests {
         );
         let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
         let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
             &mut app,
@@ -4148,7 +4148,7 @@ mod tests {
         );
         let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
         let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
             &mut app,
@@ -4217,7 +4217,7 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
 
         let start = std::time::Instant::now();
         let outcome = action_match_to_end(
@@ -4273,7 +4273,7 @@ mod tests {
         let caches = Caches::default();
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
 
         let start = std::time::Instant::now();
         let outcome = action_match_subtree(
@@ -4347,7 +4347,7 @@ mod tests {
         let function_after = after_root.child(0).unwrap();
         let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
         let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
 
@@ -4406,7 +4406,7 @@ mod tests {
         let function_after = after_root.child(0).unwrap();
         let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
         let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
-        let no_hashes = HashMap::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
 
