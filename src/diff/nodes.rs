@@ -543,6 +543,100 @@ pub fn is_semantically_structural<'a>(
                 .map(|name| (node_kind.to_string(), name.to_string())),
             _ => None,
         },
+        // Same 2026-07-26 gap as the CSharp/C/CPP arms above (`TODO.md`'s speed-goal
+        // investigation) - completing coverage for every language `is_reference` above already
+        // lists a kind set for. Java/JS/TS/TSX verified empirically against real corpus fixtures
+        // (same throwaway-binary-against-real-grammar-output method as the C-family arms); the
+        // rest (below, in the final `_ =>` fallback comment) have no fixtures in this corpus to
+        // verify against - see that comment for what "unvalidated" means there.
+        Language::Java => match node_kind {
+            "class_declaration" | "interface_declaration" | "enum_declaration" | "record_declaration"
+            | "method_declaration" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            // No direct "name" field - wraps a `variable_declarator` (possibly several, for
+            // `int a, b;`) the same shape C#'s `field_declaration` arm above already handles,
+            // minus that language's extra `variable_declaration` wrapper layer (confirmed
+            // empirically: Java nests `variable_declarator` directly under `field_declaration`).
+            // Keyed on the first declarator only, same simplification as C#'s/Go's arms.
+            "field_declaration" => {
+                let mut cursor = node.walk();
+                let declarator =
+                    node.named_children(&mut cursor).find(|c| c.kind() == "variable_declarator")?;
+                declarator
+                    .child_by_field_name("name")
+                    .and_then(|n| n.utf8_text(bytes).ok())
+                    .map(|name| (node_kind.to_string(), name.to_string()))
+            }
+            _ => None,
+        },
+        Language::JavaScript | Language::TypeScript | Language::TSX => match node_kind {
+            "function_declaration" | "class_declaration" | "method_definition" | "interface_declaration"
+            | "type_alias_declaration" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            // `const f = () => ...`/`const f = function() {...}`: the function itself has no
+            // name field (confirmed empirically - only its *enclosing* `variable_declarator`
+            // does), unlike a `function_declaration`. Deliberately narrow: only fires when the
+            // function is the *direct* value of a declarator, not when it's passed as a callback
+            // argument (`arr.map(x => ...)`) - confirmed empirically those parent as `arguments`,
+            // not `variable_declarator`, and a callback argument genuinely has no identity of its
+            // own to match on.
+            "arrow_function" | "function_expression" => {
+                let parent = node.parent()?;
+                (parent.kind() == "variable_declarator")
+                    .then(|| parent.child_by_field_name("name"))
+                    .flatten()
+                    .and_then(|n| n.utf8_text(bytes).ok())
+                    .map(|name| (node_kind.to_string(), name.to_string()))
+            }
+            _ => None,
+        },
+        // Every remaining language `is_reference` above lists a kind set for, but with no
+        // fixture in this corpus to verify field names against empirically (unlike every arm
+        // above, all confirmed live against real grammar output). Following the same `name`-field
+        // convention every verified language so far has used without exception, but genuinely
+        // **unvalidated** - treat these as a best-effort starting point, not a confirmed fix, and
+        // verify against real source the first time one of these languages gets an actual
+        // fixture (the same throwaway-binary method used for every arm above works for this too).
+        Language::PHP => match node_kind {
+            "class_declaration" | "function_declaration" | "method_definition" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::Ruby => match node_kind {
+            "class" | "module" | "method" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::Swift => match node_kind {
+            "function_declaration" | "class_declaration" | "struct_declaration" | "enum_declaration"
+            | "protocol_declaration" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::Scala => match node_kind {
+            "class_definition" | "object_definition" | "trait_definition" | "function_definition" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
+        Language::R | Language::ShellScript | Language::LUA | Language::Vimscript => match node_kind {
+            "function_definition" | "function_declaration" => node
+                .child_by_field_name("name")
+                .and_then(|n| n.utf8_text(bytes).ok())
+                .map(|name| (node_kind.to_string(), name.to_string())),
+            _ => None,
+        },
         _ => None,
     }
 }
