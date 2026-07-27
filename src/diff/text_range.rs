@@ -211,9 +211,10 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
         return false;
     };
 
-    // Convert positions to character indices
-    let first_end_idx = row_col_to_char_index(first.end_row, first.end_column, code);
-    let second_start_idx = row_col_to_char_index(second.start_row, second.start_column, code);
+    // Convert positions to byte indices (see `row_col_to_byte_index` - `code[a..b]` below needs
+    // byte offsets, not character counts).
+    let first_end_idx = row_col_to_byte_index(first.end_row, first.end_column, code);
+    let second_start_idx = row_col_to_byte_index(second.start_row, second.start_column, code);
 
     if first_end_idx >= second_start_idx {
         // No gap or overlapping
@@ -225,31 +226,43 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
     gap_text.chars().all(|c| c.is_whitespace())
 }
 
-/// Convert a (row, column) position to a character index in the code string.
-/// This counts characters (not bytes) from the start of the string.
-fn row_col_to_char_index(row: usize, col: usize, code: &str) -> usize {
+/// Convert a (row, column) position to a byte index in the code string.
+///
+/// `TextRange`'s `column` fields come straight from tree-sitter's `Point` (see `TextRange::from`),
+/// which - like all of tree-sitter's offsets - counts *bytes* within the row, not Unicode
+/// characters. This used to advance `current_col`/the returned index by 1 per `char` instead of
+/// by `ch.len_utf8()`, which was silently wrong on any line containing a multi-byte character
+/// before the target column (the row/column match itself could fire at the wrong column), and
+/// separately meant the return value - despite being fed straight into `&code[a..b]` byte-slicing
+/// at this function's only call site - was actually a character *count*, not a byte offset. Any
+/// non-ASCII content before the slice point (e.g. an em dash, accented letter, or emoji anywhere
+/// earlier in the file) could then land the slice mid-character, panicking with "byte index N is
+/// not a char boundary" - see `byte_index_lands_correctly_past_a_multi_byte_character` below,
+/// modeled on a real crash from a file containing "—".
+fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> usize {
     let mut current_row = 0;
-    let mut current_col = 0;
-    let mut char_index = 0;
+    let mut current_col = 0; // byte offset within the current row
+    let mut byte_index = 0; // byte offset from the start of the string
 
     for ch in code.chars() {
         // Check if we've reached the target position
         if current_row == row && current_col == col {
-            return char_index;
+            return byte_index;
         }
 
+        let len = ch.len_utf8();
         if ch == '\n' {
             current_row += 1;
             current_col = 0;
         } else {
-            current_col += 1;
+            current_col += len;
         }
 
-        char_index += 1;
+        byte_index += len;
     }
 
-    // Position is at or beyond the end of the string - clamp to the string length.
-    char_index
+    // Position is at or beyond the end of the string - clamp to the string's byte length.
+    byte_index
 }
 
 #[cfg(test)]
@@ -537,5 +550,30 @@ mod tests {
         let code = "line1\ntext\nline3"; // Non-whitespace line between
 
         assert!(!a.can_extend_with_whitespace(&b, code));
+    }
+
+    #[test]
+    fn row_col_to_byte_index_lands_after_a_multi_byte_character() {
+        // "—" (em dash) is 3 bytes but 1 character. Columns are byte-based (tree-sitter's `Point`
+        // convention - see `row_col_to_byte_index`'s doc comment), so column 4 is right after it
+        // ('a' = 1 byte + '—' = 3 bytes = byte 4), not "the 4th character" (which would be 'c').
+        let code = "a—bc";
+        assert_eq!(row_col_to_byte_index(0, 0, code), 0); // 'a'
+        assert_eq!(row_col_to_byte_index(0, 1, code), 1); // '—', right after 'a'
+        assert_eq!(row_col_to_byte_index(0, 4, code), 4); // 'b', right after '—'
+        assert_eq!(row_col_to_byte_index(0, 5, code), 5); // 'c', right after 'b'
+    }
+
+    /// Regression test for a real crash: `is_whitespace_between` used to slice `code` with
+    /// character counts instead of byte offsets, so any multi-byte character earlier in the file
+    /// (this reproduces one seen in the wild: an em dash, "—") could land a slice mid-character,
+    /// panicking with "byte index N is not a char boundary".
+    #[test]
+    fn text_range_can_extend_with_whitespace_after_a_multi_byte_character_earlier_in_the_line() {
+        let code = "a—b   c"; // "a—b", 3 spaces, "c" - byte columns: a=0, —=1, b=4, c=8
+        let a = TextRange::new(0, 0, 0, 5); // ends right after "a—b" (byte 5)
+        let b = TextRange::new(0, 8, 0, 9); // starts at "c" (byte 8)
+
+        assert!(a.can_extend_with_whitespace(&b, code));
     }
 }
