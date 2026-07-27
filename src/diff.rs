@@ -180,6 +180,25 @@ impl Diff {
      * ran - `HeuristicConfig::default()` (i.e. plain `from_code`) is what every real caller wants.
      */
     pub fn from_code_with_config(before: &Code, after: &Code, config: &HeuristicConfig) -> Self {
+        Self::pending_with_config(before, after, config).finish(DiffMode::Fast)
+    }
+
+    /// Runs phases 1-5 of the seven-phase pipeline (every heuristic pass except final APTED and
+    /// the moved-subtree fallback) and returns a [`PendingDiff`] paused right before phase 6, so a
+    /// caller can inspect [`PendingDiff::looks_expensive`] and choose a [`DiffMode`] - e.g. to ask
+    /// a human, or to apply a CLI flag - before paying for (or skipping) full tree-edit-distance.
+    /// See [`PendingDiff`]'s doc comment for why this split exists and its safety invariant.
+    pub fn pending<'code>(before: &'code Code, after: &'code Code) -> PendingDiff<'code> {
+        Self::pending_with_config(before, after, &HeuristicConfig::default())
+    }
+
+    /// Same as [`Diff::pending`], but with [`HeuristicConfig`]'s per-pass switches - see
+    /// [`Diff::from_code_with_config`]'s doc comment for why that config exists.
+    pub fn pending_with_config<'code>(
+        before: &'code Code,
+        after: &'code Code,
+        config: &HeuristicConfig,
+    ) -> PendingDiff<'code> {
         // Build node cache for efficient lookup
         let node_cache = NodeCache::build(before, after);
 
@@ -192,7 +211,8 @@ impl Diff {
         // pipeline outright once verified to be at least as accurate on every fixture in the
         // `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782 mismatches, zero
         // fixtures worse). See `TODO.md` for the full design history and the accuracy gap that
-        // had to be closed first.
+        // had to be closed first. Phases 1-5 live here, in `pending_with_config`; phases 6-7 live
+        // in `PendingDiff::finish` - see that struct's doc comment for why they're split.
 
         // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
         // normalized-import-path hash). The import-path hash variant is gated on
@@ -235,18 +255,152 @@ impl Diff {
             solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        // Phase 6: final APTED on the whole-file residual.
-        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
-        // containment-aware, so it now runs unconditionally instead of demoting itself back to
-        // Zhang-Shasha on forests with real containment constraints - see src/diff/TODO.md.
-        let _ = apted::for_roots(
+        // Guard metric for `DiffMode::Fast` (see `PendingDiff::looks_expensive`): how many nodes
+        // on each side are still unmatched heading into phase 6. Safe to compute from
+        // `before_node_map`/`after_node_map`'s lengths directly - no phase above this point ever
+        // calls `add_delete_mappings`/`add_insert_mappings` (only phase 6/7 and the fallback do),
+        // so every entry already present here is a genuine non-zero match, not a delete/insert
+        // sentinel.
+        let unmatched_before = node_cache
+            .before
+            .len()
+            .saturating_sub(ast_diff.before_node_map.len());
+        let unmatched_after = node_cache
+            .after
+            .len()
+            .saturating_sub(ast_diff.after_node_map.len());
+
+        PendingDiff {
             before,
             after,
-            &node_cache,
-            apted::Algorithm::Apted,
-            "final_pass",
-            &mut ast_diff,
-        );
+            node_cache,
+            ast_diff,
+            unmatched_before,
+            unmatched_after,
+            config: *config,
+        }
+    }
+}
+
+/// Controls how [`PendingDiff::finish`] runs phase 6 (final whole-tree APTED).
+///
+/// `Fast` is the default for every public entry point (`Diff::from_code`, `diff_code`, ...) - this
+/// is an intentional behavior change from "always run exact APTED," made to fix a measured
+/// pathological case: two completely unrelated Rust files (`src/test/data/diffs/
+/// rust-completely-unrelated-main-files/`) took **14.5 seconds** to diff, ~36x the project's
+/// stated 400ms budget, because phases 1-5 left 86% of the larger tree unmatched and phase 6 had
+/// to run full tree-edit-distance over nearly the whole thing with almost nothing to prune
+/// against. See `TODO.md`'s "Size/dissimilarity-capped approximate fallback" entry (2026-07-25)
+/// for a documented *prior*, narrower attempt at a similar idea (a per-subtree-pair size/
+/// similarity proxy checked repeatedly inside `resolve_forest`) that was reverted as an unreliable
+/// predictor of APTED cost - this guard is deliberately at a different granularity (the aggregate
+/// whole-file residual, checked once, after 5 dedicated matching passes already ran), which is a
+/// distinct-enough proxy to be worth trying again, but carries the same category of risk: it is
+/// an unproven heuristic, not a guarantee, and should be validated against the full
+/// `benchmark_optimal_solutions` corpus (see that binary) before `EXPENSIVE_RESIDUAL_THRESHOLD` is
+/// trusted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DiffMode {
+    /// Run phase 6 normally unless [`PendingDiff::looks_expensive`] is true, in which case
+    /// substitute [`apted::for_roots_fallback`] (Myers LCS over the residual forest) for full
+    /// APTED.
+    #[default]
+    Fast,
+    /// Always run full APTED for phase 6, ignoring the guard entirely - what `--exact` (CLI) and
+    /// the TUI's "Exact" prompt choice select.
+    Exact,
+}
+
+/// Guard threshold consulted by [`PendingDiff::looks_expensive`]: if the larger of
+/// `unmatched_before`/`unmatched_after` (node counts still unmapped after phase 5) exceeds this,
+/// [`DiffMode::Fast`] substitutes [`apted::for_roots_fallback`] for phase 6 instead of full APTED.
+///
+/// Measured against every fixture in the `optimal_solutions` corpus (`cargo test -- --nocapture`
+/// a residual-distribution dump, or `benchmark_optimal_solutions`): the largest legitimate
+/// residual is `c-microsoft-terminal-add-function` at 4261 (a real, ground-truth-scored fixture -
+/// tripping the guard on it regressed several dozen previously-correct matches to delete/insert
+/// during development of this feature, which is exactly the failure mode `DiffMode`'s doc comment
+/// warns this kind of proxy is prone to). The next-largest legitimate fixtures fall off sharply
+/// (1633, 779, 606, ...) - there's no fixture between 4261 and the pathological
+/// `rust-completely-unrelated-main-files` fixture's 7309. `5000` sits in that gap with real margin
+/// on both sides (~17% above the largest known-legitimate residual, ~32% below the pathological
+/// one). Re-measure whenever this is revisited (new corpus fixtures could shift the ceiling) - see
+/// [`DiffMode`]'s doc comment for the known limitations of this kind of guard in general.
+pub const EXPENSIVE_RESIDUAL_THRESHOLD: usize = 5000;
+
+/// Phases 1-5 of the seven-phase pipeline (see [`Diff::from_code_with_config`]), paused
+/// immediately before phase 6 so a caller can inspect [`PendingDiff::looks_expensive`] and choose
+/// a [`DiffMode`] before running (or skipping) full tree-edit-distance. [`PendingDiff::finish`]
+/// runs phases 6-7 and assembles the final [`Diff`].
+///
+/// # Safety invariant
+///
+/// Holds a [`NodeCache`] under the exact same erased-`'static` invariant documented on that
+/// struct (unchanged - this struct doesn't fix that), plus explicit `&'code Code` borrows of the
+/// two [`Code`] values phases 1-5 ran against. The `'code` lifetime is what makes the compiler -
+/// not just a doc comment - refuse to let a `PendingDiff` outlive those `Code` values.
+///
+/// If a caller needs to pause mid-computation for user input (e.g. a TUI prompting for
+/// [`DiffMode`]), it must block its *own* worker thread until the answer arrives - see
+/// `tui::app::compute_diff_interactive`'s use of `oneshot::Receiver::blocking_recv()` inside its
+/// own `spawn_blocking` closure - never hand a `PendingDiff` (or its `NodeCache`) to a different
+/// thread as a value.
+pub struct PendingDiff<'code> {
+    before: &'code Code,
+    after: &'code Code,
+    node_cache: NodeCache,
+    ast_diff: ASTDiff,
+    unmatched_before: usize,
+    unmatched_after: usize,
+    config: HeuristicConfig,
+}
+
+impl<'code> PendingDiff<'code> {
+    /// `max(unmatched_before, unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD`. Both this method
+    /// and `finish(DiffMode::Fast)`'s own guard check consult the same stored counts (computed
+    /// once, in `Diff::pending_with_config`), so they can never disagree.
+    pub fn looks_expensive(&self) -> bool {
+        self.unmatched_before.max(self.unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD
+    }
+
+    /// The raw `(unmatched_before, unmatched_after)` counts `looks_expensive` is based on - for
+    /// callers (e.g. a TUI prompt) that want to show the user why it's asking.
+    pub fn unmatched_counts(&self) -> (usize, usize) {
+        (self.unmatched_before, self.unmatched_after)
+    }
+
+    /// Runs phase 6 (full APTED under [`DiffMode::Exact`], or under [`DiffMode::Fast`] - full
+    /// APTED unless [`Self::looks_expensive`], in which case [`apted::for_roots_fallback`]) and
+    /// phase 7, and assembles the final [`Diff`].
+    pub fn finish(self, mode: DiffMode) -> Diff {
+        let use_fallback = mode == DiffMode::Fast && self.looks_expensive();
+        let PendingDiff {
+            before,
+            after,
+            node_cache,
+            mut ast_diff,
+            config,
+            ..
+        } = self;
+
+        // Phase 6: final APTED on the whole-file residual, or - under DiffMode::Fast, once the
+        // residual is too large for that to be affordable - the cheaper Myers-LCS-based fallback.
+        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
+        // containment-aware, so the exact path runs it unconditionally instead of demoting itself
+        // back to Zhang-Shasha on forests with real containment constraints - see
+        // src/diff/TODO.md.
+        if use_fallback {
+            apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
+        } else {
+            let _ = apted::for_roots(
+                before,
+                after,
+                &node_cache,
+                apted::Algorithm::Apted,
+                "final_pass",
+                &mut ast_diff,
+            );
+        }
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
         // APTED, by necessity - not a stylistic choice. Every phase above (1-6) requires *some*
@@ -265,7 +419,7 @@ impl Diff {
             solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        Self {
+        Diff {
             ast: Some(ast_diff),
             language: before.metadata.language.unwrap_or(Language::Unknown),
             text: None,
@@ -665,6 +819,40 @@ mod tests {
     use anyhow::Result;
 
     use super::*;
+
+    /// Regression guard for the pathological case that motivated `DiffMode`: two files with
+    /// nothing structurally in common (see the fixture's own `before.rs.test`/`after.rs.test`)
+    /// used to take 14.5s under the old always-exact pipeline, ~36x this project's 400ms budget,
+    /// because phases 1-5 left the bulk of both trees unmatched and full APTED had almost nothing
+    /// to prune against. Under the default `DiffMode::Fast`, `PendingDiff::looks_expensive()`
+    /// should trip and substitute the cheap fallback well before that. Run under `--release` (see
+    /// this crate's `[profile.release]`) - the bound here is generous specifically to avoid
+    /// flakiness in an unoptimized debug build, not because the fast path is expected to need it.
+    #[test]
+    fn rust_completely_unrelated_main_files_resolves_fast_under_default_fast_mode() -> Result<()> {
+        let pairs = test::helper::handmade_test_code_pairs()?;
+        let (before, after) = pairs
+            .get("rust-completely-unrelated-main-files")
+            .expect("fixture should be loadable from src/test/data/diffs/");
+
+        let pending = Diff::pending(before, after);
+        assert!(
+            pending.looks_expensive(),
+            "this fixture's residual (~40%/~86% unmatched) should trip the guard - counts: {:?}",
+            pending.unmatched_counts()
+        );
+
+        let started = std::time::Instant::now();
+        let diff = Diff::from_code(before, after);
+        let elapsed = started.elapsed();
+
+        assert!(diff.ast.is_some());
+        assert!(
+            elapsed < std::time::Duration::from_secs(5),
+            "expected DiffMode::Fast's guard to substitute the cheap fallback, took {elapsed:?}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_compute_metadata() -> Result<()> {

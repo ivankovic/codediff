@@ -1233,6 +1233,121 @@ fn resolve_flat_tree_pair(
     );
 }
 
+// --- DiffMode::Fast's whole-residual fallback: Myers O(ND) sequence diff, generalized from
+// `resolve_flat_tree_pair`'s one-parent's-direct-children scope to the entire still-unmatched
+// forest under a root pair. ---
+
+/// Edit-distance cap for `resolve_residual_forest_via_myers_lcs`'s Myers diff - same role as
+/// `FLAT_MAX_EDIT` for `resolve_flat_tree_pair`. If exceeded, every remaining node on both sides
+/// is marked delete/insert instead of aligned.
+const FALLBACK_MAX_EDIT: usize = 1000;
+
+/// Collects the root id of every *maximal* still-unmatched subtree under `root_id`: a preorder
+/// walk that stops descending the instant it finds an unmatched node, so one whole deleted/
+/// inserted block contributes exactly one sequence entry, not one per descendant (generalizes
+/// `flat_children`'s "one entry per unmatched child" from one parent's direct children to the
+/// whole tree). `node_map` is `diff.before_node_map`/`diff.after_node_map` for the respective
+/// side. Nodes are pushed onto an explicit stack in reverse child order so the result comes out in
+/// document order (matters for Myers alignment quality, not correctness) without recursion.
+fn maximal_unmatched_roots(
+    root_id: usize,
+    meta: &ASTMetadata,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+) -> Vec<usize> {
+    let mut result = Vec::new();
+    let mut stack = vec![root_id];
+    while let Some(id) = stack.pop() {
+        if !node_map.contains_key(&id) {
+            result.push(id);
+            continue;
+        }
+        if let Some(info) = meta.node_info.get(&id) {
+            for &child in info.children.iter().rev() {
+                stack.push(child);
+            }
+        }
+    }
+    result
+}
+
+/// `DiffMode::Fast`'s substitute for full whole-tree APTED (phase 6) when
+/// `PendingDiff::looks_expensive()` trips: collects every maximal still-unmatched subtree root on
+/// each side (`maximal_unmatched_roots`), hashes each with its existing full-subtree content hash
+/// (`ASTMetadata::node_to_full_hash`), and runs the same `myers_lcs` primitive
+/// `resolve_flat_tree_pair` already uses for one parent's flat children - generalized here to the
+/// whole residual forest rather than one parent's direct children. Deliberately does not call
+/// `resolve_flat_tree_pair` itself, which is scoped to one parent's direct children
+/// (`flat_children`, gated on `FLAT_MIN_CHILDREN`) and always emits one trailing root-pair
+/// mapping - the residual here can be scattered across many disjoint subtrees on both sides, with
+/// no single shared parent to anchor a trailing mapping to.
+///
+/// On an LCS hit, emits `emit_identical_subtree` (tagged `ASTMappingReason::APTED(source)`, same
+/// convention as `for_nodes`/`for_roots`); everything left unpaired - including everything, if the
+/// edit distance exceeds `FALLBACK_MAX_EDIT` - is marked delete/insert via `add_delete_mappings`/
+/// `add_insert_mappings`, exactly as `resolve_flat_tree_pair`'s own bail-out does.
+///
+/// Only ever matches subtrees whose full content is byte-identical (via `myers_lcs`'s exact-hash
+/// comparison) - there is no tree-edit-distance-quality partial matching here, by design: this
+/// path only runs once the residual is judged too large for full APTED to be affordable.
+pub(crate) fn resolve_residual_forest_via_myers_lcs(
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    before_root_id: usize,
+    after_root_id: usize,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let before_roots = maximal_unmatched_roots(before_root_id, before_meta, &diff.before_node_map);
+    let after_roots = maximal_unmatched_roots(after_root_id, after_meta, &diff.after_node_map);
+
+    let before_hashes: Vec<u64> = before_roots
+        .iter()
+        .map(|&id| before_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+    let after_hashes: Vec<u64> = after_roots
+        .iter()
+        .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+
+    match myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT) {
+        Some(pairs) => {
+            let mut before_matched = vec![false; before_roots.len()];
+            let mut after_matched = vec![false; after_roots.len()];
+            for (bi, ai) in pairs {
+                before_matched[bi] = true;
+                after_matched[ai] = true;
+                emit_identical_subtree(
+                    before_roots[bi],
+                    after_roots[ai],
+                    before_meta,
+                    after_meta,
+                    source,
+                    diff,
+                );
+            }
+            for (i, &id) in before_roots.iter().enumerate() {
+                if !before_matched[i] {
+                    add_delete_mappings(id, before_meta, source, diff);
+                }
+            }
+            for (i, &id) in after_roots.iter().enumerate() {
+                if !after_matched[i] {
+                    add_insert_mappings(id, after_meta, source, diff);
+                }
+            }
+        }
+        None => {
+            // Edit distance exceeds FALLBACK_MAX_EDIT: mark everything still unmatched replaced.
+            for &id in &before_roots {
+                add_delete_mappings(id, before_meta, source, diff);
+            }
+            for &id in &after_roots {
+                add_insert_mappings(id, after_meta, source, diff);
+            }
+        }
+    }
+}
+
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/
 /// `diff.after_node_map` for the before/after side respectively).
 pub(crate) fn filter_mapped_nodes(node_ids: Vec<usize>, node_map: &rustc_hash::FxHashMap<usize, usize>) -> Vec<usize> {

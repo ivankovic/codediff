@@ -16,6 +16,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod code_viewer;
+pub mod diff_mode_dialog;
 pub mod diff_viewer;
 pub mod file_dialog;
 pub mod theme_dialog;

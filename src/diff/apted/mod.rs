@@ -28,3 +28,27 @@ mod engine;
 mod zhang_shasha;
 
 pub use common::{Algorithm, for_nodes, for_roots};
+
+use crate::code::Code;
+use crate::diff::ASTDiff;
+
+/// Cheaper `DiffMode::Fast` substitute for [`for_roots`]'s phase-6 whole-tree APTED, used when
+/// `PendingDiff::looks_expensive()` trips: a Myers-LCS alignment of the still-unmatched residual
+/// forest instead of full tree-edit-distance. See `common::resolve_residual_forest_via_myers_lcs`
+/// for how the residual is collected and aligned.
+pub fn for_roots_fallback(before: &Code, after: &Code, source: &'static str, diff: &mut ASTDiff) {
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
+
+    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
+    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+
+    common::resolve_residual_forest_via_myers_lcs(
+        &before_metadata,
+        &after_metadata,
+        before_root_id,
+        after_root_id,
+        source,
+        diff,
+    );
+}

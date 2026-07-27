@@ -19,6 +19,7 @@ use std::path::PathBuf;
 
 use strum::Display;
 
+use crate::diff::DiffMode;
 use crate::diff::text::RangeMatch;
 use crate::tui::theme::OverlayTheme;
 
@@ -69,4 +70,15 @@ pub enum Action {
     DiffFailed(String),
     /// The user picked a color theme in the theme dialog.
     ThemeSelected(OverlayTheme),
+    /// The background diff computation's phase-1-5 residual was too large for `DiffMode::Fast`
+    /// to auto-resolve silently (`PendingDiff::looks_expensive()` was true) - prompts the user to
+    /// pick a `DiffMode`. The counts are just enough context to render "this diff looks big"; the
+    /// actual answer travels back out-of-band via `App::pending_diff_mode_tx`, not on this
+    /// action, since a `oneshot::Sender` isn't `Debug`/`PartialEq`/`Clone`.
+    DiffModeChoiceNeeded {
+        unmatched_before: usize,
+        unmatched_after: usize,
+    },
+    /// The user answered the `SelectDiffMode` prompt.
+    DiffModeSelected(DiffMode),
 }

@@ -1778,3 +1778,125 @@
         let b = [4u64, 5, 6];
         assert!(myers_lcs(&a, &b, 3).is_none());
     }
+
+    fn leaf(id: usize, hash: u64, meta: &mut ASTMetadata) {
+        meta.node_info.insert(
+            id,
+            ASTNodeMetadata {
+                kind: "leaf".to_string(),
+                text: String::new(),
+                children: vec![],
+                start_byte: id,
+                preorder_index: id,
+            },
+        );
+        meta.node_to_full_hash.insert(id, hash);
+    }
+
+    fn interior(id: usize, children: Vec<usize>, meta: &mut ASTMetadata) {
+        meta.node_info.insert(
+            id,
+            ASTNodeMetadata {
+                kind: "interior".to_string(),
+                text: String::new(),
+                children,
+                start_byte: id,
+                preorder_index: id,
+            },
+        );
+    }
+
+    #[test]
+    fn maximal_unmatched_roots_stops_at_first_unmatched_node_each_branch() {
+        // root(1, matched) -> A(2, matched) -> C(4, unmatched)
+        //                   -> B(3, unmatched) -> D(5, unmatched)
+        // Expected: {4, 3} - C is picked up independently (its matched ancestor A doesn't stop
+        // the descent), but D is *not* separately listed - B itself is unmatched, so the walk
+        // stops at B without looking at its children.
+        let mut meta = ASTMetadata::default();
+        interior(1, vec![2, 3], &mut meta);
+        interior(2, vec![4], &mut meta);
+        interior(3, vec![5], &mut meta);
+        leaf(4, 40, &mut meta);
+        leaf(5, 50, &mut meta);
+
+        let mut node_map = rustc_hash::FxHashMap::default();
+        node_map.insert(1, 100); // root matched
+        node_map.insert(2, 200); // A matched
+        // 3 (B), 4 (C), 5 (D) all unmatched
+
+        let mut roots = maximal_unmatched_roots(1, &meta, &node_map);
+        roots.sort_unstable();
+        assert_eq!(roots, vec![3, 4], "B and C should be the maximal unmatched roots, not D");
+    }
+
+    #[test]
+    fn resolve_residual_forest_via_myers_lcs_matches_identical_and_replaces_the_rest() {
+        // Before/after each have a matched root with two unmatched leaf children; one pair of
+        // children shares a hash (should match), the other pair doesn't (should delete/insert).
+        let mut before_meta = ASTMetadata::default();
+        let mut after_meta = ASTMetadata::default();
+        interior(1, vec![2, 3], &mut before_meta);
+        leaf(2, 999, &mut before_meta); // shared with after's node 12
+        leaf(3, 111, &mut before_meta); // unique to before
+
+        interior(11, vec![12, 13], &mut after_meta);
+        leaf(12, 999, &mut after_meta); // shared with before's node 2
+        leaf(13, 222, &mut after_meta); // unique to after
+
+        let mut diff = ASTDiff::default();
+        diff.before_node_map.insert(1, 11); // roots pre-matched by an earlier phase
+        diff.after_node_map.insert(11, 1);
+
+        resolve_residual_forest_via_myers_lcs(&before_meta, &after_meta, 1, 11, "test_source", &mut diff);
+
+        let matched = diff
+            .mapping
+            .get(&(2, 12))
+            .expect("identical-hash children should be matched");
+        assert_eq!(matched.operation, ASTMappingOperation::Identical);
+        assert_eq!(matched.reason, ASTMappingReason::APTED("test_source"));
+
+        assert!(diff.mapping.contains_key(&(3, 0)), "before's unique child should be deleted");
+        assert!(diff.mapping.contains_key(&(0, 13)), "after's unique child should be inserted");
+    }
+
+    #[test]
+    fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap() {
+        // 600 unmatched leaves on each side, zero shared hashes: true edit distance is 1200,
+        // comfortably over FALLBACK_MAX_EDIT (1000) - myers_lcs must return None, and every leaf
+        // on both sides should come out delete/insert rather than partially aligned.
+        const N: usize = 600;
+        let mut before_meta = ASTMetadata::default();
+        let mut after_meta = ASTMetadata::default();
+
+        let before_children: Vec<usize> = (0..N).map(|i| i + 1).collect();
+        let after_children: Vec<usize> = (0..N).map(|i| N + i + 1).collect();
+        interior(9999, before_children.clone(), &mut before_meta);
+        interior(19999, after_children.clone(), &mut after_meta);
+        for &id in &before_children {
+            leaf(id, id as u64, &mut before_meta); // hashes 1..=600
+        }
+        for &id in &after_children {
+            leaf(id, id as u64, &mut after_meta); // hashes 601..=1200, no overlap with before
+        }
+
+        let mut diff = ASTDiff::default();
+        diff.before_node_map.insert(9999, 19999);
+        diff.after_node_map.insert(19999, 9999);
+
+        resolve_residual_forest_via_myers_lcs(&before_meta, &after_meta, 9999, 19999, "test_source", &mut diff);
+
+        for &id in &before_children {
+            assert!(diff.mapping.contains_key(&(id, 0)), "before leaf {id} should be deleted");
+        }
+        for &id in &after_children {
+            assert!(diff.mapping.contains_key(&(0, id)), "after leaf {id} should be inserted");
+        }
+        let identical_count = diff
+            .mapping
+            .values()
+            .filter(|m| m.operation == ASTMappingOperation::Identical)
+            .count();
+        assert_eq!(identical_count, 0, "over the edit cap, nothing should be partially aligned");
+    }

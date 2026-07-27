@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::Parser;
 
+use codediff::diff::DiffMode;
 use codediff::tui;
 
 #[derive(Parser)]
@@ -40,6 +41,14 @@ struct Args {
     /// Shorthand for "mode=headless"
     #[arg(long)]
     headless: bool,
+
+    /// Always run full (exact) tree-edit-distance analysis, even when the residual after the
+    /// cheap heuristic passes is large enough that the default fast mode would otherwise
+    /// silently substitute a cheaper, less precise fallback for it. Batch/headless only - the
+    /// interactive TUI always offers this choice per-diff instead (see `SelectDiffMode`), rather
+    /// than fixing it for the whole run via a flag.
+    #[arg(long)]
+    exact: bool,
 
     /// Tick rate
     #[arg(long, value_name = "FLOAT", default_value_t = 4.0)]
@@ -125,7 +134,8 @@ async fn main() -> Result<()> {
             "stdout is not a terminal and no files were given - pass BEFORE and AFTER to run in \
             text mode, or run from a real terminal to use the interactive viewer",
         )?;
-        return tui::headless::run(&before, &after, use_color());
+        let mode = if args.exact { DiffMode::Exact } else { DiffMode::Fast };
+        return tui::headless::run(&before, &after, use_color(), mode);
     }
 
     if let Err(e) = tui_main(&args, before_after).await {
@@ -202,6 +212,7 @@ mod tests {
             paths: Vec::new(),
             mode: mode.to_string(),
             headless,
+            exact: false,
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }

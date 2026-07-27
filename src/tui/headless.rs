@@ -26,6 +26,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
+use crate::diff::DiffMode;
 use crate::diff::text::{RangeMatch, TextOperation, line_operations};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
@@ -95,8 +96,22 @@ pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> Strin
 /// Entry point for headless/text-mode operation (`main.rs`): computes the diff exactly like the
 /// TUI does (`app::compute_diff` - same parsing, same `ASTDiff`, same `TextDiff`), then prints it
 /// as text on stdout instead of drawing an interactive terminal UI.
-pub fn run(before: &Path, after: &Path, use_color: bool) -> Result<()> {
-    let data = compute_diff(before, after)?;
+///
+/// Headless mode never prompts (there's no interactive surface to ask on, unlike the TUI's
+/// `SelectDiffMode` dialog) - `mode` is applied unconditionally. Under `DiffMode::Fast` (the
+/// default), if the guard silently substituted the cheaper fallback for phase 6, a one-line note
+/// goes to stderr (plain `eprintln!`, not `tracing` - headless mode never calls
+/// `tui::initialize_logging`, so there's no subscriber installed to receive it) so a script
+/// invoking this isn't left wondering why the diff looks less precise than expected.
+pub fn run(before: &Path, after: &Path, use_color: bool, mode: DiffMode) -> Result<()> {
+    let (data, fallback_used) = compute_diff(before, after, mode)?;
+    if fallback_used {
+        eprintln!(
+            "codediff: the residual after the fast heuristic passes was too large for full \
+             tree-edit-distance analysis; used a faster, less precise fallback instead \
+             (pass --exact to force full analysis)."
+        );
+    }
     print!("{}", render_text_diff(&data, use_color));
     Ok(())
 }
@@ -201,7 +216,7 @@ mod tests {
         std::fs::write(&before_path, "fn main() {\n    old();\n}\n").unwrap();
         std::fs::write(&after_path, "fn main() {\n    new();\n}\n").unwrap();
 
-        let data = compute_diff(&before_path, &after_path)?;
+        let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
         let text = render_text_diff(&data, false);
 
         assert!(text.contains("old();"), "before content missing: {text}");

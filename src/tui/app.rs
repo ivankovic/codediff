@@ -22,16 +22,18 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Clear, Paragraph},
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error};
 
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use crate::code::{Code, Language};
-use crate::diff::{Diff, NodeCache, text::TextDiff};
+use crate::diff::{Diff, DiffMode, NodeCache, text::TextDiff};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
     Component,
+    diff_mode_dialog::DiffModeDialog,
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
     theme_dialog::ThemeDialog,
@@ -52,6 +54,10 @@ pub enum AppScreen {
     SelectTheme,
     /// The background diff computation is running.
     Diffing,
+    /// The background diff computation is paused, waiting for the user to answer
+    /// `Action::DiffModeChoiceNeeded` (the phase-1-5 residual was too large for `DiffMode::Fast`
+    /// to auto-resolve silently - see `PendingDiff::looks_expensive`).
+    SelectDiffMode,
 }
 
 /// The codediff application. The state, but not the state machine or the UI, of the TUI.
@@ -62,9 +68,19 @@ pub struct App {
     diff_viewer: DiffViewer,
     file_dialog: Option<FileDialog>,
     theme_dialog: Option<ThemeDialog>,
+    diff_mode_dialog: Option<DiffModeDialog>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
+    /// Shared with whichever background diff thread is currently running (if any): once
+    /// `PendingDiff::looks_expensive()` trips, `compute_diff_interactive` stashes the
+    /// `oneshot::Sender` half here, and `Action::DiffModeSelected`'s handler (running on the main
+    /// task - a *different* OS thread than the `spawn_blocking` closure) retrieves it to unblock
+    /// that closure's `blocking_recv()`. There is never more than one diff in flight at a time
+    /// (`AppScreen::Diffing`/`SelectDiffMode` both make `dispatch_event_to_active_screen` ignore
+    /// new `StartDiff`s), so a single-slot cell is sufficient. Needs `Arc<Mutex<_>>`, not a bare
+    /// field, because it's written to from the `spawn_blocking` closure's own OS thread.
+    pending_diff_mode_tx: Arc<Mutex<Option<oneshot::Sender<DiffMode>>>>,
 
     screen: AppScreen,
     /// Which panel the open file dialog is selecting a file for.
@@ -93,8 +109,10 @@ impl App {
             diff_viewer: DiffViewer::new(),
             file_dialog: None,
             theme_dialog: None,
+            diff_mode_dialog: None,
             action_tx,
             action_rx,
+            pending_diff_mode_tx: Arc::new(Mutex::new(None)),
             screen: AppScreen::default(),
             dialog_target: None,
             current_theme: OverlayTheme::default(),
@@ -152,8 +170,11 @@ impl App {
                 }
                 KeyCode::Esc => {
                     // Inside a file dialog, Esc cancels the dialog (handled by the dialog
-                    // itself via Action::DialogCancelled) rather than quitting the app.
-                    if self.screen != AppScreen::SelectFile {
+                    // itself via Action::DialogCancelled) rather than quitting the app. Inside
+                    // the diff-mode prompt, Esc resolves to the dialog's current (default Fast)
+                    // selection instead - "cancel" has no obvious meaning once a diff is already
+                    // in flight, and the background thread is blocked waiting for *some* answer.
+                    if self.screen != AppScreen::SelectFile && self.screen != AppScreen::SelectDiffMode {
                         action_tx.send(Action::Quit)?;
                     }
                 }
@@ -205,6 +226,10 @@ impl App {
                 None => Ok(None),
             },
             AppScreen::Diffing => Ok(None),
+            AppScreen::SelectDiffMode => match self.diff_mode_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
         }
     }
 
@@ -249,6 +274,17 @@ impl App {
                 }
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
+                }
+                Action::DiffModeChoiceNeeded { .. } => {
+                    self.diff_mode_dialog = Some(DiffModeDialog::new());
+                    self.screen = AppScreen::SelectDiffMode;
+                }
+                Action::DiffModeSelected(mode) => {
+                    if let Some(tx) = self.pending_diff_mode_tx.lock().unwrap().take() {
+                        let _ = tx.send(*mode);
+                    }
+                    self.diff_mode_dialog = None;
+                    self.screen = AppScreen::Diffing;
                 }
                 _ => {}
             }
@@ -324,9 +360,10 @@ impl App {
     /// it here turns that into a reported `Action::DiffFailed` instead.
     fn start_diff(&self, before: PathBuf, after: PathBuf) {
         let tx = self.action_tx.clone();
+        let pending_diff_mode_tx = self.pending_diff_mode_tx.clone();
         tokio::task::spawn_blocking(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                compute_diff(&before, &after)
+                compute_diff_interactive(&before, &after, &tx, &pending_diff_mode_tx)
             }));
             let action = match result {
                 Ok(Ok(data)) => Action::DiffReady(data),
@@ -362,6 +399,7 @@ impl App {
                     frame.render_widget(status, area);
                     Ok(())
                 }
+                AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -400,14 +438,23 @@ impl App {
         frame.render_widget(Clear, popup);
         dialog.draw(frame, popup)
     }
+
+    /// Draw the Fast/Exact prompt as a popup over the "Diffing…" status behind it.
+    fn draw_diff_mode_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        let status = Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center);
+        frame.render_widget(status, area);
+        let Some(dialog) = self.diff_mode_dialog.as_mut() else {
+            return Ok(());
+        };
+        let popup = dialog.popup_area(area);
+        frame.render_widget(Clear, popup);
+        dialog.draw(frame, popup)
+    }
 }
 
-/// Parse both files, diff them, and compute the textual ranges needed to display the result.
-///
-/// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
-/// terminal-independent diff computation either way - only what happens to the result (draw it
-/// interactively vs. print it as text) differs between the two modes.
-pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionData> {
+/// Parse both files, applying the `/dev/null` fallback below. Shared prefix of `compute_diff`
+/// (headless/no-prompt callers) and `compute_diff_interactive` (the TUI's pause-capable path).
+fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
     let mut before_code = Code::from_file(before)?;
     let mut after_code = Code::from_file(after)?;
 
@@ -433,19 +480,82 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<DiffSessionDat
     if after_code.ast.is_none() {
         anyhow::bail!("unsupported or unrecognized file type: {}", after.display());
     }
-    let node_cache = NodeCache::build(&before_code, &after_code);
-    let diff = Diff::from_code(&before_code, &after_code);
+
+    Ok((before_code, after_code))
+}
+
+/// Builds the textual ranges needed to display an already-`finish`ed `Diff`.
+fn assemble_diff_session_data(
+    before_path: &Path,
+    after_path: &Path,
+    before_code: &Code,
+    after_code: &Code,
+    diff: &Diff,
+) -> Result<DiffSessionData> {
+    let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
-    let text_diff = TextDiff::from(&before_code, &after_code, ast, &node_cache);
+    let text_diff = TextDiff::from(before_code, after_code, ast, &node_cache);
 
     Ok(DiffSessionData {
-        before_path: before.to_path_buf(),
-        after_path: after.to_path_buf(),
-        before_contents: before_code.contents,
-        after_contents: after_code.contents,
+        before_path: before_path.to_path_buf(),
+        after_path: after_path.to_path_buf(),
+        before_contents: before_code.contents.clone(),
+        after_contents: after_code.contents.clone(),
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
     })
+}
+
+/// Parse, diff and compute the textual ranges needed to display the result, using `mode`
+/// unconditionally - no prompting, for callers with no interactive UI to ask (headless mode, and
+/// any caller that just wants a diff). Returns whether `DiffMode::Fast`'s guard silently
+/// substituted the cheaper fallback for phase 6 (always `false` under `DiffMode::Exact`), so
+/// headless mode can warn about it.
+///
+/// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
+/// terminal-independent diff computation either way - only what happens to the result (draw it
+/// interactively vs. print it as text) differs between the two modes.
+pub(crate) fn compute_diff(before: &Path, after: &Path, mode: DiffMode) -> Result<(DiffSessionData, bool)> {
+    let (before_code, after_code) = parse_before_after(before, after)?;
+    let pending = Diff::pending(&before_code, &after_code);
+    let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
+    let diff = pending.finish(mode);
+    let data = assemble_diff_session_data(before, after, &before_code, &after_code, &diff)?;
+    Ok((data, fallback_used))
+}
+
+/// Interactive counterpart to `compute_diff`, only ever called from `start_diff`'s
+/// `spawn_blocking` closure: if `PendingDiff::looks_expensive()` trips, sends
+/// `Action::DiffModeChoiceNeeded`, stashes the `oneshot::Sender` in `pending_diff_mode_tx`, and
+/// blocks *this* worker thread on `Receiver::blocking_recv()` until `App` (running on the main
+/// task, a different OS thread) answers via `Action::DiffModeSelected`. Safe to block here
+/// specifically because this runs inside `spawn_blocking`, on tokio's dedicated blocking-pool
+/// thread, not the async executor that drives rendering/input.
+fn compute_diff_interactive(
+    before: &Path,
+    after: &Path,
+    action_tx: &mpsc::UnboundedSender<Action>,
+    pending_diff_mode_tx: &Arc<Mutex<Option<oneshot::Sender<DiffMode>>>>,
+) -> Result<DiffSessionData> {
+    let (before_code, after_code) = parse_before_after(before, after)?;
+    let pending = Diff::pending(&before_code, &after_code);
+
+    let mode = if pending.looks_expensive() {
+        let (tx, rx) = oneshot::channel::<DiffMode>();
+        *pending_diff_mode_tx.lock().unwrap() = Some(tx);
+        let (unmatched_before, unmatched_after) = pending.unmatched_counts();
+        let _ = action_tx.send(Action::DiffModeChoiceNeeded {
+            unmatched_before,
+            unmatched_after,
+        });
+        // `App` is shutting down (receiver dropped) => just proceed with the default.
+        rx.blocking_recv().unwrap_or_default()
+    } else {
+        DiffMode::Fast
+    };
+
+    let diff = pending.finish(mode);
+    assemble_diff_session_data(before, after, &before_code, &after_code, &diff)
 }
 
 /// If `code` has no detected language and no content (the `/dev/null` case handled by
@@ -543,7 +653,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(after.path(), "fn main() {}\n").expect("write temp file");
 
-        let data = compute_diff(Path::new("/dev/null"), after.path())?;
+        let (data, _fallback_used) = compute_diff(Path::new("/dev/null"), after.path(), DiffMode::Fast)?;
 
         assert_eq!(data.before_contents, "");
         assert_eq!(data.after_contents, "fn main() {}\n");
@@ -563,7 +673,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
 
-        let data = compute_diff(before.path(), Path::new("/dev/null"))?;
+        let (data, _fallback_used) = compute_diff(before.path(), Path::new("/dev/null"), DiffMode::Fast)?;
 
         assert_eq!(data.before_contents, "fn main() {}\n");
         assert_eq!(data.after_contents, "");
@@ -581,7 +691,7 @@ mod tests {
         let before = write_temp_file("hello");
         let after = write_temp_file("world");
 
-        let result = compute_diff(before.path(), after.path());
+        let result = compute_diff(before.path(), after.path(), DiffMode::Fast);
         assert!(result.is_err(), "both sides unrecognized should still bail");
     }
 
