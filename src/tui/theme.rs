@@ -37,6 +37,16 @@ pub enum OverlayTheme {
     SolarizedDark,
     #[strum(to_string = "Solarized Light")]
     SolarizedLight,
+    #[strum(to_string = "Dracula")]
+    Dracula,
+    #[strum(to_string = "Nord")]
+    Nord,
+    #[strum(to_string = "Gruvbox Dark")]
+    GruvboxDark,
+    #[strum(to_string = "Monokai")]
+    Monokai,
+    #[strum(to_string = "One Dark")]
+    OneDark,
 }
 
 /// The concrete colors making up one [`OverlayTheme`].
@@ -86,8 +96,88 @@ impl OverlayTheme {
                 overlay_fg: Color::Rgb(7, 54, 66),
                 cross_highlight_bg: Color::Rgb(124, 182, 217),
             },
+            // The five palettes below all follow the same recipe, reverse-engineered from the
+            // Solarized variants above (whose values were hand-picked before this helper existed):
+            // each band is that theme's own canonical accent color (from its official public
+            // spec/palette - not invented) blended 60% toward the theme's own background via
+            // `blend_toward_base`, and `cross_highlight_bg` is blended only 40% toward it so it
+            // stays visibly more vivid than the bands - reserved for "where the cursor is," not
+            // just "what changed." `overlay_fg` is always the theme's own canonical foreground
+            // color, unblended, since text needs to stay maximally readable.
+            OverlayTheme::Dracula => {
+                // https://draculatheme.com/spec
+                let bg = (40, 42, 54);
+                OverlayPalette {
+                    insert_bg: blend_toward_base((80, 250, 123), bg, 0.6), // green
+                    delete_bg: blend_toward_base((255, 85, 85), bg, 0.6), // red
+                    move_bg: blend_toward_base((241, 250, 140), bg, 0.6), // yellow
+                    update_bg: blend_toward_base((189, 147, 249), bg, 0.6), // purple
+                    overlay_fg: Color::Rgb(248, 248, 242),                // foreground
+                    cross_highlight_bg: blend_toward_base((139, 233, 253), bg, 0.4), // cyan
+                }
+            }
+            OverlayTheme::Nord => {
+                // https://www.nordtheme.com/docs/colors-and-palettes - nord0 (bg), nord6
+                // (brightest snow storm, fg), nord11/13/14/15 (aurora accents), nord9 (frost blue)
+                let bg = (46, 52, 64);
+                OverlayPalette {
+                    insert_bg: blend_toward_base((163, 190, 140), bg, 0.6), // nord14, green
+                    delete_bg: blend_toward_base((191, 97, 106), bg, 0.6), // nord11, red
+                    move_bg: blend_toward_base((235, 203, 139), bg, 0.6), // nord13, yellow
+                    update_bg: blend_toward_base((180, 142, 173), bg, 0.6), // nord15, purple
+                    overlay_fg: Color::Rgb(236, 239, 244),               // nord6
+                    cross_highlight_bg: blend_toward_base((129, 161, 193), bg, 0.4), // nord9
+                }
+            }
+            OverlayTheme::GruvboxDark => {
+                // https://github.com/morhetz/gruvbox - bg0, fg1, and the "bright" accent row
+                let bg = (40, 40, 40);
+                OverlayPalette {
+                    insert_bg: blend_toward_base((184, 187, 38), bg, 0.6), // bright green
+                    delete_bg: blend_toward_base((251, 73, 52), bg, 0.6), // bright red
+                    move_bg: blend_toward_base((250, 189, 47), bg, 0.6), // bright yellow
+                    update_bg: blend_toward_base((211, 134, 155), bg, 0.6), // bright purple
+                    overlay_fg: Color::Rgb(235, 219, 178),               // fg1
+                    cross_highlight_bg: blend_toward_base((131, 165, 152), bg, 0.4), // bright blue
+                }
+            }
+            OverlayTheme::Monokai => {
+                // Canonical Sublime Text "Monokai" (monokai.tmTheme) accents and background.
+                let bg = (39, 40, 34);
+                OverlayPalette {
+                    insert_bg: blend_toward_base((166, 226, 46), bg, 0.6), // green
+                    delete_bg: blend_toward_base((249, 38, 114), bg, 0.6), // pink/red
+                    move_bg: blend_toward_base((230, 219, 116), bg, 0.6), // yellow
+                    update_bg: blend_toward_base((174, 129, 255), bg, 0.6), // purple
+                    overlay_fg: Color::Rgb(248, 248, 242),                // foreground
+                    cross_highlight_bg: blend_toward_base((102, 217, 239), bg, 0.4), // cyan
+                }
+            }
+            OverlayTheme::OneDark => {
+                // Atom's "One Dark" (atom-one-dark-syntax) accents and background - one of the
+                // most widely ported editor themes, independent of the Atom editor itself.
+                let bg = (40, 44, 52);
+                OverlayPalette {
+                    insert_bg: blend_toward_base((152, 195, 121), bg, 0.6), // green
+                    delete_bg: blend_toward_base((224, 108, 117), bg, 0.6), // red
+                    move_bg: blend_toward_base((229, 192, 123), bg, 0.6), // yellow
+                    update_bg: blend_toward_base((198, 120, 221), bg, 0.6), // purple
+                    overlay_fg: Color::Rgb(171, 178, 191),               // foreground
+                    cross_highlight_bg: blend_toward_base((97, 175, 239), bg, 0.4), // blue
+                }
+            }
         }
     }
+}
+
+/// Blends `accent` toward `base` by `base_weight` (`0.0` = pure accent, `1.0` = pure base). Both
+/// are `(r, g, b)` triples rather than `Color`, since every caller works from a plain canonical
+/// hex triple. See `OverlayTheme::palette`'s doc comment on the five themes that use this.
+fn blend_toward_base(accent: (u8, u8, u8), base: (u8, u8, u8), base_weight: f32) -> Color {
+    let mix = |a: u8, b: u8| -> u8 {
+        (a as f32 * (1.0 - base_weight) + b as f32 * base_weight).round() as u8
+    };
+    Color::Rgb(mix(accent.0, base.0), mix(accent.1, base.1), mix(accent.2, base.2))
 }
 
 /// On-disk representation of the persisted theme choice. A dedicated struct (rather than
@@ -157,6 +247,34 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("does-not-exist.toml");
         assert_eq!(load_from(path), OverlayTheme::default());
+    }
+
+    #[test]
+    fn blend_toward_base_interpolates_correctly() {
+        let accent = (200, 100, 0);
+        let base = (0, 100, 200);
+
+        assert_eq!(blend_toward_base(accent, base, 0.0), Color::Rgb(200, 100, 0));
+        assert_eq!(blend_toward_base(accent, base, 1.0), Color::Rgb(0, 100, 200));
+        assert_eq!(blend_toward_base(accent, base, 0.5), Color::Rgb(100, 100, 100));
+    }
+
+    /// Every theme picker option (including the five palettes derived via `blend_toward_base`)
+    /// must actually resolve to a distinct set of colors from the built-in `Dark` theme -
+    /// otherwise "more color schemes" would just be more names for the same look.
+    #[test]
+    fn every_added_theme_is_visually_distinct_from_dark() {
+        let dark = OverlayTheme::Dark.palette();
+        for theme in OverlayTheme::iter().filter(|&t| t != OverlayTheme::Dark) {
+            let p = theme.palette();
+            assert!(
+                p.insert_bg != dark.insert_bg
+                    || p.delete_bg != dark.delete_bg
+                    || p.move_bg != dark.move_bg
+                    || p.update_bg != dark.update_bg,
+                "{theme:?} is identical to Dark"
+            );
+        }
     }
 
     /// Every theme's bands must actually be distinct colors - otherwise the picker would offer

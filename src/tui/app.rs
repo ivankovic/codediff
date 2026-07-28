@@ -36,6 +36,7 @@ use crate::tui::components::{
     diff_mode_dialog::DiffModeDialog,
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
+    help_modal::HelpModal,
     theme_dialog::ThemeDialog,
 };
 use crate::tui::events::Event;
@@ -58,6 +59,8 @@ pub enum AppScreen {
     /// `Action::DiffModeChoiceNeeded` (the phase-1-5 residual was too large for `DiffMode::Fast`
     /// to auto-resolve silently - see `PendingDiff::looks_expensive`).
     SelectDiffMode,
+    /// The `?` keybinding reference is open, drawn over the (still-visible) viewer.
+    Help,
 }
 
 /// The codediff application. The state, but not the state machine or the UI, of the TUI.
@@ -69,6 +72,7 @@ pub struct App {
     file_dialog: Option<FileDialog>,
     theme_dialog: Option<ThemeDialog>,
     diff_mode_dialog: Option<DiffModeDialog>,
+    help_modal: Option<HelpModal>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -110,6 +114,7 @@ impl App {
             file_dialog: None,
             theme_dialog: None,
             diff_mode_dialog: None,
+            help_modal: None,
             action_tx,
             action_rx,
             pending_diff_mode_tx: Arc::new(Mutex::new(None)),
@@ -169,12 +174,16 @@ impl App {
                     action_tx.send(Action::Quit)?;
                 }
                 KeyCode::Esc => {
-                    // Inside a file dialog, Esc cancels the dialog (handled by the dialog
-                    // itself via Action::DialogCancelled) rather than quitting the app. Inside
-                    // the diff-mode prompt, Esc resolves to the dialog's current (default Fast)
-                    // selection instead - "cancel" has no obvious meaning once a diff is already
-                    // in flight, and the background thread is blocked waiting for *some* answer.
-                    if self.screen != AppScreen::SelectFile && self.screen != AppScreen::SelectDiffMode {
+                    // Inside a file dialog or the help modal, Esc cancels/closes it (handled by
+                    // the component itself via Action::DialogCancelled) rather than quitting the
+                    // app. Inside the diff-mode prompt, Esc resolves to the dialog's current
+                    // (default Fast) selection instead - "cancel" has no obvious meaning once a
+                    // diff is already in flight, and the background thread is blocked waiting for
+                    // *some* answer.
+                    if self.screen != AppScreen::SelectFile
+                        && self.screen != AppScreen::SelectDiffMode
+                        && self.screen != AppScreen::Help
+                    {
                         action_tx.send(Action::Quit)?;
                     }
                 }
@@ -193,6 +202,11 @@ impl App {
                 KeyCode::Char('c') if self.screen == AppScreen::Viewer => {
                     self.theme_dialog = Some(ThemeDialog::new(self.current_theme));
                     self.screen = AppScreen::SelectTheme;
+                    action_tx.send(Action::Render)?;
+                }
+                KeyCode::Char('?') if self.screen == AppScreen::Viewer => {
+                    self.help_modal = Some(HelpModal::new());
+                    self.screen = AppScreen::Help;
                     action_tx.send(Action::Render)?;
                 }
                 _ => {}
@@ -228,6 +242,10 @@ impl App {
             AppScreen::Diffing => Ok(None),
             AppScreen::SelectDiffMode => match self.diff_mode_dialog.as_mut() {
                 Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
+            AppScreen::Help => match self.help_modal.as_mut() {
+                Some(modal) => modal.handle_events(Some(event)),
                 None => Ok(None),
             },
         }
@@ -337,6 +355,7 @@ impl App {
     fn handle_dialog_cancelled(&mut self) {
         self.file_dialog = None;
         self.theme_dialog = None;
+        self.help_modal = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
     }
@@ -400,6 +419,7 @@ impl App {
                     Ok(())
                 }
                 AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
+                AppScreen::Help => self.draw_help_modal(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -449,6 +469,17 @@ impl App {
         let popup = dialog.popup_area(area);
         frame.render_widget(Clear, popup);
         dialog.draw(frame, popup)
+    }
+
+    /// Draw the `?` keybinding reference as a popup over the (still-visible) viewer behind it.
+    fn draw_help_modal(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(modal) = self.help_modal.as_mut() else {
+            return Ok(());
+        };
+        let popup = modal.popup_area(area);
+        frame.render_widget(Clear, popup);
+        modal.draw(frame, popup)
     }
 }
 

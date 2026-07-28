@@ -19,6 +19,7 @@ pub mod code_viewer;
 pub mod diff_mode_dialog;
 pub mod diff_viewer;
 pub mod file_dialog;
+pub mod help_modal;
 pub mod theme_dialog;
 
 use anyhow::Result;

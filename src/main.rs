@@ -38,8 +38,10 @@ struct Args {
     #[arg(long, default_value = "TUI")]
     mode: String,
 
-    /// Shorthand for "mode=headless"
-    #[arg(long)]
+    /// Shorthand for "mode=headless". `--batch` is a synonym - the two names people reach for
+    /// depend on which non-interactive use case brought them here (git integration/piping vs.
+    /// scripted/CI invocation), but they mean the same thing.
+    #[arg(long, alias = "batch")]
     headless: bool,
 
     /// Always run full (exact) tree-edit-distance analysis, even when the residual after the
@@ -231,6 +233,15 @@ mod tests {
     #[test]
     fn should_run_headless_honors_the_headless_flag_even_on_a_real_terminal() {
         assert!(should_run_headless(&args_with("TUI", true), true));
+    }
+
+    /// Exercises real clap parsing (unlike `args_with`, which builds `Args` directly) - `alias`
+    /// is a clap-level detail that a struct built by hand can't accidentally get wrong, so this
+    /// is the only test that would actually catch `--batch` silently not working.
+    #[test]
+    fn batch_flag_is_a_clap_alias_for_headless() {
+        let args = Args::try_parse_from(["codediff", "--batch"]).expect("--batch should parse");
+        assert!(args.headless, "--batch should set the same field as --headless");
     }
 
     #[test]
