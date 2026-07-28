@@ -173,6 +173,15 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
+    /// Move the cursor to the start of the next (`forward = true`) or previous (`forward =
+    /// false`) actual change, wrapping around at the ends - see `CodeViewerState::
+    /// next_change_position`. A no-op if this side has no changes at all.
+    pub fn jump_to_change(&mut self, forward: bool) {
+        if let Some((row, col)) = self.state.next_change_position(forward) {
+            self.set_cursor_position(row, col);
+        }
+    }
+
     /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
     /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
     /// to match the active panel's cursor destination.

@@ -37,6 +37,7 @@ Navigation
   Tab              Switch the active panel (Before/After)
   h/j/k/l          Move the cursor left/down/up/right
   Arrow keys       Same as h/j/k/l
+  n/p              Jump to the next/previous change, skipping unchanged lines
   Page Up/Down     Scroll by a page
   Home/End         Jump to the top/bottom of the file
 

@@ -38,6 +38,8 @@ viewer. (Building from a checkout instead of a `cargo install`? Use `cargo run -
 * Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
   editor. The range under the cursor, and the matching range on the other panel, are highlighted
   in blue.
+* `n`/`p` — jump straight to the next/previous change, skipping over unchanged lines entirely.
+  Wraps around at the start/end of the file.
 * `Page Up`/`Page Down`/`Home`/`End` — scroll.
 * `q` or `Esc` — quit (`Esc` cancels an open dialog instead, while one is open).
 

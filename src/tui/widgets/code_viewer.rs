@@ -248,6 +248,45 @@ impl CodeViewerState {
         self.highlight_destination = None;
     }
 
+    /// The `(row, column)` of the start of the nearest actual change (anything but `Identical`/
+    /// the `NotYetSet` sentinel, and not a zero-width placeholder) strictly after (`forward =
+    /// true`) or before (`forward = false`) the cursor's current position - what `n`/`p` jump to.
+    /// Wraps around (forward past the last change goes to the first, and vice versa) rather than
+    /// stopping at the ends, same convention as a search's `n`/`N`. `None` if there are no changes
+    /// at all (e.g. two identical files).
+    pub fn next_change_position(&self, forward: bool) -> Option<(usize, usize)> {
+        let cursor = (self.cursor_row, self.cursor_col);
+        // `range_order` is already sorted by source start position, and filtering preserves that
+        // order, so `changes` comes out sorted with no extra work.
+        let changes: Vec<(usize, usize)> = self
+            .range_order
+            .iter()
+            .map(|&i| &self.ranges[i])
+            .filter(|range_match| {
+                !matches!(
+                    range_match.operation,
+                    TextOperation::Identical | TextOperation::NotYetSet
+                ) && !range_match.source.is_empty()
+            })
+            .map(|range_match| (range_match.source.start_row, range_match.source.start_column))
+            .collect();
+
+        if forward {
+            changes
+                .iter()
+                .find(|&&pos| pos > cursor)
+                .or_else(|| changes.first())
+                .copied()
+        } else {
+            changes
+                .iter()
+                .rev()
+                .find(|&&pos| pos < cursor)
+                .or_else(|| changes.last())
+                .copied()
+        }
+    }
+
     /// The index into `ranges` of the range covering the cursor's current position, if any (the
     /// cursor can sit in a gap with no range under it, e.g. on blank/unmapped text).
     fn range_at_cursor(&self) -> Option<usize> {
@@ -793,6 +832,110 @@ mod tests {
             range_match(TextOperation::Delete, 2, 4),
         ]);
         assert_eq!((state.cursor_row, state.cursor_col), (0, 2));
+    }
+
+    /// Three changes on rows 2, 5, and 9, with `Identical` ranges filling the gaps between them -
+    /// shared setup for `next_change_position`'s tests.
+    fn state_with_three_changes_on_rows_2_5_and_9() -> CodeViewerState {
+        let mut state = CodeViewerState::default();
+        state.load_ranges(vec![
+            RangeMatch {
+                source: TextRange::new(0, 0, 2, 0),
+                destination: TextRange::zero(),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: TextRange::new(2, 0, 2, 4),
+                destination: TextRange::zero(),
+                operation: TextOperation::Delete,
+            },
+            RangeMatch {
+                source: TextRange::new(2, 4, 5, 0),
+                destination: TextRange::zero(),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: TextRange::new(5, 0, 5, 4),
+                destination: TextRange::zero(),
+                operation: TextOperation::Update,
+            },
+            RangeMatch {
+                source: TextRange::new(5, 4, 9, 0),
+                destination: TextRange::zero(),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: TextRange::new(9, 0, 9, 4),
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+        ]);
+        state
+    }
+
+    #[test]
+    fn next_change_position_finds_the_next_change_forward() {
+        let mut state = state_with_three_changes_on_rows_2_5_and_9();
+        state.cursor_row = 0;
+        state.cursor_col = 0;
+        assert_eq!(state.next_change_position(true), Some((2, 0)));
+
+        state.cursor_row = 2;
+        state.cursor_col = 0;
+        assert_eq!(
+            state.next_change_position(true),
+            Some((5, 0)),
+            "sitting exactly on a change should jump to the *next* one, not stay put"
+        );
+    }
+
+    #[test]
+    fn next_change_position_finds_the_previous_change_backward() {
+        let mut state = state_with_three_changes_on_rows_2_5_and_9();
+        state.cursor_row = 9;
+        state.cursor_col = 0;
+        assert_eq!(
+            state.next_change_position(false),
+            Some((5, 0)),
+            "sitting exactly on a change should jump to the *previous* one, not stay put"
+        );
+
+        state.cursor_row = 7;
+        state.cursor_col = 0;
+        assert_eq!(state.next_change_position(false), Some((5, 0)));
+    }
+
+    #[test]
+    fn next_change_position_wraps_around_at_the_ends() {
+        let mut state = state_with_three_changes_on_rows_2_5_and_9();
+
+        state.cursor_row = 9;
+        state.cursor_col = 4; // past the last change
+        assert_eq!(
+            state.next_change_position(true),
+            Some((2, 0)),
+            "forward past the last change should wrap to the first"
+        );
+
+        state.cursor_row = 0;
+        state.cursor_col = 0; // before the first change
+        assert_eq!(
+            state.next_change_position(false),
+            Some((9, 0)),
+            "backward before the first change should wrap to the last"
+        );
+    }
+
+    #[test]
+    fn next_change_position_is_none_when_the_file_has_no_changes() {
+        let mut state = CodeViewerState::default();
+        state.load_ranges(vec![RangeMatch {
+            source: TextRange::new(0, 0, 5, 0),
+            destination: TextRange::zero(),
+            operation: TextOperation::Identical,
+        }]);
+        assert_eq!(state.next_change_position(true), None);
+        assert_eq!(state.next_change_position(false), None);
     }
 
     /// `cursor_destination` resolves the cursor's current position to the matched range's

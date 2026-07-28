@@ -121,6 +121,15 @@ impl DiffViewer {
         self.sync_scroll();
     }
 
+    /// Move the focused panel's cursor to the next (`forward = true`) or previous (`forward =
+    /// false`) actual change (`n`/`p`), and push the resulting matched node onto the other
+    /// panel's cross-highlight, same as any other cursor movement.
+    pub fn jump_to_change(&mut self, forward: bool) {
+        self.focused_viewer().jump_to_change(forward);
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
     /// Push the focused panel's current cursor destination onto the other panel's
     /// cross-highlight, and move the other panel's cursor to follow the matched leaf node;
     /// call after anything that can change the cursor or the focused panel.
@@ -286,6 +295,17 @@ impl Component for DiffViewer {
             }
             crossterm::event::KeyCode::Right | crossterm::event::KeyCode::Char('l') => {
                 self.move_cursor_horizontal(1);
+                Ok(Some(Action::Render))
+            }
+            // n/p jump the cursor straight to the next/previous actual change, skipping over
+            // unchanged content entirely - unlike h/j/k/l, which move one character/line at a
+            // time regardless of what's there.
+            crossterm::event::KeyCode::Char('n') => {
+                self.jump_to_change(true);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('p') => {
+                self.jump_to_change(false);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {
@@ -602,5 +622,75 @@ mod tests {
         // Right cursor should follow to the matched destination (row 1, col 0)
         assert_eq!(viewer.right_viewer.state().cursor_row, 1);
         assert_eq!(viewer.right_viewer.state().cursor_col, 0);
+    }
+
+    /// `n`/`p` (`jump_to_change`) must skip straight over unchanged lines to the next/previous
+    /// real change, and - like every other cursor movement - push the result onto the other
+    /// panel's cross-highlight so both sides stay in sync.
+    #[test]
+    fn jump_to_change_skips_unchanged_lines_and_syncs_the_other_panel() {
+        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text_range::TextRange;
+
+        let mut viewer = DiffViewer::new();
+        let data = DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: "same0\nsame1\nchanged\nsame3\nsame4".to_string(),
+            after_contents: "same0\nsame1\nCHANGED\nsame3\nsame4".to_string(),
+            before_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 2, 0),
+                    destination: TextRange::new(0, 0, 2, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    source: TextRange::new(2, 0, 2, 7),
+                    destination: TextRange::new(2, 0, 2, 7),
+                    operation: TextOperation::Update,
+                },
+                RangeMatch {
+                    source: TextRange::new(2, 7, 5, 0),
+                    destination: TextRange::new(2, 7, 5, 0),
+                    operation: TextOperation::Identical,
+                },
+            ],
+            after_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 2, 0),
+                    destination: TextRange::new(0, 0, 2, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    source: TextRange::new(2, 0, 2, 7),
+                    destination: TextRange::new(2, 0, 2, 7),
+                    operation: TextOperation::Update,
+                },
+                RangeMatch {
+                    source: TextRange::new(2, 7, 5, 0),
+                    destination: TextRange::new(2, 7, 5, 0),
+                    operation: TextOperation::Identical,
+                },
+            ],
+        };
+        viewer.load_diff(&data);
+
+        // load_diff already places the cursor on the first (only) change, so back it off first.
+        viewer.left_viewer.set_cursor_position(0, 0);
+
+        viewer.jump_to_change(true);
+        assert_eq!(viewer.left_viewer.state().cursor_row, 2, "should land on the changed line");
+        assert_eq!(
+            viewer.right_viewer.state().cursor_row,
+            2,
+            "the other panel's cursor should follow to the matched destination"
+        );
+
+        // Only one change exists, so jumping forward again must wrap back to the same spot.
+        viewer.jump_to_change(true);
+        assert_eq!(viewer.left_viewer.state().cursor_row, 2);
+
+        viewer.jump_to_change(false);
+        assert_eq!(viewer.left_viewer.state().cursor_row, 2);
     }
 }
