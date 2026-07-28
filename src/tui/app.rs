@@ -167,6 +167,10 @@ impl App {
         };
         let action_tx = self.action_tx.clone();
 
+        // Set by the o/c/? arms below when they open a new screen - see the comment at this
+        // function's `dispatch_event_to_active_screen` call site for why that matters.
+        let mut globally_handled = false;
+
         // Global key handling that doesn't depend on which component is focused.
         if let Event::Key(key) = &event {
             match key.code {
@@ -198,16 +202,19 @@ impl App {
                     };
                     self.open_file_dialog(title, ui)?;
                     action_tx.send(Action::Render)?;
+                    globally_handled = true;
                 }
                 KeyCode::Char('c') if self.screen == AppScreen::Viewer => {
                     self.theme_dialog = Some(ThemeDialog::new(self.current_theme));
                     self.screen = AppScreen::SelectTheme;
                     action_tx.send(Action::Render)?;
+                    globally_handled = true;
                 }
                 KeyCode::Char('?') if self.screen == AppScreen::Viewer => {
                     self.help_modal = Some(HelpModal::new());
                     self.screen = AppScreen::Help;
                     action_tx.send(Action::Render)?;
+                    globally_handled = true;
                 }
                 _ => {}
             }
@@ -220,8 +227,17 @@ impl App {
             Event::Key(_) | Event::Mouse(_) => {}
         }
 
-        if let Some(action) = self.dispatch_event_to_active_screen(event)? {
-            action_tx.send(action)?;
+        // Skip forwarding this same keystroke to whatever screen it just opened above - `o`/`c`
+        // happened to get away with the double-dispatch (neither FileDialog nor ThemeDialog treats
+        // `o`/`c` as one of its own keys, so the stray extra delivery was a harmless no-op), but
+        // `?` doesn't: HelpModal treats `?` as its own close key too, so without this guard the
+        // keystroke that opens it would immediately reach the just-created modal and close it
+        // again in the same event cycle - it would open and close within a single frame, i.e.
+        // never visibly show up at all.
+        if !globally_handled {
+            if let Some(action) = self.dispatch_event_to_active_screen(event)? {
+                action_tx.send(action)?;
+            }
         }
         Ok(())
     }
@@ -751,6 +767,35 @@ mod tests {
         assert_eq!(app.screen, AppScreen::Viewer);
         assert_eq!(app.dialog_target, None);
         assert!(app.file_dialog.is_none());
+    }
+
+    /// Regression test for the exact mechanism `handle_events`'s `globally_handled` guard exists
+    /// to prevent: without it, the `?` keystroke that opens the help modal would *also* reach
+    /// `dispatch_event_to_active_screen` in the same event cycle (since `self.screen` is already
+    /// `Help` by the time that call happens), and `HelpModal` treats `?` as its own close key too
+    /// - so the same keypress that opens it would immediately close it again, meaning it would
+    /// never visibly show up at all. `handle_events` itself can't be unit-tested directly (it
+    /// owns a real `UI`/terminal, which every other test in this module also avoids), so this
+    /// pins the hazard at the one layer that is testable: simulating exactly the state
+    /// `handle_events` leaves behind right after opening the modal, and confirming that
+    /// re-delivering the same keystroke to it would indeed cancel it.
+    #[test]
+    fn redelivering_the_opening_keystroke_would_immediately_close_the_help_modal() {
+        use crossterm::event::{KeyEvent, KeyModifiers};
+
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.help_modal = Some(crate::tui::components::help_modal::HelpModal::new());
+        app.screen = AppScreen::Help;
+
+        let event = Event::Key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
+        let action = app.dispatch_event_to_active_screen(event).unwrap();
+
+        assert_eq!(
+            action,
+            Some(Action::DialogCancelled),
+            "confirms why handle_events must skip re-dispatching the keystroke that just opened \
+             this screen, not just document it"
+        );
     }
 
     #[test]
