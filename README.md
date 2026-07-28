@@ -18,6 +18,69 @@ you're building from a checkout) sit behind an off-by-default `stats` feature, s
 git2 and its own OpenSSL/libssh2 build dependencies that the diffing tool itself doesn't need. Build
 them with `cargo build --features stats`.
 
+# Using CodeDiff
+
+## The interactive TUI
+
+`codediff` with no arguments opens a terminal UI with two panels, "Before" and "After". Terminals
+220 columns or wider show both panels side by side; narrower terminals show one panel at a time.
+Passing two file paths, `codediff BEFORE AFTER`, opens straight into their diff instead of an empty
+viewer. (Building from a checkout instead of a `cargo install`? Use `cargo run --` in place of
+`codediff` in every example below.)
+
+* `Tab` — switch the active panel.
+* `o` — open a file selector for the active panel. Once both panels have a file, the diff between
+  them is computed and drawn automatically (green = inserted, red = deleted, dark green = updated,
+  yellow = moved).
+* `c` — open the color theme picker. Built-in themes: Dark (default), Solarized Dark, Solarized
+  Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. The choice is remembered across runs.
+* `?` — show every keybinding and the diff-color legend. `j`/`k` scrolls it, `?` or `Esc` closes it.
+* Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
+  editor. The range under the cursor, and the matching range on the other panel, are highlighted
+  in blue.
+* `Page Up`/`Page Down`/`Home`/`End` — scroll.
+* `q` or `Esc` — quit (`Esc` cancels an open dialog instead, while one is open).
+
+If a diff turns out to involve two essentially unrelated files, full structural analysis can take
+several seconds; codediff detects this and asks whether to wait for the precise (but slow) result
+or accept a faster, approximate one instead.
+
+## Headless / batch mode
+
+`codediff --headless BEFORE AFTER` (or its synonym, `--batch`) prints the diff as plain, optionally
+colored text instead of opening the TUI - for scripts, CI, or anywhere stdout isn't a real
+terminal. This also kicks in automatically whenever stdout isn't a terminal (e.g. piped into
+`less`, redirected to a file), so `codediff BEFORE AFTER | less` just works without the flag.
+
+Long runs of unchanged lines are collapsed (3 lines of context on either side of a change, same
+convention as `diff -u`), and each hunk is prefixed with the nearest enclosing function/class/
+struct's own line when it isn't otherwise visible - so a change deep inside a large file still
+tells you where it is, without printing the whole file around it.
+
+By default, headless mode uses the same fast/approximate fallback the TUI can offer for unrelated-
+looking files, without asking - pass `--exact` to always force the full, precise analysis instead.
+Set `NO_COLOR=1` (<https://no-color.org>) to disable ANSI colors, e.g. when redirecting to a file.
+
+## Git integration
+
+`codediff` doubles as a `git difftool` backend:
+
+```
+git config difftool.codediff.cmd 'codediff "$LOCAL" "$REMOTE"'
+git difftool --tool=codediff
+```
+
+Add `git config diff.tool codediff` to make plain `git difftool` (no `--tool` needed) use it by
+default, and `git config difftool.prompt false` if you don't want git to ask "view diff ...
+[Y/n]?" before every file.
+
+It also works directly with `git diff`/`git log -p` via `GIT_EXTERNAL_DIFF` (no `difftool` config
+needed, but always non-interactive - see "Headless / batch mode" above):
+
+```
+GIT_EXTERNAL_DIFF=codediff git diff
+```
+
 # Guiding principles
 
 ## Robust
@@ -38,23 +101,6 @@ CodeDiff must produce a diff in under 400ms for 99.99% of all commits in the ful
 In code, I accept less readable, more complex code if it is faster.
 
 Benchmarks are used to make sure performance doesn't regress.
-
-# Using the TUI
-
-`cargo run` opens a terminal UI with two panels, "Before" and "After". Terminals 220 columns or
-wider show both panels side by side; narrower terminals show one panel at a time. Passing two file
-paths, `cargo run -- BEFORE AFTER`, opens straight into their diff instead of an empty viewer.
-
-* `Tab` — switch the active panel.
-* `o` — open a file selector for the active panel. Once both panels have a file, the diff between
-  them is computed and drawn automatically (green = inserted, red = deleted, dark green = updated,
-  yellow = moved).
-* `c` — open the theme picker.
-* Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
-  editor. The range under the cursor, and the matching range on the other panel, are highlighted
-  in blue.
-* `Page Up`/`Page Down`/`Home`/`End` — scroll.
-* `q` or `Esc` — quit (`Esc` cancels an open dialog instead, while one is open).
 
 # License
 
