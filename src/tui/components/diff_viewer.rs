@@ -377,8 +377,19 @@ impl Component for DiffViewer {
         // Update display mode based on current width
         self.update_display_mode(area.width);
 
-        // Update viewport heights based on current area
-        let viewport_height = area.height.saturating_sub(4) as usize; // -4 for borders and padding
+        // In single panel mode, the outer block drawn below already shows the panel name,
+        // filename, and language in one header line - the inner CodeViewer's own border would
+        // just repeat the filename and language a second time. Dual mode keeps each side's own
+        // border (it's the only place the language shows at all there).
+        let hide_inner_border = self.display_mode == DisplayMode::Single;
+        self.left_viewer.set_hide_border(hide_inner_border);
+        self.right_viewer.set_hide_border(hide_inner_border);
+
+        // Update viewport heights based on current area. Dual mode nests two borders (the
+        // "Before"/"After" panel_block, plus each CodeViewer's own) - 2 rows (top+bottom) each,
+        // -4 total. Single mode now hides the inner border above, leaving only the outer block's
+        // own 2 rows.
+        let viewport_height = area.height.saturating_sub(if hide_inner_border { 2 } else { 4 }) as usize;
         self.left_viewer.set_viewport_height(viewport_height);
         self.right_viewer.set_viewport_height(viewport_height);
 

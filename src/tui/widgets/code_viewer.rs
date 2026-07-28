@@ -292,6 +292,12 @@ pub struct CodeViewerWidget {
     /// The palette used to paint the diff/cursor overlay (not the syntax-highlighting theme
     /// above); user-selectable via the `c` theme picker, see `tui/theme.rs`.
     overlay_theme: OverlayTheme,
+    /// Skip this widget's own bordered title block (filename + language) entirely, rendering the
+    /// code flush with `area` instead. Set by single-panel `DiffViewer` mode, whose own outer
+    /// block already shows the panel name, filename, and language in one header line - drawing
+    /// this widget's border too duplicated that same information a second time. Defaults to
+    /// `false` (border shown) so every other caller's behavior is unchanged.
+    hide_border: bool,
 }
 
 impl CodeViewerWidget {
@@ -371,6 +377,11 @@ impl CodeViewerWidget {
         self.overlay_theme = theme;
     }
 
+    /// See the `hide_border` field's doc comment.
+    pub fn set_hide_border(&mut self, hide: bool) {
+        self.hide_border = hide;
+    }
+
     /// Get the total number of lines
     pub fn line_count(&self) -> usize {
         self.highlighted_lines.len()
@@ -385,11 +396,16 @@ impl CodeViewerWidget {
             .unwrap_or(0)
     }
 
-    /// The area inside this widget's own border, given the full area it would be rendered into.
-    /// Exposed so callers (e.g. terminal-cursor placement in `CodeViewer`) can compute screen
-    /// coordinates without duplicating the border's inset.
-    pub fn inner_area(area: Rect) -> Rect {
-        Block::default().borders(Borders::ALL).inner(area)
+    /// The area inside this widget's own border, given the full area it would be rendered into -
+    /// or `area` unchanged if `hide_border` means there's no border to inset for. Exposed so
+    /// callers (e.g. terminal-cursor placement in `CodeViewer`) can compute screen coordinates
+    /// without duplicating `render`'s own border logic.
+    pub fn inner_area(&self, area: Rect) -> Rect {
+        if self.hide_border {
+            area
+        } else {
+            Block::default().borders(Borders::ALL).inner(area)
+        }
     }
 
     /// Get the syntax for highlighting based on language
@@ -580,18 +596,23 @@ impl StatefulWidget for &CodeViewerWidget {
     type State = CodeViewerState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(self.display_title(), Style::new().bold().fg(Color::Cyan)),
-                Span::raw(" - "),
-                Span::styled(self.language_name(), Style::new().fg(Color::Gray)),
-            ]))
-            .borders(Borders::ALL)
-            .border_set(border::ROUNDED)
-            .border_style(Style::new().fg(Color::Gray));
+        let inner = if self.hide_border {
+            area
+        } else {
+            let block = Block::default()
+                .title(Line::from(vec![
+                    Span::styled(self.display_title(), Style::new().bold().fg(Color::Cyan)),
+                    Span::raw(" - "),
+                    Span::styled(self.language_name(), Style::new().fg(Color::Gray)),
+                ]))
+                .borders(Borders::ALL)
+                .border_set(border::ROUNDED)
+                .border_style(Style::new().fg(Color::Gray));
 
-        let inner = block.inner(area);
-        block.render(area, buf);
+            let inner = block.inner(area);
+            block.render(area, buf);
+            inner
+        };
 
         let lines = self.visible_lines(state);
 
@@ -836,5 +857,63 @@ mod tests {
             after.fg,
             Some(OverlayTheme::SolarizedLight.palette().overlay_fg)
         );
+    }
+
+    /// `inner_area` must stop insetting for its own border once there's no border to inset for -
+    /// otherwise cursor placement (`CodeViewer::cursor_screen_position`, which calls this) would
+    /// be off by one row/column from where the content is actually drawn.
+    #[test]
+    fn inner_area_is_the_full_area_when_border_is_hidden() {
+        let mut widget = widget_with_line("hello");
+        let area = Rect::new(0, 0, 20, 5);
+        assert_ne!(
+            widget.inner_area(area),
+            area,
+            "with the border shown, inner_area should be inset from the full area"
+        );
+
+        widget.set_hide_border(true);
+        assert_eq!(
+            widget.inner_area(area),
+            area,
+            "with the border hidden, there's nothing to inset for"
+        );
+    }
+
+    /// Single panel `DiffViewer` mode sets `hide_border` because its own outer block already
+    /// shows the filename and language - this pins that `render` actually honors the flag rather
+    /// than drawing its title/border unconditionally regardless.
+    #[test]
+    fn hide_border_skips_the_widgets_own_border_and_title() {
+        let area = Rect::new(0, 0, 20, 5);
+        let mut state = CodeViewerState {
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let mut buf = Buffer::empty(area);
+        let bordered = widget_with_line("hello");
+        (&bordered).render(area, &mut buf, &mut state);
+        let bordered_text: String = buf.content().iter().map(|cell| cell.symbol()).collect();
+        assert!(
+            bordered_text.contains(&bordered.filename()),
+            "with the border shown, the widget's own title should include the filename: \
+             {bordered_text}"
+        );
+        // Content is inset by the border, so row 0 starts with a border-drawing character, not
+        // the file's own first character.
+        assert_ne!(buf.get(0, 1).symbol(), "h");
+
+        let mut buf = Buffer::empty(area);
+        let mut hidden = widget_with_line("hello");
+        hidden.set_hide_border(true);
+        (&hidden).render(area, &mut buf, &mut state);
+        let hidden_text: String = buf.content().iter().map(|cell| cell.symbol()).collect();
+        assert!(
+            !hidden_text.contains(&hidden.filename()),
+            "with the border hidden, no title should be drawn at all: {hidden_text}"
+        );
+        // Content is flush against the top-left corner now - no border row/column to skip.
+        assert_eq!(buf.get(0, 0).symbol(), "h");
     }
 }

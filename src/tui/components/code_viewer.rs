@@ -128,6 +128,11 @@ impl CodeViewer {
         self.widget.set_overlay_theme(theme);
     }
 
+    /// See `CodeViewerWidget`'s `hide_border` field.
+    pub fn set_hide_border(&mut self, hide: bool) {
+        self.widget.set_hide_border(hide);
+    }
+
     /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, clamping the
     /// column to the new line's length, and scroll to keep it visible.
     pub fn move_cursor_vertical(&mut self, direction: i32) {
@@ -189,7 +194,7 @@ impl CodeViewer {
     /// if the cursor's row is scrolled out of view, or its column is past the (not horizontally
     /// scrollable) visible width.
     pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
-        let inner = crate::tui::widgets::code_viewer::CodeViewerWidget::inner_area(area);
+        let inner = self.widget.inner_area(area);
         let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
         if row_in_viewport >= inner.height as usize || self.state.cursor_col >= inner.width as usize
         {
