@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Rust dependencies (Cargo.toml/Cargo.lock) - a large tree (tree-sitter grammars, ratatui,
+  # tokio, git2, ...), so keeping it current matters for security patches in particular.
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # The actions used by .github/workflows/ci.yml and release.yml (actions/checkout,
+  # dtolnay/rust-toolchain, Swatinem/rust-cache, rustsec/audit-check, softprops/action-gh-release).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

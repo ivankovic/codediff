@@ -21,6 +21,29 @@ jobs:
 
       - run: cargo fmt --check
 
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: audit
+
+      - run: cargo install cargo-audit --locked
+
+      # RUSTSEC-2026-0195/-0194 (quick-xml, pulled in via syntect -> plist): both are DoS vectors
+      # in untrusted-XML parsing. codediff only ever calls syntect's ThemeSet::load_defaults()
+      # (bundled themes baked into the syntect binary - see src/tui/widgets/code_viewer.rs), never
+      # feeds any external/user-supplied plist/XML into it, so this code path is unreachable here.
+      # Can't fix directly: syntect 5.3.0 (latest as of this writing) pins plist ~1.9, which pins
+      # the vulnerable quick-xml; blocked on syntect bumping its own plist dependency upstream.
+      # Re-check by removing these --ignore flags occasionally.
+      - run: cargo audit --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0194
+
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})
     runs-on: ubuntu-latest

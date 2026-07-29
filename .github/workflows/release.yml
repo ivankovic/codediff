@@ -53,3 +53,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: codediff-${{ matrix.target }}.*
+          # Harmless to set on all 4 matrix jobs: same tag/commit range each time, so every job
+          # generates identical notes - GitHub just uses whatever's already there past the first.
+          generate_release_notes: true
