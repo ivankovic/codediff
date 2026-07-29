@@ -118,6 +118,15 @@ See the LICENSE file for the full text of the License.
 
 Contact me for options.
 
+# AI policy
+
+This project is developed with substantial AI assistance (currently Claude Code) - most commits
+disclose this via a `Co-Authored-By` trailer and a link to the session that produced them. That's
+not hidden, and it's not treated as a lesser way to write software here.
+
+AI-assisted contributions are welcome. Use whatever tools help you do good work; disclose it the
+same way, and you're still responsible for understanding and standing behind whatever you submit.
+
 # For Developers, human or otherwise
 
 This part of the README is mostly used to tell the AI how to work in this code. Still, useful for
