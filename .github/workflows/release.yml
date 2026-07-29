@@ -50,7 +50,7 @@ jobs:
         run: Compress-Archive -Path target/${{ matrix.target }}/release/codediff.exe -DestinationPath codediff-${{ matrix.target }}.zip
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: codediff-${{ matrix.target }}.*
           # Harmless to set on all 4 matrix jobs: same tag/commit range each time, so every job
