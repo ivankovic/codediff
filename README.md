@@ -16,6 +16,9 @@ This builds from source, so you'll need a C compiler on `PATH` alongside a Rust 
 build. The first `cargo install` will take a couple of minutes because of this plus the
 `lto = "fat"` release profile.
 
+Prefer not to build from source? Pre-built binaries for Linux, macOS (Intel and Apple Silicon)
+and Windows are attached to every [GitHub release](https://github.com/ivankovic/codediff/releases/latest).
+
 The git-history analysis tools in `src/bin/` (not installed by `cargo install`, only relevant if
 you're building from a checkout) sit behind an off-by-default `stats` feature, since they pull in
 git2 and its own OpenSSL/libssh2 build dependencies that the diffing tool itself doesn't need. Build
