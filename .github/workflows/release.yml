@@ -1,0 +1,55 @@
+name: Release binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      # Default features (`tui`) only - this is the `codediff` product binary, not the
+      # test-fixtures/stats-gated dev tools in src/bin/.
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --bin codediff
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: tar czf codediff-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release codediff
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path target/${{ matrix.target }}/release/codediff.exe -DestinationPath codediff-${{ matrix.target }}.zip
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: codediff-${{ matrix.target }}.*
