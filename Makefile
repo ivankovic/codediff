@@ -37,6 +37,26 @@ build: test
 benchmark-optimal:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions
 
+# Tags the current commit as v<Cargo.toml version> and pushes the tag, which triggers
+# .github/workflows/release.yml to build codediff for Linux/macOS/Windows and attach the
+# binaries to a new GitHub Release. Requires a clean working tree and HEAD to already match
+# origin/main, so the tag can't silently point at uncommitted or unpushed work that the release
+# workflow (running against what GitHub already has) would never actually see.
+deploy:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "error: working tree is dirty - commit or stash before deploying" >&2; \
+		exit 1; \
+	fi
+	git fetch origin main
+	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then \
+		echo "error: HEAD does not match origin/main - push your commits first" >&2; \
+		exit 1; \
+	fi
+	$(eval VERSION := $(shell grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/'))
+	@echo "Tagging and pushing v$(VERSION)..."
+	git tag v$(VERSION)
+	git push origin v$(VERSION)
+
 hermetic-benchmark:
 	cargo bench --bench diff_code_benchmark
 
