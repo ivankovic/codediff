@@ -2355,8 +2355,8 @@ pub(crate) fn resolve_forest(
     );
 
     // `compute_delta` (engine.rs) is now containment-aware: `EngineCtx.containment` is threaded
-    // into every `vren` call site (`spf_a`'s `ren_cost` closure, `apted_tree_edit_dist`,
-    // `apted_tree_edit_dist_r`) via `vren_adjusted`, mirroring the `ctx.adjust(...)` call in
+    // into every `vren` call site (`spf_a`'s `ren_cost` closure, `apted_tree_edit_dist` for both
+    // `PostDir`s) via `vren_adjusted`, mirroring the `ctx.adjust(...)` call in
     // `forest_dist`'s own `ren` computation (Zhang-Shasha side). So, unlike before, the algorithm
     // choice below no longer needs to fall back to `Algorithm::ZhangShasha` just because this
     // forest has real pruned-descendant constraints - both engines respect them identically.

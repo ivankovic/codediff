@@ -434,6 +434,24 @@ pub(crate) struct EngineCtx<'a> {
     pub(crate) containment: Option<&'a ContainmentCtx<'a>>,
 }
 
+impl<'a> EngineCtx<'a> {
+    /// Resolves which indexer/metadata pair is the "path" side and which is "other", given which
+    /// global side (`before`/`after`) the path currently lives on. Every single-path function
+    /// (`spf_a`, `apted_tree_edit_dist`, `spf_path`) starts with exactly this lookup - pulled out
+    /// once here instead of duplicating the same `if path_is_before {...} else {...}` at each of
+    /// their 5 call sites.
+    fn sides(
+        &self,
+        path_is_before: bool,
+    ) -> (&'a AptedIndexer, &'a AptedIndexer, &'a ASTMetadata, &'a ASTMetadata) {
+        if path_is_before {
+            (self.before_idx, self.after_idx, self.before_meta, self.after_meta)
+        } else {
+            (self.after_idx, self.before_idx, self.after_meta, self.before_meta)
+        }
+    }
+}
+
 /// Applies `ctx.containment`'s `adjust()` to a `vren`-computed `base` cost for the real-node pair
 /// at virtual preorder ids `(before_pre, after_pre)` in the fixed global before/after orientation
 /// - the Apted-engine equivalent of the `ctx.adjust(before_id, after_id, cost_ren)` call in
@@ -458,15 +476,15 @@ pub(crate) type Mat = Grid<i64>;
 
 /// Direct port of APTED.java's `spfA` (the general "inner path" single-path function -
 /// Algorithm 3 in the APTED paper), **specialized to `pathType == INNER`**: `gted` only ever
-/// calls this once it has already routed `pathType == LEFT`/`RIGHT` to `spf_l`/`spf_r`
-/// directly, so Java's `pathType == 0`/`pathType == 1` branches (handling this function as a
+/// calls this once it has already routed `pathType == LEFT`/`RIGHT` to `spf_path` directly, so
+/// Java's `pathType == 0`/`pathType == 1` branches (handling this function as a
 /// hypothetically general LEFT/RIGHT/INNER entry point) are dead code from that call site and
 /// are omitted; every conditional that depended on them is simplified accordingly (e.g. the
 /// "deal with nodes to the left of the path" guard becomes plain `leftPart`).
 ///
 /// Variable names mirror Java's as closely as possible (`lF`/`rF` range over `path_idx`'s
 /// subtree, `lG`/`rG` over `other_idx`'s) to keep this checkable line-by-line against the
-/// original; `treesSwapped` is replaced by `path_is_before` throughout, same as `spf_l`/`spf_r`.
+/// original; `treesSwapped` is replaced by `path_is_before` throughout, same as `spf_path`.
 /// Costs are `i64` (never negative in practice for a metric cost model, but several
 /// intermediate `sp3` terms are differences, so `i64` avoids an underflow panic `u64` would risk
 /// on the way to a non-negative result) and cast to `u64` only at the `DeltaTable`/return
@@ -498,18 +516,9 @@ pub(crate) fn spf_a(
     other_subtree: usize,
     path_id: usize,
 ) -> u64 {
-    let (path_idx, other_idx) = if path_is_before {
-        (ctx.before_idx, ctx.after_idx)
-    } else {
-        (ctx.after_idx, ctx.before_idx)
-    };
-    let (path_meta, other_meta) = if path_is_before {
-        (ctx.before_meta, ctx.after_meta)
-    } else {
-        (ctx.after_meta, ctx.before_meta)
-    };
+    let (path_idx, other_idx, path_meta, other_meta) = ctx.sides(path_is_before);
     // `(before, after)`, in that order - the fixed global orientation `delta` is always read and
-    // written in, regardless of which side `path_idx`/`other_idx` happen to be (see `spf_l`).
+    // written in, regardless of which side `path_idx`/`other_idx` happen to be (see `spf_path`).
     let delta_order = |path_pre: i64, other_pre: i64| -> (usize, usize) {
         if path_is_before {
             (path_pre as usize, other_pre as usize)
@@ -1124,12 +1133,69 @@ pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     cost.min(max_cost)
 }
 
-/// Direct port of APTED.java's `computeKeyRoots` (left-path variant): collects, into `keyroots`,
-/// every node that is a keyroot of `subtree_root`'s *leftmost* path decomposition - i.e.
-/// `subtree_root` itself, plus (recursively) every right-sibling encountered while walking up
-/// from `path_id` (the leftmost leaf descendant of `subtree_root`) back to `subtree_root`.
-pub(crate) fn compute_left_keyroots(
+/// Which postorder direction a single-path decomposition is walking - `Left` (left-to-right,
+/// `spfL`'s world) or `Right` (right-to-left, `spfR`'s world). Bundled with the four accessor
+/// functions below so the functions that used to be hand-duplicated once per direction
+/// (`computeKeyRoots`/`computeRevKeyRoots` -> `compute_keyroots`; `treeEditDist`/`treeEditDistR` ->
+/// `apted_tree_edit_dist`; `spfL`/`spfR` -> `spf_path`) can share one implementation instead, the
+/// same way `path_is_before: bool` already lets `spf_a` share one implementation across the
+/// before/after axis. Checkability against the original Java (which keeps these as separate,
+/// unparameterized functions) is no longer a goal here, so this genuine mechanical duplication was
+/// worth removing like any other. `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are
+/// deliberately NOT unified this way - they aren't a pure accessor-swap mirror (the post-`min_cost`
+/// parent-propagation step swaps which owned mutable buffer plays which role between the two), so
+/// merging them would be a materially bigger and riskier change than this one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PostDir {
+    Left,
+    Right,
+}
+
+/// Preorder id -> this direction's own postorder index. `Left` is a plain array lookup
+/// (`pre_to_post_l`); `Right` is `pre_to_post_r`'s computed `size - 1 - pre`.
+fn pre_to_post(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
+    match dir {
+        PostDir::Left => idx.pre_to_post_l[pre],
+        PostDir::Right => idx.pre_to_post_r(pre),
+    }
+}
+
+/// This direction's postorder index -> preorder id. Inverse of `pre_to_post`.
+fn post_to_pre(idx: &AptedIndexer, dir: PostDir, post: usize) -> usize {
+    match dir {
+        PostDir::Left => idx.post_l_to_pre_l[post],
+        PostDir::Right => idx.post_r_to_pre_l(post),
+    }
+}
+
+/// This direction's postorder index -> this direction's own postorder index of that node's
+/// "extreme" leaf descendant (leftmost/`lld` for `Left`, rightmost/`rld` for `Right`).
+fn post_to_extreme_leaf_post(idx: &AptedIndexer, dir: PostDir, post: usize) -> usize {
+    match dir {
+        PostDir::Left => idx.post_l_to_lld[post],
+        PostDir::Right => idx.post_r_to_rld[post],
+    }
+}
+
+/// Preorder id -> preorder id of that node's extreme leaf descendant (itself if it's a leaf;
+/// leftmost for `Left`, rightmost for `Right`).
+fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
+    match dir {
+        PostDir::Left => idx.pre_l_to_lld(pre),
+        PostDir::Right => idx.pre_l_to_rld(pre),
+    }
+}
+
+/// Direct port of APTED.java's `computeKeyRoots`/`computeRevKeyRoots`, generalized over `dir`:
+/// collects, into `keyroots`, every node that is a keyroot of `subtree_root`'s decomposition along
+/// `dir` - i.e. `subtree_root` itself, plus (recursively) every sibling on the side opposite `dir`
+/// encountered while walking up from `path_id` (the extreme leaf descendant of `subtree_root` in
+/// direction `dir`) back to `subtree_root`. `Left`: every node with a left sibling is its own
+/// keyroot, reached via each subtree's leftmost leaf descendant. `Right`: the mirror image, via
+/// rightmost leaf descendants.
+pub(crate) fn compute_keyroots(
     idx: &AptedIndexer,
+    dir: PostDir,
     subtree_root: usize,
     path_id: usize,
     keyroots: &mut Vec<usize>,
@@ -1140,41 +1206,22 @@ pub(crate) fn compute_left_keyroots(
         let parent = idx.parents[path_node] as usize;
         for &child in &idx.children[parent] {
             if child != path_node {
-                compute_left_keyroots(idx, child, idx.pre_l_to_lld(child), keyroots);
+                compute_keyroots(idx, dir, child, pre_to_extreme_leaf(idx, dir, child), keyroots);
             }
         }
         path_node = parent;
     }
 }
 
-/// Direct port of APTED.java's `computeRevKeyRoots` (right-path variant): the mirror image of
-/// `compute_left_keyroots` - every node that has a *right* sibling is its own keyroot (rather
-/// than every node that has a left sibling), reached by walking up from `subtree_root`'s
-/// *rightmost* leaf descendant instead of its leftmost.
-pub(crate) fn compute_right_keyroots(
-    idx: &AptedIndexer,
-    subtree_root: usize,
-    path_id: usize,
-    keyroots: &mut Vec<usize>,
-) {
-    keyroots.push(subtree_root);
-    let mut path_node = path_id;
-    while path_node > subtree_root {
-        let parent = idx.parents[path_node] as usize;
-        for &child in &idx.children[parent] {
-            if child != path_node {
-                compute_right_keyroots(idx, child, idx.pre_l_to_rld(child), keyroots);
-            }
-        }
-        path_node = parent;
-    }
-}
-
-/// Direct port of APTED.java's `treeEditDist` (the core of `spfL`): fills `forestdist` with the
-/// distances between every subforest pair spanning `[lld(path_subtree), path_subtree]` on the
-/// path side against `[lld(other_subtree), other_subtree]` on the other side, and - as a side
-/// effect, exactly like `forest_dist` above - writes `delta` for every aligned (tree-vs-tree)
-/// position encountered along the way.
+/// Direct port of APTED.java's `treeEditDist`/`treeEditDistR` (the core of `spfL`/`spfR`),
+/// generalized over `dir`: fills `forestdist` with the distances between every subforest pair
+/// spanning `[extreme_leaf(path_subtree), path_subtree]` on the path side against
+/// `[extreme_leaf(other_subtree), other_subtree]` on the other side, and - as a side effect,
+/// exactly like `forest_dist` above - writes `delta` for every aligned (tree-vs-tree) position
+/// encountered along the way. `dir == Left`: "extreme leaf" means leftmost (`lld`), boundaries are
+/// left-to-right postorder. `dir == Right`: rightmost (`rld`), right-to-left postorder - the `_i`/
+/// `_j`/`lld_*` names below are kept for both directions rather than renamed per-direction, since
+/// the DP shape is otherwise identical either way.
 ///
 /// `path_is_before` says whether the path side is `before` (the "T1" of the global
 /// before/after orientation) or `after`; this alone determines both the delete/insert cost
@@ -1185,36 +1232,29 @@ pub(crate) fn compute_right_keyroots(
 pub(crate) fn apted_tree_edit_dist(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
+    dir: PostDir,
     path_is_before: bool,
     path_subtree: usize,
     other_subtree: usize,
     forestdist: &mut ForestDist,
 ) {
-    let (path_idx, other_idx) = if path_is_before {
-        (ctx.before_idx, ctx.after_idx)
-    } else {
-        (ctx.after_idx, ctx.before_idx)
-    };
-    let (path_meta, other_meta) = if path_is_before {
-        (ctx.before_meta, ctx.after_meta)
-    } else {
-        (ctx.after_meta, ctx.before_meta)
-    };
+    let (path_idx, other_idx, path_meta, other_meta) = ctx.sides(path_is_before);
 
     // `i`/`j`/`di`/`dj` are 1-based boundaries exactly like `forest_dist`'s (boundary `b`
     // corresponds to the node at 0-based postorder `b - 1`) - `forestdist`'s array index *is*
-    // this same boundary value directly, so `lld_i`/`lld_j` (0-based postorder of the `lld`,
-    // which numerically equals the boundary of the node *before* the `lld`) double as the base-
+    // this same boundary value directly, so `lld_i`/`lld_j` (0-based postorder of the extreme
+    // leaf, which numerically equals the boundary of the node *before* it) double as the base-
     // case index without any extra shift. Mirrors `forest_dist` precisely; only the cost
-    // direction (`path_is_before`) and the indexer/cost-model plumbing differ.
-    let i = path_idx.pre_to_post_l[path_subtree] + 1;
-    let j = other_idx.pre_to_post_l[other_subtree] + 1;
-    let lld_i = path_idx.post_l_to_lld[i - 1];
-    let lld_j = other_idx.post_l_to_lld[j - 1];
+    // direction (`path_is_before`), the direction (`dir`), and the indexer/cost-model plumbing
+    // differ.
+    let i = pre_to_post(path_idx, dir, path_subtree) + 1;
+    let j = pre_to_post(other_idx, dir, other_subtree) + 1;
+    let lld_i = post_to_extreme_leaf_post(path_idx, dir, i - 1);
+    let lld_j = post_to_extreme_leaf_post(other_idx, dir, j - 1);
 
     forestdist[(lld_i, lld_j)] = 0;
     for di in (lld_i + 1)..=i {
-        let pre = path_idx.post_l_to_pre_l[di - 1];
+        let pre = post_to_pre(path_idx, dir, di - 1);
         let cost = if path_is_before {
             vdel(ctx.cost_model, vnode(path_idx, path_meta, pre))
         } else {
@@ -1223,7 +1263,7 @@ pub(crate) fn apted_tree_edit_dist(
         forestdist[(di, lld_j)] = forestdist[(di - 1, lld_j)] + cost;
     }
     for dj in (lld_j + 1)..=j {
-        let pre = other_idx.post_l_to_pre_l[dj - 1];
+        let pre = post_to_pre(other_idx, dir, dj - 1);
         let cost = if path_is_before {
             vins(ctx.cost_model, vnode(other_idx, other_meta, pre))
         } else {
@@ -1233,18 +1273,18 @@ pub(crate) fn apted_tree_edit_dist(
     }
 
     for di in (lld_i + 1)..=i {
-        let path_pre = path_idx.post_l_to_pre_l[di - 1];
+        let path_pre = post_to_pre(path_idx, dir, di - 1);
         let path_node = vnode(path_idx, path_meta, path_pre);
-        let path_lld = path_idx.post_l_to_lld[di - 1];
+        let path_lld = post_to_extreme_leaf_post(path_idx, dir, di - 1);
         let del_cost = if path_is_before {
             vdel(ctx.cost_model, path_node)
         } else {
             vins(ctx.cost_model, path_node)
         };
         for dj in (lld_j + 1)..=j {
-            let other_pre = other_idx.post_l_to_pre_l[dj - 1];
+            let other_pre = post_to_pre(other_idx, dir, dj - 1);
             let other_node = vnode(other_idx, other_meta, other_pre);
-            let other_lld = other_idx.post_l_to_lld[dj - 1];
+            let other_lld = post_to_extreme_leaf_post(other_idx, dir, dj - 1);
             let ins_cost = if path_is_before {
                 vins(ctx.cost_model, other_node)
             } else {
@@ -1284,54 +1324,55 @@ pub(crate) fn apted_tree_edit_dist(
     }
 }
 
-/// Direct port of APTED.java's `spfL`: the path side (`path_subtree`, already reduced to a
-/// single remaining path by `gted`'s caller) against the *entire* other side, decomposed via its
-/// own left-path keyroots in one combined sweep - this single combined sweep across all of
-/// `other_subtree`'s keyroots, rather than one call per (keyroot, keyroot) pair, is what makes
-/// APTED asymptotically cheaper than the classic Zhang-Shasha keyroot loop.
-pub(crate) fn spf_l(
+/// Direct port of APTED.java's `spfL`/`spfR`, generalized over `dir`: the path side
+/// (`path_subtree`, already reduced to a single remaining path by `gted`'s caller) against the
+/// *entire* other side, decomposed via its own keyroots (in direction `dir`) in one combined
+/// sweep - this single combined sweep across all of `other_subtree`'s keyroots, rather than one
+/// call per (keyroot, keyroot) pair, is what makes APTED asymptotically cheaper than the classic
+/// Zhang-Shasha keyroot loop.
+pub(crate) fn spf_path(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
+    dir: PostDir,
     path_is_before: bool,
     path_subtree: usize,
     other_subtree: usize,
 ) -> u64 {
-    let (path_idx, other_idx) = if path_is_before {
-        (ctx.before_idx, ctx.after_idx)
-    } else {
-        (ctx.after_idx, ctx.before_idx)
-    };
+    let (path_idx, other_idx, _, _) = ctx.sides(path_is_before);
 
     let mut keyroots = Vec::new();
     if other_subtree == 0 {
         // The virtual root's children are the *forest's own roots* - each is its own keyroot
-        // regardless of left-sibling status (mirroring `PostorderIndexer`'s `root_pres`), since
-        // there is no real ancestor whose own leftmost path could ever cover more than one of
-        // them. Treating the virtual root itself as an ordinary node here would silently absorb
-        // its first child into a path that runs all the way down to the forest's overall
-        // leftmost leaf - that child would then never get its own aligned (tree-vs-tree)
+        // regardless of sibling status on either side (mirroring `PostorderIndexer`'s
+        // `root_pres`), since there is no real ancestor whose own path could ever cover more than
+        // one of them. Treating the virtual root itself as an ordinary node here would silently
+        // absorb its first child into a path that runs all the way down to the forest's overall
+        // extreme leaf - that child would then never get its own aligned (tree-vs-tree)
         // boundary, exactly the boundary `compute_edit_mapping`'s backtrace later depends on.
         for &root in &other_idx.children[0] {
-            compute_left_keyroots(other_idx, root, other_idx.pre_l_to_lld(root), &mut keyroots);
+            compute_keyroots(other_idx, dir, root, pre_to_extreme_leaf(other_idx, dir, root), &mut keyroots);
         }
     } else {
-        compute_left_keyroots(
+        compute_keyroots(
             other_idx,
+            dir,
             other_subtree,
-            other_idx.pre_l_to_lld(other_subtree),
+            pre_to_extreme_leaf(other_idx, dir, other_subtree),
             &mut keyroots,
         );
     }
-    keyroots.sort_by_key(|&pre| other_idx.pre_to_post_l[pre]);
+    keyroots.sort_by_key(|&pre| pre_to_post(other_idx, dir, pre));
 
     // Sized and indexed by the same 1-based-boundary convention as `apted_tree_edit_dist`
-    // (absolute, not relative to any one call's own `lld`), and reused across the whole keyroot
-    // sweep below - see the comment there for why a relative scheme would be unsound here.
+    // (absolute, not relative to any one call's own extreme-leaf boundary), and reused across the
+    // whole keyroot sweep below - see the comment there for why a relative scheme would be
+    // unsound here.
     let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0);
     for &kr in &keyroots {
         apted_tree_edit_dist(
             ctx,
             delta,
+            dir,
             path_is_before,
             path_subtree,
             kr,
@@ -1339,157 +1380,8 @@ pub(crate) fn spf_l(
         );
     }
     forestdist[(
-        path_idx.pre_to_post_l[path_subtree] + 1,
-        other_idx.pre_to_post_l[other_subtree] + 1,
-    )]
-}
-
-/// Mirror image of `apted_tree_edit_dist`, walking right-to-left postorder (`pre_to_post_r`/
-/// `post_r_to_rld`) instead of left-to-right - the core of `spfR`. Boundary/index conventions and
-/// the `path_is_before` direction logic are otherwise identical; see that function's comment.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn apted_tree_edit_dist_r(
-    ctx: &EngineCtx,
-    delta: &mut DeltaTable,
-    path_is_before: bool,
-    path_subtree: usize,
-    other_subtree: usize,
-    forestdist: &mut ForestDist,
-) {
-    let (path_idx, other_idx) = if path_is_before {
-        (ctx.before_idx, ctx.after_idx)
-    } else {
-        (ctx.after_idx, ctx.before_idx)
-    };
-    let (path_meta, other_meta) = if path_is_before {
-        (ctx.before_meta, ctx.after_meta)
-    } else {
-        (ctx.after_meta, ctx.before_meta)
-    };
-
-    let i = path_idx.pre_to_post_r(path_subtree) + 1;
-    let j = other_idx.pre_to_post_r(other_subtree) + 1;
-    let rld_i = path_idx.post_r_to_rld[i - 1];
-    let rld_j = other_idx.post_r_to_rld[j - 1];
-
-    forestdist[(rld_i, rld_j)] = 0;
-    for di in (rld_i + 1)..=i {
-        let pre = path_idx.post_r_to_pre_l(di - 1);
-        let cost = if path_is_before {
-            vdel(ctx.cost_model, vnode(path_idx, path_meta, pre))
-        } else {
-            vins(ctx.cost_model, vnode(path_idx, path_meta, pre))
-        };
-        forestdist[(di, rld_j)] = forestdist[(di - 1, rld_j)] + cost;
-    }
-    for dj in (rld_j + 1)..=j {
-        let pre = other_idx.post_r_to_pre_l(dj - 1);
-        let cost = if path_is_before {
-            vins(ctx.cost_model, vnode(other_idx, other_meta, pre))
-        } else {
-            vdel(ctx.cost_model, vnode(other_idx, other_meta, pre))
-        };
-        forestdist[(rld_i, dj)] = forestdist[(rld_i, dj - 1)] + cost;
-    }
-
-    for di in (rld_i + 1)..=i {
-        let path_pre = path_idx.post_r_to_pre_l(di - 1);
-        let path_node = vnode(path_idx, path_meta, path_pre);
-        let path_rld = path_idx.post_r_to_rld[di - 1];
-        let del_cost = if path_is_before {
-            vdel(ctx.cost_model, path_node)
-        } else {
-            vins(ctx.cost_model, path_node)
-        };
-        for dj in (rld_j + 1)..=j {
-            let other_pre = other_idx.post_r_to_pre_l(dj - 1);
-            let other_node = vnode(other_idx, other_meta, other_pre);
-            let other_rld = other_idx.post_r_to_rld[dj - 1];
-            let ins_cost = if path_is_before {
-                vins(ctx.cost_model, other_node)
-            } else {
-                vdel(ctx.cost_model, other_node)
-            };
-            let (before_node, after_node) = if path_is_before {
-                (path_node, other_node)
-            } else {
-                (other_node, path_node)
-            };
-            let (before_pre, after_pre) = if path_is_before {
-                (path_pre, other_pre)
-            } else {
-                (other_pre, path_pre)
-            };
-            let ren_cost = vren_adjusted(
-                ctx,
-                before_pre as i64,
-                after_pre as i64,
-                vren(ctx.cost_model, before_node, after_node),
-            );
-
-            let da = forestdist[(di - 1, dj)] + del_cost;
-            let db = forestdist[(di, dj - 1)] + ins_cost;
-
-            let aligned = path_rld == rld_i && other_rld == rld_j;
-            let dc = if aligned {
-                let v = forestdist[(di - 1, dj - 1)];
-                delta.set(before_pre, after_pre, v);
-                v + ren_cost
-            } else {
-                forestdist[(path_rld, other_rld)] + delta.get(before_pre, after_pre) + ren_cost
-            };
-
-            forestdist[(di, dj)] = da.min(db).min(dc);
-        }
-    }
-}
-
-/// Direct port of APTED.java's `spfR`: the mirror image of `spf_l`, decomposing the other side
-/// via its *right*-path keyroots instead of its left-path ones.
-pub(crate) fn spf_r(
-    ctx: &EngineCtx,
-    delta: &mut DeltaTable,
-    path_is_before: bool,
-    path_subtree: usize,
-    other_subtree: usize,
-) -> u64 {
-    let (path_idx, other_idx) = if path_is_before {
-        (ctx.before_idx, ctx.after_idx)
-    } else {
-        (ctx.after_idx, ctx.before_idx)
-    };
-
-    let mut keyroots = Vec::new();
-    if other_subtree == 0 {
-        // Same fix as `spf_l`'s `other_subtree == 0` case, mirrored: the virtual root's children
-        // are the forest's own roots and must each get their own keyroot/aligned boundary.
-        for &root in &other_idx.children[0] {
-            compute_right_keyroots(other_idx, root, other_idx.pre_l_to_rld(root), &mut keyroots);
-        }
-    } else {
-        compute_right_keyroots(
-            other_idx,
-            other_subtree,
-            other_idx.pre_l_to_rld(other_subtree),
-            &mut keyroots,
-        );
-    }
-    keyroots.sort_by_key(|&pre| other_idx.pre_to_post_r(pre));
-
-    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0);
-    for &kr in &keyroots {
-        apted_tree_edit_dist_r(
-            ctx,
-            delta,
-            path_is_before,
-            path_subtree,
-            kr,
-            &mut forestdist,
-        );
-    }
-    forestdist[(
-        path_idx.pre_to_post_r(path_subtree) + 1,
-        other_idx.pre_to_post_r(other_subtree) + 1,
+        pre_to_post(path_idx, dir, path_subtree) + 1,
+        pre_to_post(other_idx, dir, other_subtree) + 1,
     )]
 }
 
@@ -1924,9 +1816,9 @@ pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
 /// sibling first), then dispatches to the matching single-path function for the resolved path.
 ///
 /// Two deliberate deviations from the Java original:
-/// - No `spf1` shortcut for `size <= 1` (see `gted_forced_left`'s comment - `current2`/`current1`
+/// - No `spf1` shortcut for `size <= 1` (see `gted_forced_right`'s comment - `current2`/`current1`
 ///   can sit at a much larger node than the strategy "expects" mid-recursion here exactly the way
-///   it could in the forced-left/-right drivers, for the same structural reason: the virtual
+///   it could in that forced-right driver, for the same structural reason: the virtual
 ///   root makes one side's subtree larger than any single real node, and only `spfL`/`spfR`'s own
 ///   per-keyroot sweep - not a single aggregate `spf1` comparison - leaves every delta entry an
 ///   ancestor's sweep might need behind).
@@ -1934,7 +1826,7 @@ pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
 ///   every other node, it does not have a single "leftmost child on the path" - *all* of its
 ///   children are independent forest roots, so each gets its own fully independent `gted` call
 ///   instead of being silently absorbed into a path that runs past it. This mirrors the
-///   `other_subtree == 0` fix in `spf_l`/`spf_r`, just applied to `gted`'s own recursion instead
+///   `other_subtree == 0` fix in `spf_path`, just applied to `gted`'s own recursion instead
 ///   of the keyroot-seeding helpers.
 pub(crate) fn gted(
     ctx: &EngineCtx,
@@ -1946,7 +1838,7 @@ pub(crate) fn gted(
 ) -> u64 {
     // Expand virtual-root axes *before* ever reading the strategy or calling a single-path
     // function - on *either* axis, not just whichever one the strategy ends up choosing to
-    // decompose. `spf_l`/`spf_r` tolerate a vroot-sized *other_subtree* (their own
+    // decompose. `spf_path` tolerates a vroot-sized *other_subtree* (its own
     // `other_subtree == 0` fix), but `spf_a` does not: its size-based shortcuts (e.g. "G is a
     // single node") key off the *raw* subtree size, which the virtual root inflates by one
     // without representing anything real, so it doesn't get to see vroot as a boundary at all.
@@ -1969,14 +1861,14 @@ pub(crate) fn gted(
     let size2 = ctx.after_idx.sizes[current2];
     // Direct port of Java's `gted`: whenever EITHER side has size 1, shortcut to `spf1` - a pure
     // scalar computation that writes nothing into `delta`. This must be `||`, not `&&`: any
-    // size-1-side pair that instead falls through to spf_l/spf_r/spf_a gets its boundary cells
+    // size-1-side pair that instead falls through to spf_path/spf_a gets its boundary cells
     // *written* by that call's keyroot sweep, clobbering the values `ted_init` already deposited
     // for exactly these size-1-side pairs (confirmed via a 10-node repro,
     // debug_check_gted_return_n10 - `&&` let an off-path `gted(id3-alone, id8-subtree)` call run
-    // spf_l, which overwrote `ted_init`'s delta[id3][id9]=0 mid-computation, corrupting a sibling
-    // spf_a call's read of that same cell even though the final delta value looked correct again
-    // by the time `gted` returned). Since `ted_init` already covers every size-1-side cell
-    // spf_l/spf_r could otherwise write, this loses no coverage.
+    // spf_path (then still named spf_l), which overwrote `ted_init`'s delta[id3][id9]=0
+    // mid-computation, corrupting a sibling spf_a call's read of that same cell even though the
+    // final delta value looked correct again by the time `gted` returned). Since `ted_init`
+    // already covers every size-1-side cell spf_path could otherwise write, this loses no coverage.
     if size1 <= 1 || size2 <= 1 {
         return spf1(ctx, current1, current2);
     }
@@ -2008,8 +1900,8 @@ pub(crate) fn gted(
             );
         }
         return match strategy_path_type {
-            0 => spf_l(ctx, delta, true, current1, current2),
-            1 => spf_r(ctx, delta, true, current1, current2),
+            0 => spf_path(ctx, delta, PostDir::Left, true, current1, current2),
+            1 => spf_path(ctx, delta, PostDir::Right, true, current1, current2),
             _ => spf_a(
                 ctx,
                 delta,
@@ -2046,8 +1938,8 @@ pub(crate) fn gted(
         );
     }
     match strategy_path_type {
-        0 => spf_l(ctx, delta, false, current2, current1),
-        1 => spf_r(ctx, delta, false, current2, current1),
+        0 => spf_path(ctx, delta, PostDir::Left, false, current2, current1),
+        1 => spf_path(ctx, delta, PostDir::Right, false, current2, current1),
         _ => spf_a(
             ctx,
             delta,
@@ -2060,9 +1952,10 @@ pub(crate) fn gted(
 }
 
 /// Recursive tree-decomposition driver, forcing APTED's RIGHT strategy: always decomposes
-/// `before`'s *rightmost* path, recursing into off-path (non-last) children, then `spf_r` for the
-/// resolved path. A `#[cfg(test)]`-only validator: pins `spf_r`/`compute_right_keyroots`/
-/// `apted_tree_edit_dist_r` against the oracle in isolation, since the live engine's strategy
+/// `before`'s *rightmost* path, recursing into off-path (non-last) children, then
+/// `spf_path(.., PostDir::Right, ..)` for the resolved path. A `#[cfg(test)]`-only validator: pins
+/// `spf_path`/`compute_keyroots`/`apted_tree_edit_dist` (all three with `PostDir::Right`) against
+/// the oracle in isolation, since the live engine's strategy
 /// choice (`compute_opt_strategy_post_l`) doesn't otherwise guarantee the right-side machinery
 /// gets exercised on every test case.
 #[cfg(test)]
@@ -2087,7 +1980,7 @@ pub(crate) fn gted_forced_right(
         current_path_node = parent;
     }
 
-    spf_r(ctx, delta, true, current1, current2)
+    spf_path(ctx, delta, PostDir::Right, true, current1, current2)
 }
 
 /// Computes the tree edit distance and populates `delta` for a forest pair, using the real
@@ -2122,7 +2015,7 @@ pub(crate) fn compute_delta(
     // postL/postR's preorder direction is cheaper for this tree's shape (counted via `lchl`/
     // `rchl` on `before_idx` - matching Java, which only ever looks at `it1`, the source tree).
     // The strategy table's *contents* (signed, offset-encoded path ids) mean the same thing
-    // regardless of which function computed them, so `gted`/`spf_l`/`spf_r`/`spf_a` don't need to
+    // regardless of which function computed them, so `gted`/`spf_path`/`spf_a` don't need to
     // know or care which branch ran.
     //
     // Unclamped (INNER/spfA enabled) is correctness-verified: full fuzz suite
@@ -2137,7 +2030,7 @@ pub(crate) fn compute_delta(
     //      from the adjacent s-table lookup, which legitimately needs the offset; the delta
     //      write does not).
     //   3. gted's spf1 shortcut required `size1 <= 1 && size2 <= 1`; Java uses `||`. With `&&`,
-    //      a size-1-side pair fell through to spf_l/spf_r, whose keyroot sweep overwrote cells
+    //      a size-1-side pair fell through to spf_path, whose keyroot sweep overwrote cells
     //      `ted_init` had already correctly populated.
     let strategy = if before_idx.lchl < before_idx.rchl {
         compute_opt_strategy_post_l(&before_idx, &after_idx, false)
@@ -2213,7 +2106,7 @@ pub(crate) fn compute_delta_with_driver(
     };
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
     // Drive once per top-level real root (the virtual root's children) - exactly the
-    // `other_subtree == 0` fix in `spf_l`/`spf_r` above, mirrored on the before/T1 axis:
+    // `other_subtree == 0` fix in `spf_path` above, mirrored on the before/T1 axis:
     // starting from the virtual root itself would walk its leftmost/rightmost path all the way
     // down to the forest's overall extreme leaf, silently absorbing the first real root into
     // that path instead of giving it (and every sibling root) its own aligned boundary.

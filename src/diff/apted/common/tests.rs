@@ -178,8 +178,9 @@
     }
 
     /// Same as `assert_distance_matches_oracle_pruned`, but pins the forced-RIGHT driver
-    /// instead of the live (forced-left) engine - validates `spf_r`/`compute_right_keyroots`/
-    /// `apted_tree_edit_dist_r` in isolation, the same way the forced-left tests above pin `spf_l`.
+    /// instead of the live (forced-left) engine - validates `spf_path`/`compute_keyroots`/
+    /// `apted_tree_edit_dist` (all three with `PostDir::Right`) in isolation, the same way the
+    /// forced-left tests above pin them with `PostDir::Left`.
     fn assert_distance_matches_oracle_forced_right(
         before_meta: &ASTMetadata,
         after_meta: &ASTMetadata,
