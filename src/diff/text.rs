@@ -151,8 +151,8 @@ fn ranges(
                             ));
                             descend = false;
                         }
-                        ASTMappingOperation::Delete => {
-                            if node.child_count() == 0 {
+                        ASTMappingOperation::Delete
+                            if node.child_count() == 0 => {
                                 new_range = Some(advance_and_build_range(
                                     &mut last_non_move_range,
                                     node,
@@ -160,9 +160,8 @@ fn ranges(
                                     TextOperation::Delete,
                                 ));
                             }
-                        }
-                        ASTMappingOperation::Insert => {
-                            if node.child_count() == 0 {
+                        ASTMappingOperation::Insert
+                            if node.child_count() == 0 => {
                                 new_range = Some(advance_and_build_range(
                                     &mut last_non_move_range,
                                     node,
@@ -170,7 +169,6 @@ fn ranges(
                                     TextOperation::Insert,
                                 ));
                             }
-                        }
                         ASTMappingOperation::Update => {
                             new_range = Some(advance_and_build_range(
                                 &mut last_non_move_range,
@@ -413,7 +411,7 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
         // `TextRange`'s convention: an end column of 0 already means "up to, not including, this
         // row", so only a genuinely mid-row end column needs the extra +1.
         let end_row = if r.end_column == 0 { r.end_row } else { r.end_row + 1 };
-        for row in r.start_row..end_row.min(line_count) {
+        for row_op in ops.iter_mut().take(end_row.min(line_count)).skip(r.start_row) {
             // A row can legitimately be touched by more than one range (e.g. a changed token
             // shares its row with the identical whitespace/punctuation around it). Whichever
             // range for that row is *not* Identical wins, regardless of iteration order -
@@ -422,8 +420,8 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
             // ranges touching the same row is not expected to happen in practice (ranges are
             // built from a non-overlapping tree traversal, see `diff/text.rs`), so last-wins
             // between two of those is an arbitrary but harmless tiebreak.
-            if rm.operation != TextOperation::Identical || ops[row] == TextOperation::Identical {
-                ops[row] = rm.operation.clone();
+            if rm.operation != TextOperation::Identical || *row_op == TextOperation::Identical {
+                *row_op = rm.operation.clone();
             }
         }
     }

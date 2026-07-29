@@ -11,6 +11,13 @@ keywords = ["diff", "ast", "tree-sitter", "cli", "git"]
 categories = ["command-line-utilities", "development-tools", "text-processing"]
 exclude = [
     "research/**",
+    # Checkout-only: the six `stats`-feature [[bin]] targets below cannot be built from the
+    # published/packaged crate once their source is excluded here (confirmed via `cargo package`
+    # + a build against the extracted tarball with `--features stats`: cargo reports no such bin
+    # target at all). That's intentional - these are dataset-analysis dev tools, not part of the
+    # published product (see README's Installation section) - but nothing else signals this
+    # boundary, so `cargo install codediff --features stats` fails with a confusing error rather
+    # than an explanatory one. Noted here for whoever next touches this.
     "src/bin/**",
     "src/test/data/**",
 ]
@@ -31,16 +38,18 @@ anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
 confy = "2.0.0"
 crossbeam-channel = "0.5.15"
-rayon = "1.10"
 csv = "1.4.0"
 git2 = { version = "0.20.3", optional = true }
 indoc = "2.0.7"
-infer = "0.19.0"
 libc = "0.2"
 num_cpus = "1.17.0"
 rand = "0.8"
 regex = "1.12.2"
-rusqlite = { version = "0.37.0", features = ["bundled"] }
+# Bundled/C-compiled, and (like git2 just above) only used by two of the stats-gated src/bin/
+# tools (commit_stats.rs, file_stats.rs) - gated the same way for the same reason: the main
+# codediff binary/library has no use for it, so it shouldn't be a mandatory build-time cost for
+# every `cargo install`/library consumer.
+rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.10.1"
@@ -83,16 +92,15 @@ signal-hook = "0.4.4"
 syntect = { version = "5.2", features = ["default-fancy"] }
 
 [dev-dependencies]
-tempfile = "3.10.1"
 insta = "1.38.0"
 
 [features]
 default = []
-# Pulls in git2 (and its openssl/libssh2 build-time deps) for the git-history
-# stats/sampling tools in src/bin/. Not needed by the main codediff binary or
-# TUI, so it's opt-in to keep `cargo install codediff` and library consumers
-# free of that dependency chain by default.
-stats = ["dep:git2"]
+# Pulls in git2 (and its openssl/libssh2 build-time deps) and rusqlite (a bundled, C-compiled
+# SQLite) for the git-history stats/sampling tools in src/bin/. Not needed by the main codediff
+# binary or TUI, so it's opt-in to keep `cargo install codediff` and library consumers free of
+# that dependency chain by default.
+stats = ["dep:git2", "dep:rusqlite"]
 
 [[bin]]
 name = "commit_stats"

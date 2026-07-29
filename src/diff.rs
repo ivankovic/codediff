@@ -392,7 +392,7 @@ impl<'code> PendingDiff<'code> {
         if use_fallback {
             apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
         } else {
-            let _ = apted::for_roots(
+            apted::for_roots(
                 before,
                 after,
                 &node_cache,
@@ -819,6 +819,33 @@ mod tests {
     use anyhow::Result;
 
     use super::*;
+
+    /// Regression test for a real panic: `diff_code`/`from_code` used to `unwrap()` a `None`
+    /// `Code.ast` whenever either side's language has no tree-sitter grammar (`Language::Unknown`
+    /// and several others - `Code::from_string` deliberately leaves `ast: None` for those, a
+    /// valid state, not a bug). `Diff`'s own doc comment promises every function taking a `Code`
+    /// should "fail-safe... returning a safe zero result" - this pins that phase 6 (`for_roots`/
+    /// `for_roots_fallback`) actually honors that instead of crashing.
+    #[test]
+    fn diff_code_does_not_panic_when_language_is_unknown() {
+        let before = Code::from_string("this is not code, just text", &Language::Unknown);
+        let after = Code::from_string("this is different text now", &Language::Unknown);
+
+        let diff = diff_code(&before, &after);
+
+        assert!(diff.ast.is_some(), "should still produce an (empty) ASTDiff, not panic");
+    }
+
+    /// Same guard for the `DiffMode::Exact` path, which goes through the same `for_roots` call.
+    #[test]
+    fn diff_code_with_exact_mode_does_not_panic_when_language_is_unknown() {
+        let before = Code::from_string("this is not code, just text", &Language::Unknown);
+        let after = Code::from_string("this is different text now", &Language::Unknown);
+
+        let diff = Diff::pending(&before, &after).finish(DiffMode::Exact);
+
+        assert!(diff.ast.is_some());
+    }
 
     /// Regression guard for the pathological case that motivated `DiffMode`: two files with
     /// nothing structurally in common (see the fixture's own `before.rs.test`/`after.rs.test`)

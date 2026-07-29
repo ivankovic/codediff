@@ -135,7 +135,7 @@ mod tests {
         // `hello` and its leading comment are unchanged, but `other`'s body gains an `if`
         // statement, changing its tree shape - so neither the hash nor the structural pass can
         // match the whole file as one unit; only `hello`'s `function_item` matches, via
-        // `solve_identical_trees`. Its leading comment is a *sibling*, not a descendant, so it's
+        // `solve_hash_descent`. Its leading comment is a *sibling*, not a descendant, so it's
         // untouched by that match and left for this pass to pick up specifically, which we
         // verify via `ASTMappingReason::CommentSibling`.
         let before = Code::from_string(

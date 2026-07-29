@@ -296,43 +296,13 @@ impl Component for CodeViewer {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
-        match key.code {
-            crossterm::event::KeyCode::Up => {
-                self.move_cursor_vertical(-1);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::Down => {
-                self.move_cursor_vertical(1);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::Left => {
-                self.move_cursor_horizontal(-1);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::Right => {
-                self.move_cursor_horizontal(1);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::PageUp => {
-                self.state.scroll = self.state.scroll.saturating_sub(self.state.viewport_height);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::PageDown => {
-                self.state.scroll = self.state.scroll.saturating_add(self.state.viewport_height);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::Home => {
-                self.state.scroll = 0;
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::End => {
-                self.state.scroll = self.line_count().saturating_sub(1);
-                Ok(Some(Action::Render))
-            }
-            _ => Ok(None),
-        }
-    }
+    // No `handle_key_event` override: `DiffViewer::handle_key_event` (the only place a
+    // `CodeViewer` is ever constructed) intercepts every key this component used to handle
+    // itself - arrows/hjkl via `move_cursor_vertical`/`move_cursor_horizontal`, PageUp/PageDown/
+    // Home/End via `scroll_up`/`scroll_down`/`scroll_to` - before ever reaching the fallback that
+    // forwards to `left_viewer`/`right_viewer`. Those arms were dead code (verified: nothing
+    // constructs a bare `CodeViewer` outside `diff_viewer.rs`, and no test called this method
+    // directly), so this now just falls through to `Component`'s default `Ok(None)`.
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
@@ -353,5 +323,88 @@ impl Component for CodeViewer {
         // So we use a reference and implement StatefulWidget for &CodeViewerWidget
         frame.render_stateful_widget(&self.widget, area, &mut self.state);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn viewer_with(contents: &str) -> CodeViewer {
+        let mut viewer = CodeViewer::new();
+        viewer.load_contents(PathBuf::from("test.txt"), contents.to_string());
+        viewer
+    }
+
+    #[test]
+    fn move_cursor_horizontal_right_advances_within_a_line() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.move_cursor_horizontal(1);
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (0, 1));
+    }
+
+    #[test]
+    fn move_cursor_horizontal_right_wraps_to_the_start_of_the_next_line() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.set_cursor_position(0, 3); // end of "abc"
+        viewer.move_cursor_horizontal(1);
+        assert_eq!(
+            (viewer.state.cursor_row, viewer.state.cursor_col),
+            (1, 0),
+            "moving right past the end of a line must land on column 0 of the next line"
+        );
+    }
+
+    #[test]
+    fn move_cursor_horizontal_right_is_a_no_op_at_the_very_end_of_the_file() {
+        let mut viewer = viewer_with("abc\ndef");
+        let last_row = viewer.line_count() - 1;
+        let last_col = viewer.widget.line_len(last_row);
+        viewer.set_cursor_position(last_row, last_col);
+        viewer.move_cursor_horizontal(1);
+        assert_eq!(
+            (viewer.state.cursor_row, viewer.state.cursor_col),
+            (last_row, last_col),
+            "there is no next line to wrap to at the end of the file"
+        );
+    }
+
+    #[test]
+    fn move_cursor_horizontal_left_retreats_within_a_line() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.set_cursor_position(0, 2);
+        viewer.move_cursor_horizontal(-1);
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (0, 1));
+    }
+
+    #[test]
+    fn move_cursor_horizontal_left_wraps_to_the_end_of_the_previous_line() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.set_cursor_position(1, 0);
+        viewer.move_cursor_horizontal(-1);
+        assert_eq!(
+            (viewer.state.cursor_row, viewer.state.cursor_col),
+            (0, 3),
+            "moving left past column 0 must land at the end of the previous line"
+        );
+    }
+
+    #[test]
+    fn move_cursor_horizontal_left_is_a_no_op_at_the_very_start_of_the_file() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.move_cursor_horizontal(-1);
+        assert_eq!(
+            (viewer.state.cursor_row, viewer.state.cursor_col),
+            (0, 0),
+            "there is no previous line to wrap to at the start of the file"
+        );
+    }
+
+    #[test]
+    fn move_cursor_horizontal_with_zero_direction_is_a_no_op() {
+        let mut viewer = viewer_with("abc\ndef\n");
+        viewer.set_cursor_position(0, 1);
+        viewer.move_cursor_horizontal(0);
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (0, 1));
     }
 }

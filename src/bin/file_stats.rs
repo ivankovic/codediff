@@ -184,32 +184,28 @@ fn writer_loop(
     let mut batch = Vec::with_capacity(batch_size);
     let mut stopped_early = false;
 
-    loop {
-        match stats_rx.recv() {
-            Ok(item) => {
-                batch.push(item);
-                if batch.len() >= batch_size {
-                    processed += write_batch(&mut conn, &mut batch)? as u64;
-                    batch.clear();
+    // `recv()` returning `Err` means all workers are done and the channel is closed.
+    while let Ok(item) = stats_rx.recv() {
+        batch.push(item);
+        if batch.len() >= batch_size {
+            processed += write_batch(&mut conn, &mut batch)? as u64;
+            batch.clear();
 
-                    if processed - last_progress_at >= PROGRESS_INTERVAL_FILES {
-                        last_progress_at = processed;
-                        report_progress(db_path, processed, start.elapsed());
-                    }
-
-                    if db_size_bytes(db_path)? >= max_db_bytes {
-                        eprintln!(
-                            "file_stats: database reached the {} GB cap after {} files - \
-                             stopping early (already-written data is preserved)",
-                            max_db_bytes / (1024 * 1024 * 1024),
-                            processed
-                        );
-                        stopped_early = true;
-                        break;
-                    }
-                }
+            if processed - last_progress_at >= PROGRESS_INTERVAL_FILES {
+                last_progress_at = processed;
+                report_progress(db_path, processed, start.elapsed());
             }
-            Err(_) => break, // All workers are done; channel closed.
+
+            if db_size_bytes(db_path)? >= max_db_bytes {
+                eprintln!(
+                    "file_stats: database reached the {} GB cap after {} files - \
+                     stopping early (already-written data is preserved)",
+                    max_db_bytes / (1024 * 1024 * 1024),
+                    processed
+                );
+                stopped_early = true;
+                break;
+            }
         }
     }
 

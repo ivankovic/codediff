@@ -816,7 +816,7 @@ fn update_diff(
 
                                 // Match children by position
                                 for (before_child, after_child) in
-                                    before_children.into_iter().zip(after_children.into_iter())
+                                    before_children.into_iter().zip(after_children)
                                 {
                                     let before_child_id = before_child.id();
                                     let after_child_id = after_child.id();

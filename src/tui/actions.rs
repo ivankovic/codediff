@@ -54,8 +54,9 @@ pub enum Action {
     Resume,
     Quit,
     ClearScreen,
+    /// A recoverable, non-fatal failure the user should be told about (e.g. a failed frame draw)
+    /// - surfaced via `App::last_error`, the same one-line banner `Action::DiffFailed` uses.
     Error(String),
-    Help,
     /// A directory listing for the file dialog finished loading.
     DirectoryListed(PathBuf, Vec<DirEntryInfo>),
     /// The user confirmed a file selection in the file dialog.

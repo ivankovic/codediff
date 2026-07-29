@@ -34,7 +34,7 @@ const FLAT_CONTAINER_MIN_CHILDREN: usize = 50;
 * the pipeline gets a chance to bury them inside a much larger, non-flat comparison.
 *
 * Originally this only looked for Rust `macro_invocation` nodes by macro name (see git history:
-* `solve_flat_macro_bodies` in `solve_semantically_structural_nodes.rs`). Generalized
+* `solve_flat_macro_bodies`, since removed - folded into this file). Generalized
 * (2026-07-17) to any top-level item, in any supported language, whose identity can be
 * established (either `nodes::is_semantically_structural`'s cross-language name extraction, or -
 * preserving the original Rust macro case, which `is_semantically_structural` does not cover -

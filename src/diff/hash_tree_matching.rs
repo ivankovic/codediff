@@ -42,9 +42,9 @@ impl Default for NodeSelectionConfig {
     fn default() -> Self {
         Self {
             // Tuned against the benchmark suite: 0/45 was found to provide optimal results.
-            // With solve_identical_trees using extended selection and solve_structurally_identical_trees
-            // using only reference nodes, this gives: 1437 -> 771 (666 fewer mismatches).
-            // This is the best configuration found after testing various thresholds.
+            // With solve_hash_descent's KindAndValueHash pass using extended selection and its
+            // KindOnlyHash pass using only reference nodes, this gives: 1437 -> 771 (666 fewer
+            // mismatches). This is the best configuration found after testing various thresholds.
             min_depth: 0,
             min_subtree_size: 45,
         }
@@ -180,7 +180,7 @@ pub(crate) fn solve_with_hash_map(
         diff.add_mapping(
             before_node_id,
             after_node_id,
-            ASTMapping { cost, operation, reason: root_reason.clone() },
+            ASTMapping { cost, operation, reason: root_reason },
         );
 
         // Descend both subtrees in lockstep, pairing children by position and kind - except
@@ -222,7 +222,7 @@ pub(crate) fn solve_with_hash_map(
                 diff.add_mapping(
                     before_child.id(),
                     after_child.id(),
-                    ASTMapping { cost, operation, reason: descendant_reason.clone() },
+                    ASTMapping { cost, operation, reason: descendant_reason },
                 );
                 stack.push((before_child, after_child));
             }
@@ -236,8 +236,7 @@ pub(crate) fn solve_with_hash_map(
         // anything themselves, they just aren't a pure `Identical` match anymore either.
         for reordered_id in reordered_ids {
             let mut cur = reordered_id;
-            loop {
-                let Some(&parent_id) = before_metadata.node_to_parent.get(&cur) else { break };
+            while let Some(&parent_id) = before_metadata.node_to_parent.get(&cur) {
                 let Some(&after_parent_id) = diff.before_node_map.get(&parent_id) else { break };
                 if let Some(mapping) = diff.mapping.get_mut(&(parent_id, after_parent_id))
                     && mapping.operation == ASTMappingOperation::Identical
@@ -377,5 +376,150 @@ fn pair_children_for_descent<'a>(
     }
 
     (pairs, reordered)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::code::Language;
+    use crate::test::helper::find_first_of_kind;
+
+    #[test]
+    fn build_extended_node_list_always_includes_reference_nodes_regardless_of_size() {
+        let code = Code::from_string("fn f() {}\n", &Language::Rust);
+        let metadata = metadata_of(&code);
+        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let list = build_extended_node_list(&metadata, &config);
+
+        let root = code.ast.as_ref().unwrap().root_node();
+        let function_item = find_first_of_kind(root, "function_item").unwrap();
+        assert!(
+            list.contains(&function_item.id()),
+            "a reference node must be included even though it's far smaller than min_subtree_size"
+        );
+    }
+
+    #[test]
+    fn build_extended_node_list_excludes_small_non_reference_nodes() {
+        let code = Code::from_string("fn f() { let x = 1; }\n", &Language::Rust);
+        let metadata = metadata_of(&code);
+        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let list = build_extended_node_list(&metadata, &config);
+
+        let root = code.ast.as_ref().unwrap().root_node();
+        let let_decl = find_first_of_kind(root, "let_declaration").unwrap();
+        assert!(
+            !list.contains(&let_decl.id()),
+            "a small, non-reference node must be excluded when it can't meet the size threshold"
+        );
+    }
+
+    #[test]
+    fn build_extended_node_list_includes_non_reference_nodes_above_the_size_threshold() {
+        let code = Code::from_string("fn f() { let x = 1; }\n", &Language::Rust);
+        let metadata = metadata_of(&code);
+        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: 1 };
+        let list = build_extended_node_list(&metadata, &config);
+
+        let root = code.ast.as_ref().unwrap().root_node();
+        let let_decl = find_first_of_kind(root, "let_declaration").unwrap();
+        assert!(
+            list.contains(&let_decl.id()),
+            "a low enough min_subtree_size must let ordinary, non-reference nodes in too"
+        );
+    }
+
+    #[test]
+    fn build_extended_node_list_sorts_by_subtree_size_descending() {
+        let code = Code::from_string("fn f() { let x = 1; }\nfn g() {}\n", &Language::Rust);
+        let metadata = metadata_of(&code);
+        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let list = build_extended_node_list(&metadata, &config);
+
+        let sizes: Vec<usize> = list
+            .iter()
+            .map(|id| metadata.node_to_subtree_size.get(id).copied().unwrap_or(0))
+            .collect();
+        let mut sorted_desc = sizes.clone();
+        sorted_desc.sort_by(|a, b| b.cmp(a));
+        assert_eq!(sizes, sorted_desc, "list must be sorted by subtree size descending");
+    }
+
+    #[test]
+    fn pair_children_for_descent_zips_positionally_and_drops_mismatched_kinds() {
+        let before = Code::from_string("fn f() { let x = 1; let y = 2; }\n", &Language::Rust);
+        let after = Code::from_string("fn f() { let x = 1; return; }\n", &Language::Rust);
+        let before_metadata = metadata_of(&before);
+        let after_metadata = metadata_of(&after);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_block = find_first_of_kind(before_root, "block").unwrap();
+        let after_block = find_first_of_kind(after_root, "block").unwrap();
+
+        let (pairs, reordered) =
+            pair_children_for_descent(before_block, after_block, &before_metadata, &after_metadata);
+
+        assert!(!reordered, "a block is not a commutative container - reordered must always be false");
+        assert!(
+            pairs.iter().all(|(b, a)| b.kind() == a.kind()),
+            "every returned pair must share a kind - the positional zip filters out kind mismatches: {:?}",
+            pairs.iter().map(|(b, a)| (b.kind(), a.kind())).collect::<Vec<_>>()
+        );
+        assert!(
+            pairs.iter().any(|(b, a)| b.kind() == "let_declaration" && a.kind() == "let_declaration"),
+            "the first, still-matching let_declaration must still be paired"
+        );
+    }
+
+    #[test]
+    fn pair_children_for_descent_detects_reordering_in_a_commutative_container() {
+        let before = Code::from_string("use std::{a, b, c};\n", &Language::Rust);
+        let after = Code::from_string("use std::{c, a, b};\n", &Language::Rust);
+        let before_metadata = metadata_of(&before);
+        let after_metadata = metadata_of(&after);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_use_list = find_first_of_kind(before_root, "use_list").unwrap();
+        let after_use_list = find_first_of_kind(after_root, "use_list").unwrap();
+
+        let (pairs, reordered) = pair_children_for_descent(
+            before_use_list,
+            after_use_list,
+            &before_metadata,
+            &after_metadata,
+        );
+
+        assert!(
+            reordered,
+            "identical identifiers reshuffled inside a commutative container must be detected as reordered"
+        );
+        // `{`, `a`, `,`, `b`, `,`, `c`, `}` - every child (identifiers and punctuation alike)
+        // must still find its same-kind, same-text counterpart despite the reorder.
+        assert_eq!(pairs.len(), 7, "every child must still be paired despite the reorder");
+    }
+
+    #[test]
+    fn pair_children_for_descent_reports_no_reorder_when_nothing_moved() {
+        let before = Code::from_string("use std::{a, b, c};\n", &Language::Rust);
+        let after = Code::from_string("use std::{a, b, c};\n", &Language::Rust);
+        let before_metadata = metadata_of(&before);
+        let after_metadata = metadata_of(&after);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_use_list = find_first_of_kind(before_root, "use_list").unwrap();
+        let after_use_list = find_first_of_kind(after_root, "use_list").unwrap();
+
+        let (_, reordered) = pair_children_for_descent(
+            before_use_list,
+            after_use_list,
+            &before_metadata,
+            &after_metadata,
+        );
+
+        assert!(!reordered, "an unchanged commutative container must not be flagged as reordered");
+    }
 }
 

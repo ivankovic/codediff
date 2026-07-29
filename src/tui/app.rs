@@ -63,6 +63,24 @@ pub enum AppScreen {
     Help,
 }
 
+/// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
+/// screen's own dialog (via `Action::DialogCancelled`, or - for `SelectDiffMode` - resolving to
+/// its current default selection instead of "cancel," which has no obvious meaning once a diff is
+/// already in flight and the background thread is blocked waiting for *some* answer).
+///
+/// Deliberately an exhaustive match, not a list of `!=` exclusions: that list was extended twice
+/// before (for `SelectDiffMode`, then `Help`) and `SelectTheme` was missed *both* times, letting
+/// Esc silently quit the whole app instead of closing the theme picker - the only dialog that
+/// happened to (found in a 2026-07 code-health pass). An exhaustive match means the compiler
+/// itself forces every future `AppScreen` variant to be considered here, instead of relying on
+/// someone remembering to extend a growing exclusion list.
+fn esc_should_quit(screen: AppScreen) -> bool {
+    match screen {
+        AppScreen::Viewer | AppScreen::Diffing => true,
+        AppScreen::SelectFile | AppScreen::SelectTheme | AppScreen::SelectDiffMode | AppScreen::Help => false,
+    }
+}
+
 /// The codediff application. The state, but not the state machine or the UI, of the TUI.
 pub struct App {
     tick_rate: f64,
@@ -177,20 +195,10 @@ impl App {
                 KeyCode::Char('q') => {
                     action_tx.send(Action::Quit)?;
                 }
-                KeyCode::Esc => {
-                    // Inside a file dialog or the help modal, Esc cancels/closes it (handled by
-                    // the component itself via Action::DialogCancelled) rather than quitting the
-                    // app. Inside the diff-mode prompt, Esc resolves to the dialog's current
-                    // (default Fast) selection instead - "cancel" has no obvious meaning once a
-                    // diff is already in flight, and the background thread is blocked waiting for
-                    // *some* answer.
-                    if self.screen != AppScreen::SelectFile
-                        && self.screen != AppScreen::SelectDiffMode
-                        && self.screen != AppScreen::Help
-                    {
+                KeyCode::Esc
+                    if esc_should_quit(self.screen) => {
                         action_tx.send(Action::Quit)?;
                     }
-                }
                 KeyCode::Char('o') if self.screen == AppScreen::Viewer => {
                     let panel = self.diff_viewer.active_panel();
                     self.dialog_target = Some(panel);
@@ -306,15 +314,24 @@ impl App {
                     self.screen = AppScreen::Viewer;
                     self.file_dialog = None;
                 }
+                Action::Error(message) => {
+                    error!("{message}");
+                    self.last_error = Some(message.clone());
+                }
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
-                Action::DiffModeChoiceNeeded { .. } => {
-                    self.diff_mode_dialog = Some(DiffModeDialog::new());
+                Action::DiffModeChoiceNeeded { unmatched_before, unmatched_after } => {
+                    self.diff_mode_dialog = Some(DiffModeDialog::new(*unmatched_before, *unmatched_after));
                     self.screen = AppScreen::SelectDiffMode;
                 }
                 Action::DiffModeSelected(mode) => {
-                    if let Some(tx) = self.pending_diff_mode_tx.lock().unwrap().take() {
+                    if let Some(tx) = self
+                        .pending_diff_mode_tx
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .take()
+                    {
                         let _ = tx.send(*mode);
                     }
                     self.diff_mode_dialog = None;
@@ -589,7 +606,7 @@ fn compute_diff_interactive(
 
     let mode = if pending.looks_expensive() {
         let (tx, rx) = oneshot::channel::<DiffMode>();
-        *pending_diff_mode_tx.lock().unwrap() = Some(tx);
+        *pending_diff_mode_tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx);
         let (unmatched_before, unmatched_after) = pending.unmatched_counts();
         let _ = action_tx.send(Action::DiffModeChoiceNeeded {
             unmatched_before,
@@ -754,6 +771,23 @@ mod tests {
         assert_eq!(app.after_path, Some(after.path().to_path_buf()));
         assert!(app.action_rx.try_recv().is_ok());
         Ok(())
+    }
+
+    /// Regression test: Esc used to quit the whole app instead of closing the theme picker,
+    /// because `SelectTheme` was missing from a hand-maintained exclusion list (twice-extended,
+    /// missed both times). Every screen with its own dialog must resolve Esc itself, not quit.
+    #[test]
+    fn esc_should_quit_is_false_for_every_screen_with_its_own_dialog() {
+        assert!(!esc_should_quit(AppScreen::SelectFile));
+        assert!(!esc_should_quit(AppScreen::SelectTheme));
+        assert!(!esc_should_quit(AppScreen::SelectDiffMode));
+        assert!(!esc_should_quit(AppScreen::Help));
+    }
+
+    #[test]
+    fn esc_should_quit_is_true_with_no_dialog_open() {
+        assert!(esc_should_quit(AppScreen::Viewer));
+        assert!(esc_should_quit(AppScreen::Diffing));
     }
 
     #[test]

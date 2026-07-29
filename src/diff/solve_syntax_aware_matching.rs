@@ -73,9 +73,9 @@ pub fn solve(
 * Matches `nodes::is_semantically_structural` candidates (functions, classes, structs, enums,
 * impls, ...) by **fully-resolved name**: `(kind, name)` where `name` is scope-qualified by
 * prepending every enclosing named node's own name, joined by `::` - e.g. a `new` method inside
-* `impl Bar` resolves to `"Bar::new"`, distinguishing it from `Foo::new` without the dedicated
-* impl/class method pre-pass `solve_semantically_structural_nodes` needed (Pass 0b/Pass 1 there):
-* the scope qualification *is* the disambiguation, for every kind, uniformly.
+* `impl Bar` resolves to `"Bar::new"`, distinguishing it from `Foo::new` without a dedicated
+* impl/class method pre-pass: the scope qualification *is* the disambiguation, for every kind,
+* uniformly.
 *
 * Grouped into `HashMap<(kind, fully_resolved_name), Vec<node_id>>` (a `Vec`, not a single id) to
 * support real N:M: overloads, duplicate trait impls, or any other case where more than one
@@ -379,9 +379,8 @@ mod tests {
 
     #[test]
     fn methods_in_different_impls_are_matched_within_their_own_impl() {
-        // Same regression guard as solve_semantically_structural_nodes' equivalent test: two
-        // impls both define `new`. Fully-resolved names ("Foo::new" vs "Bar::new") disambiguate
-        // them without any dedicated impl-scoped pre-pass.
+        // Regression guard: two impls both define `new`. Fully-resolved names ("Foo::new" vs
+        // "Bar::new") disambiguate them without any dedicated impl-scoped pre-pass.
         let before_src = "
 struct Foo;
 struct Bar;

@@ -151,7 +151,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 
 /// Resolves each before-arm against the first not-yet-claimed after-arm with an identical
 /// (non-wildcard) signature, via a dedicated `apted::for_nodes` call per pair - the same idiom
-/// `solve_semantically_structural_nodes` uses to pre-match same-named methods before diffing their
+/// `solve_syntax_aware_matching` uses to pre-match same-named methods before diffing their
 /// enclosing impl. Wildcard arms and arms with no counterpart signature are left for the
 /// container-level `for_nodes` call to handle as ordinary adds/removals.
 fn anchor_matching_arms(

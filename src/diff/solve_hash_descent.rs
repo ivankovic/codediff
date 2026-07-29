@@ -149,14 +149,12 @@ fn normalize_import_path(path: &str) -> String {
     // Normalize path separators
     let normalized_separators = unquoted.replace('\\', "/");
 
-    // Normalize relative path prefixes
-    // Handle ./prefix and ../prefix
-    if normalized_separators.starts_with("./") {
-        normalized_separators[2..].to_string()
-    } else {
-        // Keep ../ as-is - it changes the meaning.
-        normalized_separators
-    }
+    // Normalize relative path prefixes: strip a leading "./", but keep "../" as-is since it
+    // changes the meaning (goes up a directory).
+    normalized_separators
+        .strip_prefix("./")
+        .map(str::to_string)
+        .unwrap_or(normalized_separators)
 }
 
 /// Returns true if the node kind represents an import statement for a given language
@@ -337,5 +335,97 @@ mod tests {
         // The ancestor itself didn't reorder anything - only the actual commutative container
         // gets tagged FullymappingSubtrees.
         assert_ne!(use_decl_mapping.reason, ASTMappingReason::FullymappingSubtrees);
+    }
+
+    #[test]
+    fn normalize_import_path_strips_quotes_and_normalizes_separators() {
+        assert_eq!(normalize_import_path("\"foo/bar\""), "foo/bar");
+        assert_eq!(normalize_import_path("'foo\\bar'"), "foo/bar");
+        assert_eq!(normalize_import_path("  \"./foo\"  "), "foo");
+    }
+
+    #[test]
+    fn normalize_import_path_keeps_parent_relative_prefix() {
+        // "../" changes meaning (goes up a directory), unlike "./" - it must survive normalization.
+        assert_eq!(normalize_import_path("\"../foo\""), "../foo");
+    }
+
+    #[test]
+    fn is_import_node_recognizes_each_supported_language() {
+        assert!(is_import_node("use_declaration", &Language::Rust));
+        assert!(is_import_node("extern_crate_declaration", &Language::Rust));
+        assert!(is_import_node("import_spec", &Language::Go));
+        assert!(is_import_node("import_declaration", &Language::Go));
+        assert!(is_import_node("import_statement", &Language::Python));
+        assert!(is_import_node("import_from_statement", &Language::Python));
+        assert!(is_import_node("import_declaration", &Language::Java));
+        assert!(is_import_node("import_declaration", &Language::CSharp));
+        assert!(is_import_node("import_statement", &Language::JavaScript));
+        assert!(is_import_node("import_expression", &Language::TypeScript));
+        assert!(is_import_node("preproc_include", &Language::C));
+        assert!(is_import_node("preproc_include", &Language::CPP));
+        assert!(is_import_node("import", &Language::Kotlin));
+        assert!(is_import_node("import_declaration", &Language::Scala));
+        assert!(is_import_node("import_declaration", &Language::Swift));
+        assert!(is_import_node("include_expression", &Language::PHP));
+        assert!(is_import_node("require_once_expression", &Language::PHP));
+    }
+
+    #[test]
+    fn is_import_node_rejects_rubys_require_since_it_is_a_plain_method_call() {
+        // Ruby's `require "foo"` parses as an ordinary `call` node - indistinguishable from any
+        // other method call by kind alone, so it's deliberately left unmatched here.
+        assert!(!is_import_node("call", &Language::Ruby));
+        assert!(!is_import_node("import_statement", &Language::Ruby));
+    }
+
+    #[test]
+    fn is_import_node_rejects_a_kind_from_the_wrong_language() {
+        // Go's `import_spec` must not accidentally match under Rust just because the string matches.
+        assert!(!is_import_node("import_spec", &Language::Rust));
+    }
+
+    #[test]
+    fn extract_import_path_joins_rust_scoped_identifier_with_double_colon() {
+        let code = Code::from_string("use std::collections::HashMap;\n", &Language::Rust);
+        let metadata = metadata_of(&code);
+        let root = code.ast.as_ref().unwrap().root_node();
+        let use_decl = find_first_of_kind(root, "use_declaration").unwrap();
+        let path = extract_import_path(use_decl.id(), &metadata).unwrap();
+        assert_eq!(path, "std::collections::HashMap");
+    }
+
+    #[test]
+    fn extract_import_path_normalizes_relative_js_string_literal() {
+        let code = Code::from_string("import Foo from \"./foo\";\n", &Language::JavaScript);
+        let metadata = metadata_of(&code);
+        let root = code.ast.as_ref().unwrap().root_node();
+        let import_stmt = find_first_of_kind(root, "import_statement").unwrap();
+        let path = extract_import_path(import_stmt.id(), &metadata).unwrap();
+        assert_eq!(path, "foo");
+    }
+
+    /// Regression/integration guard for the whole pass: a relative import whose formatting
+    /// (leading `./`) differs from its counterpart must still match by normalized path, even
+    /// though the raw string literal text (and therefore any byte-identical hash) differs.
+    #[test]
+    fn solve_import_path_hash_matches_reformatted_relative_import() {
+        let before = Code::from_string("import Foo from \"./foo\";\n", &Language::JavaScript);
+        let after = Code::from_string("import Foo from \"foo\";\n", &Language::JavaScript);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+
+        solve_import_path_hash(&before, &after, &node_cache, &mut diff);
+
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_import = find_first_of_kind(before_root, "import_statement").unwrap();
+        let after_import = find_first_of_kind(after_root, "import_statement").unwrap();
+
+        let mapping = diff
+            .mapping
+            .get(&(before_import.id(), after_import.id()))
+            .expect("\"./foo\" and \"foo\" should normalize to the same import path");
+        assert_eq!(mapping.reason, ASTMappingReason::NormalizedImportPath);
     }
 }

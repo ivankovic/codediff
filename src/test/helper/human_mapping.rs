@@ -626,13 +626,24 @@ pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
 
 /// Same as [`compute_mismatches`], but forwards `config` to [`compute_mismatches_for_with_config`]
 /// - see [`crate::diff::HeuristicConfig`] for what it's for. Used by
-/// `benchmark_optimal_solutions --details --no-solver-X`.
+///   `benchmark_optimal_solutions --details --no-solver-X`.
 pub fn compute_mismatches_with_config(name: &str, config: &crate::diff::HeuristicConfig) -> Result<Vec<String>> {
     let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs
         .get(name)
         .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
     compute_mismatches_for_with_config(name, before, after, config)
+}
+
+/**
+* Total number of AST nodes across both `before` and `after` - the denominator
+* `benchmark_optimal_solutions` uses to turn a fixture's absolute mismatch count into a relative
+* percentage, so a 3-mismatch fixture with 20 nodes and a 3-mismatch fixture with 2000 nodes don't
+* read as equally bad.
+*/
+pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Code) -> usize {
+    let node_cache = NodeCache::build(before, after);
+    node_cache.before.len() + node_cache.after.len()
 }
 
 /**
@@ -645,17 +656,6 @@ pub fn compute_mismatches_with_config(name: &str, config: &crate::diff::Heuristi
 * still clones the *entire* map to hand back an owned one, which is O(fixture count) work just to
 * reach a single entry.
 */
-/**
-* Total number of AST nodes across both `before` and `after` - the denominator
-* `benchmark_optimal_solutions` uses to turn a fixture's absolute mismatch count into a relative
-* percentage, so a 3-mismatch fixture with 20 nodes and a 3-mismatch fixture with 2000 nodes don't
-* read as equally bad.
-*/
-pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Code) -> usize {
-    let node_cache = NodeCache::build(before, after);
-    node_cache.before.len() + node_cache.after.len()
-}
-
 pub fn compute_mismatches_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<Vec<String>> {
     compute_mismatches_for_with_config(name, before, after, &crate::diff::HeuristicConfig::default())
 }

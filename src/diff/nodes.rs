@@ -870,12 +870,6 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
 /// something other than "start of a grouped/parenthesized thing".
 const GENERIC_PUNCTUATION: &[&str] = &["(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "."];
 
-/// True if `kind` is an identifier-like node kind (identifier, field_identifier, etc.)
-/// that represents a "name" in the code.
-pub fn is_identifier_kind(kind: &str) -> bool {
-    IDENTIFIER_KINDS.contains(&kind)
-}
-
 /// Literal-value leaf kinds (string, number, boolean, ...), shared by every consumer that needs
 /// to distinguish "this leaf's identity is its value" (a literal) from "this leaf's identity is
 /// its name" (an identifier, see `IDENTIFIER_KINDS`) - e.g. the APTED rename-cost model and the
@@ -2439,17 +2433,26 @@ class Calculator {
 /// Note: This is intentionally conservative. We only mark containers that are definitively
 /// order-independent according to the language semantics (not just "often reordered" by formatters).
 ///
-/// KNOWN ISSUE, JSON/YAML fixed 2026-07-23, others still open (originally logged 2026-07-15,
-/// verified against each grammar's node-types.json under
-/// `~/.cargo/registry/src/*/tree-sitter-<language>-*/`): most of the kind strings below don't
-/// match any real node in their grammar, so most of this function is still near-dead weight -
-/// `Go` checks `field_list` (real name: `field_declaration_list`); `Python`/`JS`/`TS`/`TSX` check
-/// `pair_list` (doesn't exist; real containers are `dictionary` and `object` respectively);
-/// `Java`/`CSharp` check `enum_constants` (doesn't exist; real containers are `enum_body` and
-/// `enum_member_declaration_list`); `Swift` checks `enum_member_list` (real name:
-/// `enum_class_body`); `Kotlin`'s `import_list` and `Scala`'s `import_expr_list` don't exist in
-/// either grammar at all (imports aren't wrapped in a list node). `Rust` is the only originally-
-/// correct arm, and even it's missing `field_declaration_list` (struct fields).
+/// KNOWN ISSUE, fixed 2026-07-29 (originally logged 2026-07-15, JSON/YAML fixed 2026-07-23):
+/// every kind string below is now verified against ground truth, not just each grammar's
+/// node-types.json (which can omit or rename aliased node kinds) but the actual node kinds a real
+/// `tree_sitter::Parser` reports for a representative snippet in each language (see git history
+/// for the throwaway `examples/grammar_check.rs` used to confirm these). Before this pass, most of
+/// this function was near-dead weight: `Go` checked `field_list` (real name:
+/// `field_declaration_list`); `Python` checked `pair_list` (real container: `dictionary`, whose
+/// children are `pair` nodes); `JS`/`TS`/`TSX` also checked `pair_list` (real container: `object`);
+/// `Java` and `CSharp` shared one arm checking `enum_constants` (doesn't exist for either - and the
+/// real containers differ per language: `enum_body` for Java, `enum_member_declaration_list` for
+/// C#, so they can no longer share an arm); `Swift` checked `enum_member_list` (real name:
+/// `enum_class_body`); `Scala` checked `import_expr_list` (real name: `namespace_selectors` - and
+/// only the braced `import a.b.{X, Y, Z}` selector list is wrapped in a node at all; the top-level
+/// comma-separated import list itself has no wrapper). `Rust` was the only originally-correct arm,
+/// and was still missing `field_declaration_list` (struct fields - same node kind name as Go's).
+///
+/// `Kotlin` has no fix available: imports are direct repeated children of `source_file`
+/// (interleaved with the package header and top-level statements in the grammar), never wrapped in
+/// any list/container node at all - confirmed via `tree-sitter-kotlin-ng`'s `grammar.js`. There is
+/// no string that could make this arm correct, so it's left `false` rather than guessing.
 ///
 /// The 2026-07-15 version of this comment additionally claimed that even corrected strings would
 /// have no effect, because `compute_commutative_structural_hash` (a separate, bolted-on third
@@ -2459,10 +2462,9 @@ class Calculator {
 /// container` support folded directly into `compute_kind_and_value_hash`/`compute_kind_only_hash`
 /// at every recursion level (`code::hash`), and `pair_children_for_descent`
 /// (`hash_tree_matching.rs`) now checks `is_commutative_container` itself when pairing children.
-/// Nobody circled back to fix the actual strings at the same time, though - so JSON/YAML (fixed
-/// here, confirmed against a real 3,075-node case: a single deleted key in a ~140-key localization
-/// JSON object was landing 100% of its mapping on the expensive `APTED` fallback before this fix,
-/// vs. instantly beforehand) is very likely representative of what fixing the rest would do too,
+/// JSON's fix (confirmed against a real 3,075-node case: a single deleted key in a ~140-key
+/// localization JSON object was landing 100% of its mapping on the expensive `APTED` fallback
+/// before that fix, vs. instantly beforehand) is the model for what fixing the rest should do too,
 /// now that the plumbing actually respects this function's answer.
 pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
     match language {
@@ -2471,40 +2473,46 @@ pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
             node_kind == "enum_variant_list"
                 // Use tree items can be reordered
                 || node_kind == "use_list"
+                // Struct/union field declarations can be reordered
+                || node_kind == "field_declaration_list"
         }
         Language::Go => {
             // Struct field list - fields can be reordered
-            node_kind == "field_list"
+            node_kind == "field_declaration_list"
                 // Import spec list - imports can be reordered
                 || node_kind == "import_spec_list"
         }
         Language::Python => {
-            // Dictionary pair list - keys can be reordered
-            node_kind == "pair_list"
+            // Dictionary - key/value pairs can be reordered
+            node_kind == "dictionary"
         }
-        Language::Java | Language::CSharp => {
-            // Enum constants can be reordered
-            node_kind == "enum_constants"
+        Language::Java => {
+            // Enum body - enum constants can be reordered
+            node_kind == "enum_body"
+        }
+        Language::CSharp => {
+            // Enum member declaration list - enum constants can be reordered
+            node_kind == "enum_member_declaration_list"
         }
         Language::C | Language::CPP => {
             // Enum specifiers - enumerators can be reordered
             node_kind == "enumerator_list"
         }
         Language::JavaScript | Language::TypeScript | Language::TSX => {
-            // Object pair list - properties can be reordered
-            node_kind == "pair_list"
+            // Object - properties can be reordered
+            node_kind == "object"
         }
-        Language::Kotlin => {
-            // Import list - imports can be reordered
-            node_kind == "import_list"
-        }
+        // Imports aren't wrapped in any container node in this grammar at all - see this
+        // function's doc comment. Nothing to match; always false.
+        Language::Kotlin => false,
         Language::Scala => {
-            // Import clause - imports can be reordered
-            node_kind == "import_expr_list"
+            // Braced import selector list (`import a.b.{X, Y, Z}`) - selectors can be reordered.
+            // The plain, unbraced multi-import form has no wrapper node to match here.
+            node_kind == "namespace_selectors"
         }
         Language::Swift => {
-            // Enum member list
-            node_kind == "enum_member_list"
+            // Enum class body - enum cases can be reordered
+            node_kind == "enum_class_body"
         }
         // JSON, YAML - object/mapping keys are commutative. Verified directly against
         // tree-sitter-json/tree-sitter-yaml's actual parse trees (2026-07-23) - the previous
@@ -2524,5 +2532,105 @@ pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
         Language::YAML => node_kind == "block_mapping" || node_kind == "flow_mapping",
         // Default: no commutative containers
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod is_commutative_container_tests {
+    use super::is_commutative_container;
+    use crate::code::{Code, Language};
+
+    /// Parses `source` in `language`, finds the first node of kind `container_kind`, and asserts
+    /// `is_commutative_container` recognizes it - proving the kind string actually occurs in a
+    /// real parse tree instead of just matching a made-up name that no grammar ever produces
+    /// (exactly the bug this whole function had for most languages before 2026-07-29).
+    fn assert_recognizes(language: Language, source: &str, container_kind: &str) {
+        let code = Code::from_string(source, &language);
+        let root = code.ast.as_ref().unwrap().root_node();
+        let mut cursor = root.walk();
+        let found = find_kind(&mut cursor, container_kind);
+        assert!(
+            found,
+            "expected a `{container_kind}` node in {language:?} source {source:?}, but none was found - the container kind string is wrong"
+        );
+        assert!(is_commutative_container(container_kind, &language));
+    }
+
+    fn find_kind(cursor: &mut tree_sitter::TreeCursor, kind: &str) -> bool {
+        loop {
+            if cursor.node().kind() == kind {
+                return true;
+            }
+            if cursor.goto_first_child() {
+                if find_kind(cursor, kind) {
+                    cursor.goto_parent();
+                    return true;
+                }
+                cursor.goto_parent();
+            }
+            if !cursor.goto_next_sibling() {
+                return false;
+            }
+        }
+    }
+
+    #[test]
+    fn rust_recognizes_struct_fields_enum_variants_and_use_lists() {
+        assert_recognizes(Language::Rust, "struct S { a: i32, b: i32 }\n", "field_declaration_list");
+        assert_recognizes(Language::Rust, "enum E { A, B }\n", "enum_variant_list");
+        assert_recognizes(Language::Rust, "use std::{a, b};\n", "use_list");
+    }
+
+    #[test]
+    fn go_recognizes_struct_fields_and_import_specs() {
+        assert_recognizes(Language::Go, "package main\ntype T struct {\n A int\n}\n", "field_declaration_list");
+        assert_recognizes(Language::Go, "package main\nimport (\n \"fmt\"\n)\n", "import_spec_list");
+    }
+
+    #[test]
+    fn python_recognizes_dictionary() {
+        assert_recognizes(Language::Python, "d = {1: 2}\n", "dictionary");
+    }
+
+    #[test]
+    fn java_recognizes_enum_body() {
+        assert_recognizes(Language::Java, "enum E { A, B }\n", "enum_body");
+    }
+
+    #[test]
+    fn csharp_recognizes_enum_member_declaration_list() {
+        assert_recognizes(Language::CSharp, "enum E { A, B }\n", "enum_member_declaration_list");
+    }
+
+    #[test]
+    fn c_and_cpp_recognize_enumerator_list() {
+        assert_recognizes(Language::C, "enum E { A, B };\n", "enumerator_list");
+        assert_recognizes(Language::CPP, "enum E { A, B };\n", "enumerator_list");
+    }
+
+    #[test]
+    fn js_ts_tsx_recognize_object() {
+        assert_recognizes(Language::JavaScript, "const o = {a: 1};\n", "object");
+        assert_recognizes(Language::TypeScript, "const o = {a: 1};\n", "object");
+        assert_recognizes(Language::TSX, "const o = {a: 1};\n", "object");
+    }
+
+    #[test]
+    fn scala_recognizes_braced_import_selectors() {
+        assert_recognizes(Language::Scala, "import a.b.{X, Y}\n", "namespace_selectors");
+    }
+
+    #[test]
+    fn swift_recognizes_enum_class_body() {
+        assert_recognizes(Language::Swift, "enum E { case a, b }\n", "enum_class_body");
+    }
+
+    /// Kotlin has no commutative container at all - imports are unwrapped repeated children of
+    /// `source_file`, so this must stay `false` for every kind, not just a made-up string.
+    #[test]
+    fn kotlin_has_no_commutative_container() {
+        assert!(!is_commutative_container("import_list", &Language::Kotlin));
+        assert!(!is_commutative_container("import", &Language::Kotlin));
+        assert!(!is_commutative_container("source_file", &Language::Kotlin));
     }
 }

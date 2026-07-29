@@ -536,58 +536,6 @@ pub fn code_pair_from_dir(path: &Path, parser: &mut tree_sitter::Parser) -> Resu
 }
 
 /**
-* Returns handmade Diff objects from code pairs, along with the before and after Code objects.
-*
-* This function creates actual Diff objects from the handmade test code pairs.
-* It accepts boolean parameters to control which parts of the diff are computed.
-*
-* Note that the actual files are stored with ".test" extension in "src/test/data/diffs/<dir>/".
-*
-* @param compute_ast If true, compute the AST-based diff
-* @param compute_ts_points If true, compute the TreeSitter points diff
-* @return A HashMap where the key is the directory name and the value is a tuple of
-*         (before Code, after Code, Diff object)
-*/
-pub fn handmade_test_diffs(
-    compute_ast: bool,
-    compute_ts_points: bool,
-    filename_filter: &str,
-) -> Result<HashMap<String, (Code, Code, crate::diff::Diff)>> {
-    let code_pairs = handmade_test_code_pairs()?;
-    let mut result = HashMap::new();
-
-    for (name, (before, after)) in code_pairs {
-        if !filename_filter.is_empty() && !name.contains(filename_filter) {
-            continue;
-        }
-        let mut diff = crate::diff::Diff {
-            language: before
-                .metadata
-                .language
-                .unwrap_or(crate::code::Language::Unknown),
-            ..Default::default()
-        };
-
-        if compute_ast {
-            // Use the new from_code method to compute AST diff
-            let ast_diff = crate::diff::Diff::from_code(&before, &after);
-            diff.ast = ast_diff.ast;
-        }
-
-        if compute_ts_points {
-            // Compute ts_points if requested
-            // For now, we'll leave this as a placeholder since the implementation
-            // would depend on the existing ts_points module
-            // diff.ts_points = Some(crate::diff::ts_points::compute(&antes, &after)?);
-        }
-
-        result.insert(name, (before, after, diff));
-    }
-
-    Ok(result)
-}
-
-/**
 * Returns a path to a fully functional git repository that is on a temporary path.
 *
 * The repository contains handmade commits to be used in tests.

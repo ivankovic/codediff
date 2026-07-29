@@ -85,7 +85,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         }
     }
 
-    // Largest subtree first, mirroring `solve_identical_trees` - not load-bearing here (these are
+    // Largest subtree first, mirroring `solve_hash_descent` - not load-bearing here (these are
     // small leaf-ish statements, rarely nested in one another), but keeps behavior deterministic
     // and consistent with the rest of the pipeline.
     let mut before_candidates = before_candidates;
@@ -115,7 +115,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         );
 
         // Recursively add all descendants with IdenticalHashOfAncestor reason - same idiom as
-        // `solve_identical_trees`, since an identical full hash guarantees the entire subtree
+        // `solve_hash_descent`, since an identical full hash guarantees the entire subtree
         // (structure and values) is byte-for-byte identical too.
         map_identical_descendants(before_node, after_node, diff);
     }
@@ -246,7 +246,7 @@ fn b() {
     #[test]
     fn duplicate_identical_diagnostic_calls_are_matched_one_to_one() {
         // Two identical `bail!` calls on each side: each before-node should claim a distinct
-        // after-node, not both collapse onto the same one (`solve_identical_trees` used to have
+        // after-node, not both collapse onto the same one (`solve_hash_descent` used to have
         // exactly that collapse quirk, since fixed - this pass indexes after-candidates in a
         // `VecDeque` per hash to guarantee one-to-one pairing).
         let before_src = r#"

@@ -72,24 +72,79 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         .context("AST must be parsed before hashing")?;
     let root_node = ast.root_node();
     let language = metadata.language;
+    let source = code.contents.as_bytes();
 
     let mut cursor = root_node.walk();
-    let mut stack = Vec::new();
-    stack.push(root_node);
+    // Post-order traversal via an explicit stack: each node is pushed once "unexpanded" (to
+    // discover and stack its children first) and, once popped a second time as "expanded", every
+    // one of its descendants has already had its four hashes computed and stored below - so this
+    // node's own hash can be computed by looking up each child's hash directly instead of
+    // recursing back into it.
+    //
+    // This replaces an earlier version where each of the four `compute_*_hash` functions
+    // recursed into every descendant itself, on every node, independent of the fact that the very
+    // same subtree had just been fully hashed a moment earlier as part of its parent's own
+    // computation - i.e. one call per node here, but each call doing O(that node's subtree size)
+    // work, made the whole pass O(n * average nested-subtree size): quadratic or worse on a
+    // deeply left/right-nested tree (long chained method calls, deeply nested conditionals - all
+    // realistic in real code). Found during a 2026-07 code-health pass; confirmed empirically
+    // before this fix (a synthetic deeply-nested expression went from 35ms at 616 nodes to 8.46s
+    // at 9616 nodes) and after (linear in node count, matching this function's own "under 50ms"
+    // goal documented above).
+    //
+    // Changing the traversal order does change which of several hash-colliding nodes ends up
+    // first in `full_hash_to_node`/etc.'s per-hash `Vec` (previously a pre-order, rightmost-child-
+    // first walk; now post-order) - confirmed safe: both real consumers of that ordering
+    // (`solve_moved_subtrees.rs`, `hash_tree_matching.rs`) already explicitly re-sort by document
+    // position/proximity rather than relying on raw insertion order, using it only as a last-
+    // resort tiebreak for an exact-distance tie.
+    let mut stack: Vec<(tree_sitter::Node, bool)> = vec![(root_node, false)];
 
-    while let Some(node) = stack.pop() {
+    while let Some((node, expanded)) = stack.pop() {
+        if !expanded {
+            stack.push((node, true));
+            for child in node.children(&mut cursor) {
+                stack.push((child, false));
+            }
+            continue;
+        }
+
         let node_id = node.id();
+        let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
 
-        // Compute full hash for this node (includes structure and values)
-        let full_hash = compute_full_hash(&node, &mut cursor, code.contents.as_bytes());
+        // Every child already has all four hashes computed and stored (post-order guarantee) -
+        // look them up (missing only if some pathological grammar reports children that aren't
+        // fully behaved nodes; falling back to 0 keeps this a lookup, never a panic).
+        let child_hash = |map: &rustc_hash::FxHashMap<usize, u64>, child: &tree_sitter::Node| {
+            map.get(&child.id()).copied().unwrap_or(0)
+        };
+        let full_child_hashes: Vec<u64> = children
+            .iter()
+            .map(|c| child_hash(&metadata.node_to_full_hash, c))
+            .collect();
+        let structural_child_hashes: Vec<u64> = children
+            .iter()
+            .map(|c| child_hash(&metadata.node_to_structural_hash, c))
+            .collect();
+        let kind_and_value_child_hashes: Vec<u64> = children
+            .iter()
+            .map(|c| child_hash(&metadata.node_to_kind_and_value_hash, c))
+            .collect();
+        let kind_only_child_hashes: Vec<u64> = children
+            .iter()
+            .map(|c| child_hash(&metadata.node_to_kind_only_hash, c))
+            .collect();
 
-        // Compute structural hash for this node (includes only structure, not values)
-        let structural_hash = compute_structural_hash(&node, &mut cursor);
-
-        // Order-independence (per is_commutative_container) folded in at every recursion level,
-        // not bolted on as a third separate hash - see each function's doc comment.
-        let kind_and_value_hash = compute_kind_and_value_hash(&node, &mut cursor, code.contents.as_bytes(), language);
-        let kind_only_hash = compute_kind_only_hash(&node, &mut cursor, language);
+        let full_hash = compute_full_hash(&node, source, &children, &full_child_hashes);
+        let structural_hash = compute_structural_hash(&node, &structural_child_hashes);
+        let kind_and_value_hash = compute_kind_and_value_hash(
+            &node,
+            source,
+            &children,
+            &kind_and_value_child_hashes,
+            language,
+        );
+        let kind_only_hash = compute_kind_only_hash(&node, &kind_only_child_hashes, language);
 
         // Store full hash mappings
         metadata.node_to_full_hash.insert(node_id, full_hash);
@@ -121,11 +176,6 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             .entry(kind_only_hash)
             .or_default()
             .push(node_id);
-
-        // Push children to stack for processing
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
     }
 
     Ok(())
@@ -146,10 +196,11 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 * whitespace embedded inside otherwise-meaningful gap text (e.g. two files whose only difference
 * is trailing spaces before a `\n` escape would trim down to the same gap and falsely collide).
 */
-fn compute_full_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
+fn compute_full_hash(
+    node: &tree_sitter::Node,
     source_code: &[u8],
+    children: &[tree_sitter::Node],
+    child_hashes: &[u64],
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
@@ -157,12 +208,9 @@ fn compute_full_hash<'a>(
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    // We need to collect children first to avoid borrowing issues (same as compute_structural_hash).
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
     let mut gap_start = node.start_byte();
-    for child in &children {
+    for (child, &child_hash) in children.iter().zip(child_hashes) {
         hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
-        let child_hash = compute_full_hash(child, cursor, source_code);
         hasher.write(child_hash.to_le_bytes().as_slice());
         gap_start = child.end_byte();
     }
@@ -189,21 +237,14 @@ fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
 * This is a recursive function that hashes only the node type and child structure,
 * ignoring the actual values and positions.
 */
-fn compute_structural_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-) -> u64 {
+fn compute_structural_hash(node: &tree_sitter::Node, child_hashes: &[u64]) -> u64 {
     let mut hasher = MetroHash64::new();
 
     // Hash only node type and child count (structure), not position or values
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    // Compute children structural hashes recursively (if any)
-    // We need to collect children first to avoid borrowing issues
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    for child in children {
-        let child_hash = compute_structural_hash(&child, cursor);
+    for &child_hash in child_hashes {
         hasher.write(child_hash.to_le_bytes().as_slice());
     }
 
@@ -226,35 +267,30 @@ fn compute_structural_hash<'a>(
 * requires `hash_tree_matching`'s descendant pairing to be commutative-aware (see
 * `pair_children_for_descent`), or reordered children get re-mangled by a positional `zip`.
 */
-fn compute_kind_and_value_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
+fn compute_kind_and_value_hash(
+    node: &tree_sitter::Node,
     source_code: &[u8],
+    children: &[tree_sitter::Node],
+    child_hashes: &[u64],
     language: Language,
 ) -> u64 {
     let mut hasher = MetroHash64::new();
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-
     if is_commutative_container(node.kind(), &language) {
         // Order-independent: sort (child_hash) pairs, drop gap text (gap order/identity is
         // itself a document-order artifact that doesn't make sense to preserve once children are
         // allowed to reorder).
-        let mut child_hashes: Vec<u64> = children
-            .iter()
-            .map(|child| compute_kind_and_value_hash(child, cursor, source_code, language))
-            .collect();
-        child_hashes.sort_unstable();
-        for hash in child_hashes {
+        let mut sorted_hashes: Vec<u64> = child_hashes.to_vec();
+        sorted_hashes.sort_unstable();
+        for hash in sorted_hashes {
             hasher.write(hash.to_le_bytes().as_slice());
         }
     } else {
         let mut gap_start = node.start_byte();
-        for child in &children {
+        for (child, &child_hash) in children.iter().zip(child_hashes) {
             hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
-            let child_hash = compute_kind_and_value_hash(child, cursor, source_code, language);
             hasher.write(child_hash.to_le_bytes().as_slice());
             gap_start = child.end_byte();
         }
@@ -274,19 +310,12 @@ fn compute_kind_and_value_hash<'a>(
 * ignore both) - `KindOnlyHash` collapses all of that into the single coarsest tier (any leaf
 * value, since leaf values aren't hashed at all), an accepted precision loss - see `TODO.md`.
 */
-fn compute_kind_only_hash<'a>(
-    node: &tree_sitter::Node<'a>,
-    cursor: &mut tree_sitter::TreeCursor<'a>,
-    language: Language,
-) -> u64 {
+fn compute_kind_only_hash(node: &tree_sitter::Node, child_hashes: &[u64], language: Language) -> u64 {
     let mut hasher = MetroHash64::new();
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
 
-    let children: Vec<tree_sitter::Node> = node.children(cursor).collect();
-    let mut child_hashes: Vec<u64> =
-        children.iter().map(|child| compute_kind_only_hash(child, cursor, language)).collect();
-
+    let mut child_hashes = child_hashes.to_vec();
     if is_commutative_container(node.kind(), &language) {
         child_hashes.sort_unstable();
     }

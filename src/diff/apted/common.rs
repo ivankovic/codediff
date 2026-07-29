@@ -16,7 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-use anyhow::Result;
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Language};
@@ -56,8 +55,8 @@ impl UnitCostModel {
     /// - Different kinds (allowed): COST_UPDATE (1) to COST_DELETE + COST_INSERT + 1
     ///
     /// A prior version of this also special-cased type/field/property identifiers at cost 5, but
-    /// that branch was unreachable dead code (`is_identifier_kind`'s check above it already
-    /// matches every kind that branch checked for, per `IDENTIFIER_KINDS` in `diff::nodes`) - and
+    /// that branch was unreachable dead code (an identifier-kind check above it already matched
+    /// every kind that branch checked for, per `IDENTIFIER_KINDS` in `diff::nodes`) - and
     /// benchmarking the branch made reachable showed cost 5 for those kinds is a net regression
     /// (APTED starts preferring delete+insert over a same-kind rename in several fixtures), so it
     /// was removed rather than fixed. See review discussion for the reachable variant and its
@@ -2507,6 +2506,16 @@ pub fn for_roots(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
+    // Fail safe rather than panic when either side has no AST (e.g. `Language::Unknown` and
+    // several other languages tree-sitter has no grammar for - `Code::from_string`/`parse`
+    // deliberately leave `ast: None` for those, a valid state, not a bug - see `code.rs`'s
+    // doc comment on `Code::parse`). `Diff`'s own doc comment promises every function taking a
+    // `Code` should "fail-safe... returning a safe zero result" - with no root node to anchor on,
+    // there is nothing this phase can match, so it's a no-op rather than a crash.
+    if before.ast.is_none() || after.ast.is_none() {
+        return;
+    }
+
     // Compute metadata once at the top level
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);

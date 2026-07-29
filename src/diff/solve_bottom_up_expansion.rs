@@ -42,7 +42,7 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 ///    "the body matches, only the name differs" - classic GumTree bottom-up matching.
 ///
 /// Accepted pairs are handed to `apted::for_nodes` - the same "pre-match children, then diff the
-/// container" idiom `solve_similar_flow_control` and `solve_semantically_structural_nodes` use for
+/// container" idiom `solve_similar_flow_control` and `solve_syntax_aware_matching` use for
 /// the same reason: it guarantees the result is complete (nothing under the pair is left unmapped
 /// for a later pass to never revisit, since any already-mapped subtree is pruned from every later
 /// forest) and gets a real edit-distance-based cost/operation instead of an invented one. Only the
@@ -53,11 +53,11 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 /// ancestor is considered, all of its descendants already had their chance to match in this same
 /// call, letting one call propagate a match several levels up the tree.
 ///
-/// Called from exactly one place in `Diff::from_code` - right before
-/// `solve_orphaned_semantic_nodes`'s Pass 3 blanket-deletes/inserts everything still unmatched.
-/// That's deliberate, not just "last chance to salvage a real orphan before Pass 3 destroys it":
+/// Called from exactly one place in `Diff::from_code` - right before phase 6 (final APTED, via
+/// `apted::for_roots`/`for_roots_fallback`) blanket-deletes/inserts everything still unmatched.
+/// That's deliberate, not just "last chance to salvage a real orphan before phase 6 destroys it":
 /// an earlier version of this pass ran after every top-down heuristic in the pipeline, and while
-/// harmless late, running it *before* `solve_semantically_structural_nodes`/
+/// harmless late, running it *before* `solve_syntax_aware_matching`/
 /// `solve_similar_flow_control` let a merely-plausible Dice-coefficient candidate occasionally win
 /// a node that one of those more precise, name-/pattern-based passes would otherwise have claimed
 /// correctly - once matched here, that decision is irrevocable (the matched subtree is pruned out

@@ -3055,9 +3055,7 @@ fn handle_modal_key(
     before_src: &[u8],
     after_src: &[u8],
 ) -> Option<OpenTarget> {
-    let Some(modal) = app.modal.take() else {
-        return None;
-    };
+    let modal = app.modal.take()?;
 
     match modal {
         Modal::ConfirmKindMismatch {

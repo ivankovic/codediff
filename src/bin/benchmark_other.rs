@@ -19,7 +19,7 @@
 //! Compares codediff, and other diff tools (`ExternalTool` - Unix `diff` is the first, more can
 //! be added), against the human-authored ground truth in `src/test/data/diffs/*/human_mapping.json`
 //! - the same corpus `benchmark_optimal_solutions` scores codediff against, but at line
-//! granularity instead of AST-node granularity.
+//!   granularity instead of AST-node granularity.
 //!
 //! Line granularity, not node granularity, because that's the only signal an external line-based
 //! tool can produce at all: Unix `diff` has no notion of "this identifier was renamed," only

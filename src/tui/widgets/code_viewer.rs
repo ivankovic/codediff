@@ -311,7 +311,7 @@ impl CodeViewerState {
 /// This is a stateful widget that displays file contents with syntax highlighting plus an
 /// optional diff/cursor overlay. Syntax highlighting is computed once per loaded file and
 /// cached, since re-highlighting on every render frame is too slow for real-time scrolling.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct CodeViewerWidget {
     /// The path to the file being displayed
     file_path: Option<PathBuf>,
@@ -319,8 +319,6 @@ pub struct CodeViewerWidget {
     contents: String,
     /// The language of the file
     language: Option<crate::code::Language>,
-    /// The title to display (overrides filename if set)
-    title: Option<String>,
     /// The theme name to use for syntax highlighting
     theme_name: Option<String>,
     /// Whether syntax highlighting is enabled
@@ -337,6 +335,26 @@ pub struct CodeViewerWidget {
     /// this widget's border too duplicated that same information a second time. Defaults to
     /// `false` (border shown) so every other caller's behavior is unchanged.
     hide_border: bool,
+}
+
+impl Default for CodeViewerWidget {
+    // Hand-written rather than `#[derive(Default)]` specifically so `syntax_highlighting`
+    // defaults to `true`: the whole syntect-backed highlighting engine below was fully wired up
+    // (`get_syntax`/`get_theme`/`rebuild_highlight_cache`) but nothing anywhere ever called
+    // `enable_syntax_highlighting` - found dead in a 2026-07 code-health pass. Every other field
+    // keeps the same default a derive would have given it.
+    fn default() -> Self {
+        Self {
+            file_path: None,
+            contents: String::new(),
+            language: None,
+            theme_name: None,
+            syntax_highlighting: true,
+            highlighted_lines: Vec::new(),
+            overlay_theme: OverlayTheme::default(),
+            hide_border: false,
+        }
+    }
 }
 
 impl CodeViewerWidget {
@@ -454,11 +472,20 @@ impl CodeViewerWidget {
         syntax_set().find_syntax_by_name(syntect_name)
     }
 
-    /// Get the theme for highlighting
+    /// Get the theme for highlighting. Falls back to `base16-ocean.dark` (one of syntect's own
+    /// bundled default themes, always present in `ThemeSet::load_defaults()`) if `theme_name` is
+    /// unset or names a theme that doesn't exist - `set_theme` takes an arbitrary caller-supplied
+    /// `String` with no validation, so indexing `theme_set.themes` directly on that name (as this
+    /// used to) panicked on any unrecognized name instead of degrading gracefully.
     fn get_theme(&self) -> Theme {
         let theme_set = theme_set();
         let theme_name = self.theme_name.as_deref().unwrap_or("base16-ocean.dark");
-        theme_set.themes[theme_name].clone()
+        theme_set
+            .themes
+            .get(theme_name)
+            .or_else(|| theme_set.themes.get("base16-ocean.dark"))
+            .expect("base16-ocean.dark is one of syntect's own bundled default themes")
+            .clone()
     }
 
     /// Recompute the cached, syntax-highlighted representation of the whole file.
@@ -625,9 +652,9 @@ impl CodeViewerWidget {
             .unwrap_or_else(|| "Plain Text".to_string())
     }
 
-    /// Get the display title (custom title or filename)
+    /// Get the display title (currently always the filename - see `filename()`)
     pub fn display_title(&self) -> String {
-        self.title.clone().unwrap_or_else(|| self.filename())
+        self.filename()
     }
 }
 
@@ -675,6 +702,40 @@ mod tests {
 
     fn widget_with_line(text: &str) -> CodeViewerWidget {
         CodeViewerWidget::default().with_contents(text.to_string())
+    }
+
+    /// Regression test: syntax highlighting was fully implemented (`get_syntax`/`get_theme`/
+    /// `rebuild_highlight_cache`) but `syntax_highlighting` defaulted to `false` and nothing
+    /// anywhere ever called `enable_syntax_highlighting` - the TUI never actually highlighted
+    /// anything. Confirms it's on by default now, and that a real file with a language actually
+    /// gets multiple differently-styled spans (not just one plain, unstyled span per line).
+    #[test]
+    fn syntax_highlighting_is_enabled_by_default_and_actually_highlights() {
+        let mut widget = CodeViewerWidget::default();
+        assert!(widget.is_syntax_highlighting_enabled());
+
+        widget.load_contents(PathBuf::from("test.rs"), "fn main() { let x = 1; }".to_string());
+        let line = &widget.highlighted_lines[0];
+        assert!(
+            line.spans.len() > 1,
+            "a real Rust line should be split into multiple differently-styled spans by syntax \
+             highlighting, got {} span(s): {:?}",
+            line.spans.len(),
+            line.spans
+        );
+    }
+
+    /// Regression test: `get_theme` used to index `theme_set.themes[name]` directly, which
+    /// panics for any name that isn't a real syntect theme - `set_theme` takes an arbitrary
+    /// caller-supplied `String` with no validation, so this was trivially reachable.
+    #[test]
+    fn set_theme_with_an_unknown_name_falls_back_instead_of_panicking() {
+        let mut widget = CodeViewerWidget::default();
+        widget.set_theme("this-theme-does-not-exist".to_string());
+        widget.load_contents(PathBuf::from("test.rs"), "fn main() {}".to_string());
+        // Reaching here at all (no panic) is the actual assertion; also confirm it still produced
+        // real output rather than silently going blank.
+        assert!(!widget.highlighted_lines.is_empty());
     }
 
     /// The palette `widget_with_line`'s widget uses, since it never overrides `overlay_theme`.

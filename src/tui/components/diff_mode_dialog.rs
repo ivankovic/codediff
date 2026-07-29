@@ -31,16 +31,25 @@ use crate::tui::actions::Action;
 pub struct DiffModeDialog {
     options: Vec<DiffMode>,
     selected: usize,
+    /// The counts `PendingDiff::unmatched_counts()` reported, for the "why am I being asked this"
+    /// context shown in the title. Regression fix (2026-07 code-health pass): `Action::
+    /// DiffModeChoiceNeeded`'s own doc comment always promised these counts were "just enough
+    /// context to render 'this diff looks big'," but `handle_actions` discarded them with `{ .. }`
+    /// and this dialog never had anywhere to put them even if it hadn't.
+    unmatched_before: usize,
+    unmatched_after: usize,
 }
 
 impl DiffModeDialog {
     /// Fast is always first (and pre-selected) - both because it's `DiffMode::default()`, and so
     /// an inattentive Enter press (or Esc, which this dialog treats the same as confirming the
     /// current selection - see `handle_key_event`) can't accidentally trigger the slow path.
-    pub fn new() -> Self {
+    pub fn new(unmatched_before: usize, unmatched_after: usize) -> Self {
         Self {
             options: vec![DiffMode::Fast, DiffMode::Exact],
             selected: 0,
+            unmatched_before,
+            unmatched_after,
         }
     }
 
@@ -64,7 +73,7 @@ impl DiffModeDialog {
 
 impl Default for DiffModeDialog {
     fn default() -> Self {
-        Self::new()
+        Self::new(0, 0)
     }
 }
 
@@ -95,10 +104,14 @@ impl Component for DiffModeDialog {
             .map(|&mode| ListItem::new(Self::label(mode)))
             .collect();
 
+        let title = format!(
+            " This diff is unusually large ({} before-side / {} after-side nodes still unmatched) ",
+            self.unmatched_before, self.unmatched_after
+        );
         render_list_dialog(
             frame,
             area,
-            " This diff is unusually large ".bold().fg(Color::Cyan).into(),
+            title.bold().fg(Color::Cyan).into(),
             items,
             self.selected,
             " Enter: select (default: Fast) ",
@@ -119,13 +132,13 @@ mod tests {
 
     #[test]
     fn new_preselects_fast() {
-        let dialog = DiffModeDialog::new();
+        let dialog = DiffModeDialog::new(3, 5);
         assert_eq!(dialog.options[dialog.selected], DiffMode::Fast);
     }
 
     #[test]
     fn enter_selects_the_highlighted_mode() {
-        let mut dialog = DiffModeDialog::new();
+        let mut dialog = DiffModeDialog::new(3, 5);
         dialog.handle_key_event(key(KeyCode::Down)).unwrap();
         let action = dialog.handle_key_event(key(KeyCode::Enter)).unwrap();
         assert_eq!(action, Some(Action::DiffModeSelected(DiffMode::Exact)));
@@ -133,14 +146,14 @@ mod tests {
 
     #[test]
     fn esc_confirms_the_current_selection_instead_of_cancelling() {
-        let mut dialog = DiffModeDialog::new();
+        let mut dialog = DiffModeDialog::new(3, 5);
         let action = dialog.handle_key_event(key(KeyCode::Esc)).unwrap();
         assert_eq!(action, Some(Action::DiffModeSelected(DiffMode::Fast)));
     }
 
     #[test]
     fn down_does_not_run_past_the_last_option() {
-        let mut dialog = DiffModeDialog::new();
+        let mut dialog = DiffModeDialog::new(3, 5);
         for _ in 0..10 {
             dialog.handle_key_event(key(KeyCode::Down)).unwrap();
         }
@@ -149,9 +162,30 @@ mod tests {
 
     #[test]
     fn up_does_not_run_before_the_first_option() {
-        let mut dialog = DiffModeDialog::new();
+        let mut dialog = DiffModeDialog::new(3, 5);
         let action = dialog.handle_key_event(key(KeyCode::Up)).unwrap();
         assert_eq!(action, Some(Action::Render));
         assert_eq!(dialog.selected, 0);
+    }
+
+    /// Regression test: `Action::DiffModeChoiceNeeded`'s own doc comment always promised
+    /// `unmatched_before`/`unmatched_after` were "just enough context to render 'this diff looks
+    /// big'," but `handle_actions` discarded them with `{ .. }` and this dialog had nowhere to
+    /// put them even if it hadn't - the prompt never actually showed why it was asking.
+    #[test]
+    fn draw_shows_the_unmatched_counts() {
+        use ratatui::{Terminal, backend::TestBackend};
+
+        let area = ratatui::layout::Rect::new(0, 0, 80, 20);
+        let backend = TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut dialog = DiffModeDialog::new(729, 7309);
+
+        terminal.draw(|f| dialog.draw(f, area).unwrap()).unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let rendered: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+        assert!(rendered.contains("729"), "should show the before-side count: {rendered}");
+        assert!(rendered.contains("7309"), "should show the after-side count: {rendered}");
     }
 }

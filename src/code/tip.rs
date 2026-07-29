@@ -86,27 +86,6 @@ pub fn type_from_filename(filename: &str) -> Option<Type> {
     }
 }
 
-/**
-* Returns the type from the file contents.
-*
-* If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
-*/
-pub fn type_from_contents(content: &[u8]) -> Option<Type> {
-    match infer::get(content) {
-        Some(kind) => match kind.matcher_type() {
-            infer::MatcherType::App => Some(Type::Data(String::from("Binary"))),
-            infer::MatcherType::Image => Some(Type::Data(String::from("Image"))),
-            infer::MatcherType::Video => Some(Type::Data(String::from("Video"))),
-            infer::MatcherType::Audio => Some(Type::Data(String::from("Audio"))),
-            infer::MatcherType::Font => Some(Type::Data(String::from("Font"))),
-            infer::MatcherType::Book => Some(Type::Data(String::from("Book"))),
-            infer::MatcherType::Archive => Some(Type::Data(String::from("Archive"))),
-            _ => None,
-        },
-        None => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -437,9 +437,9 @@ pub(crate) struct EngineCtx<'a> {
 /// Applies `ctx.containment`'s `adjust()` to a `vren`-computed `base` cost for the real-node pair
 /// at virtual preorder ids `(before_pre, after_pre)` in the fixed global before/after orientation
 /// - the Apted-engine equivalent of the `ctx.adjust(before_id, after_id, cost_ren)` call in
-/// `forest_dist` (common.rs). A `None` id (the virtual root, or any boundary read that lands on
-/// it) is never itself pruned, so it's always left as a no-op - `vren` already prices a lone `None`
-/// side as `FORBIDDEN_PAIRING_COST` regardless.
+///   `forest_dist` (common.rs). A `None` id (the virtual root, or any boundary read that lands on
+///   it) is never itself pruned, so it's always left as a no-op - `vren` already prices a lone
+///   `None` side as `FORBIDDEN_PAIRING_COST` regardless.
 pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, base: u64) -> u64 {
     let Some(containment) = ctx.containment else {
         return base;
@@ -748,7 +748,11 @@ pub(crate) fn spf_a(
 
                     // Loop D [1, Algorithm 3] - for all nodes to the left of rG.
                     while l_g >= l_g_last {
-                        current_forest_size2 += 1;
+                        // `current_forest_size2` is deliberately not incremented here: it's
+                        // re-read only via the `== 1` check above, before this loop runs, and
+                        // gets a fresh value on the next outer (`l_f`) iteration regardless - an
+                        // increment here was dead (confirmed via clippy's `unused_assignments`),
+                        // so it was removed rather than kept as effect-free busywork.
                         current_forest_cost2 += other_ins_cost(l_g);
                         sp1 = match sp1source {
                             1 => s[(sp1s_row, l_g - it2_pre_l_off)] + path_del_cost(l_f_node),
@@ -962,7 +966,8 @@ pub(crate) fn spf_a(
 
                     let mut r_g = r_g_first2;
                     let r_g_first_in_pre_l = other_idx.pre_r_to_pre_l[r_g_first2 as usize] as i64;
-                    current_forest_size2 += 1;
+                    // See Loop D above: incrementing `current_forest_size2` here was dead (never
+                    // read again before the next outer iteration's fresh assignment).
                     let mut sp1 = match sp1source {
                         1 => s[(sp1s_row, r_g - it2_pre_r_off)],
                         2 => t[(sp1t_row, r_g - it2_pre_r_off)],
@@ -990,7 +995,6 @@ pub(crate) fn spf_a(
                     // Loop D' [1, Algorithm 3] - for all nodes to the right of lG.
                     while r_g >= r_g_last2 {
                         let r_g_in_pre_l = other_idx.pre_r_to_pre_l[r_g as usize] as i64;
-                        current_forest_size2 += 1;
                         current_forest_cost2 += other_ins_cost(r_g_in_pre_l);
                         sp1 = match sp1source {
                             1 => s[(sp1s_row, r_g - it2_pre_r_off)] + path_del_cost(r_f_node),

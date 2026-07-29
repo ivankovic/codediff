@@ -37,6 +37,11 @@ use crate::diff::ASTDiff;
 /// forest instead of full tree-edit-distance. See `common::resolve_residual_forest_via_myers_lcs`
 /// for how the residual is collected and aligned.
 pub fn for_roots_fallback(before: &Code, after: &Code, source: &'static str, diff: &mut ASTDiff) {
+    // See the identical guard/rationale on `for_roots` in `common.rs`.
+    if before.ast.is_none() || after.ast.is_none() {
+        return;
+    }
+
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 

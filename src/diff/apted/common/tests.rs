@@ -18,6 +18,7 @@
 // Split out of common.rs (formerly its trailing #[cfg(test)] mod tests block, ~1760 of
 // common.rs's then-4119 lines) purely to shrink that file's visible size - no behavior change.
 
+    use anyhow::Result;
     use super::super::engine::*;
     use super::*;
     use crate::diff::{ASTMappingOperation, ASTMappingReason};

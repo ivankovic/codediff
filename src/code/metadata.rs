@@ -289,11 +289,12 @@ fn compute_node_depths(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     let ast = code.ast.as_ref().expect("AST must be parsed");
     let root_node = ast.root_node();
-    let language = code
-        .metadata
-        .language
-        .as_ref()
-        .expect("Language must be set");
+    // `metadata.language`, not `code.metadata.language` - the former is already fail-safed to
+    // `Language::Unknown` by `compute_ast_metadata` (this function's only caller) a few lines
+    // before calling here; re-reading the latter and `.expect()`-ing it was inconsistent with
+    // that and could panic in a case the caller had already made safe (found in a 2026-07
+    // code-health pass).
+    let language = &metadata.language;
 
     // Collect reference nodes with their subtree sizes
     let mut reference_nodes_with_sizes = Vec::new();
@@ -308,7 +309,7 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
     });
 
     // Sort reference nodes by subtree size in descending order
-    reference_nodes_with_sizes.sort_by(|a, b| b.1.cmp(&a.1));
+    reference_nodes_with_sizes.sort_by_key(|&(_, subtree_size)| std::cmp::Reverse(subtree_size));
 
     // Extract just the node IDs in order
     metadata.reference_nodes_ordered = reference_nodes_with_sizes
@@ -324,6 +325,22 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
+
+    /// Regression test: `discover_reference_nodes` used to read `code.metadata.language` and
+    /// `.expect()` it directly, instead of the `metadata.language` its own caller
+    /// (`compute_ast_metadata`) had already fail-safed a few lines earlier - so a `Code` with a
+    /// real parsed AST but an unset `metadata.language` (constructible directly, since every
+    /// field here is `pub`) panicked instead of degrading gracefully like everything else in this
+    /// pipeline.
+    #[test]
+    fn compute_ast_metadata_does_not_panic_when_language_is_unset() {
+        let mut code = crate::code::Code::from_string("fn main() {}", &crate::code::Language::Rust);
+        code.metadata.language = None;
+        code.metadata.ast_metadata = None;
+
+        let metadata = compute_ast_metadata(&code).expect("should fail safe, not panic");
+        assert_eq!(metadata.language, crate::code::Language::Unknown);
+    }
 
     #[test]
     fn hermetic_expand_from_path() {

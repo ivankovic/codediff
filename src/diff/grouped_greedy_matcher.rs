@@ -111,3 +111,142 @@ pub(crate) fn solve<K: Eq + Hash>(
         on_accept(before_id, after_id, diff);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_same_key_candidates_are_ever_paired() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "a"), (2, "b")],
+            &[(10, "a"), (20, "b")],
+            |_, _| 0.0,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert_eq!(accepted, vec![(1, 10), (2, 20)]);
+    }
+
+    #[test]
+    fn cheapest_pair_in_a_group_wins_and_each_side_is_claimed_once() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+        // Two before-candidates and two after-candidates share one key - only the (2, 20) pair
+        // has a low enough cost, and once it's accepted, 2 and 20 must not be reused for 1/10.
+        let cost = |before_id: usize, after_id: usize| match (before_id, after_id) {
+            (2, 20) => 0.0,
+            _ => 5.0,
+        };
+
+        solve(
+            &mut diff,
+            &[(1, "k"), (2, "k")],
+            &[(10, "k"), (20, "k")],
+            cost,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert_eq!(accepted.len(), 2, "every candidate should still find some pairing");
+        assert!(accepted.contains(&(2, 20)), "the cheapest pair must be accepted");
+        // The remaining before/after ids (1 and 10) must pair with each other, not be dropped or
+        // re-paired with an already-claimed id.
+        assert!(accepted.contains(&(1, 10)));
+    }
+
+    #[test]
+    fn max_cost_rejects_pairs_above_the_threshold() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "k")],
+            &[(10, "k")],
+            |_, _| 5.0,
+            Some(1.0),
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert!(accepted.is_empty(), "a pair costing more than max_cost must never be accepted");
+    }
+
+    #[test]
+    fn none_max_cost_accepts_regardless_of_cost() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "k")],
+            &[(10, "k")],
+            |_, _| 1_000_000.0,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert_eq!(accepted, vec![(1, 10)]);
+    }
+
+    #[test]
+    fn already_mapped_before_candidates_are_skipped() {
+        let mut diff = ASTDiff::default();
+        diff.before_node_map.insert(1, 999);
+        diff.after_node_map.insert(999, 1);
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "k")],
+            &[(10, "k")],
+            |_, _| 0.0,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert!(accepted.is_empty(), "a before-candidate already mapped elsewhere must not be re-paired");
+    }
+
+    #[test]
+    fn already_mapped_after_candidates_are_skipped() {
+        let mut diff = ASTDiff::default();
+        diff.after_node_map.insert(10, 999);
+        diff.before_node_map.insert(999, 10);
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "k")],
+            &[(10, "k")],
+            |_, _| 0.0,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert!(accepted.is_empty(), "an after-candidate already mapped elsewhere must not be re-paired");
+    }
+
+    #[test]
+    fn ties_are_broken_by_input_order_for_determinism() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+        // Every pair costs the same - the stable sort must preserve the caller-supplied
+        // (deterministic traversal) order rather than reordering equal-cost entries arbitrarily.
+        solve(
+            &mut diff,
+            &[(1, "k"), (2, "k")],
+            &[(10, "k"), (20, "k")],
+            |_, _| 0.0,
+            None,
+            |before_id, after_id, _| accepted.push((before_id, after_id)),
+        );
+
+        assert_eq!(accepted, vec![(1, 10), (2, 20)]);
+    }
+}
