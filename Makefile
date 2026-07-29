@@ -23,8 +23,19 @@ clean-db:
 test:
 	cargo test
 
+# --features stats: every target below this one (file-stats, commit-stats, sample-pairs,
+# benchmark-pairs, and the language-specific variants) runs a stats-gated binary
+# (file_stats/commit_stats/sample_code_pairs/benchmark_diff_pairs) that doesn't exist in
+# target/release without it - see Cargo.toml's `stats` feature.
 build: test
-	cargo build --release
+	cargo build --release --features stats
+
+# Scores codediff's diffing accuracy against the human-authored ground truth corpus in
+# src/test/data/ - the project's own primary regression gate for any change to the diff
+# algorithm (see TODO.md). --features test-fixtures: this binary needs codediff::test's
+# fixture-loading helpers, gated separately from `stats` since it needs no git2/rusqlite.
+benchmark-optimal:
+	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions
 
 hermetic-benchmark:
 	cargo bench --bench diff_code_benchmark

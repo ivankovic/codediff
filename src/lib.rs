@@ -17,11 +17,20 @@
  */
 pub mod code;
 pub mod diff;
+#[cfg(feature = "stats")]
 pub mod metadata;
 #[cfg(feature = "stats")]
 pub mod stats;
+#[cfg(feature = "tui")]
 pub mod tui;
 
+// `test` also (not just `feature = "test-fixtures"`) whenever compiling under `cfg(test)`:
+// dozens of ordinary `#[cfg(test)] mod tests` blocks throughout the crate (diff/, code/, tui/)
+// use `crate::test::helper` for their own fixtures, entirely independent of which Cargo features
+// happen to be enabled - `cargo test` must always see this module. `feature = "test-fixtures"`
+// covers the other, non-test case: the three src/bin/ tools (human_solver.rs,
+// benchmark_optimal_solutions.rs, benchmark_other.rs) that need it as a real, non-test dependency.
+#[cfg(any(test, feature = "test-fixtures"))]
 pub mod test;
 
 use crate::{

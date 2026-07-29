@@ -9,9 +9,9 @@ cargo install codediff
 ```
 
 This builds from source, so you'll need a C compiler on `PATH` alongside a Rust toolchain
-(edition 2024, so rustc 1.85+) - the bundled SQLite and the tree-sitter grammars are all compiled
-from C during the build. The first `cargo install` will take a couple of minutes because of this
-plus the `lto = "fat"` release profile.
+(edition 2024, so rustc 1.85+) - the tree-sitter grammars are all compiled from C during the
+build. The first `cargo install` will take a couple of minutes because of this plus the
+`lto = "fat"` release profile.
 
 The git-history analysis tools in `src/bin/` (not installed by `cargo install`, only relevant if
 you're building from a checkout) sit behind an off-by-default `stats` feature, since they pull in
@@ -175,9 +175,10 @@ When necessary, e.g. for filesystem or database access, fake in-memory implement
 
 ### Quality
 
-`cargo run --release --bin benchmark_optimal_solutions` diffs every fixture in
-src/test/data/diffs/ that has a human-verified ground truth mapping, and reports how many nodes
-each one gets wrong. Use this to check whether a change made diffs better or worse.
+`cargo run --release --features test-fixtures --bin benchmark_optimal_solutions` (or
+`make benchmark-optimal`) diffs every fixture in src/test/data/diffs/ that has a human-verified
+ground truth mapping, and reports how many nodes each one gets wrong. Use this to check whether a
+change made diffs better or worse.
 
 ### Speed
 

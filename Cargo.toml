@@ -1,6 +1,6 @@
 [package]
 name = "codediff"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 rust-version = "1.85"
 description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
@@ -11,13 +11,14 @@ keywords = ["diff", "ast", "tree-sitter", "cli", "git"]
 categories = ["command-line-utilities", "development-tools", "text-processing"]
 exclude = [
     "research/**",
-    # Checkout-only: the six `stats`-feature [[bin]] targets below cannot be built from the
-    # published/packaged crate once their source is excluded here (confirmed via `cargo package`
-    # + a build against the extracted tarball with `--features stats`: cargo reports no such bin
-    # target at all). That's intentional - these are dataset-analysis dev tools, not part of the
-    # published product (see README's Installation section) - but nothing else signals this
-    # boundary, so `cargo install codediff --features stats` fails with a confusing error rather
-    # than an explanatory one. Noted here for whoever next touches this.
+    # Checkout-only: the `stats`- and `test-fixtures`-gated [[bin]] targets below (ten total)
+    # cannot be built from the published/packaged crate once their source is excluded here
+    # (confirmed via `cargo package` + a build against the extracted tarball with `--features
+    # stats`: cargo reports no such bin target at all). That's intentional - these are
+    # dataset-analysis/dev-fixture-curation tools, not part of the published product (see README's
+    # Installation section) - but nothing else signals this boundary, so `cargo install codediff
+    # --features stats` fails with a confusing error rather than an explanatory one. Noted here for
+    # whoever next touches this.
     "src/bin/**",
     "src/test/data/**",
 ]
@@ -36,14 +37,27 @@ codegen-units = 1
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
-confy = "2.0.0"
-crossbeam-channel = "0.5.15"
-csv = "1.4.0"
+# TUI-only, but also used directly by src/bin/human_solver.rs's own small debug UI - gated by the
+# `tui` feature (see [features] below), not unconditional: a pure library consumer of
+# `codediff::diff`/`codediff::code` has no use for it.
+confy = { version = "2.0.0", optional = true }
+# Only used by src/stats/ (feature-gated) and the stats-gated src/bin/ tools that need concurrent
+# filesystem walks (file_stats.rs, commit_stats.rs) - gated the same way as git2/rusqlite below.
+crossbeam-channel = { version = "0.5.15", optional = true }
+# Used by both the stats-gated dev tools (materialize_test_diffs.rs, sample_code_pairs.rs,
+# sample_test_diffs.rs, benchmark_diff_pairs.rs) and the three that only need test fixtures
+# (human_solver.rs, benchmark_optimal_solutions.rs, benchmark_other.rs) - gated by `test-fixtures`,
+# which `stats` also includes (see [features] below), so either feature alone is sufficient.
+csv = { version = "1.4.0", optional = true }
 git2 = { version = "0.20.3", optional = true }
-indoc = "2.0.7"
-libc = "0.2"
-num_cpus = "1.17.0"
-rand = "0.8"
+# Only used by src/stats.rs itself - gated the same way as the rest of the stats-only deps.
+indoc = { version = "2.0.7", optional = true }
+# Only used by src/bin/file_stats.rs (stats-gated).
+libc = { version = "0.2", optional = true }
+# Only used by src/bin/file_stats.rs and commit_stats.rs (both stats-gated).
+num_cpus = { version = "1.17.0", optional = true }
+# Only used by src/stats/sampling.rs (feature-gated) and the stats-gated sample_*.rs dev tools.
+rand = { version = "0.8", optional = true }
 regex = "1.12.2"
 # Bundled/C-compiled, and (like git2 just above) only used by two of the stats-gated src/bin/
 # tools (commit_stats.rs, file_stats.rs) - gated the same way for the same reason: the main
@@ -54,10 +68,14 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.10.1"
 futures = "0.3"
-tokio = { version = "1.0", features = ["full"] }
+# TUI-only, but also used directly by src/bin/commit_stats.rs for concurrent I/O - gated by `tui`,
+# same reasoning as confy above.
+tokio = { version = "1.0", features = ["full"], optional = true }
 tree-sitter = "0.25"
-ratatui = { version = "0.26.3", features = ["serde", "macros"]}
-crossterm = { version = "0.27.0", features = ["serde", "event-stream"]}
+# TUI-only (see `tui` feature below) - also used directly by src/bin/human_solver.rs's own small
+# debug UI, same as confy/crossterm's siblings above.
+ratatui = { version = "0.26.3", features = ["serde", "macros"], optional = true }
+crossterm = { version = "0.27.0", features = ["serde", "event-stream"], optional = true }
 tree-sitter-bash = "0.25"
 tree-sitter-c = "0.24"
 tree-sitter-c-sharp = "0.23"
@@ -88,19 +106,74 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"]}
 tracing-error = "0.2.1"
 strum = { version = "0.28.0", features = ["derive"] }
-signal-hook = "0.4.4"
-syntect = { version = "5.2", features = ["default-fancy"] }
+# TUI-only - gated by `tui` below.
+signal-hook = { version = "0.4.4", optional = true }
+syntect = { version = "5.2", features = ["default-fancy"], optional = true }
 
 [dev-dependencies]
 insta = "1.38.0"
 
 [features]
-default = []
-# Pulls in git2 (and its openssl/libssh2 build-time deps) and rusqlite (a bundled, C-compiled
-# SQLite) for the git-history stats/sampling tools in src/bin/. Not needed by the main codediff
-# binary or TUI, so it's opt-in to keep `cargo install codediff` and library consumers free of
-# that dependency chain by default.
-stats = ["dep:git2", "dep:rusqlite"]
+# `tui` on by default so a bare `cargo build`/`cargo install codediff` keeps producing the working
+# `codediff` TUI binary, exactly as before this feature existed - a pure library consumer can still
+# opt out entirely via `default-features = false`, which was not possible at all before (every one
+# of these deps used to be unconditional).
+default = ["tui"]
+# Everything the TUI (src/tui/, src/main.rs) needs. Also required by `test-fixtures`/`stats` below,
+# since a couple of the dev-tool bins those gate use some of these deps directly for their own
+# unrelated purposes (human_solver.rs has its own small ratatui-based debug UI; commit_stats.rs
+# uses tokio for concurrent I/O) - simpler to have every dev-tool feature imply `tui` than to track
+# exactly which of these 6 deps each individual bin happens to need.
+tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:syntect", "dep:signal-hook", "dep:confy"]
+# Gates `codediff::test` (fixture-loading helpers whose data files under src/test/data/ are
+# excluded from the published crate - see this file's own `exclude` list - so the module itself
+# must not be part of the crate's default public surface either, or a real dependent would see
+# API that's guaranteed to fail at runtime). Needed by every src/bin/ dev tool, not just the three
+# that don't otherwise need `stats` (human_solver.rs, benchmark_optimal_solutions.rs,
+# benchmark_other.rs) - `stats` includes it below so the other six don't need to list it twice.
+test-fixtures = ["dep:csv", "tui"]
+# Pulls in git2 (and its openssl/libssh2 build-time deps), rusqlite (a bundled, C-compiled SQLite),
+# and the rest of the git-history stats/sampling tools' dependencies for the src/bin/ tools gated
+# the same way. Not needed by the main codediff binary or a library consumer, so it's opt-in to
+# keep `cargo install codediff` and library consumers free of that dependency chain by default.
+stats = [
+    "dep:git2",
+    "dep:rusqlite",
+    "dep:crossbeam-channel",
+    "dep:libc",
+    "dep:num_cpus",
+    "dep:rand",
+    "dep:indoc",
+    "test-fixtures",
+]
+
+[[bin]]
+name = "codediff"
+path = "src/main.rs"
+required-features = ["tui"]
+
+[[bin]]
+name = "ascii_visualizer"
+path = "src/bin/ascii_visualizer.rs"
+# Debug/dev tool only (a plain-text AST dump), no test-fixture or stats deps of its own - reuses
+# `test-fixtures` as the general "checkout-only dev tool" gate rather than inventing a feature
+# just for this one binary.
+required-features = ["test-fixtures"]
+
+[[bin]]
+name = "human_solver"
+path = "src/bin/human_solver.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
+name = "benchmark_optimal_solutions"
+path = "src/bin/benchmark_optimal_solutions.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
+name = "benchmark_other"
+path = "src/bin/benchmark_other.rs"
+required-features = ["test-fixtures"]
 
 [[bin]]
 name = "commit_stats"
