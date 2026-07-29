@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # "" = default features (tui only). test-fixtures and stats are each their own
+        # compilation unit - see Cargo.toml's [features] - so each needs its own build+test pass,
+        # not just a single default-feature run.
+        features: ["", "test-fixtures", "stats"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.features }}
+
+      - name: Build
+        run: cargo build --release --features "${{ matrix.features }}"
+
+      - name: Test
+        run: cargo test --release --features "${{ matrix.features }}"
