@@ -1,5 +1,8 @@
 # CodeDiff
 
+[![CI](https://github.com/ivankovic/codediff/actions/workflows/ci.yml/badge.svg)](https://github.com/ivankovic/codediff/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/ivankovic/codediff)](https://github.com/ivankovic/codediff/releases/latest)
+
 Fast, robust, syntax aware code diffing.
 
 # Installation
