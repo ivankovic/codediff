@@ -17,13 +17,7 @@
  */
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    Frame,
-    layout::Rect,
-    prelude::Stylize,
-    style::Color,
-    widgets::ListItem,
-};
+use ratatui::{Frame, layout::Rect, prelude::Stylize, style::Color, widgets::ListItem};
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::UnboundedSender;
 

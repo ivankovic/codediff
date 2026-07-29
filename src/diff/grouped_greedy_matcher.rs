@@ -76,7 +76,9 @@ pub(crate) fn solve<K: Eq + Hash>(
         if diff.before_node_map.contains_key(before_id) {
             continue;
         }
-        let Some(after_ids) = after_by_key.get(key) else { continue };
+        let Some(after_ids) = after_by_key.get(key) else {
+            continue;
+        };
         for &after_id in after_ids {
             if diff.after_node_map.contains_key(&after_id) {
                 continue;
@@ -103,7 +105,9 @@ pub(crate) fn solve<K: Eq + Hash>(
         // claimed one of these nodes as a matched descendant (e.g. an outer container matched
         // first, whose real edit-distance resolution already covered a nested candidate that's
         // also, independently, a candidate here).
-        if diff.before_node_map.contains_key(&before_id) || diff.after_node_map.contains_key(&after_id) {
+        if diff.before_node_map.contains_key(&before_id)
+            || diff.after_node_map.contains_key(&after_id)
+        {
             continue;
         }
         before_claimed.insert(before_id);
@@ -153,8 +157,15 @@ mod tests {
             |before_id, after_id, _| accepted.push((before_id, after_id)),
         );
 
-        assert_eq!(accepted.len(), 2, "every candidate should still find some pairing");
-        assert!(accepted.contains(&(2, 20)), "the cheapest pair must be accepted");
+        assert_eq!(
+            accepted.len(),
+            2,
+            "every candidate should still find some pairing"
+        );
+        assert!(
+            accepted.contains(&(2, 20)),
+            "the cheapest pair must be accepted"
+        );
         // The remaining before/after ids (1 and 10) must pair with each other, not be dropped or
         // re-paired with an already-claimed id.
         assert!(accepted.contains(&(1, 10)));
@@ -174,7 +185,10 @@ mod tests {
             |before_id, after_id, _| accepted.push((before_id, after_id)),
         );
 
-        assert!(accepted.is_empty(), "a pair costing more than max_cost must never be accepted");
+        assert!(
+            accepted.is_empty(),
+            "a pair costing more than max_cost must never be accepted"
+        );
     }
 
     #[test]
@@ -210,7 +224,10 @@ mod tests {
             |before_id, after_id, _| accepted.push((before_id, after_id)),
         );
 
-        assert!(accepted.is_empty(), "a before-candidate already mapped elsewhere must not be re-paired");
+        assert!(
+            accepted.is_empty(),
+            "a before-candidate already mapped elsewhere must not be re-paired"
+        );
     }
 
     #[test]
@@ -229,7 +246,10 @@ mod tests {
             |before_id, after_id, _| accepted.push((before_id, after_id)),
         );
 
-        assert!(accepted.is_empty(), "an after-candidate already mapped elsewhere must not be re-paired");
+        assert!(
+            accepted.is_empty(),
+            "an after-candidate already mapped elsewhere must not be re-paired"
+        );
     }
 
     #[test]

@@ -39,32 +39,31 @@ fn python_added_if_block() -> Result<()> {
 
     // Double check the indetical code at the start is matched
     let path = vec!["function_definition"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     // The interesting part is the added if_statement
-    assert!(test::helper::entire_path_has_mapping(
-        &["if_statement", "block"],
-        before_root,
-        after_root,
-        &diff_ast,
-        ASTMappingOperation::MatchButNotIdentical
-    )?, "The if_statement block path is not correctly mapped");
+    assert!(
+        test::helper::entire_path_has_mapping(
+            &["if_statement", "block"],
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::MatchButNotIdentical
+        )?,
+        "The if_statement block path is not correctly mapped"
+    );
 
     let path = vec!["if_statement", "block", "expression_statement:1"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     let path = vec!["if_statement", "block", "expression_statement:2"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     let path = vec!["if_statement", "block", "expression_statement:3"];
-    let mapping =
-        test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
+    let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
     // This is the core of the test. What separates AST diff from text diff.

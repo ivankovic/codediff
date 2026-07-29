@@ -32,7 +32,11 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason};
 /// byte-identical - guarantees kinds always match, making the kind check here a no-op for that
 /// caller) and `solve_identical_diagnostic_statements` (whose precondition - matched statements'
 /// full hash is identical - gives the same guarantee).
-pub fn map_identical_descendants<'a>(before_node: Node<'a>, after_node: Node<'a>, diff: &mut ASTDiff) {
+pub fn map_identical_descendants<'a>(
+    before_node: Node<'a>,
+    after_node: Node<'a>,
+    diff: &mut ASTDiff,
+) {
     let mut stack = vec![(before_node, after_node)];
     while let Some((before_parent, after_parent)) = stack.pop() {
         let mut before_cursor = before_parent.walk();
@@ -375,11 +379,11 @@ pub fn is_semantically_structural<'a>(
                 let spec = node
                     .named_children(&mut cursor)
                     .find(|c| c.kind() == "var_spec" || c.kind() == "const_spec")?;
-                go_spec_identifier_name(spec, bytes).map(|name| (node_kind.to_string(), name.to_string()))
+                go_spec_identifier_name(spec, bytes)
+                    .map(|name| (node_kind.to_string(), name.to_string()))
             }
-            "var_spec" | "const_spec" => {
-                go_spec_identifier_name(*node, bytes).map(|name| (node_kind.to_string(), name.to_string()))
-            }
+            "var_spec" | "const_spec" => go_spec_identifier_name(*node, bytes)
+                .map(|name| (node_kind.to_string(), name.to_string())),
             "call_expression" => {
                 go_subtest_call_name(node, bytes).map(|name| (node_kind.to_string(), name))
             }
@@ -475,8 +479,13 @@ pub fn is_semantically_structural<'a>(
         // empirically against the real grammar (a throwaway binary dumping `child_by_field_name`
         // results on this fixture), not assumed from other C-family grammars.
         Language::CSharp => match node_kind {
-            "class_declaration" | "struct_declaration" | "interface_declaration" | "enum_declaration"
-            | "record_declaration" | "method_declaration" | "namespace_declaration" => node
+            "class_declaration"
+            | "struct_declaration"
+            | "interface_declaration"
+            | "enum_declaration"
+            | "record_declaration"
+            | "method_declaration"
+            | "namespace_declaration" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
                 .map(|name| (node_kind.to_string(), name.to_string())),
@@ -488,8 +497,9 @@ pub fn is_semantically_structural<'a>(
             // name is unchanged.
             "field_declaration" => {
                 let mut cursor = node.walk();
-                let variable_declaration =
-                    node.named_children(&mut cursor).find(|c| c.kind() == "variable_declaration")?;
+                let variable_declaration = node
+                    .named_children(&mut cursor)
+                    .find(|c| c.kind() == "variable_declaration")?;
                 let mut declarator_cursor = variable_declaration.walk();
                 let declarator = variable_declaration
                     .named_children(&mut declarator_cursor)
@@ -548,7 +558,10 @@ pub fn is_semantically_structural<'a>(
         // rest (below, in the final `_ =>` fallback comment) have no fixtures in this corpus to
         // verify against - see that comment for what "unvalidated" means there.
         Language::Java => match node_kind {
-            "class_declaration" | "interface_declaration" | "enum_declaration" | "record_declaration"
+            "class_declaration"
+            | "interface_declaration"
+            | "enum_declaration"
+            | "record_declaration"
             | "method_declaration" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
@@ -560,8 +573,9 @@ pub fn is_semantically_structural<'a>(
             // Keyed on the first declarator only, same simplification as C#'s/Go's arms.
             "field_declaration" => {
                 let mut cursor = node.walk();
-                let declarator =
-                    node.named_children(&mut cursor).find(|c| c.kind() == "variable_declarator")?;
+                let declarator = node
+                    .named_children(&mut cursor)
+                    .find(|c| c.kind() == "variable_declarator")?;
                 declarator
                     .child_by_field_name("name")
                     .and_then(|n| n.utf8_text(bytes).ok())
@@ -570,7 +584,10 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::JavaScript | Language::TypeScript | Language::TSX => match node_kind {
-            "function_declaration" | "class_declaration" | "method_definition" | "interface_declaration"
+            "function_declaration"
+            | "class_declaration"
+            | "method_definition"
+            | "interface_declaration"
             | "type_alias_declaration" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
@@ -614,7 +631,10 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::Swift => match node_kind {
-            "function_declaration" | "class_declaration" | "struct_declaration" | "enum_declaration"
+            "function_declaration"
+            | "class_declaration"
+            | "struct_declaration"
+            | "enum_declaration"
             | "protocol_declaration" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
@@ -622,19 +642,24 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::Scala => match node_kind {
-            "class_definition" | "object_definition" | "trait_definition" | "function_definition" => node
+            "class_definition"
+            | "object_definition"
+            | "trait_definition"
+            | "function_definition" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
                 .map(|name| (node_kind.to_string(), name.to_string())),
             _ => None,
         },
-        Language::R | Language::ShellScript | Language::LUA | Language::Vimscript => match node_kind {
-            "function_definition" | "function_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
-            _ => None,
-        },
+        Language::R | Language::ShellScript | Language::LUA | Language::Vimscript => {
+            match node_kind {
+                "function_definition" | "function_declaration" => node
+                    .child_by_field_name("name")
+                    .and_then(|n| n.utf8_text(bytes).ok())
+                    .map(|name| (node_kind.to_string(), name.to_string())),
+                _ => None,
+            }
+        }
         _ => None,
     }
 }
@@ -675,11 +700,18 @@ fn go_spec_identifier_name<'a>(spec: Node<'a>, bytes: &'a [u8]) -> Option<&'a st
 /// `function_declarator` for every pointer-returning function.
 fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
     match node.kind() {
-        "identifier" | "field_identifier" | "qualified_identifier" | "destructor_name" | "operator_name" => {
-            node.utf8_text(bytes).ok()
-        }
-        "function_declarator" | "pointer_declarator" | "array_declarator" | "parenthesized_declarator"
-        | "reference_declarator" => node.child_by_field_name("declarator").and_then(|d| c_family_declarator_name(d, bytes)),
+        "identifier"
+        | "field_identifier"
+        | "qualified_identifier"
+        | "destructor_name"
+        | "operator_name" => node.utf8_text(bytes).ok(),
+        "function_declarator"
+        | "pointer_declarator"
+        | "array_declarator"
+        | "parenthesized_declarator"
+        | "reference_declarator" => node
+            .child_by_field_name("declarator")
+            .and_then(|d| c_family_declarator_name(d, bytes)),
         _ => None,
     }
 }
@@ -696,7 +728,10 @@ fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
     let arguments = node.child_by_field_name("arguments")?;
     let mut cursor = arguments.walk();
     let first_arg = arguments.named_children(&mut cursor).next()?;
-    if !matches!(first_arg.kind(), "interpreted_string_literal" | "raw_string_literal") {
+    if !matches!(
+        first_arg.kind(),
+        "interpreted_string_literal" | "raw_string_literal"
+    ) {
         return None;
     }
     let text = first_arg.utf8_text(bytes).ok()?;
@@ -1087,8 +1122,14 @@ pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
         (Language::Rust, "block")
             | (Language::Python, "block")
             | (Language::C | Language::CPP, "compound_statement")
-            | (Language::Java | Language::Go | Language::CSharp | Language::Kotlin, "block")
-            | (Language::JavaScript | Language::TypeScript | Language::TSX, "statement_block")
+            | (
+                Language::Java | Language::Go | Language::CSharp | Language::Kotlin,
+                "block"
+            )
+            | (
+                Language::JavaScript | Language::TypeScript | Language::TSX,
+                "statement_block"
+            )
     )
 }
 
@@ -1516,7 +1557,6 @@ mod tests {
         Code::from_string(src, &Language::Rust)
     }
 
-
     #[test]
     fn rust_match_arms_extracts_string_literal_patterns() {
         let code = rust_match_container(
@@ -1583,8 +1623,10 @@ fn f(s: &str) {
         );
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
-        let before_expr = helper::find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
-        let after_expr = helper::find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
+        let before_expr =
+            helper::find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
+        let after_expr =
+            helper::find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
         let before_arms =
             match_arms(before_expr, &Language::Rust, before.contents.as_bytes()).unwrap();
         let after_arms =
@@ -2093,7 +2135,8 @@ class DecoratedClass:
             return Some(root.id());
         }
         let mut cursor = root.walk();
-        root.children(&mut cursor).find_map(|child| find_semantic_node(child, lang, code, target))
+        root.children(&mut cursor)
+            .find_map(|child| find_semantic_node(child, lang, code, target))
     }
 
     #[test]
@@ -2132,7 +2175,8 @@ class Calculator:
                 let key = ("function_definition".to_string(), name.to_string());
                 let bid = find_semantic_node(before_root, &Language::Python, &before, &key);
                 let aid = find_semantic_node(after_root, &Language::Python, &after, &key);
-                bid.zip(aid).map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                bid.zip(aid)
+                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(
@@ -2301,7 +2345,8 @@ class Calculator {
                 let key = ("function_declaration".to_string(), name.to_string());
                 let bid = find_semantic_node(before_root, &Language::Kotlin, &before, &key);
                 let aid = find_semantic_node(after_root, &Language::Kotlin, &after, &key);
-                bid.zip(aid).map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                bid.zip(aid)
+                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(
@@ -2576,15 +2621,27 @@ mod is_commutative_container_tests {
 
     #[test]
     fn rust_recognizes_struct_fields_enum_variants_and_use_lists() {
-        assert_recognizes(Language::Rust, "struct S { a: i32, b: i32 }\n", "field_declaration_list");
+        assert_recognizes(
+            Language::Rust,
+            "struct S { a: i32, b: i32 }\n",
+            "field_declaration_list",
+        );
         assert_recognizes(Language::Rust, "enum E { A, B }\n", "enum_variant_list");
         assert_recognizes(Language::Rust, "use std::{a, b};\n", "use_list");
     }
 
     #[test]
     fn go_recognizes_struct_fields_and_import_specs() {
-        assert_recognizes(Language::Go, "package main\ntype T struct {\n A int\n}\n", "field_declaration_list");
-        assert_recognizes(Language::Go, "package main\nimport (\n \"fmt\"\n)\n", "import_spec_list");
+        assert_recognizes(
+            Language::Go,
+            "package main\ntype T struct {\n A int\n}\n",
+            "field_declaration_list",
+        );
+        assert_recognizes(
+            Language::Go,
+            "package main\nimport (\n \"fmt\"\n)\n",
+            "import_spec_list",
+        );
     }
 
     #[test]
@@ -2599,7 +2656,11 @@ mod is_commutative_container_tests {
 
     #[test]
     fn csharp_recognizes_enum_member_declaration_list() {
-        assert_recognizes(Language::CSharp, "enum E { A, B }\n", "enum_member_declaration_list");
+        assert_recognizes(
+            Language::CSharp,
+            "enum E { A, B }\n",
+            "enum_member_declaration_list",
+        );
     }
 
     #[test]
@@ -2617,7 +2678,11 @@ mod is_commutative_container_tests {
 
     #[test]
     fn scala_recognizes_braced_import_selectors() {
-        assert_recognizes(Language::Scala, "import a.b.{X, Y}\n", "namespace_selectors");
+        assert_recognizes(
+            Language::Scala,
+            "import a.b.{X, Y}\n",
+            "namespace_selectors",
+        );
     }
 
     #[test]

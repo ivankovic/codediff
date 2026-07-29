@@ -18,17 +18,17 @@
 use anyhow::Result;
 use clap::Parser;
 use git2::Delta;
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::metadata;
 use codediff::stats::filesystem::find_git_repositories;
 use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::Reservoir;
-use codediff::metadata;
 
 // Files outside this range are excluded: near-empty files make trivial benchmark cases, and
 // anything above the upper bound is past the size `expand_from_code` itself treats as
@@ -197,7 +197,12 @@ fn sample_repository(
         // The larger of the before/after byte sizes decides the size bucket; `None` means either
         // side is binary or outside the configured size bounds.
         let size = text_len_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
-            .zip(text_len_if_in_range(repo, delta.new_file().id(), MIN_BYTES, MAX_BYTES))
+            .zip(text_len_if_in_range(
+                repo,
+                delta.new_file().id(),
+                MIN_BYTES,
+                MAX_BYTES,
+            ))
             .map(|(before_len, after_len)| before_len.max(after_len));
         let Some(size) = size else {
             return Ok(());
@@ -219,7 +224,10 @@ fn sample_repository(
     })
 }
 
-fn write_csv(path: &Path, reservoirs: &HashMap<(String, &'static str), Reservoir<Candidate>>) -> Result<()> {
+fn write_csv(
+    path: &Path,
+    reservoirs: &HashMap<(String, &'static str), Reservoir<Candidate>>,
+) -> Result<()> {
     let mut writer = csv::Writer::from_path(path)?;
     writer.write_record([
         "language",

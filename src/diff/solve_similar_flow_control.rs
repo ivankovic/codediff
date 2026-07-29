@@ -63,29 +63,35 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 
-    let Some(before_ast) = before.ast.as_ref() else { return };
-    let Some(after_ast) = after.ast.as_ref() else { return };
+    let Some(before_ast) = before.ast.as_ref() else {
+        return;
+    };
+    let Some(after_ast) = after.ast.as_ref() else {
+        return;
+    };
     let language = before_metadata.language;
 
     let before_source = before.contents.as_bytes();
     let after_source = after.contents.as_bytes();
 
-    let before_items: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
-        before_ast.root_node(),
-        &diff.before_node_map,
-        |node| flow_control_family(node.kind(), &language).is_some(),
-    )
-    .into_iter()
-    .filter_map(|node| flow_control_arms(node, &language, before_source).map(|arms| (node, arms)))
-    .collect();
-    let after_items: Vec<(Node, Vec<FlowControlArm>)> = collect_unmatched(
-        after_ast.root_node(),
-        &diff.after_node_map,
-        |node| flow_control_family(node.kind(), &language).is_some(),
-    )
-    .into_iter()
-    .filter_map(|node| flow_control_arms(node, &language, after_source).map(|arms| (node, arms)))
-    .collect();
+    let before_items: Vec<(Node, Vec<FlowControlArm>)> =
+        collect_unmatched(before_ast.root_node(), &diff.before_node_map, |node| {
+            flow_control_family(node.kind(), &language).is_some()
+        })
+        .into_iter()
+        .filter_map(|node| {
+            flow_control_arms(node, &language, before_source).map(|arms| (node, arms))
+        })
+        .collect();
+    let after_items: Vec<(Node, Vec<FlowControlArm>)> =
+        collect_unmatched(after_ast.root_node(), &diff.after_node_map, |node| {
+            flow_control_family(node.kind(), &language).is_some()
+        })
+        .into_iter()
+        .filter_map(|node| {
+            flow_control_arms(node, &language, after_source).map(|arms| (node, arms))
+        })
+        .collect();
     if before_items.is_empty() || after_items.is_empty() {
         return;
     }
@@ -93,26 +99,46 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     // Precompute each candidate's signature set once (keyed by node id) - `grouped_greedy_
     // matcher`'s cost function is called once per same-family pair, and would otherwise rebuild
     // both `HashSet`s from scratch every time.
-    let before_sets: HashMap<usize, HashSet<&str>> =
-        before_items.iter().map(|(node, arms)| (node.id(), flow_control_signature_set(arms))).collect();
-    let after_sets: HashMap<usize, HashSet<&str>> =
-        after_items.iter().map(|(node, arms)| (node.id(), flow_control_signature_set(arms))).collect();
+    let before_sets: HashMap<usize, HashSet<&str>> = before_items
+        .iter()
+        .map(|(node, arms)| (node.id(), flow_control_signature_set(arms)))
+        .collect();
+    let after_sets: HashMap<usize, HashSet<&str>> = after_items
+        .iter()
+        .map(|(node, arms)| (node.id(), flow_control_signature_set(arms)))
+        .collect();
     // Same idea for the arms themselves, needed by `anchor_matching_arms` on accept.
-    let before_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> =
-        before_items.iter().map(|(node, arms)| (node.id(), arms)).collect();
-    let after_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> =
-        after_items.iter().map(|(node, arms)| (node.id(), arms)).collect();
+    let before_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> = before_items
+        .iter()
+        .map(|(node, arms)| (node.id(), arms))
+        .collect();
+    let after_arms_by_id: HashMap<usize, &Vec<FlowControlArm>> = after_items
+        .iter()
+        .map(|(node, arms)| (node.id(), arms))
+        .collect();
 
     // (id, family) candidate lists - `collect_unmatched`'s stack-based DFS order is deterministic
     // run-to-run (satisfying `grouped_greedy_matcher`'s determinism contract) even though it isn't
     // preorder per se.
     let before_candidates: Vec<(usize, crate::diff::nodes::FlowControlFamily)> = before_items
         .iter()
-        .map(|(node, _)| (node.id(), flow_control_family(node.kind(), &language).expect("collect_unmatched already filtered to flow-control kinds")))
+        .map(|(node, _)| {
+            (
+                node.id(),
+                flow_control_family(node.kind(), &language)
+                    .expect("collect_unmatched already filtered to flow-control kinds"),
+            )
+        })
         .collect();
     let after_candidates: Vec<(usize, crate::diff::nodes::FlowControlFamily)> = after_items
         .iter()
-        .map(|(node, _)| (node.id(), flow_control_family(node.kind(), &language).expect("collect_unmatched already filtered to flow-control kinds")))
+        .map(|(node, _)| {
+            (
+                node.id(),
+                flow_control_family(node.kind(), &language)
+                    .expect("collect_unmatched already filtered to flow-control kinds"),
+            )
+        })
         .collect();
 
     // `grouped_greedy_matcher` works in "lower cost is better" terms; Jaccard similarity is
@@ -124,7 +150,9 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         diff,
         &before_candidates,
         &after_candidates,
-        |before_id, after_id| 1.0 - flow_control_similarity_of_sets(&before_sets[&before_id], &after_sets[&after_id]),
+        |before_id, after_id| {
+            1.0 - flow_control_similarity_of_sets(&before_sets[&before_id], &after_sets[&after_id])
+        },
         Some(1.0 - SIMILARITY_THRESHOLD),
         |before_id, after_id, diff| {
             anchor_matching_arms(
@@ -148,7 +176,6 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     );
 }
 
-
 /// Resolves each before-arm against the first not-yet-claimed after-arm with an identical
 /// (non-wildcard) signature, via a dedicated `apted::for_nodes` call per pair - the same idiom
 /// `solve_syntax_aware_matching` uses to pre-match same-named methods before diffing their
@@ -164,14 +191,23 @@ fn anchor_matching_arms(
     let mut after_by_signature: HashMap<&str, VecDeque<usize>> = HashMap::new();
     for arm in after_arms {
         if let Some(signature) = arm.signature.as_deref() {
-            after_by_signature.entry(signature).or_default().push_back(arm.node_id);
+            after_by_signature
+                .entry(signature)
+                .or_default()
+                .push_back(arm.node_id);
         }
     }
 
     for arm in before_arms {
-        let Some(signature) = arm.signature.as_deref() else { continue };
-        let Some(queue) = after_by_signature.get_mut(signature) else { continue };
-        let Some(after_arm_id) = queue.pop_front() else { continue };
+        let Some(signature) = arm.signature.as_deref() else {
+            continue;
+        };
+        let Some(queue) = after_by_signature.get_mut(signature) else {
+            continue;
+        };
+        let Some(after_arm_id) = queue.pop_front() else {
+            continue;
+        };
 
         apted::for_nodes(
             before_metadata,
@@ -252,8 +288,12 @@ fn parse(s: &str) -> i32 {
 
         // All 8 shared-pattern arms ("asset", "ecmascript", ...) should each be mapped, arm-for-
         // arm, even though their *values* (1 vs 10, etc.) differ.
-        let before_arms = super::flow_control_arms(before_match, &Language::Rust, before.contents.as_bytes()).unwrap();
-        let after_arms = super::flow_control_arms(after_match, &Language::Rust, after.contents.as_bytes()).unwrap();
+        let before_arms =
+            super::flow_control_arms(before_match, &Language::Rust, before.contents.as_bytes())
+                .unwrap();
+        let after_arms =
+            super::flow_control_arms(after_match, &Language::Rust, after.contents.as_bytes())
+                .unwrap();
         for signature in [
             "\"asset\"",
             "\"ecmascript\"",
@@ -264,8 +304,14 @@ fn parse(s: &str) -> i32 {
             "\"raw\"",
             "\"node\"",
         ] {
-            let before_arm = before_arms.iter().find(|a| a.signature.as_deref() == Some(signature)).unwrap();
-            let after_arm = after_arms.iter().find(|a| a.signature.as_deref() == Some(signature)).unwrap();
+            let before_arm = before_arms
+                .iter()
+                .find(|a| a.signature.as_deref() == Some(signature))
+                .unwrap();
+            let after_arm = after_arms
+                .iter()
+                .find(|a| a.signature.as_deref() == Some(signature))
+                .unwrap();
             assert_eq!(
                 diff.before_node_map.get(&before_arm.node_id),
                 Some(&after_arm.node_id),
@@ -322,8 +368,11 @@ fn validate(x: i32) -> i32 {
 
         // Confirm the whole chain - not just the outermost branch - was resolved: the second
         // `else if x > 10` branch, nested inside the first, should also be individually mapped.
-        let before_arms = super::flow_control_arms(before_if, &Language::Rust, before.contents.as_bytes()).unwrap();
-        let after_arms = super::flow_control_arms(after_if, &Language::Rust, after.contents.as_bytes()).unwrap();
+        let before_arms =
+            super::flow_control_arms(before_if, &Language::Rust, before.contents.as_bytes())
+                .unwrap();
+        let after_arms =
+            super::flow_control_arms(after_if, &Language::Rust, after.contents.as_bytes()).unwrap();
         assert_eq!(
             diff.before_node_map.get(&before_arms[1].node_id),
             Some(&after_arms[1].node_id),
@@ -365,9 +414,10 @@ fn b(s: &str) -> i32 {
         let after_match = find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
 
         assert!(
-            !diff.mapping.contains_key(&(before_match.id(), after_match.id())),
+            !diff
+                .mapping
+                .contains_key(&(before_match.id(), after_match.id())),
             "matches with no shared patterns should not be paired"
         );
     }
-
 }

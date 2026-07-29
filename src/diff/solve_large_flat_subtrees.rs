@@ -67,12 +67,18 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 
-    let Some(before_ast) = before.ast.as_ref() else { return };
-    let Some(after_ast) = after.ast.as_ref() else { return };
+    let Some(before_ast) = before.ast.as_ref() else {
+        return;
+    };
+    let Some(after_ast) = after.ast.as_ref() else {
+        return;
+    };
     let language = before_metadata.language;
 
-    let mut before_items = top_level_identities(before_ast.root_node(), &before_metadata, &language, before);
-    let mut after_items = top_level_identities(after_ast.root_node(), &after_metadata, &language, after);
+    let mut before_items =
+        top_level_identities(before_ast.root_node(), &before_metadata, &language, before);
+    let mut after_items =
+        top_level_identities(after_ast.root_node(), &after_metadata, &language, after);
 
     // A data-shaped file (JSON, YAML, ...) has no named top-level declarations to key off at
     // all - its whole content is one anonymous value (an `object`/`array`/mapping/...), so
@@ -90,7 +96,10 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     // and only ever attempted when nothing already matched by name), it's necessarily the same
     // logical thing on both sides - there is nothing else it could correspond to.
     if before_items.is_empty() && after_items.is_empty() {
-        if let (Some(b), Some(a)) = (only_named_child(before_ast.root_node()), only_named_child(after_ast.root_node())) {
+        if let (Some(b), Some(a)) = (
+            only_named_child(before_ast.root_node()),
+            only_named_child(after_ast.root_node()),
+        ) {
             let key = ("<whole-file value>".to_string(), String::new());
             before_items.insert(key.clone(), b.id());
             after_items.insert(key, a.id());
@@ -98,10 +107,18 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     }
 
     for (key, &before_id) in &before_items {
-        let Some(&after_id) = after_items.get(key) else { continue };
+        let Some(&after_id) = after_items.get(key) else {
+            continue;
+        };
 
-        let Some(before_flat) = largest_flat_container_in(before_id, &before_metadata, &language) else { continue };
-        let Some(after_flat) = largest_flat_container_in(after_id, &after_metadata, &language) else { continue };
+        let Some(before_flat) = largest_flat_container_in(before_id, &before_metadata, &language)
+        else {
+            continue;
+        };
+        let Some(after_flat) = largest_flat_container_in(after_id, &after_metadata, &language)
+        else {
+            continue;
+        };
 
         // Diff the flat descendant directly - the flat-tree fast path in `resolve_forest` picks
         // it up and routes to Myers.
@@ -122,9 +139,10 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         // one (deliberately - see this function's doc comment) and so never gets the chance. See
         // `solve_named_reference_groups_within`'s doc comment for the confirmed live cases this
         // fixes.
-        if let (Some(&before_node), Some(&after_node)) =
-            (node_cache.before.get(&before_id), node_cache.after.get(&after_id))
-        {
+        if let (Some(&before_node), Some(&after_node)) = (
+            node_cache.before.get(&before_id),
+            node_cache.after.get(&after_id),
+        ) {
             solve_named_reference_groups_within(
                 before_node,
                 before_id,
@@ -173,7 +191,9 @@ fn top_level_identities(
         if child.kind() == "macro_invocation"
             && let Some(name) = macro_callee_name(child.id(), metadata)
         {
-            result.entry(("macro_invocation".to_string(), name)).or_insert(child.id());
+            result
+                .entry(("macro_invocation".to_string(), name))
+                .or_insert(child.id());
         }
     }
     result
@@ -185,7 +205,9 @@ fn top_level_identities(
 /// token (if the grammar even emits one at this level) can't spuriously disqualify a file that
 /// otherwise has just one real top-level value.
 fn only_named_child(root_node: tree_sitter::Node) -> Option<tree_sitter::Node> {
-    (root_node.named_child_count() == 1).then(|| root_node.named_child(0)).flatten()
+    (root_node.named_child_count() == 1)
+        .then(|| root_node.named_child(0))
+        .flatten()
 }
 
 /// Macro name = text of the first `identifier`/`scoped_identifier` child of a `macro_invocation`
@@ -218,7 +240,11 @@ fn macro_callee_name(macro_id: usize, meta: &ASTMetadata) -> Option<String> {
 /// so a plain kind check on it misses the table completely - confirmed against a live case
 /// (cockroachdb's `api_v2_grants_test.go`: the precomputed widest subtree wasn't the table at all,
 /// so the table never got a chance).
-fn largest_flat_container_in(root_id: usize, meta: &ASTMetadata, language: &Language) -> Option<usize> {
+fn largest_flat_container_in(
+    root_id: usize,
+    meta: &ASTMetadata,
+    language: &Language,
+) -> Option<usize> {
     let &(count, id) = meta.node_to_widest_subtree_node.get(&root_id)?;
     if count >= FLAT_CONTAINER_MIN_CHILDREN {
         return Some(id);
@@ -235,7 +261,11 @@ fn largest_flat_container_in(root_id: usize, meta: &ASTMetadata, language: &Lang
 /// top-level item, e.g. one test function - not the whole file), so this stays cheap: exactly the
 /// walk `solve_large_flat_subtrees` did everywhere before the O(1) precomputation existed, just
 /// scoped down to the kinds that actually need it.
-fn widest_data_literal_container(root_id: usize, meta: &ASTMetadata, language: &Language) -> Option<usize> {
+fn widest_data_literal_container(
+    root_id: usize,
+    meta: &ASTMetadata,
+    language: &Language,
+) -> Option<usize> {
     // `is_data_literal_container` is only ever true for `Language::Go`, so for every other
     // language this walk is guaranteed to return `None` - skip paying for it on the common case
     // (every non-Go top-level item that didn't already qualify via the O(1) widest-subtree check
@@ -246,10 +276,14 @@ fn widest_data_literal_container(root_id: usize, meta: &ASTMetadata, language: &
     let mut best: Option<(usize, usize)> = None;
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {
-        let Some(info) = meta.node_info.get(&id) else { continue };
+        let Some(info) = meta.node_info.get(&id) else {
+            continue;
+        };
         if is_data_literal_container(&info.kind, language) {
             let count = info.children.len();
-            if count >= DATA_LITERAL_MIN_CHILDREN && best.is_none_or(|(best_count, _)| count > best_count) {
+            if count >= DATA_LITERAL_MIN_CHILDREN
+                && best.is_none_or(|(best_count, _)| count > best_count)
+            {
                 best = Some((count, id));
             }
         }
@@ -293,7 +327,10 @@ mod tests {
 
     #[test]
     fn large_flat_macro_body_is_myers_diffed() {
-        let mut args_before = (0..80).map(|i| format!("a{i}")).collect::<Vec<_>>().join(", ");
+        let mut args_before = (0..80)
+            .map(|i| format!("a{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         args_before.insert_str(0, "vec![");
         args_before.push(']');
         let mut args_after = (0..80).map(|i| format!("a{i}")).collect::<Vec<_>>();
@@ -312,11 +349,16 @@ mod tests {
 
         // The macro_invocation (vec!) itself should end up mapped, with the flat body
         // pre-matched via the "large_flat_subtree" reason before it was diffed.
-        let has_flat_reason = diff
-            .mapping
-            .values()
-            .any(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("large_flat_subtree")));
-        assert!(has_flat_reason, "expected at least one large_flat_subtree-reasoned mapping");
+        let has_flat_reason = diff.mapping.values().any(|m| {
+            matches!(
+                &m.reason,
+                crate::diff::ASTMappingReason::APTED("large_flat_subtree")
+            )
+        });
+        assert!(
+            has_flat_reason,
+            "expected at least one large_flat_subtree-reasoned mapping"
+        );
     }
 
     #[test]
@@ -345,8 +387,9 @@ mod tests {
     /// 3,075-combined-node file, vs. ~2ms once this pass can see it.
     #[test]
     fn large_flat_top_level_json_object_is_myers_diffed() {
-        let mut pairs_before: Vec<String> =
-            (0..80).map(|i| format!("\"key{i}\": \"value {i}\"")).collect();
+        let mut pairs_before: Vec<String> = (0..80)
+            .map(|i| format!("\"key{i}\": \"value {i}\""))
+            .collect();
         let mut pairs_after = pairs_before.clone();
         pairs_before.remove(40);
         let before_src = format!("{{{}}}", pairs_before.join(", "));
@@ -360,10 +403,12 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let has_flat_reason = diff
-            .mapping
-            .values()
-            .any(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("large_flat_subtree")));
+        let has_flat_reason = diff.mapping.values().any(|m| {
+            matches!(
+                &m.reason,
+                crate::diff::ASTMappingReason::APTED("large_flat_subtree")
+            )
+        });
         assert!(
             has_flat_reason,
             "expected the top-level JSON object's implicit identity to trigger the flat-subtree fast path"
@@ -401,8 +446,10 @@ mod tests {
     /// otherwise make the data table invisible to the plain widest-subtree-of-any-kind check.
     #[test]
     fn data_literal_table_is_myers_diffed_even_when_not_the_widest_subtree() {
-        let cases_before: String =
-            (0..15).map(|i| format!("{{name: \"case{i}\"}},")).collect::<Vec<_>>().join("\n");
+        let cases_before: String = (0..15)
+            .map(|i| format!("{{name: \"case{i}\"}},"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let mut cases_after: Vec<String> =
             (0..15).map(|i| format!("{{name: \"case{i}\"}},")).collect();
         cases_after[7] = "{name: \"changed\"},".to_string();
@@ -434,10 +481,12 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let has_flat_reason = diff
-            .mapping
-            .values()
-            .any(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("large_flat_subtree")));
+        let has_flat_reason = diff.mapping.values().any(|m| {
+            matches!(
+                &m.reason,
+                crate::diff::ASTMappingReason::APTED("large_flat_subtree")
+            )
+        });
         assert!(
             has_flat_reason,
             "expected the testCases table to be found and Myers-diffed despite not being the widest subtree"
@@ -454,8 +503,10 @@ mod tests {
     /// Myers fast path.
     #[test]
     fn named_subtest_inside_a_data_literal_function_is_prematched_by_name() {
-        let cases_before: String =
-            (0..15).map(|i| format!("{{name: \"case{i}\"}},")).collect::<Vec<_>>().join("\n");
+        let cases_before: String = (0..15)
+            .map(|i| format!("{{name: \"case{i}\"}},"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let mut cases_after: Vec<String> =
             (0..15).map(|i| format!("{{name: \"case{i}\"}},")).collect();
         cases_after[7] = "{name: \"changed\"},".to_string();
@@ -479,10 +530,12 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let has_syntax_named_reason = diff
-            .mapping
-            .values()
-            .any(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("syntax_named")));
+        let has_syntax_named_reason = diff.mapping.values().any(|m| {
+            matches!(
+                &m.reason,
+                crate::diff::ASTMappingReason::APTED("syntax_named")
+            )
+        });
         assert!(
             has_syntax_named_reason,
             "expected the independent t.Run(\"independent case\", ...) call to be pre-matched by name"

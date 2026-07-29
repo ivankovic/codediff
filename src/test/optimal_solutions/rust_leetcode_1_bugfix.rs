@@ -49,13 +49,16 @@ fn optimal_solution() -> Result<()> {
     let mapping = test::helper::mapping_for_path(&path, &path, before_root, after_root, &diff_ast)?;
     assert_eq!(mapping.operation, ASTMappingOperation::Identical);
 
-    assert!(test::helper::entire_path_has_mapping(
-        &["impl_item", "declaration_list", "function_item"],
-        before_root,
-        after_root,
-        &diff_ast,
-        ASTMappingOperation::MatchButNotIdentical
-    )?, "The impl_item declaration_list function_item path is not correctly mapped");
+    assert!(
+        test::helper::entire_path_has_mapping(
+            &["impl_item", "declaration_list", "function_item"],
+            before_root,
+            after_root,
+            &diff_ast,
+            ASTMappingOperation::MatchButNotIdentical
+        )?,
+        "The impl_item declaration_list function_item path is not correctly mapped"
+    );
 
     let path = vec![
         "impl_item",

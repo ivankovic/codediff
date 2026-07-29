@@ -303,7 +303,11 @@ mod tests {
     fn row_for(repo_path: &Path, commit: String, path: String) -> Row {
         Row {
             language: "Rust".to_string(),
-            repository: repo_path.file_name().unwrap().to_string_lossy().into_owned(),
+            repository: repo_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
             commit,
             path,
         }
@@ -383,10 +387,13 @@ mod tests {
         let third = materialize_row(&row, &repo_roots, output_dir.path())?;
         match third {
             Resolution::Create(dir) => {
-                assert_eq!(dir, first_dir.with_file_name(format!(
-                    "{}-2",
-                    first_dir.file_name().unwrap().to_string_lossy()
-                )));
+                assert_eq!(
+                    dir,
+                    first_dir.with_file_name(format!(
+                        "{}-2",
+                        first_dir.file_name().unwrap().to_string_lossy()
+                    ))
+                );
             }
             Resolution::AlreadyPresent(_) => panic!("content was tampered with, should not match"),
         }

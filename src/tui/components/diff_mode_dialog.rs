@@ -185,7 +185,13 @@ mod tests {
 
         let buffer = terminal.backend().buffer().clone();
         let rendered: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
-        assert!(rendered.contains("729"), "should show the before-side count: {rendered}");
-        assert!(rendered.contains("7309"), "should show the after-side count: {rendered}");
+        assert!(
+            rendered.contains("729"),
+            "should show the before-side count: {rendered}"
+        );
+        assert!(
+            rendered.contains("7309"),
+            "should show the after-side count: {rendered}"
+        );
     }
 }

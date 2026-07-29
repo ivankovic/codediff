@@ -288,14 +288,8 @@ mod tests {
     /// the size floor keeps commodity code out of move detection.
     #[test]
     fn tiny_identical_statements_do_not_move() {
-        let before = Code::from_string(
-            "fn a() { let x = 1; }\nfn c() {}\n",
-            &Language::Rust,
-        );
-        let after = Code::from_string(
-            "fn c() {}\nfn d() { let x = 1; }\n",
-            &Language::Rust,
-        );
+        let before = Code::from_string("fn a() { let x = 1; }\nfn c() {}\n", &Language::Rust);
+        let after = Code::from_string("fn c() {}\nfn d() { let x = 1; }\n", &Language::Rust);
 
         let diff = diff_code(&before, &after);
         let ast = diff.ast.unwrap();

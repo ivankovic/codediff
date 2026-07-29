@@ -268,7 +268,12 @@ impl CodeViewerState {
                     TextOperation::Identical | TextOperation::NotYetSet
                 ) && !range_match.source.is_empty()
             })
-            .map(|range_match| (range_match.source.start_row, range_match.source.start_column))
+            .map(|range_match| {
+                (
+                    range_match.source.start_row,
+                    range_match.source.start_column,
+                )
+            })
             .collect();
 
         if forward {
@@ -714,7 +719,10 @@ mod tests {
         let mut widget = CodeViewerWidget::default();
         assert!(widget.is_syntax_highlighting_enabled());
 
-        widget.load_contents(PathBuf::from("test.rs"), "fn main() { let x = 1; }".to_string());
+        widget.load_contents(
+            PathBuf::from("test.rs"),
+            "fn main() { let x = 1; }".to_string(),
+        );
         let line = &widget.highlighted_lines[0];
         assert!(
             line.spans.len() > 1,

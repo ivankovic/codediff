@@ -135,19 +135,19 @@ fn node_kind_for_id(root: Node, node_id: usize) -> String {
     if node_id == 0 {
         return "0".to_string();
     }
-    
+
     let mut stack = vec![root];
     while let Some(n) = stack.pop() {
         if n.id() == node_id {
             return n.kind().to_string();
         }
-        
+
         let mut cursor = n.walk();
         for child in n.children(&mut cursor) {
             stack.push(child);
         }
     }
-    
+
     "None".to_string()
 }
 
@@ -308,7 +308,11 @@ pub fn human_mapping_cost(
 * Convenience wrapper for callers (like `benchmark_optimal_solutions`) that only have a fixture
 * name and a `Code` pair, not an already-loaded `HumanMapping`/already-built `ASTMetadata`.
 */
-pub fn human_mapping_cost_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<u64> {
+pub fn human_mapping_cost_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<u64> {
     let mapping = load(name)?;
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
     let after_ast = after.ast.as_ref().context("After code has no AST")?;
@@ -335,7 +339,11 @@ pub fn human_mapping_cost_for(name: &str, before: &crate::code::Code, after: &cr
 /// `cost`/`reason` on the resulting `ASTMapping`s are placeholders - nothing that consumes a
 /// synthetic diff built this way needs them, only `operation` and the node-id maps
 /// (`ASTDiff::mapping_for_node`, which `diff::text::ranges` walks, only reads `operation`).
-pub fn as_ast_diff(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<ASTDiff> {
+pub fn as_ast_diff(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<ASTDiff> {
     let mapping = load(name)?;
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
     let after_ast = after.ast.as_ref().context("After code has no AST")?;
@@ -386,7 +394,9 @@ fn check_entry(
     mismatches: &mut Vec<String>,
 ) -> Result<()> {
     match entry.operation {
-        HumanOperation::Identical | HumanOperation::Update | HumanOperation::MatchButNotIdentical => {
+        HumanOperation::Identical
+        | HumanOperation::Update
+        | HumanOperation::MatchButNotIdentical => {
             let before_path = entry
                 .before_path
                 .as_ref()
@@ -420,8 +430,9 @@ fn check_entry(
                 return Ok(());
             }
 
-            let expected_op = expected_ast_operation(entry.operation)
-                .expect("Identical/Update/MatchButNotIdentical always have an expected ASTMappingOperation");
+            let expected_op = expected_ast_operation(entry.operation).expect(
+                "Identical/Update/MatchButNotIdentical always have an expected ASTMappingOperation",
+            );
             match diff_ast.mapping.get(&(before_node.id(), after_node.id())) {
                 Some(actual_mapping) if actual_mapping.operation == expected_op => {}
                 Some(actual_mapping) => mismatches.push(format!(
@@ -584,7 +595,12 @@ fn describe_nondeterminism(
     after_source: &str,
     language: &crate::code::Language,
 ) -> Vec<String> {
-    describe_nondeterminism_with_config(before_source, after_source, language, &crate::diff::HeuristicConfig::default())
+    describe_nondeterminism_with_config(
+        before_source,
+        after_source,
+        language,
+        &crate::diff::HeuristicConfig::default(),
+    )
 }
 
 /// Same as [`describe_nondeterminism`], but computes each of the three independent runs via
@@ -599,7 +615,9 @@ fn describe_nondeterminism_with_config(
     let mut mismatches = Vec::new();
     for run_number in 2..=3 {
         let repeat = diff_paths_with_config(before_source, after_source, language, config);
-        mismatches.extend(describe_path_map_differences(run_number, &baseline, &repeat));
+        mismatches.extend(describe_path_map_differences(
+            run_number, &baseline, &repeat,
+        ));
     }
     mismatches
 }
@@ -627,7 +645,10 @@ pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
 /// Same as [`compute_mismatches`], but forwards `config` to [`compute_mismatches_for_with_config`]
 /// - see [`crate::diff::HeuristicConfig`] for what it's for. Used by
 ///   `benchmark_optimal_solutions --details --no-solver-X`.
-pub fn compute_mismatches_with_config(name: &str, config: &crate::diff::HeuristicConfig) -> Result<Vec<String>> {
+pub fn compute_mismatches_with_config(
+    name: &str,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<Vec<String>> {
     let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
     let (before, after) = test_diffs
         .get(name)
@@ -656,8 +677,17 @@ pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Cod
 * still clones the *entire* map to hand back an owned one, which is O(fixture count) work just to
 * reach a single entry.
 */
-pub fn compute_mismatches_for(name: &str, before: &crate::code::Code, after: &crate::code::Code) -> Result<Vec<String>> {
-    compute_mismatches_for_with_config(name, before, after, &crate::diff::HeuristicConfig::default())
+pub fn compute_mismatches_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<Vec<String>> {
+    compute_mismatches_for_with_config(
+        name,
+        before,
+        after,
+        &crate::diff::HeuristicConfig::default(),
+    )
 }
 
 /// Same as [`compute_mismatches_for`], but computes codediff's diff (and its determinism check)
@@ -676,11 +706,13 @@ pub fn compute_mismatches_for_with_config(
 
     let node_cache = NodeCache::build(before, after);
     let language = before.metadata.language.unwrap_or_default();
-    let mut mismatches = describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config);
+    let mut mismatches =
+        describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config);
 
     // Check that the produced diff is valid
     if !diff_ast.is_valid(before, after, &node_cache) {
-        mismatches.push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
+        mismatches
+            .push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
     }
 
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
@@ -765,7 +797,10 @@ mod tests {
         let round_tripped: HumanMapping = serde_json::from_str(&json)?;
 
         assert_eq!(round_tripped.entries.len(), 2);
-        assert_eq!(round_tripped.entries[0].operation, HumanOperation::Identical);
+        assert_eq!(
+            round_tripped.entries[0].operation,
+            HumanOperation::Identical
+        );
         assert!(round_tripped.entries[0].after_path.is_some());
         assert_eq!(
             round_tripped.entries[1].operation,
@@ -894,7 +929,8 @@ mod tests {
     /// comparator): identical source parsed three independent times must fully agree.
     #[test]
     fn describe_nondeterminism_is_empty_for_stable_source() {
-        let report = describe_nondeterminism("fn f() { 1 + 1; }", "fn f() { 1 + 1; }", &Language::Rust);
+        let report =
+            describe_nondeterminism("fn f() { 1 + 1; }", "fn f() { 1 + 1; }", &Language::Rust);
         assert!(report.is_empty(), "{report:?}");
     }
 }

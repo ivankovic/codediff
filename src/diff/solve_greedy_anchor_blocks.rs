@@ -113,7 +113,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     let after_metadata = crate::code::metadata::metadata_of(after);
     let language = before_metadata.language;
 
-    let before_candidate_ids = collect_candidates(&before_metadata, &diff.before_node_map, &language);
+    let before_candidate_ids =
+        collect_candidates(&before_metadata, &diff.before_node_map, &language);
     let after_candidate_ids = collect_candidates(&after_metadata, &diff.after_node_map, &language);
     if before_candidate_ids.is_empty() || after_candidate_ids.is_empty() {
         return;
@@ -135,7 +136,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         &before_candidates,
         &after_candidates,
         |before_id, after_id| {
-            cost_ratio(before_id, after_id, &before_metadata, &after_metadata).unwrap_or(f64::INFINITY)
+            cost_ratio(before_id, after_id, &before_metadata, &after_metadata)
+                .unwrap_or(f64::INFINITY)
         },
         Some(MAX_COST_RATIO),
         |before_id, after_id, diff| {
@@ -164,7 +166,11 @@ type PositionalKey = (Option<usize>, Vec<String>);
 /// `diff.before_node_map` - translated to that parent's after-side counterpart, so this is directly
 /// comparable to a `positional_key_after` result on the other side. Falls back to `None` (the file
 /// root) if no matched ancestor is found.
-fn positional_key_before(before_id: usize, before_metadata: &ASTMetadata, diff: &ASTDiff) -> PositionalKey {
+fn positional_key_before(
+    before_id: usize,
+    before_metadata: &ASTMetadata,
+    diff: &ASTDiff,
+) -> PositionalKey {
     let mut path = vec![node_kind(before_id, before_metadata)];
     let mut cur = before_id;
     loop {
@@ -185,7 +191,11 @@ fn positional_key_before(before_id: usize, before_metadata: &ASTMetadata, diff: 
 /// `after_metadata.node_to_parent` until it reaches a parent already present in
 /// `diff.after_node_map` - used directly as the anchor id (no translation needed: it's already an
 /// after-side id, the same coordinate space `positional_key_before` translates into).
-fn positional_key_after(after_id: usize, after_metadata: &ASTMetadata, diff: &ASTDiff) -> PositionalKey {
+fn positional_key_after(
+    after_id: usize,
+    after_metadata: &ASTMetadata,
+    diff: &ASTDiff,
+) -> PositionalKey {
     let mut path = vec![node_kind(after_id, after_metadata)];
     let mut cur = after_id;
     loop {
@@ -203,7 +213,11 @@ fn positional_key_after(after_id: usize, after_metadata: &ASTMetadata, diff: &AS
 }
 
 fn node_kind(id: usize, metadata: &ASTMetadata) -> String {
-    metadata.node_info.get(&id).map(|info| info.kind.clone()).unwrap_or_default()
+    metadata
+        .node_info
+        .get(&id)
+        .map(|info| info.kind.clone())
+        .unwrap_or_default()
 }
 
 /// Every not-yet-matched node in `metadata` that is both a recognized block container (see
@@ -227,8 +241,13 @@ fn collect_candidates(
         })
         .map(|(&id, _)| id)
         .collect();
-    candidates
-        .sort_by_key(|id| metadata.node_info.get(id).map(|info| info.preorder_index).unwrap_or(0));
+    candidates.sort_by_key(|id| {
+        metadata
+            .node_info
+            .get(id)
+            .map(|info| info.preorder_index)
+            .unwrap_or(0)
+    });
     candidates
 }
 
@@ -285,11 +304,23 @@ fn sequence_edit_cost(
 
     let before_weights: Vec<u64> = before_children
         .iter()
-        .map(|id| before_metadata.node_to_subtree_size.get(id).copied().unwrap_or(1) as u64)
+        .map(|id| {
+            before_metadata
+                .node_to_subtree_size
+                .get(id)
+                .copied()
+                .unwrap_or(1) as u64
+        })
         .collect();
     let after_weights: Vec<u64> = after_children
         .iter()
-        .map(|id| after_metadata.node_to_subtree_size.get(id).copied().unwrap_or(1) as u64)
+        .map(|id| {
+            after_metadata
+                .node_to_subtree_size
+                .get(id)
+                .copied()
+                .unwrap_or(1) as u64
+        })
         .collect();
 
     let n = before_children.len();
@@ -302,7 +333,9 @@ fn sequence_edit_cost(
         dp[0][j] = dp[0][j - 1] + after_weights[j - 1];
     }
     for i in 1..=n {
-        let before_hash = before_metadata.node_to_full_hash.get(&before_children[i - 1]);
+        let before_hash = before_metadata
+            .node_to_full_hash
+            .get(&before_children[i - 1]);
         for j in 1..=m {
             let after_hash = after_metadata.node_to_full_hash.get(&after_children[j - 1]);
             dp[i][j] = if before_hash.is_some() && before_hash == after_hash {
@@ -331,11 +364,18 @@ mod tests {
         let before_metadata = crate::code::metadata::metadata_of(&before);
         let after_metadata = crate::code::metadata::metadata_of(&after);
 
-        let before_block = first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
-        let after_block = first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let before_block =
+            first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let after_block =
+            first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
 
-        let cost =
-            sequence_edit_cost(before_block.id(), after_block.id(), &before_metadata, &after_metadata).unwrap();
+        let cost = sequence_edit_cost(
+            before_block.id(),
+            after_block.id(),
+            &before_metadata,
+            &after_metadata,
+        )
+        .unwrap();
         assert_eq!(cost, 0);
     }
 
@@ -348,23 +388,48 @@ mod tests {
         let before_metadata = crate::code::metadata::metadata_of(&before);
         let after_metadata = crate::code::metadata::metadata_of(&after);
 
-        let before_block = first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
-        let after_block = first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let before_block =
+            first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let after_block =
+            first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
 
-        let cost =
-            sequence_edit_cost(before_block.id(), after_block.id(), &before_metadata, &after_metadata).unwrap();
+        let cost = sequence_edit_cost(
+            before_block.id(),
+            after_block.id(),
+            &before_metadata,
+            &after_metadata,
+        )
+        .unwrap();
         let before_stmt_size = *before_metadata
             .node_to_subtree_size
-            .get(&before_metadata.node_info.get(&before_block.id()).unwrap().children[1])
+            .get(
+                &before_metadata
+                    .node_info
+                    .get(&before_block.id())
+                    .unwrap()
+                    .children[1],
+            )
             .unwrap();
         let after_stmt_size = *after_metadata
             .node_to_subtree_size
-            .get(&after_metadata.node_info.get(&after_block.id()).unwrap().children[1])
+            .get(
+                &after_metadata
+                    .node_info
+                    .get(&after_block.id())
+                    .unwrap()
+                    .children[1],
+            )
             .unwrap();
         assert_eq!(cost, (before_stmt_size + after_stmt_size) as u64);
         assert!(cost > 0);
-        let whole_block_size = *before_metadata.node_to_subtree_size.get(&before_block.id()).unwrap();
-        assert!((cost as usize) < whole_block_size, "changing one statement should be far cheaper than the whole block");
+        let whole_block_size = *before_metadata
+            .node_to_subtree_size
+            .get(&before_block.id())
+            .unwrap();
+        assert!(
+            (cost as usize) < whole_block_size,
+            "changing one statement should be far cheaper than the whole block"
+        );
     }
 
     #[test]
@@ -384,8 +449,10 @@ mod tests {
 
         // Match everything except the `if` block's own body - simulating an earlier pass having
         // already resolved the function signature but not descended into an unnamed `if`.
-        let before_fn = first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "function_item").unwrap();
-        let after_fn = first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "function_item").unwrap();
+        let before_fn =
+            first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "function_item").unwrap();
+        let after_fn =
+            first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "function_item").unwrap();
         diff.add_mapping(
             before_fn.id(),
             after_fn.id(),
@@ -411,7 +478,8 @@ mod tests {
 
     #[test]
     fn completely_different_blocks_are_not_anchored() {
-        let before_src = "fn f() {\n    let a = 1;\n    let b = 2;\n    let c = 3;\n    let d = 4;\n}\n";
+        let before_src =
+            "fn f() {\n    let a = 1;\n    let b = 2;\n    let c = 3;\n    let d = 4;\n}\n";
         let after_src = "fn g() {\n    println!(\"one\");\n    println!(\"two\");\n    println!(\"three\");\n    println!(\"four\");\n}\n";
         let before = Code::from_string(before_src, &Language::Rust);
         let after = Code::from_string(after_src, &Language::Rust);
@@ -420,10 +488,14 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let before_block = first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
-        let after_block = first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let before_block =
+            first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
+        let after_block =
+            first_child_of_kind(after.ast.as_ref().unwrap().root_node(), "block").unwrap();
         assert!(
-            !diff.mapping.contains_key(&(before_block.id(), after_block.id())),
+            !diff
+                .mapping
+                .contains_key(&(before_block.id(), after_block.id())),
             "blocks with no shared content should not be anchored"
         );
     }
@@ -448,16 +520,22 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let before_if = first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "if_expression").unwrap();
+        let before_if =
+            first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "if_expression").unwrap();
         let before_block = first_child_of_kind(before_if, "block").unwrap();
         let after_root = after.ast.as_ref().unwrap().root_node();
-        let after_inner_if = first_child_of_kind(first_child_of_kind(after_root, "if_expression").unwrap(), "if_expression").unwrap();
+        let after_inner_if = first_child_of_kind(
+            first_child_of_kind(after_root, "if_expression").unwrap(),
+            "if_expression",
+        )
+        .unwrap();
         let after_block = first_child_of_kind(after_inner_if, "block").unwrap();
 
         assert!(
-            !diff.mapping.contains_key(&(before_block.id(), after_block.id())),
+            !diff
+                .mapping
+                .contains_key(&(before_block.id(), after_block.id())),
             "blocks at different structural depths (different kind-paths) should not be anchored"
         );
     }
-
 }

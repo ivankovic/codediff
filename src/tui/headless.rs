@@ -96,7 +96,11 @@ fn lines_to_keep(ops: &[TextOperation], context: usize) -> Vec<bool> {
 /// instead of the enclosing function - not what a human orienting themselves in a hunk wants.
 /// `is_semantically_structural` only matches nodes with an actual name (functions, structs,
 /// classes, impls, ...), which is a closer match for "parts of code humans think about."
-fn nearest_reference_line(code: &Code, language: &crate::code::Language, row: usize) -> Option<usize> {
+fn nearest_reference_line(
+    code: &Code,
+    language: &crate::code::Language,
+    row: usize,
+) -> Option<usize> {
     let root = code.ast.as_ref()?.root_node();
     let point = tree_sitter::Point::new(row, 0);
     let mut node = root.descendant_for_point_range(point, point)?;
@@ -122,7 +126,13 @@ fn nearest_reference_line(code: &Code, language: &crate::code::Language, row: us
 /// and duplicating that parse here (rather than threading the AST through the diff pipeline just
 /// for this) keeps this purely a headless-rendering concern. Headless mode isn't on any hot path,
 /// so the redundant parse is an acceptable trade for that isolation.
-fn render_side(contents: &str, ranges: &[RangeMatch], side_is_before: bool, use_color: bool, path: &Path) -> String {
+fn render_side(
+    contents: &str,
+    ranges: &[RangeMatch],
+    side_is_before: bool,
+    use_color: bool,
+    path: &Path,
+) -> String {
     let lines: Vec<&str> = contents.split('\n').collect();
     let ops = line_operations(ranges, lines.len());
     let keep = lines_to_keep(&ops, CONTEXT_LINES);
@@ -140,7 +150,10 @@ fn render_side(contents: &str, ranges: &[RangeMatch], side_is_before: bool, use_
                 i += 1;
             }
             let skipped = i - run_start;
-            let elision = format!("      ... {skipped} unchanged line{} ...", if skipped == 1 { "" } else { "s" });
+            let elision = format!(
+                "      ... {skipped} unchanged line{} ...",
+                if skipped == 1 { "" } else { "s" }
+            );
             if use_color {
                 out.push_str(&format!("\u{1b}[90m{elision}\u{1b}[0m\n"));
             } else {
@@ -248,7 +261,9 @@ mod tests {
         let keep = lines_to_keep(&ops, 2);
         assert_eq!(
             keep,
-            vec![false, false, false, true, true, true, true, true, false, false]
+            vec![
+                false, false, false, true, true, true, true, true, false, false
+            ]
         );
     }
 
@@ -326,7 +341,12 @@ mod tests {
         let changed_row = 11;
         let ranges = vec![RangeMatch {
             source: crate::diff::text_range::TextRange::new(changed_row, 0, changed_row + 1, 0),
-            destination: crate::diff::text_range::TextRange::new(changed_row, 0, changed_row + 1, 0),
+            destination: crate::diff::text_range::TextRange::new(
+                changed_row,
+                0,
+                changed_row + 1,
+                0,
+            ),
             operation: TextOperation::Delete,
         }];
         (lines.join("\n"), ranges)
@@ -341,7 +361,10 @@ mod tests {
         // and the enclosing `fn` (row 4).
         let ref_row = nearest_reference_line(&code, &crate::code::Language::Rust, 11)
             .expect("a Rust function should be found enclosing this row");
-        assert_eq!(ref_row, 4, "should find `fn parse_args`, not the nearer `if`");
+        assert_eq!(
+            ref_row, 4,
+            "should find `fn parse_args`, not the nearer `if`"
+        );
     }
 
     #[test]
@@ -415,20 +438,31 @@ mod tests {
         format!(
             "=== before: before.rs ===\n{}{}\n{}{}\n{}{}\n{}{}\n\
              === after: after.rs ===\n{}{}\n{}{}\n{}{}\n{}{}\n",
-            "  ", "fn main() {",
-            "- ", "    old_call();",
-            "  ", "    same();",
-            "  ", "}",
-            "  ", "fn main() {",
-            "+ ", "    new_call();",
-            "  ", "    same();",
-            "  ", "}",
+            "  ",
+            "fn main() {",
+            "- ",
+            "    old_call();",
+            "  ",
+            "    same();",
+            "  ",
+            "}",
+            "  ",
+            "fn main() {",
+            "+ ",
+            "    new_call();",
+            "  ",
+            "    same();",
+            "  ",
+            "}",
         )
     }
 
     #[test]
     fn render_text_diff_without_color_shows_both_sides_with_markers() {
-        assert_eq!(render_text_diff(&sample_data(), false), expected_plain_text());
+        assert_eq!(
+            render_text_diff(&sample_data(), false),
+            expected_plain_text()
+        );
     }
 
     #[test]
@@ -436,8 +470,14 @@ mod tests {
         let text = render_text_diff(&sample_data(), true);
         let deleted = format!("\u{1b}[31m{}{}\u{1b}[0m", "- ", "    old_call();");
         let inserted = format!("\u{1b}[32m{}{}\u{1b}[0m", "+ ", "    new_call();");
-        assert!(text.contains(&deleted), "deleted-side line should be red: {text}");
-        assert!(text.contains(&inserted), "inserted-side line should be green: {text}");
+        assert!(
+            text.contains(&deleted),
+            "deleted-side line should be red: {text}"
+        );
+        assert!(
+            text.contains(&inserted),
+            "inserted-side line should be green: {text}"
+        );
         assert_eq!(
             text.matches('\u{1b}').count(),
             4,

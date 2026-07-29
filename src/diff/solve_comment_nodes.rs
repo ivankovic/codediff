@@ -40,7 +40,8 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let matched_before_ids: HashSet<usize> = diff.before_node_map.keys().cloned().collect();
     let matched_after_ids: HashSet<usize> = diff.after_node_map.keys().cloned().collect();
 
-    let current_mappings: Vec<(usize, usize)> = diff.before_node_map.iter().map(|(&k, &v)| (k, v)).collect();
+    let current_mappings: Vec<(usize, usize)> =
+        diff.before_node_map.iter().map(|(&k, &v)| (k, v)).collect();
 
     for (before_id, after_id) in current_mappings {
         // Skip if either node is 0 (delete/insert)
@@ -56,10 +57,16 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             continue;
         };
 
-        let before_comment = find_immediate_preceding_comment_sibling(before_node, &matched_before_ids);
-        let after_comment = find_immediate_preceding_comment_sibling(after_node, &matched_after_ids);
+        let before_comment =
+            find_immediate_preceding_comment_sibling(before_node, &matched_before_ids);
+        let after_comment =
+            find_immediate_preceding_comment_sibling(after_node, &matched_after_ids);
 
-        if let (Some((before_comment_node, before_comment_id)), Some((after_comment_node, after_comment_id))) = (before_comment, after_comment) {
+        if let (
+            Some((before_comment_node, before_comment_id)),
+            Some((after_comment_node, after_comment_id)),
+        ) = (before_comment, after_comment)
+        {
             // Check if the comment text is identical
             let before_text = before_comment_node.utf8_text(before_src).unwrap_or("");
             let after_text = after_comment_node.utf8_text(after_src).unwrap_or("");
@@ -102,7 +109,8 @@ fn find_immediate_preceding_comment_sibling<'a>(
         if child.id() == node_id {
             let prev = prev_sibling?;
             let prev_id = prev.id();
-            return (is_comment(prev.kind()) && !already_matched.contains(&prev_id)).then_some((prev, prev_id));
+            return (is_comment(prev.kind()) && !already_matched.contains(&prev_id))
+                .then_some((prev, prev_id));
         }
         prev_sibling = Some(child);
     }
@@ -147,7 +155,9 @@ mod tests {
             &Language::Rust,
         );
 
-        let diff = crate::diff::diff_code(&before, &after).ast.expect("ast diff");
+        let diff = crate::diff::diff_code(&before, &after)
+            .ast
+            .expect("ast diff");
 
         let comment_mapping = diff
             .mapping

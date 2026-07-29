@@ -136,7 +136,11 @@ async fn main() -> Result<()> {
             "stdout is not a terminal and no files were given - pass BEFORE and AFTER to run in \
             text mode, or run from a real terminal to use the interactive viewer",
         )?;
-        let mode = if args.exact { DiffMode::Exact } else { DiffMode::Fast };
+        let mode = if args.exact {
+            DiffMode::Exact
+        } else {
+            DiffMode::Fast
+        };
         return tui::headless::run(&before, &after, use_color(), mode);
     }
 
@@ -205,7 +209,10 @@ mod tests {
         ];
         assert_eq!(
             resolve_before_after(&paths).unwrap(),
-            Some((PathBuf::from("/dev/null"), PathBuf::from("/tmp/git-blob-BBBB/foo.rs")))
+            Some((
+                PathBuf::from("/dev/null"),
+                PathBuf::from("/tmp/git-blob-BBBB/foo.rs")
+            ))
         );
     }
 
@@ -241,7 +248,10 @@ mod tests {
     #[test]
     fn batch_flag_is_a_clap_alias_for_headless() {
         let args = Args::try_parse_from(["codediff", "--batch"]).expect("--batch should parse");
-        assert!(args.headless, "--batch should set the same field as --headless");
+        assert!(
+            args.headless,
+            "--batch should set the same field as --headless"
+        );
     }
 
     #[test]

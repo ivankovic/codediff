@@ -18,7 +18,9 @@
 
 use crate::code::{ASTMetadata, ASTNodeMetadata};
 
-use super::common::{ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel};
+use super::common::{
+    ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel,
+};
 
 /// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
 /// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
@@ -443,11 +445,26 @@ impl<'a> EngineCtx<'a> {
     fn sides(
         &self,
         path_is_before: bool,
-    ) -> (&'a AptedIndexer, &'a AptedIndexer, &'a ASTMetadata, &'a ASTMetadata) {
+    ) -> (
+        &'a AptedIndexer,
+        &'a AptedIndexer,
+        &'a ASTMetadata,
+        &'a ASTMetadata,
+    ) {
         if path_is_before {
-            (self.before_idx, self.after_idx, self.before_meta, self.after_meta)
+            (
+                self.before_idx,
+                self.after_idx,
+                self.before_meta,
+                self.after_meta,
+            )
         } else {
-            (self.after_idx, self.before_idx, self.after_meta, self.before_meta)
+            (
+                self.after_idx,
+                self.before_idx,
+                self.after_meta,
+                self.before_meta,
+            )
         }
     }
 }
@@ -1206,7 +1223,13 @@ pub(crate) fn compute_keyroots(
         let parent = idx.parents[path_node] as usize;
         for &child in &idx.children[parent] {
             if child != path_node {
-                compute_keyroots(idx, dir, child, pre_to_extreme_leaf(idx, dir, child), keyroots);
+                compute_keyroots(
+                    idx,
+                    dir,
+                    child,
+                    pre_to_extreme_leaf(idx, dir, child),
+                    keyroots,
+                );
             }
         }
         path_node = parent;
@@ -1350,7 +1373,13 @@ pub(crate) fn spf_path(
         // extreme leaf - that child would then never get its own aligned (tree-vs-tree)
         // boundary, exactly the boundary `compute_edit_mapping`'s backtrace later depends on.
         for &root in &other_idx.children[0] {
-            compute_keyroots(other_idx, dir, root, pre_to_extreme_leaf(other_idx, dir, root), &mut keyroots);
+            compute_keyroots(
+                other_idx,
+                dir,
+                root,
+                pre_to_extreme_leaf(other_idx, dir, root),
+                &mut keyroots,
+            );
         }
     } else {
         compute_keyroots(

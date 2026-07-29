@@ -19,13 +19,13 @@ use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
-use crate::code::{Code, Language};
 use crate::code::metadata::metadata_of;
+use crate::code::{Code, Language};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::nodes::flow_control_similarity_of_sets;
 use crate::diff::{
-    ASTDiff, NodeCache, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks, solve_large_flat_subtrees,
-    solve_similar_flow_control,
+    ASTDiff, NodeCache, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks,
+    solve_large_flat_subtrees, solve_similar_flow_control,
 };
 
 /**
@@ -100,13 +100,23 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
     let after_metadata = metadata_of(after);
     let language = before_metadata.language;
 
-    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else { return };
-    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else { return };
+    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
+    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
 
     let before_groups = collect_fully_resolved_groups(before_root, &language, before);
     let after_groups = collect_fully_resolved_groups(after_root, &language, after);
 
-    match_named_groups(before_groups, after_groups, &before_metadata, &after_metadata, diff);
+    match_named_groups(
+        before_groups,
+        after_groups,
+        &before_metadata,
+        &after_metadata,
+        diff,
+    );
 }
 
 /// Same matching as [`solve_named_reference_groups`], but scoped to an arbitrary `(before_root,
@@ -136,12 +146,26 @@ pub(crate) fn solve_named_reference_groups_within(
 ) {
     let language = before_metadata.language;
 
-    let before_groups =
-        collect_fully_resolved_groups_excluding_root(before_root, before_root_id, &language, before_code);
-    let after_groups =
-        collect_fully_resolved_groups_excluding_root(after_root, after_root_id, &language, after_code);
+    let before_groups = collect_fully_resolved_groups_excluding_root(
+        before_root,
+        before_root_id,
+        &language,
+        before_code,
+    );
+    let after_groups = collect_fully_resolved_groups_excluding_root(
+        after_root,
+        after_root_id,
+        &language,
+        after_code,
+    );
 
-    match_named_groups(before_groups, after_groups, before_metadata, after_metadata, diff);
+    match_named_groups(
+        before_groups,
+        after_groups,
+        before_metadata,
+        after_metadata,
+        diff,
+    );
 }
 
 /// Shared by [`solve_named_reference_groups`] and [`solve_named_reference_groups_within`]: flatten
@@ -160,22 +184,41 @@ fn match_named_groups(
     // `preorder_index` to satisfy its determinism contract - `collect_fully_resolved_groups`'
     // per-key `Vec`s are already in document order, but the flattened union across keys needs
     // its own global sort (`HashMap` key iteration order is not deterministic).
-    let mut before_candidates: Vec<(usize, (String, String))> =
-        before_groups.iter().flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone()))).collect();
-    before_candidates
-        .sort_by_key(|(id, _)| before_metadata.node_info.get(id).map(|i| i.preorder_index).unwrap_or(usize::MAX));
-    let mut after_candidates: Vec<(usize, (String, String))> =
-        after_groups.iter().flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone()))).collect();
-    after_candidates
-        .sort_by_key(|(id, _)| after_metadata.node_info.get(id).map(|i| i.preorder_index).unwrap_or(usize::MAX));
+    let mut before_candidates: Vec<(usize, (String, String))> = before_groups
+        .iter()
+        .flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone())))
+        .collect();
+    before_candidates.sort_by_key(|(id, _)| {
+        before_metadata
+            .node_info
+            .get(id)
+            .map(|i| i.preorder_index)
+            .unwrap_or(usize::MAX)
+    });
+    let mut after_candidates: Vec<(usize, (String, String))> = after_groups
+        .iter()
+        .flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone())))
+        .collect();
+    after_candidates.sort_by_key(|(id, _)| {
+        after_metadata
+            .node_info
+            .get(id)
+            .map(|i| i.preorder_index)
+            .unwrap_or(usize::MAX)
+    });
 
     grouped_greedy_matcher::solve(
         diff,
         &before_candidates,
         &after_candidates,
         |before_id, after_id| {
-            solve_greedy_anchor_blocks::cost_ratio(before_id, after_id, before_metadata, after_metadata)
-                .unwrap_or(0.0)
+            solve_greedy_anchor_blocks::cost_ratio(
+                before_id,
+                after_id,
+                before_metadata,
+                after_metadata,
+            )
+            .unwrap_or(0.0)
         },
         None,
         |before_id, after_id, diff| {
@@ -239,8 +282,11 @@ fn collect_fully_resolved_groups_rec(
 ) {
     let mut pushed_scope = false;
     if let Some((kind, name)) = nodes::is_semantically_structural(&node, language, code) {
-        let full_name =
-            if scope.is_empty() { name.clone() } else { format!("{}::{}", scope.join("::"), name) };
+        let full_name = if scope.is_empty() {
+            name.clone()
+        } else {
+            format!("{}::{}", scope.join("::"), name)
+        };
         out.entry((kind, full_name)).or_default().push(node.id());
         scope.push(name);
         pushed_scope = true;
@@ -287,29 +333,48 @@ fn solve_import_list_overlap(before: &Code, after: &Code, diff: &mut ASTDiff) {
         return;
     }
 
-    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else { return };
-    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else { return };
+    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
+    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
 
-    let before_items = collect_rust_grouped_use_declarations(before_root, before, &diff.before_node_map);
-    let after_items = collect_rust_grouped_use_declarations(after_root, after, &diff.after_node_map);
+    let before_items =
+        collect_rust_grouped_use_declarations(before_root, before, &diff.before_node_map);
+    let after_items =
+        collect_rust_grouped_use_declarations(after_root, after, &diff.after_node_map);
     if before_items.is_empty() || after_items.is_empty() {
         return;
     }
 
-    let before_candidates: Vec<(usize, String)> =
-        before_items.iter().map(|(id, path, _)| (*id, path.clone())).collect();
-    let after_candidates: Vec<(usize, String)> =
-        after_items.iter().map(|(id, path, _)| (*id, path.clone())).collect();
-    let before_symbols: HashMap<usize, &HashSet<&str>> =
-        before_items.iter().map(|(id, _, symbols)| (*id, symbols)).collect();
-    let after_symbols: HashMap<usize, &HashSet<&str>> =
-        after_items.iter().map(|(id, _, symbols)| (*id, symbols)).collect();
+    let before_candidates: Vec<(usize, String)> = before_items
+        .iter()
+        .map(|(id, path, _)| (*id, path.clone()))
+        .collect();
+    let after_candidates: Vec<(usize, String)> = after_items
+        .iter()
+        .map(|(id, path, _)| (*id, path.clone()))
+        .collect();
+    let before_symbols: HashMap<usize, &HashSet<&str>> = before_items
+        .iter()
+        .map(|(id, _, symbols)| (*id, symbols))
+        .collect();
+    let after_symbols: HashMap<usize, &HashSet<&str>> = after_items
+        .iter()
+        .map(|(id, _, symbols)| (*id, symbols))
+        .collect();
 
     grouped_greedy_matcher::solve(
         diff,
         &before_candidates,
         &after_candidates,
-        |before_id, after_id| 1.0 - flow_control_similarity_of_sets(before_symbols[&before_id], after_symbols[&after_id]),
+        |before_id, after_id| {
+            1.0 - flow_control_similarity_of_sets(
+                before_symbols[&before_id],
+                after_symbols[&after_id],
+            )
+        },
         Some(1.0 - IMPORT_LIST_SIMILARITY_THRESHOLD),
         |before_id, after_id, diff| {
             apted::for_nodes(
@@ -410,7 +475,11 @@ impl Bar { fn new() -> Bar { Bar::default() } }
             &diff,
         )
         .unwrap();
-        assert_eq!(foo_new_mapping.operation, ASTMappingOperation::Identical, "Foo::new should be identical");
+        assert_eq!(
+            foo_new_mapping.operation,
+            ASTMappingOperation::Identical,
+            "Foo::new should be identical"
+        );
 
         let bar_new_mapping = crate::test::helper::mapping_for_path(
             &["impl_item:2", "declaration_list", "function_item"],
@@ -459,7 +528,12 @@ func TestThings(t *testing.T) {
         let syntax_named_count = diff
             .mapping
             .values()
-            .filter(|m| matches!(&m.reason, crate::diff::ASTMappingReason::APTED("syntax_named")))
+            .filter(|m| {
+                matches!(
+                    &m.reason,
+                    crate::diff::ASTMappingReason::APTED("syntax_named")
+                )
+            })
             .count();
         assert!(
             syntax_named_count >= 2,
@@ -511,7 +585,10 @@ impl Foo { fn b() -> i32 { 20 } }
             })
             .filter(|n| diff.before_node_map.contains_key(&n.id()))
             .count();
-        assert_eq!(mapped_fn_count, 2, "both overloaded-name functions should be mapped");
+        assert_eq!(
+            mapped_fn_count, 2,
+            "both overloaded-name functions should be mapped"
+        );
     }
 
     #[test]
@@ -527,8 +604,11 @@ impl Foo { fn b() -> i32 { 20 } }
         let mut diff = ASTDiff::default();
         solve(&before, &after, &node_cache, &mut diff, true);
 
-        let before_use = find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
-        let after_use = find_first_of_kind(after.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
+        let before_use =
+            find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")
+                .unwrap();
+        let after_use =
+            find_first_of_kind(after.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
         assert_eq!(
             diff.before_node_map.get(&before_use.id()),
             Some(&after_use.id()),
@@ -546,7 +626,9 @@ impl Foo { fn b() -> i32 { 20 } }
         let mut diff = ASTDiff::default();
         solve(&before, &after, &node_cache, &mut diff, true);
 
-        let before_use = find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration").unwrap();
+        let before_use =
+            find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")
+                .unwrap();
         assert!(
             !diff.before_node_map.contains_key(&before_use.id()),
             "use statements with zero symbol overlap should not be matched by this pass"

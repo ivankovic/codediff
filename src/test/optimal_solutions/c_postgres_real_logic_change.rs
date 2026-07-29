@@ -43,5 +43,8 @@ fn optimal_solution() -> Result<()> {
     //
     //    TODO: Deal with mutli-to-multi mapps. We can't represent this either in the mapping or
     //    visually at this time!
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit("c-postgres-real-logic-change", 28)
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "c-postgres-real-logic-change",
+        28,
+    )
 }

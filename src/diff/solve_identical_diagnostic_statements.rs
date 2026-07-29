@@ -59,16 +59,21 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 
-    let Some(before_ast) = before.ast.as_ref() else { return };
-    let Some(after_ast) = after.ast.as_ref() else { return };
+    let Some(before_ast) = before.ast.as_ref() else {
+        return;
+    };
+    let Some(after_ast) = after.ast.as_ref() else {
+        return;
+    };
     let language = before_metadata.language;
 
     let before_source = before.contents.as_bytes();
     let after_source = after.contents.as_bytes();
 
-    let before_candidates = collect_unmatched(before_ast.root_node(), &diff.before_node_map, |node| {
-        is_diagnostic_statement(node, &language, before_source)
-    });
+    let before_candidates =
+        collect_unmatched(before_ast.root_node(), &diff.before_node_map, |node| {
+            is_diagnostic_statement(node, &language, before_source)
+        });
     let after_candidates = collect_unmatched(after_ast.root_node(), &diff.after_node_map, |node| {
         is_diagnostic_statement(node, &language, after_source)
     });
@@ -90,8 +95,16 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     // and consistent with the rest of the pipeline.
     let mut before_candidates = before_candidates;
     before_candidates.sort_by(|a, b| {
-        let size_a = before_metadata.node_to_subtree_size.get(&a.id()).copied().unwrap_or(0);
-        let size_b = before_metadata.node_to_subtree_size.get(&b.id()).copied().unwrap_or(0);
+        let size_a = before_metadata
+            .node_to_subtree_size
+            .get(&a.id())
+            .copied()
+            .unwrap_or(0);
+        let size_b = before_metadata
+            .node_to_subtree_size
+            .get(&b.id())
+            .copied()
+            .unwrap_or(0);
         size_b.cmp(&size_a)
     });
 
@@ -99,10 +112,18 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         if diff.before_node_map.contains_key(&before_node.id()) {
             continue;
         }
-        let Some(hash) = before_metadata.node_to_full_hash.get(&before_node.id()) else { continue };
-        let Some(queue) = after_by_hash.get_mut(hash) else { continue };
-        let Some(after_node_id) = queue.pop_front() else { continue };
-        let Some(after_node) = node_cache.after.get(&after_node_id).copied() else { continue };
+        let Some(hash) = before_metadata.node_to_full_hash.get(&before_node.id()) else {
+            continue;
+        };
+        let Some(queue) = after_by_hash.get_mut(hash) else {
+            continue;
+        };
+        let Some(after_node_id) = queue.pop_front() else {
+            continue;
+        };
+        let Some(after_node) = node_cache.after.get(&after_node_id).copied() else {
+            continue;
+        };
 
         diff.add_mapping(
             before_node.id(),
@@ -206,7 +227,9 @@ fn b() {
         let after_log = find_first_of_kind(after_ast.root_node(), "macro_invocation").unwrap();
 
         assert!(
-            !diff.mapping.contains_key(&(before_log.id(), after_log.id())),
+            !diff
+                .mapping
+                .contains_key(&(before_log.id(), after_log.id())),
             "non-identical diagnostic statements should not be matched by this pass"
         );
     }
@@ -238,7 +261,9 @@ fn b() {
         let after_call = find_first_of_kind(after_ast.root_node(), "call_expression").unwrap();
 
         assert!(
-            !diff.mapping.contains_key(&(before_call.id(), after_call.id())),
+            !diff
+                .mapping
+                .contains_key(&(before_call.id(), after_call.id())),
             "non-diagnostic calls should not be matched by this pass, even if identical"
         );
     }
@@ -272,7 +297,11 @@ fn b() {
         let after_ast = after.ast.as_ref().unwrap();
         let mut before_bails = Vec::new();
         let mut after_bails = Vec::new();
-        find_all(before_ast.root_node(), "macro_invocation", &mut before_bails);
+        find_all(
+            before_ast.root_node(),
+            "macro_invocation",
+            &mut before_bails,
+        );
         find_all(after_ast.root_node(), "macro_invocation", &mut after_bails);
         assert_eq!(before_bails.len(), 2);
         assert_eq!(after_bails.len(), 2);
@@ -286,6 +315,10 @@ fn b() {
                     .unwrap_or_else(|| panic!("before bail! {} was never matched", b.id()))
             })
             .collect();
-        assert_eq!(targets.len(), 2, "each duplicate bail! should match a distinct after-node");
+        assert_eq!(
+            targets.len(),
+            2,
+            "each duplicate bail! should match a distinct after-node"
+        );
     }
 }

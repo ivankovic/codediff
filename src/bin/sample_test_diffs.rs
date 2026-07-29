@@ -23,18 +23,18 @@
 use anyhow::Result;
 use clap::Parser;
 use git2::Delta;
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::metadata;
 use codediff::stats::filesystem::find_git_repositories;
 use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::Reservoir;
-use codediff::metadata;
 
 // Files outside this range are excluded: near-empty files make trivial test fixtures, and
 // anything above the upper bound is past the size `expand_from_code` itself treats as
@@ -240,7 +240,8 @@ fn sample_repository(
             return Ok(());
         }
 
-        let in_range = |oid: git2::Oid| text_len_if_in_range(repo, oid, MIN_BYTES, MAX_BYTES).is_some();
+        let in_range =
+            |oid: git2::Oid| text_len_if_in_range(repo, oid, MIN_BYTES, MAX_BYTES).is_some();
         if !in_range(delta.old_file().id()) || !in_range(delta.new_file().id()) {
             return Ok(());
         }
@@ -365,10 +366,8 @@ mod tests {
 
         // First pass: deliberately under-sample so there is room to top up.
         let first_pass = sample(&repo_path, 1, &[], 1)?;
-        let rust_count_after_first: usize = first_pass
-            .iter()
-            .filter(|r| r.language == "Rust")
-            .count();
+        let rust_count_after_first: usize =
+            first_pass.iter().filter(|r| r.language == "Rust").count();
         assert_eq!(rust_count_after_first, 1);
 
         // Second pass, with the first pass's rows treated as already on disk: should top up to
@@ -391,5 +390,4 @@ mod tests {
 
         Ok(())
     }
-
 }

@@ -15,8 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::{ASTMetadata, Code, Language};
 use crate::code::metadata::metadata_of;
+use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
@@ -92,7 +92,8 @@ fn solve_import_path_hash(before: &Code, after: &Code, node_cache: &NodeCache, d
     let before_hash = import_path_hash_map(&before_metadata);
     let after_hash = import_path_hash_map(&after_metadata);
 
-    let mut after_reverse: rustc_hash::FxHashMap<u64, Vec<usize>> = rustc_hash::FxHashMap::default();
+    let mut after_reverse: rustc_hash::FxHashMap<u64, Vec<usize>> =
+        rustc_hash::FxHashMap::default();
     for (&node_id, &hash) in &after_hash {
         after_reverse.entry(hash).or_default().push(node_id);
     }
@@ -126,7 +127,9 @@ fn import_path_hash_map(metadata: &ASTMetadata) -> rustc_hash::FxHashMap<usize, 
         if !is_import_node(&info.kind, &language) {
             continue;
         }
-        let Some(path) = extract_import_path(node_id, metadata) else { continue };
+        let Some(path) = extract_import_path(node_id, metadata) else {
+            continue;
+        };
         let mut hasher = rustc_hash::FxHasher::default();
         path.hash(&mut hasher);
         result.insert(node_id, hasher.finish());
@@ -200,7 +203,10 @@ fn is_import_node(node_kind: &str, language: &Language) -> bool {
 /// breaks path extraction for Go and JS/TS/JSON imports, falling through to using the whole
 /// import statement's raw text as the "path" instead.
 fn is_string_literal_kind(kind: &str) -> bool {
-    matches!(kind, "string_literal" | "raw_string_literal" | "interpreted_string_literal" | "string")
+    matches!(
+        kind,
+        "string_literal" | "raw_string_literal" | "interpreted_string_literal" | "string"
+    )
 }
 
 /// Extracts the import path text from a node's children
@@ -325,7 +331,10 @@ mod tests {
         // Identical, since neither is a true no-op match either.
         let before_use_decl = find_first_of_kind(before_root, "use_declaration").unwrap();
         let after_use_decl = find_first_of_kind(after_root, "use_declaration").unwrap();
-        let use_decl_mapping = diff.mapping.get(&(before_use_decl.id(), after_use_decl.id())).unwrap();
+        let use_decl_mapping = diff
+            .mapping
+            .get(&(before_use_decl.id(), after_use_decl.id()))
+            .unwrap();
         assert_eq!(
             use_decl_mapping.operation,
             ASTMappingOperation::MatchButNotIdentical,
@@ -334,7 +343,10 @@ mod tests {
         assert_eq!(use_decl_mapping.cost, COST_UPDATE);
         // The ancestor itself didn't reorder anything - only the actual commutative container
         // gets tagged FullymappingSubtrees.
-        assert_ne!(use_decl_mapping.reason, ASTMappingReason::FullymappingSubtrees);
+        assert_ne!(
+            use_decl_mapping.reason,
+            ASTMappingReason::FullymappingSubtrees
+        );
     }
 
     #[test]

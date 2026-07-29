@@ -85,12 +85,18 @@ fn reason_column_label(reason: &ASTMappingReason) -> String {
 /// by its `ASTMappingReason` column label (see `reason_column_label`) - i.e. which algorithm pass
 /// (and, for APTED, which call site) is responsible for how much of the diff. Independent of
 /// `human_mapping.json`, so this works for "unsolved" fixtures too.
-fn reason_counts_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> HashMap<String, usize> {
+fn reason_counts_for(
+    before: &Code,
+    after: &Code,
+    config: &codediff::diff::HeuristicConfig,
+) -> HashMap<String, usize> {
     let diff = codediff::diff::diff_code_with_config(before, after, config);
     let mut counts = HashMap::new();
     if let Some(diff_ast) = diff.ast {
         for mapping in diff_ast.mapping.values() {
-            *counts.entry(reason_column_label(&mapping.reason)).or_insert(0) += 1;
+            *counts
+                .entry(reason_column_label(&mapping.reason))
+                .or_insert(0) += 1;
         }
     }
     counts
@@ -111,7 +117,10 @@ fn reason_counts_for(before: &Code, after: &Code, config: &codediff::diff::Heuri
 /// (e.g. `research/analysis/matching_reasons_report.py`) - see `active_reason_columns` for the
 /// display-only variant that additionally drops always-zero columns.
 fn all_reason_columns(rows: &[Row]) -> Vec<String> {
-    let mut columns: Vec<String> = NON_APTED_REASON_LABELS.iter().map(|label| label.to_string()).collect();
+    let mut columns: Vec<String> = NON_APTED_REASON_LABELS
+        .iter()
+        .map(|label| label.to_string())
+        .collect();
 
     let apted_columns: std::collections::BTreeSet<&String> = rows
         .iter()
@@ -128,7 +137,10 @@ fn all_reason_columns(rows: &[Row]) -> Vec<String> {
 fn active_reason_columns(rows: &[Row]) -> Vec<String> {
     all_reason_columns(rows)
         .into_iter()
-        .filter(|label| rows.iter().any(|r| r.reason_counts.get(label).copied().unwrap_or(0) > 0))
+        .filter(|label| {
+            rows.iter()
+                .any(|r| r.reason_counts.get(label).copied().unwrap_or(0) > 0)
+        })
         .collect()
 }
 
@@ -138,7 +150,11 @@ fn active_reason_columns(rows: &[Row]) -> Vec<String> {
 /// `human_mapping::compute_mismatches_for`: this binary already re-diffs per computation (see
 /// `total_node_count_for`'s own re-walk), and a shared-run refactor isn't worth the complexity for
 /// a benchmark tool that's run interactively, not in a hot loop.
-fn algorithm_cost_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> u64 {
+fn algorithm_cost_for(
+    before: &Code,
+    after: &Code,
+    config: &codediff::diff::HeuristicConfig,
+) -> u64 {
     let diff = codediff::diff::diff_code_with_config(before, after, config);
     let Some(diff_ast) = diff.ast else {
         return 0;
@@ -204,8 +220,10 @@ struct Args {
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
     codediff::diff::HeuristicConfig {
         solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
-        solver_similar_flow_control: args.solver_similar_flow_control && !args.no_solver_similar_flow_control,
-        solver_bottom_up_expansion: args.solver_bottom_up_expansion && !args.no_solver_bottom_up_expansion,
+        solver_similar_flow_control: args.solver_similar_flow_control
+            && !args.no_solver_similar_flow_control,
+        solver_bottom_up_expansion: args.solver_bottom_up_expansion
+            && !args.no_solver_bottom_up_expansion,
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
     }
 }
@@ -268,9 +286,20 @@ fn dump_mapping(name: &str, config: &codediff::diff::HeuristicConfig) -> Result<
         .mapping
         .iter()
         .map(|(&(b, a), m)| {
-            let bp = if b == 0 { "-" } else { paths.get(&b).map(String::as_str).unwrap_or("?") };
-            let ap = if a == 0 { "-" } else { paths.get(&a).map(String::as_str).unwrap_or("?") };
-            format!("{:?} ({:?})\n    B {}\n    A {}", m.operation, m.reason, bp, ap)
+            let bp = if b == 0 {
+                "-"
+            } else {
+                paths.get(&b).map(String::as_str).unwrap_or("?")
+            };
+            let ap = if a == 0 {
+                "-"
+            } else {
+                paths.get(&a).map(String::as_str).unwrap_or("?")
+            };
+            format!(
+                "{:?} ({:?})\n    B {}\n    A {}",
+                m.operation, m.reason, bp, ap
+            )
         })
         .collect();
     lines.sort();
@@ -307,7 +336,9 @@ fn main() -> Result<()> {
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
-        let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+        let (before, after) = test_diffs
+            .get(name)
+            .expect("name came from test_diffs.keys()");
         let reason_counts = reason_counts_for(before, after, &config);
         let algorithm_cost = algorithm_cost_for(before, after, &config);
 
@@ -321,7 +352,8 @@ fn main() -> Result<()> {
             });
             continue;
         }
-        let mismatches = human_mapping::compute_mismatches_for_with_config(name, before, after, &config)?;
+        let mismatches =
+            human_mapping::compute_mismatches_for_with_config(name, before, after, &config)?;
         let total_nodes = human_mapping::total_node_count_for(before, after);
         let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
         rows.push(Row {
@@ -345,7 +377,9 @@ fn main() -> Result<()> {
     let elapsed = started.elapsed();
 
     if let Some(csv_path) = args.csv {
-        let path = csv_path.unwrap_or_else(|| std::path::PathBuf::from("./research/optimal_solutions_benchmark.csv"));
+        let path = csv_path.unwrap_or_else(|| {
+            std::path::PathBuf::from("./research/optimal_solutions_benchmark.csv")
+        });
         write_csv(&rows, &path)?;
     }
 
@@ -379,7 +413,10 @@ fn print_table(rows: &[Row]) {
         "Cost Diff",
         name_width = name_width
     );
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9));
+    println!(
+        "{}",
+        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9)
+    );
 
     let mut total_mismatches = 0usize;
     let mut total_nodes = 0usize;
@@ -398,7 +435,11 @@ fn print_table(rows: &[Row]) {
                 total_nodes += nodes;
                 total_algorithm_cost_where_solved += row.algorithm_cost;
                 total_human_cost += human_cost;
-                let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
+                let pct = if nodes > 0 {
+                    100.0 * count as f64 / nodes as f64
+                } else {
+                    0.0
+                };
                 let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 println!(
                     "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}",
@@ -429,7 +470,10 @@ fn print_table(rows: &[Row]) {
         }
     }
 
-    println!("{}", "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9));
+    println!(
+        "{}",
+        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9)
+    );
     let total_pct = if total_nodes > 0 {
         100.0 * total_mismatches as f64 / total_nodes as f64
     } else {
@@ -466,7 +510,10 @@ fn print_reason_table(rows: &[Row]) {
     // much longer than the old fixed 9-char budget, and a fixed width would misalign the table
     // the moment one appears.
     const MIN_COL_WIDTH: usize = 9;
-    let col_widths: Vec<usize> = active_reasons.iter().map(|label| label.len().max(MIN_COL_WIDTH)).collect();
+    let col_widths: Vec<usize> = active_reasons
+        .iter()
+        .map(|label| label.len().max(MIN_COL_WIDTH))
+        .collect();
     let rule_width = name_width + col_widths.iter().map(|w| w + 2).sum::<usize>();
 
     println!();
@@ -492,7 +539,11 @@ fn print_reason_table(rows: &[Row]) {
     println!("{}", "-".repeat(rule_width));
     print!("{:<name_width$}", "TOTAL", name_width = name_width);
     for (label, width) in active_reasons.iter().zip(&col_widths) {
-        print!("  {:>width$}", totals.get(label.as_str()).copied().unwrap_or(0), width = width);
+        print!(
+            "  {:>width$}",
+            totals.get(label.as_str()).copied().unwrap_or(0),
+            width = width
+        );
     }
     println!();
 }
@@ -519,11 +570,21 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     for row in rows {
         let reason_fields: Vec<String> = columns
             .iter()
-            .map(|label| row.reason_counts.get(label).copied().unwrap_or(0).to_string())
+            .map(|label| {
+                row.reason_counts
+                    .get(label)
+                    .copied()
+                    .unwrap_or(0)
+                    .to_string()
+            })
             .collect();
         match (row.mismatches, row.human_cost) {
             (Some((count, nodes)), Some(human_cost)) => {
-                let pct = if nodes > 0 { 100.0 * count as f64 / nodes as f64 } else { 0.0 };
+                let pct = if nodes > 0 {
+                    100.0 * count as f64 / nodes as f64
+                } else {
+                    0.0
+                };
                 let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 let mut record = vec![
                     row.name.clone(),

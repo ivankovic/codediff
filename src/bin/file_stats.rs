@@ -139,7 +139,8 @@ fn file_stats(
     // holding the file's full raw source text, exhausted system memory and hung the whole
     // machine. Streaming writes bound peak memory to O(batch_size) regardless of corpus size.
     let db_path_owned = db_path.to_owned();
-    let writer = thread::spawn(move || writer_loop(&db_path_owned, stats_rx, batch_size, max_db_bytes));
+    let writer =
+        thread::spawn(move || writer_loop(&db_path_owned, stats_rx, batch_size, max_db_bytes));
 
     let _ = path_producer.join();
     for w in workers {
@@ -391,8 +392,12 @@ fn write_batch(conn: &mut Connection, batch: &mut Vec<(PathBuf, CodeStats)>) -> 
                 upsert_kind_count.execute(params![file_id, kind, kind_stats.count as i64])?;
 
                 for (&size_bucket, &count) in &kind_stats.subtree_size_histogram {
-                    upsert_histogram_bucket
-                        .execute(params![file_id, kind, size_bucket, count as i64])?;
+                    upsert_histogram_bucket.execute(params![
+                        file_id,
+                        kind,
+                        size_bucket,
+                        count as i64
+                    ])?;
                 }
             }
         }
@@ -579,7 +584,10 @@ mod tests {
             let mut stmt = conn.prepare(&format!(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
             ))?;
-            assert!(stmt.exists([])?, "{table} table should exist in the database");
+            assert!(
+                stmt.exists([])?,
+                "{table} table should exist in the database"
+            );
         }
 
         // Join both new tables back to `files` by file_id, the way downstream analysis is
@@ -594,7 +602,10 @@ mod tests {
             counts_stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
         assert_eq!(language.as_deref(), Some("Rust"));
         assert_eq!(kind, "function_item");
-        assert!(count > 0, "main.rs should contain at least one function_item");
+        assert!(
+            count > 0,
+            "main.rs should contain at least one function_item"
+        );
 
         let mut histogram_stmt = conn.prepare(
             "SELECT SUM(h.count)

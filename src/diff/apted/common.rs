@@ -148,7 +148,8 @@ impl PostorderIndexer {
         }
 
         let mut pre_to_node_id: Vec<usize> = Vec::new();
-        let mut node_id_to_pre: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
+        let mut node_id_to_pre: rustc_hash::FxHashMap<usize, usize> =
+            rustc_hash::FxHashMap::default();
         let mut root_pres: Vec<usize> = Vec::new();
 
         for &root_id in root_ids {
@@ -372,7 +373,12 @@ pub(crate) fn forest_dist(
                 .node_info
                 .get(&after_id)
                 .expect("indexed node must have metadata");
-            (after_id, node2, after.post_to_lld[dj - 1], after.post_to_pre[dj - 1])
+            (
+                after_id,
+                node2,
+                after.post_to_lld[dj - 1],
+                after.post_to_pre[dj - 1],
+            )
         })
         .collect();
 
@@ -972,13 +978,27 @@ fn add_prune_mappings(
     }
     if let Some(info) = meta.node_info.get(&node_id) {
         for &child_id in &info.children {
-            add_prune_mappings(child_id, meta, source, diff, node_map, mapping_key, operation, subtree_cost);
+            add_prune_mappings(
+                child_id,
+                meta,
+                source,
+                diff,
+                node_map,
+                mapping_key,
+                operation,
+                subtree_cost,
+            );
         }
     }
 }
 
 /// Add delete mappings for an entire subtree (used when no part of it is reused elsewhere).
-pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, source: &'static str, diff: &mut ASTDiff) {
+pub(crate) fn add_delete_mappings(
+    node_id: usize,
+    meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
     add_prune_mappings(
         node_id,
         meta,
@@ -992,7 +1012,12 @@ pub(crate) fn add_delete_mappings(node_id: usize, meta: &ASTMetadata, source: &'
 }
 
 /// Add insert mappings for an entire subtree (used when no part of it is reused elsewhere).
-pub(crate) fn add_insert_mappings(node_id: usize, meta: &ASTMetadata, source: &'static str, diff: &mut ASTDiff) {
+pub(crate) fn add_insert_mappings(
+    node_id: usize,
+    meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
     add_prune_mappings(
         node_id,
         meta,
@@ -1349,8 +1374,14 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
 
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/
 /// `diff.after_node_map` for the before/after side respectively).
-pub(crate) fn filter_mapped_nodes(node_ids: Vec<usize>, node_map: &rustc_hash::FxHashMap<usize, usize>) -> Vec<usize> {
-    node_ids.into_iter().filter(|node_id| !node_map.contains_key(node_id)).collect()
+pub(crate) fn filter_mapped_nodes(
+    node_ids: Vec<usize>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+) -> Vec<usize> {
+    node_ids
+        .into_iter()
+        .filter(|node_id| !node_map.contains_key(node_id))
+        .collect()
 }
 
 /// Cost charged for a `ren()` pairing that `ContainmentCtx` has vetoed - deliberately the same
@@ -1465,11 +1496,21 @@ fn collect_before_subtree_targets(
     diff: &ASTDiff,
     out: &mut Vec<usize>,
 ) {
-    collect_subtree_targets(root, before_meta, out, &|child| match before_decision.get(&child) {
-        Some(BeforeDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
-        Some(BeforeDecision::Delete) => SubtreeTargetOutcome::PruneRecurse,
-        None => SubtreeTargetOutcome::Leaf(diff.before_node_map.get(&child).copied().filter(|&t| t != 0)),
-    });
+    collect_subtree_targets(
+        root,
+        before_meta,
+        out,
+        &|child| match before_decision.get(&child) {
+            Some(BeforeDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
+            Some(BeforeDecision::Delete) => SubtreeTargetOutcome::PruneRecurse,
+            None => SubtreeTargetOutcome::Leaf(
+                diff.before_node_map
+                    .get(&child)
+                    .copied()
+                    .filter(|&t| t != 0),
+            ),
+        },
+    );
 }
 
 /// After-side counterpart of `collect_before_subtree_targets`.
@@ -1480,11 +1521,18 @@ fn collect_after_subtree_targets(
     diff: &ASTDiff,
     out: &mut Vec<usize>,
 ) {
-    collect_subtree_targets(root, after_meta, out, &|child| match after_decision.get(&child) {
-        Some(AfterDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
-        Some(AfterDecision::Insert) => SubtreeTargetOutcome::PruneRecurse,
-        None => SubtreeTargetOutcome::Leaf(diff.after_node_map.get(&child).copied().filter(|&t| t != 0)),
-    });
+    collect_subtree_targets(
+        root,
+        after_meta,
+        out,
+        &|child| match after_decision.get(&child) {
+            Some(AfterDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
+            Some(AfterDecision::Insert) => SubtreeTargetOutcome::PruneRecurse,
+            None => SubtreeTargetOutcome::Leaf(
+                diff.after_node_map.get(&child).copied().filter(|&t| t != 0),
+            ),
+        },
+    );
 }
 
 /// Post-DP slot alignment: reshapes cost-*neutral* corners of the DP's decision so they read the
@@ -1862,8 +1910,16 @@ fn slot_promotion_allowed(
     }
 
     if b_targets.is_empty() && a_targets.is_empty() {
-        let size_b = before_meta.node_to_subtree_size.get(&b).copied().unwrap_or(1);
-        let size_a = after_meta.node_to_subtree_size.get(&a).copied().unwrap_or(1);
+        let size_b = before_meta
+            .node_to_subtree_size
+            .get(&b)
+            .copied()
+            .unwrap_or(1);
+        let size_a = after_meta
+            .node_to_subtree_size
+            .get(&a)
+            .copied()
+            .unwrap_or(1);
         if size_b > LARGE_SLOT_SUBTREE
             && size_a > LARGE_SLOT_SUBTREE
             && !share_descendant_hash(b, a, before_meta, after_meta)
@@ -1882,11 +1938,7 @@ fn share_descendant_hash(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
 ) -> bool {
-    fn collect_hashes(
-        root: usize,
-        meta: &ASTMetadata,
-        out: &mut std::collections::HashSet<u64>,
-    ) {
+    fn collect_hashes(root: usize, meta: &ASTMetadata, out: &mut std::collections::HashSet<u64>) {
         let Some(info) = meta.node_info.get(&root) else {
             return;
         };
@@ -1922,7 +1974,11 @@ fn share_descendant_hash(
 /// Weighted LCS over two child index ranges. `weight(i, j)` returns 0 for incompatible positions;
 /// the DP maximizes total weight over an order-preserving pairing, and the returned list is the
 /// chosen pairs (in order). Child lists are small, so the O(n*m) table is fine.
-fn weighted_lcs_pairs(n: usize, m: usize, weight: impl Fn(usize, usize) -> u64) -> Vec<(usize, usize)> {
+fn weighted_lcs_pairs(
+    n: usize,
+    m: usize,
+    weight: impl Fn(usize, usize) -> u64,
+) -> Vec<(usize, usize)> {
     let mut dp = vec![vec![0u64; m + 1]; n + 1];
     for i in (0..n).rev() {
         for j in (0..m).rev() {
@@ -2038,10 +2094,9 @@ fn promote_same_slot_pairs(
                 if !deletable || !insertable {
                     return 0;
                 }
-                let (Some(b_info), Some(a_info)) = (
-                    before_meta.node_info.get(&b),
-                    after_meta.node_info.get(&a),
-                ) else {
+                let (Some(b_info), Some(a_info)) =
+                    (before_meta.node_info.get(&b), after_meta.node_info.get(&a))
+                else {
                     return 0;
                 };
                 if b_info.kind != a_info.kind {
@@ -2144,7 +2199,11 @@ fn repair_leaf_slots(
 }
 
 /// True if `node` is `ancestor` itself or a descendant of it, walking up via `parents`.
-fn is_ancestor_or_self(ancestor: usize, mut node: usize, parents: &rustc_hash::FxHashMap<usize, usize>) -> bool {
+fn is_ancestor_or_self(
+    ancestor: usize,
+    mut node: usize,
+    parents: &rustc_hash::FxHashMap<usize, usize>,
+) -> bool {
     loop {
         if node == ancestor {
             return true;
@@ -2178,7 +2237,11 @@ fn compute_pruned_targets(
             return cached.clone();
         }
         let result = if let Some(&target) = node_map.get(&node_id) {
-            if target == 0 { Vec::new() } else { vec![target] }
+            if target == 0 {
+                Vec::new()
+            } else {
+                vec![target]
+            }
         } else if let Some(info) = meta.node_info.get(&node_id) {
             info.children
                 .iter()
@@ -2255,12 +2318,18 @@ impl<'a> ContainmentCtx<'a> {
             return base;
         }
         if let Some(targets) = self.before_pruned_targets.get(&before_id) {
-            if targets.iter().any(|&t| !is_ancestor_or_self(after_id, t, self.after_parents)) {
+            if targets
+                .iter()
+                .any(|&t| !is_ancestor_or_self(after_id, t, self.after_parents))
+            {
                 return FORBIDDEN_RENAME_COST;
             }
         }
         if let Some(targets) = self.after_pruned_targets.get(&after_id) {
-            if targets.iter().any(|&t| !is_ancestor_or_self(before_id, t, self.before_parents)) {
+            if targets
+                .iter()
+                .any(|&t| !is_ancestor_or_self(before_id, t, self.before_parents))
+            {
                 return FORBIDDEN_RENAME_COST;
             }
         }

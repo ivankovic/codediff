@@ -140,7 +140,9 @@ use tree_sitter::Node;
 
 use codediff::code::Code;
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
-use codediff::test::helper::human_mapping::{self, HumanMapping, HumanMappingEntry, HumanOperation};
+use codediff::test::helper::human_mapping::{
+    self, HumanMapping, HumanMappingEntry, HumanOperation,
+};
 use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node};
 
 #[derive(Parser, Debug)]
@@ -210,19 +212,34 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
     let mut parser = tree_sitter::Parser::new();
     let (mut before, mut after) = code_pair_from_dir(&dir, &mut parser)
         .with_context(|| format!("Failed to load test case from {:?}", dir))?
-        .ok_or_else(|| anyhow!("Directory '{}' exists but is missing a before/after fixture", name))?;
+        .ok_or_else(|| {
+            anyhow!(
+                "Directory '{}' exists but is missing a before/after fixture",
+                name
+            )
+        })?;
 
     if before.ast.is_none() {
-        bail!("Before code for '{}' has no AST (unsupported or undetected language)", name);
+        bail!(
+            "Before code for '{}' has no AST (unsupported or undetected language)",
+            name
+        );
     }
     if after.ast.is_none() {
-        bail!("After code for '{}' has no AST (unsupported or undetected language)", name);
+        bail!(
+            "After code for '{}' has no AST (unsupported or undetected language)",
+            name
+        );
     }
 
     // Populates node_to_full_hash (among other things), which `m`/`M` use to auto-classify
     // matches on nodes with children instead of asking.
-    before.ensure_parsed().context("Failed to compute AST metadata for before code")?;
-    after.ensure_parsed().context("Failed to compute AST metadata for after code")?;
+    before
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for before code")?;
+    after
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for after code")?;
 
     Ok((before, after))
 }
@@ -285,7 +302,12 @@ fn list_samples_with_status() -> Result<Vec<(String, bool)>> {
         .map(|name| {
             let solved = source_json_for_sample(&name)
                 .map(|source| {
-                    promoted.contains(&(source.language, source.repository, source.commit, source.path))
+                    promoted.contains(&(
+                        source.language,
+                        source.repository,
+                        source.commit,
+                        source.path,
+                    ))
                 })
                 .unwrap_or(false);
             (name, solved)
@@ -300,7 +322,8 @@ fn source_json_for_sample(name: &str) -> Option<SampleSource> {
     serde_json::from_str(&contents).ok()
 }
 
-fn promoted_sample_sources() -> Result<std::collections::HashSet<(String, String, String, String)>> {
+fn promoted_sample_sources() -> Result<std::collections::HashSet<(String, String, String, String)>>
+{
     promoted_sample_sources_at(&sample_csv_path())
 }
 
@@ -352,19 +375,29 @@ fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
         .ok_or_else(|| anyhow!("No before/after fixture found in samples/{}", name))?;
 
     if before.ast.is_none() {
-        bail!("Before code for sample '{}' has no AST (unsupported or undetected language)", name);
+        bail!(
+            "Before code for sample '{}' has no AST (unsupported or undetected language)",
+            name
+        );
     }
     if after.ast.is_none() {
-        bail!("After code for sample '{}' has no AST (unsupported or undetected language)", name);
+        bail!(
+            "After code for sample '{}' has no AST (unsupported or undetected language)",
+            name
+        );
     }
-    before.ensure_parsed().context("Failed to compute AST metadata for before code")?;
-    after.ensure_parsed().context("Failed to compute AST metadata for after code")?;
+    before
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for before code")?;
+    after
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for after code")?;
 
     let source_path = dir.join("source.json");
-    let contents = fs::read_to_string(&source_path)
-        .with_context(|| format!("reading {:?}", source_path))?;
-    let source: SampleSource = serde_json::from_str(&contents)
-        .with_context(|| format!("parsing {:?}", source_path))?;
+    let contents =
+        fs::read_to_string(&source_path).with_context(|| format!("reading {:?}", source_path))?;
+    let source: SampleSource =
+        serde_json::from_str(&contents).with_context(|| format!("parsing {:?}", source_path))?;
 
     Ok((before, after, source))
 }
@@ -374,10 +407,16 @@ fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
 /// relying on any on-disk path the content may have originally come from) so this always reflects
 /// exactly what's currently loaded, regardless of case origin.
 fn run_unix_diff(before_src: &[u8], after_src: &[u8]) -> Result<String> {
-    let mut before_file = tempfile::NamedTempFile::new().context("creating temp file for before content")?;
-    before_file.write_all(before_src).context("writing before content to temp file")?;
-    let mut after_file = tempfile::NamedTempFile::new().context("creating temp file for after content")?;
-    after_file.write_all(after_src).context("writing after content to temp file")?;
+    let mut before_file =
+        tempfile::NamedTempFile::new().context("creating temp file for before content")?;
+    before_file
+        .write_all(before_src)
+        .context("writing before content to temp file")?;
+    let mut after_file =
+        tempfile::NamedTempFile::new().context("creating temp file for after content")?;
+    after_file
+        .write_all(after_src)
+        .context("writing after content to temp file")?;
 
     let output = std::process::Command::new("diff")
         .arg("-u")
@@ -423,10 +462,19 @@ fn main() -> Result<()> {
 
     let mapping = human_mapping::load(&name).unwrap_or_default();
 
-    let mut app = App::new(name, CaseOrigin::Diffs, before_root_id, after_root_id, mapping);
+    let mut app = App::new(
+        name,
+        CaseOrigin::Diffs,
+        before_root_id,
+        after_root_id,
+        mapping,
+    );
 
     if let Some(options) = initial_picker_options {
-        app.modal = Some(Modal::OpenDiffPicker { options, selected: 0 });
+        app.modal = Some(Modal::OpenDiffPicker {
+            options,
+            selected: 0,
+        });
     }
 
     let panic_hook = std::panic::take_hook();
@@ -516,7 +564,10 @@ enum Modal {
         recursive: bool,
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
-    OpenDiffPicker { options: Vec<String>, selected: usize },
+    OpenDiffPicker {
+        options: Vec<String>,
+        selected: usize,
+    },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with whether it has already been promoted into
     /// src/test/data/diffs/ (per sample.csv's `promoted_to` column) -- shown as " - SOLVED" and,
@@ -534,7 +585,10 @@ enum Modal {
     /// Raised by `s` when the current case is a sample: asks for the name to promote it under in
     /// `src/test/data/diffs/`. Re-raised with `error` set (input preserved) if the name is
     /// invalid or already in use.
-    PromptPromoteName { input: String, error: Option<String> },
+    PromptPromoteName {
+        input: String,
+        error: Option<String>,
+    },
     /// Raised by `t`: shows the raw before/after source side by side, for reading the actual code
     /// instead of navigating the AST tree. `T` while open switches to `UnixDiffView` instead.
     TextView { scroll: u16 },
@@ -617,7 +671,8 @@ impl App {
             mapping,
             dirty: false,
             status: Some(
-                "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open.".to_string(),
+                "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open."
+                    .to_string(),
             ),
             modal: None,
             should_quit: false,
@@ -709,7 +764,9 @@ fn rebuild_caches(entries: &[HumanMappingEntry], before_root: Node, after_root: 
 
     for entry in entries {
         let resolved = match entry.operation {
-            HumanOperation::Identical | HumanOperation::Update | HumanOperation::MatchButNotIdentical => (|| {
+            HumanOperation::Identical
+            | HumanOperation::Update
+            | HumanOperation::MatchButNotIdentical => (|| {
                 let before_path = entry.before_path.as_ref()?;
                 let after_path = entry.after_path.as_ref()?;
                 let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
@@ -721,17 +778,19 @@ fn rebuild_caches(entries: &[HumanMappingEntry], before_root: Node, after_root: 
             HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
                 let before_path = entry.before_path.as_ref()?;
                 let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
-                caches
-                    .before_removed
-                    .insert(b.id(), entry.operation == HumanOperation::DeleteWithChildren);
+                caches.before_removed.insert(
+                    b.id(),
+                    entry.operation == HumanOperation::DeleteWithChildren,
+                );
                 Some(())
             })(),
             HumanOperation::Insert | HumanOperation::InsertWithChildren => (|| {
                 let after_path = entry.after_path.as_ref()?;
                 let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
-                caches
-                    .after_removed
-                    .insert(a.id(), entry.operation == HumanOperation::InsertWithChildren);
+                caches.after_removed.insert(
+                    a.id(),
+                    entry.operation == HumanOperation::InsertWithChildren,
+                );
                 Some(())
             })(),
         };
@@ -883,13 +942,19 @@ fn algo_status_glyph(status: AlgoStatus) -> &'static str {
 /// node -- `None` only when `before_node_map` itself has no entry at all (`AlgoStatus::Unknown`).
 fn algo_reason_before(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
     let after_id = *diff_ast.before_node_map.get(&node.id())?;
-    diff_ast.mapping.get(&(node.id(), after_id)).map(|m| m.reason)
+    diff_ast
+        .mapping
+        .get(&(node.id(), after_id))
+        .map(|m| m.reason)
 }
 
 /// Same as [`algo_reason_before`], but for the After tree.
 fn algo_reason_after(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
     let before_id = *diff_ast.after_node_map.get(&node.id())?;
-    diff_ast.mapping.get(&(before_id, node.id())).map(|m| m.reason)
+    diff_ast
+        .mapping
+        .get(&(before_id, node.id()))
+        .map(|m| m.reason)
 }
 
 /// Short column-style label for an `ASTMappingReason`. Thin wrapper around
@@ -924,7 +989,9 @@ fn algo_disagrees_before(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> boo
     if let Some(human_after_id) = caches.before_match.get(&node.id()) {
         return algo_partner != Some(*human_after_id);
     }
-    if caches.before_removed.contains_key(&node.id()) || is_inherited_removed(node, &caches.before_removed) {
+    if caches.before_removed.contains_key(&node.id())
+        || is_inherited_removed(node, &caches.before_removed)
+    {
         return algo_partner != Some(0);
     }
     false
@@ -936,7 +1003,9 @@ fn algo_disagrees_after(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool
     if let Some(human_before_id) = caches.after_match.get(&node.id()) {
         return algo_partner != Some(*human_before_id);
     }
-    if caches.after_removed.contains_key(&node.id()) || is_inherited_removed(node, &caches.after_removed) {
+    if caches.after_removed.contains_key(&node.id())
+        || is_inherited_removed(node, &caches.after_removed)
+    {
         return algo_partner != Some(0);
     }
     false
@@ -1001,14 +1070,24 @@ fn advance_both_to_next_unmarked(
 
 /// Same as [`advance_both_to_next_unmarked`], but only for the Before panel: used after a
 /// delete, which only touches the Before side, so only that cursor should step forward.
-fn advance_before_to_next_unmarked(app: &mut App, before_flat: &[(Node, usize)], before_root: Node, after_root: Node) {
+fn advance_before_to_next_unmarked(
+    app: &mut App,
+    before_flat: &[(Node, usize)],
+    before_root: Node,
+    after_root: Node,
+) {
     let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
     advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
 }
 
 /// Same as [`advance_both_to_next_unmarked`], but only for the After panel: used after an
 /// insert, which only touches the After side, so only that cursor should step forward.
-fn advance_after_to_next_unmarked(app: &mut App, after_flat: &[(Node, usize)], before_root: Node, after_root: Node) {
+fn advance_after_to_next_unmarked(
+    app: &mut App,
+    after_flat: &[(Node, usize)],
+    before_root: Node,
+    after_root: Node,
+) {
     let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
@@ -1028,9 +1107,16 @@ fn advance_to_next_mismatch<'a>(
         return None;
     }
     let len = flat.len();
-    let idx = flat.iter().position(|(n, _)| n.id() == panel.cursor_id).unwrap_or(0);
+    let idx = flat
+        .iter()
+        .position(|(n, _)| n.id() == panel.cursor_id)
+        .unwrap_or(0);
     for step in 1..=len {
-        let i = if forward { (idx + step) % len } else { (idx + len - step) % len };
+        let i = if forward {
+            (idx + step) % len
+        } else {
+            (idx + len - step) % len
+        };
         let (node, _) = flat[i];
         if disagrees_fn(node, caches, diff_ast) {
             panel.cursor_id = node.id();
@@ -1056,12 +1142,22 @@ fn action_next_mismatch(
         .as_ref()
         .context("No codediff result yet; press 'p' to run it first")?;
     let found = match focus {
-        Focus::Before => {
-            advance_to_next_mismatch(&mut app.before, before_flat, caches, diff_ast, algo_disagrees_before, forward)
-        }
-        Focus::After => {
-            advance_to_next_mismatch(&mut app.after, after_flat, caches, diff_ast, algo_disagrees_after, forward)
-        }
+        Focus::Before => advance_to_next_mismatch(
+            &mut app.before,
+            before_flat,
+            caches,
+            diff_ast,
+            algo_disagrees_before,
+            forward,
+        ),
+        Focus::After => advance_to_next_mismatch(
+            &mut app.after,
+            after_flat,
+            caches,
+            diff_ast,
+            algo_disagrees_after,
+            forward,
+        ),
     };
     match found {
         Some(node) => Ok(format!("Jumped to mismatch: '{}'", node.kind())),
@@ -1141,7 +1237,13 @@ fn expand_ancestors(collapsed: &mut std::collections::HashSet<usize>, node: Node
 /// hidden, or just scrolled out of view), centers the other panel's viewport on it;
 /// `idx.saturating_sub(half).min(max_scroll)` naturally clamps that centering at the start/end of
 /// the tree, where a true center isn't possible.
-fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: Node, target_id: usize) -> Result<String> {
+fn align_cursor_to(
+    app: &mut App,
+    focus: Focus,
+    before_root: Node,
+    after_root: Node,
+    target_id: usize,
+) -> Result<String> {
     let other_root = match focus {
         Focus::Before => after_root,
         Focus::After => before_root,
@@ -1154,16 +1256,21 @@ fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: N
     let was_visible = flatten_visible(other_root, &other.collapsed, None)
         .iter()
         .position(|(n, _)| n.id() == target_id)
-        .is_some_and(|idx| idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1));
+        .is_some_and(|idx| {
+            idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1)
+        });
 
-    let target_node =
-        find_node_by_id_anywhere(other_root, target_id).context("Matched node not found in tree")?;
+    let target_node = find_node_by_id_anywhere(other_root, target_id)
+        .context("Matched node not found in tree")?;
     expand_ancestors(&mut other.collapsed, target_node);
     other.cursor_id = target_id;
 
     if !was_visible {
         let flat = flatten_visible(other_root, &other.collapsed, None);
-        let idx = flat.iter().position(|(n, _)| n.id() == target_id).unwrap_or(0);
+        let idx = flat
+            .iter()
+            .position(|(n, _)| n.id() == target_id)
+            .unwrap_or(0);
         let height = other.viewport_height.max(1);
         let max_scroll = flat.len().saturating_sub(height);
         other.scroll = idx.saturating_sub(height / 2).min(max_scroll);
@@ -1174,7 +1281,13 @@ fn align_cursor_to(app: &mut App, focus: Focus, before_root: Node, after_root: N
 
 /// Implements `a`: aligns to the node the *human mapping* says the cursor node is matched with, if
 /// any. See [`align_cursor_to`] for how the target is made visible.
-fn action_align(app: &mut App, focus: Focus, before_root: Node, after_root: Node, caches: &Caches) -> Result<String> {
+fn action_align(
+    app: &mut App,
+    focus: Focus,
+    before_root: Node,
+    after_root: Node,
+    caches: &Caches,
+) -> Result<String> {
     let (own_cursor, matches) = match focus {
         Focus::Before => (app.before.cursor_id, &caches.before_match),
         Focus::After => (app.after.cursor_id, &caches.after_match),
@@ -1191,7 +1304,12 @@ fn action_align(app: &mut App, focus: Focus, before_root: Node, after_root: Node
 /// node is mapped to, instead of the human mapping. Requires `p` to have been run at least once
 /// for the current case, and fails if codediff mapped the cursor node to nothing (i.e. it
 /// considers it deleted/inserted rather than matched).
-fn action_align_algo(app: &mut App, focus: Focus, before_root: Node, after_root: Node) -> Result<String> {
+fn action_align_algo(
+    app: &mut App,
+    focus: Focus,
+    before_root: Node,
+    after_root: Node,
+) -> Result<String> {
     let target_id = {
         let diff_ast = app
             .algo_diff
@@ -1277,7 +1395,6 @@ fn remove_entries_touching(
     });
 }
 
-
 fn find_node_by_id<'a>(flat: &[(Node<'a>, usize)], id: usize) -> Option<Node<'a>> {
     flat.iter().find(|(n, _)| n.id() == id).map(|(n, _)| *n)
 }
@@ -1296,7 +1413,11 @@ fn is_strict_descendant_of(node: Node, ancestor: Node) -> bool {
 /// Drops any entry whose before_path resolves to a strict descendant of `ancestor`. Used when
 /// marking `ancestor` deleted-with-children, so a previous direct mark on one of its descendants
 /// (e.g. a Match) can't survive alongside it and export a self-contradictory mapping.
-fn clear_before_descendants(entries: &mut Vec<HumanMappingEntry>, ancestor: Node, before_root: Node) {
+fn clear_before_descendants(
+    entries: &mut Vec<HumanMappingEntry>,
+    ancestor: Node,
+    before_root: Node,
+) {
     entries.retain(|entry| {
         !entry
             .before_path
@@ -1341,7 +1462,13 @@ fn apply_match_entry(
     a: Node,
     operation: HumanOperation,
 ) {
-    remove_direct_entries_for(&mut mapping.entries, Some(b.id()), Some(a.id()), before_root, after_root);
+    remove_direct_entries_for(
+        &mut mapping.entries,
+        Some(b.id()),
+        Some(a.id()),
+        before_root,
+        after_root,
+    );
     mapping.entries.push(HumanMappingEntry {
         operation,
         before_path: Some(path_for_node(b)),
@@ -1392,10 +1519,14 @@ fn action_match(
         find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
-        bail!("Before node is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "Before node is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)"
+        );
     }
     if is_inherited_removed(after_node, &caches.after_removed) {
-        bail!("After node is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "After node is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)"
+        );
     }
 
     if before_node.kind() != after_node.kind() {
@@ -1417,7 +1548,14 @@ fn action_match(
     } else {
         subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
     };
-    apply_match_entry(mapping, before_root, after_root, before_node, after_node, operation);
+    apply_match_entry(
+        mapping,
+        before_root,
+        after_root,
+        before_node,
+        after_node,
+        operation,
+    );
     Ok(ActionOutcome::Done(format!(
         "Matched '{}' <-> '{}' as {:?}",
         before_node.kind(),
@@ -1518,7 +1656,9 @@ fn action_match_to_end(
             before_path: before_paths.get(&before_node.id()).cloned(),
             after_path: after_paths.get(&after_node.id()).cloned(),
         });
-        caches.before_match.insert(before_node.id(), after_node.id());
+        caches
+            .before_match
+            .insert(before_node.id(), after_node.id());
         caches.after_match.insert(after_node.id(), before_node.id());
         app.dirty = true;
         matched += 1;
@@ -1611,10 +1751,14 @@ fn action_match_subtree(
         find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
-        bail!("Before node is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "Before node is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)"
+        );
     }
     if is_inherited_removed(after_node, &caches.after_removed) {
-        bail!("After node is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "After node is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)"
+        );
     }
 
     if before_node.kind() != after_node.kind() {
@@ -1635,7 +1779,14 @@ fn action_match_subtree(
         } else {
             HumanOperation::Update
         };
-        apply_match_entry(mapping, before_root, after_root, before_node, after_node, operation);
+        apply_match_entry(
+            mapping,
+            before_root,
+            after_root,
+            before_node,
+            after_node,
+            operation,
+        );
         return Ok(ActionOutcome::Done(format!(
             "Matched '{}' <-> '{}' as {}",
             before_node.kind(),
@@ -1644,7 +1795,8 @@ fn action_match_subtree(
         )));
     }
 
-    let operation = subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash);
+    let operation =
+        subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash);
     let msg = apply_modal_choice(
         mapping,
         before_flat,
@@ -1711,7 +1863,9 @@ fn auto_match_pair(
     before_collapsed: &mut std::collections::HashSet<usize>,
     after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> bool {
-    if is_inherited_removed(b, &caches.before_removed) || is_inherited_removed(a, &caches.after_removed) {
+    if is_inherited_removed(b, &caches.before_removed)
+        || is_inherited_removed(a, &caches.after_removed)
+    {
         *skipped += 1;
         return false;
     }
@@ -1732,7 +1886,12 @@ fn auto_match_pair(
     if b.kind() != a.kind() {
         // Shouldn't happen for children reached via the same_shape check below, but the very
         // first call into this function (the top pair's children) hasn't been shape-checked yet.
-        push(new_entries, touched_before, touched_after, HumanOperation::MatchButNotIdentical);
+        push(
+            new_entries,
+            touched_before,
+            touched_after,
+            HumanOperation::MatchButNotIdentical,
+        );
         *matched += 1;
         return false;
     }
@@ -1748,17 +1907,29 @@ fn auto_match_pair(
             new_entries,
             touched_before,
             touched_after,
-            if identical { HumanOperation::Identical } else { HumanOperation::Update },
+            if identical {
+                HumanOperation::Identical
+            } else {
+                HumanOperation::Update
+            },
         );
         *matched += 1;
         return identical;
     }
 
     let same_shape = b_children.len() == a_children.len()
-        && b_children.iter().zip(&a_children).all(|(x, y)| x.kind() == y.kind());
+        && b_children
+            .iter()
+            .zip(&a_children)
+            .all(|(x, y)| x.kind() == y.kind());
 
     if !same_shape {
-        push(new_entries, touched_before, touched_after, HumanOperation::MatchButNotIdentical);
+        push(
+            new_entries,
+            touched_before,
+            touched_after,
+            HumanOperation::MatchButNotIdentical,
+        );
         *matched += 1;
         return false;
     }
@@ -1766,8 +1937,20 @@ fn auto_match_pair(
     let mut all_identical = true;
     for (b_child, a_child) in b_children.into_iter().zip(a_children) {
         let child_identical = auto_match_pair(
-            new_entries, touched_before, touched_after, caches, b_child, a_child, before_src, after_src,
-            before_paths, after_paths, matched, skipped, before_collapsed, after_collapsed,
+            new_entries,
+            touched_before,
+            touched_after,
+            caches,
+            b_child,
+            a_child,
+            before_src,
+            after_src,
+            before_paths,
+            after_paths,
+            matched,
+            skipped,
+            before_collapsed,
+            after_collapsed,
         );
         all_identical &= child_identical;
     }
@@ -1776,7 +1959,11 @@ fn auto_match_pair(
         new_entries,
         touched_before,
         touched_after,
-        if all_identical { HumanOperation::Identical } else { HumanOperation::MatchButNotIdentical },
+        if all_identical {
+            HumanOperation::Identical
+        } else {
+            HumanOperation::MatchButNotIdentical
+        },
     );
     *matched += 1;
     if all_identical {
@@ -1806,15 +1993,22 @@ fn apply_modal_choice(
     before_collapsed: &mut std::collections::HashSet<usize>,
     after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> String {
-    let (Some(b), Some(a)) = (find_node_by_id(before_flat, before_id), find_node_by_id(after_flat, after_id))
-    else {
+    let (Some(b), Some(a)) = (
+        find_node_by_id(before_flat, before_id),
+        find_node_by_id(after_flat, after_id),
+    ) else {
         return "Node no longer available (tree changed?)".to_string();
     };
 
     apply_match_entry(mapping, before_root, after_root, b, a, operation);
 
     if !recursive {
-        return format!("Matched '{}' <-> '{}' as {:?}", b.kind(), a.kind(), operation);
+        return format!(
+            "Matched '{}' <-> '{}' as {:?}",
+            b.kind(),
+            a.kind(),
+            operation
+        );
     }
 
     if operation == HumanOperation::Identical {
@@ -1830,7 +2024,10 @@ fn apply_modal_choice(
     let mut a_cursor = a.walk();
     let a_children: Vec<Node> = a.children(&mut a_cursor).collect();
     let same_shape = b_children.len() == a_children.len()
-        && b_children.iter().zip(&a_children).all(|(x, y)| x.kind() == y.kind());
+        && b_children
+            .iter()
+            .zip(&a_children)
+            .all(|(x, y)| x.kind() == y.kind());
 
     if same_shape {
         let before_paths = precompute_paths(before_root);
@@ -1841,8 +2038,19 @@ fn apply_modal_choice(
 
         for (b_child, a_child) in b_children.into_iter().zip(a_children) {
             auto_match_pair(
-                &mut new_entries, &mut touched_before, &mut touched_after, caches, b_child, a_child, before_src,
-                after_src, &before_paths, &after_paths, &mut matched, &mut skipped, before_collapsed,
+                &mut new_entries,
+                &mut touched_before,
+                &mut touched_after,
+                caches,
+                b_child,
+                a_child,
+                before_src,
+                after_src,
+                &before_paths,
+                &after_paths,
+                &mut matched,
+                &mut skipped,
+                before_collapsed,
                 after_collapsed,
             );
         }
@@ -1854,7 +2062,13 @@ fn apply_modal_choice(
         // actually decided on, *then* append what it produced. Using the ids `auto_match_pair`
         // actually touched (rather than every id in the subtree) matters: a node the recursion
         // bailed out of without visiting keeps whatever pre-existing entry it had.
-        remove_entries_touching(&mut mapping.entries, &touched_before, &touched_after, before_root, after_root);
+        remove_entries_touching(
+            &mut mapping.entries,
+            &touched_before,
+            &touched_after,
+            before_root,
+            after_root,
+        );
         mapping.entries.extend(new_entries);
     }
 
@@ -1867,7 +2081,12 @@ fn apply_modal_choice(
             skipped
         )
     } else {
-        format!("Matched {} node pair(s) under '{}' <-> '{}'", matched, b.kind(), a.kind())
+        format!(
+            "Matched {} node pair(s) under '{}' <-> '{}'",
+            matched,
+            b.kind(),
+            a.kind()
+        )
     }
 }
 
@@ -1884,10 +2103,18 @@ fn action_delete(
         find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
-        bail!("Node is already covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "Node is already covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)"
+        );
     }
 
-    remove_direct_entries_for(&mut mapping.entries, Some(before_node.id()), None, before_root, after_root);
+    remove_direct_entries_for(
+        &mut mapping.entries,
+        Some(before_node.id()),
+        None,
+        before_root,
+        after_root,
+    );
     if with_children {
         clear_before_descendants(&mut mapping.entries, before_node, before_root);
     }
@@ -1904,7 +2131,11 @@ fn action_delete(
     Ok(format!(
         "Marked '{}' deleted{}",
         before_node.kind(),
-        if with_children { " (with children)" } else { "" }
+        if with_children {
+            " (with children)"
+        } else {
+            ""
+        }
     ))
 }
 
@@ -1921,10 +2152,18 @@ fn action_insert(
         find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
 
     if is_inherited_removed(after_node, &caches.after_removed) {
-        bail!("Node is already covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)");
+        bail!(
+            "Node is already covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)"
+        );
     }
 
-    remove_direct_entries_for(&mut mapping.entries, None, Some(after_node.id()), before_root, after_root);
+    remove_direct_entries_for(
+        &mut mapping.entries,
+        None,
+        Some(after_node.id()),
+        before_root,
+        after_root,
+    );
     if with_children {
         clear_after_descendants(&mut mapping.entries, after_node, after_root);
     }
@@ -1941,7 +2180,11 @@ fn action_insert(
     Ok(format!(
         "Marked '{}' inserted{}",
         after_node.kind(),
-        if with_children { " (with children)" } else { "" }
+        if with_children {
+            " (with children)"
+        } else {
+            ""
+        }
     ))
 }
 
@@ -1969,18 +2212,34 @@ fn action_unmark(
         ),
     };
 
-    let before_id = if focus == Focus::Before { Some(id) } else { None };
-    let after_id = if focus == Focus::After { Some(id) } else { None };
+    let before_id = if focus == Focus::Before {
+        Some(id)
+    } else {
+        None
+    };
+    let after_id = if focus == Focus::After {
+        Some(id)
+    } else {
+        None
+    };
 
     let before_len = mapping.entries.len();
-    remove_direct_entries_for(&mut mapping.entries, before_id, after_id, before_root, after_root);
+    remove_direct_entries_for(
+        &mut mapping.entries,
+        before_id,
+        after_id,
+        before_root,
+        after_root,
+    );
 
     if mapping.entries.len() < before_len {
         return Ok(format!("Unmarked '{}'", node.kind()));
     }
 
     if is_inherited_removed(node, removed) {
-        bail!("This node is only covered via an ancestor's with-children mark; clear the ancestor instead");
+        bail!(
+            "This node is only covered via an ancestor's with-children mark; clear the ancestor instead"
+        );
     }
 
     Ok(format!("'{}' was not marked", node.kind()))
@@ -2020,12 +2279,18 @@ fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
             kind: MarkKind::Deleted,
             with_children: true,
             inherited: false,
-        } => ("-", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        } => (
+            "-",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
         NodeStatus::Marked {
             kind: MarkKind::Deleted,
             inherited: true,
             ..
-        } => ("-", Style::default().fg(Color::Red).add_modifier(Modifier::DIM)),
+        } => (
+            "-",
+            Style::default().fg(Color::Red).add_modifier(Modifier::DIM),
+        ),
         NodeStatus::Marked {
             kind: MarkKind::Inserted,
             with_children: false,
@@ -2035,12 +2300,22 @@ fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
             kind: MarkKind::Inserted,
             with_children: true,
             inherited: false,
-        } => ("+", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        } => (
+            "+",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
         NodeStatus::Marked {
             kind: MarkKind::Inserted,
             inherited: true,
             ..
-        } => ("+", Style::default().fg(Color::Green).add_modifier(Modifier::DIM)),
+        } => (
+            "+",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::DIM),
+        ),
     }
 }
 
@@ -2100,20 +2375,36 @@ fn render_panel(
                         Side::Before => algo_reason_before(*node, diff_ast),
                         Side::After => algo_reason_after(*node, diff_ast),
                     };
-                    reason.map(|r| format!(" {}", reason_detail(r))).unwrap_or_default()
+                    reason
+                        .map(|r| format!(" {}", reason_detail(r)))
+                        .unwrap_or_default()
                 } else {
                     String::new()
                 };
-                (format!("({}{})", algo_status_glyph(algo_status), reason_suffix), disagrees)
+                (
+                    format!("({}{})", algo_status_glyph(algo_status), reason_suffix),
+                    disagrees,
+                )
             })
             .unwrap_or_default();
         let indent = "  ".repeat(*depth);
         let marker = if disagrees { " *" } else { "" };
-        let text = format!("{}{}{} {}{}", indent, glyph, algo_glyph, node_label(*node, src), marker);
+        let text = format!(
+            "{}{}{} {}{}",
+            indent,
+            glyph,
+            algo_glyph,
+            node_label(*node, src),
+            marker
+        );
 
         if idx == cursor_idx {
             style = style
-                .bg(if focused { Color::Yellow } else { Color::DarkGray })
+                .bg(if focused {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                })
                 .fg(Color::Black);
         }
 
@@ -2142,7 +2433,8 @@ fn render_panel(
 /// instead of splitting the screen 50/50 - two half-width panels wrap almost every line and
 /// become unreadable on a narrow terminal. Shared with the main TUI's `DiffViewer`, which faces
 /// the same readability constraint.
-const SINGLE_PANEL_WIDTH_THRESHOLD: u16 = codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
+const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
+    codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
 fn draw_ui(
     frame: &mut Frame,
@@ -2157,7 +2449,11 @@ fn draw_ui(
     let size = frame.size();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(3), Constraint::Length(2)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(3),
+            Constraint::Length(2),
+        ])
         .split(size);
 
     frame.render_widget(
@@ -2174,7 +2470,13 @@ fn draw_ui(
     if single_panel {
         let panel_area = chunks[1];
         let (title, flat, panel, side, src) = match app.focus {
-            Focus::Before => ("Before", before_flat, &mut app.before, Side::Before, before_src),
+            Focus::Before => (
+                "Before",
+                before_flat,
+                &mut app.before,
+                Side::Before,
+                before_src,
+            ),
             Focus::After => ("After", after_flat, &mut app.after, Side::After, after_src),
         };
         render_panel(
@@ -2296,7 +2598,11 @@ fn render_modal(
         Modal::OpenDiffPicker { options, selected } => {
             render_open_picker(frame, area, options, *selected, "diff");
         }
-        Modal::OpenSamplePicker { options, selected, hide_solved } => {
+        Modal::OpenSamplePicker {
+            options,
+            selected,
+            hide_solved,
+        } => {
             render_open_sample_picker(frame, area, options, *selected, *hide_solved);
         }
         Modal::ConfirmDiscardUnsaved { target, can_save } => render_text_modal(
@@ -2306,12 +2612,14 @@ fn render_modal(
             &if *can_save {
                 format!(
                     "'{}' has unsaved changes.\n\nSave before opening '{}'?\n\n[s] Save & Open    [d] Discard & Open    [Esc] Cancel",
-                    current_name, target.name()
+                    current_name,
+                    target.name()
                 )
             } else {
                 format!(
                     "'{}' has unsaved changes (it's a sample; promote it with 's' from the main view to save it).\n\nOpen '{}' anyway?\n\n[d] Discard & Open    [Esc] Cancel",
-                    current_name, target.name()
+                    current_name,
+                    target.name()
                 )
             },
         ),
@@ -2322,7 +2630,10 @@ fn render_modal(
             &format!(
                 "Enter a name for src/test/data/diffs/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
                 input,
-                error.as_deref().map(|e| format!("\n{}\n", e)).unwrap_or_default(),
+                error
+                    .as_deref()
+                    .map(|e| format!("\n{}\n", e))
+                    .unwrap_or_default(),
             ),
         ),
         Modal::TextView { scroll } => {
@@ -2345,7 +2656,9 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
         .title(title)
         .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
     frame.render_widget(
-        Paragraph::new(body.to_string()).block(block).wrap(Wrap { trim: true }),
+        Paragraph::new(body.to_string())
+            .block(block)
+            .wrap(Wrap { trim: true }),
         popup_area,
     );
 }
@@ -2354,7 +2667,13 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
 /// rather than the AST tree -- useful for just reading the code. `scroll` applies to both sides
 /// identically, since it's meant for eyeballing roughly-aligned content, not precise per-side
 /// navigation.
-fn render_text_view_modal(frame: &mut Frame, area: Rect, before_src: &str, after_src: &str, scroll: u16) {
+fn render_text_view_modal(
+    frame: &mut Frame,
+    area: Rect,
+    before_src: &str,
+    after_src: &str,
+    scroll: u16,
+) {
     let popup_area = centered_rect(92, 90, area);
     frame.render_widget(Clear, popup_area);
 
@@ -2363,23 +2682,29 @@ fn render_text_view_modal(frame: &mut Frame, area: Rect, before_src: &str, after
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(popup_area);
 
-    let block_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let block_style = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
     frame.render_widget(
-        Paragraph::new(before_src).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Before (text) — j/k scroll, T diff view, Esc close")
-                .border_style(block_style),
-        ).scroll((scroll, 0)),
+        Paragraph::new(before_src)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Before (text) — j/k scroll, T diff view, Esc close")
+                    .border_style(block_style),
+            )
+            .scroll((scroll, 0)),
         columns[0],
     );
     frame.render_widget(
-        Paragraph::new(after_src).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("After (text)")
-                .border_style(block_style),
-        ).scroll((scroll, 0)),
+        Paragraph::new(after_src)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("After (text)")
+                    .border_style(block_style),
+            )
+            .scroll((scroll, 0)),
         columns[1],
     );
 }
@@ -2412,7 +2737,11 @@ fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str, scroll: u
     let block = Block::default()
         .borders(Borders::ALL)
         .title("unix `diff -u` — j/k scroll, t text view, Esc close")
-        .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .border_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_widget(
         Paragraph::new(lines).block(block).scroll((scroll, 0)),
@@ -2428,7 +2757,11 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title("Keybindings — j/k scroll, ? or Esc to close")
-        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_widget(
         Paragraph::new(HELP_TEXT).block(block).scroll((scroll, 0)),
@@ -2440,7 +2773,13 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
 /// for `O`, per `kind`), with `selected` highlighted. Scroll position is recomputed fresh each
 /// frame from `selected` (no persisted state needed) by roughly centering it in the viewport,
 /// clamped to the list's extent.
-fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selected: usize, kind: &str) {
+fn render_open_picker(
+    frame: &mut Frame,
+    area: Rect,
+    options: &[String],
+    selected: usize,
+    kind: &str,
+) {
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
 
@@ -2471,7 +2810,11 @@ fn render_open_picker(frame: &mut Frame, area: Rect, options: &[String], selecte
             selected + 1,
             options.len()
         ))
-        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_widget(List::new(items).block(block), popup_area);
 }
@@ -2486,8 +2829,10 @@ fn render_open_sample_picker(
     selected: usize,
     hide_solved: bool,
 ) {
-    let visible: Vec<&(String, bool)> =
-        options.iter().filter(|(_, solved)| !hide_solved || !*solved).collect();
+    let visible: Vec<&(String, bool)> = options
+        .iter()
+        .filter(|(_, solved)| !hide_solved || !*solved)
+        .collect();
 
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
@@ -2509,7 +2854,11 @@ fn render_open_sample_picker(
             } else {
                 Style::default()
             };
-            let label = if *solved { format!("{name} - SOLVED") } else { name.clone() };
+            let label = if *solved {
+                format!("{name} - SOLVED")
+            } else {
+                name.clone()
+            };
             ListItem::new(Line::from(Span::styled(label, style)))
         })
         .collect();
@@ -2524,7 +2873,11 @@ fn render_open_sample_picker(
             if hide_solved { "show" } else { "hide" },
             solved_count,
         ))
-        .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_widget(List::new(items).block(block), popup_area);
 }
@@ -2548,8 +2901,16 @@ struct FrameState<'a> {
 }
 
 fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Result<FrameState<'a>> {
-    let before_root = before.ast.as_ref().context("Before code has no AST")?.root_node();
-    let after_root = after.ast.as_ref().context("After code has no AST")?.root_node();
+    let before_root = before
+        .ast
+        .as_ref()
+        .context("Before code has no AST")?
+        .root_node();
+    let after_root = after
+        .ast
+        .as_ref()
+        .context("After code has no AST")?
+        .root_node();
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
@@ -2557,13 +2918,25 @@ fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Resu
 
     // Recomputed fresh whenever frame state is rebuilt, so `H` can't show a subtree as hidden
     // after it's actually been un-marked, or vice versa.
-    let before_hidden = app.hide_solved.then(|| fully_solved_nodes(before_root, &caches, status_before));
-    let after_hidden = app.hide_solved.then(|| fully_solved_nodes(after_root, &caches, status_after));
+    let before_hidden = app
+        .hide_solved
+        .then(|| fully_solved_nodes(before_root, &caches, status_before));
+    let after_hidden = app
+        .hide_solved
+        .then(|| fully_solved_nodes(after_root, &caches, status_after));
 
     let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
     let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
 
-    Ok(FrameState { before_root, after_root, before_src, after_src, caches, before_flat, after_flat })
+    Ok(FrameState {
+        before_root,
+        after_root,
+        before_src,
+        after_src,
+        caches,
+        before_flat,
+        after_flat,
+    })
 }
 
 fn run_event_loop(
@@ -2828,7 +3201,13 @@ fn handle_key(
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
-                    advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
+                    advance_both_to_next_unmarked(
+                        app,
+                        before_flat,
+                        after_flat,
+                        before_root,
+                        after_root,
+                    );
                 }
                 Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
@@ -2873,7 +3252,13 @@ fn handle_key(
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
-                    advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
+                    advance_both_to_next_unmarked(
+                        app,
+                        before_flat,
+                        after_flat,
+                        before_root,
+                        after_root,
+                    );
                 }
                 Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
@@ -2959,8 +3344,22 @@ fn handle_key(
             });
             None
         }
-        KeyCode::Char('n') => Some(action_next_mismatch(app, focus, before_flat, after_flat, caches, true)),
-        KeyCode::Char('N') => Some(action_next_mismatch(app, focus, before_flat, after_flat, caches, false)),
+        KeyCode::Char('n') => Some(action_next_mismatch(
+            app,
+            focus,
+            before_flat,
+            after_flat,
+            caches,
+            true,
+        )),
+        KeyCode::Char('N') => Some(action_next_mismatch(
+            app,
+            focus,
+            before_flat,
+            after_flat,
+            caches,
+            false,
+        )),
         KeyCode::Char('t') => {
             app.modal = Some(Modal::TextView { scroll: 0 });
             None
@@ -2993,7 +3392,10 @@ fn handle_key(
         KeyCode::Char('s') => match &app.origin {
             CaseOrigin::Diffs => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
             CaseOrigin::Sample(_) => {
-                app.modal = Some(Modal::PromptPromoteName { input: String::new(), error: None });
+                app.modal = Some(Modal::PromptPromoteName {
+                    input: String::new(),
+                    error: None,
+                });
                 None
             }
         },
@@ -3015,8 +3417,15 @@ fn handle_key(
         KeyCode::Char('O') => {
             match list_samples_with_status() {
                 Ok(options) if !options.is_empty() => {
-                    let selected = options.iter().position(|(name, _)| name == &app.name).unwrap_or(0);
-                    app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved: false });
+                    let selected = options
+                        .iter()
+                        .position(|(name, _)| name == &app.name)
+                        .unwrap_or(0);
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        options,
+                        selected,
+                        hide_solved: false,
+                    });
                 }
                 Ok(_) => {
                     app.status = Some("No samples found in src/test/data/samples".to_string());
@@ -3083,7 +3492,13 @@ fn handle_modal_key(
                     &mut app.before.collapsed,
                     &mut app.after.collapsed,
                 ));
-                advance_both_to_next_unmarked(app, before_flat, after_flat, before_root, after_root);
+                advance_both_to_next_unmarked(
+                    app,
+                    before_flat,
+                    after_flat,
+                    before_root,
+                    after_root,
+                );
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 app.status = Some("Cancelled: node kinds do not match".to_string());
@@ -3127,7 +3542,11 @@ fn handle_modal_key(
                 app.modal = Some(Modal::OpenDiffPicker { options, selected });
             }
         },
-        Modal::OpenSamplePicker { options, selected, hide_solved } => {
+        Modal::OpenSamplePicker {
+            options,
+            selected,
+            hide_solved,
+        } => {
             // Cloned rather than borrowed, so `options` stays free to move into whichever
             // `Modal::OpenSamplePicker` gets rebuilt below.
             let visible: Vec<(String, bool)> = options
@@ -3161,7 +3580,11 @@ fn handle_modal_key(
                             return Some(target);
                         }
                     } else {
-                        app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved });
+                        app.modal = Some(Modal::OpenSamplePicker {
+                            options,
+                            selected,
+                            hide_solved,
+                        });
                     }
                 }
                 KeyCode::Char('h') | KeyCode::Char('H') => {
@@ -3190,7 +3613,11 @@ fn handle_modal_key(
                     app.status = Some("Cancelled".to_string());
                 }
                 _ => {
-                    app.modal = Some(Modal::OpenSamplePicker { options, selected, hide_solved });
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        options,
+                        selected,
+                        hide_solved,
+                    });
                 }
             }
         }
@@ -3217,7 +3644,10 @@ fn handle_modal_key(
                 app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
             }
         },
-        Modal::PromptPromoteName { mut input, error: _ } => match code {
+        Modal::PromptPromoteName {
+            mut input,
+            error: _,
+        } => match code {
             KeyCode::Enter => {
                 let new_name = input.trim().to_string();
                 match action_promote(app, &new_name, before_src, after_src) {
@@ -3247,16 +3677,24 @@ fn handle_modal_key(
         },
         Modal::TextView { scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::TextView { scroll: scroll.saturating_sub(1) });
+                app.modal = Some(Modal::TextView {
+                    scroll: scroll.saturating_sub(1),
+                });
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::TextView { scroll: scroll.saturating_add(1) });
+                app.modal = Some(Modal::TextView {
+                    scroll: scroll.saturating_add(1),
+                });
             }
             KeyCode::PageUp => {
-                app.modal = Some(Modal::TextView { scroll: scroll.saturating_sub(10) });
+                app.modal = Some(Modal::TextView {
+                    scroll: scroll.saturating_sub(10),
+                });
             }
             KeyCode::PageDown => {
-                app.modal = Some(Modal::TextView { scroll: scroll.saturating_add(10) });
+                app.modal = Some(Modal::TextView {
+                    scroll: scroll.saturating_add(10),
+                });
             }
             KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
                 Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
@@ -3271,16 +3709,28 @@ fn handle_modal_key(
         },
         Modal::UnixDiffView { output, scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_sub(1) });
+                app.modal = Some(Modal::UnixDiffView {
+                    output,
+                    scroll: scroll.saturating_sub(1),
+                });
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_add(1) });
+                app.modal = Some(Modal::UnixDiffView {
+                    output,
+                    scroll: scroll.saturating_add(1),
+                });
             }
             KeyCode::PageUp => {
-                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_sub(10) });
+                app.modal = Some(Modal::UnixDiffView {
+                    output,
+                    scroll: scroll.saturating_sub(10),
+                });
             }
             KeyCode::PageDown => {
-                app.modal = Some(Modal::UnixDiffView { output, scroll: scroll.saturating_add(10) });
+                app.modal = Some(Modal::UnixDiffView {
+                    output,
+                    scroll: scroll.saturating_add(10),
+                });
             }
             KeyCode::Char('t') => {
                 app.modal = Some(Modal::TextView { scroll: 0 });
@@ -3294,10 +3744,14 @@ fn handle_modal_key(
         },
         Modal::Help { scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::Help { scroll: scroll.saturating_sub(1) });
+                app.modal = Some(Modal::Help {
+                    scroll: scroll.saturating_sub(1),
+                });
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::Help { scroll: scroll.saturating_add(1) });
+                app.modal = Some(Modal::Help {
+                    scroll: scroll.saturating_add(1),
+                });
             }
             KeyCode::Esc | KeyCode::Char('?') => {
                 app.status = Some("Closed help".to_string());
@@ -3332,11 +3786,11 @@ fn action_save(mapping: &mut HumanMapping, dirty: &mut bool, name: &str) -> Resu
 /// name directly into a module identifier (`-` -> `_`), so a name that collides with one of these
 /// would produce a stub that fails to compile -- caught here instead, before anything is written.
 const RUST_KEYWORDS: &[&str] = &[
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
-    "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move",
-    "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true",
-    "type", "unsafe", "use", "where", "while", "abstract", "become", "box", "do", "final", "gen",
-    "macro", "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+    "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type",
+    "unsafe", "use", "where", "while", "abstract", "become", "box", "do", "final", "gen", "macro",
+    "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
 ];
 
 fn validate_new_case_name(name: &str) -> Result<()> {
@@ -3346,7 +3800,10 @@ fn validate_new_case_name(name: &str) -> Result<()> {
     if !name.chars().next().unwrap().is_ascii_alphabetic() {
         bail!("Name must start with a letter");
     }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
         bail!("Name may only contain letters, digits, '-' and '_'");
     }
     if RUST_KEYWORDS.contains(&module_name(name).as_str()) {
@@ -3366,7 +3823,12 @@ fn validate_new_case_name(name: &str) -> Result<()> {
 /// the optimal_solutions stub via the normal `action_save` path, and records `new_name` against
 /// the matching row in sample.csv. On success, `app` is switched over to the new diffs/ case so
 /// subsequent `s` presses behave like a normal save.
-fn action_promote(app: &mut App, new_name: &str, before_src: &[u8], after_src: &[u8]) -> Result<String> {
+fn action_promote(
+    app: &mut App,
+    new_name: &str,
+    before_src: &[u8],
+    after_src: &[u8],
+) -> Result<String> {
     let CaseOrigin::Sample(source) = app.origin.clone() else {
         bail!("Current case is not a sample");
     };
@@ -3398,7 +3860,10 @@ fn action_promote(app: &mut App, new_name: &str, before_src: &[u8], after_src: &
     app.name = new_name.to_string();
     app.origin = CaseOrigin::Diffs;
 
-    Ok(format!("Promoted to '{}'. {}{}", new_name, save_msg, csv_note))
+    Ok(format!(
+        "Promoted to '{}'. {}{}",
+        new_name, save_msg, csv_note
+    ))
 }
 
 fn sample_csv_path() -> PathBuf {
@@ -3541,8 +4006,8 @@ fn ensure_stub_test(name: &str) -> Result<bool> {
 /// it's already present.
 fn insert_mod_declaration(module: &str) -> Result<()> {
     let mod_file = optimal_solutions_mod_file();
-    let content = fs::read_to_string(&mod_file)
-        .with_context(|| format!("reading {:?}", mod_file))?;
+    let content =
+        fs::read_to_string(&mod_file).with_context(|| format!("reading {:?}", mod_file))?;
 
     let mut lines = content.lines().peekable();
     let mut header_lines = Vec::new();
@@ -3559,14 +4024,22 @@ fn insert_mod_declaration(module: &str) -> Result<()> {
         if line.trim() != "#[cfg(test)]" {
             continue;
         }
-        let mod_line = lines
-            .next()
-            .with_context(|| format!("'#[cfg(test)]' not followed by a mod line in {:?}", mod_file))?;
+        let mod_line = lines.next().with_context(|| {
+            format!(
+                "'#[cfg(test)]' not followed by a mod line in {:?}",
+                mod_file
+            )
+        })?;
         let trimmed = mod_line.trim();
         let mod_name = trimmed
             .strip_prefix("mod ")
             .and_then(|rest| rest.strip_suffix(';'))
-            .with_context(|| format!("unexpected line after '#[cfg(test)]' in {:?}: {:?}", mod_file, mod_line))?;
+            .with_context(|| {
+                format!(
+                    "unexpected line after '#[cfg(test)]' in {:?}: {:?}",
+                    mod_file, mod_line
+                )
+            })?;
         entries.push(mod_name.to_string());
     }
 
@@ -3665,8 +4138,14 @@ mod tests {
             .unwrap();
 
         let text = rendered_text(&terminal);
-        assert!(text.contains("old_name"), "before content missing from render: {text}");
-        assert!(text.contains("new_name"), "after content missing from render: {text}");
+        assert!(
+            text.contains("old_name"),
+            "before content missing from render: {text}"
+        );
+        assert!(
+            text.contains("new_name"),
+            "after content missing from render: {text}"
+        );
     }
 
     #[test]
@@ -3675,7 +4154,11 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let area = Rect::new(0, 0, 80, 24);
 
-        let output = run_unix_diff(b"fn main() {\n    old();\n}\n", b"fn main() {\n    new();\n}\n").unwrap();
+        let output = run_unix_diff(
+            b"fn main() {\n    old();\n}\n",
+            b"fn main() {\n    new();\n}\n",
+        )
+        .unwrap();
         terminal
             .draw(|f| {
                 render_unix_diff_modal(f, area, &output, 0);
@@ -3683,8 +4166,14 @@ mod tests {
             .unwrap();
 
         let text = rendered_text(&terminal);
-        assert!(text.contains("old();"), "removed line missing from render: {text}");
-        assert!(text.contains("new();"), "added line missing from render: {text}");
+        assert!(
+            text.contains("old();"),
+            "removed line missing from render: {text}"
+        );
+        assert!(
+            text.contains("new();"),
+            "added line missing from render: {text}"
+        );
     }
 
     #[test]
@@ -3702,17 +4191,35 @@ mod tests {
             .draw(|f| render_open_sample_picker(f, area, &options, 0, false))
             .unwrap();
         let text = rendered_text(&terminal);
-        assert!(text.contains("rust-x-foo-abc12345-a - SOLVED"), "solved marker missing: {text}");
-        assert!(text.contains("rust-x-foo-def67890-b"), "unsolved entry missing: {text}");
-        assert!(text.contains("1/2"), "count should include both entries: {text}");
+        assert!(
+            text.contains("rust-x-foo-abc12345-a - SOLVED"),
+            "solved marker missing: {text}"
+        );
+        assert!(
+            text.contains("rust-x-foo-def67890-b"),
+            "unsolved entry missing: {text}"
+        );
+        assert!(
+            text.contains("1/2"),
+            "count should include both entries: {text}"
+        );
 
         terminal
             .draw(|f| render_open_sample_picker(f, area, &options, 0, true))
             .unwrap();
         let text = rendered_text(&terminal);
-        assert!(!text.contains("SOLVED"), "solved entry should be hidden: {text}");
-        assert!(text.contains("rust-x-foo-def67890-b"), "unsolved entry should still show: {text}");
-        assert!(text.contains("1/1"), "count should only include the unsolved entry: {text}");
+        assert!(
+            !text.contains("SOLVED"),
+            "solved entry should be hidden: {text}"
+        );
+        assert!(
+            text.contains("rust-x-foo-def67890-b"),
+            "unsolved entry should still show: {text}"
+        );
+        assert!(
+            text.contains("1/1"),
+            "count should only include the unsolved entry: {text}"
+        );
     }
 
     #[test]
@@ -3724,8 +4231,13 @@ mod tests {
         let source = "fn main() {}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
-        let mut app =
-            App::new("test".to_string(), CaseOrigin::Diffs, root.id(), root.id(), HumanMapping::default());
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
         let flat = flatten_visible(root, &app.before.collapsed, None);
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
@@ -3796,7 +4308,10 @@ mod tests {
             })
             .unwrap();
         let text = rendered_text(&terminal);
-        assert!(text.contains("before_marker"), "focused panel missing from render: {text}");
+        assert!(
+            text.contains("before_marker"),
+            "focused panel missing from render: {text}"
+        );
         assert!(
             !text.contains("after_marker"),
             "unfocused panel should not render in single-panel mode: {text}"
@@ -3820,8 +4335,14 @@ mod tests {
             })
             .unwrap();
         let text = rendered_text(&terminal);
-        assert!(text.contains("before_marker"), "before panel missing from wide render: {text}");
-        assert!(text.contains("after_marker"), "after panel missing from wide render: {text}");
+        assert!(
+            text.contains("before_marker"),
+            "before panel missing from wide render: {text}"
+        );
+        assert!(
+            text.contains("after_marker"),
+            "after panel missing from wide render: {text}"
+        );
     }
 
     #[test]
@@ -3835,16 +4356,29 @@ mod tests {
         terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
         let text = rendered_text(&terminal);
-        assert!(text.contains("Keybindings"), "help title missing from render: {text}");
-        assert!(text.contains("switch focus between"), "first entry missing from render: {text}");
-        assert!(text.contains("toggle this help"), "help entry missing from render: {text}");
-        assert!(text.contains("quit"), "last entry missing from render: {text}");
+        assert!(
+            text.contains("Keybindings"),
+            "help title missing from render: {text}"
+        );
+        assert!(
+            text.contains("switch focus between"),
+            "first entry missing from render: {text}"
+        );
+        assert!(
+            text.contains("toggle this help"),
+            "help entry missing from render: {text}"
+        );
+        assert!(
+            text.contains("quit"),
+            "last entry missing from render: {text}"
+        );
     }
 
     /// Parses a tiny Rust snippet for the `fully_solved_nodes`/`flatten_visible` tests below,
     /// decoupled from any real fixture on disk.
     fn parse_rust(source: &str) -> tree_sitter::Tree {
-        let language = codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
+        let language =
+            codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&language).unwrap();
         parser.parse(source, None).unwrap()
@@ -3855,7 +4389,8 @@ mod tests {
             return Some(node);
         }
         let mut cursor = node.walk();
-        node.children(&mut cursor).find_map(|child| find_first(child, kind))
+        node.children(&mut cursor)
+            .find_map(|child| find_first(child, kind))
     }
 
     /// The function body's two top-level statements, `a();` and `b();`.
@@ -3894,10 +4429,22 @@ mod tests {
 
         let solved = fully_solved_nodes(root, &caches, status_before);
 
-        assert!(solved.contains(&stmt_a.id()), "fully marked subtree should be solved");
-        assert!(!solved.contains(&stmt_b.id()), "partially marked subtree should not be solved");
-        assert!(!solved.contains(&block.id()), "block has an unsolved descendant, so isn't solved");
-        assert!(!solved.contains(&root.id()), "root has an unsolved descendant, so isn't solved");
+        assert!(
+            solved.contains(&stmt_a.id()),
+            "fully marked subtree should be solved"
+        );
+        assert!(
+            !solved.contains(&stmt_b.id()),
+            "partially marked subtree should not be solved"
+        );
+        assert!(
+            !solved.contains(&block.id()),
+            "block has an unsolved descendant, so isn't solved"
+        );
+        assert!(
+            !solved.contains(&root.id()),
+            "root has an unsolved descendant, so isn't solved"
+        );
     }
 
     #[test]
@@ -3968,7 +4515,11 @@ mod tests {
         );
 
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
-        assert_eq!(caches.unresolved, 0, "every entry M produced should resolve: {:?}", mapping.entries);
+        assert_eq!(
+            caches.unresolved, 0,
+            "every entry M produced should resolve: {:?}",
+            mapping.entries
+        );
 
         let solved = fully_solved_nodes(before_root, &caches, status_before);
         assert!(
@@ -4086,18 +4637,28 @@ mod tests {
                 after_kind,
                 recursive,
             }) => {
-                assert!(!recursive, "f should raise a single-pair mismatch, not a recursive one");
+                assert!(
+                    !recursive,
+                    "f should raise a single-pair mismatch, not a recursive one"
+                );
                 (before_id, after_id, before_kind, after_kind)
             }
-            ActionOutcome::Done(msg) => panic!("expected a kind mismatch modal, action completed instead: {msg}"),
-            ActionOutcome::NeedsModal(other) => panic!("expected ConfirmKindMismatch, got {other:?}"),
+            ActionOutcome::Done(msg) => {
+                panic!("expected a kind mismatch modal, action completed instead: {msg}")
+            }
+            ActionOutcome::NeedsModal(other) => {
+                panic!("expected ConfirmKindMismatch, got {other:?}")
+            }
         };
         assert_ne!(before_kind, after_kind);
 
         // The common prefix (fn main() { ... before the differing statement) must already be
         // matched, even though the sweep didn't run to completion.
         assert!(app.dirty);
-        assert!(!app.mapping.entries.is_empty(), "should have matched at least the common prefix");
+        assert!(
+            !app.mapping.entries.is_empty(),
+            "should have matched at least the common prefix"
+        );
 
         // The cursor is parked exactly on the mismatched pair, ready for a human (or a plain `m`)
         // to resolve it and then resume with `f` again.
@@ -4161,16 +4722,25 @@ mod tests {
         )
         .unwrap();
 
-        assert!(app.dirty, "the shared a(); b(); prefix should have been matched");
+        assert!(
+            app.dirty,
+            "the shared a(); b(); prefix should have been matched"
+        );
         match outcome {
-            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch { before_kind, after_kind, .. }) => {
+            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
+                before_kind,
+                after_kind,
+                ..
+            }) => {
                 assert_ne!(before_kind, after_kind);
             }
             ActionOutcome::Done(msg) => panic!(
                 "expected the sweep to stop on a kind mismatch once `c();` has nothing left to pair \
                  with, action completed instead: {msg}"
             ),
-            ActionOutcome::NeedsModal(other) => panic!("expected ConfirmKindMismatch, got {other:?}"),
+            ActionOutcome::NeedsModal(other) => {
+                panic!("expected ConfirmKindMismatch, got {other:?}")
+            }
         }
 
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
@@ -4206,7 +4776,11 @@ mod tests {
 
         let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
         let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
-        assert!(before_flat.len() > 10_000, "expected a large tree, got {} nodes", before_flat.len());
+        assert!(
+            before_flat.len() > 10_000,
+            "expected a large tree, got {} nodes",
+            before_flat.len()
+        );
 
         let mut app = App::new(
             "test".to_string(),
@@ -4265,7 +4839,11 @@ mod tests {
 
         let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
         let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
-        assert!(before_flat.len() > 10_000, "expected a large tree, got {} nodes", before_flat.len());
+        assert!(
+            before_flat.len() > 10_000,
+            "expected a large tree, got {} nodes",
+            before_flat.len()
+        );
 
         let mut mapping = HumanMapping::default();
         let caches = Caches::default();
@@ -4294,7 +4872,11 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert!(matches!(outcome, ActionOutcome::Done(_)));
-        assert_eq!(mapping.entries.len(), before_flat.len(), "M should match every node in the identical subtree");
+        assert_eq!(
+            mapping.entries.len(),
+            before_flat.len(),
+            "M should match every node in the identical subtree"
+        );
         assert!(
             elapsed.as_secs() < 5,
             "took {elapsed:?} to sweep {} nodes -- the old O(n^2) implementation didn't finish \
@@ -4312,7 +4894,8 @@ mod tests {
         // `a();`'s `expression_statement` sits *below* that bail point, so `M` (pressed above it,
         // at the whole function) should never touch its pre-existing entry.
         let before_source = "fn main() {\n    if true {\n        a();\n    }\n    b();\n}\n";
-        let after_source = "fn main() {\n    if true {\n        a();\n        c();\n    }\n    b();\n}\n";
+        let after_source =
+            "fn main() {\n    if true {\n        a();\n        c();\n    }\n    b();\n}\n";
         let before_tree = parse_rust(before_source);
         let after_tree = parse_rust(after_source);
         let before_root = before_tree.root_node();
@@ -4546,7 +5129,13 @@ mod tests {
         write_csv(
             file.path(),
             &[
-                ("Rust", "repo", "abc123", "src/a.rs", "rust-already-promoted"),
+                (
+                    "Rust",
+                    "repo",
+                    "abc123",
+                    "src/a.rs",
+                    "rust-already-promoted",
+                ),
                 ("Rust", "repo", "def456", "src/b.rs", ""),
             ],
         );
@@ -4608,17 +5197,35 @@ mod tests {
         // this test exists so a label drift between the two tools fails loudly instead of quietly
         // making the same abbreviation mean two different things.
         assert_eq!(reason_label(ASTMappingReason::IdenticalHash), "IdHash");
-        assert_eq!(reason_label(ASTMappingReason::IdenticalHashOfAncestor), "IdHashAnc");
-        assert_eq!(reason_label(ASTMappingReason::FullymappingSubtrees), "FullMap");
-        assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalSubtrees), "StructId");
-        assert_eq!(reason_label(ASTMappingReason::StructurallyIdenticalAncestor), "StructAnc");
+        assert_eq!(
+            reason_label(ASTMappingReason::IdenticalHashOfAncestor),
+            "IdHashAnc"
+        );
+        assert_eq!(
+            reason_label(ASTMappingReason::FullymappingSubtrees),
+            "FullMap"
+        );
+        assert_eq!(
+            reason_label(ASTMappingReason::StructurallyIdenticalSubtrees),
+            "StructId"
+        );
+        assert_eq!(
+            reason_label(ASTMappingReason::StructurallyIdenticalAncestor),
+            "StructAnc"
+        );
         assert_eq!(reason_label(ASTMappingReason::OptimalIDU), "OptIDU");
         assert_eq!(reason_label(ASTMappingReason::APTED("final_pass")), "APTED");
         assert_eq!(reason_label(ASTMappingReason::FlatSequenceDiff), "FlatSeq");
         assert_eq!(reason_label(ASTMappingReason::MovedSubtree), "Moved");
         assert_eq!(reason_label(ASTMappingReason::CommentSibling), "Comment");
-        assert_eq!(reason_label(ASTMappingReason::BottomUpExpansion), "BottomUp");
-        assert_eq!(reason_label(ASTMappingReason::GreedyAnchorBlock), "GreedyAnchor");
+        assert_eq!(
+            reason_label(ASTMappingReason::BottomUpExpansion),
+            "BottomUp"
+        );
+        assert_eq!(
+            reason_label(ASTMappingReason::GreedyAnchorBlock),
+            "GreedyAnchor"
+        );
     }
 
     #[test]
@@ -4628,7 +5235,9 @@ mod tests {
         assert_eq!(reason_detail(reason), "APTED:bottom_up_expansion");
         // Every other variant has no payload to show, so `reason_detail` just falls back to the
         // same short label as `reason_label`.
-        assert_eq!(reason_detail(ASTMappingReason::BottomUpExpansion), "BottomUp");
+        assert_eq!(
+            reason_detail(ASTMappingReason::BottomUpExpansion),
+            "BottomUp"
+        );
     }
 }
-

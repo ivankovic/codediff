@@ -97,8 +97,16 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         let depth_a = before_metadata.node_to_depth.get(&a).copied().unwrap_or(0);
         let depth_b = before_metadata.node_to_depth.get(&b).copied().unwrap_or(0);
         depth_b.cmp(&depth_a).then_with(|| {
-            let pre_a = before_metadata.node_info.get(&a).map(|i| i.preorder_index).unwrap_or(0);
-            let pre_b = before_metadata.node_info.get(&b).map(|i| i.preorder_index).unwrap_or(0);
+            let pre_a = before_metadata
+                .node_info
+                .get(&a)
+                .map(|i| i.preorder_index)
+                .unwrap_or(0);
+            let pre_b = before_metadata
+                .node_info
+                .get(&b)
+                .map(|i| i.preorder_index)
+                .unwrap_or(0);
             pre_a.cmp(&pre_b)
         })
     });
@@ -107,11 +115,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         if diff.before_node_map.contains_key(&before_id) {
             continue;
         }
-        let Some(before_info) = before_metadata.node_info.get(&before_id) else { continue };
+        let Some(before_info) = before_metadata.node_info.get(&before_id) else {
+            continue;
+        };
         if before_info.children.len() < MIN_CHILDREN {
             continue;
         }
-        let Some(&before_size) = before_metadata.node_to_subtree_size.get(&before_id) else { continue };
+        let Some(&before_size) = before_metadata.node_to_subtree_size.get(&before_id) else {
+            continue;
+        };
         if before_size < MIN_SUBTREE_SIZE {
             continue;
         }
@@ -119,11 +131,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         // Stage 1: cheap candidate proposal via direct-children votes.
         let mut votes: HashMap<usize, usize> = HashMap::new();
         for &child_id in &before_info.children {
-            let Some(&after_child_id) = diff.before_node_map.get(&child_id) else { continue };
+            let Some(&after_child_id) = diff.before_node_map.get(&child_id) else {
+                continue;
+            };
             if after_child_id == 0 {
                 continue;
             }
-            let Some(&after_parent_id) = after_metadata.node_to_parent.get(&after_child_id) else { continue };
+            let Some(&after_parent_id) = after_metadata.node_to_parent.get(&after_child_id) else {
+                continue;
+            };
             *votes.entry(after_parent_id).or_insert(0) += 1;
         }
         if votes.is_empty() {
@@ -134,15 +150,22 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         // no matter what order the `HashMap` above happens to iterate in.
         let mut best: Option<(usize, usize)> = None;
         for (after_id, count) in votes {
-            let pre = after_metadata.node_info.get(&after_id).map(|i| i.preorder_index).unwrap_or(usize::MAX);
+            let pre = after_metadata
+                .node_info
+                .get(&after_id)
+                .map(|i| i.preorder_index)
+                .unwrap_or(usize::MAX);
             let is_better = match best {
                 None => true,
                 Some((best_id, best_count)) => {
                     if count != best_count {
                         count > best_count
                     } else {
-                        let best_pre =
-                            after_metadata.node_info.get(&best_id).map(|i| i.preorder_index).unwrap_or(usize::MAX);
+                        let best_pre = after_metadata
+                            .node_info
+                            .get(&best_id)
+                            .map(|i| i.preorder_index)
+                            .unwrap_or(usize::MAX);
                         pre < best_pre
                     }
                 }
@@ -156,11 +179,15 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         if diff.after_node_map.contains_key(&after_id) {
             continue;
         }
-        let Some(after_info) = after_metadata.node_info.get(&after_id) else { continue };
+        let Some(after_info) = after_metadata.node_info.get(&after_id) else {
+            continue;
+        };
         if after_info.children.len() < MIN_CHILDREN {
             continue;
         }
-        let Some(&after_size) = after_metadata.node_to_subtree_size.get(&after_id) else { continue };
+        let Some(&after_size) = after_metadata.node_to_subtree_size.get(&after_id) else {
+            continue;
+        };
         if after_size < MIN_SUBTREE_SIZE {
             continue;
         }
@@ -171,7 +198,8 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         }
 
         // Stage 2: verify with a full-subtree Dice coefficient.
-        let common = common_descendant_count(before_id, after_id, &before_metadata, &after_metadata, diff);
+        let common =
+            common_descendant_count(before_id, after_id, &before_metadata, &after_metadata, diff);
         let dice = 2.0 * common as f64 / (before_size + after_size) as f64;
         if dice < DICE_THRESHOLD {
             continue;
@@ -203,8 +231,12 @@ fn common_descendant_count(
     after_metadata: &ASTMetadata,
     diff: &ASTDiff,
 ) -> usize {
-    let Some(after_info) = after_metadata.node_info.get(&after_id) else { return 0 };
-    let Some(&after_size) = after_metadata.node_to_subtree_size.get(&after_id) else { return 0 };
+    let Some(after_info) = after_metadata.node_info.get(&after_id) else {
+        return 0;
+    };
+    let Some(&after_size) = after_metadata.node_to_subtree_size.get(&after_id) else {
+        return 0;
+    };
     let range_start = after_info.preorder_index;
     let range_end = range_start + after_size;
 
@@ -281,15 +313,20 @@ mod tests {
         // resolved (as an Update) by the `apted::for_nodes` call this pass delegates to.
         let before_name = first_child_of_kind(before_fn, "identifier").unwrap();
         let after_name = first_child_of_kind(after_fn, "identifier").unwrap();
-        assert_eq!(diff.before_node_map.get(&before_name.id()), Some(&after_name.id()));
+        assert_eq!(
+            diff.before_node_map.get(&before_name.id()),
+            Some(&after_name.id())
+        );
     }
 
     #[test]
     fn dissimilar_containers_are_not_matched() {
         // Only 1 of 4 statements matches - well under the 90% Dice threshold - so the two blocks
         // (and therefore their enclosing functions) must not be paired up.
-        let before_src = "fn a() {\n    let x = 1;\n    let y = 2;\n    let z = 3;\n    let w = 4;\n}\n";
-        let after_src = "fn b() {\n    let p = 9;\n    let q = 8;\n    let r = 7;\n    let w = 4;\n}\n";
+        let before_src =
+            "fn a() {\n    let x = 1;\n    let y = 2;\n    let z = 3;\n    let w = 4;\n}\n";
+        let after_src =
+            "fn b() {\n    let p = 9;\n    let q = 8;\n    let r = 7;\n    let w = 4;\n}\n";
         let before = Code::from_string(before_src, &Language::Rust);
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
@@ -305,8 +342,16 @@ mod tests {
         // Only map the one shared statement (`let w = 4;`), positionally last.
         let mut before_cursor = before_block.walk();
         let mut after_cursor = after_block.walk();
-        let before_last = before_block.children(&mut before_cursor).filter(|n| n.kind() == "let_declaration").last().unwrap();
-        let after_last = after_block.children(&mut after_cursor).filter(|n| n.kind() == "let_declaration").last().unwrap();
+        let before_last = before_block
+            .children(&mut before_cursor)
+            .filter(|n| n.kind() == "let_declaration")
+            .last()
+            .unwrap();
+        let after_last = after_block
+            .children(&mut after_cursor)
+            .filter(|n| n.kind() == "let_declaration")
+            .last()
+            .unwrap();
         map_positionally(before_last, after_last, &mut diff);
 
         solve(&before, &after, &node_cache, &mut diff);
@@ -317,17 +362,24 @@ mod tests {
         );
     }
 
-
     /// Maps two nodes (and, recursively, every descendant pair at the same position) as
     /// `Identical`, unconditionally - a test-only stand-in for "some earlier pass already matched
     /// this content", not a general-purpose matcher.
-    fn map_positionally(before_node: tree_sitter::Node, after_node: tree_sitter::Node, diff: &mut ASTDiff) {
+    fn map_positionally(
+        before_node: tree_sitter::Node,
+        after_node: tree_sitter::Node,
+        diff: &mut ASTDiff,
+    ) {
         use crate::diff::{ASTMapping, ASTMappingOperation};
 
         diff.add_mapping(
             before_node.id(),
             after_node.id(),
-            ASTMapping { cost: 0, operation: ASTMappingOperation::Identical, reason: ASTMappingReason::IdenticalHash },
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::IdenticalHash,
+            },
         );
         let mut before_cursor = before_node.walk();
         let mut after_cursor = after_node.walk();

@@ -88,7 +88,11 @@ pub fn operation_cost(operation: &ASTMappingOperation, subtree_size: usize) -> u
 * `before_metadata`/`after_metadata` supply subtree sizes for `*WithChildren` operations - see
 * `operation_cost`'s doc comment on why those should never actually appear here today.
 */
-pub fn diff_cost(diff: &ASTDiff, before_metadata: &ASTMetadata, after_metadata: &ASTMetadata) -> u64 {
+pub fn diff_cost(
+    diff: &ASTDiff,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+) -> u64 {
     diff.mapping
         .iter()
         .map(|(&(before_id, after_id), m)| {
@@ -124,27 +128,49 @@ mod tests {
     }
 
     fn mapping(operation: ASTMappingOperation) -> ASTMapping {
-        ASTMapping { cost: 0, operation, reason: ASTMappingReason::APTED("test") }
+        ASTMapping {
+            cost: 0,
+            operation,
+            reason: ASTMappingReason::APTED("test"),
+        }
     }
 
     #[test]
     fn identical_and_match_but_not_identical_cost_nothing() {
         assert_eq!(operation_cost(&ASTMappingOperation::Identical, 50), 0);
-        assert_eq!(operation_cost(&ASTMappingOperation::MatchButNotIdentical, 50), 0);
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::MatchButNotIdentical, 50),
+            0
+        );
         assert_eq!(operation_cost(&ASTMappingOperation::Move, 50), COST_MOVE);
     }
 
     #[test]
     fn single_node_operations_cost_one_regardless_of_subtree_size() {
-        assert_eq!(operation_cost(&ASTMappingOperation::Update, 50), COST_UPDATE);
-        assert_eq!(operation_cost(&ASTMappingOperation::Delete, 50), COST_DELETE);
-        assert_eq!(operation_cost(&ASTMappingOperation::Insert, 50), COST_INSERT);
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::Update, 50),
+            COST_UPDATE
+        );
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::Delete, 50),
+            COST_DELETE
+        );
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::Insert, 50),
+            COST_INSERT
+        );
     }
 
     #[test]
     fn with_children_operations_scale_by_subtree_size() {
-        assert_eq!(operation_cost(&ASTMappingOperation::DeleteWithChildren, 7), 7 * COST_DELETE);
-        assert_eq!(operation_cost(&ASTMappingOperation::InsertWithChildren, 3), 3 * COST_INSERT);
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::DeleteWithChildren, 7),
+            7 * COST_DELETE
+        );
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::InsertWithChildren, 3),
+            3 * COST_INSERT
+        );
     }
 
     #[test]

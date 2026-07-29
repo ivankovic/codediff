@@ -219,7 +219,13 @@ impl Diff {
         // `solver_import_nodes`: the 2026-07-15 ablation study found it net-negative (-89
         // disabling it individually), and nothing about folding it into a hash variant changes
         // that signal's own accuracy.
-        solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff, config.solver_import_nodes);
+        solve_hash_descent::solve(
+            before,
+            after,
+            &node_cache,
+            &mut ast_diff,
+            config.solver_import_nodes,
+        );
 
         // Phase 2: contextual exact matching - houses solve_comment_nodes (comment-precedes-
         // matched-node) and solve_identical_diagnostic_statements (byte-identical logging/bail/
@@ -833,7 +839,10 @@ mod tests {
 
         let diff = diff_code(&before, &after);
 
-        assert!(diff.ast.is_some(), "should still produce an (empty) ASTDiff, not panic");
+        assert!(
+            diff.ast.is_some(),
+            "should still produce an (empty) ASTDiff, not panic"
+        );
     }
 
     /// Same guard for the `DiffMode::Exact` path, which goes through the same `for_roots` call.

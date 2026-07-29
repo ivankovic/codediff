@@ -40,7 +40,10 @@ pub fn text_len_if_in_range(
 ) -> Option<usize> {
     let blob = repo.find_blob(oid).ok()?;
     let content = blob.content();
-    if content.len() >= min_bytes && content.len() <= max_bytes && std::str::from_utf8(content).is_ok() {
+    if content.len() >= min_bytes
+        && content.len() <= max_bytes
+        && std::str::from_utf8(content).is_ok()
+    {
         Some(content.len())
     } else {
         None

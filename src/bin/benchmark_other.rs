@@ -152,20 +152,32 @@ impl ExternalTool {
 fn unix_diff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let mut before_file = tempfile::NamedTempFile::new().context("creating before temp file")?;
     let mut after_file = tempfile::NamedTempFile::new().context("creating after temp file")?;
-    before_file.write_all(before.contents.as_bytes()).context("writing before temp file")?;
-    after_file.write_all(after.contents.as_bytes()).context("writing after temp file")?;
+    before_file
+        .write_all(before.contents.as_bytes())
+        .context("writing before temp file")?;
+    after_file
+        .write_all(after.contents.as_bytes())
+        .context("writing after temp file")?;
 
     let before_line_count = before.contents.split('\n').count();
     let after_line_count = after.contents.split('\n').count();
 
     let before_touched = touched_line_numbers(
-        &["--old-line-format=%dn\n", "--new-line-format=", "--unchanged-line-format="],
+        &[
+            "--old-line-format=%dn\n",
+            "--new-line-format=",
+            "--unchanged-line-format=",
+        ],
         before_file.path(),
         after_file.path(),
         before_line_count,
     )?;
     let after_touched = touched_line_numbers(
-        &["--old-line-format=", "--new-line-format=%dn\n", "--unchanged-line-format="],
+        &[
+            "--old-line-format=",
+            "--new-line-format=%dn\n",
+            "--unchanged-line-format=",
+        ],
         before_file.path(),
         after_file.path(),
         after_line_count,
@@ -191,13 +203,23 @@ fn touched_line_numbers(
     // diff exits 0 for "no differences" and 1 for "differences found" - both are success for our
     // purposes. 2+ is a real error (bad flags, unreadable file, ...).
     if output.status.code().is_none_or(|c| c > 1) {
-        bail!("diff exited with {:?}: {}", output.status.code(), String::from_utf8_lossy(&output.stderr));
+        bail!(
+            "diff exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     let mut touched = vec![false; line_count];
     for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let line_number: usize = line.trim().parse().with_context(|| format!("parsing diff output line {:?}", line))?;
-        if let Some(slot) = line_number.checked_sub(1).and_then(|idx| touched.get_mut(idx)) {
+        let line_number: usize = line
+            .trim()
+            .parse()
+            .with_context(|| format!("parsing diff output line {:?}", line))?;
+        if let Some(slot) = line_number
+            .checked_sub(1)
+            .and_then(|idx| touched.get_mut(idx))
+        {
             *slot = true;
         }
     }
@@ -230,17 +252,17 @@ fn touched_line_numbers(
 /// confirmed no registered generator exists for it in this build.
 fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)> {
     match language {
-        Language::Java => Some(("java-jdt", "java")),               // Stable
-        Language::CSS => Some(("css-phcss", "css")),                // Stable
-        Language::Rust => Some(("rust-treesitter-ng", "rs")),       // Testing
-        Language::CPP => Some(("cpp-treesitter-ng", "cpp")),        // Testing
-        Language::Kotlin => Some(("kotlin-treesitter-ng", "kt")),   // Testing
-        Language::C => Some(("c-treesitter-ng", "c")),              // Testing
-        Language::Go => Some(("go-treesitter-ng", "go")),           // Testing
-        Language::Python => Some(("python-treesitter-ng", "py")),   // Testing
-        Language::TypeScript => Some(("ts-treesitter-ng", "ts")),   // Testing
-        Language::JavaScript => Some(("js-treesitter-ng", "js")),   // Testing
-        Language::CSharp => Some(("cs-treesitter-ng", "cs")),       // Testing
+        Language::Java => Some(("java-jdt", "java")), // Stable
+        Language::CSS => Some(("css-phcss", "css")),  // Stable
+        Language::Rust => Some(("rust-treesitter-ng", "rs")), // Testing
+        Language::CPP => Some(("cpp-treesitter-ng", "cpp")), // Testing
+        Language::Kotlin => Some(("kotlin-treesitter-ng", "kt")), // Testing
+        Language::C => Some(("c-treesitter-ng", "c")), // Testing
+        Language::Go => Some(("go-treesitter-ng", "go")), // Testing
+        Language::Python => Some(("python-treesitter-ng", "py")), // Testing
+        Language::TypeScript => Some(("ts-treesitter-ng", "ts")), // Testing
+        Language::JavaScript => Some(("js-treesitter-ng", "js")), // Testing
+        Language::CSharp => Some(("cs-treesitter-ng", "cs")), // Testing
         _ => None,
     }
 }
@@ -277,14 +299,22 @@ fn gumtree_bin() -> Result<std::path::PathBuf> {
 ///   `update-node` action's `tree` string always appears verbatim as some `matches[].src` entry).
 fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let language = before.metadata.language.unwrap_or_default();
-    let (generator, ext) =
-        gumtree_generator(language).with_context(|| format!("no GumTree generator for {language:?}"))?;
+    let (generator, ext) = gumtree_generator(language)
+        .with_context(|| format!("no GumTree generator for {language:?}"))?;
     let gumtree = gumtree_bin()?;
 
-    let mut before_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
-    let mut after_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
-    before_file.write_all(before.contents.as_bytes()).context("writing before temp file")?;
-    after_file.write_all(after.contents.as_bytes()).context("writing after temp file")?;
+    let mut before_file = tempfile::Builder::new()
+        .suffix(&format!(".{ext}"))
+        .tempfile()?;
+    let mut after_file = tempfile::Builder::new()
+        .suffix(&format!(".{ext}"))
+        .tempfile()?;
+    before_file
+        .write_all(before.contents.as_bytes())
+        .context("writing before temp file")?;
+    after_file
+        .write_all(after.contents.as_bytes())
+        .context("writing after temp file")?;
 
     let output = Command::new(&gumtree)
         .args(["textdiff", "-g", generator, "-f", "JSON"])
@@ -293,10 +323,15 @@ fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bo
         .output()
         .with_context(|| format!("running {gumtree:?} textdiff -g {generator}"))?;
     if !output.status.success() {
-        bail!("gumtree exited with {:?}: {}", output.status.code(), String::from_utf8_lossy(&output.stderr));
+        bail!(
+            "gumtree exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).context("parsing gumtree JSON output")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing gumtree JSON output")?;
     gumtree_touched_from_json(before, after, &json)
 }
 
@@ -305,9 +340,17 @@ fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bo
 /// "actions": [...]}` schema (the driver reuses GumTree's own `ActionsIoUtils.toJson`, see
 /// `research/drivers/gumtree-batch/BatchDriver.java`'s doc comment). See `gumtree_line_labels`'s
 /// doc comment for what `matches`/`actions` mean.
-fn gumtree_touched_from_json(before: &Code, after: &Code, json: &serde_json::Value) -> Result<(Vec<bool>, Vec<bool>)> {
-    let matches = json["matches"].as_array().context("gumtree JSON has no `matches` array")?;
-    let actions = json["actions"].as_array().context("gumtree JSON has no `actions` array")?;
+fn gumtree_touched_from_json(
+    before: &Code,
+    after: &Code,
+    json: &serde_json::Value,
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let matches = json["matches"]
+        .as_array()
+        .context("gumtree JSON has no `matches` array")?;
+    let actions = json["actions"]
+        .as_array()
+        .context("gumtree JSON has no `actions` array")?;
 
     let src_to_dest: HashMap<&str, &str> = matches
         .iter()
@@ -328,8 +371,12 @@ fn gumtree_touched_from_json(before: &Code, after: &Code, json: &serde_json::Val
     };
 
     for action in actions {
-        let kind = action["action"].as_str().context("gumtree action missing `action`")?;
-        let tree = action["tree"].as_str().context("gumtree action missing `tree`")?;
+        let kind = action["action"]
+            .as_str()
+            .context("gumtree action missing `action`")?;
+        let tree = action["tree"]
+            .as_str()
+            .context("gumtree action missing `tree`")?;
         match kind {
             "insert-tree" | "insert-node" => mark(&mut after_touched, &after.contents, tree)?,
             "delete-tree" | "delete-node" => mark(&mut before_touched, &before.contents, tree)?,
@@ -340,7 +387,9 @@ fn gumtree_touched_from_json(before: &Code, after: &Code, json: &serde_json::Val
                     // Contradicts what every fixture checked during development showed (see this
                     // function's doc comment) - not fatal, but real enough to want visible in
                     // benchmark output rather than a silently under-counted after-side.
-                    None => eprintln!("gumtree: no `matches` entry for {kind} tree {tree:?}, after-side line(s) not marked"),
+                    None => eprintln!(
+                        "gumtree: no `matches` entry for {kind} tree {tree:?}, after-side line(s) not marked"
+                    ),
                 }
             }
             other => bail!("unrecognized gumtree action kind {other:?}"),
@@ -395,32 +444,55 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
         let Some((generator, ext)) = gumtree_generator(language) else {
             continue;
         };
-        let mut before_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
-        let mut after_file = tempfile::Builder::new().suffix(&format!(".{ext}")).tempfile()?;
-        before_file.write_all(before.contents.as_bytes()).context("writing before temp file")?;
-        after_file.write_all(after.contents.as_bytes()).context("writing after temp file")?;
-        requests.push_str(&serde_json::json!({
-            "id": name,
-            "generator": generator,
-            "before": before_file.path().display().to_string(),
-            "after": after_file.path().display().to_string(),
-        }).to_string());
+        let mut before_file = tempfile::Builder::new()
+            .suffix(&format!(".{ext}"))
+            .tempfile()?;
+        let mut after_file = tempfile::Builder::new()
+            .suffix(&format!(".{ext}"))
+            .tempfile()?;
+        before_file
+            .write_all(before.contents.as_bytes())
+            .context("writing before temp file")?;
+        after_file
+            .write_all(after.contents.as_bytes())
+            .context("writing after temp file")?;
+        requests.push_str(
+            &serde_json::json!({
+                "id": name,
+                "generator": generator,
+                "before": before_file.path().display().to_string(),
+                "after": after_file.path().display().to_string(),
+            })
+            .to_string(),
+        );
         requests.push('\n');
         before_files.push(before_file);
         after_files.push(after_file);
     }
 
     let mut child = Command::new("java")
-        .args(["-cp", &format!("{}:{}", jar.display(), driver_out.display()), "BatchDriver"])
+        .args([
+            "-cp",
+            &format!("{}:{}", jar.display(), driver_out.display()),
+            "BatchDriver",
+        ])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .context("spawning the GumTree batch driver (is `java` on PATH?)")?;
-    let mut stdin = child.stdin.take().context("batch driver child has no stdin")?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .context("batch driver child has no stdin")?;
     let writer = std::thread::spawn(move || stdin.write_all(requests.as_bytes()));
-    let output = child.wait_with_output().context("waiting for the GumTree batch driver")?;
-    writer.join().expect("batch driver stdin-writer thread panicked").context("writing batch driver stdin")?;
+    let output = child
+        .wait_with_output()
+        .context("waiting for the GumTree batch driver")?;
+    writer
+        .join()
+        .expect("batch driver stdin-writer thread panicked")
+        .context("writing batch driver stdin")?;
     if !output.status.success() {
         bail!(
             "GumTree batch driver exited with {:?}: {}",
@@ -431,13 +503,18 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
 
     let mut results = HashMap::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let json: serde_json::Value =
-            serde_json::from_str(line).with_context(|| format!("parsing batch driver response line {line:?}"))?;
-        let id = json["id"].as_str().context("batch driver response missing `id`")?.to_string();
+        let json: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("parsing batch driver response line {line:?}"))?;
+        let id = json["id"]
+            .as_str()
+            .context("batch driver response missing `id`")?
+            .to_string();
         if let Some(error) = json["error"].as_str() {
             bail!("GumTree batch driver failed on {id:?}: {error}");
         }
-        let ms = json["ms"].as_f64().context("batch driver response missing `ms`")?;
+        let ms = json["ms"]
+            .as_f64()
+            .context("batch driver response missing `ms`")?;
         results.insert(id, ms);
     }
     Ok(Some(results))
@@ -451,7 +528,9 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
 fn gumtree_node_offsets(node_ref: &str) -> Result<(usize, usize)> {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     let re = RE.get_or_init(|| regex::Regex::new(r"\[(\d+),(\d+)\]$").unwrap());
-    let caps = re.captures(node_ref).with_context(|| format!("no [start,end] suffix in {node_ref:?}"))?;
+    let caps = re
+        .captures(node_ref)
+        .with_context(|| format!("no [start,end] suffix in {node_ref:?}"))?;
     let start: usize = caps[1].parse()?;
     let end: usize = caps[2].parse()?;
     Ok((start, end))
@@ -468,13 +547,20 @@ fn gumtree_line_range(contents: &str, start: usize, end: usize) -> std::ops::Ran
 /// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against
 /// an `ExternalTool`, which has no notion of codediff's finer-grained Update/Move/... distinction.
 fn touched(ops: &[TextOperation]) -> Vec<bool> {
-    ops.iter().map(|op| *op != TextOperation::Identical).collect()
+    ops.iter()
+        .map(|op| *op != TextOperation::Identical)
+        .collect()
 }
 
 /// Projects `ast_diff` down to per-line touched masks for both sides, via the same
 /// `TextDiff`/`line_operations` path used for both codediff's own diff and the synthetic
 /// human-mapping diff - so the two are reduced to line labels identically.
-fn touched_lines(before: &Code, after: &Code, ast_diff: &ASTDiff, node_cache: &NodeCache) -> (Vec<bool>, Vec<bool>) {
+fn touched_lines(
+    before: &Code,
+    after: &Code,
+    ast_diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> (Vec<bool>, Vec<bool>) {
     let text_diff = TextDiff::from(before, after, ast_diff, node_cache);
     let before_ops = line_operations(&text_diff.all(0), before.contents.split('\n').count());
     let after_ops = line_operations(&text_diff.all(1), after.contents.split('\n').count());
@@ -485,7 +571,11 @@ fn touched_lines(before: &Code, after: &Code, ast_diff: &ASTDiff, node_cache: &N
 /// come from splitting the exact same `contents` string on `'\n'`, so their lengths can never
 /// legitimately differ.
 fn disagreement_count(a: &[bool], b: &[bool]) -> usize {
-    assert_eq!(a.len(), b.len(), "line count mismatch between two labelings of the same file");
+    assert_eq!(
+        a.len(),
+        b.len(),
+        "line count mismatch between two labelings of the same file"
+    );
     a.iter().zip(b).filter(|(x, y)| x != y).count()
 }
 
@@ -567,8 +657,11 @@ fn score_fixture(
     for i in 0..repeats {
         let started = std::time::Instant::now();
         let codediff_diff = diff::diff_code(before, after);
-        let codediff_ast = codediff_diff.ast.context("codediff produced no AST mapping")?;
-        let (codediff_before, codediff_after) = touched_lines(before, after, &codediff_ast, &node_cache);
+        let codediff_ast = codediff_diff
+            .ast
+            .context("codediff produced no AST mapping")?;
+        let (codediff_before, codediff_after) =
+            touched_lines(before, after, &codediff_ast, &node_cache);
         codediff_ms.push(started.elapsed().as_secs_f64() * 1000.0);
         if i == 0 {
             codediff_mismatches = disagreement_count(&human_before, &codediff_before)
@@ -625,10 +718,14 @@ fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
     let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
 
     let codediff_diff = diff::diff_code(before, after);
-    let codediff_ast = codediff_diff.ast.context("codediff produced no AST mapping")?;
-    let (codediff_before, codediff_after) = touched_lines(before, after, &codediff_ast, &node_cache);
+    let codediff_ast = codediff_diff
+        .ast
+        .context("codediff produced no AST mapping")?;
+    let (codediff_before, codediff_after) =
+        touched_lines(before, after, &codediff_ast, &node_cache);
 
-    let mut sources: Vec<(&str, Vec<bool>, Vec<bool>)> = vec![("codediff", codediff_before, codediff_after)];
+    let mut sources: Vec<(&str, Vec<bool>, Vec<bool>)> =
+        vec![("codediff", codediff_before, codediff_after)];
     for tool in ExternalTool::ALL {
         if !tool.supports(language) {
             println!("{}: does not support {:?}, skipped", tool.name(), language);
@@ -639,9 +736,10 @@ fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
     }
 
     for (source_name, source_before, source_after) in &sources {
-        for (side_name, human_side, source_side) in
-            [("before", &human_before, source_before), ("after", &human_after, source_after)]
-        {
+        for (side_name, human_side, source_side) in [
+            ("before", &human_before, source_before),
+            ("after", &human_after, source_after),
+        ] {
             for (i, (h, s)) in human_side.iter().zip(source_side).enumerate() {
                 if h != s {
                     println!(
@@ -682,8 +780,9 @@ fn main() -> Result<()> {
     }
 
     if let Some(name) = args.details {
-        let (before, after) =
-            test_diffs.get(&name).with_context(|| format!("no fixture named '{}'", name))?;
+        let (before, after) = test_diffs
+            .get(&name)
+            .with_context(|| format!("no fixture named '{}'", name))?;
         return print_details(&name, before, after);
     }
 
@@ -697,7 +796,9 @@ fn main() -> Result<()> {
     let warm_fixtures: Vec<(&str, &Code, &Code)> = names
         .iter()
         .map(|name| {
-            let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+            let (before, after) = test_diffs
+                .get(name)
+                .expect("name came from test_diffs.keys()");
             (name.as_str(), before, after)
         })
         .collect();
@@ -719,9 +820,14 @@ fn main() -> Result<()> {
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
-        let (before, after) = test_diffs.get(name).expect("name came from test_diffs.keys()");
+        let (before, after) = test_diffs
+            .get(name)
+            .expect("name came from test_diffs.keys()");
         let warm_ms = gumtree_warm_available.then(|| {
-            gumtree_warm_runs.iter().filter_map(|results| results.get(name).copied()).collect::<Vec<f64>>()
+            gumtree_warm_runs
+                .iter()
+                .filter_map(|results| results.get(name).copied())
+                .collect::<Vec<f64>>()
         });
         // A fixture outside GumTree's language scope has no entry in any repeat's batch results
         // (see `gumtree_warm_batch`) - `Some(vec![])` there would misrepresent "not applicable" as
@@ -734,10 +840,16 @@ fn main() -> Result<()> {
 
     // Worst codediff offenders first, so the fixtures where line-level scoring disagrees most
     // with codediff's own (node-level) view of its accuracy are the first thing visible.
-    rows.sort_by(|a, b| b.codediff.0.cmp(&a.codediff.0).then_with(|| a.name.cmp(&b.name)));
+    rows.sort_by(|a, b| {
+        b.codediff
+            .0
+            .cmp(&a.codediff.0)
+            .then_with(|| a.name.cmp(&b.name))
+    });
 
     if let Some(csv_path) = args.csv {
-        let path = csv_path.unwrap_or_else(|| std::path::PathBuf::from("./research/benchmark_other.csv"));
+        let path =
+            csv_path.unwrap_or_else(|| std::path::PathBuf::from("./research/benchmark_other.csv"));
         write_csv(&rows, &path)?;
     }
 
@@ -753,10 +865,21 @@ fn main() -> Result<()> {
 }
 
 fn print_table(rows: &[Row]) {
-    let name_width = rows.iter().map(|r| r.name.len()).chain(["Solution".len()]).max().unwrap_or(0);
+    let name_width = rows
+        .iter()
+        .map(|r| r.name.len())
+        .chain(["Solution".len()])
+        .max()
+        .unwrap_or(0);
     let tool_names: Vec<&str> = ExternalTool::ALL.iter().map(|t| t.name()).collect();
 
-    print!("{:<name_width$}  {:>9}  {:>7}", "Solution", "codediff", "cd %", name_width = name_width);
+    print!(
+        "{:<name_width$}  {:>9}  {:>7}",
+        "Solution",
+        "codediff",
+        "cd %",
+        name_width = name_width
+    );
     for tool_name in &tool_names {
         print!("  {:>9}  {:>7}", tool_name, format!("{tool_name} %"));
     }
@@ -809,13 +932,20 @@ fn print_table(rows: &[Row]) {
 
     for (tool_name, &(_, _, scored)) in tool_names.iter().zip(&tool_totals) {
         if scored < rows.len() {
-            println!("  ({tool_name} scored on {scored}/{} fixtures - the rest are outside its language scope)", rows.len());
+            println!(
+                "  ({tool_name} scored on {scored}/{} fixtures - the rest are outside its language scope)",
+                rows.len()
+            );
         }
     }
 }
 
 fn pct(mismatches: usize, total: usize) -> f64 {
-    if total > 0 { 100.0 * mismatches as f64 / total as f64 } else { 0.0 }
+    if total > 0 {
+        100.0 * mismatches as f64 / total as f64
+    } else {
+        0.0
+    }
 }
 
 /// Per-tool timing: total and mean milliseconds across every fixture, each tool timed identically
@@ -837,7 +967,11 @@ fn mean_coefficient_of_variation<'a>(samples: impl Iterator<Item = &'a [f64]>) -
             Some(100.0 * variance.sqrt() / mean)
         })
         .collect();
-    if cvs.is_empty() { None } else { Some(cvs.iter().sum::<f64>() / cvs.len() as f64) }
+    if cvs.is_empty() {
+        None
+    } else {
+        Some(cvs.iter().sum::<f64>() / cvs.len() as f64)
+    }
 }
 
 fn print_runtime_table(rows: &[Row]) {
@@ -850,11 +984,17 @@ fn print_runtime_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!();
-    println!("Per-tool runtime (time to produce line-level touched/untouched labels, {} repeat(s)/fixture):",
-        rows.first().map(|r| r.codediff_ms.len()).unwrap_or(0));
+    println!(
+        "Per-tool runtime (time to produce line-level touched/untouched labels, {} repeat(s)/fixture):",
+        rows.first().map(|r| r.codediff_ms.len()).unwrap_or(0)
+    );
     println!(
         "{:<label_width$}  {:>10}  {:>10}  {:>8}",
-        "Tool", "Total ms", "Mean ms", "CoV %", label_width = label_width
+        "Tool",
+        "Total ms",
+        "Mean ms",
+        "CoV %",
+        label_width = label_width
     );
     println!("{}", "-".repeat(label_width + 2 + 10 + 2 + 10 + 2 + 8));
 
@@ -863,7 +1003,10 @@ fn print_runtime_table(rows: &[Row]) {
     // sample (n = fixtures * repeats), same convention for every row below - "CoV %" is the
     // separate per-fixture-then-averaged spread measure (see `mean_coefficient_of_variation`),
     // not derivable from the flattened total/mean alone.
-    let treesitter_flat: Vec<f64> = rows.iter().flat_map(|r| r.treesitter_ms.iter().copied()).collect();
+    let treesitter_flat: Vec<f64> = rows
+        .iter()
+        .flat_map(|r| r.treesitter_ms.iter().copied())
+        .collect();
     let treesitter_total: f64 = treesitter_flat.iter().sum();
     println!(
         "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})  <- tree-sitter parse only, reference lower bound",
@@ -877,7 +1020,10 @@ fn print_runtime_table(rows: &[Row]) {
         label_width = label_width
     );
 
-    let codediff_flat: Vec<f64> = rows.iter().flat_map(|r| r.codediff_ms.iter().copied()).collect();
+    let codediff_flat: Vec<f64> = rows
+        .iter()
+        .flat_map(|r| r.codediff_ms.iter().copied())
+        .collect();
     let codediff_total: f64 = codediff_flat.iter().sum();
     println!(
         "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})",
@@ -894,7 +1040,10 @@ fn print_runtime_table(rows: &[Row]) {
         // Mean is over fixtures this tool was actually scored on, not every fixture in the
         // corpus - dividing by `rows.len()` would understate a language-scoped tool's real
         // per-fixture cost by mixing in zero-cost "not applicable" fixtures it never ran on.
-        let scored: Vec<&[f64]> = rows.iter().filter_map(|r| r.tool_ms[i].as_deref()).collect();
+        let scored: Vec<&[f64]> = rows
+            .iter()
+            .filter_map(|r| r.tool_ms[i].as_deref())
+            .collect();
         let flat: Vec<f64> = scored.iter().flat_map(|s| s.iter().copied()).collect();
         let total: f64 = flat.iter().sum();
         println!(
@@ -902,7 +1051,9 @@ fn print_runtime_table(rows: &[Row]) {
             tool_name,
             total,
             total / flat.len().max(1) as f64,
-            mean_coefficient_of_variation(scored.iter().copied()).map(|cv| format!("{cv:.1}")).unwrap_or_else(|| "-".to_string()),
+            mean_coefficient_of_variation(scored.iter().copied())
+                .map(|cv| format!("{cv:.1}"))
+                .unwrap_or_else(|| "-".to_string()),
             flat.len(),
             label_width = label_width
         );
@@ -910,7 +1061,10 @@ fn print_runtime_table(rows: &[Row]) {
 
     // Only printed when the batch driver actually ran - see `gumtree_warm_batch`'s doc comment for
     // when that's `None` across every row.
-    let warm: Vec<&[f64]> = rows.iter().filter_map(|r| r.gumtree_warm_ms.as_deref()).collect();
+    let warm: Vec<&[f64]> = rows
+        .iter()
+        .filter_map(|r| r.gumtree_warm_ms.as_deref())
+        .collect();
     let warm_flat: Vec<f64> = warm.iter().flat_map(|s| s.iter().copied()).collect();
     if !warm_flat.is_empty() {
         let total: f64 = warm_flat.iter().sum();
@@ -919,7 +1073,9 @@ fn print_runtime_table(rows: &[Row]) {
             "gumtree_warm",
             total,
             total / warm_flat.len() as f64,
-            mean_coefficient_of_variation(warm.iter().copied()).map(|cv| format!("{cv:.1}")).unwrap_or_else(|| "-".to_string()),
+            mean_coefficient_of_variation(warm.iter().copied())
+                .map(|cv| format!("{cv:.1}"))
+                .unwrap_or_else(|| "-".to_string()),
             warm_flat.len(),
             label_width = label_width
         );
@@ -934,7 +1090,11 @@ fn print_runtime_table(rows: &[Row]) {
 /// 1`) produces a one-element field, so the format is a strict superset of the old single-float
 /// column, not a breaking change to what "no repeats" output looks like.
 fn join_ms(values: &[f64]) -> String {
-    values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(";")
+    values
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
@@ -948,7 +1108,12 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "codediff_ms".to_string(),
         "treesitter_parse_ms".to_string(),
     ];
-    header.extend(ExternalTool::ALL.iter().flat_map(|t| [format!("{}_mismatches", t.name()), format!("{}_ms", t.name())]));
+    header.extend(ExternalTool::ALL.iter().flat_map(|t| {
+        [
+            format!("{}_mismatches", t.name()),
+            format!("{}_ms", t.name()),
+        ]
+    }));
     header.push("gumtree_warm_ms".to_string());
     wtr.write_record(&header)?;
 
@@ -966,7 +1131,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         // excluded from that tool's aggregate, not coerced to zero.
         record.extend(row.tools.iter().zip(&row.tool_ms).flat_map(|(cell, ms)| {
             [
-                cell.map(|(mismatches, _)| mismatches.to_string()).unwrap_or_default(),
+                cell.map(|(mismatches, _)| mismatches.to_string())
+                    .unwrap_or_default(),
                 ms.as_deref().map(join_ms).unwrap_or_default(),
             ]
         }));
@@ -974,7 +1140,12 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         // `gumtree_warm_batch`'s doc comment), same "blank means not scored" convention as above -
         // not blank per-fixture the way `tool_ms` can be, since GumTree's language scope already
         // determines that before the batch driver even runs.
-        record.push(row.gumtree_warm_ms.as_deref().map(join_ms).unwrap_or_default());
+        record.push(
+            row.gumtree_warm_ms
+                .as_deref()
+                .map(join_ms)
+                .unwrap_or_default(),
+        );
         wtr.write_record(&record)?;
     }
     wtr.flush()?;

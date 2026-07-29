@@ -477,7 +477,10 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
 * not an error, since `handmade_test_code_pairs` tolerates directories that aren't (yet) complete
 * test cases.
 */
-pub fn code_pair_from_dir(path: &Path, parser: &mut tree_sitter::Parser) -> Result<Option<(Code, Code)>> {
+pub fn code_pair_from_dir(
+    path: &Path,
+    parser: &mut tree_sitter::Parser,
+) -> Result<Option<(Code, Code)>> {
     let mut before_code = None;
     let mut after_code = None;
 
@@ -926,10 +929,7 @@ mod tests {
     fn test_entire_path_has_mapping() -> Result<()> {
         // Use rust-no-change since all nodes should have Identical mapping
         let test_diffs = handmade_test_code_pairs()?;
-        let (before, after) = test_diffs
-            .get("rust-no-change")
-            .unwrap()
-            .clone();
+        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
 
         let diff = crate::diff::diff_code(&before, &after);
         let diff_ast = diff.ast.unwrap();

@@ -217,7 +217,12 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         // Push children in reverse so the stack (LIFO) pops them back out left-to-right, keeping
         // `preorder_index` a genuine preorder (root, then children in document order).
         let mut child_cursor = node.walk();
-        for child in node.children(&mut child_cursor).collect::<Vec<_>>().into_iter().rev() {
+        for child in node
+            .children(&mut child_cursor)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             stack.push(child);
         }
     }
@@ -237,7 +242,11 @@ fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
     let mut stack = vec![(root_id, false)];
     while let Some((node_id, processed)) = stack.pop() {
         if processed {
-            let Some(children) = metadata.node_info.get(&node_id).map(|info| info.children.clone()) else {
+            let Some(children) = metadata
+                .node_info
+                .get(&node_id)
+                .map(|info| info.children.clone())
+            else {
                 continue;
             };
             let mut best = (children.len(), node_id);

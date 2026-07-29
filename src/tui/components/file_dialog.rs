@@ -20,14 +20,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    Frame,
-    layout::Rect,
-    prelude::Stylize,
-    style::Color,
-    text::Line,
-    widgets::ListItem,
-};
+use ratatui::{Frame, layout::Rect, prelude::Stylize, style::Color, text::Line, widgets::ListItem};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, move_selection, render_list_dialog};

@@ -77,7 +77,10 @@ pub enum AppScreen {
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
         AppScreen::Viewer | AppScreen::Diffing => true,
-        AppScreen::SelectFile | AppScreen::SelectTheme | AppScreen::SelectDiffMode | AppScreen::Help => false,
+        AppScreen::SelectFile
+        | AppScreen::SelectTheme
+        | AppScreen::SelectDiffMode
+        | AppScreen::Help => false,
     }
 }
 
@@ -195,10 +198,9 @@ impl App {
                 KeyCode::Char('q') => {
                     action_tx.send(Action::Quit)?;
                 }
-                KeyCode::Esc
-                    if esc_should_quit(self.screen) => {
-                        action_tx.send(Action::Quit)?;
-                    }
+                KeyCode::Esc if esc_should_quit(self.screen) => {
+                    action_tx.send(Action::Quit)?;
+                }
                 KeyCode::Char('o') if self.screen == AppScreen::Viewer => {
                     let panel = self.diff_viewer.active_panel();
                     self.dialog_target = Some(panel);
@@ -321,8 +323,12 @@ impl App {
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
-                Action::DiffModeChoiceNeeded { unmatched_before, unmatched_after } => {
-                    self.diff_mode_dialog = Some(DiffModeDialog::new(*unmatched_before, *unmatched_after));
+                Action::DiffModeChoiceNeeded {
+                    unmatched_before,
+                    unmatched_after,
+                } => {
+                    self.diff_mode_dialog =
+                        Some(DiffModeDialog::new(*unmatched_before, *unmatched_after));
                     self.screen = AppScreen::SelectDiffMode;
                 }
                 Action::DiffModeSelected(mode) => {
@@ -579,7 +585,11 @@ fn assemble_diff_session_data(
 /// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
 /// terminal-independent diff computation either way - only what happens to the result (draw it
 /// interactively vs. print it as text) differs between the two modes.
-pub(crate) fn compute_diff(before: &Path, after: &Path, mode: DiffMode) -> Result<(DiffSessionData, bool)> {
+pub(crate) fn compute_diff(
+    before: &Path,
+    after: &Path,
+    mode: DiffMode,
+) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
     let pending = Diff::pending(&before_code, &after_code);
     let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
@@ -606,7 +616,9 @@ fn compute_diff_interactive(
 
     let mode = if pending.looks_expensive() {
         let (tx, rx) = oneshot::channel::<DiffMode>();
-        *pending_diff_mode_tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx);
+        *pending_diff_mode_tx
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(tx);
         let (unmatched_before, unmatched_after) = pending.unmatched_counts();
         let _ = action_tx.send(Action::DiffModeChoiceNeeded {
             unmatched_before,
@@ -717,7 +729,8 @@ mod tests {
             .expect("create temp file");
         std::fs::write(after.path(), "fn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) = compute_diff(Path::new("/dev/null"), after.path(), DiffMode::Fast)?;
+        let (data, _fallback_used) =
+            compute_diff(Path::new("/dev/null"), after.path(), DiffMode::Fast)?;
 
         assert_eq!(data.before_contents, "");
         assert_eq!(data.after_contents, "fn main() {}\n");
@@ -737,7 +750,8 @@ mod tests {
             .expect("create temp file");
         std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) = compute_diff(before.path(), Path::new("/dev/null"), DiffMode::Fast)?;
+        let (data, _fallback_used) =
+            compute_diff(before.path(), Path::new("/dev/null"), DiffMode::Fast)?;
 
         assert_eq!(data.before_contents, "fn main() {}\n");
         assert_eq!(data.after_contents, "");

@@ -17,17 +17,17 @@
  */
 use std::collections::HashMap;
 
-use crate::code::{ASTMetadata, Code};
 use crate::code::metadata::metadata_of;
+use crate::code::{ASTMetadata, Code};
 use crate::diff::nodes::is_reference;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 
 /// Configuration for selecting which nodes to consider for hash-based matching.
-/// 
+///
 /// Nodes are included if they are either:
 /// - Reference nodes (language-specific structural elements like functions, classes)
 /// - OR meet the minimum depth and subtree size thresholds
-/// 
+///
 /// This allows the hash matching passes to also consider large, deep subtrees
 /// that aren't formally "reference nodes" but are still worth matching.
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ impl Default for NodeSelectionConfig {
 
 impl NodeSelectionConfig {
     /// Create a node list selector function that can be passed to `solve_with_node_list`.
-    /// 
+    ///
     /// The selector includes reference nodes plus any nodes that meet the depth/size thresholds,
     /// sorted by subtree size (largest first) and then by start byte for deterministic ordering.
     pub fn to_node_list_selector(&self) -> impl Fn(&ASTMetadata) -> Vec<usize> + '_ {
@@ -62,15 +62,22 @@ impl NodeSelectionConfig {
 }
 
 /// Build an extended node list that includes reference nodes plus nodes meeting size thresholds.
-/// 
+///
 /// Returns nodes sorted by subtree size (largest first), with ties broken by start_byte
 /// for deterministic ordering across runs.
-pub fn build_extended_node_list(metadata: &ASTMetadata, config: &NodeSelectionConfig) -> Vec<usize> {
+pub fn build_extended_node_list(
+    metadata: &ASTMetadata,
+    config: &NodeSelectionConfig,
+) -> Vec<usize> {
     let language = metadata.language;
     let mut nodes_with_info: Vec<(usize, usize, usize)> = Vec::new(); // (node_id, subtree_size, start_byte)
 
     for (&node_id, info) in &metadata.node_info {
-        let subtree_size = metadata.node_to_subtree_size.get(&node_id).copied().unwrap_or(0);
+        let subtree_size = metadata
+            .node_to_subtree_size
+            .get(&node_id)
+            .copied()
+            .unwrap_or(0);
         let depth = metadata.node_to_depth.get(&node_id).copied().unwrap_or(0);
         let start_byte = info.start_byte;
 
@@ -87,7 +94,10 @@ pub fn build_extended_node_list(metadata: &ASTMetadata, config: &NodeSelectionCo
     // separate parses of identical source, since node_ids are tree-sitter arena slots that
     // may differ between parses even for identical code.
     nodes_with_info.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
-    nodes_with_info.into_iter().map(|(node_id, _, _)| node_id).collect()
+    nodes_with_info
+        .into_iter()
+        .map(|(node_id, _, _)| node_id)
+        .collect()
 }
 
 /**
@@ -155,9 +165,15 @@ pub(crate) fn solve_with_hash_map(
         if diff.before_node_map.contains_key(&before_node_id) {
             continue;
         }
-        let Some(&before_node) = node_cache.before.get(&before_node_id) else { continue };
-        let Some(before_hash_value) = before_hash.get(&before_node_id) else { continue };
-        let Some(after_candidates) = after_hash_to_nodes.get(before_hash_value) else { continue };
+        let Some(&before_node) = node_cache.before.get(&before_node_id) else {
+            continue;
+        };
+        let Some(before_hash_value) = before_hash.get(&before_node_id) else {
+            continue;
+        };
+        let Some(after_candidates) = after_hash_to_nodes.get(before_hash_value) else {
+            continue;
+        };
 
         // Same tiebreak rationale as `solve_with_node_list`: proximity in the file, not discovery
         // order, is what tells true duplicates apart from unrelated hash collisions.
@@ -174,13 +190,19 @@ pub(crate) fn solve_with_hash_map(
         else {
             continue;
         };
-        let Some(&after_node) = node_cache.after.get(&after_node_id) else { continue };
+        let Some(&after_node) = node_cache.after.get(&after_node_id) else {
+            continue;
+        };
 
         let (operation, cost) = classify(before_node_id, after_node_id);
         diff.add_mapping(
             before_node_id,
             after_node_id,
-            ASTMapping { cost, operation, reason: root_reason },
+            ASTMapping {
+                cost,
+                operation,
+                reason: root_reason,
+            },
         );
 
         // Descend both subtrees in lockstep, pairing children by position and kind - except
@@ -194,8 +216,12 @@ pub(crate) fn solve_with_hash_map(
         let mut reordered_ids: Vec<usize> = Vec::new();
         let mut stack = vec![(before_node, after_node)];
         while let Some((before_parent, after_parent)) = stack.pop() {
-            let (pairs, reordered) =
-                pair_children_for_descent(before_parent, after_parent, &before_metadata, &after_metadata);
+            let (pairs, reordered) = pair_children_for_descent(
+                before_parent,
+                after_parent,
+                &before_metadata,
+                &after_metadata,
+            );
 
             // `before_parent`/`after_parent`'s own mapping was already added (either as the root
             // match above, or as a `descendant_reason`-tagged child pair in an earlier iteration
@@ -206,7 +232,10 @@ pub(crate) fn solve_with_hash_map(
             // matching the human-authored ground truth's own convention for these pairs (see
             // `TODO.md`'s "Distinguishing reordered from truly identical" section).
             if reordered {
-                if let Some(mapping) = diff.mapping.get_mut(&(before_parent.id(), after_parent.id())) {
+                if let Some(mapping) = diff
+                    .mapping
+                    .get_mut(&(before_parent.id(), after_parent.id()))
+                {
                     mapping.reason = ASTMappingReason::FullymappingSubtrees;
                     mapping.operation = ASTMappingOperation::MatchButNotIdentical;
                     mapping.cost = crate::diff::COST_UPDATE;
@@ -222,7 +251,11 @@ pub(crate) fn solve_with_hash_map(
                 diff.add_mapping(
                     before_child.id(),
                     after_child.id(),
-                    ASTMapping { cost, operation, reason: descendant_reason },
+                    ASTMapping {
+                        cost,
+                        operation,
+                        reason: descendant_reason,
+                    },
                 );
                 stack.push((before_child, after_child));
             }
@@ -237,7 +270,9 @@ pub(crate) fn solve_with_hash_map(
         for reordered_id in reordered_ids {
             let mut cur = reordered_id;
             while let Some(&parent_id) = before_metadata.node_to_parent.get(&cur) {
-                let Some(&after_parent_id) = diff.before_node_map.get(&parent_id) else { break };
+                let Some(&after_parent_id) = diff.before_node_map.get(&parent_id) else {
+                    break;
+                };
                 if let Some(mapping) = diff.mapping.get_mut(&(parent_id, after_parent_id))
                     && mapping.operation == ASTMappingOperation::Identical
                 {
@@ -317,7 +352,8 @@ fn pair_children_for_descent<'a>(
         return (pairs, false);
     }
 
-    let index_by_hash = |children: &[tree_sitter::Node<'a>], hash_map: &rustc_hash::FxHashMap<usize, u64>| {
+    let index_by_hash = |children: &[tree_sitter::Node<'a>],
+                         hash_map: &rustc_hash::FxHashMap<usize, u64>| {
         let mut by_hash: HashMap<u64, Vec<(usize, tree_sitter::Node<'a>)>> = HashMap::new();
         for (index, &child) in children.iter().enumerate() {
             let hash = hash_map.get(&child.id()).copied().unwrap_or(0);
@@ -334,7 +370,11 @@ fn pair_children_for_descent<'a>(
     let mut unmatched_before: Vec<(usize, tree_sitter::Node<'a>)> = Vec::new();
 
     for (before_index, before_child) in before_children.into_iter().enumerate() {
-        let kv_hash = before_metadata.node_to_kind_and_value_hash.get(&before_child.id()).copied().unwrap_or(0);
+        let kv_hash = before_metadata
+            .node_to_kind_and_value_hash
+            .get(&before_child.id())
+            .copied()
+            .unwrap_or(0);
         let found = after_by_kv
             .get(&kv_hash)
             .and_then(|candidates| {
@@ -359,8 +399,14 @@ fn pair_children_for_descent<'a>(
     // Tier 2: kind-only fallback for whatever tier 1 (exact kind+value) couldn't pair - covers a
     // `KindOnlyHash`-driven outer match, where children may legitimately differ in value.
     for (before_index, before_child) in unmatched_before {
-        let ko_hash = before_metadata.node_to_kind_only_hash.get(&before_child.id()).copied().unwrap_or(0);
-        let Some(candidates) = after_by_ko.get(&ko_hash) else { continue };
+        let ko_hash = before_metadata
+            .node_to_kind_only_hash
+            .get(&before_child.id())
+            .copied()
+            .unwrap_or(0);
+        let Some(candidates) = after_by_ko.get(&ko_hash) else {
+            continue;
+        };
         let Some(&(after_index, best)) = candidates
             .iter()
             .filter(|(_, c)| !used.contains(&c.id()) && c.kind() == before_child.kind())
@@ -388,7 +434,10 @@ mod tests {
     fn build_extended_node_list_always_includes_reference_nodes_regardless_of_size() {
         let code = Code::from_string("fn f() {}\n", &Language::Rust);
         let metadata = metadata_of(&code);
-        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let config = NodeSelectionConfig {
+            min_depth: 0,
+            min_subtree_size: usize::MAX,
+        };
         let list = build_extended_node_list(&metadata, &config);
 
         let root = code.ast.as_ref().unwrap().root_node();
@@ -403,7 +452,10 @@ mod tests {
     fn build_extended_node_list_excludes_small_non_reference_nodes() {
         let code = Code::from_string("fn f() { let x = 1; }\n", &Language::Rust);
         let metadata = metadata_of(&code);
-        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let config = NodeSelectionConfig {
+            min_depth: 0,
+            min_subtree_size: usize::MAX,
+        };
         let list = build_extended_node_list(&metadata, &config);
 
         let root = code.ast.as_ref().unwrap().root_node();
@@ -418,7 +470,10 @@ mod tests {
     fn build_extended_node_list_includes_non_reference_nodes_above_the_size_threshold() {
         let code = Code::from_string("fn f() { let x = 1; }\n", &Language::Rust);
         let metadata = metadata_of(&code);
-        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: 1 };
+        let config = NodeSelectionConfig {
+            min_depth: 0,
+            min_subtree_size: 1,
+        };
         let list = build_extended_node_list(&metadata, &config);
 
         let root = code.ast.as_ref().unwrap().root_node();
@@ -433,7 +488,10 @@ mod tests {
     fn build_extended_node_list_sorts_by_subtree_size_descending() {
         let code = Code::from_string("fn f() { let x = 1; }\nfn g() {}\n", &Language::Rust);
         let metadata = metadata_of(&code);
-        let config = NodeSelectionConfig { min_depth: 0, min_subtree_size: usize::MAX };
+        let config = NodeSelectionConfig {
+            min_depth: 0,
+            min_subtree_size: usize::MAX,
+        };
         let list = build_extended_node_list(&metadata, &config);
 
         let sizes: Vec<usize> = list
@@ -442,7 +500,10 @@ mod tests {
             .collect();
         let mut sorted_desc = sizes.clone();
         sorted_desc.sort_by(|a, b| b.cmp(a));
-        assert_eq!(sizes, sorted_desc, "list must be sorted by subtree size descending");
+        assert_eq!(
+            sizes, sorted_desc,
+            "list must be sorted by subtree size descending"
+        );
     }
 
     #[test]
@@ -460,14 +521,22 @@ mod tests {
         let (pairs, reordered) =
             pair_children_for_descent(before_block, after_block, &before_metadata, &after_metadata);
 
-        assert!(!reordered, "a block is not a commutative container - reordered must always be false");
+        assert!(
+            !reordered,
+            "a block is not a commutative container - reordered must always be false"
+        );
         assert!(
             pairs.iter().all(|(b, a)| b.kind() == a.kind()),
             "every returned pair must share a kind - the positional zip filters out kind mismatches: {:?}",
-            pairs.iter().map(|(b, a)| (b.kind(), a.kind())).collect::<Vec<_>>()
+            pairs
+                .iter()
+                .map(|(b, a)| (b.kind(), a.kind()))
+                .collect::<Vec<_>>()
         );
         assert!(
-            pairs.iter().any(|(b, a)| b.kind() == "let_declaration" && a.kind() == "let_declaration"),
+            pairs
+                .iter()
+                .any(|(b, a)| b.kind() == "let_declaration" && a.kind() == "let_declaration"),
             "the first, still-matching let_declaration must still be paired"
         );
     }
@@ -497,7 +566,11 @@ mod tests {
         );
         // `{`, `a`, `,`, `b`, `,`, `c`, `}` - every child (identifiers and punctuation alike)
         // must still find its same-kind, same-text counterpart despite the reorder.
-        assert_eq!(pairs.len(), 7, "every child must still be paired despite the reorder");
+        assert_eq!(
+            pairs.len(),
+            7,
+            "every child must still be paired despite the reorder"
+        );
     }
 
     #[test]
@@ -519,7 +592,9 @@ mod tests {
             &after_metadata,
         );
 
-        assert!(!reordered, "an unchanged commutative container must not be flagged as reordered");
+        assert!(
+            !reordered,
+            "an unchanged commutative container must not be flagged as reordered"
+        );
     }
 }
-

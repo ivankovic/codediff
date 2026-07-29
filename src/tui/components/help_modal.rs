@@ -101,7 +101,11 @@ impl Component for HelpModal {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         frame.render_widget(Clear, area);
         let block = Block::default()
-            .title(" Help - j/k scroll, ? or Esc to close ".bold().fg(Color::Cyan))
+            .title(
+                " Help - j/k scroll, ? or Esc to close "
+                    .bold()
+                    .fg(Color::Cyan),
+            )
             .borders(Borders::ALL)
             .border_style(Style::new().fg(Color::Cyan));
 

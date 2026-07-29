@@ -46,5 +46,8 @@ fn optimal_solution() -> Result<()> {
     //
     // There is no optimal cost difference between mapping the field_expression on the after side to
     // either of the field_expression nodes on the before side. The cost is the same either way.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit("rust-firefox-webrenderer-borders", 18)
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "rust-firefox-webrenderer-borders",
+        18,
+    )
 }

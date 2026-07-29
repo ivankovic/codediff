@@ -136,7 +136,10 @@ pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, Kind
 }
 
 /// Returns the subtree size (including `node` itself) so the caller can bucket it.
-fn visit_for_kind_stats(node: Node, stats: &mut std::collections::HashMap<String, KindStats>) -> usize {
+fn visit_for_kind_stats(
+    node: Node,
+    stats: &mut std::collections::HashMap<String, KindStats>,
+) -> usize {
     let mut size = 1;
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {

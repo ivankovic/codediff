@@ -135,11 +135,13 @@ impl DiffViewer {
     /// call after anything that can change the cursor or the focused panel.
     fn sync_cross_highlight(&mut self) {
         let destination = self.focused_viewer().cursor_destination();
-        self.other_viewer().set_highlight_destination(destination.clone());
-        
+        self.other_viewer()
+            .set_highlight_destination(destination.clone());
+
         // Also move the inactive side's cursor to follow the matched leaf node
         if let Some(dest_range) = destination {
-            self.other_viewer().set_cursor_position(dest_range.start_row, dest_range.start_column);
+            self.other_viewer()
+                .set_cursor_position(dest_range.start_row, dest_range.start_column);
         }
     }
 
@@ -409,7 +411,9 @@ impl Component for DiffViewer {
         // "Before"/"After" panel_block, plus each CodeViewer's own) - 2 rows (top+bottom) each,
         // -4 total. Single mode now hides the inner border above, leaving only the outer block's
         // own 2 rows.
-        let viewport_height = area.height.saturating_sub(if hide_inner_border { 2 } else { 4 }) as usize;
+        let viewport_height =
+            area.height
+                .saturating_sub(if hide_inner_border { 2 } else { 4 }) as usize;
         self.left_viewer.set_viewport_height(viewport_height);
         self.right_viewer.set_viewport_height(viewport_height);
 
@@ -566,11 +570,11 @@ mod tests {
     /// follow the matched leaf node.
     #[test]
     fn moving_cursor_on_active_side_moves_inactive_side_cursor_to_matched_node() {
+        use crate::diff::text::{RangeMatch, TextOperation};
         use crate::diff::text_range::TextRange;
-        use crate::diff::text::{TextOperation, RangeMatch};
 
         let mut viewer = DiffViewer::new();
-        
+
         // Create sample diff data with two ranges
         let data = DiffSessionData {
             before_path: PathBuf::from("before.txt"),
@@ -602,23 +606,23 @@ mod tests {
                 },
             ],
         };
-        
+
         viewer.load_diff(&data);
-        
+
         // Initially, cursor should be on first range (0, 0)
         assert_eq!(viewer.left_viewer.state().cursor_row, 0);
         assert_eq!(viewer.left_viewer.state().cursor_col, 0);
-        
+
         // The right side's cursor should also be at (0, 0) to follow the matched node
         assert_eq!(viewer.right_viewer.state().cursor_row, 0);
         assert_eq!(viewer.right_viewer.state().cursor_col, 0);
-        
+
         // Move cursor down on left side
         viewer.move_cursor_vertical(1);
-        
+
         // Left cursor should now be on row 1
         assert_eq!(viewer.left_viewer.state().cursor_row, 1);
-        
+
         // Right cursor should follow to the matched destination (row 1, col 0)
         assert_eq!(viewer.right_viewer.state().cursor_row, 1);
         assert_eq!(viewer.right_viewer.state().cursor_col, 0);
@@ -679,7 +683,11 @@ mod tests {
         viewer.left_viewer.set_cursor_position(0, 0);
 
         viewer.jump_to_change(true);
-        assert_eq!(viewer.left_viewer.state().cursor_row, 2, "should land on the changed line");
+        assert_eq!(
+            viewer.left_viewer.state().cursor_row,
+            2,
+            "should land on the changed line"
+        );
         assert_eq!(
             viewer.right_viewer.state().cursor_row,
             2,

@@ -164,13 +164,17 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             .or_default()
             .push(node_id);
 
-        metadata.node_to_kind_and_value_hash.insert(node_id, kind_and_value_hash);
+        metadata
+            .node_to_kind_and_value_hash
+            .insert(node_id, kind_and_value_hash);
         metadata
             .kind_and_value_hash_to_node
             .entry(kind_and_value_hash)
             .or_default()
             .push(node_id);
-        metadata.node_to_kind_only_hash.insert(node_id, kind_only_hash);
+        metadata
+            .node_to_kind_only_hash
+            .insert(node_id, kind_only_hash);
         metadata
             .kind_only_hash_to_node
             .entry(kind_only_hash)
@@ -310,7 +314,11 @@ fn compute_kind_and_value_hash(
 * ignore both) - `KindOnlyHash` collapses all of that into the single coarsest tier (any leaf
 * value, since leaf values aren't hashed at all), an accepted precision loss - see `TODO.md`.
 */
-fn compute_kind_only_hash(node: &tree_sitter::Node, child_hashes: &[u64], language: Language) -> u64 {
+fn compute_kind_only_hash(
+    node: &tree_sitter::Node,
+    child_hashes: &[u64],
+    language: Language,
+) -> u64 {
     let mut hasher = MetroHash64::new();
     hasher.write(node.kind_id().to_le_bytes().as_slice());
     hasher.write(node.child_count().to_le_bytes().as_slice());
