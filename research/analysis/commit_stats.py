@@ -19,69 +19,7 @@ import sys
 import polars as pl
 import matplotlib.pyplot as plt
 
-
-def compute_percentiles_and_plot(df, column_name, output_filename, log_scale=False):
-    """
-    Compute 50, 90, 99, 99.9, 99.99 percentiles and max for a column and create a distribution plot.
-
-    Args:
-        df: Polars DataFrame containing the data
-        column_name: Name of the column to analyze
-        output_filename: Base filename for the output plot (will be saved in plots/ directory)
-        log_scale: Whether to use log scale for the plot
-
-    Returns:
-        Dictionary containing the computed percentiles
-    """
-    # Compute percentiles
-    percentiles = {}
-    percentiles["p50"] = df.select(pl.col(column_name).quantile(0.50)).item()
-    percentiles["p90"] = df.select(pl.col(column_name).quantile(0.90)).item()
-    percentiles["p99"] = df.select(pl.col(column_name).quantile(0.99)).item()
-    percentiles["p999"] = df.select(pl.col(column_name).quantile(0.999)).item()
-    percentiles["p9999"] = df.select(pl.col(column_name).quantile(0.9999)).item()
-    percentiles["max"] = df.select(pl.col(column_name).max()).item()
-
-    print(f"Percentiles for {column_name}:")
-    print(f"  50th percentile:   {percentiles['p50']:,}")
-    print(f"  90th percentile:   {percentiles['p90']:,}")
-    print(f"  99th percentile:   {percentiles['p99']:,}")
-    print(f"  99.9th percentile: {percentiles['p999']:,}")
-    print(f"  99.99th percentile: {percentiles['p9999']:,}")
-    print(f"  max:               {percentiles['max']:,}")
-
-    # Create distribution plot
-    plt.figure(figsize=(8, 8))
-
-    # Trim to 99th percentile for better visualization
-    trim_threshold = percentiles["p99"]
-    df_trimmed = df.filter(pl.col(column_name) <= trim_threshold)
-
-    if log_scale:
-        plt.hist(
-            df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black", log=True
-        )
-    else:
-        plt.hist(df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black")
-
-    title = f"Distribution of {column_name} (99th percentile filtered)"
-    if log_scale:
-        title += " (Log Scale)"
-        plt.yscale("log")
-    plt.title(title)
-    plt.xlabel(column_name)
-    plt.ylabel("Frequency")
-    plt.xticks(rotation=30)
-
-    # Save plot
-    output_path = f"plots/{output_filename}"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plt.savefig(output_path, dpi=300)
-    plt.close()
-
-    print(f"Plot saved to {output_path}")
-
-    return percentiles
+from percentile_report import compute_percentiles_and_plot
 
 
 def load_data(db_path):

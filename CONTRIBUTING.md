@@ -168,9 +168,11 @@ shorthands for "fetch-stats analysis in that mode".
   `sample-pairs-rust`'s output.
 * `benchmark-pairs-diff BEFORE=<csv> AFTER=<csv>` - compares two `benchmark-pairs-rust` runs (e.g.
   before/after a `diff_code` algorithm change) and charts the difference.
-* `benchmark-sampled` / `benchmark-sampled-extended` - runs `research/measure/benchmark_all.sh` (or
-  the extended, higher-node-limit variant covering every language with a tree-sitter grammar)
-  across all sampled pairs, then `research/analysis/benchmark_report.py`.
+* `benchmark-sampled` / `benchmark-sampled-extended` - both run
+  `research/measure/benchmark_all_extended.sh` across all sampled pairs, then
+  `research/analysis/benchmark_report.py`; the former restricts it to the four primary languages
+  (Rust, Python, Go, Kotlin), the latter runs every language with a tree-sitter grammar at a higher
+  node limit.
 * `analyze` / `tiny` / `small` / `full` - `file-stats`, in the current (or an explicitly
   overridden) `MODE`.
 * `clean` / `clean-db` - remove the fetched repositories (and/or just the stats database) for the

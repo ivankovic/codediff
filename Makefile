@@ -149,12 +149,14 @@ hermetic-benchmark:
 hermetic-benchmark-update-baseline:
 	cargo bench --bench diff_code_benchmark -- --save-baseline baseline
 
-# Benchmark against existing sampled pairs for all languages in benchmark_all.sh (Rust, Python, Go, Kotlin)
-# and run analysis afterwards
+# Benchmark against existing sampled pairs for the four primary languages (Rust, Python, Go,
+# Kotlin) and run analysis afterwards. Uses benchmark_all_extended.sh restricted to these four via
+# --language - the only difference from benchmark-sampled-extended below was ever which languages
+# ran by default, not the underlying script.
 benchmark-sampled:
-	@echo "Running benchmarks for all languages (Rust, Python, Go, Kotlin)..."
+	@echo "Running benchmarks for Rust, Python, Go, Kotlin..."
 	@echo "Results will be written to research/results/"
-	cd research && ./measure/benchmark_all.sh --language all --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
+	cd research && ./measure/benchmark_all_extended.sh --language "Rust Python Go Kotlin" --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
 	@echo ""
 	@echo "Running analysis..."
 	cd research && uv run ./analysis/benchmark_report.py
