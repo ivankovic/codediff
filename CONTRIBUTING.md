@@ -111,6 +111,71 @@ purpose:
 TODO.md and REVIEW.md are normally root-only. A subsystem can have its own TODO.md for issues
 specific to it (e.g. src/diff/TODO.md) - but REVIEW.md stays root-only.
 
+## Makefile targets
+
+A reference for `make <target>`. Most of the dataset/corpus targets accept `MODE=tiny` (default),
+`MODE=small`, or `MODE=full`, picking which fetched repository set (see
+`research/list_of_repositories*.csv`) to run against; `tiny`/`small`/`full` themselves are
+shorthands for "fetch-stats analysis in that mode".
+
+### Build, test, quality
+
+* `test` - `cargo test`.
+* `build` - `cargo test` + `cargo build --release --features stats` (needed by every dataset/stats
+  target below).
+* `view-diff NAME=<fixture>` - opens one `src/test/data/diffs/` fixture's before/after side by
+  side in nvim's diff mode.
+* `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality gate
+  (mismatch count vs. the human-authored ground truth - see "Quality" above).
+* `benchmark-optimal-report` - same, plus `--csv` and a report on which algorithm pass
+  (`ASTMappingReason`) is responsible for how much of the diff.
+* `benchmark-other` - compares codediff against Unix `diff` and GumTree on line-level agreement
+  with the human mapping, plus runtime. Requires `GUMTREE_BIN` pointing at a built GumTree
+  distribution - the one target in this file with an external, non-Rust dependency.
+* `ablation-study [OUT_DIR=path]` - leave-one-out study over the diff algorithm's optional
+  heuristic passes, measuring each one's real contribution to accuracy on the fixture corpus.
+* `check-quality` - what `deploy` runs before it ever tags: gates on `research/quality_baseline.txt`
+  (hard-fails on an accuracy regression, warns - doesn't fail - on a >2x runtime jump).
+* `update-quality-baseline` - deliberately lowers that bar after a reviewed improvement. Never run
+  automatically by `deploy`.
+* `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - criterion wall-clock benchmark of
+  `diff_code` over every handmade test case from `src/test/helper.rs` (see "Speed" above); save/
+  compare against a saved baseline.
+
+### Release
+
+* `deploy` - tags the current commit `v<Cargo.toml version>` and pushes the tag, which triggers
+  `.github/workflows/release.yml` to build and publish the cross-platform `codediff` binaries as a
+  GitHub Release. Refuses to run on a dirty working tree, a `HEAD` that doesn't match
+  `origin/main`, or a `check-quality` regression.
+
+### Dataset / corpus analysis (research/)
+
+* `fetch` - clones/updates the repository set for the current `MODE`.
+* `file-stats` / `commit-stats` - run `file_stats`/`commit_stats` over the fetched repositories
+  into a SQLite DB, then that binary's own `research/analysis/*.py` report.
+* `debug-stats DIR=<path> [DEBUG_MODE=dirs|all|repositories]` - the same two binaries, ad-hoc, over
+  one arbitrary directory instead of the fetch/`MODE` pipeline - useful for debugging them
+  directly.
+* `sample-pairs` / `sample-pairs-rust` / `sample-pairs-java` / `sample-pairs-javascript` /
+  `sample-pairs-typescript` - sample real (repository, commit, path) code pairs, per language, for
+  benchmark test data.
+* `benchmark-pairs` / `benchmark-pairs-rust` / `benchmark-pairs-java` /
+  `benchmark-pairs-javascript` / `benchmark-pairs-typescript` - measure `diff_code`'s speed/memory/
+  AST size/mapping-operation count across a sampled CSV. `benchmark-pairs-rust` is the one to
+  re-run after any diff-algorithm change, to track its effect on real Rust commits.
+* `code-pair-diff-stats` - size/LOC-changed statistics and distribution plots for
+  `sample-pairs-rust`'s output.
+* `benchmark-pairs-diff BEFORE=<csv> AFTER=<csv>` - compares two `benchmark-pairs-rust` runs (e.g.
+  before/after a `diff_code` algorithm change) and charts the difference.
+* `benchmark-sampled` / `benchmark-sampled-extended` - runs `research/measure/benchmark_all.sh` (or
+  the extended, higher-node-limit variant covering every language with a tree-sitter grammar)
+  across all sampled pairs, then `research/analysis/benchmark_report.py`.
+* `analyze` / `tiny` / `small` / `full` - `file-stats`, in the current (or an explicitly
+  overridden) `MODE`.
+* `clean` / `clean-db` - remove the fetched repositories (and/or just the stats database) for the
+  current `MODE`.
+
 ## CI
 
 Every push and pull request runs (see `.github/workflows/ci.yml`):
