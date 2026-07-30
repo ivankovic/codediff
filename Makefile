@@ -7,12 +7,16 @@ LIST_TINY  := ./research/list_of_repositories_tiny.csv
 # Default mode is "tiny", can be overridden with "make MODE=small" or "make MODE=full"
 MODE ?= tiny
 
-# Resolve the appropriate list based on mode
-LIST := $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL)))
+# Resolve the appropriate list based on mode. Deliberately `=` (recursive/lazy), not `:=`
+# (immediate): `tiny`/`small`/`full` below set MODE as a target-specific variable (`override
+# MODE=...`), which only reaches these via lazy re-expansion at the point each recipe line
+# actually uses them - `:=` would instead bake in whatever MODE was at Makefile-parse time
+# (always the global `tiny` default) and silently ignore the override.
+LIST = $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL)))
 
-# Resolve directories based on mode
-REPOSITORIES_DIR := /var/tmp/research/$(MODE)/repositories/
-RESEARCH_DIR := /var/tmp/research/$(MODE)/
+# Resolve directories based on mode - see the `LIST` comment above for why `=`, not `:=`.
+REPOSITORIES_DIR = /var/tmp/research/$(MODE)/repositories/
+RESEARCH_DIR = /var/tmp/research/$(MODE)/
 
 clean: clean-db
 	rm -rf $(REPOSITORIES_DIR)
@@ -22,6 +26,14 @@ clean-db:
 
 test:
 	cargo test
+
+# Opens a test fixture's before/after files side by side in nvim. Usage: make view-diff NAME=rust-add-if
+view-diff:
+	@if [ -z "$(NAME)" ]; then \
+		echo "usage: make view-diff NAME=<fixture-name>  (e.g. rust-add-if - see src/test/data/diffs/)" >&2; \
+		exit 1; \
+	fi
+	./src/test/view_test_diff.sh $(NAME)
 
 # --features stats: every target below this one (file-stats, commit-stats, sample-pairs,
 # benchmark-pairs, and the language-specific variants) runs a stats-gated binary
@@ -36,6 +48,28 @@ build: test
 # fixture-loading helpers, gated separately from `stats` since it needs no git2/rusqlite.
 benchmark-optimal:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions
+
+# Same benchmark, but with --csv (so matching-reasons-report below has something to read) and a
+# summary of which algorithm pass (ASTMappingReason) is responsible for how much of the diff.
+benchmark-optimal-report:
+	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
+	(cd research && uv run ./analysis/matching_reasons_report.py)
+
+# Compares codediff against other diff tools (Unix diff, GumTree) on line-level agreement with
+# the human-authored mapping, plus runtime. --features test-fixtures: benchmark_other, like
+# benchmark_optimal_solutions, needs codediff::test's fixture-loading helpers. Requires GUMTREE_BIN
+# to point at a built GumTree distribution's bin/gumtree - unlike everything else in this Makefile,
+# this is an external, non-Rust tool dependency this target can't provide on its own (see
+# research/drivers/gumtree-batch/build.sh for the optional warm-JVM timing variant).
+benchmark-other:
+	cargo run --release --features test-fixtures --bin benchmark_other -- --csv
+	(cd research && uv run ./analysis/benchmark_other_report.py)
+
+# Leave-one-out ablation study over the diff algorithm's optional heuristic passes - see
+# research/measure/ablation_study.sh's own header comment for exactly what it measures.
+# Usage: make ablation-study [OUT_DIR=path]  (default OUT_DIR: research/ablation)
+ablation-study:
+	./research/measure/ablation_study.sh $(OUT_DIR)
 
 QUALITY_BASELINE := research/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
@@ -155,6 +189,20 @@ file-stats: build
 # Analyze commit statistics
 commit-stats: build
 	./target/release/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
+	(cd research && uv run ./analysis/commit_stats.py $(RESEARCH_DIR)/stats.sqlite)
+
+# Ad-hoc file_stats/commit_stats run over one specific directory (not the dataset-mode pipeline
+# above) - useful for debugging those binaries without the fetch/mode machinery. No `build`
+# prerequisite: research/measure/debug.sh already does its own `cargo build --release --features
+# stats`, so adding one here would just force a redundant full test+build first.
+# Usage: make debug-stats DIR=/path/to/repos [DEBUG_MODE=dirs|all|repositories]
+DEBUG_MODE ?= dirs
+debug-stats:
+	@if [ -z "$(DIR)" ]; then \
+		echo "usage: make debug-stats DIR=/path/to/repos [DEBUG_MODE=dirs|all|repositories]" >&2; \
+		exit 1; \
+	fi
+	./research/measure/debug.sh --$(DEBUG_MODE) $(DIR)
 
 # Sample real (repository, commit, path) code pairs for benchmark test data, per language.
 sample-pairs: build
@@ -173,6 +221,22 @@ sample-pairs-rust: build
 
 benchmark-pairs-rust: build
 	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark_rust.csv
+
+# Size/LOC-changed statistics and distribution plots for sample-pairs-rust's output. Depends on
+# sample-pairs-rust having already been run (needs the checked-out repositories, not just the CSV).
+code-pair-diff-stats:
+	(cd research && uv run ./analysis/code_pair_diff_stats.py sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output-csv code_pair_diff_stats_rust.csv)
+
+# Compares two benchmark-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
+# charts the difference. Usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
+# (save a copy of research/diff_pairs_benchmark_rust.csv before re-running benchmark-pairs-rust,
+# then pass that copy as BEFORE and the fresh run as AFTER).
+benchmark-pairs-diff:
+	@if [ -z "$(BEFORE)" ] || [ -z "$(AFTER)" ]; then \
+		echo "usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
+		exit 1; \
+	fi
+	(cd research && uv run ./analysis/diff_pairs_benchmark_comparison.py --before $(abspath $(BEFORE)) --after $(abspath $(AFTER)))
 
 # Extended language targets with 20000 node limit
 sample-pairs-java: build

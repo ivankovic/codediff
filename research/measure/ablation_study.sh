@@ -25,9 +25,11 @@
 # measured contribution to accuracy on the fixture corpus.
 #
 # Usage: ./ablation_study.sh [output-dir]  (default output-dir: research/ablation)
+# Can be run from anywhere - always operates relative to the repo root, two directories up from
+# this script's own location (research/measure/).
 
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 OUT_DIR="${1:-research/ablation}"
 mkdir -p "$OUT_DIR"
@@ -35,7 +37,9 @@ mkdir -p "$OUT_DIR"
 BIN=./target/release/benchmark_optimal_solutions
 
 echo "Building benchmark_optimal_solutions (release)..."
-if ! cargo build --release --bin benchmark_optimal_solutions; then
+# --features test-fixtures: benchmark_optimal_solutions needs codediff::test's fixture-loading
+# helpers, gated behind this feature (see Cargo.toml's [features]) since it needs no git2/rusqlite.
+if ! cargo build --release --features test-fixtures --bin benchmark_optimal_solutions; then
   echo "Build failed, aborting." >&2
   exit 1
 fi

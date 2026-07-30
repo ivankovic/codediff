@@ -15,6 +15,11 @@ tmp/
 **/research/data/*
 **/research/**/plots/
 **/research/drivers/gumtree-batch/out/
+# ablation_study.sh always overwrites the same filenames in place (baseline.csv/log,
+# <flag>.csv/log) - regenerable scratch output, not a versioned record, so it doesn't belong in
+# git (unlike e.g. research/results/*_baseline_*.csv, which are deliberately-named point-in-time
+# snapshots kept for historical comparison).
+**/research/ablation/*
 
 # ---> Python, only used in research/ directory.
 

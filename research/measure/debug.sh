@@ -16,6 +16,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Can be run from anywhere - always operates relative to the repo root, two directories up from
+# this script's own location (research/measure/).
+cd "$(dirname "$0")/../.."
+
 MODE="dirs"   # default
 
 # Parse optional flag
@@ -29,7 +34,10 @@ while [ $# -gt 1 ]; do
   shift
 done
 
-cargo build --release
+# --features stats: file_stats/commit_stats (invoked below) are both stats-gated - a plain
+# `cargo build --release` wouldn't build them at all, silently leaving whatever stale binary (or
+# none) already happened to sit in target/release/.
+cargo build --release --features stats
 
 # Target directory (current dir if not specified)
 PARENT="$1"

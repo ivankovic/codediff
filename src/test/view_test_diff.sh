@@ -16,6 +16,11 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Can be run from anywhere - resolves fixture paths relative to this script's own location
+# (src/test/), not the caller's working directory.
+DATA_DIR="$(dirname "$0")/data/diffs"
+
 case "$1" in
   rust-*)   lang="rs" ;;
   python-*) lang="py" ;;
@@ -34,4 +39,4 @@ case "$1" in
   *)        lang="unknown" ;;
 esac
 
-nvim -d "./src/test/data/diffs/$1/before.$lang.test" "./src/test/data/diffs/$1/after.$lang.test"
+nvim -d "$DATA_DIR/$1/before.$lang.test" "$DATA_DIR/$1/after.$lang.test"
