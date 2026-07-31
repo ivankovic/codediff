@@ -1969,3 +1969,27 @@ now; further gains on those need a different lever (e.g. the residual-size ideas
 this session), not more caching. `research/benchmark_other.csv` and all three `research/plots/*.png`
 regenerated from this real run. Throwaway `src/bin/clone_test.rs` deleted after use, per the
 established pattern for this kind of grammar/runtime verification binary.
+
+## Four new optimal-solution fixtures added, one clamped: `css-wordpress-reformat` (2026-07-31)
+
+Added `csharp-sonarr-add-if-block`, `css-wordpress-reformat`, `html-fatedier-add-attribute`, and
+`rust-rustdesk-add-item` to `src/test/data/diffs/` (human-verified ground truth via
+`human_solver`). Three match codediff's diff exactly (`assert_matches_human_mapping`, 0
+mismatches). `css-wordpress-reformat` needed `assert_matches_human_mapping_within_limit(30)`
+instead.
+
+**The gap**: reformatting minified CSS into one-declaration-per-line swaps the order of two
+structurally-identical-shaped declaration pairs within the same `rule_set` (`margin-bottom` then
+`margin-top` before, `margin-top` then `margin-bottom` after, in both
+`:where(.wp-block-post-excerpt)` and `.wp-block-post-excerpt__excerpt`). APTED's final pass finds
+an equal-cost mapping that pairs each declaration with its positional counterpart (`Update`-ing
+`margin-bottom`'s node into `margin-top`'s text) rather than following the property name across
+the reorder - a locality-optimal solution the human ground truth doesn't share. Same class of
+ambiguous-mapping gap as `c-postgres-real-logic-change` (see "Known gaps with full analysis"
+above), not a bug with a fix pending.
+
+**Quality baseline updated**: `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` 744 -> 774 (the
+new fixtures' combined contribution: 0 + 30 + 0 + 0) via `make update-quality-baseline` - a
+deliberate, reviewed shift from corpus growth, not a hidden regression in any existing fixture.
+`MS_PER_FIXTURE` 1083 -> 1136.3 (103 fixtures now, up from 99). `cargo test --release --lib`:
+440/0/5, `make check-quality`: clean against the new baseline.

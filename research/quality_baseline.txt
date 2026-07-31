@@ -2,9 +2,10 @@
 # TOTAL_MISMATCHES: benchmark_optimal_solutions' first TOTAL row (mismatches vs. the
 # human-authored ground truth in src/test/data/diffs/) - a hard gate, since this is
 # algorithm-only and not machine-dependent: deploy fails if this number goes up.
-# MS_PER_FIXTURE: benchmark_optimal_solutions' own "Runtime: ... ms/fixture" line - informational
-# only (a >2x jump warns but doesn't fail deploy), since wall-clock time varies by machine.
-# Update deliberately via `make update-quality-baseline` after a reviewed improvement, not
-# automatically as a side effect of every deploy.
-TOTAL_MISMATCHES=744
-MS_PER_FIXTURE=1083
+# MS_PER_FIXTURE: benchmark_optimal_solutions' own "Runtime: ... ms/fixture" line -
+# informational only (a >2x jump warns but doesn't fail deploy), since wall-clock time
+# varies by machine.
+# Update deliberately via `make update-quality-baseline` after a reviewed improvement,
+# not automatically as a side effect of every deploy.
+TOTAL_MISMATCHES=774
+MS_PER_FIXTURE=1136.3
