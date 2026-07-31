@@ -103,7 +103,10 @@
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
 *                  see `s` above for what happens when one of these is saved. Samples already
 *                  promoted (per sample.csv's `promoted_to` column) are marked " - SOLVED"; press
-*                  `H` inside this picker to hide them
+*                  `H` inside this picker to hide them, or `s` inside this picker to cycle its sort
+*                  order: alphabetical, reverse alphabetical, smallest text diff first, largest
+*                  text diff first (by changed-line count in a raw `diff -u`, not AST size) --
+*                  selection follows the current name across a re-sort, same as `H`
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -188,7 +191,8 @@ s              save -- or, on a sample, prompt for a name and promote it
 o              open a different test case (src/test/data/diffs/)
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\" -- press H inside this picker to
-                 hide/show them
+                 hide/show them, or s to cycle its sort order (A-Z, Z-A,
+                 smallest/largest text diff first)
 
 ?              toggle this help
 q / Esc        quit
@@ -437,6 +441,112 @@ fn run_unix_diff(before_src: &[u8], after_src: &[u8]) -> Result<String> {
     }
 }
 
+/// Reads the raw `before.<ext>.test`/`after.<ext>.test` contents of a fixture directory, without
+/// parsing an AST -- cheap enough to call once per sample when computing the `O` picker's
+/// text-diff-size sort keys (unlike `load_sample`, which parses both sides via tree-sitter just to
+/// display them). `None` if either file is missing or unreadable.
+fn raw_before_after(dir: &Path) -> Option<(String, String)> {
+    let mut before = None;
+    let mut after = None;
+
+    for entry in fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if name.starts_with("before.") && name.ends_with(".test") {
+            before = fs::read_to_string(&path).ok();
+        } else if name.starts_with("after.") && name.ends_with(".test") {
+            after = fs::read_to_string(&path).ok();
+        }
+    }
+
+    Some((before?, after?))
+}
+
+/// The number of changed (`+`/`-`, excluding the `+++`/`---` header lines) lines in the unified
+/// `diff -u` between a sample's raw before/after content -- the sort key for
+/// `SampleSortOrder::{Smallest,Largest}DiffFirst`. A cheap, language-agnostic proxy for "how big a
+/// change is this" that needs no AST, unlike every other size notion this tool otherwise works
+/// with. `0` (not an error) if the sample's files can't be read or `diff` can't be run, so a
+/// missing/malformed sample just sorts as if it were empty rather than breaking the picker.
+fn sample_diff_line_count(name: &str) -> usize {
+    let Some((before, after)) = raw_before_after(&samples_root().join(name)) else {
+        return 0;
+    };
+    let Ok(diff) = run_unix_diff(before.as_bytes(), after.as_bytes()) else {
+        return 0;
+    };
+    diff.lines()
+        .filter(|line| {
+            (line.starts_with('+') && !line.starts_with("+++"))
+                || (line.starts_with('-') && !line.starts_with("---"))
+        })
+        .count()
+}
+
+/// Sort order for the `O` (open sample) picker's list, cycled by pressing `s` while it's open (see
+/// `Modal::OpenSamplePicker`). `SmallestDiffFirst`/`LargestDiffFirst` rank by
+/// `sample_diff_line_count` - useful for triaging samples by how much work solving one by hand is
+/// likely to take, without needing to open each one first to find out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SampleSortOrder {
+    Alphabetical,
+    ReverseAlphabetical,
+    SmallestDiffFirst,
+    LargestDiffFirst,
+}
+
+impl SampleSortOrder {
+    fn next(self) -> Self {
+        match self {
+            SampleSortOrder::Alphabetical => SampleSortOrder::ReverseAlphabetical,
+            SampleSortOrder::ReverseAlphabetical => SampleSortOrder::SmallestDiffFirst,
+            SampleSortOrder::SmallestDiffFirst => SampleSortOrder::LargestDiffFirst,
+            SampleSortOrder::LargestDiffFirst => SampleSortOrder::Alphabetical,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            SampleSortOrder::Alphabetical => "A-Z",
+            SampleSortOrder::ReverseAlphabetical => "Z-A",
+            SampleSortOrder::SmallestDiffFirst => "smallest diff first",
+            SampleSortOrder::LargestDiffFirst => "largest diff first",
+        }
+    }
+}
+
+/// Sample entries actually shown in the `O` picker: `options` filtered by `hide_solved`, then
+/// ordered by `sort_order`. Shared by the render function and the key handler so both agree on
+/// what index `selected` refers to by construction, rather than keeping two independently
+/// maintained copies of the same filter/sort logic in sync by hand.
+fn visible_sample_options(
+    options: &[(String, bool, usize)],
+    hide_solved: bool,
+    sort_order: SampleSortOrder,
+) -> Vec<(String, bool, usize)> {
+    let mut visible: Vec<(String, bool, usize)> = options
+        .iter()
+        .filter(|(_, solved, _)| !hide_solved || !*solved)
+        .cloned()
+        .collect();
+
+    match sort_order {
+        SampleSortOrder::Alphabetical => visible.sort_by(|a, b| a.0.cmp(&b.0)),
+        SampleSortOrder::ReverseAlphabetical => visible.sort_by(|a, b| b.0.cmp(&a.0)),
+        SampleSortOrder::SmallestDiffFirst => visible.sort_by_key(|(_, _, size)| *size),
+        SampleSortOrder::LargestDiffFirst => {
+            visible.sort_by_key(|(_, _, size)| std::cmp::Reverse(*size))
+        }
+    }
+
+    visible
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -571,11 +681,15 @@ enum Modal {
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with whether it has already been promoted into
     /// src/test/data/diffs/ (per sample.csv's `promoted_to` column) -- shown as " - SOLVED" and,
-    /// when `hide_solved` is set, left out of the list entirely.
+    /// when `hide_solved` is set, left out of the list entirely -- and with its
+    /// `sample_diff_line_count` (computed once when the picker opens, not on every `s` press).
+    /// `selected` indexes into `visible_sample_options(&options, hide_solved, sort_order)`, not
+    /// `options` itself.
     OpenSamplePicker {
-        options: Vec<(String, bool)>,
+        options: Vec<(String, bool, usize)>,
         selected: usize,
         hide_solved: bool,
+        sort_order: SampleSortOrder,
     },
     /// Raised when a picker's selection is confirmed while the current mapping has unsaved
     /// changes: asks whether to save the *current* case before switching to `target`.
@@ -2602,8 +2716,9 @@ fn render_modal(
             options,
             selected,
             hide_solved,
+            sort_order,
         } => {
-            render_open_sample_picker(frame, area, options, *selected, *hide_solved);
+            render_open_sample_picker(frame, area, options, *selected, *hide_solved, *sort_order);
         }
         Modal::ConfirmDiscardUnsaved { target, can_save } => render_text_modal(
             frame,
@@ -2820,19 +2935,19 @@ fn render_open_picker(
 }
 
 /// Like `render_open_picker`, but for `O`'s sample picker: solved (already-promoted) entries are
-/// shown in green with a " - SOLVED" suffix, and are left out of the list entirely when
-/// `hide_solved` is set.
+/// shown in green with a " - SOLVED" suffix, left out of the list entirely when `hide_solved` is
+/// set, and ordered per `sort_order` (cycled by `s` - see `SampleSortOrder`). Each entry also shows
+/// its `sample_diff_line_count` in parentheses, so the effect of switching to a diff-size order is
+/// visible directly, not just trusted.
 fn render_open_sample_picker(
     frame: &mut Frame,
     area: Rect,
-    options: &[(String, bool)],
+    options: &[(String, bool, usize)],
     selected: usize,
     hide_solved: bool,
+    sort_order: SampleSortOrder,
 ) {
-    let visible: Vec<&(String, bool)> = options
-        .iter()
-        .filter(|(_, solved)| !hide_solved || !*solved)
-        .collect();
+    let visible = visible_sample_options(options, hide_solved, sort_order);
 
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
@@ -2846,7 +2961,7 @@ fn render_open_sample_picker(
         .enumerate()
         .skip(scroll)
         .take(inner_height.max(1))
-        .map(|(i, (name, solved))| {
+        .map(|(i, (name, solved, size))| {
             let style = if i == selected {
                 Style::default().bg(Color::Yellow).fg(Color::Black)
             } else if *solved {
@@ -2855,23 +2970,24 @@ fn render_open_sample_picker(
                 Style::default()
             };
             let label = if *solved {
-                format!("{name} - SOLVED")
+                format!("{name} ({size}) - SOLVED")
             } else {
-                name.clone()
+                format!("{name} ({size})")
             };
             ListItem::new(Line::from(Span::styled(label, style)))
         })
         .collect();
 
-    let solved_count = options.iter().filter(|(_, solved)| *solved).count();
+    let solved_count = options.iter().filter(|(_, solved, _)| *solved).count();
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open sample ({}/{}) — j/k move, Enter open, H {} solved ({} total), Esc cancel",
+            "Open sample ({}/{}) — j/k move, Enter open, H {} solved ({} total), s sort: {}, Esc cancel",
             if visible.is_empty() { 0 } else { selected + 1 },
             visible.len(),
             if hide_solved { "show" } else { "hide" },
             solved_count,
+            sort_order.label(),
         ))
         .border_style(
             Style::default()
@@ -3417,14 +3533,22 @@ fn handle_key(
         KeyCode::Char('O') => {
             match list_samples_with_status() {
                 Ok(options) if !options.is_empty() => {
+                    let options: Vec<(String, bool, usize)> = options
+                        .into_iter()
+                        .map(|(name, solved)| {
+                            let size = sample_diff_line_count(&name);
+                            (name, solved, size)
+                        })
+                        .collect();
                     let selected = options
                         .iter()
-                        .position(|(name, _)| name == &app.name)
+                        .position(|(name, ..)| name == &app.name)
                         .unwrap_or(0);
                     app.modal = Some(Modal::OpenSamplePicker {
                         options,
                         selected,
                         hide_solved: false,
+                        sort_order: SampleSortOrder::Alphabetical,
                     });
                 }
                 Ok(_) => {
@@ -3546,14 +3670,9 @@ fn handle_modal_key(
             options,
             selected,
             hide_solved,
+            sort_order,
         } => {
-            // Cloned rather than borrowed, so `options` stays free to move into whichever
-            // `Modal::OpenSamplePicker` gets rebuilt below.
-            let visible: Vec<(String, bool)> = options
-                .iter()
-                .filter(|(_, solved)| !hide_solved || !*solved)
-                .cloned()
-                .collect();
+            let visible = visible_sample_options(&options, hide_solved, sort_order);
 
             match code {
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -3561,6 +3680,7 @@ fn handle_modal_key(
                         selected: selected.saturating_sub(1),
                         options,
                         hide_solved,
+                        sort_order,
                     });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
@@ -3568,10 +3688,11 @@ fn handle_modal_key(
                         selected: (selected + 1).min(visible.len().saturating_sub(1)),
                         options,
                         hide_solved,
+                        sort_order,
                     });
                 }
                 KeyCode::Enter => {
-                    if let Some((name, _)) = visible.get(selected) {
+                    if let Some((name, ..)) = visible.get(selected) {
                         let target = OpenTarget::Sample(name.clone());
                         if app.dirty {
                             let can_save = matches!(app.origin, CaseOrigin::Diffs);
@@ -3584,29 +3705,38 @@ fn handle_modal_key(
                             options,
                             selected,
                             hide_solved,
+                            sort_order,
                         });
                     }
                 }
                 KeyCode::Char('h') | KeyCode::Char('H') => {
-                    let current_name = visible.get(selected).map(|(name, _)| name.clone());
+                    let current_name = visible.get(selected).map(|(name, ..)| name.clone());
                     let new_hide_solved = !hide_solved;
-                    let new_visible_len = options
-                        .iter()
-                        .filter(|(_, solved)| !new_hide_solved || !*solved)
-                        .count();
+                    let new_visible = visible_sample_options(&options, new_hide_solved, sort_order);
                     let new_selected = current_name
-                        .and_then(|name| {
-                            options
-                                .iter()
-                                .filter(|(_, solved)| !new_hide_solved || !*solved)
-                                .position(|(n, _)| *n == name)
-                        })
+                        .and_then(|name| new_visible.iter().position(|(n, ..)| *n == name))
                         .unwrap_or(0)
-                        .min(new_visible_len.saturating_sub(1));
+                        .min(new_visible.len().saturating_sub(1));
                     app.modal = Some(Modal::OpenSamplePicker {
                         options,
                         selected: new_selected,
                         hide_solved: new_hide_solved,
+                        sort_order,
+                    });
+                }
+                KeyCode::Char('s') | KeyCode::Char('S') => {
+                    let current_name = visible.get(selected).map(|(name, ..)| name.clone());
+                    let new_sort_order = sort_order.next();
+                    let new_visible = visible_sample_options(&options, hide_solved, new_sort_order);
+                    let new_selected = current_name
+                        .and_then(|name| new_visible.iter().position(|(n, ..)| *n == name))
+                        .unwrap_or(0)
+                        .min(new_visible.len().saturating_sub(1));
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        options,
+                        selected: new_selected,
+                        hide_solved,
+                        sort_order: new_sort_order,
                     });
                 }
                 KeyCode::Esc => {
@@ -3617,6 +3747,7 @@ fn handle_modal_key(
                         options,
                         selected,
                         hide_solved,
+                        sort_order,
                     });
                 }
             }
@@ -4113,6 +4244,83 @@ mod tests {
         assert!(output.contains("+++ after"));
     }
 
+    #[test]
+    fn raw_before_after_reads_the_before_and_after_test_files_from_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("before.rs.test"), "fn old() {}\n").unwrap();
+        fs::write(dir.path().join("after.rs.test"), "fn new() {}\n").unwrap();
+        fs::write(dir.path().join("source.json"), "{}").unwrap();
+
+        let (before, after) = raw_before_after(dir.path()).expect("both files should be found");
+        assert_eq!(before, "fn old() {}\n");
+        assert_eq!(after, "fn new() {}\n");
+    }
+
+    #[test]
+    fn raw_before_after_is_none_when_a_file_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("before.rs.test"), "fn old() {}\n").unwrap();
+        // No after.*.test written.
+
+        assert!(raw_before_after(dir.path()).is_none());
+    }
+
+    #[test]
+    fn sample_diff_line_count_counts_only_changed_lines_not_context_or_headers() {
+        let dir = tempfile::tempdir().unwrap();
+        // Same directory layout `sample_diff_line_count` reads via `samples_root().join(name)` -
+        // exercised directly against a real temp directory here instead, via `raw_before_after` +
+        // `run_unix_diff` (the same two calls `sample_diff_line_count` itself makes), since
+        // `samples_root()` is hardcoded to this crate's own `src/test/data/samples`.
+        fs::write(
+            dir.path().join("before.rs.test"),
+            "fn main() {\n    old();\n    same();\n}\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("after.rs.test"),
+            "fn main() {\n    new();\n    same();\n}\n",
+        )
+        .unwrap();
+
+        let (before, after) = raw_before_after(dir.path()).unwrap();
+        let diff = run_unix_diff(before.as_bytes(), after.as_bytes()).unwrap();
+        let count = diff
+            .lines()
+            .filter(|line| {
+                (line.starts_with('+') && !line.starts_with("+++"))
+                    || (line.starts_with('-') && !line.starts_with("---"))
+            })
+            .count();
+        assert_eq!(
+            count, 2,
+            "one removed + one added line, not the 2 unchanged: {diff}"
+        );
+    }
+
+    #[test]
+    fn sample_diff_line_count_is_zero_for_a_nonexistent_sample() {
+        assert_eq!(sample_diff_line_count("does-not-exist-at-all"), 0);
+    }
+
+    #[test]
+    fn sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk() {
+        // Full integrated path (`samples_root().join(name)`, not a crafted temp dir) against
+        // whatever's actually checked in under src/test/data/samples/ - skips rather than fails if
+        // none exist yet in this checkout (materialize_test_diffs hasn't run), matching
+        // `list_dir_names`'s own "not an error" treatment of a missing/empty samples/ directory.
+        let Ok(names) = list_dir_names(&samples_root()) else {
+            return;
+        };
+        let Some(name) = names.first() else {
+            return;
+        };
+        assert!(
+            sample_diff_line_count(name) > 0,
+            "sample '{name}' should have at least one changed line"
+        );
+    }
+
     /// Concatenates every cell's symbol in a `TestBackend`'s buffer, so a rendered frame's
     /// content can be checked with a plain `contains`.
     fn rendered_text(terminal: &Terminal<ratatui::backend::TestBackend>) -> String {
@@ -4179,8 +4387,8 @@ mod tests {
     #[test]
     fn open_sample_picker_marks_solved_entries_and_can_hide_them() {
         let options = vec![
-            ("rust-x-foo-abc12345-a".to_string(), true),
-            ("rust-x-foo-def67890-b".to_string(), false),
+            ("rust-x-foo-abc12345-a".to_string(), true, 7),
+            ("rust-x-foo-def67890-b".to_string(), false, 3),
         ];
 
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -4188,15 +4396,24 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
 
         terminal
-            .draw(|f| render_open_sample_picker(f, area, &options, 0, false))
+            .draw(|f| {
+                render_open_sample_picker(
+                    f,
+                    area,
+                    &options,
+                    0,
+                    false,
+                    SampleSortOrder::Alphabetical,
+                )
+            })
             .unwrap();
         let text = rendered_text(&terminal);
         assert!(
-            text.contains("rust-x-foo-abc12345-a - SOLVED"),
+            text.contains("rust-x-foo-abc12345-a (7) - SOLVED"),
             "solved marker missing: {text}"
         );
         assert!(
-            text.contains("rust-x-foo-def67890-b"),
+            text.contains("rust-x-foo-def67890-b (3)"),
             "unsolved entry missing: {text}"
         );
         assert!(
@@ -4205,7 +4422,9 @@ mod tests {
         );
 
         terminal
-            .draw(|f| render_open_sample_picker(f, area, &options, 0, true))
+            .draw(|f| {
+                render_open_sample_picker(f, area, &options, 0, true, SampleSortOrder::Alphabetical)
+            })
             .unwrap();
         let text = rendered_text(&terminal);
         assert!(
@@ -4219,6 +4438,89 @@ mod tests {
         assert!(
             text.contains("1/1"),
             "count should only include the unsolved entry: {text}"
+        );
+    }
+
+    #[test]
+    fn render_open_sample_picker_shows_the_current_sort_order() {
+        // Wider than the other picker tests: the title is long enough (position, hide-solved
+        // hint, sort order, key hints) that an 80-column terminal's narrow ~46-column popup
+        // truncates it well before reaching "sort:" - this test cares specifically about that
+        // tail end, so it needs the room.
+        let options = vec![("a".to_string(), false, 1)];
+        let backend = ratatui::backend::TestBackend::new(160, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 160, 24);
+
+        terminal
+            .draw(|f| {
+                render_open_sample_picker(
+                    f,
+                    area,
+                    &options,
+                    0,
+                    false,
+                    SampleSortOrder::LargestDiffFirst,
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("largest diff first"),
+            "title should reflect the current sort order: {text}"
+        );
+    }
+
+    #[test]
+    fn visible_sample_options_orders_by_the_requested_sort_order() {
+        let options = vec![
+            ("charlie".to_string(), false, 5),
+            ("alpha".to_string(), false, 20),
+            ("bravo".to_string(), false, 1),
+        ];
+
+        let names = |order| -> Vec<String> {
+            visible_sample_options(&options, false, order)
+                .into_iter()
+                .map(|(name, ..)| name)
+                .collect()
+        };
+
+        assert_eq!(
+            names(SampleSortOrder::Alphabetical),
+            vec!["alpha", "bravo", "charlie"]
+        );
+        assert_eq!(
+            names(SampleSortOrder::ReverseAlphabetical),
+            vec!["charlie", "bravo", "alpha"]
+        );
+        assert_eq!(
+            names(SampleSortOrder::SmallestDiffFirst),
+            vec!["bravo", "charlie", "alpha"]
+        );
+        assert_eq!(
+            names(SampleSortOrder::LargestDiffFirst),
+            vec!["alpha", "charlie", "bravo"]
+        );
+    }
+
+    #[test]
+    fn sample_sort_order_next_cycles_through_all_four_and_back() {
+        assert_eq!(
+            SampleSortOrder::Alphabetical.next(),
+            SampleSortOrder::ReverseAlphabetical
+        );
+        assert_eq!(
+            SampleSortOrder::ReverseAlphabetical.next(),
+            SampleSortOrder::SmallestDiffFirst
+        );
+        assert_eq!(
+            SampleSortOrder::SmallestDiffFirst.next(),
+            SampleSortOrder::LargestDiffFirst
+        );
+        assert_eq!(
+            SampleSortOrder::LargestDiffFirst.next(),
+            SampleSortOrder::Alphabetical
         );
     }
 
@@ -4241,12 +4543,13 @@ mod tests {
         let flat = flatten_visible(root, &app.before.collapsed, None);
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
-                ("solved-one".to_string(), true),
-                ("unsolved-one".to_string(), false),
-                ("unsolved-two".to_string(), false),
+                ("solved-one".to_string(), true, 0),
+                ("unsolved-one".to_string(), false, 0),
+                ("unsolved-two".to_string(), false, 0),
             ],
             selected: 1,
             hide_solved: true,
+            sort_order: SampleSortOrder::Alphabetical,
         });
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
