@@ -1,0 +1,166 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{9}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{}, \showDOI{}, and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showDOI}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showDOI #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showDOI      \undefined \def \showDOI       #1{#1}\fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       {\relax}        \fi
+% The following commands are used for tagged output and should be
+% invisible to TeX
+\providecommand\bibfield[2]{#2}
+\providecommand\bibinfo[2]{#2}
+\providecommand\natexlab[1]{#1}
+\providecommand\showeprint[2][]{arXiv:#2}
+
+\bibitem[Arafat and Riehle(2009)]%
+        {commit-size-distribution-paper}
+\bibfield{author}{\bibinfo{person}{Osama Arafat} {and} \bibinfo{person}{Dirk
+  Riehle}.} \bibinfo{year}{2009}\natexlab{}.
+\newblock \showarticletitle{The Commit Size Distribution of Open Source
+  Software}. In \bibinfo{booktitle}{\emph{2009 42nd Hawaii International
+  Conference on System Sciences}}. \bibinfo{pages}{1--8}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/HICSS.2009.421}
+\showDOI{\tempurl}
+
+
+\bibitem[Dyer et~al\mbox{.}(2014)]%
+        {ast-api-1}
+\bibfield{author}{\bibinfo{person}{Robert Dyer}, \bibinfo{person}{Hridesh
+  Rajan}, \bibinfo{person}{Hoan~Anh Nguyen}, {and} \bibinfo{person}{Tien~N.
+  Nguyen}.} \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{Mining billions of {AST} nodes to study actual and
+  potential usage of {Java} language features}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 36th International Conference on
+  Software Engineering}} \emph{(\bibinfo{series}{ICSE 2014})}.
+  \bibinfo{publisher}{Association for Computing Machinery},
+  \bibinfo{address}{New York, NY, USA}, \bibinfo{pages}{779--790}.
+\newblock
+\showISBNx{9781450327565}
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2568225.2568295}
+\showDOI{\tempurl}
+
+
+\bibitem[Enayet(2020)]%
+        {diffsitter}
+\bibfield{author}{\bibinfo{person}{Afnan Enayet}.}
+  \bibinfo{year}{2020}\natexlab{}.
+\newblock \bibinfo{title}{diffsitter: A Tree-Sitter-Based AST Difftool for
+  Meaningful Diffs}.
+\newblock
+  \bibinfo{howpublished}{\url{https://github.com/afnanenayet/diffsitter}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-07-31}.
+
+
+\bibitem[Falleri et~al\mbox{.}(2014)]%
+        {gumtreediff-2014}
+\bibfield{author}{\bibinfo{person}{Jean-R{\'e}my Falleri},
+  \bibinfo{person}{Flor{\'e}al Morandat}, \bibinfo{person}{Xavier Blanc},
+  \bibinfo{person}{Matias Martinez}, {and} \bibinfo{person}{Martin Monperrus}.}
+  \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{Fine-grained and accurate source code
+  differencing}. In \bibinfo{booktitle}{\emph{Proceedings of the 29th ACM/IEEE
+  International Conference on Automated Software Engineering}}
+  \emph{(\bibinfo{series}{ASE '14})}. \bibinfo{address}{V\"aster\aa s, Sweden},
+  \bibinfo{pages}{313--324}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2642937.2642982}
+\showDOI{\tempurl}
+
+
+\bibitem[Hughes(2018)]%
+        {difftastic}
+\bibfield{author}{\bibinfo{person}{Wilfred Hughes}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \bibinfo{title}{Difftastic: A Structural Diff That Understands
+  Syntax}.
+\newblock \bibinfo{howpublished}{\url{https://github.com/Wilfred/difftastic}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-07-31}.
+
+
+\bibitem[L{\"a}mmel et~al\mbox{.}(2011)]%
+        {ast-api-2}
+\bibfield{author}{\bibinfo{person}{Ralf L{\"a}mmel}, \bibinfo{person}{Ekaterina
+  Pek}, {and} \bibinfo{person}{J{\"u}rgen Starek}.}
+  \bibinfo{year}{2011}\natexlab{}.
+\newblock \showarticletitle{Large-scale, {AST}-based {API}-usage analysis of
+  open-source {Java} projects}. In \bibinfo{booktitle}{\emph{Proceedings of the
+  2011 ACM Symposium on Applied Computing}}. \bibinfo{pages}{1317--1324}.
+\newblock
+
+
+\bibitem[Myers(1986)]%
+        {myers-1986}
+\bibfield{author}{\bibinfo{person}{Eugene~W. Myers}.}
+  \bibinfo{year}{1986}\natexlab{}.
+\newblock \showarticletitle{An {O(ND)} Difference Algorithm and Its
+  Variations}.
+\newblock \bibinfo{journal}{\emph{Algorithmica}} \bibinfo{volume}{1},
+  \bibinfo{number}{2} (\bibinfo{year}{1986}), \bibinfo{pages}{251--266}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/BF01840446}
+\showDOI{\tempurl}
+
+
+\bibitem[Pawlik and Augsten(2015)]%
+        {apted-2015}
+\bibfield{author}{\bibinfo{person}{Mateusz Pawlik} {and}
+  \bibinfo{person}{Nikolaus Augsten}.} \bibinfo{year}{2015}\natexlab{}.
+\newblock \showarticletitle{Efficient Computation of the Tree Edit Distance}.
+\newblock \bibinfo{journal}{\emph{ACM Transactions on Database Systems}}
+  \bibinfo{volume}{40}, \bibinfo{number}{1}, Article \bibinfo{articleno}{3}
+  (\bibinfo{year}{2015}), \bibinfo{numpages}{3:1--3:40}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2699485}
+\showDOI{\tempurl}
+
+
+\bibitem[Zhang and Shasha(1989)]%
+        {zhang-shasha-1989}
+\bibfield{author}{\bibinfo{person}{Kaizhong Zhang} {and}
+  \bibinfo{person}{Dennis Shasha}.} \bibinfo{year}{1989}\natexlab{}.
+\newblock \showarticletitle{Simple Fast Algorithms for the Editing Distance
+  between Trees and Related Problems}.
+\newblock \bibinfo{journal}{\emph{SIAM J. Comput.}} \bibinfo{volume}{18},
+  \bibinfo{number}{6} (\bibinfo{year}{1989}), \bibinfo{pages}{1245--1262}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1137/0218082}
+\showDOI{\tempurl}
+
+
+\end{thebibliography}

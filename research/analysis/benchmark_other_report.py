@@ -14,9 +14,9 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Compare codediff against other diff tools (Unix `diff` today - `benchmark_other.rs`'s
-`ExternalTool` can grow more) on line-level agreement with the human-authored mapping, and on
-runtime.
+"""Compare codediff against other diff tools - Unix `diff`, GumTree, difftastic, diffsitter today
+(`benchmark_other.rs`'s `ExternalTool` can grow more) - on line-level agreement with the
+human-authored mapping, and on runtime.
 
 Reads benchmark_other.csv (produced by
 `cargo run --release --bin benchmark_other -- --csv --repeats N`), one row per fixture with
@@ -40,12 +40,18 @@ Writes three plots:
     so a single mean bar hides exactly the shape that matters here). The reference violin is
     tree-sitter parsing alone, with no diffing on top - the lower bound every other series must pay
     before its own work even starts.
-  - benchmark_other_variance.png: per-fixture coefficient of variation (stddev/mean across that
-    fixture's repeats, as a %) distribution, one box per tool - added 2026-07-26 after
+Also writes one table (not a plot - a handful of summary numbers per tool reads better as a table
+than as a chart):
+
+  - benchmark_other_variance.tex: per-fixture coefficient of variation (stddev/mean across that
+    fixture's repeats, as a %), median and p90 per tool - added 2026-07-26 (as a plot) after
     `benchmark_other`'s own aggregate median/p90/max turned out to swing by roughly +-10% between
     back-to-back single-shot runs on a loaded machine, making a single run's numbers untrustworthy
-    for judging a real speed change. Answers "how much should one run's number be trusted" as a
-    companion to the runtime plot's "what does the distribution look like."
+    for judging a real speed change. Changed to a table 2026-07-31. Answers "how much should one
+    run's number be trusted" as a companion to the runtime plot's "what does the distribution look
+    like." A complete, ready-to-`\\input`-ed ACM `table` environment, so
+    `research/papers/introductory-paper/main.tex` can include it directly and it never goes stale
+    relative to whatever `benchmark_other.csv` says.
 
 Usage (from research/):
     uv run ./analysis/benchmark_other_report.py
@@ -68,18 +74,71 @@ INK_MUTED = "#898781"
 GRIDLINE = "#e1e0d9"
 BASELINE = "#c3c2b7"
 
-# Categorical slots 1 (blue), 2 (orange), 7 (violet), 6 (green), 8 (red) from the dataviz skill's
-# reference palette - validated colorblind-safe as a fivesome via validate_palette.js (light + dark
-# mode, all PASS) *in this exact left-to-right order* (green, blue, orange, violet, red) - the
-# validator checks adjacent pairs, so re-ordering the x-axis without re-validating could silently
-# reintroduce a CVD collision (green next to orange, tried first, failed at ΔE 3.2 protan). Each
-# series keeps one fixed slot regardless of which subset a given chart shows - "color follows the
-# entity, never its rank" - so `gumtree` is always violet and `gumtree_warm` is always red, whether
-# plotted alongside every other series or alone.
-CODEDIFF_COLOR = "#2a78d6"
-TOOL_COLORS = {"unix_diff": "#eb6834", "gumtree": "#4a3aa7"}
-TREESITTER_COLOR = "#008300"
-GUMTREE_WARM_COLOR = "#e34948"
+# Display name and color for every series this report can plot, keyed by the internal id
+# `benchmark_other.rs`'s CSV columns use (e.g. "gumtree_ms", "gumtree_mismatches"). `DISPLAY_ORDER`
+# is this dict's insertion order - the canonical left-to-right/legend order every plot below uses
+# (see `ordered`). Not every plot shows every entry: `plot_accuracy` never shows `treesitter_parse`
+# or `gumtree_warm`, since neither produces line labels to score for agreement (see that
+# function's own doc comment).
+#
+# `treesitter_parse` (black, INK_PRIMARY) and `unix_diff` (grey, INK_MUTED) reuse this file's own
+# chart-chrome tokens rather than a categorical color - a deliberate choice (2026-07-31): neither
+# is "a tool being compared" the way codediff/gumtree/difftastic/diffsitter are, one's a reference
+# lower bound, the other the long-standing line-level baseline every other series is measured
+# against. codediff/gumtree/gumtree_warm's colors (blue/violet/red) are from the dataviz skill's
+# reference palette, originally validated colorblind-safe via validate_palette.js as part of a
+# larger fivesome that also included unix_diff/treesitter_parse's old categorical slots, before
+# those two moved to grey/black above. difftastic/diffsitter (gold/teal) were added 2026-07-31,
+# after that validation pass - the dataviz skill and validate_palette.js aren't available in this
+# environment, so these two were picked by hand as the two hue families the rest don't already
+# cover, mirroring how Okabe-Ito's colorblind-safe 8-palette adds sky-blue and yellow to a base 5
+# for the same reason. Re-validate the full current set before treating it as confirmed
+# colorblind-safe.
+DISPLAY_NAMES = {
+    "treesitter_parse": "TreeSitter parse (lower bound)",
+    "unix_diff": "UNIX diff (baseline)",
+    "codediff": "CodeDiff",
+    "gumtree": "GumTree (binary)",
+    "gumtree_warm": "GumTree (warm JVM)",
+    "diffsitter": "diffsitter",
+    "difftastic": "difftastic",
+}
+DISPLAY_ORDER = list(DISPLAY_NAMES)
+COLORS = {
+    "treesitter_parse": INK_PRIMARY,
+    "unix_diff": INK_MUTED,
+    "codediff": "#2a78d6",
+    "gumtree": "#4a3aa7",
+    "gumtree_warm": "#e34948",
+    "difftastic": "#c9a227",
+    "diffsitter": "#1a9e96",
+}
+
+
+def ordered(ids: list[str]) -> list[str]:
+    """`ids` sorted into `DISPLAY_ORDER`'s canonical order - lets each plot ask for "whichever of
+    these series exist" without hardcoding which subset or order applies to it."""
+    return [i for i in DISPLAY_ORDER if i in ids]
+
+
+def rows_for(id_: str, rows: list[dict]) -> list[dict]:
+    """Which of `rows` series `id_` draws from. `treesitter_parse`/`codediff` always draw from the
+    full corpus (every language parses, and codediff has no scope gaps of its own). `gumtree_warm`
+    draws from whichever rows the batch driver actually covered that run - its own opt-in
+    availability check, not a per-fixture language scope (see `plot_runtime`'s doc comment). Every
+    other id is `applicable_rows` - `ExternalTool::supports`'s per-fixture language scope."""
+    if id_ in ("treesitter_parse", "codediff"):
+        return rows
+    if id_ == "gumtree_warm":
+        return [r for r in rows if r["gumtree_warm_ms"] != ""]
+    return applicable_rows(rows, id_)
+
+
+def has_gumtree_warm(rows: list[dict]) -> bool:
+    """Whether `gumtree_warm_ms` is present and non-empty for at least one row - the batch driver
+    is opt-in per *run*, not per-fixture (see `plot_runtime`'s doc comment), so this is checked
+    once per report rather than treated like a per-fixture language scope."""
+    return bool(rows) and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows)
 
 
 def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
@@ -189,23 +248,25 @@ def plot_accuracy(rows: list[dict], tools: list[str], output_path: Path) -> None
     Each series is built from that tool's own `applicable_rows` - a fixture outside a tool's
     language scope (`ExternalTool::supports`, e.g. GumTree has no generator for this corpus's one
     JSON fixture) is dropped from that tool's series entirely, not coerced to a 0%-agreement
-    fixture it was never scored on. One combined panel is honest here specifically because every
-    tool's scope is close to the full corpus (within a fixture or two) - if a future tool covers
-    only a small slice, give it a second, separately-scaled panel instead of folding it into these
-    bars (see git history around 2026-07 for the two-panel version this replaced, back when GumTree
-    covered only 5 of 93 fixtures).
+    fixture it was never scored on. Each legend entry's own "(n=...)" is what makes a narrower-scope
+    tool's bars honestly readable in this shared panel - diffsitter, the narrowest scope in this
+    comparison, still covers 83 of 98 fixtures (its compiled-in language set skips JavaScript,
+    Kotlin, and several others - see `diffsitter_file_type`'s doc comment in `benchmark_other.rs`).
+    If a future tool's scope drops much further than that, give it a second, separately-scaled
+    panel instead of folding it into these bars (see git history around 2026-07 for the two-panel
+    version this replaced, back when GumTree covered only 5 of 93 fixtures).
 
     `treesitter_parse` never appears here, unlike in `plot_runtime` - it produces no line labels,
     so it has nothing to agree or disagree with the human mapping about; it's a runtime reference
     only.
     """
-    labels = ["codediff"] + tools
-    colors = [CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
-    legend_labels = [f"{label} (n={len(applicable_rows(rows, label))})" for label in labels]
+    ids = ordered(["codediff"] + tools)
+    colors = [COLORS[i] for i in ids]
+    legend_labels = [f"{DISPLAY_NAMES[i]} (n={len(applicable_rows(rows, i))})" for i in ids]
 
     fig, ax = plt.subplots(figsize=(11, 6.5), facecolor=SURFACE)
     _plot_agreement_histogram(
-        ax, rows, labels, colors,
+        ax, rows, ids, colors,
         f"Line-level agreement rate, bucketed in 10-point increments ({len(rows)} fixtures in the corpus)",
         legend_labels=legend_labels,
     )
@@ -224,18 +285,24 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     log10-space (matplotlib's own kernel bandwidth assumes a linear axis, so feeding it raw ms on a
     log-scaled axis would misshape the KDE) - the y-axis ticks are then relabeled back to real ms.
 
-    `treesitter_parse` goes first, ahead of codediff: it's not a competing tool (no accuracy to
-    score, see `plot_accuracy`'s doc comment for why it's absent there), it's the reference lower
-    bound every AST-aware series to its right must pay before their own work even starts - reading
-    left to right is reading the cost stack from the ground up.
+    Series order and display names both come from `DISPLAY_ORDER`/`DISPLAY_NAMES` (see `ordered`),
+    not from `tools`' own CSV-column order, so this plot, `plot_accuracy`, and
+    `variance_table_rows` all read in the same fixed sequence regardless of which columns happen
+    to appear first in the CSV: TreeSitter parse, UNIX diff, CodeDiff, GumTree (binary), GumTree
+    (warm JVM), diffsitter, difftastic. `treesitter_parse` goes first: it's not a competing tool
+    (no accuracy
+    to score, see `plot_accuracy`'s doc comment for why it's absent there), it's the reference
+    lower bound every AST-aware series to its right must pay before their own work even starts -
+    reading left to right is reading the cost stack from the ground up.
 
-    `gumtree_warm` goes last, right after `gumtree`: same algorithm, same accuracy, timed inside a
-    persistent JVM instead of a fresh subprocess per fixture (`research/drivers/gumtree-batch/`) -
-    it isolates GumTree's own cost from the JVM-startup overhead `gumtree`'s own violin includes.
-    `benchmark_other.rs` only fills this column in when the batch driver was actually available for
-    that run (see `gumtree_warm_batch`'s doc comment) - every cell blank means the whole column is
-    absent, not scored per-fixture like `gumtree_ms` can be, so `tools` (built from `_mismatches`
-    columns) never lists it and it needs its own opt-in check here.
+    `gumtree_warm`, when present, goes right after `gumtree`: same algorithm, same accuracy, timed
+    inside a persistent JVM instead of a fresh subprocess per fixture
+    (`research/drivers/gumtree-batch/`) - it isolates GumTree's own cost from the JVM-startup
+    overhead `gumtree`'s own violin includes. `benchmark_other.rs` only fills this column in when
+    the batch driver was actually available for that run (see `gumtree_warm_batch`'s doc comment) -
+    every cell blank means the whole column is absent, not scored per-fixture like `gumtree_ms` can
+    be, so `tools` (built from `_mismatches` columns) never lists it and `has_gumtree_warm` checks
+    for it separately.
 
     Each tool's violin is built from its own `applicable_rows` (see that function's doc comment) -
     a language-scoped tool like GumTree has far fewer points than codediff/unix_diff, so its violin
@@ -246,33 +313,26 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     Every point plotted is one individual `--repeats` measurement, not a per-fixture mean/median -
     `ms_values` splits `benchmark_other.rs`'s `;`-joined column back into its full sample, so a
     fixture run with 3 repeats contributes 3 points to the violin/strip, not 1. This is what makes
-    the shape here directly comparable to `plot_variance`'s per-fixture spread: both read from the
-    same underlying repeats, just aggregated differently. `n` in each x-tick counts *fixtures*
+    the shape here directly comparable to `variance_table_rows`' per-fixture coefficient of
+    variation: both read from the same underlying repeats, just aggregated differently. `n` in
+    each x-tick counts *fixtures*
     (matching `sample_sizes`' pre-existing meaning), not the larger flattened point count - the
     fixture count is what determines each violin's real independence (3 repeats of the same
     fixture are correlated with each other, not 3 independent fixtures), so it stays the honest
     number to report as "n"."""
-    labels = ["treesitter_parse", "codediff"] + tools
-    colors = [TREESITTER_COLOR, CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
-    sample_sizes = [len(rows), len(rows)] + [len(applicable_rows(rows, tool)) for tool in tools]
-    series_ms = [
-        np.array([v for r in rows for v in ms_values(r, "treesitter_parse_ms")]),
-        np.array([v for r in rows for v in ms_values(r, "codediff_ms")]),
-    ]
-    series_ms += [
-        np.array([v for r in applicable_rows(rows, tool) for v in ms_values(r, f"{tool}_ms")]) for tool in tools
-    ]
-
-    if rows and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows):
-        warm_rows = [r for r in rows if r["gumtree_warm_ms"] != ""]
-        labels.append("gumtree_warm")
-        colors.append(GUMTREE_WARM_COLOR)
-        sample_sizes.append(len(warm_rows))
-        series_ms.append(np.array([v for r in warm_rows for v in ms_values(r, "gumtree_warm_ms")]))
+    ids = ordered(["treesitter_parse", "codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    labels = [DISPLAY_NAMES[i] for i in ids]
+    colors = [COLORS[i] for i in ids]
+    scoped_rows = [rows_for(i, rows) for i in ids]
+    sample_sizes = [len(s) for s in scoped_rows]
+    series_ms = [np.array([v for r in s for v in ms_values(r, f"{i}_ms")]) for i, s in zip(ids, scoped_rows)]
 
     series_log = [np.log10(s) for s in series_ms]
 
-    fig, ax = plt.subplots(figsize=(3 + 2 * len(labels), 5.5), facecolor=SURFACE)
+    # Per-item width bumped from 2 to 2.6 (2026-07-31): the longer display names ("TreeSitter parse
+    # (lower bound)", "UNIX diff (baseline)") need more horizontal room per x-tick than the old
+    # short ids did, or adjacent tick labels visually collide.
+    fig, ax = plt.subplots(figsize=(3 + 2.6 * len(labels), 5.5), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
 
     x = np.arange(len(labels))
@@ -353,92 +413,68 @@ def coefficients_of_variation(rows: list[dict], column: str) -> np.ndarray:
     return np.array(out)
 
 
-def plot_variance(rows: list[dict], tools: list[str], output_path: Path) -> None:
-    """How noisy is a single timing measurement, per tool - directly motivated by
-    `benchmark_other.rs`'s own aggregate median/p90/max swinging by roughly +-10% between
-    back-to-back single-shot runs on a loaded machine (2026-07-26), which made it impossible to
-    tell a real speed regression/improvement from ambient noise using a single run. One box (plus
-    a jittered strip of the underlying per-fixture points) per tool, `coefficients_of_variation`'s
-    per-fixture CoV% distribution - not the same shape as `plot_runtime`'s absolute-ms violins,
-    this is entirely about *relative* run-to-run spread, so a fast tool and a slow tool can be
-    compared on equal footing here even though their raw ms distributions are incomparable in
-    `plot_runtime`.
+def _escape_tex(text: str) -> str:
+    """Minimal LaTeX escaping for `DISPLAY_NAMES` values embedded in a generated `.tex` table - none
+    of the current names need this (parentheses have no special meaning in LaTeX), but a future
+    tool name with `_`/`%`/`&`/`#` would otherwise silently break the build."""
+    for char in "&%$#_{}":
+        text = text.replace(char, f"\\{char}")
+    return text
 
-    Same label/color/ordering convention as `plot_runtime` (`treesitter_parse`, `codediff`, then
-    every `ExternalTool`, then `gumtree_warm` last if present) so the two plots read as a matched
-    pair - "here's the distribution" next to "here's how much any single draw from that
-    distribution can be trusted."."""
-    labels = ["treesitter_parse", "codediff"] + tools
-    colors = [TREESITTER_COLOR, CODEDIFF_COLOR] + [TOOL_COLORS[t] for t in tools]
-    series = [
-        coefficients_of_variation(rows, "treesitter_parse_ms"),
-        coefficients_of_variation(rows, "codediff_ms"),
+
+def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, int, float, float]]:
+    """Per-tool `(display_name, n, median_cov_pct, p90_cov_pct)` - the same
+    `coefficients_of_variation` data `plot_variance`'s box plot used to draw, reduced to the two
+    numbers that actually matter for "how much should one run's number be trusted": the typical
+    case (median) and a worst-case-but-not-a-single-outlier case (p90). Same
+    `DISPLAY_ORDER`/`DISPLAY_NAMES`/`ordered` sequence as `plot_runtime`/`plot_accuracy`. A tool
+    scored on too few multi-repeat fixtures (e.g. GumTree on a corpus with only 1-2 fixtures in its
+    language scope) can't support a meaningful median/p90 - dropped rather than reported from 1-2
+    points, same spirit as `applicable_rows` dropping out-of-scope rows entirely instead of
+    coercing them to a misleading value."""
+    ids = ordered(["treesitter_parse", "codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    out = []
+    for id_ in ids:
+        series = coefficients_of_variation(rows_for(id_, rows), f"{id_}_ms")
+        if len(series) < 3:
+            continue
+        out.append((DISPLAY_NAMES[id_], len(series), float(np.median(series)), float(np.percentile(series, 90))))
+    return out
+
+
+def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) -> None:
+    """Writes a complete, ready-to-`\\input`-ed ACM `table` environment - see this module's own
+    doc comment for why this is a table, not a plot, and `variance_table_rows` for the numbers."""
+    table_rows = variance_table_rows(rows, tools)
+
+    lines = [
+        r"\begin{table}",
+        r"  \caption{Timing noise per series: per-fixture coefficient of variation across repeated"
+        r" measurements of the same fixture (lower means a single run is more trustworthy on its"
+        r" own).}",
+        r"  \label{tab:variance}",
+        r"  \begin{tabular}{lrrr}",
+        r"    \toprule",
+        r"    Series & $n$ & Median CoV & p90 CoV \\",
+        r"    \midrule",
     ]
-    series += [coefficients_of_variation(applicable_rows(rows, tool), f"{tool}_ms") for tool in tools]
-
-    if rows and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows):
-        labels.append("gumtree_warm")
-        colors.append(GUMTREE_WARM_COLOR)
-        series.append(coefficients_of_variation(rows, "gumtree_warm_ms"))
-
-    # A tool scored on too few multi-repeat fixtures (e.g. GumTree on a corpus with only 1-2
-    # fixtures in its language scope) can't support a meaningful box - drop it rather than draw a
-    # misleading box from 1-2 points, same spirit as `applicable_rows` dropping out-of-scope rows
-    # entirely instead of coercing them to a misleading value.
-    keep = [i for i, s in enumerate(series) if len(s) >= 3]
-    labels = [labels[i] for i in keep]
-    colors = [colors[i] for i in keep]
-    series = [series[i] for i in keep]
-
-    fig, ax = plt.subplots(figsize=(3 + 1.8 * len(labels), 5.5), facecolor=SURFACE)
-    ax.set_facecolor(SURFACE)
-
-    x = np.arange(len(labels))
-    rng = np.random.default_rng(0)
-    for xi, vals in zip(x, series):
-        jitter = rng.uniform(-0.12, 0.12, size=len(vals))
-        ax.scatter(
-            np.full(len(vals), xi) + jitter, vals, s=10, alpha=0.35,
-            color=INK_MUTED, linewidth=0, zorder=2,
-        )
-
-    box = ax.boxplot(
-        series, positions=x, widths=0.5, showfliers=False, patch_artist=True, zorder=3,
-        medianprops={"color": INK_PRIMARY, "linewidth": 2},
-        whiskerprops={"color": BASELINE}, capprops={"color": BASELINE},
-    )
-    for patch, color in zip(box["boxes"], colors):
-        patch.set_facecolor(color)
-        patch.set_edgecolor(color)
-        patch.set_alpha(0.55)
-
-    for xi, vals, color in zip(x, series, colors):
-        median = float(np.median(vals))
-        ax.text(
-            xi + 0.32, median, f"median {median:.1f}%",
-            ha="left", va="center", fontsize=9, color=INK_SECONDARY, zorder=4,
-        )
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([f"{label}\n(n={len(s)})" for label, s in zip(labels, series)], fontsize=10, color=INK_MUTED)
-    ax.set_xlim(-0.6, len(labels) - 1 + 1.1)
-    ax.set_ylim(bottom=0)
-    ax.set_ylabel("Per-fixture coefficient of variation (%)", fontsize=11, color=INK_SECONDARY)
-    ax.set_title(
-        "Timing noise per tool: spread across repeated measurements of the same fixture (lower = more trustworthy single run)",
-        fontsize=12.5, color=INK_PRIMARY, loc="left", pad=12,
-    )
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
-    ax.tick_params(axis="y", colors=INK_MUTED, labelsize=9)
-    ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0, which="major")
-    for spine in ("top", "right", "left"):
-        ax.spines[spine].set_visible(False)
-    ax.spines["bottom"].set_color(BASELINE)
+    for name, n, median, p90 in table_rows:
+        lines.append(f"    {_escape_tex(name)} & {n} & {median:.1f}\\% & {p90:.1f}\\% \\\\")
+    lines += [
+        r"    \bottomrule",
+        r"  \end{tabular}",
+        r"\end{table}",
+        "",
+    ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
-    plt.close(fig)
-    print(f"Plot saved to {output_path}")
+    output_path.write_text("\n".join(lines))
+    print(f"Table written to {output_path}")
+
+    name_width = max(len(name) for name, _, _, _ in table_rows)
+    print(f"{'Series':<{name_width}}  {'n':>4}  {'Median CoV':>11}  {'p90 CoV':>8}")
+    for name, n, median, p90 in table_rows:
+        print(f"{name:<{name_width}}  {n:>4}  {median:>10.1f}%  {p90:>7.1f}%")
 
 
 if __name__ == "__main__":
@@ -462,4 +498,4 @@ if __name__ == "__main__":
     plots_dir = Path(args.plots_dir)
     plot_accuracy(rows, tools, plots_dir / "benchmark_other_accuracy.png")
     plot_runtime(rows, tools, plots_dir / "benchmark_other_runtime.png")
-    plot_variance(rows, tools, plots_dir / "benchmark_other_variance.png")
+    write_variance_table(rows, tools, plots_dir / "benchmark_other_variance.tex")

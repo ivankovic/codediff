@@ -16,10 +16,17 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Compares codediff, and other diff tools (`ExternalTool` - Unix `diff` is the first, more can
-//! be added), against the human-authored ground truth in `src/test/data/diffs/*/human_mapping.json`
-//! - the same corpus `benchmark_optimal_solutions` scores codediff against, but at line
-//!   granularity instead of AST-node granularity.
+//! Compares codediff against other diff tools (`ExternalTool`: Unix `diff`, GumTree, difftastic,
+//! diffsitter - more can be added), against the human-authored ground truth in
+//! `src/test/data/diffs/*/human_mapping.json` - the same corpus `benchmark_optimal_solutions`
+//! scores codediff against, but at line granularity instead of AST-node granularity.
+//!
+//! GumTree, difftastic, and diffsitter are all separate, non-Cargo binaries, not bundled or
+//! auto-installed - each needs its own environment variable pointing at a built binary
+//! (`GUMTREE_BIN`, `DIFFT_BIN`, `DIFFSITTER_BIN` - see `gumtree_bin`, `difftastic_bin`,
+//! `diffsitter_bin`). difftastic and diffsitter are plain `cargo install`-able, so
+//! `cargo install --root /var/tmp/codediff-tools difftastic diffsitter` keeps both out of the
+//! system-wide cargo bin directory and this checkout alike.
 //!
 //! Line granularity, not node granularity, because that's the only signal an external line-based
 //! tool can produce at all: Unix `diff` has no notion of "this identifier was renamed," only
@@ -93,15 +100,24 @@ struct Args {
 enum ExternalTool {
     UnixDiff,
     GumTree,
+    Difftastic,
+    Diffsitter,
 }
 
 impl ExternalTool {
-    const ALL: &'static [ExternalTool] = &[ExternalTool::UnixDiff, ExternalTool::GumTree];
+    const ALL: &'static [ExternalTool] = &[
+        ExternalTool::UnixDiff,
+        ExternalTool::GumTree,
+        ExternalTool::Difftastic,
+        ExternalTool::Diffsitter,
+    ];
 
     fn name(&self) -> &'static str {
         match self {
             ExternalTool::UnixDiff => "unix_diff",
             ExternalTool::GumTree => "gumtree",
+            ExternalTool::Difftastic => "difftastic",
+            ExternalTool::Diffsitter => "diffsitter",
         }
     }
 
@@ -120,10 +136,16 @@ impl ExternalTool {
     /// anyway so the comparison covers the corpus GumTree can actually run on at all; the
     /// Stable/Testing split is exactly what `gumtree_generator`'s doc comment records per language,
     /// so a reader who wants only the "fair fight" subset can still filter by it.
+    ///
+    /// Difftastic and diffsitter coverage is each tool's own compiled-in language set, confirmed
+    /// live via `difft --list-languages` and `diffsitter list` against the actual installed
+    /// builds - see `difftastic_extension`/`diffsitter_file_type`.
     fn supports(&self, language: Language) -> bool {
         match self {
             ExternalTool::UnixDiff => true,
             ExternalTool::GumTree => gumtree_generator(language).is_some(),
+            ExternalTool::Difftastic => difftastic_extension(language).is_some(),
+            ExternalTool::Diffsitter => diffsitter_file_type(language).is_some(),
         }
     }
 
@@ -134,6 +156,8 @@ impl ExternalTool {
         match self {
             ExternalTool::UnixDiff => unix_diff_line_labels(before, after),
             ExternalTool::GumTree => gumtree_line_labels(before, after),
+            ExternalTool::Difftastic => difftastic_line_labels(before, after),
+            ExternalTool::Diffsitter => diffsitter_line_labels(before, after),
         }
     }
 }
@@ -542,6 +566,264 @@ fn gumtree_node_offsets(node_ref: &str) -> Result<(usize, usize)> {
 fn gumtree_line_range(contents: &str, start: usize, end: usize) -> std::ops::RangeInclusive<usize> {
     let line_of = |offset: usize| contents[..offset.min(contents.len())].matches('\n').count();
     line_of(start)..=line_of(end.saturating_sub(1).max(start))
+}
+
+/// Path to the `difft` binary, from the `DIFFT_BIN` environment variable - not bundled or
+/// auto-installed, same reasoning as `gumtree_bin`. Install with
+/// `cargo install --root /var/tmp/codediff-tools difftastic` (installs the `difft` binary to
+/// `/var/tmp/codediff-tools/bin/difft`, outside this checkout and outside the system-wide cargo
+/// bin directory) and point `DIFFT_BIN` at the result.
+fn difftastic_bin() -> Result<std::path::PathBuf> {
+    let path = std::env::var("DIFFT_BIN")
+        .context("DIFFT_BIN is not set - point it at a built `difft` binary")?;
+    let path = std::path::PathBuf::from(path);
+    if !path.is_file() {
+        bail!("DIFFT_BIN={:?} does not exist or is not a file", path);
+    }
+    Ok(path)
+}
+
+/// Path to the `diffsitter` binary, from the `DIFFSITTER_BIN` environment variable - see
+/// `difftastic_bin`. Install with
+/// `cargo install --root /var/tmp/codediff-tools diffsitter`.
+fn diffsitter_bin() -> Result<std::path::PathBuf> {
+    let path = std::env::var("DIFFSITTER_BIN")
+        .context("DIFFSITTER_BIN is not set - point it at a built `diffsitter` binary")?;
+    let path = std::path::PathBuf::from(path);
+    if !path.is_file() {
+        bail!("DIFFSITTER_BIN={:?} does not exist or is not a file", path);
+    }
+    Ok(path)
+}
+
+/// File extension difftastic's own language auto-detection maps back to `language`, confirmed
+/// live against `difft --list-languages` (difftastic v0.69.0, 2026-07). `None` for every corpus
+/// language difftastic has no grammar for at all: `Bazel` (also not tree-sitter-parseable by
+/// codediff itself - see `Code`'s own doc comment), `MarkDown`, `ProtoBuf`, and `Vimscript`.
+/// `Language::Lisp` maps to `.el` - codediff's own extension table (`code/language.rs`) treats
+/// `Language::Lisp` as Emacs Lisp specifically, and difftastic lists Emacs Lisp and Common Lisp as
+/// separate languages with disjoint extensions, so `.el` is the correct, unambiguous match.
+fn difftastic_extension(language: Language) -> Option<&'static str> {
+    match language {
+        Language::Rust => Some("rs"),
+        Language::Python => Some("py"),
+        Language::Go => Some("go"),
+        Language::Kotlin => Some("kt"),
+        Language::Java => Some("java"),
+        Language::JavaScript => Some("js"),
+        Language::TypeScript => Some("ts"),
+        Language::TSX => Some("tsx"),
+        Language::C => Some("c"),
+        Language::CPP => Some("cpp"),
+        Language::CSharp => Some("cs"),
+        Language::Ruby => Some("rb"),
+        Language::PHP => Some("php"),
+        Language::Swift => Some("swift"),
+        Language::Scala => Some("scala"),
+        Language::LUA => Some("lua"),
+        Language::CSS => Some("css"),
+        Language::HTML => Some("html"),
+        Language::JSON => Some("json"),
+        Language::R => Some("R"),
+        Language::ShellScript => Some("sh"),
+        Language::XML => Some("xml"),
+        Language::YAML => Some("yaml"),
+        Language::SQL => Some("sql"),
+        Language::Dart => Some("dart"),
+        Language::Lisp => Some("el"),
+        _ => None,
+    }
+}
+
+/// `-t <FILE_TYPE>` value diffsitter needs for `language`, confirmed live against `diffsitter
+/// list` (diffsitter v0.9.0, 2026-07) - a much narrower compiled-in language set than difftastic
+/// or GumTree: no `JavaScript`, `HTML`, `Kotlin`, `LUA`, `R`, `Scala`, `Swift`, `XML`, or `YAML`,
+/// none of which this build was compiled with a grammar for at all (`diffsitter list`'s output is
+/// the full, exhaustive set - there is no generic fallback parser).
+fn diffsitter_file_type(language: Language) -> Option<&'static str> {
+    match language {
+        Language::ShellScript => Some("bash"),
+        Language::C => Some("c"),
+        Language::CSharp => Some("c_sharp"),
+        Language::CPP => Some("cpp"),
+        Language::CSS => Some("css"),
+        Language::Go => Some("go"),
+        Language::Java => Some("java"),
+        Language::JSON => Some("json"),
+        Language::MarkDown => Some("markdown"),
+        Language::PHP => Some("php"),
+        Language::Python => Some("python"),
+        Language::Ruby => Some("ruby"),
+        Language::Rust => Some("rust"),
+        Language::TSX => Some("tsx"),
+        Language::TypeScript => Some("typescript"),
+        _ => None,
+    }
+}
+
+/// Runs `difft --display json` and reduces its output to the same per-line touched signal every
+/// other `ExternalTool` produces. `DFT_UNSTABLE=yes` is required by difftastic itself - JSON
+/// output is explicitly marked an unstable feature that may change format in a future release
+/// (confirmed live, difftastic v0.69.0 refuses `--display json` without it) - see
+/// `difftastic_touched_from_json` for the schema this code depends on.
+fn difftastic_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let language = before.metadata.language.unwrap_or_default();
+    let ext = difftastic_extension(language)
+        .with_context(|| format!("no difftastic extension mapping for {language:?}"))?;
+    let difft = difftastic_bin()?;
+
+    let mut before_file = tempfile::Builder::new()
+        .suffix(&format!(".{ext}"))
+        .tempfile()?;
+    let mut after_file = tempfile::Builder::new()
+        .suffix(&format!(".{ext}"))
+        .tempfile()?;
+    before_file
+        .write_all(before.contents.as_bytes())
+        .context("writing before temp file")?;
+    after_file
+        .write_all(after.contents.as_bytes())
+        .context("writing after temp file")?;
+
+    let output = Command::new(&difft)
+        .args(["--display", "json"])
+        .env("DFT_UNSTABLE", "yes")
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {difft:?} --display json"))?;
+    if !output.status.success() {
+        bail!(
+            "difft exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing difft JSON output")?;
+    difftastic_touched_from_json(before, after, &json)
+}
+
+/// Difftastic's JSON has one relevant field, `chunks`: a list of hunks, each a list of line
+/// entries. Each entry has an optional `lhs`/`rhs`, each `{line_number, changes}` - `line_number`
+/// is 0-indexed (confirmed empirically against this project's own fixtures, 2026-07: a change on
+/// a file's second line reports `line_number: 1`) and `changes` is empty for a context line shown
+/// only for readability, non-empty for a line difftastic considers actually touched. Confirmed
+/// live that `chunks` only ever contains touched lines, never surrounding context, in JSON mode
+/// (unlike difftastic's own terminal display, which does show context) - so every `lhs`/`rhs`
+/// entry present here is touched, `changes` non-empty or not. A file with `status: "unchanged"`
+/// has no `chunks` key at all, not an empty array.
+fn difftastic_touched_from_json(
+    before: &Code,
+    after: &Code,
+    json: &serde_json::Value,
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let mut before_touched = vec![false; before.contents.split('\n').count()];
+    let mut after_touched = vec![false; after.contents.split('\n').count()];
+
+    let Some(chunks) = json["chunks"].as_array() else {
+        return Ok((before_touched, after_touched));
+    };
+
+    for chunk in chunks {
+        let entries = chunk
+            .as_array()
+            .context("difft JSON chunk is not an array")?;
+        for entry in entries {
+            if let Some(line_number) = entry["lhs"]["line_number"].as_u64() {
+                if let Some(slot) = before_touched.get_mut(line_number as usize) {
+                    *slot = true;
+                }
+            }
+            if let Some(line_number) = entry["rhs"]["line_number"].as_u64() {
+                if let Some(slot) = after_touched.get_mut(line_number as usize) {
+                    *slot = true;
+                }
+            }
+        }
+    }
+
+    Ok((before_touched, after_touched))
+}
+
+/// Runs `diffsitter -r json` and reduces its output to the same per-line touched signal every
+/// other `ExternalTool` produces. `-t <file-type>` is passed explicitly (see
+/// `diffsitter_file_type`) rather than relying on the temp file's extension, the same reasoning as
+/// GumTree's explicit `-g <generator>` in `gumtree_line_labels` - an explicit choice documents
+/// exactly which parser ran, rather than leaving it to auto-detection.
+fn diffsitter_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let language = before.metadata.language.unwrap_or_default();
+    let file_type = diffsitter_file_type(language)
+        .with_context(|| format!("no diffsitter file type mapping for {language:?}"))?;
+    let diffsitter = diffsitter_bin()?;
+
+    let mut before_file = tempfile::NamedTempFile::new().context("creating before temp file")?;
+    let mut after_file = tempfile::NamedTempFile::new().context("creating after temp file")?;
+    before_file
+        .write_all(before.contents.as_bytes())
+        .context("writing before temp file")?;
+    after_file
+        .write_all(after.contents.as_bytes())
+        .context("writing after temp file")?;
+
+    let output = Command::new(&diffsitter)
+        .args(["-n", "-r", "json", "-t", file_type])
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {diffsitter:?} -r json -t {file_type}"))?;
+    if !output.status.success() {
+        bail!(
+            "diffsitter exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing diffsitter JSON output")?;
+    diffsitter_touched_from_json(before, after, &json)
+}
+
+/// Diffsitter's JSON has one relevant field, `hunks`: a list of hunk objects, each with exactly
+/// one of two keys, `"Old"` or `"New"` (confirmed live, diffsitter v0.9.0: never both in the same
+/// hunk object, even for a same-line before/after change - that shows up as two separate hunks,
+/// one `Old` and one `New`). Each key holds a list of `{line_index, entries}`, `line_index`
+/// 0-indexed the same way as `difftastic_touched_from_json`'s `line_number`. `entries` (the
+/// character-level tokens changed on that line) is not needed here - `line_index`'s presence
+/// alone means diffsitter considers that line touched.
+fn diffsitter_touched_from_json(
+    before: &Code,
+    after: &Code,
+    json: &serde_json::Value,
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let mut before_touched = vec![false; before.contents.split('\n').count()];
+    let mut after_touched = vec![false; after.contents.split('\n').count()];
+
+    let hunks = json["hunks"]
+        .as_array()
+        .context("diffsitter JSON has no `hunks` array")?;
+
+    for hunk in hunks {
+        let hunk = hunk
+            .as_object()
+            .context("diffsitter JSON hunk is not an object")?;
+        for (side, touched) in [("Old", &mut before_touched), ("New", &mut after_touched)] {
+            let Some(entries) = hunk.get(side).and_then(|v| v.as_array()) else {
+                continue;
+            };
+            for entry in entries {
+                if let Some(line_index) = entry["line_index"].as_u64() {
+                    if let Some(slot) = touched.get_mut(line_index as usize) {
+                        *slot = true;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok((before_touched, after_touched))
 }
 
 /// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against

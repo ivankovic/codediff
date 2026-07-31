@@ -55,15 +55,60 @@ benchmark-optimal-report:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 	(cd research && uv run ./analysis/matching_reasons_report.py)
 
-# Compares codediff against other diff tools (Unix diff, GumTree) on line-level agreement with
-# the human-authored mapping, plus runtime. --features test-fixtures: benchmark_other, like
-# benchmark_optimal_solutions, needs codediff::test's fixture-loading helpers. Requires GUMTREE_BIN
-# to point at a built GumTree distribution's bin/gumtree - unlike everything else in this Makefile,
-# this is an external, non-Rust tool dependency this target can't provide on its own (see
-# research/drivers/gumtree-batch/build.sh for the optional warm-JVM timing variant).
+# Runs benchmark_other's own analysis/plotting step over whatever research/benchmark_other.csv
+# already has on disk, without re-running the benchmark itself. Split out from benchmark-other
+# below so a paper rebuild (introductory-paper) can re-render from existing data without paying
+# for a fresh (slow - GumTree's JVM cold-starts per fixture) benchmark run.
+benchmark-other-report:
+	(cd research && uv run ./analysis/benchmark_other_report.py)
+
+# Compares codediff against other diff tools (Unix diff, GumTree, difftastic, diffsitter) on
+# line-level agreement with the human-authored mapping, plus runtime, then runs the analysis step
+# above. --features test-fixtures: benchmark_other, like benchmark_optimal_solutions, needs
+# codediff::test's fixture-loading helpers. Requires GUMTREE_BIN, DIFFT_BIN, and DIFFSITTER_BIN,
+# each pointing at a built binary - unlike everything else in this Makefile, these are external,
+# non-Rust (GumTree) or at least non-workspace (difftastic, diffsitter) tool dependencies this
+# target can't provide on its own (see research/drivers/gumtree-batch/build.sh for GumTree's
+# optional warm-JVM timing variant, and CONTRIBUTING.md's `benchmark-other` entry for how to
+# install difftastic/diffsitter into /var/tmp without touching the system-wide cargo bin
+# directory).
 benchmark-other:
 	cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-	(cd research && uv run ./analysis/benchmark_other_report.py)
+	$(MAKE) benchmark-other-report
+
+# Regenerates the benchmark_other charts/table research/papers/introductory-paper/main.tex embeds
+# (accuracy chart, runtime chart, variance table - the last is a generated .tex table, not a
+# chart, \input directly by main.tex rather than copied as a PNG) from whatever
+# research/benchmark_other.csv already has on disk, then rebuilds that paper's PDF. Deliberately
+# depends on benchmark-other-report, not benchmark-other: rebuilding a paper should not pay for a
+# fresh benchmark run (minutes, dominated by GumTree's JVM cold-start per fixture) every time -
+# run `make benchmark-other` yourself first to refresh the underlying data, then this target to
+# re-render from it. Also does not regenerate figures/tips.png, which needs the full
+# repository-fetch pipeline (`make full`) - see main.tex's own TODO comment for that gap. Needs a
+# LaTeX toolchain with the acmart class and cm-super (see
+# research/papers/introductory-paper/README.md). `-g` forces a full latexmk run regardless of its
+# own up-to-date check: without it, latexmk can decide main.pdf is already current from main.tex's
+# own timestamp alone and skip the rebuild even though the \input-ed accuracy/variance table just
+# changed underneath it (confirmed live, 2026-07-31 - main.pdf was silently one run stale until
+# this flag was added).
+introductory-paper: benchmark-other-report
+	cp research/plots/benchmark_other_accuracy.png research/plots/benchmark_other_runtime.png \
+		research/plots/benchmark_other_variance.tex research/papers/introductory-paper/figures/
+	cd research/papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
+
+# Regenerates research/papers/introductory-paper/main.tex's empirical-study numbers (Table 1,
+# repository/file/language counts, bytes-AST correlation - all \input from figures/variables.tex,
+# a generated LaTeX-macro file, not hand-transcribed - see write_paper_variables's own doc comment
+# in research/analysis/file_stats.py for exactly why that matters) and its file-types figure, from
+# whatever $(RESEARCH_DIR)/stats.sqlite already has on disk for the current MODE (default tiny -
+# pass MODE=small or MODE=full to match whatever `make file-stats` run you actually have). Reuses
+# the fast half of that split (file-stats-report), not file-stats itself, for the same reason
+# introductory-paper depends on benchmark-other-report and not benchmark-other: rebuilding a paper
+# should never pay for the slow step. Run `make file-stats MODE=<mode>` yourself first to
+# (re)populate that mode's stats.sqlite.
+introductory-paper-empirical: file-stats-report
+	cp research/plots/variables.tex research/plots/tips.png research/papers/introductory-paper/figures/
+	cd research/papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
 
 # Leave-one-out ablation study over the diff algorithm's optional heuristic passes - see
 # research/measure/ablation_study.sh's own header comment for exactly what it measures.
@@ -184,9 +229,16 @@ fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
 	$(SCRIPTS_FETCH_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)
 
 # Analyze file statistics
+# Just the analysis/plotting/paper-variables step of file-stats, over whatever
+# $(RESEARCH_DIR)/stats.sqlite already has on disk, without re-running file_stats itself. Split
+# out for the same reason as benchmark-other-report above - see introductory-paper-empirical
+# below, which depends on this, not on file-stats.
+file-stats-report:
+	(cd research && uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite)
+
 file-stats: build
 	./target/release/file_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
-	(cd research && uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite)
+	$(MAKE) file-stats-report
 
 # Analyze commit statistics
 commit-stats: build

@@ -1,17 +1,18 @@
 # Contributing
 
-Thanks for considering a contribution - human or AI-assisted (see the README's AI policy). This
-file has the practical "how do I work in this codebase" info. `AGENTS.md` supplements it with
-additional AI-agent-specific conventions (mostly style rules for the TUI code).
+Thank you for considering a contribution, human or AI-assisted (see the README's AI policy). This
+file gives practical information about how to work in this codebase. `AGENTS.md` adds more
+conventions for AI agents, mostly style rules for the TUI code.
 
 ## Technology
 
 The project is completely written in Rust.
 
-User configuration (e.g. the active theme) is stored on disk via `confy`. SQLite is used
-separately, by the dataset-analysis tools in `src/bin/`, to store the stats they collect.
+CodeDiff stores user configuration, for example the active theme, on disk with `confy`. The
+dataset-analysis tools in `src/bin/` use a separate SQLite database to store the stats that they
+collect.
 
-The UI is a Terminal UI written using the excellent Ratatui and Crossterm libraries.
+The UI is a terminal UI, written with the Ratatui and Crossterm libraries.
 
 ### UI design patterns
 
@@ -21,60 +22,62 @@ Each component encapsulates its own state, event handlers, and rendering logic.
 
 ## Code quality
 
-Code must always be formatted using the automated standard Rust formatter (`cargo fmt` - CI
-enforces this on every push/PR).
+Format all code with `cargo fmt`, the standard Rust formatter. CI enforces this on every push and
+pull request.
 
-No Rust check errors are allowed. Rust check should be run frequently (`cargo clippy` - also
-enforced by CI, across all three Cargo feature configs - see "CI" below).
+No Rust check errors are allowed. Run `cargo clippy` frequently. CI also enforces `cargo clippy`,
+across all three Cargo feature configs (see "CI" below).
 
 ## Testing
 
-Automated tests should be run frequently during coding.
+Run automated tests frequently during coding.
 
-Diff quality and diff speed are measured separately (see "Quality" and "Speed" below) and should
-be checked on demand, definitely before any release - `make deploy` already gates on quality
-automatically (see `make check-quality` in the Makefile).
+Diff quality and diff speed are measured separately (see "Quality" and "Speed" below). Check both
+on demand, and always before a release. `make deploy` already gates on quality automatically (see
+`make check-quality` in the Makefile).
 
 ### Automated tests
 
-Each file in src/ should end with the test module for that file, as is typical in Rust. These tests
-should test both happy-path and corner cases, and should use src/test/helper.rs to get handmade
-high quality test data.
+Each file in `src/` ends with its own test module, as is typical in Rust. These tests must cover
+both the happy path and corner cases. Use `src/test/helper.rs` to get handmade, high-quality test
+data.
 
 **Per-file unit tests must run in under 1 second.**
 
-src/test/ additionally holds slower, fixture-driven tests (e.g. src/test/optimal_solutions/, which
-checks real diffs against human-verified ground truth). **These must run in under 5 seconds.**
+`src/test/` also holds slower, fixture-driven tests, for example `src/test/optimal_solutions/`.
+These tests check real diffs against a human-verified ground truth. **These tests must run in
+under 5 seconds.**
 
-Semi-automated tests that run on the small and full dataset take some time to run and should be run
-when appropriate, definitely before any release.
+Semi-automated tests run on the small and full dataset. They take more time to run. Run them when
+appropriate, and always before a release.
 
-### How should tests handle dependencies?
+### Test dependencies
 
-*No mocks*. Mocks prevent testing through the interface and are brittle.
+**No mocks.** Mocks block testing through the interface, and mocks are brittle.
 
-Ideally, the real implementation is used.
+Use the real implementation where possible.
 
-When necessary, e.g. for filesystem or database access, fake in-memory implementations should be used.
+Where the real implementation is not possible, for example for filesystem or database access, use
+a fake in-memory implementation.
 
 ### Quality
 
-`cargo run --release --features test-fixtures --bin benchmark_optimal_solutions` (or
-`make benchmark-optimal`) diffs every fixture in src/test/data/diffs/ that has a human-verified
-ground truth mapping, and reports how many nodes each one gets wrong. Use this to check whether a
-change made diffs better or worse.
+Run `cargo run --release --features test-fixtures --bin benchmark_optimal_solutions`, or `make
+benchmark-optimal`. This command diffs every fixture in `src/test/data/diffs/` that has a
+human-verified ground truth mapping. It reports how many nodes each fixture gets wrong. Use this
+output to see whether a change made diffs better or worse.
 
 ### Speed
 
-Automated benchmarks, using the Rust criterion library, measure the wall clock time of the main
-diffing algorithm on all handmade test cases from src/test/helper.rs (`make hermetic-benchmark`).
-Run these frequently to catch performance regressions.
+Automated benchmarks measure the wall-clock time of the main diffing algorithm. These benchmarks
+use the Rust criterion library and run over every handmade test case from `src/test/helper.rs`
+(`make hermetic-benchmark`). Run these benchmarks frequently, to catch performance regressions.
 
 ## Code structure
 
-Rust's project structure must be followed.
+Follow Rust's standard project structure.
 
-Some directories don't exist yet but should be created if the need arises.
+Some directories in the list below do not exist yet. Create them if the need arises.
 
 ```
 <root of the repository>
@@ -91,7 +94,7 @@ Some directories don't exist yet but should be created if the need arises.
         |                  components/, widgets/
         |   |- SPECS.md <- TUI specs
         |- test/        <- Shared test helpers, plus slower fixture-driven tests (see "Testing")
-        |- bin/         <- Standalone developer tools (benchmarking, dataset sampling, etc.)
+        |- bin/         <- Standalone developer tools: benchmarking, dataset sampling, and more
     |- /benches         <- Benchmarks
     |- /research        <- Datasets and analysis scripts used to guide design decisions
     |- README.md        <- High-level project summary. Must be readable to humans.
@@ -101,22 +104,22 @@ Some directories don't exist yet but should be created if the need arises.
     |- TODO.md          <- List of small to mid size TODO items that need to be fixed in the future
 ```
 
-The SPECS.md and README.md files can exist in any subdirectory, and they always serve the same
-purpose:
+`SPECS.md` and `README.md` files can exist in any subdirectory. They always serve the same purpose
+in every location:
 
-*  README.md - High level summary. Must be readable to humans.
-*  SPECS.md - Semi-structured collection of specifications and a decision log of every decision that
-   was taken during implementation.
+* `README.md` — a high-level summary. It must be readable by humans.
+* `SPECS.md` — a semi-structured collection of specifications, plus a decision log of every
+  decision made during implementation.
 
-TODO.md and REVIEW.md are normally root-only. A subsystem can have its own TODO.md for issues
-specific to it (e.g. src/diff/TODO.md) - but REVIEW.md stays root-only.
+`TODO.md` and `REVIEW.md` are normally root-only. A subsystem can have its own `TODO.md` for issues
+specific to that subsystem, for example `src/diff/TODO.md`. `REVIEW.md` stays root-only.
 
 ## Makefile targets
 
-A reference for `make <target>`. Most of the dataset/corpus targets accept `MODE=tiny` (default),
-`MODE=small`, or `MODE=full`, picking which fetched repository set (see
-`research/list_of_repositories*.csv`) to run against; `tiny`/`small`/`full` themselves are
-shorthands for "fetch-stats analysis in that mode".
+A reference for `make <target>`. Most dataset and corpus targets accept `MODE=tiny` (default),
+`MODE=small`, or `MODE=full`. This flag picks the fetched repository set to run against (see
+`research/list_of_repositories*.csv`). The targets `tiny`, `small`, and `full` are shorthand for
+"run fetch-stats analysis in that mode".
 
 ### Build, test, quality
 
@@ -125,38 +128,77 @@ shorthands for "fetch-stats analysis in that mode".
   target below).
 * `view-diff NAME=<fixture>` - opens one `src/test/data/diffs/` fixture's before/after side by
   side in nvim's diff mode.
-* `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality gate
-  (mismatch count vs. the human-authored ground truth - see "Quality" above).
-* `benchmark-optimal-report` - same, plus `--csv` and a report on which algorithm pass
-  (`ASTMappingReason`) is responsible for how much of the diff.
-* `benchmark-other` - compares codediff against Unix `diff` and GumTree on line-level agreement
-  with the human mapping, plus runtime. Requires `GUMTREE_BIN` pointing at a built GumTree
-  distribution - the one target in this file with an external, non-Rust dependency.
-* `ablation-study [OUT_DIR=path]` - leave-one-out study over the diff algorithm's optional
-  heuristic passes, measuring each one's real contribution to accuracy on the fixture corpus.
-* `check-quality` - what `deploy` runs before it ever tags: gates on `research/quality_baseline.txt`
-  (hard-fails on an accuracy regression, warns - doesn't fail - on a >2x runtime jump).
-* `update-quality-baseline` - deliberately lowers that bar after a reviewed improvement. Never run
-  automatically by `deploy`.
-* `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - criterion wall-clock benchmark of
-  `diff_code` over every handmade test case from `src/test/helper.rs` (see "Speed" above); save/
-  compare against a saved baseline.
+* `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
+  gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
+* `benchmark-optimal-report` - same as `benchmark-optimal`, plus `--csv` output and a report on how
+  much of the diff each algorithm pass (`ASTMappingReason`) is responsible for.
+* `benchmark-other` - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
+  on line-level agreement with the human mapping, plus runtime, then runs `benchmark-other-report`
+  below. Each external tool needs its own environment variable pointing at a built binary:
+  `GUMTREE_BIN` (a built GumTree distribution - this is the only one with an external, non-Rust
+  dependency), `DIFFT_BIN`, and `DIFFSITTER_BIN`. difftastic and diffsitter are plain
+  `cargo install`-able. To keep both out of the system-wide cargo bin directory, install them into
+  a scratch prefix instead: `cargo install --root /var/tmp/codediff-tools difftastic diffsitter`,
+  then
+  `export DIFFT_BIN=/var/tmp/codediff-tools/bin/difft DIFFSITTER_BIN=/var/tmp/codediff-tools/bin/diffsitter`.
+  All three environment variables are required for a full run - a missing one fails loudly on the
+  first fixture in that tool's language scope, rather than silently skipping the tool (see
+  `src/bin/benchmark_other.rs`'s own doc comment). This is the slow half of the pair below - a
+  fresh GumTree JVM cold-starts once per fixture.
+* `benchmark-other-report` - just the analysis/plotting step of `benchmark-other`, over whatever
+  `research/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
+  variables above, since it never runs the benchmark itself. `introductory-paper` below depends on
+  this, not on `benchmark-other`, so rebuilding the paper never pays for a fresh benchmark run.
+* `ablation-study [OUT_DIR=path]` - a leave-one-out study over the diff algorithm's optional
+  heuristic passes. It measures each pass's real contribution to accuracy on the fixture corpus.
+* `check-quality` - what `deploy` runs before it tags a release. This target gates on
+  `research/quality_baseline.txt`. It fails hard on an accuracy regression. It only warns, and does
+  not fail, on a runtime jump of more than 2x.
+* `update-quality-baseline` - deliberately lowers that bar, after a reviewed improvement. `deploy`
+  never runs this target automatically.
+* `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - a criterion wall-clock benchmark of
+  `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
+  first command compares against the saved baseline. The second command saves a new baseline.
 
 ### Release
 
-* `deploy` - tags the current commit `v<Cargo.toml version>` and pushes the tag, which triggers
-  `.github/workflows/release.yml` to build and publish the cross-platform `codediff` binaries as a
-  GitHub Release. Refuses to run on a dirty working tree, a `HEAD` that doesn't match
-  `origin/main`, or a `check-quality` regression.
+* `deploy` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push triggers
+  `.github/workflows/release.yml`. That workflow builds and publishes the cross-platform
+  `codediff` binaries as a GitHub Release. `deploy` refuses to run on a dirty working tree, on a
+  `HEAD` that does not match `origin/main`, or on a `check-quality` regression.
+
+### Papers
+
+* `introductory-paper` - re-renders the benchmark_other charts and table
+  `research/papers/introductory-paper/main.tex` embeds (accuracy chart, runtime chart, and a
+  variance table - a generated `.tex` table `\input` directly, not a PNG) from whatever
+  `research/benchmark_other.csv` already has on disk, copies them into that paper's `figures/`,
+  and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-other` - run
+  that yourself first to refresh the underlying data, this target only re-renders from it, so a
+  paper rebuild stays fast. Needs a LaTeX toolchain with the `acmart` class and `cm-super` (see
+  that paper's own `README.md` for the install command).
+* `introductory-paper-empirical` - re-renders that same paper's empirical-study numbers (Table 1,
+  repository/file/language counts, bytes-AST correlation) and its file-types figure, from whatever
+  `$(RESEARCH_DIR)/stats.sqlite` already exists for the current `MODE` (pass `MODE=small` or
+  `MODE=full` to match whichever `file-stats` run you actually have - see "Dataset / corpus
+  analysis" below). These numbers are LaTeX macros in `figures/variables.tex`, generated by
+  `research/analysis/file_stats.py`, not hand-transcribed - see that file's own
+  `write_paper_variables` doc comment for why (short version: the paper's original Table 1 numbers
+  turned out to be hand-copied from a conference slide deck whose own source computation was never
+  saved anywhere, and by the time anyone asked why Bytes' max was blank, there was no way to
+  answer it). Depends on `file-stats-report`, not `file-stats` - run that yourself first (slow -
+  it re-parses every file in the corpus) to (re)populate the mode's `stats.sqlite`.
 
 ### Dataset / corpus analysis (research/)
 
 * `fetch` - clones/updates the repository set for the current `MODE`.
-* `file-stats` / `commit-stats` - run `file_stats`/`commit_stats` over the fetched repositories
-  into a SQLite DB, then that binary's own `research/analysis/*.py` report.
-* `debug-stats DIR=<path> [DEBUG_MODE=dirs|all|repositories]` - the same two binaries, ad-hoc, over
-  one arbitrary directory instead of the fetch/`MODE` pipeline - useful for debugging them
-  directly.
+* `file-stats` / `commit-stats` - run `file_stats` or `commit_stats` over the fetched repositories,
+  into a SQLite database. Then each target runs that binary's own `research/analysis/*.py` report
+  (`file-stats-report` is just that report step, over whatever `stats.sqlite` already exists,
+  without re-running `file_stats` itself - see `introductory-paper-empirical` above).
+* `debug-stats DIR=<path> [DEBUG_MODE=dirs|all|repositories]` - runs the same two binaries, ad hoc,
+  over one arbitrary directory, instead of the fetch/`MODE` pipeline. Use this target to debug the
+  binaries directly.
 * `sample-pairs` / `sample-pairs-rust` / `sample-pairs-java` / `sample-pairs-javascript` /
   `sample-pairs-typescript` - sample real (repository, commit, path) code pairs, per language, for
   benchmark test data.
@@ -166,17 +208,17 @@ shorthands for "fetch-stats analysis in that mode".
   re-run after any diff-algorithm change, to track its effect on real Rust commits.
 * `code-pair-diff-stats` - size/LOC-changed statistics and distribution plots for
   `sample-pairs-rust`'s output.
-* `benchmark-pairs-diff BEFORE=<csv> AFTER=<csv>` - compares two `benchmark-pairs-rust` runs (e.g.
-  before/after a `diff_code` algorithm change) and charts the difference.
+* `benchmark-pairs-diff BEFORE=<csv> AFTER=<csv>` - compares two `benchmark-pairs-rust` runs, for
+  example before and after a `diff_code` algorithm change, and charts the difference.
 * `benchmark-sampled` / `benchmark-sampled-extended` - both run
   `research/measure/benchmark_all_extended.sh` across all sampled pairs, then
-  `research/analysis/benchmark_report.py`; the former restricts it to the four primary languages
-  (Rust, Python, Go, Kotlin), the latter runs every language with a tree-sitter grammar at a higher
-  node limit.
+  `research/analysis/benchmark_report.py`. `benchmark-sampled` restricts this to the four primary
+  languages: Rust, Python, Go, and Kotlin. `benchmark-sampled-extended` runs every language with a
+  tree-sitter grammar, at a higher node limit.
 * `analyze` / `tiny` / `small` / `full` - `file-stats`, in the current (or an explicitly
   overridden) `MODE`.
-* `clean` / `clean-db` - remove the fetched repositories (and/or just the stats database) for the
-  current `MODE`.
+* `clean` / `clean-db` - remove the fetched repositories, or just the stats database, or both, for
+  the current `MODE`.
 
 ## CI
 
@@ -185,6 +227,6 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 * `cargo fmt --check`
 * `cargo build` + `cargo test`, once each for the three Cargo feature configs (default,
   `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
-* `cargo audit`, checking Cargo.lock against the RustSec advisory database
+* `cargo audit` (checks Cargo.lock against the RustSec advisory database)
 
-All of these must pass before a PR can be considered done.
+All of these checks must pass before a PR is done.
