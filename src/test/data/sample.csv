@@ -64,7 +64,7 @@ JSON,apache-superset.git,8fd34010776611e800e12481a3b6b34008142be3,superset-front
 JSON,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/nb-NO.json,
 JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/extension/_locales/cs/messages.json,
 JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,json-langflow-update-single-string
-JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,
+JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,
 JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/styles/radix-maia/pagination.json,
@@ -80,9 +80,9 @@ Java,protocolbuffers-protobuf.git,20b2cd7623c554e3ee39470b70d5583ad5f26f60,java/
 Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/core/src/main/java/com/google/protobuf/Internal.java,
 Java,protocolbuffers-protobuf.git,68bd6bed7923ddade82a57a6fb8274024a3cd5d8,java/core/src/main/java/com/google/protobuf/Internal.java,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/AmbientModuleAndAmbientFunctionWithTheSameNameAndCommonRoot.js,javascript-typescript-add-use-strict
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/arrayToLocaleStringES5(target=es5).js,
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/arrayToLocaleStringES5(target=es5).js,javascript-typescript-add-strict-3
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,javascript-typescript-use-strict-2
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,javascript-typescript-very-interesting-brokn-code
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/tupleElementTypes3.js,
 JavaScript,microsoft-TypeScript.git,96acaa52902feb1320e1d8ec8936b8669cca447d,tests/baselines/reference/tsserver/skipLibCheck/jsonly-inferred-project.js,
 JavaScript,microsoft-TypeScript.git,d403e0850f33521c684bbecd4a24522a4dc66b33,"tests/baselines/reference/tsserver/forceConsistentCasingInFileNames/when-import,-directory-symlink-target,-and-disk-are-all-different.js",

@@ -142,11 +142,19 @@ mod javascript_fix_promises;
 #[cfg(test)]
 mod javascript_refactor_arrow_func;
 #[cfg(test)]
+mod javascript_typescript_add_strict_3;
+#[cfg(test)]
 mod javascript_typescript_add_use_strict;
+#[cfg(test)]
+mod javascript_typescript_use_strict_2;
+#[cfg(test)]
+mod javascript_typescript_very_interesting_brokn_code;
 #[cfg(test)]
 mod json_apache_string_change_version;
 #[cfg(test)]
 mod json_langflow_update_single_string;
+#[cfg(test)]
+mod json_mastodon_add_translation;
 #[cfg(test)]
 mod kotlin_add_data_class;
 #[cfg(test)]
