@@ -20,7 +20,7 @@ CPP,ollama-ollama.git,afaf7ce8c34bab8de45ca00dbd12da8cd3cc033a,ml/backend/ggml/g
 CPP,opencv-opencv.git,fac647aaeb59c84d23d12aa8af3e8f6d09c5e5f6,modules/imgcodecs/test/test_png.cpp,cpp-opencv-add-test-case
 CPP,tensorflow-tensorflow.git,4e38042b534e52bff29739e0a88f4276c528d435,tensorflow/core/common_runtime/buf_rendezvous.cc,cpp-tensorflow-switch-to-primitive-types
 CSS,Sonarr-Sonarr.git,f7a58aab339e2012b6bb91d0b3a38d733ec213c6,frontend/src/Activity/Queue/QueueRow.css,css-add-property
-CSS,WordPress-WordPress.git,09846f8c2c34d591f31bfd2fa0464b03cf601f3a,wp-includes/css/dist/block-library/audio/theme-rtl.css,
+CSS,WordPress-WordPress.git,09846f8c2c34d591f31bfd2fa0464b03cf601f3a,wp-includes/css/dist/block-library/audio/theme-rtl.css,css-wordpress-format-comment-and-fix
 CSS,WordPress-WordPress.git,09846f8c2c34d591f31bfd2fa0464b03cf601f3a,wp-includes/css/dist/block-library/post-excerpt/style.css,css-wordpress-reformat
 CSS,WordPress-WordPress.git,1802bd631a7459c44307e408ab51e1a5732e7ae4,wp-admin/css/dashboard.min.css,
 CSS,WordPress-WordPress.git,9c13eca1c394738d9e576b48640061fd5fe66765,wp-includes/css/jquery-ui-dialog-rtl.css,
@@ -54,7 +54,7 @@ HTML,apache-echarts.git,139206be7adab50f0d79e4d8adf3d14bac15b1bb,test/runTest/cl
 HTML,fatedier-frp.git,31f40aa9136b86d879f3495a601084eba6de873f,assets/frps/static/index.html,html-fatedier-add-attribute
 HTML,gohugoio-hugo.git,5be51ac3db225d5df501ed1fa1499c41d97dbf65,layouts/shortcodes/datatable-filtered.html,
 HTML,gohugoio-hugo.git,eb06a3cd0ce98da5038e25cc9a28834b313d482c,tpl/tplimpl/embedded/templates/alias.html,
-HTML,gorhill-uBlock.git,5c029b353204a47efd8d7be22a3f741f1802780e,src/no-dashboard.html,
+HTML,gorhill-uBlock.git,5c029b353204a47efd8d7be22a3f741f1802780e,src/no-dashboard.html,html-gorhill-add-tag
 HTML,mermaid-js-mermaid.git,d7c42eb62fa208ad11a0a41185894029024e4474,cypress/platform/xss4.html,
 HTML,mozilla-firefox-firefox.git,99614e32b9ad06f08bdebc34ccf559296ab95e69,toolkit/components/pdfjs/content/web/viewer.html,
 HTML,mozilla-firefox-firefox.git,a5c6959314b1f185f42a314f41a454ed8652c87f,testing/web-platform/tests/orientation-sensor/RelativeOrientationSensor-iframe-access.https.html,
@@ -63,7 +63,7 @@ JSON,Radarr-Radarr.git,52a69b662d56c800e19568075625f7fbcccb5e47,src/NzbDrone.Cor
 JSON,apache-superset.git,8fd34010776611e800e12481a3b6b34008142be3,superset-frontend/package.json,json-apache-string-change-version
 JSON,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/nb-NO.json,
 JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/extension/_locales/cs/messages.json,
-JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,
+JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,json-langflow-update-single-string
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,
@@ -72,14 +72,14 @@ JSON,shadcn-ui-ui.git,47c47eaed21524b5263011e080d0cd52bc794a6f,apps/v4/public/r/
 Java,Genymobile-scrcpy.git,3acffaae57238ee47e05f97f8e762a04550fdad8,server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java,
 Java,Genymobile-scrcpy.git,69b836930a1d33d2aeebd17eed67c264c084c37d,server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java,
 Java,Genymobile-scrcpy.git,6af4bd601f028d4e3d96eb90326a2330f03bc960,server/src/main/java/com/genymobile/scrcpy/LogUtils.java,
-Java,Genymobile-scrcpy.git,89518f49adb59dfa961f76be3f4414bffdc22cc5,server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java,
+Java,Genymobile-scrcpy.git,89518f49adb59dfa961f76be3f4414bffdc22cc5,server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java,java-scrcpy-remove-or-expression
 Java,Genymobile-scrcpy.git,f7b4a18b4398c013b2bed9630b7bb35eb50ad97e,server/src/main/java/com/genymobile/scrcpy/wrappers/ClipboardManager.java,
 Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,
 Java,nextcloud-android.git,dd8d79d1d914cb33b641ca058a1f9f30d811ce5f,app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java,
 Java,protocolbuffers-protobuf.git,20b2cd7623c554e3ee39470b70d5583ad5f26f60,java/core/src/main/java/com/google/protobuf/MessageSchema.java,
 Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/core/src/main/java/com/google/protobuf/Internal.java,
 Java,protocolbuffers-protobuf.git,68bd6bed7923ddade82a57a6fb8274024a3cd5d8,java/core/src/main/java/com/google/protobuf/Internal.java,
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/AmbientModuleAndAmbientFunctionWithTheSameNameAndCommonRoot.js,
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/AmbientModuleAndAmbientFunctionWithTheSameNameAndCommonRoot.js,javascript-typescript-add-use-strict
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/arrayToLocaleStringES5(target=es5).js,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,
@@ -125,10 +125,10 @@ Python,ansible-ansible.git,244c2f06edd3331495de27ecce2066cfa49d1e00,lib/ansible/
 Python,ansible-ansible.git,df0b417f2db6a51a7f74a6bc1bfa8e8f24676899,lib/ansible/parsing/vault/__init__.py,
 Python,django-django.git,d82f25d3f0f4eb7be721a72d0e79a8d13d394d32,tests/template_tests/test_partials.py,
 Python,langflow-ai-langflow.git,324caf486c2274efcbeaf8648f5165c76c38c6ce,src/backend/base/langflow/logging/logger.py,
-Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/zsh.py,
+Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/zsh.py,python-thefuck-multiline-string-change
 Python,pandas-dev-pandas.git,1a753531c565e11d4d78912d09b9343945da9363,pandas/core/window/rolling.py,
 Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/attention/_fa3.py,
-Python,ytdl-org-youtube-dl.git,2500300c2a5986ace34390aa473a8bd51f83622c,devscripts/make_lazy_extractors.py,
+Python,ytdl-org-youtube-dl.git,2500300c2a5986ace34390aa473a8bd51f83622c,devscripts/make_lazy_extractors.py,python-ytdl-add-import-and-function-call
 Ruby,Homebrew-brew.git,0c34674121a5c1e6dfb14993e397adfddf440364,Library/Homebrew/dev-cmd/bump.rb,
 Ruby,Homebrew-brew.git,239d748c9d8e869bc5d940242b42059dfdcb5bf6,Library/Homebrew/cmd/deps.rb,
 Ruby,Homebrew-brew.git,561d925fa317dfead3f888cf827625b6524b573e,Library/Homebrew/cask/upgrade.rb,

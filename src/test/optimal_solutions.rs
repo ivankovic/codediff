@@ -90,6 +90,8 @@ mod css_add_property;
 #[cfg(test)]
 mod css_playwright_add_class_selector;
 #[cfg(test)]
+mod css_wordpress_format_comment_and_fix;
+#[cfg(test)]
 mod css_wordpress_reformat;
 #[cfg(test)]
 mod go_caddy_rename_type;
@@ -110,6 +112,8 @@ mod go_user_slices_library;
 #[cfg(test)]
 mod html_fatedier_add_attribute;
 #[cfg(test)]
+mod html_gorhill_add_tag;
+#[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
 mod java_add_interface;
@@ -119,6 +123,8 @@ mod java_add_logging;
 mod java_fix_array_index;
 #[cfg(test)]
 mod java_refactor_constants;
+#[cfg(test)]
+mod java_scrcpy_remove_or_expression;
 #[cfg(test)]
 mod javascript_add_array_method;
 #[cfg(test)]
@@ -130,7 +136,11 @@ mod javascript_fix_promises;
 #[cfg(test)]
 mod javascript_refactor_arrow_func;
 #[cfg(test)]
+mod javascript_typescript_add_use_strict;
+#[cfg(test)]
 mod json_apache_string_change_version;
+#[cfg(test)]
+mod json_langflow_update_single_string;
 #[cfg(test)]
 mod kotlin_add_data_class;
 #[cfg(test)]
@@ -163,6 +173,10 @@ mod python_api_change;
 mod python_bugfix_loop;
 #[cfg(test)]
 mod python_refactoring;
+#[cfg(test)]
+mod python_thefuck_multiline_string_change;
+#[cfg(test)]
+mod python_ytdl_add_import_and_function_call;
 #[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
