@@ -106,7 +106,8 @@
 *                  `H` inside this picker to hide them, or `s` inside this picker to cycle its sort
 *                  order: alphabetical, reverse alphabetical, smallest text diff first, largest
 *                  text diff first (by changed-line count in a raw `diff -u`, not AST size) --
-*                  selection follows the current name across a re-sort, same as `H`
+*                  unlike `H`, changing sort order always jumps selection to the first (1st) entry
+*                  in the new order, rather than tracking the previously selected name
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -3725,18 +3726,15 @@ fn handle_modal_key(
                     });
                 }
                 KeyCode::Char('s') | KeyCode::Char('S') => {
-                    let current_name = visible.get(selected).map(|(name, ..)| name.clone());
-                    let new_sort_order = sort_order.next();
-                    let new_visible = visible_sample_options(&options, hide_solved, new_sort_order);
-                    let new_selected = current_name
-                        .and_then(|name| new_visible.iter().position(|(n, ..)| *n == name))
-                        .unwrap_or(0)
-                        .min(new_visible.len().saturating_sub(1));
+                    // Unlike `H`, deliberately does not track the current name across the
+                    // re-sort: changing sort order is about jumping to whichever end of the new
+                    // order is interesting (e.g. the largest diff), so landing on 1 there is more
+                    // useful than staying on whatever was selected under the old order.
                     app.modal = Some(Modal::OpenSamplePicker {
                         options,
-                        selected: new_selected,
+                        selected: 0,
                         hide_solved,
-                        sort_order: new_sort_order,
+                        sort_order: sort_order.next(),
                     });
                 }
                 KeyCode::Esc => {
@@ -4568,6 +4566,60 @@ mod tests {
         match target {
             Some(OpenTarget::Sample(name)) => assert_eq!(name, "unsolved-two"),
             other => panic!("expected OpenTarget::Sample(\"unsolved-two\"), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_sample_picker_s_advances_sort_order_and_resets_selection_to_first() {
+        // Unlike `H` (which tracks the previously selected name across a re-sort), `s` always
+        // resets `selected` to 0 - changing sort order is about jumping to whichever end of the
+        // new order is interesting, not staying on what was picked under the old one.
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        app.modal = Some(Modal::OpenSamplePicker {
+            options: vec![
+                ("alpha".to_string(), false, 5),
+                ("bravo".to_string(), false, 1),
+                ("charlie".to_string(), false, 20),
+            ],
+            selected: 2,
+            hide_solved: false,
+            sort_order: SampleSortOrder::Alphabetical,
+        });
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Char('s'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(target.is_none(), "s should not switch cases directly");
+        match app.modal {
+            Some(Modal::OpenSamplePicker {
+                selected,
+                sort_order,
+                ..
+            }) => {
+                assert_eq!(selected, 0, "selection should reset to the first entry");
+                assert_eq!(sort_order, SampleSortOrder::ReverseAlphabetical);
+            }
+            other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
         }
     }
 
