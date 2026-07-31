@@ -90,9 +90,13 @@ mod css_add_property;
 #[cfg(test)]
 mod css_playwright_add_class_selector;
 #[cfg(test)]
+mod css_wordpress_add_comment;
+#[cfg(test)]
 mod css_wordpress_format_comment_and_fix;
 #[cfg(test)]
 mod css_wordpress_reformat;
+#[cfg(test)]
+mod css_wordpress_smalll_change;
 #[cfg(test)]
 mod go_caddy_rename_type;
 #[cfg(test)]
@@ -113,6 +117,8 @@ mod go_user_slices_library;
 mod html_fatedier_add_attribute;
 #[cfg(test)]
 mod html_gorhill_add_tag;
+#[cfg(test)]
+mod html_ladybird_delete_attribute;
 #[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
@@ -162,6 +168,8 @@ mod kotlin_remove_function;
 #[cfg(test)]
 mod kotlin_small_api_change;
 #[cfg(test)]
+mod php_nextcloud_change_doccomment;
+#[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
 mod python_added_if_block;
@@ -177,6 +185,8 @@ mod python_refactoring;
 mod python_thefuck_multiline_string_change;
 #[cfg(test)]
 mod python_ytdl_add_import_and_function_call;
+#[cfg(test)]
+mod ruby_homebrew_add_or_expression;
 #[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
