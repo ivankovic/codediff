@@ -96,7 +96,11 @@ fn lines_to_keep(ops: &[TextOperation], context: usize) -> Vec<bool> {
 /// instead of the enclosing function - not what a human orienting themselves in a hunk wants.
 /// `is_semantically_structural` only matches nodes with an actual name (functions, structs,
 /// classes, impls, ...), which is a closer match for "parts of code humans think about."
-fn nearest_reference_line(
+///
+/// `pub(crate)`, not private: `tui::json_output` reuses this directly too, for the same
+/// "which enclosing function is this hunk in" breadcrumb, just serialized as a field instead of
+/// printed as an `@` line - both callers want the identical AST walk, not a re-derived copy of it.
+pub(crate) fn nearest_reference_line(
     code: &Code,
     language: &crate::code::Language,
     row: usize,

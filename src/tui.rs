@@ -20,6 +20,7 @@ pub mod app;
 pub mod components;
 pub mod events;
 pub mod headless;
+pub mod json_output;
 pub mod theme;
 pub mod ui;
 pub mod widgets;

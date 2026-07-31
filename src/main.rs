@@ -34,7 +34,9 @@ struct Args {
     /// is computed immediately instead of starting on an empty viewer.
     paths: Vec<PathBuf>,
 
-    /// Mode (TUI/tui or Headless/headless)
+    /// Mode (TUI/tui, Headless/headless, or Json/json - see `tui::json_output` for the JSON
+    /// schema). `json` needs BEFORE and AFTER, same as `headless`; unlike `headless`, it is never
+    /// entered implicitly just because stdout isn't a terminal.
     #[arg(long, default_value = "TUI")]
     mode: String,
 
@@ -116,6 +118,15 @@ fn should_run_headless(args: &Args, stdout_is_terminal: bool) -> bool {
     args.headless || args.mode.eq_ignore_ascii_case("headless") || !stdout_is_terminal
 }
 
+/// Whether to print a single JSON diff object (`tui::json_output::run`) instead of anything else.
+/// Unlike `should_run_headless`, this is opt-in only via `--mode json` - a non-terminal stdout
+/// (git's pager, a redirect, CI) must still default to `headless`'s human-readable ANSI text, not
+/// silently switch formats just because it isn't a terminal, since that would break every existing
+/// `GIT_EXTERNAL_DIFF`/script integration that isn't asking for JSON.
+fn should_run_json(args: &Args) -> bool {
+    args.mode.eq_ignore_ascii_case("json")
+}
+
 /// Whether headless output should be ANSI-colored. Deliberately not tied to `stdout_is_terminal`:
 /// the whole point of headless mode's main use case (`GIT_EXTERNAL_DIFF` under git's default
 /// pager) is that stdout is a pipe, not a terminal, yet the pager on the other end is generally
@@ -130,6 +141,17 @@ fn use_color() -> bool {
 async fn main() -> Result<()> {
     let args = Args::parse();
     let before_after = resolve_before_after(&args.paths)?;
+
+    if should_run_json(&args) {
+        let (before, after) = before_after
+            .context("`--mode json` needs BEFORE and AFTER - pass two files to diff")?;
+        let mode = if args.exact {
+            DiffMode::Exact
+        } else {
+            DiffMode::Fast
+        };
+        return tui::json_output::run(&before, &after, mode);
+    }
 
     if should_run_headless(&args, std::io::stdout().is_terminal()) {
         let (before, after) = before_after.context(
@@ -257,6 +279,21 @@ mod tests {
     #[test]
     fn should_run_headless_honors_mode_headless_case_insensitively() {
         assert!(should_run_headless(&args_with("Headless", false), true));
+    }
+
+    #[test]
+    fn should_run_json_honors_mode_json_case_insensitively() {
+        assert!(should_run_json(&args_with("Json", false)));
+        assert!(should_run_json(&args_with("json", false)));
+        assert!(!should_run_json(&args_with("TUI", false)));
+        assert!(!should_run_json(&args_with("Headless", false)));
+    }
+
+    #[test]
+    fn should_run_json_is_false_on_a_non_terminal_stdout_unless_explicitly_asked_for() {
+        // Unlike should_run_headless, a piped/redirected stdout must not silently switch to JSON
+        // - only an explicit `--mode json` does that (see should_run_json's own doc comment).
+        assert!(!should_run_json(&args_with("TUI", false)));
     }
 
     #[test]
