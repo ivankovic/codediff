@@ -80,6 +80,8 @@ mod csharp_lidarr_new_feature;
 #[cfg(test)]
 mod csharp_radarr_add_object_instance;
 #[cfg(test)]
+mod csharp_sonarr_add_if_block;
+#[cfg(test)]
 mod csharp_sonarr_add_true_to_function_call;
 #[cfg(test)]
 mod csharp_sonarr_change_type;
@@ -87,6 +89,8 @@ mod csharp_sonarr_change_type;
 mod css_add_property;
 #[cfg(test)]
 mod css_playwright_add_class_selector;
+#[cfg(test)]
+mod css_wordpress_reformat;
 #[cfg(test)]
 mod go_caddy_rename_type;
 #[cfg(test)]
@@ -103,6 +107,8 @@ mod go_lazygit_switch_to_strings;
 mod go_prometheus_single_comment_change;
 #[cfg(test)]
 mod go_user_slices_library;
+#[cfg(test)]
+mod html_fatedier_add_attribute;
 #[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
@@ -185,6 +191,8 @@ mod rust_leetcode_1_bugfix;
 mod rust_next_font_imports_generator;
 #[cfg(test)]
 mod rust_no_change;
+#[cfg(test)]
+mod rust_rustdesk_add_item;
 #[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
