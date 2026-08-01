@@ -52,6 +52,27 @@ pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
     None
 }
 
+/// Parses one path segment into (node kind, 0-indexed same-kind occurrence) - shared by
+/// `node_for_path` and `PathCache::resolve` so the "type" / "type:index" mini-language is defined
+/// in exactly one place. Split on the *last* colon rather than the first: node kinds can
+/// themselves contain colons (e.g. TypeScript's ":" token, Rust's "::" token), but the index
+/// suffix we append is always pure digits, so the rightmost colon is always the one we inserted.
+fn parse_path_segment<'a>(path_segment: &'a str, path: &[&str]) -> Result<(&'a str, usize)> {
+    match path_segment.rsplit_once(':') {
+        Some((node_type, index_str)) => {
+            let index = index_str.parse::<usize>().map_err(|_| {
+                anyhow::anyhow!(
+                    "Invalid index in path segment: {} for path {:?}",
+                    path_segment,
+                    path
+                )
+            })? - 1; // Convert to 0-indexed
+            Ok((node_type, index))
+        }
+        None => Ok((path_segment, 0)), // No index given: use first matching child
+    }
+}
+
 /**
 * Follows path from the root node and returns the resulting node, if the path is valid.
 *
@@ -64,28 +85,17 @@ pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
 *    used to make the string easier to read for humans.
 *
 * If the path is invalid, an error is returned.
+*
+* Each segment does a fresh linear scan of the current node's children - fine for the occasional
+* one-off lookup this is designed for (e.g. `human_solver`'s interactive jump-to-node), but not for
+* resolving many paths against the same root, where the same high-fanout parent can get rescanned
+* over and over - see [`PathCache`] for that case.
 */
 pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     let mut current_node = root;
 
     for path_segment in path {
-        // Parse the path segment to extract node type and optional index. Split on the *last*
-        // colon rather than the first: node kinds can themselves contain colons (e.g. TypeScript's
-        // ":" token, Rust's "::" token), but the index suffix we append is always pure digits, so
-        // the rightmost colon is always the one we inserted.
-        let (node_type, child_index) = match path_segment.rsplit_once(':') {
-            Some((node_type, index_str)) => {
-                let index = index_str.parse::<usize>().map_err(|_| {
-                    anyhow::anyhow!(
-                        "Invalid index in path segment: {} for path {:?}",
-                        path_segment,
-                        path
-                    )
-                })? - 1; // Convert to 0-indexed
-                (node_type, index)
-            }
-            None => (*path_segment, 0), // No index given: use first matching child
-        };
+        let (node_type, child_index) = parse_path_segment(path_segment, path)?;
 
         // Find the matching child node
         let mut found_node = None;
@@ -113,6 +123,117 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     }
 
     Ok(current_node)
+}
+
+/// One parent's children, indexed once for both directions [`PathCache`] needs: `by_kind`
+/// answers `node_for_path`'s "the Nth child of kind K" (forward, path -> node), `occurrence_of`
+/// answers `path_for_node`'s "which same-kind occurrence is this child" (reverse, node -> path).
+/// Building both from the same single scan means a parent visited via both directions (as
+/// `human_mapping`'s determinism check does - see `diff_paths_with_config`) still only gets
+/// scanned once total, not once per direction.
+struct ParentIndex<'a> {
+    by_kind: HashMap<(String, usize), Node<'a>>,
+    occurrence_of: HashMap<usize, usize>,
+}
+
+impl<'a> ParentIndex<'a> {
+    fn build(parent: Node<'a>) -> Self {
+        let mut by_kind = HashMap::new();
+        let mut occurrence_of = HashMap::new();
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        let mut cursor = parent.walk();
+        for child in parent.children(&mut cursor) {
+            let kind = child.kind().to_string();
+            let occurrence = counts.entry(kind.clone()).or_insert(0);
+            occurrence_of.insert(child.id(), *occurrence);
+            by_kind.insert((kind, *occurrence), child);
+            *occurrence += 1;
+        }
+        Self {
+            by_kind,
+            occurrence_of,
+        }
+    }
+}
+
+/**
+* Memoized alternative to [`node_for_path`]/[`path_for_node`], for a caller that resolves *many*
+* paths against the *same* root - e.g. `human_mapping::check_entry`'s per-mapping-entry lookups, or
+* `human_mapping::diff_paths_with_config`'s per-mapped-node path computation. Both plain functions
+* rescan a parent's children from scratch on every call; for a diff with thousands of entries that
+* all resolve through one shared high-fanout parent (a large flat JSON object is the motivating
+* case - one added key produces one mapping entry, but every *other* entry's path still passes
+* through that same object node), that rescan happening once per entry makes the whole loop
+* effectively quadratic in the entry count.
+*
+* `PathCache` fixes this by indexing each parent's children ([`ParentIndex`]) exactly once, the
+* first time that parent is visited in either direction, and reusing the index for every
+* subsequent lookup through it - the same object node then costs one scan total, not one per entry
+* that passes through it.
+*
+* Not a drop-in replacement for `node_for_path`/`path_for_node`: the memory and setup cost of the
+* index only pays for itself when the same root is queried many times, so this is a separate,
+* opt-in type rather than either plain function growing an implicit cache.
+*/
+#[derive(Default)]
+pub struct PathCache<'a> {
+    by_parent: HashMap<usize, ParentIndex<'a>>,
+}
+
+impl<'a> PathCache<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn index_of(&mut self, parent: Node<'a>) -> &ParentIndex<'a> {
+        self.by_parent
+            .entry(parent.id())
+            .or_insert_with(|| ParentIndex::build(parent))
+    }
+
+    /// Same contract as [`node_for_path`], but resolves each segment via this cache instead of a
+    /// fresh scan.
+    pub fn resolve(&mut self, root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
+        let mut current_node = root;
+
+        for path_segment in path {
+            let (node_type, child_index) = parse_path_segment(path_segment, path)?;
+
+            match self
+                .index_of(current_node)
+                .by_kind
+                .get(&(node_type.to_string(), child_index))
+            {
+                Some(&node) => current_node = node,
+                None => bail!(
+                    "Path segment '{}' not found at current position for path {:?}",
+                    path_segment,
+                    path
+                ),
+            }
+        }
+
+        Ok(current_node)
+    }
+
+    /// Same contract as [`path_for_node`], but resolves each ancestor's same-kind occurrence via
+    /// this cache instead of a fresh scan of its siblings.
+    pub fn path_of(&mut self, node: Node<'a>) -> Vec<String> {
+        let mut path = Vec::new();
+        let mut current = node;
+
+        while let Some(parent) = current.parent() {
+            let kind = current.kind();
+            // `occurrence_of` is populated for every child of `parent` by `ParentIndex::build`,
+            // including `current` itself, so this can never miss.
+            let occurrence = self.index_of(parent).occurrence_of[&current.id()];
+            path.push(format!("{}:{}", kind, occurrence + 1));
+            current = parent;
+        }
+
+        path.reverse();
+        path
+    }
 }
 
 /**

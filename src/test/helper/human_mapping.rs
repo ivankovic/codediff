@@ -40,7 +40,7 @@ use tree_sitter::Node;
 use crate::code::ASTMetadata;
 use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
-use crate::test::helper::{node_for_path, path_for_node};
+use crate::test::helper::PathCache;
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
@@ -259,6 +259,12 @@ pub fn human_mapping_cost(
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
 ) -> Result<u64> {
+    // Same one-cache-per-root-per-loop pattern as `check_entry`'s caller - see `PathCache`'s own
+    // doc comment for why a fixture with many DeleteWithChildren/InsertWithChildren entries under
+    // one large flat parent (e.g. a big JSON object) needs this to stay linear.
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+
     let mut total = 0u64;
     for entry in &mapping.entries {
         let (operation, subtree_size) = match entry.operation {
@@ -272,7 +278,8 @@ pub fn human_mapping_cost(
                     .before_path
                     .as_ref()
                     .context("DeleteWithChildren entry is missing before_path")?;
-                let node = node_for_path(before_root, &path_refs(path))
+                let node = before_cache
+                    .resolve(before_root, &path_refs(path))
                     .with_context(|| format!("resolving before_path {:?}", path))?;
                 let size = before_metadata
                     .node_to_subtree_size
@@ -286,7 +293,8 @@ pub fn human_mapping_cost(
                     .after_path
                     .as_ref()
                     .context("InsertWithChildren entry is missing after_path")?;
-                let node = node_for_path(after_root, &path_refs(path))
+                let node = after_cache
+                    .resolve(after_root, &path_refs(path))
                     .with_context(|| format!("resolving after_path {:?}", path))?;
                 let size = after_metadata
                     .node_to_subtree_size
@@ -350,16 +358,21 @@ pub fn as_ast_diff(
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+
     let mut diff = ASTDiff::default();
     for entry in &mapping.entries {
         let before_id = match &entry.before_path {
-            Some(path) => node_for_path(before_root, &path_refs(path))
+            Some(path) => before_cache
+                .resolve(before_root, &path_refs(path))
                 .with_context(|| format!("resolving before_path {:?}", path))?
                 .id(),
             None => 0,
         };
         let after_id = match &entry.after_path {
-            Some(path) => node_for_path(after_root, &path_refs(path))
+            Some(path) => after_cache
+                .resolve(after_root, &path_refs(path))
                 .with_context(|| format!("resolving after_path {:?}", path))?
                 .id(),
             None => 0,
@@ -386,12 +399,14 @@ pub fn as_ast_diff(
     Ok(diff)
 }
 
-fn check_entry(
+fn check_entry<'b, 'a>(
     entry: &HumanMappingEntry,
-    before_root: Node,
-    after_root: Node,
+    before_root: Node<'b>,
+    after_root: Node<'a>,
     diff_ast: &ASTDiff,
     mismatches: &mut Vec<String>,
+    before_cache: &mut PathCache<'b>,
+    after_cache: &mut PathCache<'a>,
 ) -> Result<()> {
     match entry.operation {
         HumanOperation::Identical
@@ -406,9 +421,11 @@ fn check_entry(
                 .as_ref()
                 .with_context(|| format!("{:?} entry is missing after_path", entry.operation))?;
 
-            let before_node = node_for_path(before_root, &path_refs(before_path))
+            let before_node = before_cache
+                .resolve(before_root, &path_refs(before_path))
                 .with_context(|| format!("resolving before_path {:?}", before_path))?;
-            let after_node = node_for_path(after_root, &path_refs(after_path))
+            let after_node = after_cache
+                .resolve(after_root, &path_refs(after_path))
                 .with_context(|| format!("resolving after_path {:?}", after_path))?;
 
             let actual_partner = diff_ast.before_node_map.get(&before_node.id()).copied();
@@ -450,7 +467,8 @@ fn check_entry(
                 .before_path
                 .as_ref()
                 .context("Delete entry is missing before_path")?;
-            let before_node = node_for_path(before_root, &path_refs(before_path))
+            let before_node = before_cache
+                .resolve(before_root, &path_refs(before_path))
                 .with_context(|| format!("resolving before_path {:?}", before_path))?;
 
             if entry.operation == HumanOperation::DeleteWithChildren {
@@ -483,7 +501,8 @@ fn check_entry(
                 .after_path
                 .as_ref()
                 .context("Insert entry is missing after_path")?;
-            let after_node = node_for_path(after_root, &path_refs(after_path))
+            let after_node = after_cache
+                .resolve(after_root, &path_refs(after_path))
                 .with_context(|| format!("resolving after_path {:?}", after_path))?;
 
             if entry.operation == HumanOperation::InsertWithChildren {
@@ -542,12 +561,19 @@ fn diff_paths_with_config(
     let node_cache = NodeCache::build(&before, &after);
     let diff_ast = diff.ast.expect("Diff has no AST");
 
+    // One cache per side, reused across every mapping entry below - see `PathCache`'s own doc
+    // comment for why a fresh `path_for_node` per entry would be quadratic here: this walks
+    // *every* mapped node in the whole diff (not just human-annotated ones), and for a large flat
+    // container (e.g. a big JSON object) many thousands of them share the same huge-fanout parent.
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+
     diff_ast
         .mapping
         .iter()
         .filter_map(|(&(b, a), m)| {
-            let before_path = path_for_node(*node_cache.before.get(&b)?);
-            let after_path = path_for_node(*node_cache.after.get(&a)?);
+            let before_path = before_cache.path_of(*node_cache.before.get(&b)?);
+            let after_path = after_cache.path_of(*node_cache.after.get(&a)?);
             Some(((before_path, after_path), m.operation.clone()))
         })
         .collect()
@@ -720,8 +746,18 @@ pub fn compute_mismatches_for_with_config(
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
     for entry in &mapping.entries {
-        check_entry(entry, before_root, after_root, &diff_ast, &mut mismatches)?;
+        check_entry(
+            entry,
+            before_root,
+            after_root,
+            &diff_ast,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
     }
 
     Ok(mismatches)
@@ -836,6 +872,8 @@ mod tests {
         let after_ast = after.ast.as_ref().unwrap();
 
         let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
         for entry in &mapping.entries {
             check_entry(
                 entry,
@@ -843,6 +881,8 @@ mod tests {
                 after_ast.root_node(),
                 &diff_ast,
                 &mut mismatches,
+                &mut before_cache,
+                &mut after_cache,
             )?;
         }
 
@@ -873,6 +913,8 @@ mod tests {
         let after_ast = after.ast.as_ref().unwrap();
 
         let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
         for entry in &mapping.entries {
             check_entry(
                 entry,
@@ -880,6 +922,8 @@ mod tests {
                 after_ast.root_node(),
                 &diff_ast,
                 &mut mismatches,
+                &mut before_cache,
+                &mut after_cache,
             )?;
         }
 
