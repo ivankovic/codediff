@@ -40,6 +40,32 @@ pub struct TextDiff {
     after_ranges: Vec<RangeMatch>,
 }
 
+/// The text of `node`'s own span that isn't covered by any of its *direct* children - e.g. for a
+/// `line_comment` node with one `//` child, this is everything after the `//` (the comment's
+/// actual words), since nothing else claims those bytes. For a typical container node (a `block`,
+/// a `module`, ...), this is normally just the whitespace/punctuation between children - real
+/// content almost always lives inside a named child, not in the gaps around them.
+///
+/// This is what makes it possible to tell "this node's own un-decomposed content changed" (a
+/// comment) apart from "this node is a container and something changed somewhere inside it" (a
+/// `block` that gained/lost/rearranged a child) without hardcoding per-language node-kind rules:
+/// a container's own gap text rarely differs at all beyond whitespace, while a comment's does.
+pub(crate) fn own_content(node: Node, source: &[u8]) -> String {
+    let mut gap_bytes: Vec<u8> = Vec::new();
+    let mut pos = node.start_byte();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.start_byte() > pos {
+            gap_bytes.extend_from_slice(&source[pos..child.start_byte()]);
+        }
+        pos = pos.max(child.end_byte());
+    }
+    if node.end_byte() > pos {
+        gap_bytes.extend_from_slice(&source[pos..node.end_byte()]);
+    }
+    String::from_utf8_lossy(&gap_bytes).into_owned()
+}
+
 /// Returns the RangeMatches from source to destination.
 fn ranges(
     source: &Code,
@@ -174,6 +200,48 @@ fn ranges(
                                 &source_columns,
                                 TextOperation::Update,
                             ));
+                        }
+                        // A node (e.g. a comment) whose *own* un-decomposed content differs from
+                        // its match - content not claimed by any of its children (`own_content`) -
+                        // beyond whitespace. Without this arm, the difference was invisible in the
+                        // rendered diff entirely: `MatchButNotIdentical` had no arm here at all
+                        // before, so a changed comment (real case: tree-sitter-rust's
+                        // `line_comment` has its own `//`-marker child, so the node carrying the
+                        // comment's actual words is this node itself, not a leaf `is_comment`-kind
+                        // node the `Update`/childless-`Delete`/childless-`Insert` arms above would
+                        // already catch) produced literally no range at all, confirmed by running
+                        // `codediff --headless` against a real file pair and seeing no diff
+                        // whatsoever for a comment-only text change.
+                        //
+                        // Deliberately `own_content`, not this node's *whole* text: a container
+                        // (e.g. a function `block` that gained a statement) also has
+                        // `MatchButNotIdentical` mappings, and its whole text almost always
+                        // differs too - but comparing only the gap text between its children
+                        // correctly finds nothing (containers rarely have real content outside
+                        // their named children), so this arm doesn't fire for them and the
+                        // existing descent finds the real, much smaller change instead. Confirmed
+                        // as a real, not hypothetical, false positive during development: an
+                        // earlier version of this fix compared each child's own `mapping.operation`
+                        // instead, which missed a statement moving one level deeper (still mapped
+                        // `Identical` at the AST level - only its rendered `TextOperation` becomes
+                        // `Move`, from the column shift, see the `Identical` arm above) and wrongly
+                        // treated the whole enclosing block as one giant `Update`.
+                        ASTMappingOperation::MatchButNotIdentical => {
+                            if let Some(&destination_node) = node_cache.get_in_any(&mapped_id) {
+                                let source_content = own_content(node, source.contents.as_bytes());
+                                let destination_content =
+                                    own_content(destination_node, destination.contents.as_bytes());
+                                if !whitespace_stripped_equal(&source_content, &destination_content)
+                                {
+                                    new_range = Some(advance_and_build_range(
+                                        &mut last_non_move_range,
+                                        node,
+                                        &source_columns,
+                                        TextOperation::Update,
+                                    ));
+                                    descend = false;
+                                }
+                            }
                         }
                         _ => {
                             // For other operations, just allow the descent into the tree
@@ -584,32 +652,28 @@ pub fn summarize_diff(
 /// error, if either side has no AST (nothing to walk).
 ///
 /// "Real" means the same handful of AST-mapping operations `ranges` itself treats as producing a
-/// visible change - `DeleteWithChildren`, `InsertWithChildren`, a childless `Delete`/`Insert`, or
-/// `Update` - checked with the exact same match arms (mirrored deliberately, not reused: `ranges`
-/// also tracks positions and merges the two sides' ranges, work this doesn't need for a yes/no
-/// answer). Everything else - `Identical`, `MatchButNotIdentical`, `Move`, a non-childless plain
-/// `Delete`/`Insert` - is bookkeeping for an ancestor/container of the real change, not the change
-/// itself, so it's skipped by descending into it rather than required to be a comment. Returns
-/// `false`, not `true`, if no qualifying operation exists at all (e.g. a diff that's only `Move`s):
-/// "comment-only" is a claim about *what* changed, and is meaningless to assert about a diff where
-/// nothing did.
-///
-/// Known gap, shared with `ranges` itself, not unique to this function: a comment whose *text*
-/// changed (as opposed to being wholly inserted/deleted) is sometimes tagged `MatchButNotIdentical`
-/// rather than `Update` - confirmed against a real parse - and since `MatchButNotIdentical` isn't
-/// one of the operations checked here (matching `ranges`'s own coverage exactly, see above), that
-/// case is invisible to `is_comment_only_diff`, the same way it's invisible in the rendered diff
-/// itself (confirmed: `codediff --headless` shows no diff at all for exactly this case). Not
-/// "fixed" here on purpose - it would need to be fixed in `ranges` first, for every leaf value
-/// change tagged this way, not just comments; see `is_comment_only_diff_is_false_when_only_a_
-/// comments_text_changed_a_known_gap`'s own comment for the full story.
+/// visible change - `DeleteWithChildren`, `InsertWithChildren`, a childless `Delete`/`Insert`, an
+/// `Update`, or a `MatchButNotIdentical` whose `own_content` differs - checked with the exact same
+/// criteria `ranges` itself uses (mirrored deliberately, not reused: `ranges` also tracks positions
+/// and merges the two sides' ranges, work this doesn't need for a yes/no answer). Everything else -
+/// `Identical`, `Move`, a non-childless plain `Delete`/`Insert`, a `MatchButNotIdentical` whose
+/// `own_content` doesn't differ - is bookkeeping for an ancestor/container of the real change, not
+/// the change itself, so it's skipped by descending into it rather than required to be a comment.
+/// Returns `false`, not `true`, if no qualifying operation exists at all (e.g. a diff that's only
+/// `Move`s): "comment-only" is a claim about *what* changed, and is meaningless to assert about a
+/// diff where nothing did.
 ///
 /// Checks comment-ness via `is_comment_or_inside_comment`, not a bare `nodes::is_comment(node.
 /// kind())`: at least one grammar (Rust's `line_comment`) represents a comment as a small node
 /// tree of its own rather than one opaque token (confirmed empirically - its `//` marker is a
 /// separate child node), so the specific node actually carrying the mapping can be a non-
 /// comment-kind piece *of* a comment.
-pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool {
+pub fn is_comment_only_diff(
+    before: &Code,
+    after: &Code,
+    diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> bool {
     let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return false;
     };
@@ -630,8 +694,16 @@ pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool
         false
     }
 
-    // Returns (found_any_qualifying_operation, every_one_of_them_was_a_comment).
-    fn scan(root: Node, diff: &ASTDiff) -> (bool, bool) {
+    // Returns (found_any_qualifying_operation, every_one_of_them_was_a_comment). `own_bytes` is
+    // `root`'s own source, `other_bytes` its mapped counterpart's - i.e. (before, after) when
+    // `root` is the before-tree root, (after, before) when it's the after-tree root.
+    fn scan(
+        root: Node,
+        diff: &ASTDiff,
+        node_cache: &NodeCache,
+        own_bytes: &[u8],
+        other_bytes: &[u8],
+    ) -> (bool, bool) {
         let mut found_any = false;
         let mut all_comments = true;
         let mut stack = vec![root];
@@ -645,7 +717,7 @@ pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool
                 }
             };
 
-            if let Some((_, mapping)) = diff.mapping_for_node(&node.id()) {
+            if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
                 match mapping.operation {
                     ASTMappingOperation::Identical => descend = false,
                     ASTMappingOperation::DeleteWithChildren
@@ -659,6 +731,19 @@ pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool
                         mark_found();
                     }
                     ASTMappingOperation::Update => mark_found(),
+                    // Same criterion as `ranges`'s own `MatchButNotIdentical` arm - see that
+                    // arm's doc comment for why `own_content`, not the node's whole text.
+                    ASTMappingOperation::MatchButNotIdentical => {
+                        if let Some(&other_node) = node_cache.get_in_any(&mapped_id)
+                            && !whitespace_stripped_equal(
+                                &own_content(node, own_bytes),
+                                &own_content(other_node, other_bytes),
+                            )
+                        {
+                            descend = false;
+                            mark_found();
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -674,8 +759,22 @@ pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool
         (found_any, all_comments)
     }
 
-    let (before_found, before_all_comments) = scan(before_ast.root_node(), diff);
-    let (after_found, after_all_comments) = scan(after_ast.root_node(), diff);
+    let before_bytes = before.contents.as_bytes();
+    let after_bytes = after.contents.as_bytes();
+    let (before_found, before_all_comments) = scan(
+        before_ast.root_node(),
+        diff,
+        node_cache,
+        before_bytes,
+        after_bytes,
+    );
+    let (after_found, after_all_comments) = scan(
+        after_ast.root_node(),
+        diff,
+        node_cache,
+        after_bytes,
+        before_bytes,
+    );
 
     // At least one side must have actually found a qualifying operation - "comment-only" is
     // meaningless to assert about a diff where nothing changed at all (e.g. a diff that's only
@@ -1359,60 +1458,62 @@ mod tests {
     fn diff_ast(
         before_src: &str,
         after_src: &str,
-    ) -> (crate::code::Code, crate::code::Code, ASTDiff) {
+    ) -> (crate::code::Code, crate::code::Code, ASTDiff, NodeCache) {
         let before = crate::code::Code::from_string(before_src, &crate::code::Language::Rust);
         let after = crate::code::Code::from_string(after_src, &crate::code::Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::diff_code(&before, &after);
         let ast = diff
             .ast
             .expect("diff_code should always produce an AST for valid Rust");
-        (before, after, ast)
+        (before, after, ast, node_cache)
     }
 
-    /// Documents a real, separate gap, not this function's own bug: a comment whose text changed
-    /// (rather than being wholly inserted/deleted) is tagged `MatchButNotIdentical` by the pipeline
-    /// (confirmed via a real parse - not `Update`, which is what a leaf value change normally
-    /// gets), and `ranges` itself has no arm for `MatchButNotIdentical` either - confirmed
-    /// empirically that `codediff --headless` shows *no diff at all* for this exact case, on the
-    /// real binary. `is_comment_only_diff` deliberately mirrors `ranges`'s own blind spot here
-    /// rather than "fixing" it unilaterally: if the rendered diff shows nothing changed, the status
-    /// bar must not claim otherwise. Fixing the underlying gap (`MatchButNotIdentical` on a leaf
-    /// should behave like `Update`) is a real, separate issue - it would affect every language and
-    /// every kind of leaf value change tagged this way, not just comments.
+    /// A comment whose text changed (as opposed to being wholly inserted/deleted) is tagged
+    /// `MatchButNotIdentical` by the pipeline, not `Update` - confirmed via a real parse. This
+    /// used to be a real, separate gap shared with `ranges` (which had no arm for
+    /// `MatchButNotIdentical` at all, so a changed comment produced no visible diff whatsoever -
+    /// confirmed via `codediff --headless` against the real binary): `is_comment_only_diff`
+    /// deliberately mirrored that blind spot rather than "fixing" it unilaterally, since the
+    /// status bar must never claim something changed when the diff below it shows nothing. Now
+    /// that `ranges` handles `MatchButNotIdentical` (via `own_content`), this must too, and does.
     #[test]
-    fn is_comment_only_diff_is_false_when_only_a_comments_text_changed_a_known_gap() {
-        let (before, after, ast) = diff_ast(
+    fn is_comment_only_diff_is_true_when_only_a_comments_text_changed() {
+        let (before, after, ast, node_cache) = diff_ast(
             "// old comment\nfn main() {}",
             "// new comment\nfn main() {}",
         );
-        assert!(!is_comment_only_diff(&before, &after, &ast));
+        assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]
     fn is_comment_only_diff_is_true_when_a_comment_was_inserted() {
-        let (before, after, ast) = diff_ast("fn main() {}", "// a comment\nfn main() {}");
-        assert!(is_comment_only_diff(&before, &after, &ast));
+        let (before, after, ast, node_cache) =
+            diff_ast("fn main() {}", "// a comment\nfn main() {}");
+        assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]
     fn is_comment_only_diff_is_true_when_a_comment_was_deleted() {
-        let (before, after, ast) = diff_ast("// a comment\nfn main() {}", "fn main() {}");
-        assert!(is_comment_only_diff(&before, &after, &ast));
+        let (before, after, ast, node_cache) =
+            diff_ast("// a comment\nfn main() {}", "fn main() {}");
+        assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]
     fn is_comment_only_diff_is_false_for_a_real_code_change() {
-        let (before, after, ast) = diff_ast("fn main() { old(); }", "fn main() { new(); }");
-        assert!(!is_comment_only_diff(&before, &after, &ast));
+        let (before, after, ast, node_cache) =
+            diff_ast("fn main() { old(); }", "fn main() { new(); }");
+        assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]
     fn is_comment_only_diff_is_false_when_a_comment_and_real_code_both_changed() {
-        let (before, after, ast) = diff_ast(
+        let (before, after, ast, node_cache) = diff_ast(
             "// old comment\nfn main() { old(); }",
             "// new comment\nfn main() { new(); }",
         );
-        assert!(!is_comment_only_diff(&before, &after, &ast));
+        assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]
@@ -1420,8 +1521,24 @@ mod tests {
         // Vacuous case: no qualifying operation exists anywhere, so there is nothing to claim is
         // "comment-only" about - see this function's own doc comment on why this must be false,
         // not true.
-        let (before, after, ast) = diff_ast("fn main() {}", "fn main() {}");
-        assert!(!is_comment_only_diff(&before, &after, &ast));
+        let (before, after, ast, node_cache) = diff_ast("fn main() {}", "fn main() {}");
+        assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
+    }
+
+    /// A container whose text differs everywhere purely because a statement got wrapped one level
+    /// deeper - not because any comment changed - must not spuriously look "comment-only" just
+    /// because `MatchButNotIdentical` is now checked. Regression guard tied directly to the same
+    /// real bug `ranges`' own `own_content`-vs-child-operation development history hit (see
+    /// `ranges`'s `MatchButNotIdentical` arm doc comment): a statement moving one level deeper
+    /// stays `Identical` at the AST level, so a naive check could have missed that the enclosing
+    /// block's real content changed.
+    #[test]
+    fn is_comment_only_diff_is_false_when_a_statement_moves_one_level_deeper() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    foo();\n    bar();\n}",
+            "fn main() {\n    foo();\n    if true {\n        bar();\n    }\n}",
+        );
+        assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
     }
 
     #[test]

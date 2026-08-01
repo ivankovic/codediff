@@ -629,7 +629,7 @@ fn assemble_diff_session_data(
     // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
     // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
     // field's own doc comment.
-    let comment_only = is_comment_only_diff(before_code, after_code, ast);
+    let comment_only = is_comment_only_diff(before_code, after_code, ast, &node_cache);
 
     Ok(DiffSessionData {
         before_path: before_path.to_path_buf(),
