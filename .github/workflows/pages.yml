@@ -1,0 +1,54 @@
+name: Publish human mapping site
+
+# Builds and deploys the read-only human_mapping.json viewer (generate_mapping_site) to GitHub
+# Pages on every push to main. Nothing this workflow generates is committed to the repo - the
+# HTML/CSS/JS is built fresh from src/test/data/diffs/ each run. Requires Pages to be enabled once
+# in this repo's Settings -> Pages, with source set to "GitHub Actions" (a one-time manual step,
+# not something a workflow file can do on its own).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; a newer push should win over one still in flight rather
+# than queue behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: pages
+
+      - name: Generate site
+        run: cargo run --release --features test-fixtures --bin generate_mapping_site -- --out site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

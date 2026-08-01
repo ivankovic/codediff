@@ -176,6 +176,11 @@ path = "src/bin/benchmark_other.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
+name = "generate_mapping_site"
+path = "src/bin/generate_mapping_site.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
 name = "commit_stats"
 path = "src/bin/commit_stats.rs"
 required-features = ["stats"]
