@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     widgets::{Clear, Paragraph},
 };
 use tokio::sync::{mpsc, oneshot};
@@ -29,7 +29,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use crate::code::{Code, Language};
-use crate::diff::{Diff, DiffMode, NodeCache, text::TextDiff};
+use crate::diff::{
+    Diff, DiffMode, NodeCache,
+    text::{DiffSummary, TextDiff, summarize_diff},
+};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
     Component,
@@ -118,6 +121,13 @@ pub struct App {
     after_path: Option<PathBuf>,
     /// The most recent diff failure, shown as a one-line banner until the next file pick.
     last_error: Option<String>,
+    /// A quick, common-case classification of the currently loaded diff (see
+    /// `diff::text::DiffSummary`), shown as a one-line status bar above the panels when it's
+    /// `Some`. Computed once, when `Action::DiffReady` arrives (`summarize_diff`), not on every
+    /// frame - the panels themselves don't change without a fresh diff, so neither does this.
+    /// Cleared on `StartDiff`/`DiffFailed` so a stale summary from the *previous* diff never shows
+    /// while a new one is loading or after it fails.
+    diff_summary: Option<DiffSummary>,
 
     should_exit: bool,
     should_suspend: bool,
@@ -145,6 +155,7 @@ impl App {
             before_path: None,
             after_path: None,
             last_error: None,
+            diff_summary: None,
             should_exit: false,
             should_suspend: false,
         })
@@ -303,18 +314,26 @@ impl App {
                 Action::DialogCancelled => self.handle_dialog_cancelled(),
                 Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
+                    self.diff_summary = None;
                     self.start_diff(before.clone(), after.clone());
                 }
-                Action::DiffReady(_) => {
+                Action::DiffReady(data) => {
                     self.screen = AppScreen::Viewer;
                     self.last_error = None;
                     self.file_dialog = None;
+                    self.diff_summary = summarize_diff(
+                        &data.before_contents,
+                        &data.after_contents,
+                        &data.before_ranges,
+                        &data.after_ranges,
+                    );
                 }
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");
                     self.last_error = Some(message.clone());
                     self.screen = AppScreen::Viewer;
                     self.file_dialog = None;
+                    self.diff_summary = None;
                 }
                 Action::Error(message) => {
                     error!("{message}");
@@ -469,21 +488,42 @@ impl App {
         Ok(())
     }
 
-    /// Draw the Before/After panels, plus a one-line error banner under them if the most recent
-    /// file pick failed to diff (e.g. an unsupported file type).
+    /// Draw the Before/After panels, with an optional one-line diff-summary status bar above them
+    /// (`self.diff_summary` - see `Action::DiffReady`'s handler) and an optional one-line error
+    /// banner below them (`self.last_error`, e.g. an unsupported file type on the most recent file
+    /// pick). Either, both, or neither can be present at once - the layout only reserves space for
+    /// whichever of the two actually has something to show.
     fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
-        let Some(message) = &self.last_error else {
+        if self.diff_summary.is_none() && self.last_error.is_none() {
             return self.diff_viewer.draw(frame, area);
-        };
+        }
+
+        let mut constraints = Vec::with_capacity(3);
+        if self.diff_summary.is_some() {
+            constraints.push(Constraint::Length(1));
+        }
+        constraints.push(Constraint::Min(1));
+        if self.last_error.is_some() {
+            constraints.push(Constraint::Length(1));
+        }
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .constraints(constraints)
             .split(area);
-        self.diff_viewer.draw(frame, layout[0])?;
-        frame.render_widget(
-            Paragraph::new(message.as_str()).style(Style::new().fg(Color::Red)),
-            layout[1],
-        );
+
+        let mut next = 0;
+        if let Some(summary) = self.diff_summary {
+            frame.render_widget(status_bar_paragraph(summary), layout[next]);
+            next += 1;
+        }
+        self.diff_viewer.draw(frame, layout[next])?;
+        next += 1;
+        if let Some(message) = &self.last_error {
+            frame.render_widget(
+                Paragraph::new(message.as_str()).style(Style::new().fg(Color::Red)),
+                layout[next],
+            );
+        }
         Ok(())
     }
 
@@ -520,6 +560,24 @@ impl App {
         frame.render_widget(Clear, popup);
         modal.draw(frame, popup)
     }
+}
+
+/// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's
+/// existing insert/delete/move conventions (`tui::headless::ansi_color` draws the same mapping for
+/// the headless renderer): green for a pure addition, red for a pure removal, cyan for a pure
+/// reformat, yellow for a pure reorganization, gray when there's nothing to report at all.
+/// `DiffSummary` itself stays presentation-agnostic (just a label) - see its own doc comment.
+fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
+    let color = match summary {
+        DiffSummary::NoChanges => Color::DarkGray,
+        DiffSummary::NewFile => Color::Green,
+        DiffSummary::DeletedFile => Color::Red,
+        DiffSummary::WhitespaceOnly => Color::Cyan,
+        DiffSummary::RefactorMovedOnly => Color::Yellow,
+    };
+    Paragraph::new(summary.label())
+        .style(Style::new().fg(color).add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center)
 }
 
 /// Parse both files, applying the `/dev/null` fallback below. Shared prefix of `compute_diff`
@@ -877,5 +935,118 @@ mod tests {
         assert!(app.theme_dialog.is_none());
 
         let _ = std::fs::remove_file(theme::config_path());
+    }
+
+    fn rendered_text(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    }
+
+    #[test]
+    fn draw_viewer_shows_the_diff_summary_status_bar_when_set() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = Some(DiffSummary::NewFile);
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains(DiffSummary::NewFile.label()),
+            "expected the New file status bar to be drawn"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn draw_viewer_shows_no_status_bar_when_diff_summary_is_none() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        assert!(app.diff_summary.is_none());
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        for summary in [
+            DiffSummary::NoChanges,
+            DiffSummary::NewFile,
+            DiffSummary::DeletedFile,
+            DiffSummary::WhitespaceOnly,
+            DiffSummary::RefactorMovedOnly,
+        ] {
+            assert!(
+                !text.contains(summary.label()),
+                "no summary label should render when diff_summary is None: {}",
+                summary.label()
+            );
+        }
+        Ok(())
+    }
+
+    /// Regression guard for the layout math in `draw_viewer`: both a summary bar (top) and an
+    /// error banner (bottom) must be able to show at once, around the panels in the middle -
+    /// dynamic `Vec<Constraint>` indexing is exactly the kind of code an off-by-one silently
+    /// swallows one of the two rows without a test actually rendering both together.
+    #[test]
+    fn draw_viewer_shows_both_the_status_bar_and_the_error_banner_at_once() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = Some(DiffSummary::RefactorMovedOnly);
+        app.last_error = Some("unsupported file type".to_string());
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains(DiffSummary::RefactorMovedOnly.label()));
+        assert!(text.contains("unsupported file type"));
+        Ok(())
+    }
+
+    /// `handle_actions` itself needs a real `UI` (wraps a live terminal backend), which no other
+    /// test in this module constructs - see those tests' own comments on why they exercise the
+    /// smaller, directly-callable handlers instead. This checks the one part of the
+    /// `Action::DiffReady` handler that's actually novel here (the rest - `self.screen`,
+    /// `self.last_error`, `self.file_dialog` - already existed and is untouched): that
+    /// `summarize_diff`'s result is what ends up in `self.diff_summary`, using the exact same
+    /// `DiffSessionData` fields the real handler reads.
+    #[test]
+    fn diff_ready_summary_matches_summarize_diff_on_the_same_session_data() {
+        let data = DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: String::new(),
+            after_contents: "fn main() {}".to_string(),
+            before_ranges: vec![],
+            after_ranges: vec![crate::diff::text::RangeMatch {
+                source: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+                destination: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+                operation: crate::diff::text::TextOperation::Insert,
+            }],
+        };
+
+        let summary = summarize_diff(
+            &data.before_contents,
+            &data.after_contents,
+            &data.before_ranges,
+            &data.after_ranges,
+        );
+
+        assert_eq!(summary, Some(DiffSummary::NewFile));
     }
 }

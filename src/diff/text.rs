@@ -434,6 +434,133 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
     ops
 }
 
+/// A quick, common-case classification of a diff's overall shape, cheap enough to compute on every
+/// completed diff (see `summarize_diff`) from data `TextDiff` already produces - no extra
+/// tree-sitter/AST work needed. Deliberately presentation-agnostic (a label, not a color or an
+/// icon): callers like `tui::app` map each variant to their own styling, the same separation
+/// `tui::headless`'s `ansi_color`/`marker` already draw around `TextOperation`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffSummary {
+    /// The two sides are byte-for-byte identical. Deliberately *not* "no operations were
+    /// produced" - a pure reformat can also produce zero operations (see `summarize_diff`'s own
+    /// doc comment on why), but that case is `WhitespaceOnly`, not this.
+    NoChanges,
+    /// Every changed range is an `Insert` - nothing on the before side was touched or survived.
+    NewFile,
+    /// Every changed range is a `Delete` - nothing on the after side existed before.
+    DeletedFile,
+    /// The before/after content is identical once every whitespace character is stripped out,
+    /// though the two sides are not byte-identical (that's `NoChanges`) - regardless of what
+    /// operations, if any, actually resulted. Checked before any operation-based case: a pure
+    /// reformat can produce many `Move` ranges (a node's column shifting is by itself enough to
+    /// reclassify an otherwise-`Identical` range as `Move` - see `ranges`'s own Identical/Move
+    /// branch), *or* zero ranges at all if the shifted node's own position happens to be
+    /// unaffected (see `summarize_diff`). Checking operations alone can't tell either of those
+    /// apart from a real reordering, but comparing whitespace-stripped content can, since real
+    /// reordering changes token order and a pure reformat never does.
+    WhitespaceOnly,
+    /// Every changed range is a `Move` (on top of whatever's `Identical`) - code relocated without
+    /// a single `Insert`, `Delete`, or `Update` anywhere. Checked after `WhitespaceOnly`, so a pure
+    /// reformat (which can also produce only `Move` ranges) is reported as that instead, since
+    /// "reformatted" is the more specific and more useful claim of the two.
+    ///
+    /// Narrower than "moved code" might suggest: `TextOperation::Move` only fires when a matched
+    /// node's own *column* shifts (a re-indent), not generally whenever a node's position in the
+    /// file changes - reordering two top-level items (same column, different row) produces no
+    /// operations at all today, not `Move` (confirmed empirically: `codediff --headless` on two
+    /// files differing only by a swapped pair of top-level functions shows no diff whatsoever).
+    /// That case currently falls through to `None` if it also fails `WhitespaceOnly` (it usually
+    /// will, since token order really did change) - a real gap, not a bug: catching genuine
+    /// cross-position reordering needs the AST-level `ASTMappingOperation::Move`/
+    /// `ASTMappingReason::MovedSubtree` (`solve_moved_subtrees`), not `TextOperation`, which
+    /// `summarize_diff` doesn't have access to (it only sees `TextDiff`'s already-flattened
+    /// ranges). Worth revisiting if this proves too narrow in practice.
+    RefactorMovedOnly,
+}
+
+impl DiffSummary {
+    /// A short, human-readable label - presentation-agnostic (see this type's own doc comment).
+    pub fn label(self) -> &'static str {
+        match self {
+            DiffSummary::NoChanges => "No changes - files are identical",
+            DiffSummary::NewFile => "New file - everything inserted",
+            DiffSummary::DeletedFile => "Deleted file - everything removed",
+            DiffSummary::WhitespaceOnly => "Whitespace changes only",
+            DiffSummary::RefactorMovedOnly => "Refactor - code moved, no content changes",
+        }
+    }
+}
+
+/// Whether `a` and `b` contain the same characters once every whitespace character is removed from
+/// each - the check behind `DiffSummary::WhitespaceOnly`. Compares via iterators rather than
+/// building two new `String`s, since this runs on full file contents on every completed diff.
+fn whitespace_stripped_equal(a: &str, b: &str) -> bool {
+    a.chars()
+        .filter(|c| !c.is_whitespace())
+        .eq(b.chars().filter(|c| !c.is_whitespace()))
+}
+
+/// Classifies a diff's overall shape into one of `DiffSummary`'s common cases, or `None` if it
+/// doesn't cleanly fit any of them (the ordinary case - most diffs are a genuine mix of edits).
+/// `before_ranges`/`after_ranges` are `TextDiff::all(0)`/`TextDiff::all(1)` (or the equivalent -
+/// `DiffSessionData`'s own fields, in `tui::app`), and `before_contents`/`after_contents` the full
+/// raw source each side was parsed from.
+///
+/// Checked in order from most to least specific, returning the first match - see each
+/// `DiffSummary` variant's own doc comment for why that particular order matters
+/// (`WhitespaceOnly` before `RefactorMovedOnly` in particular).
+pub fn summarize_diff(
+    before_contents: &str,
+    after_contents: &str,
+    before_ranges: &[RangeMatch],
+    after_ranges: &[RangeMatch],
+) -> Option<DiffSummary> {
+    // Checked before anything operation-based, not after: a pure reformat can legitimately
+    // produce *zero* `TextOperation`s at all, not just `Move`s. Hash-based matching pairs the
+    // largest identical subtree it can (ignoring position), and `ranges` only checks a matched
+    // node's own start column against its match - once matched, it never descends into that
+    // node's children (`descend = false` in the `Identical` branch above). So a whole-file
+    // reformat that happens to match as one big subtree, whose own start position is unchanged
+    // (e.g. the file root, or a top-level item still at column 0), produces a single `Identical`
+    // range covering everything, with no `Move` anywhere - confirmed empirically against the real
+    // pipeline, not just reasoned about. Checking operation presence first would misreport that
+    // case as `NoChanges`, which is wrong: the files are not byte-identical, only AST-identical
+    // modulo whitespace. Only a literal content match earns `NoChanges`; everything else that's
+    // whitespace-stripped-equal is `WhitespaceOnly`, regardless of what operations (if any) resulted.
+    if before_contents == after_contents {
+        return Some(DiffSummary::NoChanges);
+    }
+    if whitespace_stripped_equal(before_contents, after_contents) {
+        return Some(DiffSummary::WhitespaceOnly);
+    }
+
+    let mut has_insert = false;
+    let mut has_delete = false;
+    let mut has_update = false;
+    let mut has_move = false;
+    for range in before_ranges.iter().chain(after_ranges.iter()) {
+        match range.operation {
+            TextOperation::Insert => has_insert = true,
+            TextOperation::Delete => has_delete = true,
+            TextOperation::Update => has_update = true,
+            TextOperation::Move => has_move = true,
+            TextOperation::Identical | TextOperation::NotYetSet => {}
+        }
+    }
+
+    if has_insert && !has_delete && !has_update && !has_move {
+        return Some(DiffSummary::NewFile);
+    }
+    if has_delete && !has_insert && !has_update && !has_move {
+        return Some(DiffSummary::DeletedFile);
+    }
+    if has_move && !has_insert && !has_delete && !has_update {
+        return Some(DiffSummary::RefactorMovedOnly);
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use crate::test;
@@ -914,5 +1041,133 @@ mod tests {
         assert_eq!(after_ranges[2].destination.end_column, 0);
 
         Ok(())
+    }
+
+    fn range(operation: TextOperation) -> RangeMatch {
+        RangeMatch {
+            source: TextRange::new(0, 0, 1, 0),
+            destination: TextRange::new(0, 0, 1, 0),
+            operation,
+        }
+    }
+
+    #[test]
+    fn whitespace_stripped_equal_ignores_all_whitespace_differences() {
+        assert!(whitespace_stripped_equal(
+            "fn main() {\n    foo();\n}\n",
+            "fn main(){foo();}"
+        ));
+        assert!(!whitespace_stripped_equal("fn main() {}", "fn other() {}"));
+    }
+
+    #[test]
+    fn summarize_diff_is_no_changes_when_every_range_is_identical() {
+        let ranges = vec![range(TextOperation::Identical)];
+        assert_eq!(
+            summarize_diff("same", "same", &ranges, &ranges),
+            Some(DiffSummary::NoChanges)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_no_changes_for_two_empty_files() {
+        assert_eq!(
+            summarize_diff("", "", &[], &[]),
+            Some(DiffSummary::NoChanges)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_new_file_when_only_inserts_are_present() {
+        let before_ranges: Vec<RangeMatch> = vec![];
+        let after_ranges = vec![range(TextOperation::Insert)];
+        assert_eq!(
+            summarize_diff("", "fn main() {}", &before_ranges, &after_ranges),
+            Some(DiffSummary::NewFile)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_deleted_file_when_only_deletes_are_present() {
+        let before_ranges = vec![range(TextOperation::Delete)];
+        let after_ranges: Vec<RangeMatch> = vec![];
+        assert_eq!(
+            summarize_diff("fn main() {}", "", &before_ranges, &after_ranges),
+            Some(DiffSummary::DeletedFile)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_whitespace_only_when_stripped_content_matches_despite_move_ranges() {
+        // A pure re-indent: codediff sees the reindented block as Moved (column shifted), even
+        // though nothing about the code itself changed - see DiffSummary::WhitespaceOnly's own
+        // doc comment for why the operation set alone can't distinguish this from a real move.
+        let ranges = vec![range(TextOperation::Move)];
+        assert_eq!(
+            summarize_diff(
+                "fn main() {\nfoo();\n}",
+                "fn main() {\n    foo();\n}",
+                &ranges,
+                &ranges
+            ),
+            Some(DiffSummary::WhitespaceOnly)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_refactor_moved_only_when_only_moves_are_present_and_content_really_differs()
+     {
+        let ranges = vec![range(TextOperation::Move)];
+        assert_eq!(
+            summarize_diff(
+                "fn a() {}\nfn b() {}",
+                "fn b() {}\nfn a() {}",
+                &ranges,
+                &ranges
+            ),
+            Some(DiffSummary::RefactorMovedOnly)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_none_for_a_genuine_mixed_edit() {
+        let ranges = vec![range(TextOperation::Update), range(TextOperation::Insert)];
+        assert_eq!(summarize_diff("a", "b", &ranges, &ranges), None);
+    }
+
+    #[test]
+    fn summarize_diff_prefers_whitespace_only_over_refactor_when_both_could_apply() {
+        // Both conditions are structurally satisfiable at once (only Move ranges present, and the
+        // content is whitespace-stripped-equal but *not* byte-identical - "same" vs " same " here,
+        // not "same" vs "same", which would instead hit NoChanges); the whitespace-stripped content
+        // check must win, since "reformatted" is the more specific and more useful claim - see
+        // DiffSummary::RefactorMovedOnly's own doc comment on the order.
+        let ranges = vec![range(TextOperation::Move)];
+        assert_eq!(
+            summarize_diff("same", " same ", &ranges, &ranges),
+            Some(DiffSummary::WhitespaceOnly)
+        );
+    }
+
+    /// Regression guard for a real finding, not a hypothetical: a whole-file reformat can produce
+    /// *zero* `TextOperation`s at all (not even `Move`), when the single matched subtree covering
+    /// the reformatted content happens to have an unchanged start position itself - confirmed
+    /// against the real pipeline (`codediff --headless` on a file reindented inside an unchanged
+    /// top-level item showed no diff whatsoever, not a `Move`-marked one). Checking "no operations"
+    /// before "content differs only in whitespace" would have misreported this as `NoChanges`
+    /// (implying the files are identical, which they are not) instead of `WhitespaceOnly`.
+    #[test]
+    fn summarize_diff_is_whitespace_only_even_with_zero_operations_when_content_is_not_byte_identical()
+     {
+        let no_ranges: Vec<RangeMatch> = vec![];
+        assert_eq!(
+            summarize_diff(
+                "fn main() {\nfoo();\n}",
+                "fn main() {\n    foo();\n}",
+                &no_ranges,
+                &no_ranges,
+            ),
+            Some(DiffSummary::WhitespaceOnly)
+        );
     }
 }
