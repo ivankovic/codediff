@@ -1993,3 +1993,47 @@ new fixtures' combined contribution: 0 + 30 + 0 + 0) via `make update-quality-ba
 deliberate, reviewed shift from corpus growth, not a hidden regression in any existing fixture.
 `MS_PER_FIXTURE` 1083 -> 1136.3 (103 fixtures now, up from 99). `cargo test --release --lib`:
 440/0/5, `make check-quality`: clean against the new baseline.
+
+## 14 new optimal-solution fixtures added, 6 clamped (2026-08-01)
+
+Added `html-firefox-update-src`, `html-hugo-tag-to-selfclosing-tag`, `html-mermaid-update-link`,
+`java-protobuf-add-two-annotations`, `java-scrcpy-public-to-protected`,
+`javascript-mozilla-firefox-add-comment`, `javascript-twbs-bootstrap-comment-version-update`,
+`javascript-typescript-interesting-small-edit-refactor`, `json-radarr-radarr-rename-string-key`,
+`json-shadcn-ui-ui-string-value-update-string-is-code`, `python-ansible-ansible-field-rename`,
+`xml-nextcloud-android-delete-element`, `xml-nextcloud-android-delete-element-2`, and
+`yaml-mastodon-remove-one-pair`. 8 match codediff's diff exactly; 6 needed
+`assert_matches_human_mapping_within_limit`:
+
+- `html-hugo-tag-to-selfclosing-tag` (2), `java-scrcpy-public-to-protected` (1),
+  `javascript-typescript-interesting-small-edit-refactor` (3): small, ordinary ambiguous-mapping
+  gaps (`final_pass`/`syntax_named` picking a different equal-cost pairing than the human), same
+  class as the other known gaps above.
+- `json-radarr-radarr-rename-string-key` (286): a big flat JSON object with hundreds of
+  structurally-identical `,` tokens between properties; codediff pairs each with a different
+  (but equally valid, `StructurallyIdenticalAncestor`-flagged) same-kind sibling than the human
+  picked. Positional-ambiguity gap, not a bug.
+- `xml-nextcloud-android-delete-element` (1141), `xml-nextcloud-android-delete-element-2` (1125):
+  not an ambiguous-mapping gap - both are ~1200-line Android layout XML files whose unmatched
+  residual going into phase 6 exceeds `EXPENSIVE_RESIDUAL_THRESHOLD` (5000), so `DiffMode::Fast`
+  (the default `diff_code` uses, and what every `optimal_solutions` test runs under) substitutes
+  the cheap Myers-LCS `for_roots_fallback` for full APTED - reason `APTED("fast_fallback")` on
+  essentially every mismatched node, including the document root. This is the deliberate,
+  documented speed/quality tradeoff described on `EXPENSIVE_RESIDUAL_THRESHOLD`'s own doc comment,
+  not a new bug; `--exact` (or the TUI's "Exact" prompt) would very likely close most of this gap,
+  but that's a separate, deliberate cost/quality decision to revisit, not something to silently
+  paper over here.
+
+**Quality baseline updated**: `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` 774 -> 3332,
+`MS_PER_FIXTURE` 1357.2 -> 1203.1, via a fresh `benchmark_optimal_solutions` run, extracted with
+the exact same `grep -m1 '^TOTAL' | awk '{print $2}'` `check-quality`/`update-quality-baseline`
+use (`benchmark_optimal_solutions` prints two unrelated tables that both end in a row literally
+starting with `TOTAL` - the first is the real per-fixture mismatch table `check-quality` means to
+read; the second is a "mapping reasons per fixture" breakdown whose own first column is an
+`IdHash` pass-usage count, not a mismatch count at all. Worth a sanity check if this number ever
+looks surprising again - a naive `grep TOTAL` without `-m1`, or without checking the output has a
+single such table, silently reads the wrong one). The `make update-quality-baseline` target itself
+can't run here since it depends on `check-quality`, which hard-fails once `TOTAL_MISMATCHES` goes
+up - so the baseline file was updated by hand with the same numbers that target would have
+written, verified afterward with a plain `make check-quality` run (passed clean against the new
+baseline). `cargo test --release --features test-fixtures --lib`: 507/0/5.

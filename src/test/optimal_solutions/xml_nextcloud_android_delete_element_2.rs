@@ -21,7 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-nextcloud-android-delete-element-2",
+        1125,
     )
 }
