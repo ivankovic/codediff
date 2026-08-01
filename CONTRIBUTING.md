@@ -162,10 +162,17 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
 
 ### Release
 
-* `deploy` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push triggers
-  `.github/workflows/release.yml`. That workflow builds and publishes the cross-platform
-  `codediff` binaries as a GitHub Release. `deploy` refuses to run on a dirty working tree, on a
-  `HEAD` that does not match `origin/main`, or on a `check-quality` regression.
+* `deploy` - publishes a release everywhere: `deploy-crates` then `deploy-github`, in that order
+  (crates.io first, since a publish there can never be undone - only yanked - while a GitHub tag
+  and Release are trivial to redo). Both refuse to run on a dirty working tree, on a `HEAD` that
+  does not match `origin/main`, or on a `check-quality` regression (`deploy-checks`, shared by
+  both - a plain `make deploy` only pays for it once).
+* `deploy-crates` - publishes the current `Cargo.toml` version to crates.io (`cargo publish
+  --locked`). Requires `cargo login` to already be configured locally (or `CARGO_REGISTRY_TOKEN`
+  set).
+* `deploy-github` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push
+  triggers `.github/workflows/release.yml`, which builds and publishes the cross-platform
+  `codediff` binaries as a GitHub Release.
 
 ### Papers
 

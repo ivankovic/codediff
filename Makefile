@@ -166,13 +166,16 @@ update-quality-baseline: check-quality
 	} > $(QUALITY_BASELINE); \
 	echo "Updated $(QUALITY_BASELINE): TOTAL_MISMATCHES=$$total MS_PER_FIXTURE=$$ms"
 
-# Tags the current commit as v<Cargo.toml version> and pushes the tag, which triggers
-# .github/workflows/release.yml to build codediff for Linux/macOS/Windows and attach the
-# binaries to a new GitHub Release. Requires a clean working tree and HEAD to already match
-# origin/main (so the tag can't silently point at uncommitted or unpushed work that the release
-# workflow, running against what GitHub already has, would never actually see) and requires
-# check-quality to pass first.
-deploy:
+# Shared preconditions for deploy-github/deploy-crates, not meant to be run directly. Requires a
+# clean working tree and HEAD to already match origin/main (so a tag/publish can't silently point
+# at uncommitted or unpushed work that GitHub's release workflow, and anyone installing from
+# crates.io, would never actually see) and requires check-quality to pass first. Both
+# deploy-github and deploy-crates depend on this as a normal prerequisite (not via a nested
+# `$(MAKE)` call) specifically so that a single `make deploy` only pays for it once - Make only
+# remakes a given prerequisite once per invocation, however many targets depend on it - while
+# `make deploy-github` or `make deploy-crates` alone (e.g. retrying just one half after it failed)
+# still gets the same safety net on its own.
+deploy-checks:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "error: working tree is dirty - commit or stash before deploying" >&2; \
 		exit 1; \
@@ -183,10 +186,32 @@ deploy:
 		exit 1; \
 	fi
 	$(MAKE) check-quality
+
+# Publishes the current Cargo.toml version to crates.io. `--locked` refuses to publish if
+# Cargo.lock and Cargo.toml have drifted apart, so the published crate's dependency resolution is
+# exactly what check-quality (via deploy-checks) actually ran against, not a fresh resolution
+# computed at publish time. Requires `cargo login` to already be configured locally (or
+# CARGO_REGISTRY_TOKEN set) - same "use whatever credentials are already there" approach
+# deploy-github takes for `git push`.
+deploy-crates: deploy-checks
+	cargo publish --locked
+
+# Tags the current commit as v<Cargo.toml version> and pushes the tag, which triggers
+# .github/workflows/release.yml to build codediff for Linux/macOS/Windows and attach the
+# binaries to a new GitHub Release.
+deploy-github: deploy-checks
 	$(eval VERSION := $(shell grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/'))
 	@echo "Tagging and pushing v$(VERSION)..."
 	git tag v$(VERSION)
 	git push origin v$(VERSION)
+
+# Publishes a release everywhere. crates.io first, GitHub second: a bad Cargo.toml or a
+# crates.io-side hiccup is better caught before anything public-facing exists on GitHub yet (a git
+# tag and a Release are trivial to create after the fact; a crates.io publish for a given version
+# can never be undone, only yanked). Prerequisite order is what enforces this, not just intent -
+# `make` runs a target's prerequisites in the order listed, one fully at a time, unless invoked
+# with `-j`.
+deploy: deploy-crates deploy-github
 
 hermetic-benchmark:
 	cargo bench --bench diff_code_benchmark
