@@ -73,6 +73,13 @@
 *   n / N          jump the focused cursor forward/backward to the next/previous node marked with
 *                  that trailing `*` (a mismatch between the human mapping and codediff's verdict).
 *                  Wraps around the ends of the tree. Requires `p` to have been run first
+*   /              prompt for text, then move the focused cursor to the next leaf node (in
+*                  document order, wrapping around) whose own text contains it -- a plain
+*                  substring match, no regex. Pre-filled with the last search, if any, so `/` then
+*                  Enter repeats it from wherever the cursor landed. Leaf nodes only, not any node
+*                  whose subtree's text contains it: an ancestor's own text is the concatenation of
+*                  everything inside it, so a whole-subtree check would almost always match the
+*                  nearest enclosing container first, not the actual token
 *   t              show the raw before/after source as plain text, side by side, instead of the
 *                  AST tree -- for just reading the code. j/k scroll (both sides together), T
 *                  switches to the unix diff view instead, Esc closes
@@ -187,6 +194,8 @@ p              run codediff's own diff, show its verdict next to each node
 r              toggle showing the ASTMappingReason (which pass matched it) next
                  to each node's algo verdict
 n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
+/              search: jump to the next leaf node whose text contains the
+                 given string (plain substring, no regex)
 
 t              view raw before/after text (not the AST tree)
 T              view the output of unix `diff -u`
@@ -759,6 +768,11 @@ enum Modal {
         input: String,
         error: Option<String>,
     },
+    /// Raised by `/`: asks for text to search for. Pre-filled with `App::last_search`, if any.
+    /// `Enter` runs the search (`action_search`) and closes the modal either way (found or not) -
+    /// unlike `PromptPromoteName`, a failed search isn't invalid input to correct, just "nothing
+    /// found from here", reported on the status line instead of re-prompting.
+    PromptSearch { input: String },
     /// Raised by `t`: shows the raw before/after source side by side, for reading the actual code
     /// instead of navigating the AST tree. `T` while open switches to `UnixDiffView` instead.
     TextView { scroll: u16 },
@@ -830,6 +844,10 @@ struct App {
     /// all every time.
     sample_hide_solved: bool,
     sample_sort_order: SampleSortOrder,
+    /// The last text searched for with `/` (`Modal::PromptSearch`), if any - pre-fills the prompt
+    /// next time, so `/` then `Enter` repeats the same search from wherever the cursor landed,
+    /// without retyping it.
+    last_search: Option<String>,
 }
 
 impl App {
@@ -859,6 +877,7 @@ impl App {
             show_reason: false,
             sample_hide_solved: false,
             sample_sort_order: SampleSortOrder::Alphabetical,
+            last_search: None,
         }
     }
 }
@@ -1342,6 +1361,66 @@ fn action_next_mismatch(
     match found {
         Some(node) => Ok(format!("Jumped to mismatch: '{}'", node.kind())),
         None => bail!("No mismatches in this panel"),
+    }
+}
+
+/// Moves `panel`'s cursor to the next leaf node (in `flat`'s order, i.e. document order) whose own
+/// text contains `query`, wrapping around like `n`/`N`'s mismatch search
+/// (`advance_to_next_mismatch`, which this otherwise mirrors exactly - kept separate rather than
+/// generalized into one shared function, since the two predicates need different captured context,
+/// `Caches`+`ASTDiff` vs. `query`+`src`, and a bare `fn` pointer can't capture either).
+///
+/// Leaf nodes only (`child_count() == 0`), not "any node whose subtree's text contains query": a
+/// non-leaf node's own text is the concatenation of all its descendants', so almost every ancestor
+/// of a real match would *also* "match" under a naive whole-subtree check - starting from most
+/// cursor positions, that means landing on some enclosing container (often the file root) instead
+/// of the actual token, which is not what a human doing the AST-browser equivalent of Ctrl-F wants.
+fn advance_to_next_search_match<'a>(
+    panel: &mut PanelState,
+    flat: &[(Node<'a>, usize)],
+    src: &[u8],
+    query: &str,
+) -> Option<Node<'a>> {
+    if flat.is_empty() {
+        return None;
+    }
+    let len = flat.len();
+    let idx = flat
+        .iter()
+        .position(|(n, _)| n.id() == panel.cursor_id)
+        .unwrap_or(0);
+    for step in 1..=len {
+        let i = (idx + step) % len;
+        let (node, _) = flat[i];
+        if node.child_count() == 0 && node.utf8_text(src).unwrap_or("").contains(query) {
+            panel.cursor_id = node.id();
+            return Some(node);
+        }
+    }
+    None
+}
+
+/// Implements `/`'s search: moves the focused panel's cursor to the next leaf node containing
+/// `query`, starting just after its current position and wrapping around. Case-sensitive, plain
+/// substring match - no regex, matching what was actually asked for.
+fn action_search(
+    app: &mut App,
+    focus: Focus,
+    before_flat: &[(Node, usize)],
+    after_flat: &[(Node, usize)],
+    before_src: &[u8],
+    after_src: &[u8],
+    query: &str,
+) -> Result<String> {
+    let found = match focus {
+        Focus::Before => {
+            advance_to_next_search_match(&mut app.before, before_flat, before_src, query)
+        }
+        Focus::After => advance_to_next_search_match(&mut app.after, after_flat, after_src, query),
+    };
+    match found {
+        Some(node) => Ok(format!("Found '{query}' in '{}'", node.kind())),
+        None => bail!("No node containing '{query}' found in this panel"),
     }
 }
 
@@ -2843,6 +2922,15 @@ fn render_modal(
                     .unwrap_or_default(),
             ),
         ),
+        Modal::PromptSearch { input } => render_text_modal(
+            frame,
+            area,
+            "Search node text",
+            &format!(
+                "Find the next leaf node (in the focused panel) whose own\ntext contains this (plain substring, no regex)\n\n> {}\n\n[Enter] find next   [Esc] cancel",
+                input,
+            ),
+        ),
         Modal::TextView { scroll } => {
             render_text_view_modal(frame, area, before_src, after_src, *scroll);
         }
@@ -3579,6 +3667,12 @@ fn handle_key(
             caches,
             false,
         )),
+        KeyCode::Char('/') => {
+            app.modal = Some(Modal::PromptSearch {
+                input: app.last_search.clone().unwrap_or_default(),
+            });
+            None
+        }
         KeyCode::Char('t') => {
             app.modal = Some(Modal::TextView { scroll: 0 });
             None
@@ -3906,6 +4000,45 @@ fn handle_modal_key(
             }
             _ => {
                 app.modal = Some(Modal::PromptPromoteName { input, error: None });
+            }
+        },
+        Modal::PromptSearch { mut input } => match code {
+            KeyCode::Enter => {
+                let query = input.trim().to_string();
+                if query.is_empty() {
+                    app.status = Some("Search cancelled: empty query".to_string());
+                } else {
+                    app.last_search = Some(query.clone());
+                    let focus = app.focus;
+                    app.status = Some(
+                        match action_search(
+                            app,
+                            focus,
+                            before_flat,
+                            after_flat,
+                            before_src,
+                            after_src,
+                            &query,
+                        ) {
+                            Ok(msg) => msg,
+                            Err(err) => format!("{:#}", err),
+                        },
+                    );
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                app.modal = Some(Modal::PromptSearch { input });
+            }
+            KeyCode::Char(c) => {
+                input.push(c);
+                app.modal = Some(Modal::PromptSearch { input });
+            }
+            _ => {
+                app.modal = Some(Modal::PromptSearch { input });
             }
         },
         Modal::TextView { scroll } => match code {
@@ -4351,6 +4484,317 @@ mod tests {
             path: "app/src/main/Foo.kt".to_string(),
         };
         assert_eq!(default_promoted_name(&source), "kotlin-nextcloud-android");
+    }
+
+    #[test]
+    fn advance_to_next_search_match_finds_the_next_leaf_containing_the_query_and_wraps_around() {
+        let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let mut panel = PanelState::new(root.id());
+
+        let found =
+            advance_to_next_search_match(&mut panel, &flat, source.as_bytes(), "beta").unwrap();
+        assert_eq!(found.utf8_text(source.as_bytes()).unwrap(), "beta");
+        assert_eq!(panel.cursor_id, found.id());
+
+        // Searching again from `beta` for a query only `alpha` matches must wrap around past the
+        // end of the file back to it, not report "not found" just because it's earlier in the
+        // document.
+        let found =
+            advance_to_next_search_match(&mut panel, &flat, source.as_bytes(), "alpha").unwrap();
+        assert_eq!(found.utf8_text(source.as_bytes()).unwrap(), "alpha");
+    }
+
+    #[test]
+    fn advance_to_next_search_match_only_matches_leaf_nodes_not_a_containers_concatenated_text() {
+        // The `block`'s own text is the concatenation of everything inside it, so it "contains"
+        // both "alpha" and "beta" -- but it must never be reported as a match, only the actual
+        // leaf tokens should be.
+        let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let mut panel = PanelState::new(root.id());
+
+        let found =
+            advance_to_next_search_match(&mut panel, &flat, source.as_bytes(), "alpha").unwrap();
+        assert_eq!(found.child_count(), 0);
+        assert_eq!(found.utf8_text(source.as_bytes()).unwrap(), "alpha");
+    }
+
+    #[test]
+    fn advance_to_next_search_match_returns_none_and_leaves_the_cursor_put_when_nothing_matches() {
+        let source = "fn main() {\n    alpha();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let mut panel = PanelState::new(root.id());
+        let original_cursor = panel.cursor_id;
+
+        let found =
+            advance_to_next_search_match(&mut panel, &flat, source.as_bytes(), "nonexistent");
+        assert!(found.is_none());
+        assert_eq!(panel.cursor_id, original_cursor);
+    }
+
+    #[test]
+    fn action_search_reports_the_matched_nodes_kind_and_moves_the_focused_panels_cursor() {
+        let before_source = "fn main() {\n    alpha();\n}\n";
+        let after_source = "fn main() {\n    beta();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+
+        let msg = action_search(
+            &mut app,
+            Focus::Before,
+            &before_flat,
+            &after_flat,
+            before_source.as_bytes(),
+            after_source.as_bytes(),
+            "alpha",
+        )
+        .unwrap();
+        assert!(msg.contains("Found 'alpha'") || msg.contains("Found \"alpha\""));
+        assert_eq!(
+            before_flat
+                .iter()
+                .find(|(n, _)| n.id() == app.before.cursor_id)
+                .unwrap()
+                .0
+                .utf8_text(before_source.as_bytes())
+                .unwrap(),
+            "alpha"
+        );
+        // The After panel's cursor must be untouched -- the search only ever moves the focused
+        // panel's cursor.
+        assert_eq!(app.after.cursor_id, after_root.id());
+    }
+
+    #[test]
+    fn action_search_errors_when_nothing_in_the_focused_panel_matches() {
+        let source = "fn main() {\n    alpha();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+
+        let err = action_search(
+            &mut app,
+            Focus::Before,
+            &flat,
+            &flat,
+            source.as_bytes(),
+            source.as_bytes(),
+            "nonexistent",
+        )
+        .unwrap_err();
+        assert!(format!("{err}").contains("No node containing"));
+    }
+
+    #[test]
+    fn handle_modal_key_prompt_search_enter_finds_a_match_and_remembers_the_query() {
+        let source = "fn main() {\n    alpha();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::PromptSearch {
+            input: "alpha".to_string(),
+        });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert_eq!(app.last_search.as_deref(), Some("alpha"));
+        assert!(
+            app.status.as_deref().unwrap_or("").contains("Found"),
+            "expected a 'Found' status message, got {:?}",
+            app.status
+        );
+        assert!(app.modal.is_none(), "the modal should close either way");
+    }
+
+    #[test]
+    fn handle_modal_key_prompt_search_enter_on_empty_input_cancels_without_touching_last_search() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        app.last_search = Some("previous".to_string());
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::PromptSearch {
+            input: "   ".to_string(),
+        });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert_eq!(
+            app.last_search.as_deref(),
+            Some("previous"),
+            "an empty/whitespace-only query must not overwrite the remembered last search"
+        );
+        assert_eq!(app.status.as_deref(), Some("Search cancelled: empty query"));
+        assert!(app.modal.is_none());
+    }
+
+    #[test]
+    fn handle_modal_key_prompt_search_esc_cancels_without_searching() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::PromptSearch {
+            input: "alpha".to_string(),
+        });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Esc,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(app.last_search.is_none());
+        assert_eq!(app.status.as_deref(), Some("Cancelled"));
+        assert!(app.modal.is_none());
+    }
+
+    #[test]
+    fn handle_modal_key_prompt_search_backspace_and_char_edit_the_input_and_keep_the_modal_open() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::PromptSearch {
+            input: "alp".to_string(),
+        });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Backspace,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+        match &app.modal {
+            Some(Modal::PromptSearch { input }) => assert_eq!(input, "al"),
+            other => panic!("expected Modal::PromptSearch to stay open, got {other:?}"),
+        }
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('x'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+        match &app.modal {
+            Some(Modal::PromptSearch { input }) => assert_eq!(input, "alx"),
+            other => panic!("expected Modal::PromptSearch to stay open, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn render_modal_prompt_search_shows_the_prefilled_query_and_instructions() {
+        let backend = ratatui::backend::TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 20);
+        let modal = Modal::PromptSearch {
+            input: "alpha".to_string(),
+        };
+
+        terminal
+            .draw(|f| render_modal(f, area, &modal, "test", "", ""))
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("Search node text"),
+            "title missing from render: {text}"
+        );
+        assert!(text.contains("alpha"), "prefilled query missing: {text}");
+        assert!(text.contains("find next"), "instructions missing: {text}");
     }
 
     #[test]
@@ -4973,9 +5417,9 @@ mod tests {
     fn help_modal_renders_keybindings() {
         // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
         // clipped by the popup's width or height -- this test is about content, not layout.
-        let backend = ratatui::backend::TestBackend::new(140, 40);
+        let backend = ratatui::backend::TestBackend::new(140, 44);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 140, 40);
+        let area = Rect::new(0, 0, 140, 44);
 
         terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
