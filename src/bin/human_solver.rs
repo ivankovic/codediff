@@ -158,9 +158,10 @@ use tree_sitter::Node;
 use codediff::code::Code;
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
-    self, HumanMapping, HumanMappingEntry, HumanOperation,
+    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, NodeStatus,
+    is_inherited_removed, rebuild_caches, status_after, status_before,
 };
-use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node};
+use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node, precompute_paths};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -919,141 +920,8 @@ fn walk_visible<'a>(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MarkKind {
-    Deleted,
-    Inserted,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NodeStatus {
-    Unmarked,
-    Matched,
-    /// `inherited` is true when this node isn't marked directly but an ancestor is marked
-    /// with `with_children`, implying this node too.
-    Marked {
-        kind: MarkKind,
-        with_children: bool,
-        inherited: bool,
-    },
-}
-
-/// Resolved node IDs for every human-authored entry, used to look up a node's status in O(1)
-/// (plus a bounded ancestor walk for inheritance) while rendering.
-#[derive(Default)]
-struct Caches {
-    before_match: HashMap<usize, usize>,
-    after_match: HashMap<usize, usize>,
-    before_removed: HashMap<usize, bool>,
-    after_removed: HashMap<usize, bool>,
-    /// Number of entries that couldn't be resolved against the current trees (e.g. a
-    /// hand-edited or stale mapping file). Surfaced in the footer rather than treated as fatal,
-    /// so a bad mapping file doesn't prevent the TUI from even opening.
-    unresolved: usize,
-}
-
 fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
-}
-
-/// Builds lookup caches from `entries`, skipping (and counting) any entry that doesn't resolve
-/// against the current trees rather than failing outright.
-fn rebuild_caches(entries: &[HumanMappingEntry], before_root: Node, after_root: Node) -> Caches {
-    let mut caches = Caches::default();
-
-    for entry in entries {
-        let resolved = match entry.operation {
-            HumanOperation::Identical
-            | HumanOperation::Update
-            | HumanOperation::MatchButNotIdentical => (|| {
-                let before_path = entry.before_path.as_ref()?;
-                let after_path = entry.after_path.as_ref()?;
-                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
-                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
-                caches.before_match.insert(b.id(), a.id());
-                caches.after_match.insert(a.id(), b.id());
-                Some(())
-            })(),
-            HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
-                let before_path = entry.before_path.as_ref()?;
-                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
-                caches.before_removed.insert(
-                    b.id(),
-                    entry.operation == HumanOperation::DeleteWithChildren,
-                );
-                Some(())
-            })(),
-            HumanOperation::Insert | HumanOperation::InsertWithChildren => (|| {
-                let after_path = entry.after_path.as_ref()?;
-                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
-                caches.after_removed.insert(
-                    a.id(),
-                    entry.operation == HumanOperation::InsertWithChildren,
-                );
-                Some(())
-            })(),
-        };
-
-        if resolved.is_none() {
-            caches.unresolved += 1;
-        }
-    }
-
-    caches
-}
-
-/// True if some strict ancestor of `node` is marked with `with_children = true` in `removed`.
-fn is_inherited_removed(node: Node, removed: &HashMap<usize, bool>) -> bool {
-    let mut current = node;
-    while let Some(parent) = current.parent() {
-        if removed.get(&parent.id()) == Some(&true) {
-            return true;
-        }
-        current = parent;
-    }
-    false
-}
-
-fn status_before(node: Node, caches: &Caches) -> NodeStatus {
-    if caches.before_match.contains_key(&node.id()) {
-        return NodeStatus::Matched;
-    }
-    if let Some(&with_children) = caches.before_removed.get(&node.id()) {
-        return NodeStatus::Marked {
-            kind: MarkKind::Deleted,
-            with_children,
-            inherited: false,
-        };
-    }
-    if is_inherited_removed(node, &caches.before_removed) {
-        return NodeStatus::Marked {
-            kind: MarkKind::Deleted,
-            with_children: true,
-            inherited: true,
-        };
-    }
-    NodeStatus::Unmarked
-}
-
-fn status_after(node: Node, caches: &Caches) -> NodeStatus {
-    if caches.after_match.contains_key(&node.id()) {
-        return NodeStatus::Matched;
-    }
-    if let Some(&with_children) = caches.after_removed.get(&node.id()) {
-        return NodeStatus::Marked {
-            kind: MarkKind::Inserted,
-            with_children,
-            inherited: false,
-        };
-    }
-    if is_inherited_removed(node, &caches.after_removed) {
-        return NodeStatus::Marked {
-            kind: MarkKind::Inserted,
-            with_children: true,
-            inherited: true,
-        };
-    }
-    NodeStatus::Unmarked
 }
 
 /// Node IDs whose entire subtree -- the node itself and every descendant -- has `NodeStatus`
@@ -1956,35 +1824,6 @@ fn next_unmarked_index(
     status_fn: fn(Node, &Caches) -> NodeStatus,
 ) -> Option<usize> {
     (start..flat.len()).find(|&i| status_fn(flat[i].0, caches) == NodeStatus::Unmarked)
-}
-
-/// Every node's path, in the same `"{kind}:{occurrence}"`-per-level format [`path_for_node`]
-/// produces, computed in a single top-down O(n) pass over `root` instead of `path_for_node`'s
-/// per-node O(sibling count) backward walk. That per-node cost is invisible for a single lookup,
-/// but a node with many same-kind siblings (a big JSON array's elements, a large enum's variants)
-/// makes it O(width) *per node at that level*, which a caller that looks up every node's path in a
-/// tight loop (like [`action_match_to_end`]) would pay again and again -- this instead assigns
-/// each child its 1-indexed occurrence while visiting its parent's children exactly once.
-fn precompute_paths(root: Node) -> HashMap<usize, Vec<String>> {
-    let mut paths = HashMap::new();
-    paths.insert(root.id(), Vec::new());
-
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        let node_path = paths.get(&node.id()).cloned().unwrap_or_default();
-        let mut occurrence: HashMap<&str, usize> = HashMap::new();
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            let count = occurrence.entry(child.kind()).or_insert(0);
-            *count += 1;
-            let mut child_path = node_path.clone();
-            child_path.push(format!("{}:{}", child.kind(), count));
-            paths.insert(child.id(), child_path);
-            stack.push(child);
-        }
-    }
-
-    paths
 }
 
 #[allow(clippy::too_many_arguments)]

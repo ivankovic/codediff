@@ -40,7 +40,7 @@ use tree_sitter::Node;
 use crate::code::ASTMetadata;
 use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
-use crate::test::helper::PathCache;
+use crate::test::helper::{PathCache, node_for_path};
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
@@ -126,6 +126,153 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
 
 fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
+}
+
+/// What kind of human-authored removal a node is marked with: `Deleted` from the before tree, or
+/// `Inserted` in the after tree.
+///
+/// Shared between `human_solver` (which lets a human create/edit a `HumanMapping`) and any
+/// read-only consumer that just needs to interpret one (e.g. a static site generator) - moved
+/// here, rather than kept private to `human_solver.rs`, specifically so a second consumer doesn't
+/// have to carry its own copy of what matched/deleted/inserted/inherited means and risk it
+/// silently drifting from the TUI's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkKind {
+    Deleted,
+    Inserted,
+}
+
+/// A node's status under a [`HumanMapping`]: unmarked (no entry says anything about it, directly
+/// or via an ancestor), matched to a specific counterpart, or marked deleted/inserted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeStatus {
+    Unmarked,
+    Matched,
+    /// `inherited` is true when this node isn't marked directly but an ancestor is marked
+    /// with `with_children`, implying this node too.
+    Marked {
+        kind: MarkKind,
+        with_children: bool,
+        inherited: bool,
+    },
+}
+
+/// Resolved node IDs for every entry in a [`HumanMapping`], used to look up a node's
+/// [`NodeStatus`] in O(1) (plus a bounded ancestor walk for inheritance) - see [`rebuild_caches`].
+#[derive(Default)]
+pub struct Caches {
+    pub before_match: HashMap<usize, usize>,
+    pub after_match: HashMap<usize, usize>,
+    pub before_removed: HashMap<usize, bool>,
+    pub after_removed: HashMap<usize, bool>,
+    /// Number of entries that couldn't be resolved against the current trees (e.g. a
+    /// hand-edited or stale mapping file). Surfaced by callers (e.g. `human_solver`'s footer)
+    /// rather than treated as fatal, so a bad mapping file doesn't block the caller outright.
+    pub unresolved: usize,
+}
+
+/// Builds lookup caches from `entries`, skipping (and counting) any entry that doesn't resolve
+/// against the current trees rather than failing outright.
+pub fn rebuild_caches(
+    entries: &[HumanMappingEntry],
+    before_root: Node,
+    after_root: Node,
+) -> Caches {
+    let mut caches = Caches::default();
+
+    for entry in entries {
+        let resolved = match entry.operation {
+            HumanOperation::Identical
+            | HumanOperation::Update
+            | HumanOperation::MatchButNotIdentical => (|| {
+                let before_path = entry.before_path.as_ref()?;
+                let after_path = entry.after_path.as_ref()?;
+                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
+                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
+                caches.before_match.insert(b.id(), a.id());
+                caches.after_match.insert(a.id(), b.id());
+                Some(())
+            })(),
+            HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
+                let before_path = entry.before_path.as_ref()?;
+                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
+                caches.before_removed.insert(
+                    b.id(),
+                    entry.operation == HumanOperation::DeleteWithChildren,
+                );
+                Some(())
+            })(),
+            HumanOperation::Insert | HumanOperation::InsertWithChildren => (|| {
+                let after_path = entry.after_path.as_ref()?;
+                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
+                caches.after_removed.insert(
+                    a.id(),
+                    entry.operation == HumanOperation::InsertWithChildren,
+                );
+                Some(())
+            })(),
+        };
+
+        if resolved.is_none() {
+            caches.unresolved += 1;
+        }
+    }
+
+    caches
+}
+
+/// True if some strict ancestor of `node` is marked with `with_children = true` in `removed`.
+pub fn is_inherited_removed(node: Node, removed: &HashMap<usize, bool>) -> bool {
+    let mut current = node;
+    while let Some(parent) = current.parent() {
+        if removed.get(&parent.id()) == Some(&true) {
+            return true;
+        }
+        current = parent;
+    }
+    false
+}
+
+pub fn status_before(node: Node, caches: &Caches) -> NodeStatus {
+    if caches.before_match.contains_key(&node.id()) {
+        return NodeStatus::Matched;
+    }
+    if let Some(&with_children) = caches.before_removed.get(&node.id()) {
+        return NodeStatus::Marked {
+            kind: MarkKind::Deleted,
+            with_children,
+            inherited: false,
+        };
+    }
+    if is_inherited_removed(node, &caches.before_removed) {
+        return NodeStatus::Marked {
+            kind: MarkKind::Deleted,
+            with_children: true,
+            inherited: true,
+        };
+    }
+    NodeStatus::Unmarked
+}
+
+pub fn status_after(node: Node, caches: &Caches) -> NodeStatus {
+    if caches.after_match.contains_key(&node.id()) {
+        return NodeStatus::Matched;
+    }
+    if let Some(&with_children) = caches.after_removed.get(&node.id()) {
+        return NodeStatus::Marked {
+            kind: MarkKind::Inserted,
+            with_children,
+            inherited: false,
+        };
+    }
+    if is_inherited_removed(node, &caches.after_removed) {
+        return NodeStatus::Marked {
+            kind: MarkKind::Inserted,
+            with_children: true,
+            inherited: true,
+        };
+    }
+    NodeStatus::Unmarked
 }
 
 /// Helper function to find a node by ID in a tree and return its kind.

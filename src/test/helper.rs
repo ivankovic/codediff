@@ -276,6 +276,38 @@ pub fn path_for_node(node: Node) -> Vec<String> {
     path
 }
 
+/**
+* Every node's path, in the same `"{kind}:{occurrence}"`-per-level format [`path_for_node`]
+* produces, computed in a single top-down O(n) pass over `root` instead of `path_for_node`'s
+* per-node O(sibling count) backward walk. That per-node cost is invisible for a single lookup,
+* but a node with many same-kind siblings (a big JSON array's elements, a large enum's variants)
+* makes it O(width) *per node at that level*, which a caller that looks up every node's path in a
+* tight loop (`human_solver`'s `action_match_to_end`, or a site generator embedding every node's
+* path) would pay again and again - this instead assigns each child its 1-indexed occurrence while
+* visiting its parent's children exactly once.
+*/
+pub fn precompute_paths(root: Node) -> HashMap<usize, Vec<String>> {
+    let mut paths = HashMap::new();
+    paths.insert(root.id(), Vec::new());
+
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        let node_path = paths.get(&node.id()).cloned().unwrap_or_default();
+        let mut occurrence: HashMap<&str, usize> = HashMap::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            let count = occurrence.entry(child.kind()).or_insert(0);
+            *count += 1;
+            let mut child_path = node_path.clone();
+            child_path.push(format!("{}:{}", child.kind(), count));
+            paths.insert(child.id(), child_path);
+            stack.push(child);
+        }
+    }
+
+    paths
+}
+
 pub fn mapping_for_path<'a>(
     path_before: &[&str],
     path_after: &[&str],
