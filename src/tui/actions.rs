@@ -43,6 +43,12 @@ pub struct DiffSessionData {
     pub after_contents: String,
     pub before_ranges: Vec<RangeMatch>,
     pub after_ranges: Vec<RangeMatch>,
+    /// Whether every real change between before/after touches only comment nodes (see
+    /// `diff::text::is_comment_only_diff`). Computed once, while the AST is still available
+    /// (`tui::app::assemble_diff_session_data`) - by the time `DiffSessionData` exists, the AST
+    /// itself is gone, so this can't be recomputed later from `before_ranges`/`after_ranges` alone
+    /// the way `diff::text::summarize_diff`'s other cases can.
+    pub comment_only: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]

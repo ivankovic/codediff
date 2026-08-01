@@ -19,7 +19,7 @@ use tree_sitter::Node;
 
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
-    diff::{ASTDiff, ASTMappingOperation, NodeCache, text_range::TextRange},
+    diff::{ASTDiff, ASTMappingOperation, NodeCache, nodes, text_range::TextRange},
 };
 
 /**
@@ -434,11 +434,14 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
     ops
 }
 
-/// A quick, common-case classification of a diff's overall shape, cheap enough to compute on every
-/// completed diff (see `summarize_diff`) from data `TextDiff` already produces - no extra
-/// tree-sitter/AST work needed. Deliberately presentation-agnostic (a label, not a color or an
-/// icon): callers like `tui::app` map each variant to their own styling, the same separation
-/// `tui::headless`'s `ansi_color`/`marker` already draw around `TextOperation`.
+/// A quick, common-case classification of a diff's overall shape. Most variants are cheap enough
+/// to compute on every completed diff (see `summarize_diff`) from data `TextDiff` already
+/// produces, no extra tree-sitter/AST work needed - `CommentOnly` is the one exception, which
+/// needs AST-level node-kind access (`is_comment_only_diff`) and so is only ever added on by
+/// `summarize_diff_with_comment_check`, not `summarize_diff` itself. Deliberately
+/// presentation-agnostic (a label, not a color or an icon): callers like `tui::app` map each
+/// variant to their own styling, the same separation `tui::headless`'s `ansi_color`/`marker`
+/// already draw around `TextOperation`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiffSummary {
     /// The two sides are byte-for-byte identical. Deliberately *not* "no operations were
@@ -459,6 +462,13 @@ pub enum DiffSummary {
     /// apart from a real reordering, but comparing whitespace-stripped content can, since real
     /// reordering changes token order and a pure reformat never does.
     WhitespaceOnly,
+    /// Every "real" change (an `Insert`, `Delete`, `DeleteWithChildren`, `InsertWithChildren`, or
+    /// `Update` at the AST-mapping level) touches only comment nodes (`nodes::is_comment`) - see
+    /// `is_comment_only_diff`. Checked after `NewFile`/`DeletedFile` (a wholly new file that
+    /// happens to be all comments is still more usefully reported as `NewFile`), but before
+    /// `RefactorMovedOnly`/no classification at all, since "only comments changed" is the more
+    /// specific and more useful claim of those two.
+    CommentOnly,
     /// Every changed range is a `Move` (on top of whatever's `Identical`) - code relocated without
     /// a single `Insert`, `Delete`, or `Update` anywhere. Checked after `WhitespaceOnly`, so a pure
     /// reformat (which can also produce only `Move` ranges) is reported as that instead, since
@@ -486,6 +496,7 @@ impl DiffSummary {
             DiffSummary::NewFile => "New file - everything inserted",
             DiffSummary::DeletedFile => "Deleted file - everything removed",
             DiffSummary::WhitespaceOnly => "Whitespace changes only",
+            DiffSummary::CommentOnly => "Comment changes only",
             DiffSummary::RefactorMovedOnly => "Refactor - code moved, no content changes",
         }
     }
@@ -538,20 +549,27 @@ pub fn summarize_diff(
     let mut has_delete = false;
     let mut has_update = false;
     let mut has_move = false;
+    let mut has_identical = false;
     for range in before_ranges.iter().chain(after_ranges.iter()) {
         match range.operation {
             TextOperation::Insert => has_insert = true,
             TextOperation::Delete => has_delete = true,
             TextOperation::Update => has_update = true,
             TextOperation::Move => has_move = true,
-            TextOperation::Identical | TextOperation::NotYetSet => {}
+            TextOperation::Identical => has_identical = true,
+            TextOperation::NotYetSet => {}
         }
     }
 
-    if has_insert && !has_delete && !has_update && !has_move {
+    // `!has_identical` matters here, not just "only Insert/Delete present": without it, adding one
+    // line to an otherwise-untouched large file would also match "only Insert present" and get
+    // mislabeled NewFile - confirmed as a real, not hypothetical, misclassification by running the
+    // actual pipeline on exactly that case. A genuinely new/deleted file has nothing on the other
+    // side to have matched anything against, so no Identical range can exist for it either.
+    if has_insert && !has_delete && !has_update && !has_move && !has_identical {
         return Some(DiffSummary::NewFile);
     }
-    if has_delete && !has_insert && !has_update && !has_move {
+    if has_delete && !has_insert && !has_update && !has_move && !has_identical {
         return Some(DiffSummary::DeletedFile);
     }
     if has_move && !has_insert && !has_delete && !has_update {
@@ -559,6 +577,132 @@ pub fn summarize_diff(
     }
 
     None
+}
+
+/// Whether every "real" change between `before` and `after` (per `diff`) touches only comment
+/// nodes (`nodes::is_comment`) - the check behind `DiffSummary::CommentOnly`. `false`, not an
+/// error, if either side has no AST (nothing to walk).
+///
+/// "Real" means the same handful of AST-mapping operations `ranges` itself treats as producing a
+/// visible change - `DeleteWithChildren`, `InsertWithChildren`, a childless `Delete`/`Insert`, or
+/// `Update` - checked with the exact same match arms (mirrored deliberately, not reused: `ranges`
+/// also tracks positions and merges the two sides' ranges, work this doesn't need for a yes/no
+/// answer). Everything else - `Identical`, `MatchButNotIdentical`, `Move`, a non-childless plain
+/// `Delete`/`Insert` - is bookkeeping for an ancestor/container of the real change, not the change
+/// itself, so it's skipped by descending into it rather than required to be a comment. Returns
+/// `false`, not `true`, if no qualifying operation exists at all (e.g. a diff that's only `Move`s):
+/// "comment-only" is a claim about *what* changed, and is meaningless to assert about a diff where
+/// nothing did.
+///
+/// Known gap, shared with `ranges` itself, not unique to this function: a comment whose *text*
+/// changed (as opposed to being wholly inserted/deleted) is sometimes tagged `MatchButNotIdentical`
+/// rather than `Update` - confirmed against a real parse - and since `MatchButNotIdentical` isn't
+/// one of the operations checked here (matching `ranges`'s own coverage exactly, see above), that
+/// case is invisible to `is_comment_only_diff`, the same way it's invisible in the rendered diff
+/// itself (confirmed: `codediff --headless` shows no diff at all for exactly this case). Not
+/// "fixed" here on purpose - it would need to be fixed in `ranges` first, for every leaf value
+/// change tagged this way, not just comments; see `is_comment_only_diff_is_false_when_only_a_
+/// comments_text_changed_a_known_gap`'s own comment for the full story.
+///
+/// Checks comment-ness via `is_comment_or_inside_comment`, not a bare `nodes::is_comment(node.
+/// kind())`: at least one grammar (Rust's `line_comment`) represents a comment as a small node
+/// tree of its own rather than one opaque token (confirmed empirically - its `//` marker is a
+/// separate child node), so the specific node actually carrying the mapping can be a non-
+/// comment-kind piece *of* a comment.
+pub fn is_comment_only_diff(before: &Code, after: &Code, diff: &ASTDiff) -> bool {
+    let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+        return false;
+    };
+
+    // `node` itself, or an ancestor of it, is a comment. Not just `nodes::is_comment(node.kind())`
+    // directly: at least one grammar (Rust's `line_comment`) represents a comment as a small node
+    // tree of its own (the `//` marker is its own child, confirmed empirically), so the specific
+    // node carrying an Insert/Delete/Update mapping can be a non-comment-kind piece *of* a
+    // comment, not the comment node itself. Walking up finds the enclosing comment either way.
+    fn is_comment_or_inside_comment(node: Node) -> bool {
+        let mut current = Some(node);
+        while let Some(n) = current {
+            if nodes::is_comment(n.kind()) {
+                return true;
+            }
+            current = n.parent();
+        }
+        false
+    }
+
+    // Returns (found_any_qualifying_operation, every_one_of_them_was_a_comment).
+    fn scan(root: Node, diff: &ASTDiff) -> (bool, bool) {
+        let mut found_any = false;
+        let mut all_comments = true;
+        let mut stack = vec![root];
+
+        while let Some(node) = stack.pop() {
+            let mut descend = true;
+            let mut mark_found = || {
+                found_any = true;
+                if !is_comment_or_inside_comment(node) {
+                    all_comments = false;
+                }
+            };
+
+            if let Some((_, mapping)) = diff.mapping_for_node(&node.id()) {
+                match mapping.operation {
+                    ASTMappingOperation::Identical => descend = false,
+                    ASTMappingOperation::DeleteWithChildren
+                    | ASTMappingOperation::InsertWithChildren => {
+                        descend = false;
+                        mark_found();
+                    }
+                    ASTMappingOperation::Delete | ASTMappingOperation::Insert
+                        if node.child_count() == 0 =>
+                    {
+                        mark_found();
+                    }
+                    ASTMappingOperation::Update => mark_found(),
+                    _ => {}
+                }
+            }
+
+            if descend {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    stack.push(child);
+                }
+            }
+        }
+
+        (found_any, all_comments)
+    }
+
+    let (before_found, before_all_comments) = scan(before_ast.root_node(), diff);
+    let (after_found, after_all_comments) = scan(after_ast.root_node(), diff);
+
+    // At least one side must have actually found a qualifying operation - "comment-only" is
+    // meaningless to assert about a diff where nothing changed at all (e.g. a diff that's only
+    // Moves) - and whichever side(s) did find one must all agree it was comment-only.
+    (before_found || after_found)
+        && (!before_found || before_all_comments)
+        && (!after_found || after_all_comments)
+}
+
+/// Same as `summarize_diff`, but folds in `DiffSummary::CommentOnly` too - checked with lower
+/// precedence than every other case (see that variant's own doc comment for the exact order).
+/// A separate function, not an extra parameter on `summarize_diff` itself: `is_comment_only` needs
+/// AST-level node-kind access (`is_comment_only_diff`, over `ASTDiff`+`Code`), which
+/// `summarize_diff`'s own inputs (`TextDiff`'s already-flattened `RangeMatch`es) don't carry -
+/// callers without that access, or that don't need it, can keep using `summarize_diff` directly.
+pub fn summarize_diff_with_comment_check(
+    before_contents: &str,
+    after_contents: &str,
+    before_ranges: &[RangeMatch],
+    after_ranges: &[RangeMatch],
+    is_comment_only: bool,
+) -> Option<DiffSummary> {
+    let summary = summarize_diff(before_contents, after_contents, before_ranges, after_ranges);
+    if is_comment_only && matches!(summary, None | Some(DiffSummary::RefactorMovedOnly)) {
+        return Some(DiffSummary::CommentOnly);
+    }
+    summary
 }
 
 #[cfg(test)]
@@ -1087,6 +1231,44 @@ mod tests {
         );
     }
 
+    /// Regression guard for a real finding, not a hypothetical: confirmed via the actual pipeline
+    /// (adding one line to an otherwise-unchanged file) that "only Insert operations present"
+    /// alone is not enough to mean NewFile - the rest of the file being untouched shows up as
+    /// Identical ranges, which must disqualify NewFile just as much as a Delete/Update/Move would.
+    #[test]
+    fn summarize_diff_is_not_new_file_when_inserts_are_mixed_with_identical_content() {
+        let ranges = vec![
+            range(TextOperation::Identical),
+            range(TextOperation::Insert),
+        ];
+        assert_eq!(
+            summarize_diff(
+                "fn main() {\n    foo();\n}",
+                "fn main() {\n    foo();\n    bar();\n}",
+                &ranges,
+                &ranges
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn summarize_diff_is_not_deleted_file_when_deletes_are_mixed_with_identical_content() {
+        let ranges = vec![
+            range(TextOperation::Identical),
+            range(TextOperation::Delete),
+        ];
+        assert_eq!(
+            summarize_diff(
+                "fn main() {\n    foo();\n    bar();\n}",
+                "fn main() {\n    foo();\n}",
+                &ranges,
+                &ranges
+            ),
+            None
+        );
+    }
+
     #[test]
     fn summarize_diff_is_deleted_file_when_only_deletes_are_present() {
         let before_ranges = vec![range(TextOperation::Delete)];
@@ -1168,6 +1350,133 @@ mod tests {
                 &no_ranges,
             ),
             Some(DiffSummary::WhitespaceOnly)
+        );
+    }
+
+    /// Real `Code`/`diff_code` pairs, not hand-built `ASTDiff`s - `is_comment_only_diff` needs
+    /// genuine node kinds (`nodes::is_comment` reads `node.kind()`), which only a real parse
+    /// provides.
+    fn diff_ast(
+        before_src: &str,
+        after_src: &str,
+    ) -> (crate::code::Code, crate::code::Code, ASTDiff) {
+        let before = crate::code::Code::from_string(before_src, &crate::code::Language::Rust);
+        let after = crate::code::Code::from_string(after_src, &crate::code::Language::Rust);
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff
+            .ast
+            .expect("diff_code should always produce an AST for valid Rust");
+        (before, after, ast)
+    }
+
+    /// Documents a real, separate gap, not this function's own bug: a comment whose text changed
+    /// (rather than being wholly inserted/deleted) is tagged `MatchButNotIdentical` by the pipeline
+    /// (confirmed via a real parse - not `Update`, which is what a leaf value change normally
+    /// gets), and `ranges` itself has no arm for `MatchButNotIdentical` either - confirmed
+    /// empirically that `codediff --headless` shows *no diff at all* for this exact case, on the
+    /// real binary. `is_comment_only_diff` deliberately mirrors `ranges`'s own blind spot here
+    /// rather than "fixing" it unilaterally: if the rendered diff shows nothing changed, the status
+    /// bar must not claim otherwise. Fixing the underlying gap (`MatchButNotIdentical` on a leaf
+    /// should behave like `Update`) is a real, separate issue - it would affect every language and
+    /// every kind of leaf value change tagged this way, not just comments.
+    #[test]
+    fn is_comment_only_diff_is_false_when_only_a_comments_text_changed_a_known_gap() {
+        let (before, after, ast) = diff_ast(
+            "// old comment\nfn main() {}",
+            "// new comment\nfn main() {}",
+        );
+        assert!(!is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn is_comment_only_diff_is_true_when_a_comment_was_inserted() {
+        let (before, after, ast) = diff_ast("fn main() {}", "// a comment\nfn main() {}");
+        assert!(is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn is_comment_only_diff_is_true_when_a_comment_was_deleted() {
+        let (before, after, ast) = diff_ast("// a comment\nfn main() {}", "fn main() {}");
+        assert!(is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn is_comment_only_diff_is_false_for_a_real_code_change() {
+        let (before, after, ast) = diff_ast("fn main() { old(); }", "fn main() { new(); }");
+        assert!(!is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn is_comment_only_diff_is_false_when_a_comment_and_real_code_both_changed() {
+        let (before, after, ast) = diff_ast(
+            "// old comment\nfn main() { old(); }",
+            "// new comment\nfn main() { new(); }",
+        );
+        assert!(!is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn is_comment_only_diff_is_false_when_nothing_changed_at_all() {
+        // Vacuous case: no qualifying operation exists anywhere, so there is nothing to claim is
+        // "comment-only" about - see this function's own doc comment on why this must be false,
+        // not true.
+        let (before, after, ast) = diff_ast("fn main() {}", "fn main() {}");
+        assert!(!is_comment_only_diff(&before, &after, &ast));
+    }
+
+    #[test]
+    fn summarize_diff_with_comment_check_reports_comment_only_over_no_classification() {
+        let ranges = vec![range(TextOperation::Update)];
+        assert_eq!(
+            summarize_diff_with_comment_check("// a", "// b", &ranges, &ranges, true),
+            Some(DiffSummary::CommentOnly)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_with_comment_check_reports_comment_only_over_refactor_moved_only() {
+        let ranges = vec![range(TextOperation::Move)];
+        assert_eq!(
+            summarize_diff_with_comment_check(
+                "fn a() {}\nfn b() {}",
+                "fn b() {}\nfn a() {}",
+                &ranges,
+                &ranges,
+                true,
+            ),
+            Some(DiffSummary::CommentOnly)
+        );
+    }
+
+    #[test]
+    fn summarize_diff_with_comment_check_does_not_override_new_file() {
+        let before_ranges: Vec<RangeMatch> = vec![];
+        let after_ranges = vec![range(TextOperation::Insert)];
+        assert_eq!(
+            summarize_diff_with_comment_check(
+                "",
+                "// just a comment",
+                &before_ranges,
+                &after_ranges,
+                true,
+            ),
+            Some(DiffSummary::NewFile),
+            "a wholly new file should stay NewFile even if it's all comments"
+        );
+    }
+
+    #[test]
+    fn summarize_diff_with_comment_check_ignores_the_flag_when_false() {
+        let ranges = vec![range(TextOperation::Move)];
+        assert_eq!(
+            summarize_diff_with_comment_check(
+                "fn a() {}\nfn b() {}",
+                "fn b() {}\nfn a() {}",
+                &ranges,
+                &ranges,
+                false,
+            ),
+            Some(DiffSummary::RefactorMovedOnly)
         );
     }
 }

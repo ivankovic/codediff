@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex};
 use crate::code::{Code, Language};
 use crate::diff::{
     Diff, DiffMode, NodeCache,
-    text::{DiffSummary, TextDiff, summarize_diff},
+    text::{DiffSummary, TextDiff, is_comment_only_diff, summarize_diff_with_comment_check},
 };
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
@@ -321,11 +321,12 @@ impl App {
                     self.screen = AppScreen::Viewer;
                     self.last_error = None;
                     self.file_dialog = None;
-                    self.diff_summary = summarize_diff(
+                    self.diff_summary = summarize_diff_with_comment_check(
                         &data.before_contents,
                         &data.after_contents,
                         &data.before_ranges,
                         &data.after_ranges,
+                        data.comment_only,
                     );
                 }
                 Action::DiffFailed(message) => {
@@ -565,14 +566,16 @@ impl App {
 /// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's
 /// existing insert/delete/move conventions (`tui::headless::ansi_color` draws the same mapping for
 /// the headless renderer): green for a pure addition, red for a pure removal, cyan for a pure
-/// reformat, yellow for a pure reorganization, gray when there's nothing to report at all.
-/// `DiffSummary` itself stays presentation-agnostic (just a label) - see its own doc comment.
+/// reformat, blue for a comment-only change, yellow for a pure reorganization, gray when there's
+/// nothing to report at all. `DiffSummary` itself stays presentation-agnostic (just a label) - see
+/// its own doc comment.
 fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
     let color = match summary {
         DiffSummary::NoChanges => Color::DarkGray,
         DiffSummary::NewFile => Color::Green,
         DiffSummary::DeletedFile => Color::Red,
         DiffSummary::WhitespaceOnly => Color::Cyan,
+        DiffSummary::CommentOnly => Color::Blue,
         DiffSummary::RefactorMovedOnly => Color::Yellow,
     };
     Paragraph::new(summary.label())
@@ -623,6 +626,10 @@ fn assemble_diff_session_data(
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
     let text_diff = TextDiff::from(before_code, after_code, ast, &node_cache);
+    // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
+    // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
+    // field's own doc comment.
+    let comment_only = is_comment_only_diff(before_code, after_code, ast);
 
     Ok(DiffSessionData {
         before_path: before_path.to_path_buf(),
@@ -631,6 +638,7 @@ fn assemble_diff_session_data(
         after_contents: after_code.contents.clone(),
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
+        comment_only,
     })
 }
 
@@ -1023,8 +1031,8 @@ mod tests {
     /// smaller, directly-callable handlers instead. This checks the one part of the
     /// `Action::DiffReady` handler that's actually novel here (the rest - `self.screen`,
     /// `self.last_error`, `self.file_dialog` - already existed and is untouched): that
-    /// `summarize_diff`'s result is what ends up in `self.diff_summary`, using the exact same
-    /// `DiffSessionData` fields the real handler reads.
+    /// `summarize_diff_with_comment_check`'s result is what ends up in `self.diff_summary`, using
+    /// the exact same `DiffSessionData` fields the real handler reads.
     #[test]
     fn diff_ready_summary_matches_summarize_diff_on_the_same_session_data() {
         let data = DiffSessionData {
@@ -1038,15 +1046,85 @@ mod tests {
                 destination: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
                 operation: crate::diff::text::TextOperation::Insert,
             }],
+            comment_only: false,
         };
 
-        let summary = summarize_diff(
+        let summary = summarize_diff_with_comment_check(
             &data.before_contents,
             &data.after_contents,
             &data.before_ranges,
             &data.after_ranges,
+            data.comment_only,
         );
 
         assert_eq!(summary, Some(DiffSummary::NewFile));
+    }
+
+    /// Regression guard for `summarize_diff_with_comment_check`'s wiring specifically (not
+    /// `is_comment_only_diff`'s own logic, already covered in `diff::text`'s tests): the
+    /// `comment_only` flag on `DiffSessionData` must actually reach the final `DiffSummary`, not
+    /// just get carried around unused.
+    #[test]
+    fn diff_ready_summary_reports_comment_only_when_the_session_data_says_so() {
+        let ranges = vec![crate::diff::text::RangeMatch {
+            source: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+            destination: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+            operation: crate::diff::text::TextOperation::Update,
+        }];
+        let data = DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "// old comment".to_string(),
+            after_contents: "// new comment".to_string(),
+            before_ranges: ranges.clone(),
+            after_ranges: ranges,
+            comment_only: true,
+        };
+
+        let summary = summarize_diff_with_comment_check(
+            &data.before_contents,
+            &data.after_contents,
+            &data.before_ranges,
+            &data.after_ranges,
+            data.comment_only,
+        );
+
+        assert_eq!(summary, Some(DiffSummary::CommentOnly));
+    }
+
+    /// Full pipeline, not synthetic data: `compute_diff` -> `assemble_diff_session_data` (where
+    /// `comment_only` actually gets computed, from real AST access) -> `summarize_diff_with_
+    /// comment_check`. Regression guard for the real end-to-end wiring, since
+    /// `diff_ready_summary_reports_comment_only_when_the_session_data_says_so` only proves the
+    /// combinator itself is correct given a `comment_only` flag handed to it directly, not that
+    /// the real pipeline ever sets that flag to `true` for a genuine comment-only diff.
+    #[test]
+    fn compute_diff_reports_comment_only_for_a_real_inserted_comment() -> Result<()> {
+        let before = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
+        let after = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(after.path(), "// a comment\nfn main() {}\n").expect("write temp file");
+
+        let (data, _fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Exact)?;
+        assert!(
+            data.comment_only,
+            "inserting only a comment should set comment_only"
+        );
+
+        let summary = summarize_diff_with_comment_check(
+            &data.before_contents,
+            &data.after_contents,
+            &data.before_ranges,
+            &data.after_ranges,
+            data.comment_only,
+        );
+        assert_eq!(summary, Some(DiffSummary::CommentOnly));
+        Ok(())
     }
 }

@@ -432,6 +432,7 @@ mod tests {
                     operation: TextOperation::Identical,
                 },
             ],
+            comment_only: false,
         }
     }
 

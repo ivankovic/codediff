@@ -534,6 +534,7 @@ mod tests {
             after_contents: "after".to_string(),
             before_ranges: Vec::new(),
             after_ranges: Vec::new(),
+            comment_only: false,
         }
     }
 
@@ -605,6 +606,7 @@ mod tests {
                     operation: TextOperation::Update,
                 },
             ],
+            comment_only: false,
         };
 
         viewer.load_diff(&data);
@@ -676,6 +678,7 @@ mod tests {
                     operation: TextOperation::Identical,
                 },
             ],
+            comment_only: false,
         };
         viewer.load_diff(&data);
 
