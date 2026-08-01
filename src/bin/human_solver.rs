@@ -91,8 +91,11 @@
 *   u              remove the mark directly on the focused cursor node
 *   s              if the current case is a real test case (opened via `o`): save
 *                  human_mapping.json and ensure the optimal_solutions test stub exists. If it's a
-*                  sample (opened via `O`): prompt for a name and promote it -- copies the sample's
-*                  before/after content into src/test/data/diffs/<name>/, saves
+*                  sample (opened via `O`): prompt for a name and promote it -- pre-filled with
+*                  "<language>-<repository>" (lowercased, ".git" stripped - the same prefix
+*                  convention every existing promoted name already follows), so only the
+*                  descriptive suffix (e.g. "-add-item") needs typing. Promoting copies the
+*                  sample's before/after content into src/test/data/diffs/<name>/, saves
 *                  human_mapping.json and the test stub there, and records <name> against the
 *                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
 *                  other than letters/digits/-/_, or a diffs/ case with that name already exists
@@ -107,7 +110,10 @@
 *                  order: alphabetical, reverse alphabetical, smallest text diff first, largest
 *                  text diff first (by changed-line count in a raw `diff -u`, not AST size) --
 *                  unlike `H`, changing sort order always jumps selection to the first (1st) entry
-*                  in the new order, rather than tracking the previously selected name
+*                  in the new order, rather than tracking the previously selected name. Both the
+*                  hide-solved state and the sort order persist across closing and reopening this
+*                  picker (they live on `App`, not just this modal instance) - the next `O` opens
+*                  right back where the last one left off
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -188,12 +194,13 @@ T              view the output of unix `diff -u`
 H              toggle hiding fully solved subtrees (unmarked nodes and their
                  ancestors always stay visible)
 
-s              save -- or, on a sample, prompt for a name and promote it
+s              save -- or, on a sample, prompt for a name (pre-filled with
+                 <language>-<repository>) and promote it
 o              open a different test case (src/test/data/diffs/)
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\" -- press H inside this picker to
                  hide/show them, or s to cycle its sort order (A-Z, Z-A,
-                 smallest/largest text diff first)
+                 smallest/largest text diff first) -- both persist across O
 
 ?              toggle this help
 q / Esc        quit
@@ -367,6 +374,23 @@ struct SampleSource {
     repository: String,
     commit: String,
     path: String,
+}
+
+/// A starting point for `s`'s promote-name prompt: `<language>-<repository>`, lowercased, with the
+/// repository's trailing `.git` stripped - same transformation `materialize_test_diffs.rs`'s own
+/// `base_name` applies to these same two fields, so the prefix a human sees here already matches
+/// the convention every existing promoted name follows. Deliberately just the prefix, not a full
+/// name: the descriptive suffix (what actually changed, e.g. "-add-item") still needs a human's
+/// judgment, and `validate_new_case_name` still rejects this if it collides or is otherwise
+/// invalid, same as before - this only saves retyping the boilerplate part.
+fn default_promoted_name(source: &SampleSource) -> String {
+    let language = source.language.to_lowercase();
+    let repository = source
+        .repository
+        .strip_suffix(".git")
+        .unwrap_or(&source.repository)
+        .to_lowercase();
+    format!("{language}-{repository}")
 }
 
 /// Loads and parses the before/after code for a sampled candidate under
@@ -546,6 +570,37 @@ fn visible_sample_options(
     }
 
     visible
+}
+
+/// Builds the `O` picker's modal from a freshly-listed `options`, `current_name` (the case
+/// already open, so it starts selected if it's a sample too), and the persisted `hide_solved`/
+/// `sort_order` (`App::sample_hide_solved`/`sample_sort_order`). A pure function, separate from
+/// the `KeyCode::Char('O')` handler that calls it, specifically so this - the part with real
+/// logic to get wrong - is unit-testable without needing real files under
+/// `src/test/data/samples/` the way `list_samples_with_status`/`sample_diff_line_count` do.
+///
+/// `selected` is computed against `visible_sample_options`'s output, not raw `options`: once
+/// `hide_solved`/`sort_order` differ from `options`' own natural order (alphabetical, nothing
+/// hidden), a raw-`options` position would point at the wrong row once the picker actually renders
+/// the filtered/sorted list.
+fn open_sample_picker_modal(
+    options: Vec<(String, bool, usize)>,
+    current_name: &str,
+    hide_solved: bool,
+    sort_order: SampleSortOrder,
+) -> Modal {
+    let visible = visible_sample_options(&options, hide_solved, sort_order);
+    let selected = visible
+        .iter()
+        .position(|(name, ..)| name == current_name)
+        .unwrap_or(0)
+        .min(visible.len().saturating_sub(1));
+    Modal::OpenSamplePicker {
+        options,
+        selected,
+        hide_solved,
+        sort_order,
+    }
 }
 
 fn main() -> Result<()> {
@@ -767,6 +822,14 @@ struct App {
     /// -- which pass is responsible for that mapping, not just what the mapping is. Has no effect
     /// until `algo_diff` is populated (`p`).
     show_reason: bool,
+    /// The `O` picker's own hide-solved toggle (distinct from `hide_solved` above, which hides
+    /// solved *subtrees* in the AST panels, not solved *samples* in this list) and sort order,
+    /// persisted here rather than reset every time a fresh `Modal::OpenSamplePicker` is built --
+    /// so picking "smallest diff first" and hiding already-promoted samples once, then closing
+    /// the picker to work through a few, sticks for the next `O` instead of reverting to A-Z/show
+    /// all every time.
+    sample_hide_solved: bool,
+    sample_sort_order: SampleSortOrder,
 }
 
 impl App {
@@ -794,6 +857,8 @@ impl App {
             algo_diff: None,
             hide_solved: false,
             show_reason: false,
+            sample_hide_solved: false,
+            sample_sort_order: SampleSortOrder::Alphabetical,
         }
     }
 }
@@ -2688,6 +2753,32 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
+/// Like `centered_rect`, but never shrinks the popup below `min_width`/`min_height` (still capped
+/// to `area` itself, since a terminal can be smaller than the popup's actual content needs) -
+/// effectively reducing the percentage-based margin/padding on a small terminal instead of just
+/// letting the content not fit. Real, not hypothetical: on a small terminal (an SSH client on a
+/// phone is the motivating case), `render_text_modal`'s `centered_rect(60, 30, area)` could come
+/// out short enough that the `> {input}` line - well past the first couple of lines of
+/// instructions - scrolled out of the visible area entirely, with no scroll indicator to hint why,
+/// since a plain `Paragraph` has no "not everything fit" affordance of its own.
+fn centered_rect_at_least(
+    percent_x: u16,
+    percent_y: u16,
+    min_width: u16,
+    min_height: u16,
+    area: Rect,
+) -> Rect {
+    let base = centered_rect(percent_x, percent_y, area);
+    let width = base.width.max(min_width).min(area.width);
+    let height = base.height.max(min_height).min(area.height);
+    Rect {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height,
+    }
+}
+
 fn render_modal(
     frame: &mut Frame,
     area: Rect,
@@ -2765,7 +2856,18 @@ fn render_modal(
 }
 
 fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
-    let popup_area = centered_rect(60, 30, area);
+    // +2 on each for the block's own top/bottom and left/right borders; the width also leaves a
+    // little breathing room (+2 more) so text isn't set flush against the border, and considers
+    // the title too, since a title longer than the popup is silently truncated by ratatui.
+    let min_height = body.lines().count() as u16 + 2;
+    let min_width = body
+        .lines()
+        .map(|line| line.chars().count() as u16)
+        .max()
+        .unwrap_or(0)
+        .max(title.chars().count() as u16)
+        + 4;
+    let popup_area = centered_rect_at_least(60, 30, min_width, min_height, area);
     frame.render_widget(Clear, popup_area);
     let block = Block::default()
         .borders(Borders::ALL)
@@ -3508,9 +3610,9 @@ fn handle_key(
         }
         KeyCode::Char('s') => match &app.origin {
             CaseOrigin::Diffs => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
-            CaseOrigin::Sample(_) => {
+            CaseOrigin::Sample(source) => {
                 app.modal = Some(Modal::PromptPromoteName {
-                    input: String::new(),
+                    input: default_promoted_name(source),
                     error: None,
                 });
                 None
@@ -3541,16 +3643,12 @@ fn handle_key(
                             (name, solved, size)
                         })
                         .collect();
-                    let selected = options
-                        .iter()
-                        .position(|(name, ..)| name == &app.name)
-                        .unwrap_or(0);
-                    app.modal = Some(Modal::OpenSamplePicker {
+                    app.modal = Some(open_sample_picker_modal(
                         options,
-                        selected,
-                        hide_solved: false,
-                        sort_order: SampleSortOrder::Alphabetical,
-                    });
+                        &app.name,
+                        app.sample_hide_solved,
+                        app.sample_sort_order,
+                    ));
                 }
                 Ok(_) => {
                     app.status = Some("No samples found in src/test/data/samples".to_string());
@@ -3718,6 +3816,9 @@ fn handle_modal_key(
                         .and_then(|name| new_visible.iter().position(|(n, ..)| *n == name))
                         .unwrap_or(0)
                         .min(new_visible.len().saturating_sub(1));
+                    // Persisted on App too (not just this modal instance), so the next `O` opens
+                    // with the same hide-solved state instead of reverting to "show all".
+                    app.sample_hide_solved = new_hide_solved;
                     app.modal = Some(Modal::OpenSamplePicker {
                         options,
                         selected: new_selected,
@@ -3730,11 +3831,14 @@ fn handle_modal_key(
                     // re-sort: changing sort order is about jumping to whichever end of the new
                     // order is interesting (e.g. the largest diff), so landing on 1 there is more
                     // useful than staying on whatever was selected under the old order.
+                    let new_sort_order = sort_order.next();
+                    // Persisted on App too - see the `H` arm just above for why.
+                    app.sample_sort_order = new_sort_order;
                     app.modal = Some(Modal::OpenSamplePicker {
                         options,
                         selected: 0,
                         hide_solved,
-                        sort_order: sort_order.next(),
+                        sort_order: new_sort_order,
                     });
                 }
                 KeyCode::Esc => {
@@ -4228,6 +4332,28 @@ mod tests {
     }
 
     #[test]
+    fn default_promoted_name_lowercases_language_and_strips_dot_git() {
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "rustdesk-rustdesk.git".to_string(),
+            commit: "abc12345".to_string(),
+            path: "src/lang/kz.rs".to_string(),
+        };
+        assert_eq!(default_promoted_name(&source), "rust-rustdesk-rustdesk");
+    }
+
+    #[test]
+    fn default_promoted_name_leaves_a_repository_with_no_dot_git_suffix_alone() {
+        let source = SampleSource {
+            language: "Kotlin".to_string(),
+            repository: "nextcloud-android".to_string(),
+            commit: "abc12345".to_string(),
+            path: "app/src/main/Foo.kt".to_string(),
+        };
+        assert_eq!(default_promoted_name(&source), "kotlin-nextcloud-android");
+    }
+
+    #[test]
     fn run_unix_diff_reports_no_differences_for_identical_content() {
         let output = run_unix_diff(b"fn main() {}\n", b"fn main() {}\n").unwrap();
         assert_eq!(output, "(no textual differences)");
@@ -4379,6 +4505,60 @@ mod tests {
         assert!(
             text.contains("new();"),
             "added line missing from render: {text}"
+        );
+    }
+
+    #[test]
+    fn centered_rect_at_least_uses_the_percentage_when_it_already_meets_the_minimum() {
+        let area = Rect::new(0, 0, 100, 100);
+        let rect = centered_rect_at_least(60, 30, 10, 10, area);
+        assert_eq!(rect, centered_rect(60, 30, area));
+    }
+
+    #[test]
+    fn centered_rect_at_least_grows_past_the_percentage_to_meet_the_minimum() {
+        // A 100x20 terminal's 30%-height popup would be 6 rows, short of a 10-row minimum.
+        let small_area = Rect::new(0, 0, 100, 20);
+        let rect = centered_rect_at_least(60, 30, 10, 10, small_area);
+        assert_eq!(
+            rect.height, 10,
+            "should grow to the minimum, not stay at 30% (6 rows)"
+        );
+        assert!(rect.height <= small_area.height);
+    }
+
+    #[test]
+    fn centered_rect_at_least_never_exceeds_the_available_area() {
+        // A terminal too small even for the minimum (a phone-sized SSH client is the motivating
+        // case) must still produce a rect that fits, not one that's clamped to a minimum bigger
+        // than the terminal itself.
+        let tiny_area = Rect::new(0, 0, 20, 8);
+        let rect = centered_rect_at_least(60, 30, 50, 20, tiny_area);
+        assert!(rect.width <= tiny_area.width);
+        assert!(rect.height <= tiny_area.height);
+    }
+
+    /// Regression guard for the real bug: on a small terminal (a phone-sized SSH client is the
+    /// motivating case), `render_text_modal`'s old fixed `centered_rect(60, 30, area)` could come
+    /// out short enough that the `> {input}` line - the actual input box, well past the first
+    /// couple of lines of instructions - was clipped out of the visible area entirely, with no
+    /// scroll indicator to hint why (a plain `Paragraph` has none). This is exactly the
+    /// `PromptPromoteName` modal's own body shape (instructions, then a blank line, then `> `).
+    #[test]
+    fn render_text_modal_shows_every_line_including_the_input_box_on_a_small_terminal() {
+        let backend = ratatui::backend::TestBackend::new(40, 12);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 12);
+
+        let body = "Enter a name for src/test/data/diffs/<name>/\n(letters, digits, - and _; must not already exist)\n\n> rust-rustdesk-\n\n[Enter] confirm   [Esc] cancel";
+        terminal
+            .draw(|f| render_text_modal(f, area, "Promote sample to test case", body))
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("rust-rustdesk-"),
+            "the input line must still be visible on a small terminal, not scrolled out of view: {text}"
         );
     }
 
@@ -4619,6 +4799,95 @@ mod tests {
                 assert_eq!(selected, 0, "selection should reset to the first entry");
                 assert_eq!(sort_order, SampleSortOrder::ReverseAlphabetical);
             }
+            other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
+        }
+        assert_eq!(
+            app.sample_sort_order,
+            SampleSortOrder::ReverseAlphabetical,
+            "the new sort order must persist on App too, not just this modal instance, so the \
+             next O reopens with it instead of resetting to Alphabetical"
+        );
+    }
+
+    #[test]
+    fn open_sample_picker_h_persists_hide_solved_on_app() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        app.modal = Some(Modal::OpenSamplePicker {
+            options: vec![("alpha".to_string(), false, 5)],
+            selected: 0,
+            hide_solved: false,
+            sort_order: SampleSortOrder::Alphabetical,
+        });
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('H'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(
+            app.sample_hide_solved,
+            "H's new hide_solved value must persist on App too, so the next O reopens with it"
+        );
+    }
+
+    #[test]
+    fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_sort_order() {
+        let options = vec![
+            ("alpha".to_string(), false, 5),
+            ("bravo".to_string(), false, 1),
+            ("charlie".to_string(), false, 20),
+        ];
+
+        // "bravo" is index 1 in `options`' own order, but index 0 once sorted smallest-diff-first
+        // - proves `selected` is computed against the sorted/filtered view, not raw `options`.
+        let modal =
+            open_sample_picker_modal(options, "bravo", false, SampleSortOrder::SmallestDiffFirst);
+
+        match modal {
+            Modal::OpenSamplePicker {
+                selected,
+                hide_solved,
+                sort_order,
+                ..
+            } => {
+                assert_eq!(selected, 0);
+                assert!(!hide_solved);
+                assert_eq!(sort_order, SampleSortOrder::SmallestDiffFirst);
+            }
+            other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_sample_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is_not_a_sample()
+     {
+        let options = vec![("alpha".to_string(), false, 5)];
+        let modal = open_sample_picker_modal(
+            options,
+            "not-a-sample-name",
+            false,
+            SampleSortOrder::Alphabetical,
+        );
+        match modal {
+            Modal::OpenSamplePicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
         }
     }
