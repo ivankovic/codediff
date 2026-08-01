@@ -132,16 +132,19 @@ fn render_fixture_page(
     let caches = rebuild_caches(&mapping.entries, before_root, after_root);
     // Most fixtures' human_mapping.json only annotates a few hundred nodes out of many thousands
     // (see human_mapping_cost's own doc comment) - the rest is untouched code the human considered
-    // unchanged. Rendering every node in full made the biggest fixtures' pages multi-megabyte
-    // (measured up to 16MB) for no reason: `render_node` uses these sizes to omit large
-    // fully-unmarked subtrees behind a placeholder (small ones still render in full, just closed by
-    // default), keeping the actually-interesting (annotated) parts front and center. Every node's
-    // path (used only by the "file an issue" button) is deliberately *not* precomputed and baked in
-    // here - `viewer.js` derives it lazily, client-side, only for whichever single node gets
-    // clicked, since baking a `data-path` string into every node measurably added to that same
-    // page-size problem (over a third of a node's own markup on a representative fixture).
-    let before_unmarked_sizes = fully_unmarked_subtree_sizes(before_root, &caches, status_before);
-    let after_unmarked_sizes = fully_unmarked_subtree_sizes(after_root, &caches, status_after);
+    // unchanged - but a few fixtures (e.g. auto-generated files matched near-exhaustively) instead
+    // carry an explicit `Matched` entry for nearly every node. Either way, rendering every node in
+    // full made the biggest fixtures' pages multi-megabyte (measured up to 16MB) for no reason:
+    // `render_node` uses these sizes to omit large "quiet" subtrees - no deletion or insertion
+    // anywhere inside them, whether unannotated or explicitly confirmed matched - behind a
+    // placeholder (small ones still render in full, just closed by default), keeping the
+    // actually-interesting (edited) parts front and center. Every node's path (used only by the
+    // "file an issue" button) is deliberately *not* precomputed and baked in here - `viewer.js`
+    // derives it lazily, client-side, only for whichever single node gets clicked, since baking a
+    // `data-path` string into every node measurably added to that same page-size problem (over a
+    // third of a node's own markup on a representative fixture).
+    let before_quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
+    let after_quiet_sizes = fully_quiet_subtree_sizes(after_root, &caches, status_after);
 
     let before_html = render_node(
         before_root,
@@ -149,7 +152,7 @@ fn render_fixture_page(
         'b',
         &caches,
         status_before,
-        &before_unmarked_sizes,
+        &before_quiet_sizes,
         true,
     );
     let after_html = render_node(
@@ -158,7 +161,7 @@ fn render_fixture_page(
         'a',
         &caches,
         status_after,
-        &after_unmarked_sizes,
+        &after_quiet_sizes,
         true,
     );
 
@@ -224,31 +227,32 @@ const SEARCH_PROMPT_HTML: &str = r#"<div id="search-prompt" class="hidden" role=
 <input id="search-input" type="text" autocomplete="off">
 </div>"#;
 
-/// A fully-unmarked subtree (see `fully_unmarked_subtree_sizes`) bigger than this many nodes is
-/// omitted from the HTML entirely (replaced with a one-line placeholder) rather than just
-/// collapsed - collapsing via `<details>` without `open` still serializes the full subtree into
-/// the page (a closed `<details>` is `display: none`, not "absent"), so on the corpus's biggest
-/// fixtures - which are almost entirely untouched code around a small annotated diff - collapsing
-/// alone still produced multi-megabyte pages (measured up to 16MB). Small fully-unmarked subtrees
-/// (at or under this size) still render in full, just closed by default, so a reader can still
-/// drill into ordinary short unchanged statements without hitting the placeholder wall constantly.
+/// A fully-quiet subtree (see `fully_quiet_subtree_sizes`) bigger than this many nodes is omitted
+/// from the HTML entirely (replaced with a one-line placeholder) rather than just collapsed -
+/// collapsing via `<details>` without `open` still serializes the full subtree into the page (a
+/// closed `<details>` is `display: none`, not "absent"), so on the corpus's biggest fixtures -
+/// either almost entirely untouched code around a small annotated diff, or a huge block explicitly
+/// matched node-for-node - collapsing alone still produced multi-megabyte pages (measured up to
+/// 16MB). Small fully-quiet subtrees (at or under this size) still render in full, just closed by
+/// default, so a reader can still drill into an ordinary short unchanged/matched statement without
+/// hitting the placeholder wall constantly.
 const OMIT_THRESHOLD: usize = 20;
 
 /// Recursively renders `node` and its subtree. `side` is `'b'` (before) or `'a'` (after) - used
 /// both as the id-namespace prefix (so before/after tree-sitter node ids, which can collide in
 /// value between the two independently-parsed trees, never collide in the DOM) and to pick which
-/// half of `caches` to read a match from. `unmarked_sizes` (see `fully_unmarked_subtree_sizes`)
-/// maps a fully-unmarked node's id to its subtree's node count; `force_open` overrides both the
+/// half of `caches` to read a match from. `quiet_sizes` (see `fully_quiet_subtree_sizes`) maps a
+/// fully-quiet node's id to its subtree's node count; `force_open` overrides both the
 /// closed-by-default and the omit-with-placeholder treatment for `node` itself (but not its
 /// descendants) - used to keep the tree root fully rendered and open even on the rare fixture
-/// where it happens to be entirely unmarked (otherwise the page would load empty or collapsed).
+/// where it happens to be entirely quiet (otherwise the page would load empty or collapsed).
 fn render_node(
     node: Node,
     src: &[u8],
     side: char,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
-    unmarked_sizes: &HashMap<usize, usize>,
+    quiet_sizes: &HashMap<usize, usize>,
     force_open: bool,
 ) -> String {
     let status = status_fn(node, caches);
@@ -281,13 +285,18 @@ fn render_node(
         .unwrap_or_default();
     let kind_attr = escape_html_attr(node.kind());
 
-    let unmarked_size = unmarked_sizes.get(&node.id()).copied();
+    let quiet_size = quiet_sizes.get(&node.id()).copied();
 
-    if !force_open && unmarked_size.is_some_and(|size| size > OMIT_THRESHOLD) {
-        let size = unmarked_size.unwrap();
+    if !force_open && quiet_size.is_some_and(|size| size > OMIT_THRESHOLD) {
+        let size = quiet_size.unwrap();
         let kind_label = escape_html_text(node.kind());
+        // Keeps the real status class/data-match (computed above) rather than hardcoding
+        // "unmarked": a placeholder can just as well be the root of a huge *matched* block (an
+        // exhaustively-annotated fixture), in which case it still has a real counterpart worth
+        // linking to, even though its individual descendants aren't in the DOM to link to
+        // themselves.
         return format!(
-            r#"<div class="node leaf status-unmarked placeholder" id="{id_attr}" data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} unchanged nodes collapsed)</div>"#
+            r#"<div class="node leaf status-{status_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
         );
     }
 
@@ -306,12 +315,12 @@ fn render_node(
                 side,
                 caches,
                 status_fn,
-                unmarked_sizes,
+                quiet_sizes,
                 false,
             ));
         }
         let kind_label = escape_html_text(node.kind());
-        let open_attr = if force_open || unmarked_size.is_none() {
+        let open_attr = if force_open || quiet_size.is_none() {
             " open"
         } else {
             ""
@@ -331,44 +340,61 @@ fn leaf_label(node: Node, src: &[u8]) -> String {
     format!("{} {:?}{}", node.kind(), truncated, ellipsis)
 }
 
+/// Whether `status` is "quiet": neither a deletion nor an insertion. Covers both `Unmarked`
+/// (never annotated - most of a typical fixture) and `Matched` (explicitly confirmed identical/
+/// updated/structurally-different-but-paired) - a node in either state has nothing actively being
+/// edited at it, which is the only thing that actually needs to stay visible by default. Excludes
+/// `Marked { kind: Deleted | Inserted, .. }`, which is exactly the content a reviewer needs to see.
+fn is_quiet(status: NodeStatus) -> bool {
+    !matches!(
+        status,
+        NodeStatus::Marked {
+            kind: MarkKind::Deleted | MarkKind::Inserted,
+            ..
+        }
+    )
+}
+
 /// Maps a node's id to its subtree's node count (itself plus every descendant), for every node
-/// whose entire subtree is `NodeStatus::Unmarked` - nothing in it was annotated by a human. The
-/// inverse-polarity counterpart of `human_solver`'s own `fully_solved_nodes` (which finds subtrees
-/// that are entirely *marked*, to hide during active editing) - kept as a separate, generator-local
-/// function rather than unified with it, since the two serve different purposes for different
-/// audiences and only coincidentally share a shape. The size is `render_node`'s to decide whether a
-/// fully-unmarked subtree is small enough to still render in full (just closed by default) or big
-/// enough to omit outright behind a placeholder (see `OMIT_THRESHOLD`).
-fn fully_unmarked_subtree_sizes(
+/// whose entire subtree is quiet (see `is_quiet`) - no deletion or insertion anywhere inside it,
+/// whether because nothing was ever annotated there or because everything in it was explicitly
+/// confirmed matched. The inverse-polarity counterpart of `human_solver`'s own
+/// `fully_solved_nodes` (which finds subtrees that are entirely *marked*, to hide during active
+/// editing) - kept as a separate, generator-local function rather than unified with it, since the
+/// two serve different purposes for different audiences and only coincidentally share a shape.
+/// The size is `render_node`'s to decide whether a fully-quiet subtree is small enough to still
+/// render in full (just closed by default) or big enough to omit outright behind a placeholder
+/// (see `OMIT_THRESHOLD`).
+fn fully_quiet_subtree_sizes(
     root: Node,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
 ) -> HashMap<usize, usize> {
     let mut sizes = HashMap::new();
-    mark_fully_unmarked(root, caches, status_fn, &mut sizes);
+    mark_fully_quiet(root, caches, status_fn, &mut sizes);
     sizes
 }
 
-/// Post-order: returns `Some(subtree size)` if `node`'s own subtree is fully unmarked (recording
-/// it in `sizes` too), `None` otherwise.
-fn mark_fully_unmarked(
+/// Post-order: returns `Some(subtree size)` if `node`'s own subtree is fully quiet (recording it
+/// in `sizes` too), `None` otherwise.
+fn mark_fully_quiet(
     node: Node,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
     sizes: &mut HashMap<usize, usize>,
 ) -> Option<usize> {
     let mut cursor = node.walk();
-    let mut all_children_unmarked = true;
+    let mut all_children_quiet = true;
     let mut subtree_size = 1usize;
     for child in node.children(&mut cursor) {
-        match mark_fully_unmarked(child, caches, status_fn, sizes) {
+        match mark_fully_quiet(child, caches, status_fn, sizes) {
             Some(child_size) => subtree_size += child_size,
-            None => all_children_unmarked = false,
+            None => all_children_quiet = false,
         }
     }
 
-    let is_unmarked = all_children_unmarked && status_fn(node, caches) == NodeStatus::Unmarked;
-    if is_unmarked {
+    let quiet = all_children_quiet && is_quiet(status_fn(node, caches));
+    if quiet {
         sizes.insert(node.id(), subtree_size);
         Some(subtree_size)
     } else {
@@ -568,8 +594,8 @@ mod tests {
     }
 
     #[test]
-    fn fully_unmarked_nodes_only_includes_subtrees_with_no_marks_anywhere_in_them() {
-        let source = "fn main() {\n    a();\n    b();\n}\n";
+    fn fully_quiet_subtree_sizes_treats_matched_as_quiet_but_deleted_as_not() {
+        let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
         let mut cursor = root.walk();
@@ -587,37 +613,45 @@ mod tests {
             .filter(|n| n.kind() == "expression_statement")
             .collect();
         let stmt_a = statements[0];
+        let stmt_c = statements[2];
 
         let mut caches = Caches::default();
-        // Mark just `a();`'s call_expression as matched - everything else (including `b();`)
-        // stays Unmarked.
+        // `a();`'s call_expression is explicitly Matched - still quiet, nothing being edited.
         let mut c = stmt_a.walk();
-        let call_expr = stmt_a.children(&mut c).next().unwrap();
-        caches.before_match.insert(call_expr.id(), usize::MAX);
+        let call_expr_a = stmt_a.children(&mut c).next().unwrap();
+        caches.before_match.insert(call_expr_a.id(), usize::MAX);
+        // `c();`'s call_expression is explicitly Deleted - genuinely not quiet.
+        let mut c2 = stmt_c.walk();
+        let call_expr_c = stmt_c.children(&mut c2).next().unwrap();
+        caches.before_removed.insert(call_expr_c.id(), false);
 
-        let unmarked = fully_unmarked_subtree_sizes(root, &caches, status_before);
+        let quiet = fully_quiet_subtree_sizes(root, &caches, status_before);
 
         assert!(
-            !unmarked.contains_key(&stmt_a.id()),
-            "a(); contains a marked descendant, so it isn't fully unmarked"
+            quiet.contains_key(&stmt_a.id()),
+            "a(); has only a Matched descendant, which is quiet - not a live edit"
         );
         assert!(
-            !unmarked.contains_key(&root.id()),
-            "the root has a marked descendant somewhere, so it isn't fully unmarked either"
+            !quiet.contains_key(&stmt_c.id()),
+            "c(); has a Deleted descendant, so it must not count as quiet"
         );
         assert!(
-            unmarked.contains_key(&statements[1].id()),
-            "b(); has no marks anywhere in it, so it should be fully unmarked"
+            !quiet.contains_key(&root.id()),
+            "the root has a Deleted descendant somewhere, so it isn't quiet either"
+        );
+        assert!(
+            quiet.contains_key(&statements[1].id()),
+            "b(); has no marks anywhere in it (fully Unmarked), so it should still be quiet"
         );
     }
 
     #[test]
-    fn render_node_keeps_the_root_open_even_when_the_whole_tree_is_fully_unmarked() {
+    fn render_node_keeps_the_root_open_even_when_the_whole_tree_is_fully_quiet() {
         let source = "fn main() {\n    a();\n    b();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
         let caches = Caches::default(); // nothing marked anywhere
-        let unmarked_sizes = fully_unmarked_subtree_sizes(root, &caches, status_before);
+        let quiet_sizes = fully_quiet_subtree_sizes(root, &caches, status_before);
 
         let html = render_node(
             root,
@@ -625,7 +659,7 @@ mod tests {
             'b',
             &caches,
             status_before,
-            &unmarked_sizes,
+            &quiet_sizes,
             true, // force_open: the root itself must stay open/rendered despite being fully unmarked
         );
 
@@ -646,9 +680,9 @@ mod tests {
         let mut cursor = root.walk();
         let function_item = root.children(&mut cursor).next().unwrap();
         let caches = Caches::default(); // nothing marked anywhere
-        let unmarked_sizes = fully_unmarked_subtree_sizes(root, &caches, status_before);
+        let quiet_sizes = fully_quiet_subtree_sizes(root, &caches, status_before);
         // The whole function body is one fully-unmarked subtree well past OMIT_THRESHOLD (20).
-        let function_item_size = *unmarked_sizes.get(&function_item.id()).unwrap();
+        let function_item_size = *quiet_sizes.get(&function_item.id()).unwrap();
         assert!(
             function_item_size > OMIT_THRESHOLD,
             "fixture assumption broken: function_item is only {function_item_size} nodes"
@@ -660,12 +694,12 @@ mod tests {
             'b',
             &caches,
             status_before,
-            &unmarked_sizes,
+            &quiet_sizes,
             true,
         );
 
         assert!(
-            html.contains(&format!("+{function_item_size} unchanged nodes collapsed")),
+            html.contains(&format!("+{function_item_size} nodes collapsed")),
             "expected an omission placeholder naming the subtree size: {html}"
         );
         assert!(
@@ -681,7 +715,79 @@ mod tests {
     }
 
     #[test]
-    fn render_node_closes_but_still_fully_renders_a_small_fully_unmarked_subtree() {
+    fn render_node_omits_a_large_fully_matched_subtree_but_keeps_its_own_data_match() {
+        // An exhaustively-annotated fixture (e.g. auto-generated code matched node-for-node) has
+        // no Unmarked nodes at all, but should compress exactly the same way: a subtree with
+        // nothing but Matched status throughout is just as "quiet" as an unannotated one.
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mut cursor = before_root.walk();
+        let function_item = before_root.children(&mut cursor).next().unwrap();
+
+        // Match every single node, before to after, one-for-one (mirrors what human_solver's `f`
+        // -- match to end of file -- produces on an unchanged file, and what a fixture like
+        // c-cpython-autogenerated-code's real human_mapping.json actually looks like).
+        fn match_everything(b: Node, a: Node, caches: &mut Caches) {
+            caches.before_match.insert(b.id(), a.id());
+            caches.after_match.insert(a.id(), b.id());
+            let mut bc = b.walk();
+            let mut ac = a.walk();
+            for (bchild, achild) in b.children(&mut bc).zip(a.children(&mut ac)) {
+                match_everything(bchild, achild, caches);
+            }
+        }
+        let mut caches = Caches::default();
+        match_everything(before_root, after_root, &mut caches);
+
+        let quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
+        let function_item_size = *quiet_sizes.get(&function_item.id()).unwrap();
+        assert!(
+            function_item_size > OMIT_THRESHOLD,
+            "fixture assumption broken: function_item is only {function_item_size} nodes"
+        );
+
+        let html = render_node(
+            before_root,
+            source.as_bytes(),
+            'b',
+            &caches,
+            status_before,
+            &quiet_sizes,
+            true,
+        );
+
+        let expected_placeholder_prefix = format!(
+            r#"<div class="node leaf status-matched placeholder" id="b-{}""#,
+            function_item.id()
+        );
+        assert!(
+            html.contains(&expected_placeholder_prefix),
+            "expected a matched-status placeholder for function_item: {html}"
+        );
+
+        let after_function_item = {
+            let mut c = after_root.walk();
+            after_root.children(&mut c).next().unwrap()
+        };
+        assert!(
+            html.contains(&format!("data-match=\"a-{}\"", after_function_item.id())),
+            "a compressed matched subtree must still link to its counterpart: {html}"
+        );
+        assert!(
+            html.contains(&format!("+{function_item_size} nodes collapsed")),
+            "expected an omission placeholder naming the subtree size: {html}"
+        );
+        assert!(
+            !html.contains("fn \"fn\""),
+            "an omitted matched subtree's leaf content must not be in the DOM either: {html}"
+        );
+    }
+
+    #[test]
+    fn render_node_closes_but_still_fully_renders_a_small_fully_quiet_subtree() {
         // `parameters` (`(` `)`) is fully unmarked and tiny (well under OMIT_THRESHOLD), while
         // `function_item` as a whole is not fully unmarked (its body is marked) - so `parameters`
         // should render in full, just closed by default, not omitted.
@@ -706,7 +812,7 @@ mod tests {
             }],
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
-        let unmarked_sizes = fully_unmarked_subtree_sizes(before_root, &caches, status_before);
+        let quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
 
         let html = render_node(
             before_root,
@@ -714,7 +820,7 @@ mod tests {
             'b',
             &caches,
             status_before,
-            &unmarked_sizes,
+            &quiet_sizes,
             true,
         );
 
