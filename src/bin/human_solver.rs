@@ -2591,6 +2591,7 @@ fn render_panel(
     focused: bool,
     algo_diff: Option<&ASTDiff>,
     show_reason: bool,
+    total_unmarked: usize,
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
     panel.viewport_height = inner_height;
@@ -2600,39 +2601,32 @@ fn render_panel(
         .unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
 
-    // Single pass over the whole (potentially multi-thousand-node) flat list: computes each node's
-    // status once, both to build the visible page's rows and to total up unmarked nodes for the
-    // header, rather than walking `flat` twice and calling status_before/status_after on every
-    // node both times.
-    let mut total_unmarked = 0usize;
+    // Only the rows actually on screen get built into `ListItem`s and have their status computed
+    // -- `total_unmarked` (the header's "N unmarked" count) is the caller's `FrameState`'s, built
+    // once per `compute_frame_state` call rather than by scanning all of `flat` here on every draw.
+    let visible_end = (panel.scroll + inner_height.max(1)).min(flat.len());
     let mut items: Vec<ListItem> = Vec::with_capacity(inner_height.max(1));
-    for (idx, (node, depth)) in flat.iter().enumerate() {
+    for (idx, &(node, depth)) in flat.iter().enumerate().take(visible_end).skip(panel.scroll) {
         let status = match side {
-            Side::Before => status_before(*node, caches),
-            Side::After => status_after(*node, caches),
+            Side::Before => status_before(node, caches),
+            Side::After => status_after(node, caches),
         };
-        if status == NodeStatus::Unmarked {
-            total_unmarked += 1;
-        }
-        if idx < panel.scroll || idx >= panel.scroll + inner_height.max(1) {
-            continue;
-        }
 
         let (glyph, mut style) = status_glyph_and_style(status);
         let (algo_glyph, disagrees) = algo_diff
             .map(|diff_ast| {
                 let algo_status = match side {
-                    Side::Before => algo_status_before(*node, diff_ast),
-                    Side::After => algo_status_after(*node, diff_ast),
+                    Side::Before => algo_status_before(node, diff_ast),
+                    Side::After => algo_status_after(node, diff_ast),
                 };
                 let disagrees = match side {
-                    Side::Before => algo_disagrees_before(*node, caches, diff_ast),
-                    Side::After => algo_disagrees_after(*node, caches, diff_ast),
+                    Side::Before => algo_disagrees_before(node, caches, diff_ast),
+                    Side::After => algo_disagrees_after(node, caches, diff_ast),
                 };
                 let reason_suffix = if show_reason {
                     let reason = match side {
-                        Side::Before => algo_reason_before(*node, diff_ast),
-                        Side::After => algo_reason_after(*node, diff_ast),
+                        Side::Before => algo_reason_before(node, diff_ast),
+                        Side::After => algo_reason_after(node, diff_ast),
                     };
                     reason
                         .map(|r| format!(" {}", reason_detail(r)))
@@ -2646,14 +2640,14 @@ fn render_panel(
                 )
             })
             .unwrap_or_default();
-        let indent = "  ".repeat(*depth);
+        let indent = "  ".repeat(depth);
         let marker = if disagrees { " *" } else { "" };
         let text = format!(
             "{}{}{} {}{}",
             indent,
             glyph,
             algo_glyph,
-            node_label(*node, src),
+            node_label(node, src),
             marker
         );
 
@@ -2703,6 +2697,8 @@ fn draw_ui(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
+    before_unmarked: usize,
+    after_unmarked: usize,
     name: &str,
 ) {
     let size = frame.size();
@@ -2728,15 +2724,23 @@ fn draw_ui(
 
     if single_panel {
         let panel_area = chunks[1];
-        let (title, flat, panel, side, src) = match app.focus {
+        let (title, flat, panel, side, src, total_unmarked) = match app.focus {
             Focus::Before => (
                 "Before",
                 before_flat,
                 &mut app.before,
                 Side::Before,
                 before_src,
+                before_unmarked,
             ),
-            Focus::After => ("After", after_flat, &mut app.after, Side::After, after_src),
+            Focus::After => (
+                "After",
+                after_flat,
+                &mut app.after,
+                Side::After,
+                after_src,
+                after_unmarked,
+            ),
         };
         render_panel(
             frame,
@@ -2750,6 +2754,7 @@ fn draw_ui(
             true,
             app.algo_diff.as_ref(),
             app.show_reason,
+            total_unmarked,
         );
     } else {
         let panels = Layout::default()
@@ -2769,6 +2774,7 @@ fn draw_ui(
             app.focus == Focus::Before,
             app.algo_diff.as_ref(),
             app.show_reason,
+            before_unmarked,
         );
         render_panel(
             frame,
@@ -2782,6 +2788,7 @@ fn draw_ui(
             app.focus == Focus::After,
             app.algo_diff.as_ref(),
             app.show_reason,
+            after_unmarked,
         );
     }
 
@@ -3205,6 +3212,24 @@ struct FrameState<'a> {
     caches: Caches,
     before_flat: Vec<(Node<'a>, usize)>,
     after_flat: Vec<(Node<'a>, usize)>,
+    /// Counts of `Unmarked` nodes in `before_flat`/`after_flat`, for `render_panel`'s "N unmarked"
+    /// header. Computed once here rather than by scanning all of `flat` on every single draw call
+    /// (see `render_panel`), since on a large case that scan -- calling `status_before`/
+    /// `status_after` on every node, not just the visible ones -- was itself a real cost paid every
+    /// frame for no reason: it only changes when this `FrameState` does.
+    before_unmarked: usize,
+    after_unmarked: usize,
+}
+
+/// The number of `flat`'s nodes with `NodeStatus::Unmarked`, per `status_fn`.
+fn count_unmarked(
+    flat: &[(Node, usize)],
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) -> usize {
+    flat.iter()
+        .filter(|(n, _)| status_fn(*n, caches) == NodeStatus::Unmarked)
+        .count()
 }
 
 fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Result<FrameState<'a>> {
@@ -3235,6 +3260,9 @@ fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Resu
     let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
     let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
 
+    let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
+    let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
+
     Ok(FrameState {
         before_root,
         after_root,
@@ -3243,7 +3271,16 @@ fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Resu
         caches,
         before_flat,
         after_flat,
+        before_unmarked,
+        after_unmarked,
     })
+}
+
+/// What a case session (`run_case_session`) ended on: either the user quit, or a modal asked to
+/// switch to a different case (`o`/`O`'s pickers, or a discard-unsaved confirmation).
+enum SessionEnd {
+    Quit,
+    Open(OpenTarget),
 }
 
 fn run_event_loop(
@@ -3252,113 +3289,15 @@ fn run_event_loop(
     mut before: Code,
     mut after: Code,
 ) -> Result<()> {
-    // Whether the on-screen frame reflects the current state. Set whenever something might have
-    // changed (a key was handled, a case was switched, the terminal was resized) and cleared right
-    // after redrawing. On a pure idle poll timeout -- the common case, since the TUI just sits
-    // there most of the time -- nothing is recomputed or redrawn at all, instead of unconditionally
-    // rebuilding caches and re-flattening both (possibly multi-thousand-node) trees ~4 times a
-    // second regardless of whether the user touched anything. This is also why opening the `o`/`O`
-    // picker used to feel slow on a large case: the picker is a modal drawn on top of the same
-    // panels, so every idle tick kept recomputing the underlying case's state for no reason even
-    // while you were just staring at the picker deciding what to pick.
-    let mut needs_redraw = true;
-
     loop {
-        if needs_redraw {
-            let state = compute_frame_state(&before, &after, app)?;
-            // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and
-            // passing both `app` and `&app.name` as separate arguments to the same call would
-            // conflict.
-            let current_name = app.name.clone();
-            terminal.draw(|f| {
-                draw_ui(
-                    f,
-                    app,
-                    &state.before_flat,
-                    &state.after_flat,
-                    &state.caches,
-                    state.before_src,
-                    state.after_src,
-                    &current_name,
-                )
-            })?;
-            needs_redraw = false;
-        }
-
-        if !event::poll(Duration::from_millis(250))? {
-            continue;
-        }
-
-        let event = event::read()?;
-        let Event::Key(key) = event else {
-            // e.g. a resize: nothing to recompute, just redraw at the (possibly new) size.
-            needs_redraw = true;
-            continue;
-        };
-        if key.kind != KeyEventKind::Press {
-            continue;
-        }
-
-        // Needed to interpret this keystroke against the state as of just before it (cursor
-        // position, current marks, etc.); recomputed here rather than reused from the last draw so
-        // it's guaranteed fresh even for the very first keystroke after a case switch.
-        let state = compute_frame_state(&before, &after, app)?;
-
-        // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
-        // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
-        // with children without asking (see `subtree_match_operation`).
-        let before_hash = &before
-            .metadata
-            .ast_metadata
-            .as_ref()
-            .context("Before code has no AST metadata")?
-            .node_to_full_hash;
-        let after_hash = &after
-            .metadata
-            .ast_metadata
-            .as_ref()
-            .context("After code has no AST metadata")?
-            .node_to_full_hash;
-
-        let mut open_request: Option<OpenTarget> = None;
-
-        if app.modal.is_some() {
-            open_request = handle_modal_key(
-                app,
-                key.code,
-                &state.before_flat,
-                &state.after_flat,
-                state.before_root,
-                state.after_root,
-                &state.caches,
-                state.before_src,
-                state.after_src,
-            );
-        } else {
-            handle_key(
-                app,
-                key.code,
-                &state.before_flat,
-                &state.after_flat,
-                state.before_root,
-                state.after_root,
-                &state.caches,
-                state.before_src,
-                state.after_src,
-                before_hash,
-                after_hash,
-                &before,
-                &after,
-            );
-        }
-
-        needs_redraw = true;
-
-        // Applied after the borrows above (`state`, `before_hash`/`after_hash`, all borrowing from
-        // `before`/`after`) have had their last use, so reassigning here is sound: the compiler
-        // ends those borrows at last-use, not at the end of the lexical scope.
-        match open_request {
-            Some(OpenTarget::Diffs(name)) => match load_case(&name) {
+        // `run_case_session` only ever reads `before`/`after` (never reassigns them), so it's free
+        // to cache state that borrows from them for as long as the whole session runs, with none of
+        // the self-referential-across-a-mutation problem that caching across *this* loop's own
+        // iterations would run into: those iterations are exactly the ones that reassign `before`/
+        // `after` below.
+        match run_case_session(terminal, app, &before, &after)? {
+            SessionEnd::Quit => break,
+            SessionEnd::Open(OpenTarget::Diffs(name)) => match load_case(&name) {
                 Ok((new_before, new_after)) => {
                     let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
                     let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
@@ -3378,7 +3317,7 @@ fn run_event_loop(
                     app.status = Some(format!("Error opening '{}': {:#}", name, err));
                 }
             },
-            Some(OpenTarget::Sample(name)) => match load_sample(&name) {
+            SessionEnd::Open(OpenTarget::Sample(name)) => match load_sample(&name) {
                 Ok((new_before, new_after, source)) => {
                     let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
                     let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
@@ -3401,14 +3340,165 @@ fn run_event_loop(
                     app.status = Some(format!("Error opening sample '{}': {:#}", name, err));
                 }
             },
-            None => {}
-        }
-
-        if app.should_quit {
-            break;
         }
     }
     Ok(())
+}
+
+/// Whether `code`, delivered while `modal` is open, is guaranteed not to touch the mapping, either
+/// panel's collapsed set, or `hide_solved` -- the three things `run_case_session`'s cached
+/// `FrameState` depends on. Only typing into (or backspacing out of) `PromptSearch`'s or
+/// `PromptPromoteName`'s own `input` string qualifies: both modals only ever mutate that string in
+/// response to these keys, everything else about the case is untouched. Every other key --
+/// including Enter/Esc on these same two modals, which can search-and-move-the-cursor, promote/
+/// save, or close the modal -- is treated conservatively as "might have changed something", so the
+/// cache is thrown away and rebuilt fresh, exactly as if this function didn't exist.
+fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
+    matches!(
+        (modal, code),
+        (
+            Some(Modal::PromptSearch { .. }) | Some(Modal::PromptPromoteName { .. }),
+            KeyCode::Char(_) | KeyCode::Backspace
+        )
+    )
+}
+
+/// Runs the event loop for a single case (before/after AST pair) until the user quits or asks to
+/// switch to a different one. Split out from `run_event_loop` specifically so the `state` cache
+/// below -- which borrows from `before`/`after` -- never has to coexist with a reassignment of
+/// them: `before`/`after` are `&Code` here, immutable for this whole call, so the cache is free to
+/// survive across as many keystrokes as it likes with no lifetime conflict. A case switch is
+/// reported back to the caller as a `SessionEnd::Open` instead of being handled in place.
+fn run_case_session(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    app: &mut App,
+    before: &Code,
+    after: &Code,
+) -> Result<SessionEnd> {
+    // Whether the on-screen frame reflects the current state. Set whenever something might have
+    // changed (a key was handled, the terminal was resized) and cleared right after redrawing. On
+    // a pure idle poll timeout -- the common case, since the TUI just sits there most of the time
+    // -- nothing is redrawn at all.
+    let mut needs_redraw = true;
+
+    // Cached result of `compute_frame_state` -- rebuilding both caches and re-flattening both
+    // (possibly multi-thousand-node) trees is real work, so it's only redone when something that
+    // could actually change it happens, not on every idle tick or every keystroke. `None` forces a
+    // fresh (potentially expensive) recompute; set back to `None` by every key that could
+    // plausibly touch the mapping, a collapsed set, or `hide_solved`, so the vast majority of keys
+    // still recompute every time, same as before this cache existed. The one deliberate exception
+    // is `state_preserving` below: typing into a pure text-input modal (`PromptSearch`,
+    // `PromptPromoteName`) only ever mutates that modal's own `input` string, so on a large case
+    // there's no reason each character typed into e.g. the save-name box should re-walk both
+    // entire trees from scratch, on top of doing that twice per keystroke (once for this draw, once
+    // again just to interpret the next key) as this used to.
+    let mut state: Option<FrameState> = None;
+
+    loop {
+        if state.is_none() {
+            state = Some(compute_frame_state(before, after, app)?);
+        }
+        let frame_state = state.as_ref().expect("just populated above if empty");
+
+        if needs_redraw {
+            // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and
+            // passing both `app` and `&app.name` as separate arguments to the same call would
+            // conflict.
+            let current_name = app.name.clone();
+            terminal.draw(|f| {
+                draw_ui(
+                    f,
+                    app,
+                    &frame_state.before_flat,
+                    &frame_state.after_flat,
+                    &frame_state.caches,
+                    frame_state.before_src,
+                    frame_state.after_src,
+                    frame_state.before_unmarked,
+                    frame_state.after_unmarked,
+                    &current_name,
+                )
+            })?;
+            needs_redraw = false;
+        }
+
+        if !event::poll(Duration::from_millis(250))? {
+            continue;
+        }
+
+        let event = event::read()?;
+        let Event::Key(key) = event else {
+            // e.g. a resize: nothing to recompute, just redraw at the (possibly new) size.
+            needs_redraw = true;
+            continue;
+        };
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
+
+        // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
+        // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
+        // with children without asking (see `subtree_match_operation`).
+        let before_hash = &before
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .context("Before code has no AST metadata")?
+            .node_to_full_hash;
+        let after_hash = &after
+            .metadata
+            .ast_metadata
+            .as_ref()
+            .context("After code has no AST metadata")?
+            .node_to_full_hash;
+
+        let state_preserving = is_state_preserving_key(app.modal.as_ref(), key.code);
+
+        let mut open_request: Option<OpenTarget> = None;
+
+        if app.modal.is_some() {
+            open_request = handle_modal_key(
+                app,
+                key.code,
+                &frame_state.before_flat,
+                &frame_state.after_flat,
+                frame_state.before_root,
+                frame_state.after_root,
+                &frame_state.caches,
+                frame_state.before_src,
+                frame_state.after_src,
+            );
+        } else {
+            handle_key(
+                app,
+                key.code,
+                &frame_state.before_flat,
+                &frame_state.after_flat,
+                frame_state.before_root,
+                frame_state.after_root,
+                &frame_state.caches,
+                frame_state.before_src,
+                frame_state.after_src,
+                before_hash,
+                after_hash,
+                before,
+                after,
+            );
+        }
+
+        needs_redraw = true;
+        if !state_preserving {
+            state = None;
+        }
+
+        if let Some(target) = open_request {
+            return Ok(SessionEnd::Open(target));
+        }
+
+        if app.should_quit {
+            return Ok(SessionEnd::Quit);
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4465,6 +4555,140 @@ mod tests {
     }
 
     #[test]
+    fn is_state_preserving_key_is_true_only_for_typing_in_the_two_text_input_modals() {
+        assert!(is_state_preserving_key(
+            Some(&Modal::PromptSearch {
+                input: String::new()
+            }),
+            KeyCode::Char('a')
+        ));
+        assert!(is_state_preserving_key(
+            Some(&Modal::PromptSearch {
+                input: "x".to_string()
+            }),
+            KeyCode::Backspace
+        ));
+        assert!(is_state_preserving_key(
+            Some(&Modal::PromptPromoteName {
+                input: String::new(),
+                error: None
+            }),
+            KeyCode::Char('a')
+        ));
+    }
+
+    #[test]
+    fn is_state_preserving_key_is_false_for_enter_esc_on_the_same_two_modals() {
+        // Enter/Esc can search-and-move-the-cursor, promote/save, or close the modal -- all things
+        // that can change what the cached `FrameState` would report, unlike plain typing.
+        let search = Some(Modal::PromptSearch {
+            input: "x".to_string(),
+        });
+        assert!(!is_state_preserving_key(search.as_ref(), KeyCode::Enter));
+        assert!(!is_state_preserving_key(search.as_ref(), KeyCode::Esc));
+
+        let promote = Some(Modal::PromptPromoteName {
+            input: "x".to_string(),
+            error: None,
+        });
+        assert!(!is_state_preserving_key(promote.as_ref(), KeyCode::Enter));
+        assert!(!is_state_preserving_key(promote.as_ref(), KeyCode::Esc));
+    }
+
+    #[test]
+    fn is_state_preserving_key_is_false_for_every_other_modal_and_for_no_modal_at_all() {
+        assert!(!is_state_preserving_key(
+            Some(&Modal::Help { scroll: 0 }),
+            KeyCode::Char('a')
+        ));
+        assert!(!is_state_preserving_key(None, KeyCode::Char('a')));
+    }
+
+    #[test]
+    fn count_unmarked_counts_only_nodes_with_no_match_or_delete_mark() {
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let (stmt_a, _) = two_statements(root);
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+
+        let mut caches = Caches::default();
+        let before_unmarked = count_unmarked(&flat, &caches, status_before);
+
+        // Marking one statement's whole subtree matched must drop the unmarked count by exactly
+        // the number of nodes under it, and by nothing else.
+        let mut subtree_ids = Vec::new();
+        collect_subtree_ids(stmt_a, &mut subtree_ids);
+        mark_subtree_matched(stmt_a, &mut caches);
+
+        let after_marking = count_unmarked(&flat, &caches, status_before);
+        assert_eq!(before_unmarked - after_marking, subtree_ids.len());
+    }
+
+    #[test]
+    fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
+        // A tree deep enough that only a handful of its nodes fit in a tiny terminal; asserts that
+        // `render_panel` never touches (and never renders) anything outside that window, and that
+        // the header's count comes from the caller-supplied `total_unmarked`, not a fresh scan.
+        let mut source = String::from("fn main() {\n");
+        for i in 0..200 {
+            source.push_str(&format!("    stmt_{i}();\n"));
+        }
+        source.push_str("}\n");
+        let tree = parse_rust(&source);
+        let root = tree.root_node();
+        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        assert!(
+            flat.len() > 200,
+            "fixture should be far bigger than any plausible terminal height"
+        );
+
+        let caches = Caches::default();
+        let mut panel = PanelState::new(root.id());
+        // Tall enough to reach past the file's fixed preamble (source_file, function_item, fn,
+        // identifier, parameters, (, ), block) down into the first statement's own leaves, but
+        // nowhere near tall enough to reach the 199th one.
+        let backend = ratatui::backend::TestBackend::new(40, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 20);
+
+        // A deliberately wrong `total_unmarked` -- if `render_panel` still scanned the whole list
+        // itself it would recompute (and show) the real count instead of trusting this value.
+        terminal
+            .draw(|f| {
+                render_panel(
+                    f,
+                    area,
+                    "Before",
+                    &flat,
+                    &mut panel,
+                    &caches,
+                    Side::Before,
+                    source.as_bytes(),
+                    true,
+                    None,
+                    false,
+                    424242,
+                )
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("424242 unmarked"),
+            "header should show the passed-in count verbatim: {text}"
+        );
+        assert!(
+            text.contains("stmt_0"),
+            "the first visible node should render: {text}"
+        );
+        assert!(
+            !text.contains("stmt_199"),
+            "a node far past the tiny viewport must not be scanned or rendered: {text}"
+        );
+    }
+
+    #[test]
     fn default_promoted_name_lowercases_language_and_strips_dot_git() {
         let source = SampleSource {
             language: "Rust".to_string(),
@@ -5355,6 +5579,8 @@ mod tests {
         let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
         let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+        let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
+        let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
 
         // Narrower than `SINGLE_PANEL_WIDTH_THRESHOLD`: only the focused (Before, by
         // `App::new`'s default) panel should render, and the After panel's content shouldn't
@@ -5371,6 +5597,8 @@ mod tests {
                     &caches,
                     before_source.as_bytes(),
                     after_source.as_bytes(),
+                    before_unmarked,
+                    after_unmarked,
                     "test",
                 )
             })
@@ -5398,6 +5626,8 @@ mod tests {
                     &caches,
                     before_source.as_bytes(),
                     after_source.as_bytes(),
+                    before_unmarked,
+                    after_unmarked,
                     "test",
                 )
             })
