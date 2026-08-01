@@ -116,9 +116,15 @@ mod go_user_slices_library;
 #[cfg(test)]
 mod html_fatedier_add_attribute;
 #[cfg(test)]
+mod html_firefox_update_src;
+#[cfg(test)]
 mod html_gorhill_add_tag;
 #[cfg(test)]
+mod html_hugo_tag_to_selfclosing_tag;
+#[cfg(test)]
 mod html_ladybird_delete_attribute;
+#[cfg(test)]
+mod html_mermaid_update_link;
 #[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
@@ -128,7 +134,11 @@ mod java_add_logging;
 #[cfg(test)]
 mod java_fix_array_index;
 #[cfg(test)]
+mod java_protobuf_add_two_annotations;
+#[cfg(test)]
 mod java_refactor_constants;
+#[cfg(test)]
+mod java_scrcpy_public_to_protected;
 #[cfg(test)]
 mod java_scrcpy_remove_or_expression;
 #[cfg(test)]
@@ -140,11 +150,17 @@ mod javascript_add_event_listener;
 #[cfg(test)]
 mod javascript_fix_promises;
 #[cfg(test)]
+mod javascript_mozilla_firefox_add_comment;
+#[cfg(test)]
 mod javascript_refactor_arrow_func;
+#[cfg(test)]
+mod javascript_twbs_bootstrap_comment_version_update;
 #[cfg(test)]
 mod javascript_typescript_add_strict_3;
 #[cfg(test)]
 mod javascript_typescript_add_use_strict;
+#[cfg(test)]
+mod javascript_typescript_interesting_small_edit_refactor;
 #[cfg(test)]
 mod javascript_typescript_use_strict_2;
 #[cfg(test)]
@@ -155,6 +171,10 @@ mod json_apache_string_change_version;
 mod json_langflow_update_single_string;
 #[cfg(test)]
 mod json_mastodon_add_translation;
+#[cfg(test)]
+mod json_radarr_radarr_rename_string_key;
+#[cfg(test)]
+mod json_shadcn_ui_ui_string_value_update_string_is_code;
 #[cfg(test)]
 mod kotlin_add_data_class;
 #[cfg(test)]
@@ -189,6 +209,8 @@ mod python_add_remove_block;
 mod python_added_if_block;
 #[cfg(test)]
 mod python_added_if_block_small;
+#[cfg(test)]
+mod python_ansible_ansible_field_rename;
 #[cfg(test)]
 mod python_api_change;
 #[cfg(test)]
@@ -267,3 +289,9 @@ mod typescript_typescript_add_target_comment;
 mod typescript_typescript_add_target_comment_2;
 #[cfg(test)]
 mod typescript_typescript_add_target_comment_3;
+#[cfg(test)]
+mod xml_nextcloud_android_delete_element;
+#[cfg(test)]
+mod xml_nextcloud_android_delete_element_2;
+#[cfg(test)]
+mod yaml_mastodon_remove_one_pair;

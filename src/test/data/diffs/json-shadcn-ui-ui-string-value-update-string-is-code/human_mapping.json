@@ -1,0 +1,3716 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1"
+      ],
+      "after_path": [
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        ",:2"
+      ],
+      "after_path": [
+        "object:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "[:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:4"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:5"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:6"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:7"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:4"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:8"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:5"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:9"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:10"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:11"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:6"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:12"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:12"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:7"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:13"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:14"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:14"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:15"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:8"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:16"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:16"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:9"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:17"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:10"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:18"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:18"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:11"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:19"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:19"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:12"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:20"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:20"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:13"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:21"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:21"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:14"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:14"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:22"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:22"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:23"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:23"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:15"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:24"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:24"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:16"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:16"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:25"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:25"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:17"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:26"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:26"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:18"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:18"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:27"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:27"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:19"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:19"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:28"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:28"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:20"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:20"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:29"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:29"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:21"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:21"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:30"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:30"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:22"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:22"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:31"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:31"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:23"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:23"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:32"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:32"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:33"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:33"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:24"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:24"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:34"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:34"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:25"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:25"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:35"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:35"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:26"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:26"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:36"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:36"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:27"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:27"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:37"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:37"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:28"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:28"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:38"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:38"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:29"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:29"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:39"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:39"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:30"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:30"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:40"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:40"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:31"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:31"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:41"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:41"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:32"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:32"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:42"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:42"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:33"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:33"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:43"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:43"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:34"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:34"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:44"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:44"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:35"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:35"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:45"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:45"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:36"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:36"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:46"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:46"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:37"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:37"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:47"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:47"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:38"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:38"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:48"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:48"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:49"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:49"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:39"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:39"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:50"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:50"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:40"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:40"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:51"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:51"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:41"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:41"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:52"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:52"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:42"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:42"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:53"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:53"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:43"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:43"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:54"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:54"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:44"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:44"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:55"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:55"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:45"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:45"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:56"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:56"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:46"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:46"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:57"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:57"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:47"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:47"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:58"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:58"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:48"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:48"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:59"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:59"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:49"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:49"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:60"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:60"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:50"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:50"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:61"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:61"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:51"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:51"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:62"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:62"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:63"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:63"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:52"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:52"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:64"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "escape_sequence:64"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        ",:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "]:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:3",
+        "array:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        ",:3"
+      ],
+      "after_path": [
+        "object:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "object:1",
+        "}:1"
+      ]
+    }
+  ]
+}
