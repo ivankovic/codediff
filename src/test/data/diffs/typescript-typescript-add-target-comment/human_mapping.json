@@ -1,0 +1,2739 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "namespace:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "namespace:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        "type_parameter:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "?:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "property_signature:2",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        ";:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        ";:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "interface_declaration:1",
+        "interface_body:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "var:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:1",
+        "number:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ",:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:2",
+        "string:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "predefined_type:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:2",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "export:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "var:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "internal_module:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2"
+      ],
+      "after_path": [
+        "expression_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "namespace:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "namespace:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "declare:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "declare:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "var:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "new:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "new:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "construct_signature:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "ambient_declaration:1",
+        "variable_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "empty_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "export:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "var:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "export_statement:2",
+        "variable_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:2",
+        "internal_module:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3"
+      ],
+      "after_path": [
+        "expression_statement:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "=:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        ".:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:3",
+        "assignment_expression:1",
+        "member_expression:2",
+        "property_identifier:1"
+      ]
+    }
+  ]
+}

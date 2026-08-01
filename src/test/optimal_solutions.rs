@@ -170,11 +170,17 @@ mod kotlin_nextcloud_change_function_fingerprint;
 #[cfg(test)]
 mod kotlin_nextcloud_remove_function;
 #[cfg(test)]
+mod kotlin_nextcloud_whitespace_only_change;
+#[cfg(test)]
 mod kotlin_refactor_function;
 #[cfg(test)]
 mod kotlin_remove_function;
 #[cfg(test)]
 mod kotlin_small_api_change;
+#[cfg(test)]
+mod lua_awesome_only_comment_change;
+#[cfg(test)]
+mod lua_neovim_one_added_line;
 #[cfg(test)]
 mod php_nextcloud_change_doccomment;
 #[cfg(test)]
@@ -226,6 +232,8 @@ mod rust_no_change;
 #[cfg(test)]
 mod rust_rustdesk_add_item;
 #[cfg(test)]
+mod rust_rustdesk_add_one_slice_element;
+#[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
 mod rust_tauri_api_build_1;
@@ -242,6 +250,8 @@ mod rust_zed_git_panel_settings;
 #[cfg(test)]
 mod rust_zed_workspace_tasks;
 #[cfg(test)]
+mod tsx_material_remove_import;
+#[cfg(test)]
 mod typescript_add_error_handling;
 #[cfg(test)]
 mod typescript_add_generics;
@@ -251,3 +261,9 @@ mod typescript_add_type_annotations;
 mod typescript_async_await;
 #[cfg(test)]
 mod typescript_refactor_interface;
+#[cfg(test)]
+mod typescript_typescript_add_target_comment;
+#[cfg(test)]
+mod typescript_typescript_add_target_comment_2;
+#[cfg(test)]
+mod typescript_typescript_add_target_comment_3;
