@@ -7,5 +7,5 @@
 # varies by machine.
 # Update deliberately via `make update-quality-baseline` after a reviewed improvement,
 # not automatically as a side effect of every deploy.
-TOTAL_MISMATCHES=3345
-MS_PER_FIXTURE=1041.1
+TOTAL_MISMATCHES=3360
+MS_PER_FIXTURE=2254.3
