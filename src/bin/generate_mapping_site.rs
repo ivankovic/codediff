@@ -38,7 +38,8 @@ use tree_sitter::Node;
 use codediff::code::{Code, Language};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
-    self, Caches, MarkKind, NodeStatus, is_identical_after, is_identical_before, rebuild_caches,
+    self, Caches, HumanOperation, MarkKind, NodeStatus, is_identical_after, is_identical_before,
+    is_moved_after, is_moved_before, match_operation_after, match_operation_before, rebuild_caches,
     status_after, status_before,
 };
 
@@ -195,6 +196,15 @@ fn render_fixture_page(
 <h1>{name_escaped}</h1>
 <span class="language-badge">{language}</span>
 <a class="source-link" href="{source_url}" target="_blank" rel="noopener">View before/after files on GitHub</a>
+<ul class="legend">
+<li><span class="status-unmarked">&#9679;</span> unmarked</li>
+<li><span class="status-matched">&#9679;</span> matched</li>
+<li><span class="status-matched op-update changed">&#9679;</span> updated</li>
+<li><span class="status-matched changed">&#9679;</span> matched, not identical</li>
+<li><span class="status-matched op-moved">&#9679;</span> moved, unchanged</li>
+<li><span class="status-deleted">&#9679;</span> deleted</li>
+<li><span class="status-inserted">&#9679;</span> inserted</li>
+</ul>
 </header>
 <div class="panels">
 <section class="panel" data-side="before">
@@ -307,6 +317,28 @@ fn render_node(
     } else {
         ""
     };
+    // A third, independent class that picks out *which* kind of matched pair this is, for
+    // color - `changed_class` above only says "not identical", not why. `Update` (a leaf whose
+    // text changed) gets its own color regardless of `changed_class`; a genuinely-`Identical` pair
+    // whose `before_path`/`after_path` differ (moved to a different position without any content
+    // change - see `Caches::before_moved`) gets a different one still, even though it's *not*
+    // `changed_class` (its content is identical, so it stays hidden by the "hide identical
+    // matches" toggle same as any other identical match - only its color differs).
+    let (operation, moved) = match side {
+        'b' => (
+            match_operation_before(node, caches),
+            is_moved_before(node, caches),
+        ),
+        _ => (
+            match_operation_after(node, caches),
+            is_moved_after(node, caches),
+        ),
+    };
+    let operation_class = match operation {
+        Some(HumanOperation::Update) => " op-update",
+        Some(HumanOperation::Identical) if moved => " op-moved",
+        _ => "",
+    };
 
     let other_side = if side == 'b' { 'a' } else { 'b' };
     let id_attr = format!("{side}-{}", node.id());
@@ -325,16 +357,17 @@ fn render_node(
         // exhaustively-annotated fixture), in which case it still has a real counterpart worth
         // linking to, even though its individual descendants aren't in the DOM to link to
         // themselves. Never carries `changed_class` in practice - `fully_quiet_subtree_sizes` only
-        // treats a `Matched` node as quiet (and thus placeholder-eligible) when it's identical.
+        // treats a `Matched` node as quiet (and thus placeholder-eligible) when it's identical -
+        // but `operation_class` can still be `op-moved` here (a whole subtree relocated intact).
         return format!(
-            r#"<div class="node leaf status-{status_class}{changed_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
         );
     }
 
     if node.child_count() == 0 {
         let label = escape_html_text(&leaf_label(node, src));
         format!(
-            r#"<div class="node leaf status-{status_class}{changed_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}</div>"#
         )
     } else {
         let mut children = String::new();
@@ -358,7 +391,7 @@ fn render_node(
             ""
         };
         format!(
-            r#"<details class="node status-{status_class}{changed_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}</summary>{children}</details>"#
+            r#"<details class="node status-{status_class}{changed_class}{operation_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}</summary>{children}</details>"#
         )
     }
 }
@@ -654,10 +687,117 @@ mod tests {
             );
 
             assert!(
-                before_html.contains(r#"status-matched changed""#),
+                before_html.contains("status-matched changed"),
                 "{operation:?} should render matched *and* changed: {before_html}"
             );
         }
+    }
+
+    #[test]
+    fn render_node_gives_update_and_matchbutnotidentical_different_operation_classes() {
+        let source = "fn f() {}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        for (operation, expected_class, unexpected_class) in [
+            (HumanOperation::Update, "op-update", "op-moved"),
+            (HumanOperation::MatchButNotIdentical, "", "op-update"),
+        ] {
+            let mapping = HumanMapping {
+                entries: vec![HumanMappingEntry {
+                    operation,
+                    before_path: Some(vec![]),
+                    after_path: Some(vec![]),
+                }],
+            };
+            let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+
+            let before_html = render_node(
+                before_root,
+                source.as_bytes(),
+                'b',
+                &caches,
+                status_before,
+                is_identical_before,
+                &HashMap::new(),
+                true,
+            );
+
+            if !expected_class.is_empty() {
+                assert!(
+                    before_html.contains(expected_class),
+                    "{operation:?} should get the {expected_class} class: {before_html}"
+                );
+            }
+            assert!(
+                !before_html.contains(unexpected_class),
+                "{operation:?} should not get the {unexpected_class} class: {before_html}"
+            );
+        }
+    }
+
+    #[test]
+    fn render_node_marks_an_identical_but_relocated_match_as_moved() {
+        let source_a = "fn f() {\n    a();\n    b();\n}\n";
+        let source_b = "fn f() {\n    b();\n    a();\n}\n";
+        let before_tree = parse_rust(source_a);
+        let after_tree = parse_rust(source_b);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        // `a();` is expression_statement:1 before, expression_statement:2 after (swapped with
+        // `b();`) - same content, different position.
+        let mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(vec![
+                    "function_item:1".to_string(),
+                    "block:1".to_string(),
+                    "expression_statement:1".to_string(),
+                ]),
+                after_path: Some(vec![
+                    "function_item:1".to_string(),
+                    "block:1".to_string(),
+                    "expression_statement:2".to_string(),
+                ]),
+            }],
+        };
+        let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+
+        let mut cursor = before_root.walk();
+        let function_item = before_root.children(&mut cursor).next().unwrap();
+        let mut c2 = function_item.walk();
+        let block = function_item
+            .children(&mut c2)
+            .find(|n| n.kind() == "block")
+            .unwrap();
+        let mut c3 = block.walk();
+        let call_statement = block
+            .children(&mut c3)
+            .find(|n| n.kind() == "expression_statement")
+            .unwrap();
+
+        let before_html = render_node(
+            call_statement,
+            source_a.as_bytes(),
+            'b',
+            &caches,
+            status_before,
+            is_identical_before,
+            &HashMap::new(),
+            true,
+        );
+
+        assert!(
+            before_html.contains("op-moved"),
+            "an Identical match at a different path should get the op-moved class: {before_html}"
+        );
+        assert!(
+            !before_html.contains("changed"),
+            "a moved-but-identical match is still content-identical, not changed: {before_html}"
+        );
     }
 
     #[test]

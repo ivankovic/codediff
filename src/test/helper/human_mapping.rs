@@ -175,6 +175,21 @@ pub struct Caches {
     /// match matched nodes' pre-existing default rendering/quietness.
     pub before_identical: HashMap<usize, bool>,
     pub after_identical: HashMap<usize, bool>,
+    /// The exact [`HumanOperation`] (`Identical`/`Update`/`MatchButNotIdentical`) a matched node's
+    /// pair was recorded as - a finer-grained sibling of `before_identical`/`after_identical`,
+    /// which only preserves the identical/not-identical split. `generate_mapping_site` uses this to
+    /// color `Update` (a leaf whose text changed) differently from `MatchButNotIdentical` (a
+    /// container whose subtree differs somewhere, or a confirmed cross-kind pairing).
+    pub before_operation: HashMap<usize, HumanOperation>,
+    pub after_operation: HashMap<usize, HumanOperation>,
+    /// Whether a matched node's `before_path` and `after_path` differ - i.e. the node sits at a
+    /// different position (different ancestor chain and/or sibling index) after the edit than
+    /// before it. Populated for every match-type entry, not just `Identical` ones, but the only
+    /// caller that reads it (`generate_mapping_site`'s "moved without change" coloring) only ever
+    /// consults it for `Identical` pairs - an `Update`/`MatchButNotIdentical` pair that also moved
+    /// doesn't get a separate visual treatment, since that hasn't come up in the fixture corpus.
+    pub before_moved: HashMap<usize, bool>,
+    pub after_moved: HashMap<usize, bool>,
     /// Number of entries that couldn't be resolved against the current trees (e.g. a
     /// hand-edited or stale mapping file). Surfaced by callers (e.g. `human_solver`'s footer)
     /// rather than treated as fatal, so a bad mapping file doesn't block the caller outright.
@@ -204,6 +219,11 @@ pub fn rebuild_caches(
                 let identical = entry.operation == HumanOperation::Identical;
                 caches.before_identical.insert(b.id(), identical);
                 caches.after_identical.insert(a.id(), identical);
+                caches.before_operation.insert(b.id(), entry.operation);
+                caches.after_operation.insert(a.id(), entry.operation);
+                let moved = before_path != after_path;
+                caches.before_moved.insert(b.id(), moved);
+                caches.after_moved.insert(a.id(), moved);
                 Some(())
             })(),
             HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
@@ -267,6 +287,33 @@ pub fn is_identical_after(node: Node, caches: &Caches) -> bool {
         .get(&node.id())
         .copied()
         .unwrap_or(true)
+}
+
+/// The exact [`HumanOperation`] a matched before-node's pair was recorded as, or `None` if `node`
+/// isn't matched at all (or `caches` was built by hand rather than via [`rebuild_caches`]).
+pub fn match_operation_before(node: Node, caches: &Caches) -> Option<HumanOperation> {
+    caches.before_operation.get(&node.id()).copied()
+}
+
+/// After-side counterpart of [`match_operation_before`].
+pub fn match_operation_after(node: Node, caches: &Caches) -> Option<HumanOperation> {
+    caches.after_operation.get(&node.id()).copied()
+}
+
+/// Whether a matched before-node's `before_path` differed from its pair's `after_path` - see
+/// `Caches::before_moved`. Defaults to `false` (not moved) when absent, the same "assume nothing
+/// noteworthy" convention [`is_identical_before`] uses for its own default.
+pub fn is_moved_before(node: Node, caches: &Caches) -> bool {
+    caches
+        .before_moved
+        .get(&node.id())
+        .copied()
+        .unwrap_or(false)
+}
+
+/// After-side counterpart of [`is_moved_before`].
+pub fn is_moved_after(node: Node, caches: &Caches) -> bool {
+    caches.after_moved.get(&node.id()).copied().unwrap_or(false)
 }
 
 pub fn status_before(node: Node, caches: &Caches) -> NodeStatus {
@@ -1104,6 +1151,80 @@ mod tests {
         // quiet/undecorated rendering when a `Caches` is built by hand rather than via
         // `rebuild_caches`).
         assert!(is_identical_before(before_root, &caches));
+
+        assert_eq!(
+            match_operation_before(identical_stmt, &caches),
+            Some(HumanOperation::Identical)
+        );
+        assert_eq!(
+            match_operation_before(update_stmt, &caches),
+            Some(HumanOperation::Update)
+        );
+        assert_eq!(
+            match_operation_before(match_but_not_identical_stmt, &caches),
+            Some(HumanOperation::MatchButNotIdentical)
+        );
+        assert_eq!(match_operation_before(before_root, &caches), None);
+
+        // None of these three moved - before/after paths line up 1:1 since nothing reordered.
+        assert!(!is_moved_before(identical_stmt, &caches));
+        assert!(!is_moved_after(after_statements[0], &caches));
+        assert!(!is_moved_before(update_stmt, &caches));
+        assert!(!is_moved_before(match_but_not_identical_stmt, &caches));
+
+        Ok(())
+    }
+
+    #[test]
+    fn rebuild_caches_flags_an_identical_match_at_a_different_path_as_moved() -> Result<()> {
+        let before_source = "fn f() {\n    a();\n    b();\n}\n";
+        let after_source = "fn f() {\n    b();\n    a();\n}\n";
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
+            .unwrap();
+        let before_tree = parser.parse(before_source, None).unwrap();
+        let after_tree = parser.parse(after_source, None).unwrap();
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        fn find_call<'a>(root: Node<'a>, text: &str, src: &str) -> Node<'a> {
+            let function_item = root.child(0).unwrap();
+            let mut c = function_item.walk();
+            let block = function_item
+                .children(&mut c)
+                .find(|n| n.kind() == "block")
+                .unwrap();
+            let mut sc = block.walk();
+            block
+                .children(&mut sc)
+                .find(|n| {
+                    n.kind() == "expression_statement"
+                        && n.utf8_text(src.as_bytes()).unwrap().starts_with(text)
+                })
+                .unwrap()
+        }
+        let before_a = find_call(before_root, "a", before_source);
+        let after_a = find_call(after_root, "a", after_source);
+
+        let entries = vec![HumanMappingEntry {
+            operation: HumanOperation::Identical,
+            before_path: Some(path_for_node(before_a)),
+            after_path: Some(path_for_node(after_a)),
+        }];
+        let caches = rebuild_caches(&entries, before_root, after_root);
+
+        assert_ne!(
+            path_for_node(before_a),
+            path_for_node(after_a),
+            "fixture assumption broken: swapping a();/b(); should change a()'s occurrence path"
+        );
+        assert!(is_moved_before(before_a, &caches));
+        assert!(is_moved_after(after_a, &caches));
+        assert!(
+            is_identical_before(before_a, &caches),
+            "moved but content-identical is still identical, not changed"
+        );
 
         Ok(())
     }

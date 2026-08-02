@@ -8,6 +8,8 @@
   --matched: #0969da;
   --deleted: #cf222e;
   --inserted: #1a7f37;
+  --update: #9a6700;
+  --moved: #8250df;
   --selected-bg: #ffe58a;
   --selected-fg: #1a1a1a;
   --highlight-bg: #cfe6ff;
@@ -27,6 +29,8 @@
     --matched: #58a6ff;
     --deleted: #ff7b72;
     --inserted: #56d364;
+    --update: #d29922;
+    --moved: #a371f7;
     --selected-bg: #6b5900;
     --selected-fg: #f5e6a8;
     --highlight-bg: #16324a;
@@ -81,6 +85,23 @@ a {
   display: inline-block;
   margin-left: 0.75rem;
   font-size: 0.8rem;
+}
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
 }
 
 .fixture-list {
@@ -205,6 +226,20 @@ details.node > summary:hover {
    toggle below must never hide. */
 .changed {
   font-weight: 700;
+}
+
+/* Which kind of matched pair this is - independent of `.changed` above, and overrides
+   `.status-matched`'s plain blue (two classes beats one on specificity, so this wins regardless of
+   the two rules' order in this file). `.op-update`: a leaf whose text changed (still `.changed` -
+   yellow AND bold). `.op-moved`: a genuinely `Identical` pair - same content - that nonetheless
+   sits at a different position than before (see `Caches::before_moved` in human_mapping.rs); never
+   `.changed` and not bold, since nothing about its content differs, only where it is. */
+.status-matched.op-update {
+  color: var(--update);
+}
+
+.status-matched.op-moved {
+  color: var(--moved);
 }
 
 /* Toggled on <body> by viewer.js's "hide identical matches" button/keybinding. Hides any node
