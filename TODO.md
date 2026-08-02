@@ -2271,3 +2271,66 @@ approximate tree-edit-distance fallback for a single large pair, in the spirit o
 `EXPENSIVE_RESIDUAL_THRESHOLD`, or (b) recognizing smaller structural pieces *within* a changed
 method/function body as their own named-or-positional candidates, so a real edit deep inside a
 large body doesn't force one whole-body APTED call - see the next entry for (b).
+
+## Explored and shelved: recognizing smaller structural pieces within a changed method (2026-08-02, user-requested)
+
+Followed lever (b) from the entry above. Read the actual content of `ruby-homebrew-add-or-
+expression`'s dominant 724.8ms call (`generate_formula_struct_hash`): a flat sequence of 33
+independent `hash["key"] = ...` statements, every key unique, 31/33 byte-identical - not a
+coincidence, this is a Homebrew-API-style hash/struct-builder function. That shape suggested two
+candidate mechanisms, both grounded in existing infrastructure rather than new algorithms:
+
+1. **Generalize the flat-tree Myers fast path** (`resolve_forest`'s existing leaf-children-only
+   O(ND) sequence diff) from "all direct children are leaves" to "direct children compared by full
+   subtree hash, leaf or not" - would pre-match the 31 unchanged statements as opaque hash-equal
+   units before the containing method's own APTED call, same principle `solve_large_flat_subtrees`
+   already uses for BFS-found `>= 50`-child flat descendants, just without the leaf-only and
+   50-child restrictions. Needs a genuinely new hash-based Myers/LCS primitive (today's fast path is
+   leaf-only, doesn't generalize by itself).
+
+2. **User's idea: track variables/assignment-targets by name within a scope and use that as an
+   anchor**, the same way `is_semantically_structural` already anchors on function/class names -
+   i.e. recognize `hash["key"] = ...`-style (or general variable-declaration) statements as
+   additional named candidates, scoped `_within` an already-matched container (reusing
+   `solve_named_reference_groups_within`/`grouped_greedy_matcher` verbatim), gated on the target
+   name being provably unique within that scope (count == 1 on both sides) to avoid the exact
+   false-positive risk already documented and rejected for a general hash-based pre-matching pass
+   (`resolve_forest`'s own doc comment: same-kind-but-unrelated nodes elsewhere in the file scoring
+   as a false "free rename" partner - loop counters/temp variables like `i`/`x`/`result` are
+   *not* reliably unique the way function names are). More powerful than (1) where it applies:
+   insensitive to reordering, and matches by identity even when the assigned value is 100%
+   rewritten (same philosophy as function-name matching).
+
+**Checked against the other phase-4-heavy fixtures first** (before building either): `c-postgres-
+real-logic-change`'s dominant cost is a whole `if` block genuinely *moved* across function
+boundaries plus real control-flow restructuring - not a statement sequence at all, arguably phase
+7's (`solve_moved_subtrees`) territory rather than phase 4's. `c-linux-small-change-struct-to-char`
+changes one variable's type (`struct symbol *` -> `const char *`); every *use* is scattered through
+the function's real branching structure (nested `if`/`WARN`/`ERROR` calls) rather than concentrated
+in a prunable, independent region - knowing "this is `code_sym` everywhere" doesn't let you skip
+visiting the branches it appears in. Neither fixture fits the pattern either idea targets.
+
+**Measured directly** (throwaway diagnostic in `src/diff/nodes.rs`, deleted after use): for every
+named candidate `>= 300` nodes across all Ruby/C fixtures in the corpus, extracted `hash[key] = `/
+plain-identifier assignment targets and computed what fraction of the candidate's own size is
+covered by assignment statements whose target name is unique (count 1) within that candidate.
+Result: **54 candidates across 11 fixtures; only the 4 from `ruby-homebrew-add-or-expression`
+(54.8-84.7% coverage) clear even a 40% bar - every one of the other 50 (all C, spanning
+`c-linux-small-change-struct-to-char`, `c-linux-small-bugfix`, `c-postgres-real-logic-change`,
+`c-nginx-add-typedef`, including fixtures never hand-inspected) sits at 2-30%, typically under
+15%.** Consistent with the hand-inspection above: C-family code in this corpus is control-flow-
+heavy (conditionals, function calls, error handling), not declarative data construction - the
+"long run of independent, uniquely-targeted assignments" shape this idea needs is Ruby-hash/
+JS-object/Python-dict/struct-literal-builder shaped, and this corpus is dominated by systems-level
+C, where it essentially doesn't occur. (Caveat: the measurement only recognized plain assignment
+statements, not C declaration-initializers or designated struct-literal initializers - a real gap,
+but the hand-inspected functions were if/else-and-function-call heavy, not struct builders, so
+this is unlikely to flip the conclusion.)
+
+**Conclusion: shelved, not implemented.** Both mechanisms are correctly diagnosed fixes for
+`ruby-homebrew-add-or-expression`'s specific pattern, but the measurement shows that pattern
+covers roughly 1 fixture out of 157 in the current corpus, not the general "large function, one
+real edit" problem the other phase-4-heavy fixtures represent - doesn't clear the bar for the
+implementation cost (a new hash-based Myers primitive, or a new per-language "assignment target"
+recognizer, `_within`-scoped and uniqueness-gated). Worth revisiting if the corpus grows to include
+more declarative/data-construction-heavy languages (JS/TS, Python) where this shape is more common.
