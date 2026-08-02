@@ -2665,3 +2665,25 @@ hard-fails on the deliberate +15, same as prior entries - baseline file updated 
 `target/benchmark_optimal_output.txt` that run still wrote, then `make check-quality` re-run clean
 against the new baseline). `cargo test --lib --features test-fixtures optimal_solutions::`:
 178/0/0.
+
+## 1 new optimal-solution fixture added, clamped (2026-08-02)
+
+Added `kotlin-nextcloud-android-extract-argument-into-variable`, needing
+`assert_matches_human_mapping_within_limit(3)`.
+
+**The gap**: the edit extracts `dimensions[i]` (a call argument) into a new `val dim = ...` line
+just above the call, replacing the argument with `dim`. The human ground truth reuses the original
+`dimensions`/`i` identifier tokens inside the new line's `dimensions.getOrNull(i)` call (treating
+them as relocated, not new) and marks the call site's new `dim` argument as a genuine `Insert`.
+`syntax_named` instead pairs `dimensions`/`i` with same-named identifiers elsewhere in this
+~200-line file (an `Update`, not the human's intended pairing) and pairs the new `dim` argument with
+some other existing identifier by name rather than recognizing it as new - the same
+same-name-identifier-ambiguity class already documented above (`shellscript-genymobile-scrcpy-add-
+two-flags`, `vimscript-neovim-neovim-add-line-comment`), just via `syntax_named` instead of
+`final_pass`.
+
+**Quality baseline updated**: `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` 3360 -> 3363
+(exactly the new fixture's own 3), `MS_PER_FIXTURE` 2254.3 -> 2256.6 (168 fixtures now, up from
+167), via `make update-quality-baseline` (same hand-update-then-reverify workflow as the entry
+above - its `check-quality` prerequisite hard-fails on the deliberate +3). `cargo test --lib
+--features test-fixtures optimal_solutions::`: 179/0/0.
