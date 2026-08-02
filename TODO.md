@@ -2093,3 +2093,53 @@ a much bigger design question than the other gaps documented above.
 (exactly the two new fixtures' own 2 + 1), `MS_PER_FIXTURE` 1226.7 -> 1286.8, via
 `benchmark_optimal_solutions --csv`. `make check-quality`: clean against the new baseline.
 `cargo test --release --features test-fixtures --lib`: 523/0/5.
+
+## Speed goal: profiled the 10 slowest fixtures - phase 4 (syntax-aware named-group matching) is the dominant cost for 8 of them (2026-08-02, user-requested)
+
+Fresh `benchmark_other --repeats 3` (156 fixtures, all today's new ones included): codediff median
+8.07ms (**meets** the `/goal` target, <=20ms), p90 292.82ms (misses, target <=100ms, ~2.9x over),
+max 4188.82ms (misses, target <=400ms, ~10.5x over) - 468 flattened per-repeat `codediff_ms`
+samples from `research/benchmark_other.csv`, same methodology as the historical `/goal`
+checkpoints (see "Real fix landed" above).
+
+Added a temporary `#[ignore]`d test in `src/diff.rs` (`profile_phase_timing_for_slowest_fixtures`,
+deleted after use, same pattern as `src/bin/clone_test.rs`) that re-runs `pending_with_config`'s 7
+phases individually with `Instant::now()` timing, against the 10 slowest fixtures from that run:
+
+| fixture | total | dominant phase |
+|---|---|---|
+| ruby-homebrew-add-or-expression | 4293.7ms | phase 4: 4213.1ms (98.1%) |
+| yaml-mastodon-remove-one-pair | 2615.1ms | phase 4: 2439.3ms (93.3%) |
+| kotlin-nextcloud-a-few-small-removals | 1525.9ms | phase 4: 1451.0ms (95.1%) |
+| cpp-ladybird-refactor-variables-if-changes | 1475.0ms | phase 4: 1335.9ms (90.6%) |
+| c-nginx-add-typedef | 1282.8ms | phase 4: 622.7ms (48.5%), phase 6: 561.0ms (43.7%) |
+| rust-turbopack-module-rule | 1124.0ms | phase 6: 818.2ms (72.8%), phase 4: 268.9ms (23.9%) |
+| c-postgres-real-logic-change | 1052.0ms | phase 4: 871.3ms (82.8%) |
+| cpp-opencv-add-test-case | 907.8ms | phase 4: 782.0ms (86.2%) |
+| c-linux-small-change-struct-to-char | 996.3ms | phase 4: 738.2ms (74.1%) |
+| json-langflow-update-single-string | 1299.8ms | phase 2: 632.9ms (48.7%), phase 4: 308.1ms (23.7%) |
+
+**Phase 4 (`solve_syntax_aware_matching`) dominates 8/10**, usually 75-98% of total time. The
+mechanism: its named-reference-group mechanism (`solve_named_reference_groups_within` ->
+`match_named_groups` -> `grouped_greedy_matcher::solve`) calls `apted::for_nodes` once per
+*accepted* same-name candidate pair (e.g. once per matched Ruby `def`/method, not once per node) -
+`grouped_greedy_matcher`'s own cost-scoring/greedy-acceptance step is cheap (a caller-supplied
+non-APTED cost function), but `on_accept` is a real full-APTED call on that pair's whole subtree.
+`ruby-homebrew-add-or-expression` is only 299/300 lines with 14 top-level `def`s, so this isn't
+"many small calls" adding up - it's a handful of those 14 subtree-APTED calls each individually
+expensive, consistent with APTED's known superlinear-in-subtree-size cost curve. Not measured
+precisely (which specific method(s), or their exact subtree sizes) - would need one more
+instrumentation pass inside `match_named_groups`'s `on_accept` closure to name them.
+
+Two fixtures don't fit that pattern: `c-nginx-add-typedef`/`rust-turbopack-module-rule` are instead
+phase-6-heavy (final whole-file APTED on a several-hundred-node residual - under
+`EXPENSIVE_RESIDUAL_THRESHOLD` so it pays full APTED, not the cheap fallback, but still real cost
+at that size). `json-langflow-update-single-string` (46272 nodes, the largest fixture in the
+corpus) is phase-2-heavy instead (`solve_comment_nodes`/`solve_identical_diagnostic_statements`) -
+likely just sheer node-count cost in an otherwise-linear scan, not a per-node inefficiency.
+
+**Not yet investigated further**: whether phase 4's per-pair full-APTED calls could reuse a
+size/cost gate similar to `EXPENSIVE_RESIDUAL_THRESHOLD` (phase 6's), or whether specific named
+subtrees here are unusually pathological for APTED regardless of raw size. This entry is
+measurement/diagnosis only, per what was asked - no code changed as a result (`git diff --stat
+src/diff.rs` is empty; the profiling test was deleted after use).
