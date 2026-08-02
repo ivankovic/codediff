@@ -60,8 +60,7 @@
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use codediff::code::{Code, Language};
-use codediff::diff::text::{TextDiff, TextOperation, line_operations};
-use codediff::diff::{self, ASTDiff, NodeCache};
+use codediff::diff::{self, NodeCache};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
 use csv::Writer;
@@ -154,100 +153,14 @@ impl ExternalTool {
     /// called by `main`'s corpus loop) when `supports` is true for the pair's language.
     fn line_labels(&self, before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
         match self {
-            ExternalTool::UnixDiff => unix_diff_line_labels(before, after),
+            // Shared with `generate_mapping_site`'s index-page columns - see
+            // `human_mapping::unix_diff_line_labels`'s own doc comment.
+            ExternalTool::UnixDiff => human_mapping::unix_diff_line_labels(before, after),
             ExternalTool::GumTree => gumtree_line_labels(before, after),
             ExternalTool::Difftastic => difftastic_line_labels(before, after),
             ExternalTool::Diffsitter => diffsitter_line_labels(before, after),
         }
     }
-}
-
-/// Shells out to the real `diff`, not a reimplementation - the whole point of this benchmark is
-/// comparing against the actual tool people run. Writes `before`/`after`'s contents to fresh temp
-/// files rather than trusting a fixture's on-disk `before.<lang>.test`/`after.<lang>.test` naming,
-/// so this works for any `Code` pair, not just ones that came from a fixture directory.
-///
-/// Uses GNU diffutils' `--old-line-format`/`--new-line-format`/`--unchanged-line-format` (`%dn`
-/// prints a line's 1-indexed line number) instead of parsing unified-diff hunk headers by hand -
-/// two invocations (one per side), each printing exactly the touched line numbers on that side and
-/// nothing else. This offloads all the hunk/context accounting to `diff` itself rather than
-/// re-deriving it from `-u` output, which would also have to special-case "\ No newline at end of
-/// file" and multi-line hunks.
-fn unix_diff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
-    let mut before_file = tempfile::NamedTempFile::new().context("creating before temp file")?;
-    let mut after_file = tempfile::NamedTempFile::new().context("creating after temp file")?;
-    before_file
-        .write_all(before.contents.as_bytes())
-        .context("writing before temp file")?;
-    after_file
-        .write_all(after.contents.as_bytes())
-        .context("writing after temp file")?;
-
-    let before_line_count = before.contents.split('\n').count();
-    let after_line_count = after.contents.split('\n').count();
-
-    let before_touched = touched_line_numbers(
-        &[
-            "--old-line-format=%dn\n",
-            "--new-line-format=",
-            "--unchanged-line-format=",
-        ],
-        before_file.path(),
-        after_file.path(),
-        before_line_count,
-    )?;
-    let after_touched = touched_line_numbers(
-        &[
-            "--old-line-format=",
-            "--new-line-format=%dn\n",
-            "--unchanged-line-format=",
-        ],
-        before_file.path(),
-        after_file.path(),
-        after_line_count,
-    )?;
-
-    Ok((before_touched, after_touched))
-}
-
-/// Runs `diff` with the given `--*-line-format` flags (see `unix_diff_line_labels`) and turns its
-/// stdout - one 1-indexed line number per line - into a 0-indexed `line_count`-long touched mask.
-fn touched_line_numbers(
-    format_flags: &[&str],
-    before_path: &std::path::Path,
-    after_path: &std::path::Path,
-    line_count: usize,
-) -> Result<Vec<bool>> {
-    let output = Command::new("diff")
-        .args(format_flags)
-        .arg(before_path)
-        .arg(after_path)
-        .output()
-        .context("running `diff` - is diffutils installed?")?;
-    // diff exits 0 for "no differences" and 1 for "differences found" - both are success for our
-    // purposes. 2+ is a real error (bad flags, unreadable file, ...).
-    if output.status.code().is_none_or(|c| c > 1) {
-        bail!(
-            "diff exited with {:?}: {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    let mut touched = vec![false; line_count];
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let line_number: usize = line
-            .trim()
-            .parse()
-            .with_context(|| format!("parsing diff output line {:?}", line))?;
-        if let Some(slot) = line_number
-            .checked_sub(1)
-            .and_then(|idx| touched.get_mut(idx))
-        {
-            *slot = true;
-        }
-    }
-    Ok(touched)
 }
 
 /// `(generator id, file extension)` for every corpus language GumTree v4.0.0-beta8 has a
@@ -843,41 +756,6 @@ fn diffsitter_touched_from_json(
     Ok((before_touched, after_touched))
 }
 
-/// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against
-/// an `ExternalTool`, which has no notion of codediff's finer-grained Update/Move/... distinction.
-fn touched(ops: &[TextOperation]) -> Vec<bool> {
-    ops.iter()
-        .map(|op| *op != TextOperation::Identical)
-        .collect()
-}
-
-/// Projects `ast_diff` down to per-line touched masks for both sides, via the same
-/// `TextDiff`/`line_operations` path used for both codediff's own diff and the synthetic
-/// human-mapping diff - so the two are reduced to line labels identically.
-fn touched_lines(
-    before: &Code,
-    after: &Code,
-    ast_diff: &ASTDiff,
-    node_cache: &NodeCache,
-) -> (Vec<bool>, Vec<bool>) {
-    let text_diff = TextDiff::from(before, after, ast_diff, node_cache);
-    let before_ops = line_operations(&text_diff.all(0), before.contents.split('\n').count());
-    let after_ops = line_operations(&text_diff.all(1), after.contents.split('\n').count());
-    (touched(&before_ops), touched(&after_ops))
-}
-
-/// Number of positions where `a` and `b` disagree. Panics on a length mismatch - `a`/`b` always
-/// come from splitting the exact same `contents` string on `'\n'`, so their lengths can never
-/// legitimately differ.
-fn disagreement_count(a: &[bool], b: &[bool]) -> usize {
-    assert_eq!(
-        a.len(),
-        b.len(),
-        "line count mismatch between two labelings of the same file"
-    );
-    a.iter().zip(b).filter(|(x, y)| x != y).count()
-}
-
 /// Milliseconds tree-sitter alone takes to parse `source`'s contents into an AST - a reference
 /// lower bound, not an `ExternalTool`: it produces no line labels and is never scored for
 /// accuracy, only timed. Every AST-aware tool in this benchmark (codediff included) must pay at
@@ -944,7 +822,8 @@ fn score_fixture(
     let language = before.metadata.language.unwrap_or_default();
     let human_diff = human_mapping::as_ast_diff(name, before, after)?;
     let node_cache = NodeCache::build(before, after);
-    let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
+    let (human_before, human_after) =
+        human_mapping::touched_lines(before, after, &human_diff, &node_cache);
     let total_lines = human_before.len() + human_after.len();
 
     // Mismatch/accuracy counts are computed once, on the first repeat only - the algorithms under
@@ -960,11 +839,12 @@ fn score_fixture(
             .ast
             .context("codediff produced no AST mapping")?;
         let (codediff_before, codediff_after) =
-            touched_lines(before, after, &codediff_ast, &node_cache);
+            human_mapping::touched_lines(before, after, &codediff_ast, &node_cache);
         codediff_ms.push(started.elapsed().as_secs_f64() * 1000.0);
         if i == 0 {
-            codediff_mismatches = disagreement_count(&human_before, &codediff_before)
-                + disagreement_count(&human_after, &codediff_after);
+            codediff_mismatches =
+                human_mapping::line_disagreement_count(&human_before, &codediff_before)
+                    + human_mapping::line_disagreement_count(&human_after, &codediff_after);
         }
     }
 
@@ -983,8 +863,8 @@ fn score_fixture(
             let (tool_before, tool_after) = tool.line_labels(before, after)?;
             ms.push(started.elapsed().as_secs_f64() * 1000.0);
             if i == 0 {
-                mismatches = disagreement_count(&human_before, &tool_before)
-                    + disagreement_count(&human_after, &tool_after);
+                mismatches = human_mapping::line_disagreement_count(&human_before, &tool_before)
+                    + human_mapping::line_disagreement_count(&human_after, &tool_after);
             }
         }
         tool_ms.push(Some(ms));
@@ -1014,14 +894,15 @@ fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
     let language = before.metadata.language.unwrap_or_default();
     let human_diff = human_mapping::as_ast_diff(name, before, after)?;
     let node_cache = NodeCache::build(before, after);
-    let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
+    let (human_before, human_after) =
+        human_mapping::touched_lines(before, after, &human_diff, &node_cache);
 
     let codediff_diff = diff::diff_code(before, after);
     let codediff_ast = codediff_diff
         .ast
         .context("codediff produced no AST mapping")?;
     let (codediff_before, codediff_after) =
-        touched_lines(before, after, &codediff_ast, &node_cache);
+        human_mapping::touched_lines(before, after, &codediff_ast, &node_cache);
 
     let mut sources: Vec<(&str, Vec<bool>, Vec<bool>)> =
         vec![("codediff", codediff_before, codediff_after)];

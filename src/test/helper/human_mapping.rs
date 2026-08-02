@@ -923,6 +923,196 @@ pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Cod
     node_cache.before.len() + node_cache.after.len()
 }
 
+/// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against a
+/// line-only external tool (e.g. Unix `diff`), which has no notion of an AST node at all, only
+/// "this line differs."
+fn touched(ops: &[crate::diff::text::TextOperation]) -> Vec<bool> {
+    ops.iter()
+        .map(|op| *op != crate::diff::text::TextOperation::Identical)
+        .collect()
+}
+
+/**
+* Projects `ast_diff` down to per-line touched masks for both sides, via `TextDiff`/
+* `line_operations` - the same path both codediff's own diff and a synthetic human-mapping diff
+* (see [`as_ast_diff`]) go through, so any two diffs of the same before/after pair reduce to line
+* labels identically and are safe to compare with [`line_disagreement_count`].
+*
+* Shared by `benchmark_other` (scores several external line-only tools this way) and
+* [`line_mismatches_for`] below (the "codediff mismatches"/"unix diff mismatches" columns
+* `generate_mapping_site` puts on its index page) - kept in one place so the two can't drift.
+*/
+pub fn touched_lines(
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    ast_diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> (Vec<bool>, Vec<bool>) {
+    let text_diff = crate::diff::text::TextDiff::from(before, after, ast_diff, node_cache);
+    let before_ops =
+        crate::diff::text::line_operations(&text_diff.all(0), before.contents.split('\n').count());
+    let after_ops =
+        crate::diff::text::line_operations(&text_diff.all(1), after.contents.split('\n').count());
+    (touched(&before_ops), touched(&after_ops))
+}
+
+/// Number of positions where `a` and `b` disagree. Panics on a length mismatch - `a`/`b` always
+/// come from splitting the exact same `contents` string on `'\n'`, so their lengths can never
+/// legitimately differ.
+pub fn line_disagreement_count(a: &[bool], b: &[bool]) -> usize {
+    assert_eq!(
+        a.len(),
+        b.len(),
+        "line count mismatch between two labelings of the same file"
+    );
+    a.iter().zip(b).filter(|(x, y)| x != y).count()
+}
+
+/**
+* Shells out to the real `diff`, not a reimplementation - the whole point of comparing against it
+* is comparing against the actual tool people run. Writes `before`/`after`'s contents to fresh temp
+* files rather than trusting a fixture's on-disk `before.<lang>.test`/`after.<lang>.test` naming, so
+* this works for any `Code` pair, not just ones that came from a fixture directory.
+*
+* Uses GNU diffutils' `--old-line-format`/`--new-line-format`/`--unchanged-line-format` (`%dn`
+* prints a line's 1-indexed line number) instead of parsing unified-diff hunk headers by hand - two
+* invocations (one per side), each printing exactly the touched line numbers on that side and
+* nothing else.
+*/
+pub fn unix_diff_line_labels(
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let mut before_file = tempfile::NamedTempFile::new().context("creating before temp file")?;
+    let mut after_file = tempfile::NamedTempFile::new().context("creating after temp file")?;
+    std::io::Write::write_all(&mut before_file, before.contents.as_bytes())
+        .context("writing before temp file")?;
+    std::io::Write::write_all(&mut after_file, after.contents.as_bytes())
+        .context("writing after temp file")?;
+
+    let before_line_count = before.contents.split('\n').count();
+    let after_line_count = after.contents.split('\n').count();
+
+    let before_touched = touched_line_numbers(
+        &[
+            "--old-line-format=%dn\n",
+            "--new-line-format=",
+            "--unchanged-line-format=",
+        ],
+        before_file.path(),
+        after_file.path(),
+        before_line_count,
+    )?;
+    let after_touched = touched_line_numbers(
+        &[
+            "--old-line-format=",
+            "--new-line-format=%dn\n",
+            "--unchanged-line-format=",
+        ],
+        before_file.path(),
+        after_file.path(),
+        after_line_count,
+    )?;
+
+    Ok((before_touched, after_touched))
+}
+
+/// Runs `diff` with the given `--*-line-format` flags (see [`unix_diff_line_labels`]) and turns
+/// its stdout - one 1-indexed line number per line - into a 0-indexed `line_count`-long touched
+/// mask.
+fn touched_line_numbers(
+    format_flags: &[&str],
+    before_path: &std::path::Path,
+    after_path: &std::path::Path,
+    line_count: usize,
+) -> Result<Vec<bool>> {
+    let output = std::process::Command::new("diff")
+        .args(format_flags)
+        .arg(before_path)
+        .arg(after_path)
+        .output()
+        .context("running `diff` - is diffutils installed?")?;
+    // diff exits 0 for "no differences" and 1 for "differences found" - both are success for our
+    // purposes. 2+ is a real error (bad flags, unreadable file, ...).
+    if output.status.code().is_none_or(|c| c > 1) {
+        bail!(
+            "diff exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let mut touched = vec![false; line_count];
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let line_number: usize = line
+            .trim()
+            .parse()
+            .with_context(|| format!("parsing diff output line {:?}", line))?;
+        if let Some(slot) = line_number
+            .checked_sub(1)
+            .and_then(|idx| touched.get_mut(idx))
+        {
+            *slot = true;
+        }
+    }
+    Ok(touched)
+}
+
+/// Line-level mismatch counts for one fixture, both against the human-authored mapping's own
+/// per-line projection (see [`touched_lines`]) - `codediff` and `unix_diff` are directly
+/// comparable to each other (same `total_lines` denominator, same projection method), which is the
+/// whole point: unlike an AST-node mismatch count, a line mismatch count is meaningful for a
+/// line-only tool like Unix `diff` too.
+pub struct LineMismatches {
+    pub codediff: usize,
+    pub unix_diff: usize,
+    /// `before`'s line count plus `after`'s - the denominator both `codediff` and `unix_diff` are
+    /// counted out of.
+    pub total_lines: usize,
+}
+
+/**
+* Computes [`LineMismatches`] for one fixture: codediff's own diff and Unix `diff`, each reduced to
+* per-line touched/untouched labels and compared against the human mapping's own projection of the
+* same shape (see [`touched_lines`]/[`as_ast_diff`]).
+*
+* This is deliberately narrower than `benchmark_other`'s full `ExternalTool` comparison (which also
+* covers GumTree, difftastic, and diffsitter) - those each need a separately-installed, non-Cargo
+* binary pointed at by an environment variable, which `generate_mapping_site` (the only caller of
+* this function, for its index page's sortable "codediff mismatches"/"unix diff mismatches"
+* columns) can't assume is present. Unix `diff` alone needs nothing beyond the `diff` binary every
+* CI runner and dev machine already has.
+*/
+pub fn line_mismatches_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<LineMismatches> {
+    let human_diff = as_ast_diff(name, before, after)?;
+    let node_cache = NodeCache::build(before, after);
+    let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
+    let total_lines = human_before.len() + human_after.len();
+
+    let codediff_diff = crate::diff::diff_code(before, after);
+    let codediff_ast = codediff_diff
+        .ast
+        .context("codediff produced no AST mapping")?;
+    let (codediff_before, codediff_after) =
+        touched_lines(before, after, &codediff_ast, &node_cache);
+    let codediff = line_disagreement_count(&human_before, &codediff_before)
+        + line_disagreement_count(&human_after, &codediff_after);
+
+    let (unix_before, unix_after) = unix_diff_line_labels(before, after)?;
+    let unix_diff = line_disagreement_count(&human_before, &unix_before)
+        + line_disagreement_count(&human_after, &unix_after);
+
+    Ok(LineMismatches {
+        codediff,
+        unix_diff,
+        total_lines,
+    })
+}
+
 /**
 * Same as [`compute_mismatches`], but takes an already-loaded before/after pair instead of looking
 * it up in a freshly-fetched `handmade_test_code_pairs()` map.
@@ -1073,6 +1263,60 @@ mod tests {
             HumanOperation::DeleteWithChildren
         );
         assert!(round_tripped.entries[1].after_path.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn line_disagreement_count_counts_positions_where_the_two_slices_differ() {
+        assert_eq!(
+            line_disagreement_count(&[true, false, true], &[true, false, true]),
+            0
+        );
+        assert_eq!(
+            line_disagreement_count(&[true, false, true], &[false, false, true]),
+            1
+        );
+        assert_eq!(
+            line_disagreement_count(&[true, true, true], &[false, false, false]),
+            3
+        );
+    }
+
+    #[test]
+    fn unix_diff_line_labels_marks_only_the_changed_line_on_each_side() {
+        let before = crate::code::Code::from_string("a\nb\nc\n", &Language::Unknown);
+        let after = crate::code::Code::from_string("a\nx\nc\n", &Language::Unknown);
+
+        let (before_touched, after_touched) = unix_diff_line_labels(&before, &after).unwrap();
+
+        assert_eq!(before_touched, vec![false, true, false, false]);
+        assert_eq!(after_touched, vec![false, true, false, false]);
+    }
+
+    #[test]
+    fn unix_diff_line_labels_marks_nothing_for_identical_files() {
+        let before = crate::code::Code::from_string("a\nb\nc\n", &Language::Unknown);
+        let after = crate::code::Code::from_string("a\nb\nc\n", &Language::Unknown);
+
+        let (before_touched, after_touched) = unix_diff_line_labels(&before, &after).unwrap();
+
+        assert!(before_touched.iter().all(|&t| !t));
+        assert!(after_touched.iter().all(|&t| !t));
+    }
+
+    #[test]
+    fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
+        // rust-no-change is fully identical before/after, so codediff and Unix diff both agree
+        // with the (trivially all-untouched) human mapping perfectly.
+        let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
+        let (before, after) = test_diffs.get("rust-no-change").unwrap();
+
+        let result = line_mismatches_for("rust-no-change", before, after)?;
+
+        assert_eq!(result.codediff, 0);
+        assert_eq!(result.unix_diff, 0);
+        assert!(result.total_lines > 0);
 
         Ok(())
     }

@@ -76,12 +76,16 @@ fn main() -> Result<()> {
         assets_dir.join("viewer.js"),
         include_str!("../../assets/mapping_site/viewer.js"),
     )?;
+    fs::write(
+        assets_dir.join("index.js"),
+        include_str!("../../assets/mapping_site/index.js"),
+    )?;
 
     let pairs = helper::handmade_test_code_pairs()?;
     let mut names: Vec<&String> = pairs.keys().collect();
     names.sort();
 
-    let mut index_entries: Vec<(String, Language)> = Vec::new();
+    let mut index_entries: Vec<IndexEntry> = Vec::new();
     let mut skipped = 0usize;
 
     for name in names {
@@ -101,7 +105,19 @@ fn main() -> Result<()> {
             .with_context(|| format!("writing page for '{name}'"))?;
 
         let language = before.metadata.language.unwrap_or_default();
-        index_entries.push((name.clone(), language));
+        // Line-level, not the AST-node-level count `assert_matches_human_mapping` checks -
+        // see `human_mapping::line_mismatches_for`'s own doc comment for why: it's the only
+        // granularity Unix `diff` (which has no notion of an AST node) can be scored at all, so
+        // it's what lets these two columns sit side by side and mean the same thing.
+        let mismatches = human_mapping::line_mismatches_for(name, before, after)
+            .with_context(|| format!("computing line mismatches for '{name}'"))?;
+        index_entries.push(IndexEntry {
+            name: name.clone(),
+            language,
+            codediff_mismatches: mismatches.codediff,
+            unix_diff_mismatches: mismatches.unix_diff,
+            total_lines: mismatches.total_lines,
+        });
     }
 
     fs::write(
@@ -479,13 +495,37 @@ fn mark_fully_quiet(
     }
 }
 
-fn render_index_page(entries: &[(String, Language)]) -> String {
+/// One row of the index page's sortable table - `main`'s corpus loop builds one of these per
+/// fixture that has a `human_mapping.json`, computing `codediff_mismatches`/`unix_diff_mismatches`
+/// via `human_mapping::line_mismatches_for` alongside the page it already renders for that
+/// fixture, so the index page doesn't need a second pass over the corpus.
+struct IndexEntry {
+    name: String,
+    language: Language,
+    /// Line-level mismatches against the human mapping - see `human_mapping::LineMismatches`.
+    codediff_mismatches: usize,
+    unix_diff_mismatches: usize,
+    total_lines: usize,
+}
+
+fn render_index_page(entries: &[IndexEntry]) -> String {
     let mut rows = String::new();
-    for (name, language) in entries {
+    for entry in entries {
+        let name_attr = escape_html_attr(&entry.name);
+        let name_escaped = escape_html_text(&entry.name);
         rows.push_str(&format!(
-            "<li><a href=\"fixtures/{name_attr}.html\">{name_escaped}</a> <span class=\"language-badge\">{language}</span></li>\n",
-            name_attr = escape_html_attr(name),
-            name_escaped = escape_html_text(name),
+            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}">
+<td><a href="fixtures/{name_attr}.html">{name_escaped}</a></td>
+<td><span class="language-badge">{language}</span></td>
+<td>{codediff}</td>
+<td>{unix_diff}</td>
+<td>{total_lines}</td>
+</tr>
+"#,
+            language = entry.language,
+            codediff = entry.codediff_mismatches,
+            unix_diff = entry.unix_diff_mismatches,
+            total_lines = entry.total_lines,
         ));
     }
 
@@ -504,9 +544,25 @@ fn render_index_page(entries: &[(String, Language)]) -> String {
 <p>Each page below shows one fixture's before/after AST, annotated with what a human decided
 should match, get deleted, or get inserted. Disagree with one? Open the fixture, select the node,
 and use the "file an issue" button.</p>
+<p>"codediff mismatches"/"unix diff mismatches" are line-level disagreements against the human
+mapping (see the introductory paper for why line granularity, not AST-node granularity, is the only
+fair way to compare codediff against a line-only tool like Unix <code>diff</code>) - click a column
+header to sort by it.</p>
 </header>
-<ul class="fixture-list">
-{rows}</ul>
+<table class="fixture-table" id="fixture-table">
+<thead>
+<tr>
+<th data-sort="name" data-type="string" tabindex="0" aria-sort="ascending">Fixture</th>
+<th data-sort="language" data-type="string" tabindex="0" aria-sort="none">Language</th>
+<th data-sort="codediff" data-type="number" tabindex="0" aria-sort="none">codediff mismatches</th>
+<th data-sort="unix_diff" data-type="number" tabindex="0" aria-sort="none">Unix diff mismatches</th>
+<th data-sort="total_lines" data-type="number" tabindex="0" aria-sort="none">Total lines</th>
+</tr>
+</thead>
+<tbody>
+{rows}</tbody>
+</table>
+<script src="assets/index.js"></script>
 </body>
 </html>
 "#
@@ -1149,8 +1205,20 @@ mod tests {
     #[test]
     fn render_index_page_links_to_each_fixtures_page_and_shows_its_language() {
         let entries = vec![
-            ("rust-add-if".to_string(), Language::Rust),
-            ("c-linux-small-bugfix".to_string(), Language::C),
+            IndexEntry {
+                name: "rust-add-if".to_string(),
+                language: Language::Rust,
+                codediff_mismatches: 0,
+                unix_diff_mismatches: 3,
+                total_lines: 40,
+            },
+            IndexEntry {
+                name: "c-linux-small-bugfix".to_string(),
+                language: Language::C,
+                codediff_mismatches: 1,
+                unix_diff_mismatches: 5,
+                total_lines: 12,
+            },
         ];
 
         let html = render_index_page(&entries);
@@ -1163,10 +1231,58 @@ mod tests {
     }
 
     #[test]
+    fn render_index_page_puts_each_mismatch_count_in_its_own_sortable_column() {
+        let entries = vec![IndexEntry {
+            name: "rust-add-if".to_string(),
+            language: Language::Rust,
+            codediff_mismatches: 2,
+            unix_diff_mismatches: 9,
+            total_lines: 40,
+        }];
+
+        let html = render_index_page(&entries);
+
+        assert!(
+            html.contains(r#"data-codediff="2""#),
+            "expected the row to carry codediff's mismatch count as a data attribute for the \
+             sort script to read: {html}"
+        );
+        assert!(
+            html.contains(r#"data-unix_diff="9""#),
+            "expected the row to carry Unix diff's mismatch count as a data attribute: {html}"
+        );
+        assert!(
+            html.contains(r#"data-total_lines="40""#),
+            "expected the row to carry the total line count as a data attribute: {html}"
+        );
+        assert!(
+            html.contains(">2</td>"),
+            "codediff's count should render as a cell: {html}"
+        );
+        assert!(
+            html.contains(">9</td>"),
+            "Unix diff's count should render as a cell: {html}"
+        );
+        for sort_key in ["name", "language", "codediff", "unix_diff", "total_lines"] {
+            assert!(
+                html.contains(&format!(r#"data-sort="{sort_key}""#)),
+                "expected a sortable column header for {sort_key}: {html}"
+            );
+        }
+        assert!(html.contains(r#"src="assets/index.js""#));
+    }
+
+    #[test]
     fn render_index_page_escapes_fixture_names() {
         // Fixture names are always safe identifiers in practice, but the escaping path itself
         // should still be exercised directly rather than assumed correct by inspection.
-        let entries = vec![("a&b".to_string(), Language::Unknown)];
+        let entries = vec![IndexEntry {
+            name: "a&b".to_string(),
+            language: Language::Unknown,
+            codediff_mismatches: 0,
+            unix_diff_mismatches: 0,
+            total_lines: 0,
+        }];
         let html = render_index_page(&entries);
         assert!(html.contains("a&amp;b"));
         assert!(!html.contains("a&b<"));
