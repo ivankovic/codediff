@@ -609,15 +609,19 @@ pub fn is_semantically_structural<'a>(
             }
             _ => None,
         },
-        // Every remaining language `is_reference` above lists a kind set for, but with no
-        // fixture in this corpus to verify field names against empirically (unlike every arm
-        // above, all confirmed live against real grammar output). Following the same `name`-field
-        // convention every verified language so far has used without exception, but genuinely
-        // **unvalidated** - treat these as a best-effort starting point, not a confirmed fix, and
-        // verify against real source the first time one of these languages gets an actual
-        // fixture (the same throwaway-binary method used for every arm above works for this too).
+        // Was "unvalidated" (added via the same best-effort `name`-field convention every checked
+        // language uses, but with no PHP fixture in the corpus to verify against) until real PHP
+        // fixtures showed up and turned out slow for the same reason as Ruby's `singleton_method`
+        // gap: two of these three kind names were simply wrong. Verified against tree-sitter-php's
+        // actual grammar (throwaway sexp-dump test, deleted after use): a top-level `function foo()
+        // {}` is `function_definition`, not `function_declaration`; a class method is `method_
+        // declaration`, not `method_definition`. Only `class_declaration` was already correct.
+        // Measured 2026-08-02 (`/goal` speed investigation): `php-wordpress-wordpress-add-null-to-
+        // return` (2823 lines, 28 top-level functions, one `return;` -> `return null;` edit in one
+        // of them) - every one of those 28 functions was invisible to phase 4, same "no named
+        // candidates, falls back to one giant blob" pattern as Ruby/YAML.
         Language::PHP => match node_kind {
-            "class_declaration" | "function_declaration" | "method_definition" => node
+            "class_declaration" | "function_definition" | "method_declaration" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
                 .map(|name| (node_kind.to_string(), name.to_string())),
@@ -640,6 +644,13 @@ pub fn is_semantically_structural<'a>(
                 .map(|name| (node_kind.to_string(), name.to_string())),
             _ => None,
         },
+        // Every remaining language `is_reference` above lists a kind set for, but with no
+        // fixture in this corpus to verify field names against empirically (unlike every arm
+        // above, all confirmed live against real grammar output). Following the same `name`-field
+        // convention every verified language so far has used without exception, but genuinely
+        // **unvalidated** - treat these as a best-effort starting point, not a confirmed fix, and
+        // verify against real source the first time one of these languages gets an actual
+        // fixture (the same throwaway-binary method used for every arm above works for this too).
         Language::Swift => match node_kind {
             "function_declaration"
             | "class_declaration"

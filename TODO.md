@@ -2406,3 +2406,44 @@ different mechanism (spurious coincidental name matches between unrelated files 
 APTED call) rather than a missing-candidate gap, since Rust's own `is_semantically_structural`
 coverage is already thorough. Worth checking next if this line of "look for another missing-arm
 gap" continues.
+
+## Third `singleton_method`-shaped gap found: PHP's kind names were simply wrong (2026-08-02, `/goal` continued)
+
+Continued the "look for another missing-arm gap" lead from the entry above. Two new fixtures had
+climbed into the top-15 since the YAML fix: `php-wordpress-wordpress-add-null-to-return` (2823
+lines, 28 top-level functions, one `return;` -> `return null;` edit) and `php-wordpress-wordpress-
+whitespace-only-change` (2829 lines, same file family) - both PHP, and `Language::PHP`'s arm was
+already flagged in its own comment as "unvalidated... no fixture in this corpus to verify field
+names against."
+
+**Root cause, verified via a throwaway sexp-dump test (deleted after use)**: two of the arm's three
+kind names were simply wrong. `class_declaration` was correct, but a top-level `function foo() {}`
+is tree-sitter-php's `function_definition`, not `function_declaration`; a class method is `method_
+declaration`, not `method_definition`. Every top-level PHP function - and every class method - was
+invisible to phase 4, same mechanism as Ruby's `singleton_method` gap and YAML's missing arm
+entirely, just this time via a wrong assumed name instead of a missing one.
+
+**Fix**: corrected the two kind names (`src/diff/nodes.rs`), and moved the "unvalidated" disclaimer
+comment past PHP to sit in front of the still-genuinely-unvalidated languages (Swift, Scala, R,
+ShellScript, Lua, Vimscript) instead, since it no longer describes PHP.
+
+**Verified, but a more mixed result than Ruby/YAML**: `php-wordpress-wordpress-whitespace-only-
+change` improved (850.8ms -> 818.2ms, ~4%), but `php-wordpress-wordpress-add-null-to-return`'s
+phase-4 time went *up* (290.8ms -> 470.1ms) even though total stayed roughly flat (978.5ms ->
+983.3ms) - unlike Ruby/YAML, this fixture apparently had no real phase-4 cost at all before the fix
+(zero named candidates existed, so `solve_named_reference_groups` was a no-op; whatever the prior
+290.8ms was came from `solve_greedy_anchor_blocks`'s positional matching instead), so recognizing
+28 functions add real (if individually modest) named-group APTED cost that wasn't there before,
+even though only one function actually differs - not fully investigated why the net effect isn't a
+clear win the way the other two fixtures' identical-shaped bugs were. The **aggregate** result is
+still unambiguously positive: `benchmark_optimal_solutions`: `TOTAL_MISMATCHES` unchanged at 3345
+(zero accuracy impact, well within the +0.5% `/goal` budget), `MS_PER_FIXTURE` 1066.0 -> 1045.2
+immediately after the fix, 1045.2 -> 1041.1 after `make update-quality-baseline`'s own fresh run.
+`cargo test --release --features test-fixtures --lib`: 523 passed, 0 failed, 5 ignored (unchanged).
+`cargo fmt --check` clean.
+
+**`/goal` still not met**: same remaining-fixture picture as the entry above - the slowest fixtures
+left are inherent APTED cost on genuinely-different subtrees (already root-caused, no safe lever
+found), plus `rust-completely-unrelated-main-files` (still not investigated) and the PHP mixed-
+result case just described, which might reward a closer look at *why* 28 real candidates didn't
+translate into a clean win before assuming there's nothing left to find there.
