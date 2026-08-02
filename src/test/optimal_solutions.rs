@@ -136,6 +136,8 @@ mod java_fix_array_index;
 #[cfg(test)]
 mod java_protobuf_add_two_annotations;
 #[cfg(test)]
+mod java_protocolbuffers_protobuf_add_import_and_update_field_access;
+#[cfg(test)]
 mod java_refactor_constants;
 #[cfg(test)]
 mod java_scrcpy_public_to_protected;
@@ -304,6 +306,10 @@ mod shellscript_torvalds_linux_double_equals_to_equals;
 #[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
 #[cfg(test)]
+mod swift_swiftlang_swift_comment_change;
+#[cfg(test)]
+mod swift_swiftlang_swift_comment_change_2;
+#[cfg(test)]
 mod tsx_material_remove_import;
 #[cfg(test)]
 mod typescript_add_error_handling;
@@ -314,6 +320,10 @@ mod typescript_add_type_annotations;
 #[cfg(test)]
 mod typescript_async_await;
 #[cfg(test)]
+mod typescript_excalidraw_excalidraw_add_values_to_lists;
+#[cfg(test)]
+mod typescript_microsoft_typescript_comment_change;
+#[cfg(test)]
 mod typescript_refactor_interface;
 #[cfg(test)]
 mod typescript_typescript_add_target_comment;
@@ -322,8 +332,18 @@ mod typescript_typescript_add_target_comment_2;
 #[cfg(test)]
 mod typescript_typescript_add_target_comment_3;
 #[cfg(test)]
+mod vimscript_neovim_neovim_add_line_comment;
+#[cfg(test)]
 mod xml_nextcloud_android_delete_element;
 #[cfg(test)]
 mod xml_nextcloud_android_delete_element_2;
 #[cfg(test)]
+mod xml_odoo_odoo_change_value;
+#[cfg(test)]
+mod yaml_ansible_ansible_add_two_sequence_items;
+#[cfg(test)]
+mod yaml_axios_axios_update_string_value;
+#[cfg(test)]
 mod yaml_mastodon_remove_one_pair;
+#[cfg(test)]
+mod yaml_mozilla_pdf_single_value_update;
