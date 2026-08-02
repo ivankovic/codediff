@@ -1105,7 +1105,16 @@ fn main() -> Result<()> {
     // `gumtree_warm_batch` re-parses/re-diffs the whole corpus inside one persistent JVM per call,
     // so each repeat here is a genuine independent wall-clock sample, not a cached replay.
     let mut gumtree_warm_runs: Vec<HashMap<String, f64>> = Vec::with_capacity(args.repeats);
-    for _ in 0..args.repeats {
+    for repeat in 0..args.repeats {
+        // This whole tool has no other progress output during a run that can easily take several
+        // minutes (a fresh GumTree JVM per fixture below, plus this whole-corpus warm-batch pass
+        // repeated `args.repeats` times) - stderr so it stays visible even when stdout/the final
+        // table is redirected to a file.
+        eprintln!(
+            "gumtree_warm_batch: repeat {}/{}...",
+            repeat + 1,
+            args.repeats
+        );
         match gumtree_warm_batch(&warm_fixtures)? {
             Some(results) => gumtree_warm_runs.push(results),
             // All-or-nothing per `Row::gumtree_warm_ms`'s doc comment: if the batch driver isn't
@@ -1118,7 +1127,8 @@ fn main() -> Result<()> {
 
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
-    for name in &names {
+    for (i, name) in names.iter().enumerate() {
+        eprintln!("[{}/{}] {name}", i + 1, names.len());
         let (before, after) = test_diffs
             .get(name)
             .expect("name came from test_diffs.keys()");
