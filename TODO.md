@@ -2334,3 +2334,75 @@ real edit" problem the other phase-4-heavy fixtures represent - doesn't clear th
 implementation cost (a new hash-based Myers primitive, or a new per-language "assignment target"
 recognizer, `_within`-scoped and uniqueness-gated). Worth revisiting if the corpus grows to include
 more declarative/data-construction-heavy languages (JS/TS, Python) where this shape is more common.
+
+## Approximate-fallback idea re-examined and declined; found a second `singleton_method`-shaped gap instead (2026-08-02, `/goal` speed investigation)
+
+`/goal` set: get runtime down to the documented targets (median <=20ms, p90 <=100ms, max <=400ms)
+without adding more than +0.5% mismatched nodes. Asked to try the one remaining deferred idea from
+the entries above: "a faster/approximate tree-edit-distance fallback for a single large pair, in
+the spirit of phase 6's `EXPENSIVE_RESIDUAL_THRESHOLD`."
+
+**Checked prior art before touching anything**: this is a closely related re-run of "Size/
+dissimilarity-capped approximate fallback for large subtrees" (2026-07-25, above), which already
+swept three configurations (size-only, and size+one-level-children-similarity at three floor
+pairs) against `resolve_forest` generically and found every one either caused real accuracy damage
+when loose enough to fire, or never fired at all when tight enough to be safe - root cause
+measured directly: APTED cost does not correlate with subtree size or one-level children
+similarity (a 1,259-node pair took 1.03s, a *larger* 2,698-node pair took 66ms), because APTED's
+own pruning already makes large-but-similar subtrees cheap - so a cheap pre-check can't predict
+which calls are actually expensive. Since a phase-4-scoped version would gate the exact same
+`apted::for_nodes`/`resolve_forest` call, the same failure mode was expected to apply. Discussed
+this with the user; declined to pursue the only remaining theoretically-sound variant (a genuine
+mid-computation abort budget inside the Zhang-Shasha/APTED engine itself) given its cost/risk
+(real engineering inside the correctness-critical DP core, uncertain payoff) - asked instead to
+look for a different, narrower angle first.
+
+**Fresh whole-corpus phase-timing profile** (throwaway `#[ignore]`d test in `src/diff.rs`, same
+pattern as the earlier "top 10 slowest" pass but covering all 157 fixtures instead of a stale
+hand-picked list - the previous ranking predated the `singleton_method` fix): `yaml-mastodon-
+remove-one-pair` had become the single worst offender, 2619.1ms total with 2442.1ms (93.3%) in
+phase 4 - not previously root-caused, just noted in passing back on 2026-08-02's original top-10
+table.
+
+**Root cause: the exact same shape as the Ruby `singleton_method` gap, one language over.**
+`yaml-mastodon-remove-one-pair` is a 939-line locale YAML file where one `following: Abonaments`
+pair was removed, everything else untouched - and `is_semantically_structural` had (and still has,
+for JSON/XML/TOML/...) **zero match arm for YAML at all**. A large YAML config/locale file is
+nothing but nested `key: value` mappings; with no named candidates, phase 4's named-group matching
+had nothing to isolate the one changed key with and fell back to one whole-top-level-mapping APTED
+call.
+
+**Fix**: added a `Language::YAML` arm recognizing `block_mapping_pair`, keyed on its `key` field
+(`src/diff/nodes.rs`). Verified tree-sitter-yaml's grammar shape first (throwaway sexp-dump test,
+deleted after use): `block_mapping_pair` has a stable `key` field whose `.utf8_text()` reads
+correctly regardless of the field's own node kind (`flow_node` wrapping a `plain_scalar`).
+
+**Why this is safe against YAML's much heavier key reuse** (unlike a function name, `one`/`other`/
+`name` are ubiquitous across sibling objects in a locale file - the exact false-positive risk
+flagged and avoided for the shelved variable-anchoring idea above): `solve_named_reference_groups`
+already scope-qualifies every candidate by every *enclosing* named ancestor
+(`Bar::new` vs `Foo::new` for Ruby methods) - since every enclosing `block_mapping_pair` is *also*
+a candidate now, that same mechanism applies for free: `one` nested under `ca` resolves to
+`ca::messages::...::one`, `one` nested under `en` resolves to `en::messages::...::one` - two pairs
+only ever share an identity if their *entire* ancestor key path matches, not just the leaf key.
+
+**Verified**: fresh whole-corpus profile confirms `yaml-mastodon-remove-one-pair` drops off the
+top-15 entirely (previously #1 at 2619.1ms); corpus max (of the 5 profiled phases, not directly
+comparable to the `benchmark_other` `/goal` numbers) dropped 2619.1ms -> 1452.3ms, p90 746.2ms ->
+708.8ms. `benchmark_optimal_solutions`: `TOTAL_MISMATCHES` unchanged at 3345 (zero accuracy impact,
+same as the Ruby fix - pure candidate-recognition addition, well within the +0.5% `/goal` budget),
+`MS_PER_FIXTURE` 1153.7 -> 1066.0 (another ~7.6% corpus-wide average improvement). `cargo test
+--release --features test-fixtures --lib`: 523 passed, 0 failed, 5 ignored (unchanged). `cargo fmt
+--check` clean. `research/quality_baseline.txt` updated via `make update-quality-baseline`.
+
+**`/goal` not yet met**: p90/max are still far over the documented targets - the remaining slowest
+fixtures (`kotlin-nextcloud-a-few-small-removals`, `cpp-ladybird-refactor-variables-if-changes`,
+`c-postgres-real-logic-change`, `c-linux-small-change-struct-to-char`, `ruby-homebrew-add-or-
+expression`'s residual module cost) are the same ones already root-caused as inherent APTED cost on
+a single genuinely-different ~1000-1700-node subtree, not a missing-candidate gap - this fix
+doesn't touch them. `rust-completely-unrelated-main-files` (a synthetic adversarial fixture, two
+genuinely unrelated files) is now phase-4-heavy too (1189.9ms) - not yet investigated, likely a
+different mechanism (spurious coincidental name matches between unrelated files costing a real
+APTED call) rather than a missing-candidate gap, since Rust's own `is_semantically_structural`
+coverage is already thorough. Worth checking next if this line of "look for another missing-arm
+gap" continues.

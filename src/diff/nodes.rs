@@ -670,6 +670,23 @@ pub fn is_semantically_structural<'a>(
                 _ => None,
             }
         }
+        // YAML has no declarations in the function/class sense, but `block_mapping_pair`'s `key`
+        // field is the same kind of stable identity signal for exactly the same reason: a large
+        // localization/config YAML file is nothing but nested `key: value` mappings, and without
+        // this, phase 4 has zero named candidates to isolate a single changed key with - measured
+        // 2026-08-02 (`/goal` speed investigation): `yaml-mastodon-remove-one-pair` (939 lines, one
+        // `following: Abonaments` pair removed, otherwise untouched) cost 2442.1ms in phase 4 alone
+        // (93.3% of its 2619.1ms total), one giant top-level-mapping APTED call, for exactly the
+        // same reason Ruby's missing `singleton_method` arm did - see that fix's own comment above.
+        // Safe against repeated keys (`one`/`other`/`name`, ubiquitous across sibling objects in a
+        // locale file) the same way Ruby's `Bar::new` vs `Foo::new` is safe: every enclosing
+        // `block_mapping_pair` that's itself a candidate contributes its own key to the fully-
+        // resolved scope chain (`solve_named_reference_groups`'s doc comment), so two pairs only
+        // ever share an identity if their *entire* ancestor key path matches, not just the leaf key.
+        Language::YAML if node_kind == "block_mapping_pair" => node
+            .child_by_field_name("key")
+            .and_then(|n| n.utf8_text(bytes).ok())
+            .map(|name| (node_kind.to_string(), name.to_string())),
         _ => None,
     }
 }
