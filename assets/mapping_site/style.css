@@ -199,6 +199,24 @@ details.node > summary:hover {
   color: var(--inserted);
 }
 
+/* A `status-matched` node that's a real edit (Update/MatchButNotIdentical), not a genuinely
+   identical match - see `render_node`'s `changed_class` in generate_mapping_site.rs. Bold rather
+   than a new color: it's still a "matched" pair (blue), just one the "hide identical matches"
+   toggle below must never hide. */
+.changed {
+  font-weight: 700;
+}
+
+/* Toggled on <body> by viewer.js's "hide identical matches" button/keybinding. Hides any node
+   that's neither itself deleted/inserted/changed nor an ancestor of one (:has() finds a
+   qualifying node at any depth, not just a direct child) - i.e. every genuinely-identical match
+   and every never-annotated node, unless something interesting is nested underneath it. */
+body.hide-identical .node:not(.status-deleted, .status-inserted, .changed):not(
+    :has(.status-deleted, .status-inserted, .changed)
+  ) {
+  display: none;
+}
+
 .node.placeholder {
   font-style: italic;
   opacity: 0.75;
@@ -228,7 +246,8 @@ details.node > summary:hover {
   gap: 1rem;
 }
 
-#file-issue {
+#file-issue,
+#toggle-identical {
   font-family: inherit;
   font-size: 0.85rem;
   padding: 0.4rem 0.8rem;
@@ -244,6 +263,12 @@ details.node > summary:hover {
   opacity: 0.5;
   cursor: default;
   pointer-events: none;
+}
+
+#toggle-identical[aria-pressed="true"] {
+  background: var(--matched);
+  color: #fff;
+  border-color: var(--matched);
 }
 
 #status-line {

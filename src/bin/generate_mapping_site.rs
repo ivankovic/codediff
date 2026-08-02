@@ -38,7 +38,8 @@ use tree_sitter::Node;
 use codediff::code::{Code, Language};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
-    self, Caches, MarkKind, NodeStatus, rebuild_caches, status_after, status_before,
+    self, Caches, MarkKind, NodeStatus, is_identical_after, is_identical_before, rebuild_caches,
+    status_after, status_before,
 };
 
 /// `owner/repo`, used both for the "file an issue" link (rewritten client-side in viewer.js) and
@@ -147,8 +148,10 @@ fn render_fixture_page(
     // derives it lazily, client-side, only for whichever single node gets clicked, since baking a
     // `data-path` string into every node measurably added to that same page-size problem (over a
     // third of a node's own markup on a representative fixture).
-    let before_quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
-    let after_quiet_sizes = fully_quiet_subtree_sizes(after_root, &caches, status_after);
+    let before_quiet_sizes =
+        fully_quiet_subtree_sizes(before_root, &caches, status_before, is_identical_before);
+    let after_quiet_sizes =
+        fully_quiet_subtree_sizes(after_root, &caches, status_after, is_identical_after);
 
     let before_html = render_node(
         before_root,
@@ -156,6 +159,7 @@ fn render_fixture_page(
         'b',
         &caches,
         status_before,
+        is_identical_before,
         &before_quiet_sizes,
         true,
     );
@@ -165,6 +169,7 @@ fn render_fixture_page(
         'a',
         &caches,
         status_after,
+        is_identical_after,
         &after_quiet_sizes,
         true,
     );
@@ -203,6 +208,7 @@ fn render_fixture_page(
 </div>
 <footer class="page-footer">
 <a id="file-issue" href="#" aria-disabled="true" target="_blank" rel="noopener">File an issue about the selected node</a>
+<button id="toggle-identical" type="button" aria-pressed="false">Hide identical matches</button>
 <span id="status-line" role="status"></span>
 </footer>
 {help_overlay}
@@ -228,6 +234,7 @@ const HELP_OVERLAY_HTML: &str = r#"<div id="help-overlay" class="hidden" role="d
 <dt>Tab</dt><dd>switch focus between Before/After panels</dd>
 <dt>/</dt><dd>search: jump to next node whose text contains a given string</dd>
 <dt>a</dt><dd>jump the other panel to this node's mapped counterpart</dd>
+<dt>i</dt><dd>hide identical matches, showing only inserted/deleted/updated nodes and their ancestors</dd>
 <dt>?</dt><dd>toggle this help</dd>
 </dl>
 </div>"#;
@@ -251,17 +258,22 @@ const OMIT_THRESHOLD: usize = 20;
 /// Recursively renders `node` and its subtree. `side` is `'b'` (before) or `'a'` (after) - used
 /// both as the id-namespace prefix (so before/after tree-sitter node ids, which can collide in
 /// value between the two independently-parsed trees, never collide in the DOM) and to pick which
-/// half of `caches` to read a match from. `quiet_sizes` (see `fully_quiet_subtree_sizes`) maps a
-/// fully-quiet node's id to its subtree's node count; `force_open` overrides both the
-/// closed-by-default and the omit-with-placeholder treatment for `node` itself (but not its
-/// descendants) - used to keep the tree root fully rendered and open even on the rare fixture
-/// where it happens to be entirely quiet (otherwise the page would load empty or collapsed).
+/// half of `caches` to read a match from. `identical_fn` (`is_identical_before`/`is_identical_after`)
+/// tells a `Matched` node apart from a real edit that happens to still be paired
+/// (`Update`/`MatchButNotIdentical`) - see the `changed` class below and viewer.js's "hide
+/// identical matches" toggle, which relies on it to tell the two apart since both share the
+/// `status-matched` class. `quiet_sizes` (see `fully_quiet_subtree_sizes`) maps a fully-quiet
+/// node's id to its subtree's node count; `force_open` overrides both the closed-by-default and
+/// the omit-with-placeholder treatment for `node` itself (but not its descendants) - used to keep
+/// the tree root fully rendered and open even on the rare fixture where it happens to be entirely
+/// quiet (otherwise the page would load empty or collapsed).
 fn render_node(
     node: Node,
     src: &[u8],
     side: char,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
+    identical_fn: fn(Node, &Caches) -> bool,
     quiet_sizes: &HashMap<usize, usize>,
     force_open: bool,
 ) -> String {
@@ -287,6 +299,14 @@ fn render_node(
             ..
         } => ("inserted", None),
     };
+    // A second, independent class on top of `status_class`: a `Matched` pair can still be a real
+    // edit (`Update`/`MatchButNotIdentical`), which the "hide identical matches" toggle needs to
+    // keep visible right alongside deleted/inserted nodes, unlike a genuinely-`Identical` match.
+    let changed_class = if status == NodeStatus::Matched && !identical_fn(node, caches) {
+        " changed"
+    } else {
+        ""
+    };
 
     let other_side = if side == 'b' { 'a' } else { 'b' };
     let id_attr = format!("{side}-{}", node.id());
@@ -304,16 +324,17 @@ fn render_node(
         // "unmarked": a placeholder can just as well be the root of a huge *matched* block (an
         // exhaustively-annotated fixture), in which case it still has a real counterpart worth
         // linking to, even though its individual descendants aren't in the DOM to link to
-        // themselves.
+        // themselves. Never carries `changed_class` in practice - `fully_quiet_subtree_sizes` only
+        // treats a `Matched` node as quiet (and thus placeholder-eligible) when it's identical.
         return format!(
-            r#"<div class="node leaf status-{status_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
         );
     }
 
     if node.child_count() == 0 {
         let label = escape_html_text(&leaf_label(node, src));
         format!(
-            r#"<div class="node leaf status-{status_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}</div>"#
         )
     } else {
         let mut children = String::new();
@@ -325,6 +346,7 @@ fn render_node(
                 side,
                 caches,
                 status_fn,
+                identical_fn,
                 quiet_sizes,
                 false,
             ));
@@ -336,7 +358,7 @@ fn render_node(
             ""
         };
         format!(
-            r#"<details class="node status-{status_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}</summary>{children}</details>"#
+            r#"<details class="node status-{status_class}{changed_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}</summary>{children}</details>"#
         )
     }
 }
@@ -350,38 +372,49 @@ fn leaf_label(node: Node, src: &[u8]) -> String {
     format!("{} {:?}{}", node.kind(), truncated, ellipsis)
 }
 
-/// Whether `status` is "quiet": neither a deletion nor an insertion. Covers both `Unmarked`
-/// (never annotated - most of a typical fixture) and `Matched` (explicitly confirmed identical/
-/// updated/structurally-different-but-paired) - a node in either state has nothing actively being
-/// edited at it, which is the only thing that actually needs to stay visible by default. Excludes
-/// `Marked { kind: Deleted | Inserted, .. }`, which is exactly the content a reviewer needs to see.
-fn is_quiet(status: NodeStatus) -> bool {
-    !matches!(
-        status,
+/// Whether `node` (given its already-computed `status`) is "quiet": neither a deletion nor an
+/// insertion, and, if matched, actually `Identical` rather than a real edit that merely stayed
+/// paired (`Update`/`MatchButNotIdentical`, per `identical_fn`). Covers `Unmarked` (never
+/// annotated - most of a typical fixture) unconditionally, since there's nothing to check there -
+/// a node in either state has nothing actively being edited at it, which is the only thing that
+/// actually needs to stay visible by default. Excludes `Marked { kind: Deleted | Inserted, .. }`
+/// (exactly the content a reviewer needs to see) and a non-identical `Matched` node (an edit that
+/// just happens to still be pairable, e.g. a changed string literal) for the same reason - it must
+/// never be swallowed into an "unremarkable" placeholder alongside genuinely untouched code.
+fn is_quiet(
+    node: Node,
+    caches: &Caches,
+    status: NodeStatus,
+    identical_fn: fn(Node, &Caches) -> bool,
+) -> bool {
+    match status {
         NodeStatus::Marked {
             kind: MarkKind::Deleted | MarkKind::Inserted,
             ..
-        }
-    )
+        } => false,
+        NodeStatus::Matched => identical_fn(node, caches),
+        NodeStatus::Unmarked => true,
+    }
 }
 
 /// Maps a node's id to its subtree's node count (itself plus every descendant), for every node
-/// whose entire subtree is quiet (see `is_quiet`) - no deletion or insertion anywhere inside it,
-/// whether because nothing was ever annotated there or because everything in it was explicitly
-/// confirmed matched. The inverse-polarity counterpart of `human_solver`'s own
-/// `fully_solved_nodes` (which finds subtrees that are entirely *marked*, to hide during active
-/// editing) - kept as a separate, generator-local function rather than unified with it, since the
-/// two serve different purposes for different audiences and only coincidentally share a shape.
-/// The size is `render_node`'s to decide whether a fully-quiet subtree is small enough to still
-/// render in full (just closed by default) or big enough to omit outright behind a placeholder
-/// (see `OMIT_THRESHOLD`).
+/// whose entire subtree is quiet (see `is_quiet`) - no deletion, insertion, or non-identical match
+/// anywhere inside it, whether because nothing was ever annotated there or because everything in
+/// it was explicitly confirmed matched *and* identical. The inverse-polarity counterpart of
+/// `human_solver`'s own `fully_solved_nodes` (which finds subtrees that are entirely *marked*, to
+/// hide during active editing) - kept as a separate, generator-local function rather than unified
+/// with it, since the two serve different purposes for different audiences and only coincidentally
+/// share a shape. The size is `render_node`'s to decide whether a fully-quiet subtree is small
+/// enough to still render in full (just closed by default) or big enough to omit outright behind a
+/// placeholder (see `OMIT_THRESHOLD`).
 fn fully_quiet_subtree_sizes(
     root: Node,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
+    identical_fn: fn(Node, &Caches) -> bool,
 ) -> HashMap<usize, usize> {
     let mut sizes = HashMap::new();
-    mark_fully_quiet(root, caches, status_fn, &mut sizes);
+    mark_fully_quiet(root, caches, status_fn, identical_fn, &mut sizes);
     sizes
 }
 
@@ -391,19 +424,20 @@ fn mark_fully_quiet(
     node: Node,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
+    identical_fn: fn(Node, &Caches) -> bool,
     sizes: &mut HashMap<usize, usize>,
 ) -> Option<usize> {
     let mut cursor = node.walk();
     let mut all_children_quiet = true;
     let mut subtree_size = 1usize;
     for child in node.children(&mut cursor) {
-        match mark_fully_quiet(child, caches, status_fn, sizes) {
+        match mark_fully_quiet(child, caches, status_fn, identical_fn, sizes) {
             Some(child_size) => subtree_size += child_size,
             None => all_children_quiet = false,
         }
     }
 
-    let quiet = all_children_quiet && is_quiet(status_fn(node, caches));
+    let quiet = all_children_quiet && is_quiet(node, caches, status_fn(node, caches), identical_fn);
     if quiet {
         sizes.insert(node.id(), subtree_size);
         Some(subtree_size)
@@ -516,6 +550,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -564,6 +599,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -582,6 +618,46 @@ mod tests {
             before_html.contains(&expected_match),
             "expected {expected_match} in {before_html}"
         );
+        assert!(
+            !before_html.contains("changed"),
+            "an Identical match must not get the changed class: {before_html}"
+        );
+    }
+
+    #[test]
+    fn render_node_marks_a_non_identical_matched_node_as_changed() {
+        let source = "fn f() {}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        for operation in [HumanOperation::Update, HumanOperation::MatchButNotIdentical] {
+            let mapping = HumanMapping {
+                entries: vec![HumanMappingEntry {
+                    operation,
+                    before_path: Some(vec![]),
+                    after_path: Some(vec![]),
+                }],
+            };
+            let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+
+            let before_html = render_node(
+                before_root,
+                source.as_bytes(),
+                'b',
+                &caches,
+                status_before,
+                is_identical_before,
+                &HashMap::new(),
+                true,
+            );
+
+            assert!(
+                before_html.contains(r#"status-matched changed""#),
+                "{operation:?} should render matched *and* changed: {before_html}"
+            );
+        }
     }
 
     #[test]
@@ -607,6 +683,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -653,7 +730,7 @@ mod tests {
         let call_expr_c = stmt_c.children(&mut c2).next().unwrap();
         caches.before_removed.insert(call_expr_c.id(), false);
 
-        let quiet = fully_quiet_subtree_sizes(root, &caches, status_before);
+        let quiet = fully_quiet_subtree_sizes(root, &caches, status_before, is_identical_before);
 
         assert!(
             quiet.contains_key(&stmt_a.id()),
@@ -674,12 +751,64 @@ mod tests {
     }
 
     #[test]
+    fn fully_quiet_subtree_sizes_excludes_a_non_identical_match_even_though_its_matched() {
+        // Same fixture as the test above, but `a();`'s call_expression is now a *non-identical*
+        // match (an `Update`/`MatchButNotIdentical`, simulated directly on `Caches` the same way
+        // the sibling test above simulates a plain match) - a real edit that happens to still be
+        // paired must not be swallowed into a placeholder alongside genuinely untouched code.
+        let source = "fn main() {\n    a();\n    b();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        let function_item = root.children(&mut cursor).next().unwrap();
+        let block = {
+            let mut c = function_item.walk();
+            function_item
+                .children(&mut c)
+                .find(|n| n.kind() == "block")
+                .unwrap()
+        };
+        let mut stmt_cursor = block.walk();
+        let statements: Vec<Node> = block
+            .children(&mut stmt_cursor)
+            .filter(|n| n.kind() == "expression_statement")
+            .collect();
+        let stmt_a = statements[0];
+
+        let mut caches = Caches::default();
+        let mut c = stmt_a.walk();
+        let call_expr_a = stmt_a.children(&mut c).next().unwrap();
+        caches.before_match.insert(call_expr_a.id(), usize::MAX);
+        caches.before_identical.insert(call_expr_a.id(), false);
+
+        let quiet = fully_quiet_subtree_sizes(root, &caches, status_before, is_identical_before);
+
+        assert!(
+            !quiet.contains_key(&call_expr_a.id()),
+            "a non-identical match is a real edit, not quiet"
+        );
+        assert!(
+            !quiet.contains_key(&stmt_a.id()),
+            "a(); contains a non-identical match, so it isn't quiet either"
+        );
+        assert!(
+            !quiet.contains_key(&root.id()),
+            "the root contains a non-identical match somewhere, so it isn't quiet either"
+        );
+        assert!(
+            quiet.contains_key(&statements[1].id()),
+            "b(); has no marks anywhere in it (fully Unmarked), so it should still be quiet"
+        );
+    }
+
+    #[test]
     fn render_node_keeps_the_root_open_even_when_the_whole_tree_is_fully_quiet() {
         let source = "fn main() {\n    a();\n    b();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
         let caches = Caches::default(); // nothing marked anywhere
-        let quiet_sizes = fully_quiet_subtree_sizes(root, &caches, status_before);
+        let quiet_sizes =
+            fully_quiet_subtree_sizes(root, &caches, status_before, is_identical_before);
 
         let html = render_node(
             root,
@@ -687,6 +816,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &quiet_sizes,
             true, // force_open: the root itself must stay open/rendered despite being fully unmarked
         );
@@ -708,7 +838,8 @@ mod tests {
         let mut cursor = root.walk();
         let function_item = root.children(&mut cursor).next().unwrap();
         let caches = Caches::default(); // nothing marked anywhere
-        let quiet_sizes = fully_quiet_subtree_sizes(root, &caches, status_before);
+        let quiet_sizes =
+            fully_quiet_subtree_sizes(root, &caches, status_before, is_identical_before);
         // The whole function body is one fully-unmarked subtree well past OMIT_THRESHOLD (20).
         let function_item_size = *quiet_sizes.get(&function_item.id()).unwrap();
         assert!(
@@ -722,6 +853,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &quiet_sizes,
             true,
         );
@@ -770,7 +902,8 @@ mod tests {
         let mut caches = Caches::default();
         match_everything(before_root, after_root, &mut caches);
 
-        let quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
+        let quiet_sizes =
+            fully_quiet_subtree_sizes(before_root, &caches, status_before, is_identical_before);
         let function_item_size = *quiet_sizes.get(&function_item.id()).unwrap();
         assert!(
             function_item_size > OMIT_THRESHOLD,
@@ -783,6 +916,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &quiet_sizes,
             true,
         );
@@ -840,7 +974,8 @@ mod tests {
             }],
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
-        let quiet_sizes = fully_quiet_subtree_sizes(before_root, &caches, status_before);
+        let quiet_sizes =
+            fully_quiet_subtree_sizes(before_root, &caches, status_before, is_identical_before);
 
         let html = render_node(
             before_root,
@@ -848,6 +983,7 @@ mod tests {
             'b',
             &caches,
             status_before,
+            is_identical_before,
             &quiet_sizes,
             true,
         );

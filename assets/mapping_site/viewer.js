@@ -1,8 +1,8 @@
 // Vanilla-JS navigation for the human_mapping static viewer. No framework, no build step - copied
 // verbatim into every generated site by generate_mapping_site.rs. Ported from a subset of
 // human_solver's own keybindings (see that binary's top-of-file doc comment): only the read-only
-// cursor-navigation ones (j/k/h/l/g/G/Tab/a//?) - nothing that mutates a mapping, and nothing that
-// compares against codediff's own diff, since this viewer never runs codediff at all.
+// cursor-navigation ones (j/k/h/l/g/G/Tab/a/i//?) - nothing that mutates a mapping, and nothing
+// that compares against codediff's own diff, since this viewer never runs codediff at all.
 (function () {
   "use strict";
 
@@ -13,6 +13,7 @@
   };
   const statusLine = document.getElementById("status-line");
   const issueLink = document.getElementById("file-issue");
+  const toggleIdenticalButton = document.getElementById("toggle-identical");
   const helpOverlay = document.getElementById("help-overlay");
   const fixtureName = document.body.dataset.fixture || "";
   const repo = document.body.dataset.repo || "";
@@ -217,6 +218,36 @@
     helpOverlay.classList.toggle("hidden");
   }
 
+  // If hiding identical matches (see style.css's `body.hide-identical` rule) just made either
+  // panel's selected node disappear, fall back to that panel's first still-visible node rather
+  // than leaving a highlight on an invisible element and j/k stuck with nowhere valid to move
+  // from (`moveCursor` looks up the selected node's index in `visibleNodes`).
+  function reselectIfHidden() {
+    for (const side of SIDES) {
+      const el = selected[side];
+      if (el && el.getClientRects().length === 0) {
+        const nodes = visibleNodes(side);
+        if (nodes.length > 0) select(side, nodes[0], { scroll: false });
+      }
+    }
+  }
+
+  function setHideIdentical(hidden) {
+    document.body.classList.toggle("hide-identical", hidden);
+    toggleIdenticalButton.setAttribute("aria-pressed", hidden ? "true" : "false");
+    toggleIdenticalButton.textContent = hidden
+      ? "Show identical matches"
+      : "Hide identical matches";
+    reselectIfHidden();
+    setStatus(
+      hidden ? "Showing only inserted/deleted/updated nodes and their ancestors" : ""
+    );
+  }
+
+  function toggleHideIdentical() {
+    setHideIdentical(!document.body.classList.contains("hide-identical"));
+  }
+
   function promptSearch() {
     const prompt = document.getElementById("search-prompt");
     const input = document.getElementById("search-input");
@@ -243,6 +274,8 @@
       select(side, node);
     });
   }
+
+  toggleIdenticalButton.addEventListener("click", toggleHideIdentical);
 
   document.addEventListener("keydown", (event) => {
     const searchPrompt = document.getElementById("search-prompt");
@@ -287,6 +320,9 @@
         break;
       case "a":
         alignOtherPanel();
+        break;
+      case "i":
+        toggleHideIdentical();
         break;
       case "/":
         promptSearch();

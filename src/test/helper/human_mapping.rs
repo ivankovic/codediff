@@ -165,6 +165,16 @@ pub struct Caches {
     pub after_match: HashMap<usize, usize>,
     pub before_removed: HashMap<usize, bool>,
     pub after_removed: HashMap<usize, bool>,
+    /// Whether a matched node's pair was recorded as [`HumanOperation::Identical`] (`true`) or
+    /// [`HumanOperation::Update`]/[`HumanOperation::MatchButNotIdentical`] (`false`). `before_match`/
+    /// `after_match` alone can't tell these apart - both write the same node-id pair into those maps
+    /// regardless of which of the three operations produced them - so a second map is needed for any
+    /// consumer (e.g. `generate_mapping_site`'s "hide identical matches" toggle) that cares whether a
+    /// match is a real edit or genuinely unchanged. Absent key means "not recorded" (e.g. a `Caches`
+    /// built by hand rather than via `rebuild_caches`), which callers should treat as identical, to
+    /// match matched nodes' pre-existing default rendering/quietness.
+    pub before_identical: HashMap<usize, bool>,
+    pub after_identical: HashMap<usize, bool>,
     /// Number of entries that couldn't be resolved against the current trees (e.g. a
     /// hand-edited or stale mapping file). Surfaced by callers (e.g. `human_solver`'s footer)
     /// rather than treated as fatal, so a bad mapping file doesn't block the caller outright.
@@ -191,6 +201,9 @@ pub fn rebuild_caches(
                 let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
                 caches.before_match.insert(b.id(), a.id());
                 caches.after_match.insert(a.id(), b.id());
+                let identical = entry.operation == HumanOperation::Identical;
+                caches.before_identical.insert(b.id(), identical);
+                caches.after_identical.insert(a.id(), identical);
                 Some(())
             })(),
             HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
@@ -231,6 +244,29 @@ pub fn is_inherited_removed(node: Node, removed: &HashMap<usize, bool>) -> bool 
         current = parent;
     }
     false
+}
+
+/// Whether a `Matched` before-node's pair was recorded as `Identical` rather than
+/// `Update`/`MatchButNotIdentical`. Meaningless (and unconsulted) for any other [`NodeStatus`].
+/// Defaults to `true` when `node` isn't in `before_identical` at all - either because it isn't
+/// matched, or because `caches` was built by hand rather than via [`rebuild_caches`] (as several
+/// tests do), in which case treating it as identical preserves those matched nodes' existing
+/// "quiet"/undecorated rendering.
+pub fn is_identical_before(node: Node, caches: &Caches) -> bool {
+    caches
+        .before_identical
+        .get(&node.id())
+        .copied()
+        .unwrap_or(true)
+}
+
+/// After-side counterpart of [`is_identical_before`].
+pub fn is_identical_after(node: Node, caches: &Caches) -> bool {
+    caches
+        .after_identical
+        .get(&node.id())
+        .copied()
+        .unwrap_or(true)
 }
 
 pub fn status_before(node: Node, caches: &Caches) -> NodeStatus {
@@ -990,6 +1026,84 @@ mod tests {
             HumanOperation::DeleteWithChildren
         );
         assert!(round_tripped.entries[1].after_path.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn rebuild_caches_distinguishes_identical_from_update_and_match_but_not_identical() -> Result<()>
+    {
+        let source = "fn f() {\n    let a = 1;\n    let b = 2;\n    let c = 3;\n}\n";
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
+            .unwrap();
+        let before_tree = parser.parse(source, None).unwrap();
+        let after_tree = parser.parse(source, None).unwrap();
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let function_item = before_root.child(0).unwrap();
+        let block = {
+            let mut c = function_item.walk();
+            function_item
+                .children(&mut c)
+                .find(|n| n.kind() == "block")
+                .unwrap()
+        };
+        let mut stmt_cursor = block.walk();
+        let statements: Vec<Node> = block
+            .children(&mut stmt_cursor)
+            .filter(|n| n.kind() == "let_declaration")
+            .collect();
+        let identical_stmt = statements[0];
+        let update_stmt = statements[1];
+        let match_but_not_identical_stmt = statements[2];
+
+        let after_function_item = after_root.child(0).unwrap();
+        let after_block = {
+            let mut c = after_function_item.walk();
+            after_function_item
+                .children(&mut c)
+                .find(|n| n.kind() == "block")
+                .unwrap()
+        };
+        let mut after_stmt_cursor = after_block.walk();
+        let after_statements: Vec<Node> = after_block
+            .children(&mut after_stmt_cursor)
+            .filter(|n| n.kind() == "let_declaration")
+            .collect();
+
+        let entries = vec![
+            HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(path_for_node(identical_stmt)),
+                after_path: Some(path_for_node(after_statements[0])),
+            },
+            HumanMappingEntry {
+                operation: HumanOperation::Update,
+                before_path: Some(path_for_node(update_stmt)),
+                after_path: Some(path_for_node(after_statements[1])),
+            },
+            HumanMappingEntry {
+                operation: HumanOperation::MatchButNotIdentical,
+                before_path: Some(path_for_node(match_but_not_identical_stmt)),
+                after_path: Some(path_for_node(after_statements[2])),
+            },
+        ];
+
+        let caches = rebuild_caches(&entries, before_root, after_root);
+
+        assert!(is_identical_before(identical_stmt, &caches));
+        assert!(is_identical_after(after_statements[0], &caches));
+        assert!(!is_identical_before(update_stmt, &caches));
+        assert!(!is_identical_after(after_statements[1], &caches));
+        assert!(!is_identical_before(match_but_not_identical_stmt, &caches));
+        assert!(!is_identical_after(after_statements[2], &caches));
+        // A node with no entry at all defaults to identical (matches matched nodes' pre-existing
+        // quiet/undecorated rendering when a `Caches` is built by hand rather than via
+        // `rebuild_caches`).
+        assert!(is_identical_before(before_root, &caches));
 
         Ok(())
     }
