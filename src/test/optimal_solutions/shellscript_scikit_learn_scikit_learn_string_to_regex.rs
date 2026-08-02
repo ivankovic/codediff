@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-scikit-learn-scikit-learn-string-to-regex")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "shellscript-scikit-learn-scikit-learn-string-to-regex",
+        1,
+    )
 }

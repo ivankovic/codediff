@@ -2064,3 +2064,32 @@ other known gaps above, not a new bug.
 `research/plots/matching_reason_share_by_fixture.png` against the now-150-fixture corpus).
 `make check-quality`: clean against the new baseline. `cargo test --release --features
 test-fixtures --lib`: 516/0/5.
+
+## 7 new optimal-solution fixtures added, 2 clamped (2026-08-02)
+
+Added `php-wordpress-wordpress-whitespace-only-change`,
+`shellscript-nextcloud-server-change-invocation-string`,
+`shellscript-nvm-sh-nvm-upgrade-version-string`,
+`shellscript-pytorch-pytorch-change-invocation-string`,
+`shellscript-scikit-learn-scikit-learn-string-to-regex`,
+`shellscript-torvalds-linux-double-equals-to-equals`, and
+`swift-nextcloud-ios-call-different-function`. 5 match codediff's diff exactly;
+`shellscript-scikit-learn-scikit-learn-string-to-regex` needed
+`assert_matches_human_mapping_within_limit(1)` and
+`shellscript-torvalds-linux-double-equals-to-equals` needed `..._within_limit(2)`.
+
+**The gap, both fixtures**: a different class from the earlier ambiguous-mapping/residual-size
+gaps above - here the human ground truth pairs two nodes of *different* kinds (a shell
+`string_content` matched to a `regex`; a token `==` matched to `=`, both same-position rewrites of
+one node into a different grammar production). codediff never maps differently-kinded nodes to
+each other by design (see `ASTDiff::is_valid`, and `human_solver`'s own `ConfirmKindMismatch`
+prompt, which exists precisely because this is a deliberate human judgment call codediff's
+algorithm doesn't make automatically) - so both come out as a `Delete`+`Insert` pair instead of the
+human's `MatchButNotIdentical`. Not a bug, a structural consequence of that design choice; closing
+this gap would mean deciding when APTED should be allowed to consider a cross-kind pairing at all,
+a much bigger design question than the other gaps documented above.
+
+**Quality baseline updated**: `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` 3342 -> 3345
+(exactly the two new fixtures' own 2 + 1), `MS_PER_FIXTURE` 1226.7 -> 1286.8, via
+`benchmark_optimal_solutions --csv`. `make check-quality`: clean against the new baseline.
+`cargo test --release --features test-fixtures --lib`: 523/0/5.
