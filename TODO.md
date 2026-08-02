@@ -2231,3 +2231,43 @@ sounding right, and it's more invasive than the `singleton_method` fix (touches 
 `grouped_greedy_matcher` engine, not a single per-language match arm). Written down here, per
 explicit request, so it's not re-derived from scratch if one of those fixtures' phase-4 cost comes
 up again.
+
+## Prototyped and disproved: the deferred cost-function idea above doesn't help (2026-08-02)
+
+Prototyped Option 1 from the entry above (sort `match_named_groups`' candidates by ascending
+`before_subtree_size + after_subtree_size` first, `cost_ratio` second, instead of `cost_ratio`
+alone) as a throwaway duplicate of `match_named_groups` plus per-`on_accept` timing/size
+instrumentation (`src/diff/solve_syntax_aware_matching.rs`, deleted after use), against the same 5
+fixtures: `ruby-homebrew-add-or-expression`, `kotlin-nextcloud-a-few-small-removals`,
+`cpp-ladybird-refactor-variables-if-changes`, `c-postgres-real-logic-change`,
+`c-linux-small-change-struct-to-char`. Result: no consistent improvement on any of them (e.g.
+ruby-homebrew 925.4ms -> 854.6ms, c-postgres 789.9ms -> 791.3ms, c-linux 633.5ms -> 610.6ms - within
+noise, no direction), for two reasons the instrumentation made concrete:
+
+1. **Reordering barely changes acceptance order in practice.** `cost_ratio` and subtree size are
+   already correlated for these fixtures: untouched content scores ~0.0 cost *and* is small; a
+   wrapper whose direct children's full-subtree hash no longer matches (because *something* inside
+   changed) scores ~0.99-1.0 cost *and* is large. Cost-ascending and size-ascending sort landed on
+   nearly the same order.
+
+2. **The nested-wrapper pruning this idea targeted was never the actual bottleneck** - it was
+   already working essentially perfectly. Per-call timing for `ruby-homebrew-add-or-expression`'s 7
+   accepted phase-4 pairs: 3 untouched methods resolve in ~0ms each (in fact phase 1's hash descent
+   already matches them before phase 4 even runs), the 3 `module` wrapper pairs cost 117.6ms ->
+   0.1ms -> 0.1ms (correctly shrinking as `ContainmentCtx` prunes more with each acceptance), and
+   **one single call - the one method that actually changed - costs 724.8ms (~79% of the fixture's
+   total phase-4 time)**, doing real tree-edit-distance over its own ~1580-node subtree (643 nodes
+   newly mapped). Every other fixture showed the identical pattern: one (occasionally two) single
+   `apted::for_nodes` call on the genuinely-different subtree dominates (400-1000ms, subtree size
+   ~1000-1700 nodes summed both sides), everything else - including every wrapper/container pair -
+   is cheap.
+
+**Conclusion**: this is not an acceptance-ordering or cost-estimation problem at all. It's one real
+edit that needs real tree-edit-distance computation over a moderately large (~1500-node) subtree;
+no rearrangement of *which pair gets resolved when* changes how expensive *that specific call* is.
+The deferred cost-function idea above is superseded by this finding - not worth pursuing further
+for these fixtures. The two levers that could actually move this number are (a) a faster/
+approximate tree-edit-distance fallback for a single large pair, in the spirit of phase 6's
+`EXPENSIVE_RESIDUAL_THRESHOLD`, or (b) recognizing smaller structural pieces *within* a changed
+method/function body as their own named-or-positional candidates, so a real edit deep inside a
+large body doesn't force one whole-body APTED call - see the next entry for (b).
