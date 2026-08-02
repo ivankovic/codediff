@@ -564,7 +564,24 @@ fn gumtree_node_offsets(node_ref: &str) -> Result<(usize, usize)> {
 /// inclusive of the line containing `end`'s last character - a range landing exactly on a line
 /// boundary doesn't spuriously pull in the following, untouched line.
 fn gumtree_line_range(contents: &str, start: usize, end: usize) -> std::ops::RangeInclusive<usize> {
-    let line_of = |offset: usize| contents[..offset.min(contents.len())].matches('\n').count();
+    // `start`/`end` are *character* offsets (from GumTree's own `[start,end]` node reference, see
+    // `gumtree_node_offsets`), not byte offsets - slicing `contents` directly at these values
+    // panics ("not a char boundary") on any file containing multi-byte UTF-8 characters before the
+    // offset (confirmed empirically: a Thai-locale string constant change crashed here). Translate
+    // the character offset to its real byte offset first; a char offset past the end of `contents`
+    // (GumTree's own `end` can point one past the last character) clamps to `contents.len()`.
+    let byte_offset_of_char = |char_offset: usize| -> usize {
+        contents
+            .char_indices()
+            .nth(char_offset)
+            .map(|(byte_idx, _)| byte_idx)
+            .unwrap_or(contents.len())
+    };
+    let line_of = |offset: usize| {
+        contents[..byte_offset_of_char(offset)]
+            .matches('\n')
+            .count()
+    };
     line_of(start)..=line_of(end.saturating_sub(1).max(start))
 }
 
@@ -1432,4 +1449,67 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     }
     wtr.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gumtree_node_offsets_parses_the_trailing_bracketed_range() {
+        assert_eq!(
+            gumtree_node_offsets("SimpleName: foo [12,15]").unwrap(),
+            (12, 15)
+        );
+    }
+
+    #[test]
+    fn gumtree_node_offsets_errors_without_a_bracketed_suffix() {
+        assert!(gumtree_node_offsets("SimpleName: foo").is_err());
+    }
+
+    #[test]
+    fn gumtree_line_range_finds_the_single_line_a_small_range_sits_on() {
+        let contents = "line0\nline1\nline2\n";
+        // "line1" starts at character offset 6, ends at offset 11.
+        assert_eq!(gumtree_line_range(contents, 6, 11), 1..=1);
+    }
+
+    #[test]
+    fn gumtree_line_range_spans_every_line_a_range_crosses() {
+        let contents = "line0\nline1\nline2\n";
+        // From partway through "line0" to partway through "line2".
+        assert_eq!(gumtree_line_range(contents, 2, 15), 0..=2);
+    }
+
+    #[test]
+    fn gumtree_line_range_does_not_pull_in_the_next_line_when_end_lands_on_a_boundary() {
+        let contents = "line0\nline1\nline2\n";
+        // end == 6 is the newline right after "line0" - the range should stop at line 0, not
+        // spill into line 1 just because `end` technically points past it.
+        assert_eq!(gumtree_line_range(contents, 0, 6), 0..=0);
+    }
+
+    /// Regression test for a real crash: GumTree's `[start,end]` are *character* offsets, not
+    /// byte offsets. A file containing multi-byte UTF-8 text (e.g. Thai, 3 bytes/char) before the
+    /// touched range used to panic with "byte index N is not a char boundary" when
+    /// `gumtree_line_range` sliced `contents` directly at the character-offset value as if it were
+    /// a byte index - confirmed on a real fixture (a RustDesk Thai-locale string constant change).
+    #[test]
+    fn gumtree_line_range_handles_multi_byte_utf8_text_before_the_touched_range() {
+        // "สวัสดี" (Thai, 6 characters, 18 bytes) sits entirely on line 0; the touched range is on
+        // line 1. A byte-index slice at character offset 7 (mid-line-1) would land inside one of
+        // line 0's multi-byte characters and panic.
+        let contents = "สวัสดี\nhello\nworld\n";
+        assert_eq!(gumtree_line_range(contents, 7, 9), 1..=1);
+    }
+
+    #[test]
+    fn gumtree_line_range_clamps_an_end_offset_past_the_end_of_the_file() {
+        let contents = "line0\nline1\n";
+        // `end` one character past the last character in `contents` (GumTree's own half-open
+        // convention) must not panic or index out of bounds.
+        let total_chars = contents.chars().count();
+        assert_eq!(gumtree_line_range(contents, 6, total_chars), 1..=1);
+    }
 }
