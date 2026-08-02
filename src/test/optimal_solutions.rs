@@ -204,6 +204,14 @@ mod lua_neovim_one_added_line;
 #[cfg(test)]
 mod php_nextcloud_change_doccomment;
 #[cfg(test)]
+mod php_wordpress_wordpress_add_null_to_return;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_update;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_update_2;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_update_3;
+#[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
 mod python_added_if_block;
@@ -215,6 +223,8 @@ mod python_ansible_ansible_field_rename;
 mod python_api_change;
 #[cfg(test)]
 mod python_bugfix_loop;
+#[cfg(test)]
+mod python_openhands_openhands_change_string_constant;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
@@ -256,6 +266,10 @@ mod rust_rustdesk_add_item;
 #[cfg(test)]
 mod rust_rustdesk_add_one_slice_element;
 #[cfg(test)]
+mod rust_rustdesk_rustdesk_add_two_values_to_slice;
+#[cfg(test)]
+mod rust_rustdesk_rustdesk_string_constant_change;
+#[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
 mod rust_tauri_api_build_1;
@@ -271,6 +285,10 @@ mod rust_turbopack_persistence_tools_main;
 mod rust_zed_git_panel_settings;
 #[cfg(test)]
 mod rust_zed_workspace_tasks;
+#[cfg(test)]
+mod shellscript_ansible_ansible_simple_deletion;
+#[cfg(test)]
+mod shellscript_genymobile_scrcpy_add_two_flags;
 #[cfg(test)]
 mod tsx_material_remove_import;
 #[cfg(test)]
