@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-rustdesk-rustdesk-add-two-values-to-slice")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "rust-rustdesk-rustdesk-add-two-values-to-slice",
+    )
 }

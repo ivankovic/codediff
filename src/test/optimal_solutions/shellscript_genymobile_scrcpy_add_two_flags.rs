@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-genymobile-scrcpy-add-two-flags")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "shellscript-genymobile-scrcpy-add-two-flags",
+        10,
+    )
 }

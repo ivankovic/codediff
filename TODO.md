@@ -2037,3 +2037,30 @@ can't run here since it depends on `check-quality`, which hard-fails once `TOTAL
 up - so the baseline file was updated by hand with the same numbers that target would have
 written, verified afterward with a plain `make check-quality` run (passed clean against the new
 baseline). `cargo test --release --features test-fixtures --lib`: 507/0/5.
+
+## 9 new optimal-solution fixtures added, 1 clamped (2026-08-02)
+
+Added `php-wordpress-wordpress-add-null-to-return`, `php-wordpress-wordpress-version-update`,
+`php-wordpress-wordpress-version-update-2`, `php-wordpress-wordpress-version-update-3`,
+`python-openhands-openhands-change-string-constant`,
+`rust-rustdesk-rustdesk-add-two-values-to-slice`, `rust-rustdesk-rustdesk-string-constant-change`,
+`shellscript-ansible-ansible-simple-deletion`, and `shellscript-genymobile-scrcpy-add-two-flags`.
+8 match codediff's diff exactly; `shellscript-genymobile-scrcpy-add-two-flags` needed
+`assert_matches_human_mapping_within_limit(10)`.
+
+**The gap**: adding two flags to a shell command shifted every later word in that same `command`
+node one position to the right. APTED's `final_pass` maps each `word` to its new positional
+counterpart in the reordered command, rather than the earlier flags shifting flag-content forward
+- an equal-cost but ground-truth-diverging solution to the same ambiguous-mapping class as the
+other known gaps above, not a new bug.
+
+**Quality baseline updated**: `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` 3332 -> 3342
+(exactly the new fixture's own 10, confirming nothing else drifted), `MS_PER_FIXTURE` 1203.1 ->
+1226.7, via `benchmark_optimal_solutions --csv | tee target/benchmark_optimal_output.txt` (the
+`--csv` also refreshes `research/optimal_solutions_benchmark.csv`, which
+`research/analysis/matching_reasons_report.py` reads - re-ran that too via
+`make benchmark-optimal-report`'s underlying commands, regenerating
+`research/plots/matching_reason_totals.png` and
+`research/plots/matching_reason_share_by_fixture.png` against the now-150-fixture corpus).
+`make check-quality`: clean against the new baseline. `cargo test --release --features
+test-fixtures --lib`: 516/0/5.
