@@ -208,6 +208,8 @@ mod lua_neovim_one_added_line;
 #[cfg(test)]
 mod php_nextcloud_change_doccomment;
 #[cfg(test)]
+mod php_nextcloud_server_whitespace_and_added_declaration;
+#[cfg(test)]
 mod php_wordpress_wordpress_add_null_to_return;
 #[cfg(test)]
 mod php_wordpress_wordpress_version_update;
@@ -231,6 +233,8 @@ mod python_api_change;
 mod python_bugfix_loop;
 #[cfg(test)]
 mod python_openhands_openhands_change_string_constant;
+#[cfg(test)]
+mod python_paddlepaddle_paddleocr_formatting_only_change;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
@@ -345,6 +349,8 @@ mod xml_odoo_odoo_change_value;
 mod yaml_ansible_ansible_add_two_sequence_items;
 #[cfg(test)]
 mod yaml_axios_axios_update_string_value;
+#[cfg(test)]
+mod yaml_junegunn_fzf_version_upgrade;
 #[cfg(test)]
 mod yaml_mastodon_remove_one_pair;
 #[cfg(test)]
