@@ -2014,10 +2014,24 @@ fn weighted_lcs_pairs(
 const SLOT_LCS_ANCHOR_WEIGHT: u64 = 10_000;
 
 /// Mechanism 2 of `improve_slot_alignment` - see its doc comment. Walks every matched parent pair
-/// (fresh decisions, plus pre-existing anchors that have residual children in this forest) and
+/// (this call's own fresh decisions - see below for what this deliberately excludes) and
 /// LCS-aligns their deleted × inserted children by kind, using already-matched child pairs as
 /// heavyweight anchors so promotions never cross or displace an existing match. Promoted pairs
 /// are enqueued and their own children aligned recursively.
+///
+/// Deliberately does *not* also seed from a matched node's *parent* (`before_parents.get(&b)`),
+/// even when that parent is matched in the shared, global `diff` rather than this call's own
+/// `before_decision`/`after_decision` - a prior version did exactly that ("a pre-matched parent
+/// whose residual children carry fresh decisions is also a slot-alignment site"), and it's the
+/// confirmed root cause of a real correctness bug: `resolve_forest`'s contract is "only touches
+/// nodes within the given root ids' own descendant sets," but that parent (and therefore its
+/// *other* children, which this call has no ownership of) can sit anywhere in the file - including
+/// inside a completely different candidate's own subtree. This is exactly what let two
+/// independent, non-ancestor/descendant candidate pairs collide during the 2026-07-25 dependency-
+/// aware parallel-batching attempt (`TODO.md`): both workers' calls could each reach the same
+/// shared, already-matched ancestor via this path and write conflicting decisions for its
+/// children. Measured 2026-08-02: this path never fired once across the entire `optimal_solutions`
+/// corpus (157 fixtures) - removing it is zero-risk by direct measurement, not just a hedge.
 fn promote_same_slot_pairs(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -2033,15 +2047,6 @@ fn promote_same_slot_pairs(
     for (&b, d) in before_decision.iter() {
         if let BeforeDecision::Match(a) = d {
             queue.push((b, *a));
-        }
-        // A pre-matched (pruned) parent whose residual children carry fresh decisions is also a
-        // slot-alignment site: its deleted/inserted children are this forest's roots.
-        if let Some(&pb) = before_parents.get(&b)
-            && !before_decision.contains_key(&pb)
-            && let Some(&t) = diff.before_node_map.get(&pb)
-            && t != 0
-        {
-            queue.push((pb, t));
         }
     }
     // Ordered by document position, then by preorder index, not node id - see the identical
