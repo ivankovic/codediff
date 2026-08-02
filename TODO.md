@@ -2447,3 +2447,71 @@ left are inherent APTED cost on genuinely-different subtrees (already root-cause
 found), plus `rust-completely-unrelated-main-files` (still not investigated) and the PHP mixed-
 result case just described, which might reward a closer look at *why* 28 real candidates didn't
 translate into a clean win before assuming there's nothing left to find there.
+
+## Two more `/goal` leads closed out: one dead end, one real bug found then reverted (2026-08-02)
+
+Followed up on the two loose threads from the entry above.
+
+**`rust-completely-unrelated-main-files`**: both files have `async fn main()` - two genuinely
+unrelated programs (one ~120 lines, the other much larger), matched by name identity the same
+"even a 100%-rewritten function is still the same function if the name didn't change" way every
+named-group match works. This is the exact scenario the already-exhausted approximate-fallback idea
+(2026-07-25, above) was trying to cheapen and couldn't find a safe threshold for - a large,
+genuinely-dissimilar named pair is expensive for the same reason any of the other root-caused
+fixtures are. No new lever here; also an unsolved/synthetic fixture (no `human_mapping.json`), so
+even if a fix existed it wouldn't move the quality-scored corpus. Not pursued further.
+
+**PHP anomaly, root-caused**: instrumented `solve_syntax_aware_matching::solve`'s four sub-passes
+individually (throwaway env-var-gated `eprintln!`s, deleted after use) against `php-wordpress-
+wordpress-add-null-to-return`. Each of the four - `solve_large_flat_subtrees`, `solve_named_
+reference_groups`, `solve_import_list_overlap`, `solve_greedy_anchor_blocks` - costs ~70ms on its
+own, even though only one function (of 28) actually changed and everything else was already matched
+by phase 1. Root cause: `solve_greedy_anchor_blocks::collect_candidates` iterates
+`metadata.node_info` - **every node in the file, unconditionally** - filtering by `!mapped.
+contains_key`, rather than a pruning tree-walk that stops descending once it finds an already-
+matched node (the same idiom `nodes::collect_unmatched` already uses elsewhere). For a ~20k-node
+file that's 99.9% already matched by the time this pass runs, that's pure waste - the walk should
+cost roughly nothing, not ~70ms.
+
+**Tried a pruning-DFS rewrite of `collect_candidates`, reverted - broke a real, tested
+invariant.** The optimization assumed "if a node is in `mapped`, its entire subtree is already
+resolved too" - true for every OTHER phase-4 mechanism (full-hash identity, or a complete `apted::
+for_nodes` call that maps every descendant), but **false** for `solve_greedy_anchor_blocks` itself:
+its own existing unit test, `anonymous_if_block_with_mostly_identical_body_is_anchored`, explicitly
+constructs and relies on the opposite case - an enclosing function matched via `MatchButNotIdentical`
+*without* its `if`-block body being recursively resolved yet ("simulating an earlier pass having
+already resolved the function signature but not descended into an unnamed `if`", per that test's
+own comment) - and asserts `solve_greedy_anchor_blocks` still finds and anchors the unresolved
+`if`-block underneath it. Pruning descent the moment an ancestor is mapped skips exactly the
+content this pass exists to find. `cargo test --release --features test-fixtures --lib` caught this
+immediately (1 failure) before it ever reached the benchmark - `benchmark_optimal_solutions`'s
+`TOTAL_MISMATCHES` was unchanged (3345) despite the bug, meaning the real fixture corpus doesn't
+currently happen to exercise this exact "matched-but-unresolved ancestor" shape in a way that
+changes the scored outcome - but the unit test is the actual contract this pass has to uphold, not
+the corpus's incidental coverage of it, so the revert stands regardless of what the benchmark said.
+Reverted in full (`git checkout -- src/diff/solve_greedy_anchor_blocks.rs`, confirmed zero diff, all
+5 of that file's own tests green, full suite back to 523/0/5).
+
+**Whoever revisits this**: the underlying inefficiency (4 independent O(file-size) walks in phase 4,
+regardless of how little is actually left to resolve) is real and would need a genuinely different
+fix - e.g. tracking "how much of the tree is still unmatched" and switching `collect_candidates` to
+a pruning walk *only* when it's provably safe (a node's `MatchButNotIdentical`/`Update` mappings
+would need to be distinguishable from "fully resolved" ones, or this pass would need to run its walk
+before any `MatchButNotIdentical`-without-descendants state can exist - neither is a small change).
+Direct, single-fixture-only speed comparison (`diff_code` on `php-wordpress-wordpress-add-null-to-
+return`, before/after the reverted change) showed the improvement was real but modest anyway -
+988.1ms -> 970.3ms, ~1.8% - so even a *correct* version of this idea wouldn't have been a large win
+on its own.
+
+**`/goal` status at end of this investigation**: not met. `MS_PER_FIXTURE` improved 1153.7 -> 1041.1
+across the three landed fixes (Ruby `singleton_method`, YAML `block_mapping_pair`, PHP kind names),
+zero mismatch-budget spent (`TOTAL_MISMATCHES` unchanged at 3345 throughout, well within the +0.5%
+`/goal` budget) - but p90/max remain far over the documented targets (median <=20ms, p90 <=100ms,
+max <=400ms). Every remaining slow fixture has now been individually root-caused: either inherent
+APTED cost on a genuinely-different subtree with no safe cheap-fallback found (multiple attempts,
+multiple fixtures, see the entries above), or this session's newly-found-and-reverted phase-4
+redundant-walk cost (real, but small, and not safely fixable without touching `solve_greedy_anchor_
+blocks`'s core correctness contract). No further safe, narrow lever identified - the remaining
+options are the previously-declined mid-DP abort-budget engine rewrite, or accepting p90/max above
+target for this class of fixture (one real edit inside a large, otherwise-unrelated-content
+function/file).
