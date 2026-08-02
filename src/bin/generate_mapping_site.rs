@@ -41,6 +41,10 @@ use codediff::test::helper::human_mapping::{
     self, Caches, MarkKind, NodeStatus, rebuild_caches, status_after, status_before,
 };
 
+/// `owner/repo`, used both for the "file an issue" link (rewritten client-side in viewer.js) and
+/// the "view source" link below (baked in at generation time, since it's static per fixture).
+const REPO: &str = "ivankovic/codediff";
+
 #[derive(Parser)]
 struct Args {
     /// Directory to write the generated site into. Wiped and recreated on every run.
@@ -166,6 +170,10 @@ fn render_fixture_page(
     );
 
     let language = before.metadata.language.unwrap_or_default();
+    let source_url = format!(
+        "https://github.com/{REPO}/tree/main/src/test/data/diffs/{}",
+        escape_html_attr(name)
+    );
 
     Ok(format!(
         r##"<!doctype html>
@@ -176,11 +184,12 @@ fn render_fixture_page(
 <title>{name_escaped} — human mapping</title>
 <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body data-fixture="{name_attr}" data-repo="ivankovic/codediff">
+<body data-fixture="{name_attr}" data-repo="{repo}">
 <header class="page-header">
 <a class="back-link" href="../index.html">&larr; all fixtures</a>
 <h1>{name_escaped}</h1>
 <span class="language-badge">{language}</span>
+<a class="source-link" href="{source_url}" target="_blank" rel="noopener">View before/after files on GitHub</a>
 </header>
 <div class="panels">
 <section class="panel" data-side="before">
@@ -204,6 +213,7 @@ fn render_fixture_page(
 "##,
         name_escaped = escape_html_text(name),
         name_attr = escape_html_attr(name),
+        repo = REPO,
         help_overlay = HELP_OVERLAY_HTML,
         search_prompt = SEARCH_PROMPT_HTML,
     ))
@@ -464,6 +474,24 @@ mod tests {
         assert_eq!(
             escape_html_attr("say \"hi\" <b>"),
             "say &quot;hi&quot; &lt;b&gt;"
+        );
+    }
+
+    #[test]
+    fn render_fixture_page_links_to_the_fixtures_directory_in_this_repo() {
+        let source = "fn f() {}\n";
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+        let mapping = HumanMapping { entries: vec![] };
+
+        let html =
+            render_fixture_page("rust-add-if", &before, &after, &mapping).expect("should render");
+
+        assert!(
+            html.contains(
+                r#"href="https://github.com/ivankovic/codediff/tree/main/src/test/data/diffs/rust-add-if""#
+            ),
+            "expected a link straight to this fixture's own before/after files: {html}"
         );
     }
 

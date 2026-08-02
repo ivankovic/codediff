@@ -77,6 +77,12 @@ a {
   font-size: 0.75rem;
 }
 
+.source-link {
+  display: inline-block;
+  margin-left: 0.75rem;
+  font-size: 0.8rem;
+}
+
 .fixture-list {
   list-style: none;
   padding: 0;
