@@ -2143,3 +2143,91 @@ size/cost gate similar to `EXPENSIVE_RESIDUAL_THRESHOLD` (phase 6's), or whether
 subtrees here are unusually pathological for APTED regardless of raw size. This entry is
 measurement/diagnosis only, per what was asked - no code changed as a result (`git diff --stat
 src/diff.rs` is empty; the profiling test was deleted after use).
+
+## Fixed: Ruby `def self.foo` methods weren't recognized as named candidates at all (2026-08-02, user-requested follow-up)
+
+Followed up on the `ruby-homebrew-add-or-expression` finding above (4293.7ms total, 4213.1ms/98.1%
+in phase 4). First hypothesis - a coarser, cheaper-scoring wrapper node winning phase 4's greedy
+acceptance race ahead of the real per-method candidates - didn't survive computing the actual
+`solve_greedy_anchor_blocks::cost_ratio` math: a 1-child wrapper whose child doesn't hash-match
+scores *expensive* (~1.0), not cheap, so it can't out-race a genuine name match. Built a real
+diagnostic instead of continuing to reason abstractly (a throwaway test dumping every scored
+named-group candidate for this fixture, deleted after use): there were only **3** candidates total
+(`module:Homebrew`, `module:Homebrew::API`, `module:Homebrew::API::Formula`), zero at the method
+level, despite the file having 14 top-level `def self.*` methods.
+
+Root cause: `nodes::is_semantically_structural`'s `Language::Ruby` arm only recognized `"class" |
+"module" | "method"` node kinds. Ruby's `def self.foo` (class/module-level "singleton method") is
+tree-sitter-ruby's own distinct grammar kind, `singleton_method` - not `method`. Every `def self.*`
+in the file was invisible to phase 4's named-group matching, which had nothing to isolate individual
+methods with and fell all the way back to whatever enclosing `class`/`module` it could still see -
+for a file that's just a chain of near-empty wrapper modules (`Homebrew` -> `Homebrew::API` ->
+`Homebrew::API::Formula`) around the real content, that meant multi-thousand-node whole-module APTED
+calls instead of many small per-method ones, for a fixture whose only real edit is one line inside
+one method.
+
+**Fix**: added `"singleton_method"` to that match arm (`src/diff/nodes.rs`) - one line, same shape
+every other language arm already uses (none of them distinguish static/instance variants either).
+
+**Verified via a fresh throwaway timing test** (`src/diff.rs`, deleted after use, same pattern as
+above): `ruby-homebrew-add-or-expression` total time dropped **4293.7ms -> ~1000ms** (~4.3x), phase
+4 alone **4213.1ms -> ~930ms** (~4.5x). Confirmed the mechanism directly: the named-group candidate
+dump now shows 17 candidates (14 `singleton_method`s plus the 3 `module`s, sizes 11-1579 for the
+methods vs. ~3021-3032 for the modules), and several small method-level pairs (sizes 11/38/41) now
+get greedily accepted and APTED'd individually instead of being invisible.
+
+**Residual, not chased further**: the two largest `module` pairs (`Homebrew::API`/`Homebrew`, sizes
+~3027/3032, nearly fully nested/overlapping) still get accepted and pay a real APTED call each, which
+is why the fixture's time floor is ~1s rather than near-zero - `grouped_greedy_matcher`'s pruning
+(`ContainmentCtx`/`compute_pruned_targets` in `resolve_forest`) only excludes *already-matched*
+descendants at the time a given pair is resolved, and cost-ascending acceptance order doesn't
+guarantee the small nested method pairs get accepted before their large enclosing-module cousins -
+so a module pair can still pay for a large not-yet-pruned residual even after this fix. Distinct
+problem from the one fixed here (candidate *existence*, not candidate *ordering/scoring*) - left for
+a future pass if these nested-wrapper-module fixtures come up again.
+
+**Verification**: `cargo fmt --check` clean. `cargo test --release --features test-fixtures --lib`:
+523 passed, 0 failed, 5 ignored (unchanged pass count). `benchmark_optimal_solutions`:
+`TOTAL_MISMATCHES` unchanged at 3345 (this is a pure phase-4-candidate-recognition change, not an
+accuracy change - no fixture's outcome should differ, and none measurably did) - `MS_PER_FIXTURE`
+dropped 1286.8 -> 1153.7 (a corpus-wide ~10% average improvement from fixing one fixture, since it's
+an unweighted per-fixture average and this one fixture's cost dropped by >3s). `research/
+quality_baseline.txt` updated via `make update-quality-baseline`.
+
+## Deferred idea: a local/pair-scoped, residual-aware cost function for phase 4's named-group matching (written down 2026-08-02, not implemented)
+
+While investigating the `ruby-homebrew-add-or-expression` slowness above, the working hypothesis
+before finding the real root cause (missing `singleton_method` candidates) was "phase 4's per-pair
+`on_accept` calls full, unconstrained APTED regardless of how much of the pair's subtree the DP
+actually needs to resolve - give it a smarter, residual-aware cost function instead." That premise
+turned out wrong *for this specific fixture* (the real problem was candidate existence, not cost),
+but the underlying idea is still architecturally sound and worth keeping for the other phase-4-heavy
+fixtures from the profiling table above where residual size, not candidate recognition, is the
+actual driver: `kotlin-nextcloud-a-few-small-removals`, `cpp-ladybird-refactor-variables-if-changes`,
+`c-postgres-real-logic-change`, `c-linux-small-change-struct-to-char` - and, per the "residual, not
+chased further" note just above, possibly `ruby-homebrew-add-or-expression`'s own remaining
+module-pair cost too.
+
+The idea: `apted::for_nodes`'s existing `ContainmentCtx`/`compute_pruned_targets` already excludes
+already-matched descendants from a given pair's DP - so a pair's *true* cost isn't its raw subtree
+size, it's its **pruned residual** size (unmatched nodes only) at the moment it's actually resolved.
+`grouped_greedy_matcher::solve`'s cost function (currently `solve_greedy_anchor_blocks::cost_ratio`,
+a `sequence_edit_cost`-based estimate over direct children only) has no visibility into that pruning
+at scoring time - it scores every candidate up front, before any acceptance/pruning has happened, so
+it can't distinguish "this pair looks expensive but most of it will already be pruned by the time we
+get to it" from "this pair really is expensive." A pair-scoped, residual-aware cost function would
+instead estimate (or directly measure, cheaply) how much of a *specific* candidate pair's subtree is
+already matched at scoring time and price accordingly - naturally deprioritizing (or short-
+circuiting) pairs whose real remaining work is small, without the false-positive risk a *general*
+hash-based pre-matching pass over arbitrary interior nodes had (documented in `resolve_forest`'s own
+doc comment, previously tried and reverted for picking same-kind-but-unrelated nodes elsewhere in
+the file as false "free rename" partners) - that risk doesn't apply here because this would stay
+strictly local/pair-scoped, confined to an already name-matched pair's own subtree, never reaching
+outside it to guess at an unrelated node.
+
+Not implemented - no evidence yet (via the same throwaway-diagnostic-then-delete pattern used
+elsewhere in this file) confirming it would actually help on the fixtures above rather than just
+sounding right, and it's more invasive than the `singleton_method` fix (touches the shared
+`grouped_greedy_matcher` engine, not a single per-language match arm). Written down here, per
+explicit request, so it's not re-derived from scratch if one of those fixtures' phase-4 cost comes
+up again.

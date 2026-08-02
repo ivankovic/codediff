@@ -624,7 +624,17 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::Ruby => match node_kind {
-            "class" | "module" | "method" => node
+            // `singleton_method` (`def self.foo`, Ruby's class/module-level method syntax) is a
+            // distinct grammar node from plain instance `method` (`def foo`) - omitting it left
+            // every `def self.*`-only file (e.g. a Homebrew formula-API helper module) with *no*
+            // method-level named candidates at all, forcing phase 4's named-group matching to fall
+            // back to whatever enclosing `class`/`module` it could still see - which, for a file
+            // that's just a chain of near-empty wrapper modules around the real content, meant one
+            // multi-thousand-node APTED call instead of many small per-method ones (measured
+            // 2026-08-02: `ruby-homebrew-add-or-expression`, 4.2s dominated by a single `module`
+            // pair with a 1022-node residual, for a fixture whose only real edit is one line inside
+            // one `def self.*` method - see `TODO.md`).
+            "class" | "module" | "method" | "singleton_method" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
                 .map(|name| (node_kind.to_string(), name.to_string())),
