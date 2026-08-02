@@ -212,6 +212,8 @@ mod php_wordpress_wordpress_version_update_2;
 #[cfg(test)]
 mod php_wordpress_wordpress_version_update_3;
 #[cfg(test)]
+mod php_wordpress_wordpress_whitespace_only_change;
+#[cfg(test)]
 mod python_add_remove_block;
 #[cfg(test)]
 mod python_added_if_block;
@@ -289,6 +291,18 @@ mod rust_zed_workspace_tasks;
 mod shellscript_ansible_ansible_simple_deletion;
 #[cfg(test)]
 mod shellscript_genymobile_scrcpy_add_two_flags;
+#[cfg(test)]
+mod shellscript_nextcloud_server_change_invocation_string;
+#[cfg(test)]
+mod shellscript_nvm_sh_nvm_upgrade_version_string;
+#[cfg(test)]
+mod shellscript_pytorch_pytorch_change_invocation_string;
+#[cfg(test)]
+mod shellscript_scikit_learn_scikit_learn_string_to_regex;
+#[cfg(test)]
+mod shellscript_torvalds_linux_double_equals_to_equals;
+#[cfg(test)]
+mod swift_nextcloud_ios_call_different_function;
 #[cfg(test)]
 mod tsx_material_remove_import;
 #[cfg(test)]
