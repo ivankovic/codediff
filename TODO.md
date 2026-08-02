@@ -2573,3 +2573,56 @@ enough to warrant their own dedicated, explicitly-scoped session rather than con
 a narrow fix that doesn't exist: (1) constrain `pull_up_wrapped_matches`'s reach and rebuild
 dependency-aware parallel batching on top of it, or (2) the mid-DP abort-budget engine rewrite. No
 further safe, narrow lever is known to exist at this point.
+
+## Found and fixed the actual out-of-scope-write bug; decided not to rebuild parallel batching on top of it (2026-08-02, `/goal` continued)
+
+Re-audited more carefully than the entry above and found the *actual* confirmed mechanism, not just
+a suspect: `promote_same_slot_pairs` (`apted/common.rs`) had a block that walked a matched node's
+*parent* via the whole-file `node_to_parent` map (not scoped to the current `resolve_forest` call's
+own root ids), checked whether that parent was matched in the shared, global `diff`, and - if so -
+pushed the parent's **entire child list** into its own promotion queue, including siblings that
+could belong to a completely different candidate's exclusive subtree. This is exactly the mechanism
+that let two independent, non-ancestor/descendant candidates collide in the reverted 2026-07-25
+parallel-batching attempt: both workers' calls could each reach the same shared, already-matched
+ancestor this way and write conflicting decisions for its children. (`pull_up_wrapped_matches`, the
+other mechanism inside `improve_slot_alignment`, turned out on closer inspection to be safe by
+induction - every node it ever writes a decision for is gated behind already being a pre-existing
+key in the call-local decision map, which traces back to the original DP output, itself correctly
+scoped to the given root ids.)
+
+**Measured before touching it**: added an env-var-gated counter and ran the whole `optimal_solutions`
+corpus (157 fixtures) - this path fired **zero times**. Removed it entirely (not just constrained -
+there's no live case to verify a constrained version against, and it's the confirmed root cause of a
+real bug); `TOTAL_MISMATCHES` unchanged at 3345, full test suite green (523/0/5). Committed
+separately - this is a real, valuable, low-risk fix on its own regardless of what follows, since it's
+the specific prerequisite the reverted parallel-batching entry required before any retry:
+`resolve_forest`'s "only touches nodes within the given root ids' own descendant sets" contract now
+actually holds (audited the rest of `resolve_forest` too - `emit_before_subtree`/`emit_after_subtree`
+only recurse down from legitimate roots via normal child pointers, nothing else writes sideways).
+
+**Decided not to proceed to rebuilding parallel batching itself.** Re-examined this session's own
+measurements before writing any new code: every fixture currently driving p90/max
+(`ruby-homebrew-add-or-expression`, `c-postgres-real-logic-change`, and the earlier "6-way
+parallelism on 6 items, not 1837-way" finding for `cpp-ladybird-refactor-variables-if-changes`, all
+above) shows the *same* shape - one single, large, genuinely-expensive `apted::for_nodes` call
+dominating its round, with the other candidates in that same round resolving near-instantly. Round-
+based parallelism only ever saves the *sum of the other candidates' time* in a round, bounded by
+Amdahl's law - it can't reduce the one dominant call's own wall time, since that's a single
+indivisible unit of work as far as this mechanism is concerned. For a round shaped like "1 call at
+900ms + 3 calls under 20ms each," parallelizing saves at most ~50ms, not the 900ms. This was already
+flagged as a risk in the original 2026-07-25 investigation ("lowers how much batching would even buy
+on files shaped like this one") but not fully absorbed into the decision at the time; re-confirmed
+now against every fixture actually driving this session's `/goal` numbers, not just the one that
+originally motivated the concern. Implementing the full feature (adding `rayon`, round-partitioning,
+clone+merge execution, multi-run determinism verification) is real, correctness-sensitive work that
+would not have moved p90/max for the fixtures that matter here even if built perfectly - not a good
+trade against the remaining risk, so not attempted.
+
+**Final `/goal` status**: not met, and no further lever identified that would meet it without either
+(a) the mid-DP abort-budget engine rewrite (the only remaining approach that could reduce a *single*
+dominant call's own cost, rather than parallelizing across multiple calls) or (b) accepting p90/max
+above target for this class of fixture. The scope-bug fix above is kept as a genuine, standalone
+correctness improvement and a valid prerequisite for *if* parallel batching is ever revisited for a
+different reason (e.g. a corpus that grows to include fixtures with many roughly-equal-cost
+candidates per round, where the Amdahl's-law argument above wouldn't apply) - but it isn't, on its
+own or combined with the batching rebuild, a path to this `/goal`'s runtime target.
