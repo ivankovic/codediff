@@ -188,6 +188,8 @@ mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod kotlin_nextcloud_a_few_small_removals;
 #[cfg(test)]
+mod kotlin_nextcloud_android_extract_argument_into_variable;
+#[cfg(test)]
 mod kotlin_nextcloud_change_function_fingerprint;
 #[cfg(test)]
 mod kotlin_nextcloud_remove_function;

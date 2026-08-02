@@ -98,7 +98,7 @@ Kotlin,nextcloud-android.git,ae3e759e615367e0a78472eb83fc7c94634fca30,app/src/ma
 Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/etm/pages/EtmPreferencesFragment.kt,kotlin-nextcloud-whitespace-only-change
 Kotlin,nextcloud-android.git,b73b0ae9a09a3d22f924ea744badc7a8e011cf37,app/src/test/java/com/owncloud/android/ui/activities/data/files/RemoteFilesRepositoryTest.kt,
 Kotlin,nextcloud-android.git,c9979170a73ee35bc1098aebd2e4fba82657d01f,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadWorker.kt,kotlin-nextcloud-a-few-small-removals
-Kotlin,nextcloud-android.git,d5223059a628ae3dca7279f0625ecc62d2ab2bd2,app/src/main/java/com/owncloud/android/ui/adapter/GalleryRowHolder.kt,
+Kotlin,nextcloud-android.git,d5223059a628ae3dca7279f0625ecc62d2ab2bd2,app/src/main/java/com/owncloud/android/ui/adapter/GalleryRowHolder.kt,kotlin-nextcloud-android-extract-argument-into-variable
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/awful/mouse/resize.lua,
 LUA,awesomeWM-awesome.git,63def3d38d988c937e5b619e86854d85e41299c4,lib/ruled/client.lua,lua-awesome-only-comment-change
 LUA,awesomeWM-awesome.git,869e63fcdc5ea836f22e935b1eb52fffefb759b3,lib/wibox/widget/textbox.lua,
