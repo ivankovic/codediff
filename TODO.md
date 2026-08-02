@@ -2515,3 +2515,61 @@ blocks`'s core correctness contract). No further safe, narrow lever identified -
 options are the previously-declined mid-DP abort-budget engine rewrite, or accepting p90/max above
 target for this class of fixture (one real edit inside a large, otherwise-unrelated-content
 function/file).
+
+## Audit requested by the reverted parallel-batching entry, completed: root cause found (2026-08-02, `/goal` continued)
+
+The "Dependency-aware parallel batching" entry above left an explicit prerequisite for anyone
+re-attempting it: audit `resolve_forest` and its callees for whether anything can write a decision
+for a node outside the given `before_root_ids`/`after_root_ids` descendant sets, since that's what
+the confirmed collision bug implied but nothing had pinned down. Did that audit by reading the code,
+not by re-running the experiment.
+
+**Root cause, confirmed via code reading**: `improve_slot_alignment`'s `pull_up_wrapped_matches`
+(`src/diff/apted/common.rs`) receives `before_parents`/`after_parents` as `&before_meta.
+node_to_parent`/`&after_meta.node_to_parent` - the **whole file's** parent map, not one scoped to
+the current call's own root ids (`ContainmentCtx::build` borrows the same full maps for the same
+reason). It walks a candidate node `b` up to its parent `pb` via this unscoped map, looks up `pb`'s
+match target via `before_match_target`, which falls back to reading the **shared, global**
+`diff.before_node_map` whenever `pb` has no entry in the call-local decision map - i.e. it can see
+and react to *any* previously-committed match anywhere in the file, not just within its own subtree.
+When a wrapper pull-up condition fires, it then writes a *new* decision
+(`after_decision.insert(c, AfterDecision::Match(b))`) for `c`, a node reached by walking up to that
+shared ancestor and back down a *different* branch (`ancestor_child_of`) - `c` is not required to be
+a descendant of the current call's own `before_root_ids`/`after_root_ids` at all, and nothing checks
+that it is. `pull_up_wrapped_matches` isn't even passed the root ids to check against.
+
+This is exactly the mechanism the reverted parallel attempt's collision required: two candidates
+with no ancestor/descendant relationship to *each other* (the only relationship the batching design
+checked) can each independently reach into a *shared* ancestor via pull-up and write conflicting
+decisions for the same node on a shared branch neither candidate structurally "owns." Not a
+parallelism-specific bug - it means `resolve_forest`'s "only touches nodes within the given root
+sets" contract is already looser than the batching design assumed, even in the sequential case;
+running two such calls concurrently just turned a silently-fine one-call-at-a-time sequencing into a
+real race.
+
+**Not measured or fixed this session**: how *often* pull-up actually reaches outside a call's own
+root ids in practice (rare vs. load-bearing) - needed before deciding whether constraining it to
+stay in-scope is a low-risk restriction or would visibly regress match quality (pull-up exists
+specifically to let a match's wrapper take over a slot the DP descended past, so it's plausibly
+doing real, valuable work, not just being sloppy). Fixing this (constrain pull-up to the given root
+ids, or redesign parallel batching to group by shared-ancestor reachability rather than direct
+ancestor/descendant relationship) and then re-implementing safe parallel batching on top of it is
+real, substantial, correctness-sensitive engineering - matching the scope of the already-declined
+mid-DP abort-budget option, not a quick follow-on to this audit. Root cause is now understood and
+documented; the fix itself needs its own dedicated, explicitly-scoped session, same conclusion the
+original parallel-batching entry already reached for a different reason.
+
+**Final `/goal` status, end of this investigation**: not met. Every lever this session and the prior
+2026-07-25 session identified has now been tried, measured, or root-caused: three real, safe,
+already-landed candidate-recognition fixes (Ruby, YAML, PHP - `MS_PER_FIXTURE` 1153.7 -> 1041.1,
+zero mismatch-budget spent); cost-function reordering (tried, no effect); finer-grained within-
+method candidates (tried, shelved as too narrow for this corpus); size/dissimilarity-capped
+approximate fallback (tried twice, at two different call sites, no safe configuration found either
+time); a phase-4 redundant-tree-walk fix (tried, reverted - broke a real, tested invariant);
+dependency-aware parallel batching (tried previously, reverted on a real correctness bug; that bug's
+root cause is now identified, but fixing it and rebuilding the batching is out of scope for this
+session). What remains is exactly two real options, both substantial and correctness-sensitive
+enough to warrant their own dedicated, explicitly-scoped session rather than continuing to search for
+a narrow fix that doesn't exist: (1) constrain `pull_up_wrapped_matches`'s reach and rebuild
+dependency-aware parallel batching on top of it, or (2) the mid-DP abort-budget engine rewrite. No
+further safe, narrow lever is known to exist at this point.
