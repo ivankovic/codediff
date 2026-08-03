@@ -607,6 +607,68 @@ pub fn is_semantically_structural<'a>(
                     .and_then(|n| n.utf8_text(bytes).ok())
                     .map(|name| (node_kind.to_string(), name.to_string()))
             }
+            // Fallback for a top-level `const`/`let`/`var X = <value>` whose value isn't itself a
+            // function/class (those already get a more specific identity above, keyed on the
+            // *declarator*) - e.g. `const APP_STATE_STORAGE_CONF = (<generic IIFE>)({...90
+            // properties...})`. Without this, such a declaration has no identity signal at all -
+            // both `solve_large_flat_subtrees` (which looks for a top-level identity match via
+            // `top_level_identities`, checking `program`'s *direct* children - a `lexical_
+            // declaration`, not its nested `variable_declarator`) and phase 4's named-group
+            // matching can't isolate it, so its entire subtree falls through to final whole-tree
+            // APTED. Deliberately keyed on the *declaration* node (not the declarator, unlike the
+            // `arrow_function` arm above) specifically so `top_level_identities`'s direct-children
+            // walk sees it, letting `solve_large_flat_subtrees` Myers-diff the flat descendant
+            // cheaply instead of routing through a real (and, for this shape, pathological)
+            // `apted::for_nodes` call.
+            //
+            // Measured live (`typescript-excalidraw-excalidraw-add-values-to-lists`): a two-line
+            // edit (one new property in each of two ~90-property object literals, one of them
+            // exactly this IIFE-const shape, densely packed with dozens of byte-identical
+            // `{ browser: false, export: false, server: false }`-shaped sibling values) took
+            // **36 seconds** - by far the single worst outlier in the whole corpus (the next
+            // slowest fixture is 25x faster) - because that IIFE-const's ~1500-node subtree had no
+            // identity signal and landed in phase 6's final APTED, which chokes specifically on
+            // that duplicate-value cluster (confirmed: keying this arm on `variable_declarator`
+            // instead - visible to phase 4's recursive named-group walk, but invisible to `top_
+            // level_identities`'s direct-children-only walk - still cost ~43s, i.e. no better,
+            // since it still forced one giant real-APTED call over the same duplicate-heavy
+            // subtree instead of the cheap Myers path).
+            //
+            // Deliberately scoped to a *top-level* declaration with exactly one declarator (parent
+            // is `program` directly, or an `export_statement` that is) and a plain identifier name
+            // (not a destructuring pattern): unlike a top-level function/class name, an arbitrary
+            // local variable name (`result`, `i`, `config`) is not reliably unique within a file -
+            // the same false-positive risk already documented and avoided elsewhere for
+            // local-variable anchoring (see `TODO.md`'s "Explored and shelved: recognizing smaller
+            // structural pieces within a changed method"). A top-level module const doesn't have
+            // that problem: it's declared exactly once, at module scope, same as a top-level
+            // function - and multi-declarator statements (`const a = 1, b = 2;`) are skipped
+            // rather than guessing which declarator the single returned name should represent.
+            "lexical_declaration" | "variable_declaration" => {
+                let mut cursor = node.walk();
+                let mut declarators = node
+                    .children(&mut cursor)
+                    .filter(|c| c.kind() == "variable_declarator");
+                let declarator = declarators.next()?;
+                if declarators.next().is_some() {
+                    return None; // more than one declarator - ambiguous, skip.
+                }
+                let name_node = declarator
+                    .child_by_field_name("name")
+                    .filter(|n| n.kind() == "identifier")?;
+                let is_function_or_class_value =
+                    declarator.child_by_field_name("value").is_some_and(|v| {
+                        matches!(v.kind(), "arrow_function" | "function_expression" | "class")
+                    });
+                let parent = node.parent()?;
+                let is_top_level = parent.kind() == "program"
+                    || (parent.kind() == "export_statement"
+                        && parent.parent().is_some_and(|pp| pp.kind() == "program"));
+                (!is_function_or_class_value && is_top_level)
+                    .then(|| name_node.utf8_text(bytes).ok())
+                    .flatten()
+                    .map(|name| (node_kind.to_string(), name.to_string()))
+            }
             _ => None,
         },
         // Was "unvalidated" (added via the same best-effort `name`-field convention every checked

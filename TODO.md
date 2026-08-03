@@ -2780,3 +2780,87 @@ under the Makefile's 2x warning threshold); `TOTAL_MISMATCHES` stayed exactly 33
 2 fixtures contribute 0. `make update-quality-baseline` ran straight through. `cargo test --release
 --features test-fixtures --lib nextcloud`: 14/0/0 (covers both new fixtures alongside the other
 nextcloud-derived cases).
+
+## Targeted, single-fixture speed heuristics: the "expand the tail even at 1/200 fixtures" framing (2026-08-03, user-requested)
+
+User's framing for this round: earlier `/goal` sessions (see the many entries above) declined
+several narrow heuristics specifically because they'd only fire on ~1/157 fixtures - not worth a
+new mechanism for that little coverage. User explicitly invited the opposite stance this time:
+narrow is fine, as long as it's *correct* whenever it fires - "if we want to cover the long tail, a
+heuristic triggering on only 0.5% of cases would trigger on 1 out of 200 fixtures."
+
+**First tried and abandoned: branch-and-bound with an incumbent inside APTED.** Measured whether
+the existing cheap fallback (`for_roots_fallback`, Myers-LCS over top-level byte-identical
+fragments) is a tight enough incumbent bound to prune APTED's DP - it isn't: ratios of **3.65x to
+996x** against real APTED's exact cost on the 5 known-slowest fixtures (`ruby-homebrew-add-or-
+expression`, `c-postgres-real-logic-change`, `cpp-ladybird-refactor-variables-if-changes`, `kotlin-
+nextcloud-a-few-small-removals`, `c-linux-small-change-struct-to-char`). Root cause: that fallback
+only recognizes whole-fragment byte-identity, never rename/partial-reuse - exactly what the true
+low-cost mapping needs in every one of these fixtures (one largely-unchanged function/subtree with
+one real edit inside). Any incumbent tight enough to matter would itself need to be rename-aware,
+at which point it's doing most of the hard work already. Not pursued further; no code changed.
+
+**Re-profiled the current (178-fixture) corpus from scratch** (`benchmark_other`'s external-tool
+dependencies aren't available in this environment, so used a throwaway `diff_code`-timing test
+instead, same methodology as every other profiling pass in this file). Found a new #1 outlier that
+hadn't existed in any of the prior top-10 lists: **`typescript-excalidraw-excalidraw-add-values-to-
+lists` at 36-44 seconds** (run-to-run variance under load) - **25x** the #2 slowest fixture
+(`kotlin-nextcloud-a-few-small-removals`, 1.4s), despite being only a 290-line file with a two-line
+edit.
+
+**Root-caused via phase-timing + phase-4-sub-pass instrumentation** (throwaway, deleted after use,
+same pattern as every prior profiling entry): the fixture's only edit adds a `searchMatches`
+property to two ~90-property object literals. One of them, `getDefaultAppState`'s return object, is
+a plain `const f = () => { return {...} }` - already recognized by `is_semantically_structural`'s
+existing `arrow_function` arm. The other, `APP_STATE_STORAGE_CONF`, is assigned via a generic IIFE
+call - `const APP_STATE_STORAGE_CONF = (<Generic>(config) => config)({...90 properties...})` - so
+its declarator's *value* is a `call_expression`, not itself a function. `is_semantically_structural`
+had no arm for that shape at all: the existing `arrow_function`/`function_expression` arm only
+fires when the function is the *direct* value of the declarator. Zero identity signal meant this
+object's entire ~1500-node subtree (38 properties whose value is the byte-identical `{ browser:
+false, export: false, server: false }`, 40 more `{ browser: true, ... }`) fell through to final
+whole-tree APTED, which chokes specifically on that duplicate-value cluster - the same class of
+combinatorial blowup that motivated (and killed) the branch-and-bound attempt above, just reached
+via a missing-candidate gap instead of being inherent to a genuinely large/dissimilar pair.
+
+**First fix attempt, wrong node kind, measured no improvement (43s, i.e. worse than baseline within
+noise) - caught by measuring, not assumed correct:** added a `variable_declarator` arm (keyed on the
+declarator itself). This *does* get found by phase 4's `solve_named_reference_groups` (which walks
+every node recursively), but `solve_large_flat_subtrees` - the pass that actually runs the cheap
+Myers-diff fast path on a >=50-child flat descendant - looks for a top-level identity via `top_
+level_identities`, which only calls `is_semantically_structural` on `program`'s *direct* children
+(a `lexical_declaration`, not its nested `variable_declarator`). So the declarator-keyed version was
+invisible to the cheap path and still forced one giant real-`apted::for_nodes` call over the
+duplicate-heavy subtree via the named-group mechanism instead - no better than before.
+
+**Real fix: key the new arm on the `lexical_declaration`/`variable_declaration` node instead**
+(`src/diff/nodes.rs`) - the node `top_level_identities` actually inspects. Recognizes a top-level
+`const`/`let`/`var X = <value>` whose value isn't itself a function/class (those already have a more
+specific identity via the existing arm) and whose name is a plain identifier (not a destructuring
+pattern), gated on being a direct child of `program` (or of an `export_statement` that is) with
+exactly one declarator - deliberately *not* extended to non-top-level declarators, since an
+arbitrary local variable name (`result`, `i`, `config`) isn't reliably unique the way a top-level
+declaration's name is (the same false-positive risk already documented and avoided for local-
+variable anchoring elsewhere in this file).
+
+**Verified**: `typescript-excalidraw-excalidraw-add-values-to-lists` dropped **43s -> 1.07s** (~40x),
+landing back in the corpus's normal range. Full suite: `cargo test --release --features
+test-fixtures --lib` (skipping the known-flaky timing test) - 556 passed, 0 failed, 5 ignored,
+finished in 89s (down from the prior full run's 852s, since this one fixture alone dominated total
+suite wall time). `benchmark_optimal_solutions`: `TOTAL_MISMATCHES` unchanged at exactly 3363 (this
+is a pure candidate-recognition addition, same as the Ruby/YAML/PHP fixes earlier in this file - no
+fixture's matched *content* should differ, and the benchmark confirms none did) -
+`MS_PER_FIXTURE` (informational) dropped 2143.4 -> 996.3, more than 2x, almost entirely attributable
+to this one fixture. `research/quality_baseline.txt` not yet updated (no baseline change needed
+since `TOTAL_MISMATCHES` didn't move; `MS_PER_FIXTURE` will pick up the improvement next time
+`make update-quality-baseline` runs for an unrelated reason).
+
+**Other candidates from the "top 10 slowest, expand the tail" framing** (not yet investigated this
+session): `cpp-opencv-add-test-case`, `rust-tauri-cli-ios-dev`, and the previously-root-caused-but-
+not-fixed inherent-APTED-cost fixtures (`kotlin-nextcloud-a-few-small-removals`, `cpp-ladybird-
+refactor-variables-if-changes`, `c-postgres-real-logic-change`, `c-linux-small-change-struct-to-
+char`, `ruby-homebrew-add-or-expression`'s residual module cost, `rust-completely-unrelated-main-
+files`) - those were already established to be genuine, unavoidable tree-edit-distance cost on a
+single large/dissimilar subtree, not a missing-candidate gap, so a *different* kind of targeted
+heuristic (not another `is_semantically_structural` arm) would be needed for each, if one exists at
+all. Worth a fresh per-fixture look now that the "narrow is fine" bar has been explicitly lowered.
