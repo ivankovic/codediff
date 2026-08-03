@@ -204,6 +204,8 @@ mod kotlin_small_api_change;
 #[cfg(test)]
 mod lua_awesome_only_comment_change;
 #[cfg(test)]
+mod lua_awesomewm_awesome_align_to_halign;
+#[cfg(test)]
 mod lua_neovim_one_added_line;
 #[cfg(test)]
 mod php_nextcloud_change_doccomment;
@@ -328,6 +330,8 @@ mod typescript_async_await;
 #[cfg(test)]
 mod typescript_excalidraw_excalidraw_add_values_to_lists;
 #[cfg(test)]
+mod typescript_microsoft_typescript_add_target_comment;
+#[cfg(test)]
 mod typescript_microsoft_typescript_comment_change;
 #[cfg(test)]
 mod typescript_refactor_interface;
@@ -337,6 +341,10 @@ mod typescript_typescript_add_target_comment;
 mod typescript_typescript_add_target_comment_2;
 #[cfg(test)]
 mod typescript_typescript_add_target_comment_3;
+#[cfg(test)]
+mod vimscript_junegunn_fzf_condition_canges;
+#[cfg(test)]
+mod vimscript_neovim_neovim_add_a_few_lines;
 #[cfg(test)]
 mod vimscript_neovim_neovim_add_line_comment;
 #[cfg(test)]
@@ -351,6 +359,8 @@ mod yaml_ansible_ansible_add_two_sequence_items;
 mod yaml_axios_axios_update_string_value;
 #[cfg(test)]
 mod yaml_junegunn_fzf_version_upgrade;
+#[cfg(test)]
+mod yaml_mastodon_mastodon_add_block_pair_translation;
 #[cfg(test)]
 mod yaml_mastodon_remove_one_pair;
 #[cfg(test)]
