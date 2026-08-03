@@ -2729,3 +2729,16 @@ but still correct) elided body; `--mode json` on the same pair reports `"summary
 A comment-only insertion reports "Comment changes only" / `"summary": "comment_only"` in both modes
 respectively. `SPECS.md`'s "Headless/text mode" section documents both. `cargo test --lib --features
 test-fixtures tui::`: 92/0/0.
+
+## 5 new optimal-solution fixtures added, 0 clamped (2026-08-03)
+
+Added `lua-awesomewm-awesome-align-to-halign`, `typescript-microsoft-typescript-add-target-comment`,
+`vimscript-junegunn-fzf-condition-canges`, `vimscript-neovim-neovim-add-a-few-lines`, and
+`yaml-mastodon-mastodon-add-block-pair-translation`. All 5 match codediff's diff exactly.
+
+**Quality baseline updated anyway**: corpus grew from 171 to 176 fixtures, so
+`research/quality_baseline.txt`'s `MS_PER_FIXTURE` moved (2896.6 -> 2132.9 - a machine-noise
+improvement, not a regression, well under the Makefile's 2x warning threshold either direction);
+`TOTAL_MISMATCHES` stayed exactly 3363, confirming these five contribute 0. `make
+update-quality-baseline` ran straight through (no hard-fail this time, since nothing regressed).
+`cargo test --lib --features test-fixtures optimal_solutions::`: 187/0/0.
