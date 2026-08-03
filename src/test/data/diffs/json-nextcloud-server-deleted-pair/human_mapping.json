@@ -1,0 +1,4723 @@
+{
+  "entries": [
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:23"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1"
+      ],
+      "after_path": [
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "escape_sequence:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "escape_sequence:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "escape_sequence:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "escape_sequence:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "string_content:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "escape_sequence:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "escape_sequence:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "escape_sequence:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "escape_sequence:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "string_content:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:3",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:3"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:4",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:4"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:5",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:5"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:6",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:6"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:7",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:7"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:8",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:8"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:9",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:9"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:10",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:10"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:11",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:11"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:12",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:12"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:13",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:13"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:14",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:14"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:14"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:15",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:15"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:16",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:16"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:16"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:17",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:17"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:18",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:18"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:18"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:19",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:19"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:19"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:20",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:20"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:20"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:21",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:21"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:21"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:22",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        ",:22"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "object:1",
+        "pair:2",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "object:1",
+        "}:1"
+      ]
+    }
+  ]
+}

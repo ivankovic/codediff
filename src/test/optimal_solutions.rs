@@ -134,6 +134,8 @@ mod java_add_logging;
 #[cfg(test)]
 mod java_fix_array_index;
 #[cfg(test)]
+mod java_nextcloud_android_add_two_function_calls;
+#[cfg(test)]
 mod java_protobuf_add_two_annotations;
 #[cfg(test)]
 mod java_protocolbuffers_protobuf_add_import_and_update_field_access;
@@ -173,6 +175,8 @@ mod json_apache_string_change_version;
 mod json_langflow_update_single_string;
 #[cfg(test)]
 mod json_mastodon_add_translation;
+#[cfg(test)]
+mod json_nextcloud_server_deleted_pair;
 #[cfg(test)]
 mod json_radarr_radarr_rename_string_key;
 #[cfg(test)]

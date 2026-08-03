@@ -65,7 +65,7 @@ JSON,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages
 JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/extension/_locales/cs/messages.json,
 JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,json-langflow-update-single-string
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation
-JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,
+JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,json-nextcloud-server-deleted-pair
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,
 JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/styles/radix-maia/pagination.json,
 JSON,shadcn-ui-ui.git,47c47eaed21524b5263011e080d0cd52bc794a6f,apps/v4/public/r/styles/radix-vega/hover-card.json,json-shadcn-ui-ui-string-value-update-string-is-code
@@ -75,7 +75,7 @@ Java,Genymobile-scrcpy.git,6af4bd601f028d4e3d96eb90326a2330f03bc960,server/src/m
 Java,Genymobile-scrcpy.git,89518f49adb59dfa961f76be3f4414bffdc22cc5,server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java,java-scrcpy-remove-or-expression
 Java,Genymobile-scrcpy.git,f7b4a18b4398c013b2bed9630b7bb35eb50ad97e,server/src/main/java/com/genymobile/scrcpy/wrappers/ClipboardManager.java,
 Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,
-Java,nextcloud-android.git,dd8d79d1d914cb33b641ca058a1f9f30d811ce5f,app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java,
+Java,nextcloud-android.git,dd8d79d1d914cb33b641ca058a1f9f30d811ce5f,app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java,java-nextcloud-android-add-two-function-calls
 Java,protocolbuffers-protobuf.git,20b2cd7623c554e3ee39470b70d5583ad5f26f60,java/core/src/main/java/com/google/protobuf/MessageSchema.java,java-protocolbuffers-protobuf-add-import-and-update-field-access
 Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/core/src/main/java/com/google/protobuf/Internal.java,java-protobuf-add-two-annotations
 Java,protocolbuffers-protobuf.git,68bd6bed7923ddade82a57a6fb8274024a3cd5d8,java/core/src/main/java/com/google/protobuf/Internal.java,
