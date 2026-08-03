@@ -30,7 +30,9 @@ use crate::code::Code;
 use crate::code::language::language_for_path;
 use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
-use crate::diff::text::{RangeMatch, TextOperation, line_operations};
+use crate::diff::text::{
+    RangeMatch, TextOperation, line_operations, summarize_diff_with_comment_check,
+};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
 
@@ -203,12 +205,41 @@ fn render_side(
     out
 }
 
+/// Prefixes `out` with the diff's overall shape (`diff::text::DiffSummary`) - the same
+/// classification the interactive TUI shows in its status bar (`tui::app::status_bar_paragraph`),
+/// reused here so a script running headless mode gets the same "no changes"/"comment changes
+/// only"/... heads-up a person watching the TUI would, without having to re-derive it from the
+/// rendered hunks. Bold, not colored: `use_color` off (piped output, `NO_COLOR`, ...) must still
+/// carry *some* visual weight for a line meant to be noticed before the diff itself, and bold
+/// degrades gracefully in a way an ANSI color code doesn't. Only emitted when
+/// `summarize_diff_with_comment_check` actually classifies the diff (`Some`) - the ordinary case
+/// (a genuine mix of edits) prints nothing extra, so this is purely additive over the previous
+/// output shape.
+fn summary_header(data: &DiffSessionData, use_color: bool) -> Option<String> {
+    let summary = summarize_diff_with_comment_check(
+        &data.before_contents,
+        &data.after_contents,
+        &data.before_ranges,
+        &data.after_ranges,
+        data.comment_only,
+    )?;
+    let label = summary.label();
+    Some(if use_color {
+        format!("\u{1b}[1m{label}\u{1b}[0m\n\n")
+    } else {
+        format!("{label}\n\n")
+    })
+}
+
 /// Renders a full diff session as plain text: the "before" side (deletions/updates/moves
 /// highlighted), then the "after" side (insertions/updates/moves highlighted). See
 /// `diff::text::line_operations`'s doc comment for why this is row-granular rather than a true
 /// interleaved unified-diff hunk format.
 pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> String {
     let mut out = String::new();
+    if let Some(header) = summary_header(data, use_color) {
+        out.push_str(&header);
+    }
     out.push_str(&format!("=== before: {} ===\n", data.before_path.display()));
     out.push_str(&render_side(
         &data.before_contents,
@@ -508,5 +539,80 @@ mod tests {
         assert!(text.contains("old();"), "before content missing: {text}");
         assert!(text.contains("new();"), "after content missing: {text}");
         Ok(())
+    }
+
+    #[test]
+    fn render_text_diff_omits_the_summary_header_for_an_ordinary_mixed_edit() {
+        // Same synthetic data headless.rs's other rendering tests use - a real Delete+Insert pair
+        // alongside Identical ranges, which shouldn't classify as any of `DiffSummary`'s special
+        // cases (see this file's `summary_header`).
+        let text = render_text_diff(&sample_data(), false);
+        assert!(
+            text.starts_with("=== before:"),
+            "an ordinary mixed edit should get no summary header at all: {text}"
+        );
+    }
+
+    #[test]
+    fn render_text_diff_shows_a_no_changes_header_for_identical_files() -> Result<()> {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let before_path = dir.path().join("before_sample.rs");
+        let after_path = dir.path().join("after_sample.rs");
+        std::fs::write(&before_path, "fn main() {\n    same();\n}\n").unwrap();
+        std::fs::write(&after_path, "fn main() {\n    same();\n}\n").unwrap();
+
+        let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
+        let text = render_text_diff(&data, false);
+
+        assert!(
+            text.starts_with(crate::diff::text::DiffSummary::NoChanges.label()),
+            "identical files should get a 'no changes' header: {text}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn render_text_diff_shows_a_comment_only_header_when_only_a_comment_changed() -> Result<()> {
+        // Same fixture `tui::app`'s own `compute_diff_reports_comment_only_for_a_real_inserted_
+        // comment` test uses, for the same real-pipeline (not hand-built `DiffSessionData`)
+        // guarantee that `comment_only` actually reaches this header.
+        let before = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
+        let after = tempfile::Builder::new()
+            .suffix(".rs")
+            .tempfile()
+            .expect("create temp file");
+        std::fs::write(after.path(), "// a comment\nfn main() {}\n").expect("write temp file");
+
+        let (data, _fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Exact)?;
+        let text = render_text_diff(&data, false);
+
+        assert!(
+            text.starts_with(crate::diff::text::DiffSummary::CommentOnly.label()),
+            "a comment-only edit should get a 'comment changes only' header: {text}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn render_text_diff_bolds_the_summary_header_when_colored() {
+        let mut data = sample_data();
+        data.before_contents = "same\n".to_string();
+        data.after_contents = "same\n".to_string();
+        data.before_ranges = vec![RangeMatch {
+            source: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+            destination: crate::diff::text_range::TextRange::new(0, 0, 1, 0),
+            operation: TextOperation::Identical,
+        }];
+        data.after_ranges = data.before_ranges.clone();
+
+        let text = render_text_diff(&data, true);
+        assert!(
+            text.starts_with("\u{1b}[1mNo changes - files are identical\u{1b}[0m\n\n"),
+            "the header should be bold, not colored, when use_color is on: {text}"
+        );
     }
 }

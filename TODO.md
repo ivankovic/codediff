@@ -2701,3 +2701,31 @@ exactly 3363 (confirming these 3 fixtures really do contribute 0), so `make upda
 ran straight through this time - its `check-quality` prerequisite only hard-fails on an actual
 increase, which didn't happen here. `cargo test --lib --features test-fixtures optimal_solutions::`:
 182/0/0.
+
+## Headless/JSON modes now report the same diff-shape summary the TUI's status bar shows (2026-08-03, user-requested)
+
+`diff::text::DiffSummary`/`summarize_diff_with_comment_check` (the "No changes"/"Comment changes
+only"/"Whitespace changes only"/... classification `tui::app`'s status bar already computed from
+`DiffSessionData`) was only ever wired into the interactive TUI - `tui::headless` and
+`tui::json_output` each recomputed their own view of a diff's shape from scratch (or didn't surface
+one at all) with no access to this existing, presentation-agnostic classification. Since
+`DiffSessionData` already carries everything the classifier needs (`before`/`after_contents`,
+`before`/`after_ranges`, and the `comment_only` flag computed while the AST was still available),
+wiring it into both non-interactive modes needed no new computation, just new call sites:
+
+- `tui::headless::render_text_diff` now prints the label (e.g. "Comment changes only") as a bolded
+  header line before the two rendered sides, only when the diff actually classifies as one of
+  `DiffSummary`'s special cases - an ordinary mixed edit gets no extra line, so this is purely
+  additive over the previous output shape. Bolded rather than colored so it still stands out under
+  `NO_COLOR`.
+- `tui::json_output::JsonDiff` gained an optional `summary` field (`JsonDiffSummary`, a local
+  serde-friendly mirror of `DiffSummary` - same boundary `JsonRange`/`JsonOperation` already draw
+  around `diff::text`'s serde-free public types), a snake_case tag (e.g. `"comment_only"`) omitted
+  entirely rather than serialized as `null` for the ordinary case.
+
+Verified end-to-end against the real `codediff` binary (not just unit tests): `--headless` on two
+byte-identical files prints "No changes - files are identical" before the (now redundant-looking
+but still correct) elided body; `--mode json` on the same pair reports `"summary": "no_changes"`.
+A comment-only insertion reports "Comment changes only" / `"summary": "comment_only"` in both modes
+respectively. `SPECS.md`'s "Headless/text mode" section documents both. `cargo test --lib --features
+test-fixtures tui::`: 92/0/0.

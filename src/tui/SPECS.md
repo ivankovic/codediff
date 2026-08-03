@@ -188,6 +188,17 @@ redirecting to a file. Not implemented (rendering a true interleaved unified-dif
 merging both sides into one stream) since it would need to invent new merge semantics on top of
 `diff::text`'s bespoke range model beyond what either integration path actually requires today.
 
+Before the two rendered sides, `render_text_diff` prints the same one-line diff-shape
+classification the interactive TUI shows in its status bar (`diff::text::DiffSummary`, via
+`app::status_bar_paragraph`'s underlying `summarize_diff_with_comment_check`) - "No changes",
+"Comment changes only", "Whitespace changes only", etc. - bolded rather than colored (so it still
+stands out with `NO_COLOR`), and only when the diff actually classifies as one of those special
+cases; an ordinary mixed edit gets no extra line at all. `tui::json_output`'s JSON mode carries the
+identical classification as an optional `summary` field (a snake_case tag, e.g. `"comment_only"`,
+omitted entirely rather than `null` for the ordinary case) instead of a printed line, for the same
+reason it has a `fallback_used` field instead of `headless::run`'s stderr note: JSON mode is for a
+script to parse, not a person to read.
+
 ## Performance note
 
 CPU usage should be judged from a `--release` build, not a debug build: idle CPU usage for an

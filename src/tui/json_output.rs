@@ -34,7 +34,8 @@
 //!     ]
 //!   },
 //!   "after": { "path": "new.rs", "language": "Rust", "hunks": [ ... ] },
-//!   "fallback_used": false
+//!   "fallback_used": false,
+//!   "summary": "comment_only"
 //! }
 //! ```
 //!
@@ -42,6 +43,12 @@
 //! are ranges in the before file, `after`'s are ranges in the after file) - the same per-side
 //! split `headless.rs` renders as two separate blocks, just serialized instead of printed. Rows
 //! and columns are 0-indexed, matching `diff::text_range::TextRange`'s own convention.
+//!
+//! `summary` is the diff's overall shape (see `JsonDiffSummary`/`diff::text::DiffSummary`) -
+//! `no_changes`, `new_file`, `deleted_file`, `whitespace_only`, `comment_only`, or
+//! `refactor_moved_only` - omitted entirely for the ordinary case of a genuine mix of edits that
+//! doesn't cleanly fit one of those, the same "print nothing extra" convention `headless::run`
+//! follows for its own header line.
 //!
 //! Deliberately does not embed file contents: `main.rs`'s own doc comment on `GIT_EXTERNAL_DIFF`
 //! notes both positional arguments are always real files (working-tree paths or git's temp blob
@@ -56,7 +63,9 @@ use serde::Serialize;
 use crate::code::Code;
 use crate::code::language::language_for_path;
 use crate::diff::DiffMode;
-use crate::diff::text::{RangeMatch, TextOperation};
+use crate::diff::text::{
+    DiffSummary, RangeMatch, TextOperation, summarize_diff_with_comment_check,
+};
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
@@ -108,6 +117,35 @@ impl JsonOperation {
     }
 }
 
+/// Mirrors `diff::text::DiffSummary` - the same overall-shape classification the interactive TUI
+/// shows in its status bar and `headless::run` prints as a header line, serialized here as a tag a
+/// script can match on instead of a prose label meant for a human. Kept as a local type rather than
+/// `#[derive(Serialize)]` on `DiffSummary` itself, the same boundary `JsonRange`/`JsonOperation`
+/// already draw around `diff::text`'s serde-free public types.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum JsonDiffSummary {
+    NoChanges,
+    NewFile,
+    DeletedFile,
+    WhitespaceOnly,
+    CommentOnly,
+    RefactorMovedOnly,
+}
+
+impl From<DiffSummary> for JsonDiffSummary {
+    fn from(summary: DiffSummary) -> Self {
+        match summary {
+            DiffSummary::NoChanges => JsonDiffSummary::NoChanges,
+            DiffSummary::NewFile => JsonDiffSummary::NewFile,
+            DiffSummary::DeletedFile => JsonDiffSummary::DeletedFile,
+            DiffSummary::WhitespaceOnly => JsonDiffSummary::WhitespaceOnly,
+            DiffSummary::CommentOnly => JsonDiffSummary::CommentOnly,
+            DiffSummary::RefactorMovedOnly => JsonDiffSummary::RefactorMovedOnly,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct JsonHunk {
     operation: JsonOperation,
@@ -144,6 +182,11 @@ struct JsonDiff {
     /// stderr note; JSON mode is meant for machine consumption, so it is a field here instead - a
     /// script parsing stdout as JSON shouldn't also have to watch stderr for a caveat.
     fallback_used: bool,
+    /// The diff's overall shape (see `JsonDiffSummary`) - `None` for the ordinary case (a genuine
+    /// mix of edits that doesn't cleanly fit one of `DiffSummary`'s special cases), same as
+    /// `headless::run` printing no header line at all in that case.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<JsonDiffSummary>,
 }
 
 /// Builds one side's `JsonSide` from its own complete `RangeMatch` list (`DiffSessionData::
@@ -183,6 +226,15 @@ fn build_side(contents: &str, path: &Path, ranges: &[RangeMatch]) -> JsonSide {
 }
 
 fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
+    let summary = summarize_diff_with_comment_check(
+        &data.before_contents,
+        &data.after_contents,
+        &data.before_ranges,
+        &data.after_ranges,
+        data.comment_only,
+    )
+    .map(JsonDiffSummary::from);
+
     JsonDiff {
         before: build_side(
             &data.before_contents,
@@ -191,6 +243,7 @@ fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
         ),
         after: build_side(&data.after_contents, &data.after_path, &data.after_ranges),
         fallback_used,
+        summary,
     }
 }
 
@@ -305,6 +358,40 @@ mod tests {
     fn build_diff_carries_the_fallback_used_flag_through_as_a_field() {
         assert!(build_diff(&sample_data(), true).fallback_used);
         assert!(!build_diff(&sample_data(), false).fallback_used);
+    }
+
+    #[test]
+    fn build_diff_omits_summary_for_an_ordinary_mixed_edit() {
+        // Same synthetic data used throughout this module's tests - a real Delete+Insert pair
+        // alongside Identical ranges, which shouldn't classify as any `DiffSummary` special case.
+        assert!(build_diff(&sample_data(), false).summary.is_none());
+    }
+
+    #[test]
+    fn build_diff_sets_summary_to_no_changes_for_identical_content() {
+        let mut data = sample_data();
+        data.before_contents = "same\n".to_string();
+        data.after_contents = "same\n".to_string();
+        data.before_ranges = vec![RangeMatch {
+            source: TextRange::new(0, 0, 1, 0),
+            destination: TextRange::new(0, 0, 1, 0),
+            operation: TextOperation::Identical,
+        }];
+        data.after_ranges = data.before_ranges.clone();
+
+        let diff = build_diff(&data, false);
+        assert_eq!(diff.summary, Some(JsonDiffSummary::NoChanges));
+        let json = serde_json::to_value(&diff).unwrap();
+        assert_eq!(json["summary"], "no_changes");
+    }
+
+    #[test]
+    fn build_diff_omits_the_summary_field_entirely_from_serialized_json_when_none() {
+        let json = serde_json::to_value(build_diff(&sample_data(), false)).unwrap();
+        assert!(
+            json.get("summary").is_none(),
+            "the summary field should be omitted, not null, for the ordinary case: {json}"
+        );
     }
 
     #[test]
