@@ -44,6 +44,18 @@ jobs:
       # Re-check by removing these --ignore flags occasionally.
       - run: cargo audit --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0194
 
+  mapping-site-js:
+    name: human_mapping site JS tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: node assets/mapping_site/index.test.js
+
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})
     runs-on: ubuntu-latest

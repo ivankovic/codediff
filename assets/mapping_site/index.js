@@ -7,6 +7,39 @@
 (function () {
   "use strict";
 
+  // `dataset` only camelCases *hyphens* (`data-foo-bar` -> `dataset.fooBar`) - an underscore in
+  // the attribute name is left exactly as-is, so `data-total_lines` reads back as
+  // `dataset.total_lines`, not `dataset.totalLines`. `key` (from a `data-sort` attribute value,
+  // e.g. "total_lines") already matches that untouched form, so no case conversion is needed at
+  // all - reaching for one here (an earlier version of this file did) reads back `undefined` for
+  // every underscored key, breaking those columns' sort silently (`Number(undefined)` is `NaN`,
+  // and every comparison against `NaN` is `false`, so the rows never actually reorder). Regression
+  // test: index.test.js.
+  function cellValue(row, key, type) {
+    const raw = row.dataset[key];
+    return type === "number" ? Number(raw) : raw;
+  }
+
+  // The actual row-vs-row ordering `sortBy` sorts by - factored out (rather than left as an inline
+  // arrow in `Array.prototype.sort`) so index.test.js can drive it directly against plain
+  // `{ dataset: {...} }` objects, without needing a real DOM (or a fake one) to prove rows actually
+  // reorder, not just that `cellValue` extracts the right value.
+  function compareRows(a, b, key, type, ascending) {
+    const av = cellValue(a, key, type);
+    const bv = cellValue(b, key, type);
+    const cmp = type === "number" ? av - bv : String(av).localeCompare(String(bv));
+    return ascending ? cmp : -cmp;
+  }
+
+  // Exposed for index.test.js (plain Node, no DOM, no npm dependency) - a no-op in the browser,
+  // where `module` is undefined and this branch never runs.
+  if (typeof module !== "undefined") {
+    module.exports = { cellValue, compareRows };
+  }
+
+  // Everything below this line drives the real page and needs a DOM - never runs under Node.
+  if (typeof document === "undefined") return;
+
   const table = document.getElementById("fixture-table");
   if (!table) return;
   const tbody = table.querySelector("tbody");
@@ -18,18 +51,6 @@
   let currentKey = "name";
   let ascending = true;
 
-  // `dataset` only camelCases *hyphens* (`data-foo-bar` -> `dataset.fooBar`) - an underscore in
-  // the attribute name is left exactly as-is, so `data-total_lines` reads back as
-  // `dataset.total_lines`, not `dataset.totalLines`. `key` (from a `data-sort` attribute value,
-  // e.g. "total_lines") already matches that untouched form, so no case conversion is needed at
-  // all - reaching for one here (an earlier version of this file did) reads back `undefined` for
-  // every underscored key, breaking those columns' sort silently (`Number(undefined)` is `NaN`,
-  // and every comparison against `NaN` is `false`, so the rows never actually reorder).
-  function cellValue(row, key, type) {
-    const raw = row.dataset[key];
-    return type === "number" ? Number(raw) : raw;
-  }
-
   function sortBy(key, type) {
     if (key === currentKey) {
       ascending = !ascending;
@@ -39,12 +60,7 @@
     }
 
     const rows = Array.from(tbody.querySelectorAll("tr"));
-    rows.sort((a, b) => {
-      const av = cellValue(a, key, type);
-      const bv = cellValue(b, key, type);
-      const cmp = type === "number" ? av - bv : String(av).localeCompare(String(bv));
-      return ascending ? cmp : -cmp;
-    });
+    rows.sort((a, b) => compareRows(a, b, key, type, ascending));
     for (const row of rows) tbody.appendChild(row);
 
     for (const th of headers) {

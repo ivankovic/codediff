@@ -24,8 +24,15 @@ clean: clean-db
 clean-db:
 	rm -rf $(RESEARCH_DIR)/stats.sqlite
 
-test:
+test: test-mapping-site-js
 	cargo test
+
+# Plain-Node regression test for the human_mapping site's own vanilla JS (assets/mapping_site/) -
+# no npm dependency, no build step, matching that directory's own convention (see index.js's header
+# comment). Cargo's test suite can't cover this: it's browser-side JS embedded verbatim via
+# include_str! into generate_mapping_site.rs, never executed by anything Rust runs.
+test-mapping-site-js:
+	node assets/mapping_site/index.test.js
 
 # Opens a test fixture's before/after files side by side in nvim. Usage: make view-diff NAME=rust-add-if
 view-diff:
