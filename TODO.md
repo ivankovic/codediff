@@ -2864,3 +2864,62 @@ files`) - those were already established to be genuine, unavoidable tree-edit-di
 single large/dissimilar subtree, not a missing-candidate gap, so a *different* kind of targeted
 heuristic (not another `is_semantically_structural` arm) would be needed for each, if one exists at
 all. Worth a fresh per-fixture look now that the "narrow is fine" bar has been explicitly lowered.
+
+## `cpp-opencv-add-test-case` investigated: a real name-collision bug found and fixed (independently valuable), but not this fixture's actual bottleneck - which turns out to be a deeper, previously-declined class of DP cost (2026-08-03, continued)
+
+`cpp-opencv-add-test-case` (736ms, adds one new googletest `TEST(Suite, Case) { ... }` block among
+~11 pre-existing ones inside `namespace opencv_test { namespace { ... } }`) was next on the "expand
+the tail" list.
+
+**Real bug found via a sexp dump (throwaway, deleted after use)**: tree-sitter-cpp has no idea
+`TEST`/`TEST_F`/`TEST_P` are macros - it parses `TEST(Suite, Case) { ... }` as an ordinary
+`function_definition` whose own declarator name is the literal string `"TEST"`, with `Suite`/`Case`
+becoming two *anonymous* parameters typed `Suite`/`Case` (a valid, if unusual, C++ parse: a function
+declaration with unnamed parameters). `is_semantically_structural`'s C++ arm had no special handling
+for this, so **every** `TEST(...)` block in a file resolves to the identical `(function_definition,
+"TEST")` identity, and every `TEST_P(...)` block to `(function_definition, "TEST_P")` - collapsing
+potentially dozens of genuinely distinct, uniquely-named test functions into one shared-name
+candidate group, forcing `solve_named_reference_groups`'s N:M support to pairwise cost-compare all
+of them instead of matching 1:1 by name for free.
+
+**Fix**: `c_family_test_macro_name` (`src/diff/nodes.rs`) recognizes this exact shape - a
+`function_declarator` named `TEST`/`TEST_F`/`TEST_P` with exactly two parameters, both genuinely
+anonymous (no `declarator` field of their own, ruling out a real hand-written function that happens
+to share the name) - and returns `"<macro>:<Suite>:<Case>"` instead, so each test function gets its
+own unique identity. Verified directly against the real fixture (throwaway diagnostic, deleted after
+use): all 11 pre-existing `TEST`/`TEST_P` blocks now resolve to 11 distinct names instead of
+colliding into 2 groups.
+
+**But this isn't what made `cpp-opencv-add-test-case` slow.** Phase-4-sub-pass and then
+finer-grained instrumentation inside `solve_large_flat_subtrees::solve` (both throwaway, deleted
+after use) traced the actual 730-755ms to that pass's own *final* step: after successfully
+pre-matching the file's one large flat descendant (fast) and all named content inside the top-level
+`opencv_test` namespace pair via `solve_named_reference_groups_within` (now fast too, 1.27ms, thanks
+to the fix above - previously would have paid real pairwise cost-scoring across the collided "TEST"
+group), it still calls `apted::for_nodes` on the **entire namespace container** (`vec![before_id],
+vec![after_id]` - the container's own single id, not a scoped-down residual) to resolve whatever's
+left. Since phase 1 had already hash-matched 5110 of ~5113 before-side nodes and the flat/named
+pre-matching resolved the rest, that container call's residual truly needing work is tiny (the one
+new ~876-node `TEST` subtree, which should be cheap `add_insert_mappings` once recognized as
+purely new) - but `resolve_forest`'s DP has no fast path for "single root pair, but nearly
+everything inside is already pre-matched": it still builds a full `PostorderIndexer` and runs
+real tree-edit-distance over the *entire* multi-thousand-node subtree the container spans,
+regardless of how much of that work is already decided. `ContainmentCtx`/pruning stops it from
+*re-deciding* already-matched pairs, but doesn't shrink the DP's own input size.
+
+**Not fixed, deliberately** - this is the same class of issue the `/goal` speed investigation
+already spent significant effort on and explicitly declined to touch: a cheap size/pre-match-aware
+fast path for `resolve_forest`'s DP core is architecturally equivalent to the previously-declined
+"mid-DP abort-budget engine rewrite" (real engineering inside the correctness-critical tree-edit-
+distance engine, uncertain payoff, needs its own dedicated session - see the "Approximate-fallback
+idea re-examined and declined" and "Audit requested by the reverted parallel-batching entry" entries
+above). `solve_large_flat_subtrees`'s own container-wide call is a narrower instance of the same
+underlying gap, not a new problem.
+
+**Verified (the landed fix, independent of the unresolved timing)**: full suite `cargo test
+--release --features test-fixtures --lib`: 556/0/5. `benchmark_optimal_solutions`: `TOTAL_MISMATCHES`
+unchanged at exactly 3363 (pure candidate-recognition addition, same as every other `is_semantically_
+structural` arm fix in this file - no fixture's matched content should differ, and none did).
+Worth keeping regardless of `cpp-opencv-add-test-case`'s own timing: any C++ file with multiple
+`TEST`/`TEST_F`/`TEST_P` blocks where more than one actually differs would have paid this same
+collided-group cost before, and won't now.

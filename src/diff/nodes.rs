@@ -534,10 +534,18 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::CPP => match node_kind {
-            "function_definition" => node
-                .child_by_field_name("declarator")
-                .and_then(|d| c_family_declarator_name(d, bytes))
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            // `c_family_test_macro_name` (see its own doc comment) takes priority: a googletest
+            // `TEST(Suite, Case)` block parses as a real `function_definition` whose own name is
+            // the literal macro name, which - left unhandled - collapses every such block in the
+            // file into one shared-name, cost-tie-broken candidate group instead of matching each
+            // uniquely by its real suite/case name.
+            "function_definition" => c_family_test_macro_name(node, bytes)
+                .map(|name| (node_kind.to_string(), name))
+                .or_else(|| {
+                    node.child_by_field_name("declarator")
+                        .and_then(|d| c_family_declarator_name(d, bytes))
+                        .map(|name| (node_kind.to_string(), name.to_string()))
+                }),
             "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => node
                 .child_by_field_name("name")
                 .and_then(|n| n.utf8_text(bytes).ok())
@@ -814,6 +822,66 @@ fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a s
             .and_then(|d| c_family_declarator_name(d, bytes)),
         _ => None,
     }
+}
+
+/// Recognizes googletest's `TEST`/`TEST_F`/`TEST_P` macro idiom - `TEST(Suite, Case) { ... }` -
+/// which tree-sitter-cpp parses as an *ordinary* `function_definition` (it has no idea `TEST` is a
+/// macro): the macro name itself becomes the function's own declarator identifier, and `Suite`/
+/// `Case` become two *anonymous* parameters typed `Suite`/`Case` (a valid, if unusual, C++ parse -
+/// a function declaration with unnamed parameters). Confirmed empirically via a sexp dump:
+/// `function_definition declarator: (function_declarator declarator: (identifier "TEST")
+/// parameters: (parameter_list (parameter_declaration type: (type_identifier "Suite"))
+/// (parameter_declaration type: (type_identifier "Case"))))`.
+///
+/// Without this, every `TEST(...)`/`TEST_F(...)`/`TEST_P(...)` block in a file resolves to the
+/// *identical* literal name "TEST"/"TEST_F"/"TEST_P" via the ordinary `c_family_declarator_name`
+/// path below, collapsing potentially dozens of genuinely distinct, uniquely-named test functions
+/// into one shared-name candidate group - `solve_named_reference_groups`'s N:M support then has to
+/// pairwise cost-compare all of them to decide which pairs with which, instead of matching 1:1 by
+/// name for free. Measured live (`cpp-opencv-add-test-case`): adding one new, uniquely-named
+/// `TEST(...)` block among ~15 pre-existing ones cost 691ms in phase 4 alone, almost entirely this
+/// pairwise cost-scoring over a group that should never have existed - see `TODO.md`.
+///
+/// Returns `"<macro>:<Suite>:<Case>"` so each test function gets its own genuinely unique identity.
+/// Guards against colliding with a real, hand-written function that happens to be named `TEST`/
+/// `TEST_F`/`TEST_P` and takes exactly two parameters (`bool TEST(int a, int b) {...}`, unlikely
+/// but possible): only fires when both parameters are genuinely anonymous (no `declarator` field
+/// of their own), the exact shape this macro idiom - and no ordinary named-parameter function -
+/// produces.
+fn c_family_test_macro_name(node: &Node, bytes: &[u8]) -> Option<String> {
+    let declarator = node.child_by_field_name("declarator")?;
+    if declarator.kind() != "function_declarator" {
+        return None;
+    }
+    let macro_name = declarator
+        .child_by_field_name("declarator")
+        .filter(|d| d.kind() == "identifier")
+        .and_then(|d| d.utf8_text(bytes).ok())
+        .filter(|name| matches!(*name, "TEST" | "TEST_F" | "TEST_P"))?;
+
+    let parameters = declarator.child_by_field_name("parameters")?;
+    let mut cursor = parameters.walk();
+    let params: Vec<Node> = parameters
+        .named_children(&mut cursor)
+        .filter(|c| c.kind() == "parameter_declaration")
+        .collect();
+    let [suite, case] = params.as_slice() else {
+        return None;
+    };
+    if suite.child_by_field_name("declarator").is_some()
+        || case.child_by_field_name("declarator").is_some()
+    {
+        return None; // Named parameters - a real function, not this macro idiom.
+    }
+    let suite_name = suite
+        .child_by_field_name("type")
+        .filter(|t| t.kind() == "type_identifier")
+        .and_then(|t| t.utf8_text(bytes).ok())?;
+    let case_name = case
+        .child_by_field_name("type")
+        .filter(|t| t.kind() == "type_identifier")
+        .and_then(|t| t.utf8_text(bytes).ok())?;
+    Some(format!("{macro_name}:{suite_name}:{case_name}"))
 }
 
 fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
