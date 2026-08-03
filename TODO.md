@@ -2923,3 +2923,24 @@ structural` arm fix in this file - no fixture's matched content should differ, a
 Worth keeping regardless of `cpp-opencv-add-test-case`'s own timing: any C++ file with multiple
 `TEST`/`TEST_F`/`TEST_P` blocks where more than one actually differs would have paid this same
 collided-group cost before, and won't now.
+
+**`rust-tauri-cli-ios-dev` (328ms, one `?` operator added to one call statement) checked too**:
+phase-4-sub-pass instrumentation (throwaway, deleted after use) shows `solve_named_reference_
+groups` dominates (337ms, matching 2074 -> 2513/2514 nodes) - the edit sits inside a local block
+expression (`let (interface, config) = { ... };`), not any directly-named item, so the enclosing
+named function (`run_dev`, ~78 lines/~440 nodes) is what actually gets matched and real-APTED'd.
+Same shape as the already-documented inherent-cost fixtures above (`c-postgres-real-logic-change`,
+`c-linux-small-change-struct-to-char`, `cpp-ladybird-refactor-variables-if-changes`, `ruby-homebrew-
+add-or-expression`'s residual) - one real edit inside a moderately-sized function needs one real
+tree-edit-distance call over that function's body, no missing-candidate gap to fix. Not pursued
+further; no code changed for this fixture.
+
+**"Expand the tail" framing, status after this round**: 2 of 2 previously-uninvestigated top-10
+fixtures checked. One (`cpp-opencv-add-test-case`) surfaced a real, independently-valuable bug (the
+TEST-macro name collision, landed above) even though it didn't explain that fixture's own timing;
+the other (`rust-tauri-cli-ios-dev`) confirmed the same inherent-cost pattern already established for
+the rest of the original top-10 list. Every fixture in that list is now either fixed
+(`typescript-excalidraw-excalidraw-add-values-to-lists`) or confirmed inherent-cost with no known
+narrow lever - consistent with the `/goal` investigation's standing conclusion that the remaining
+gap needs either the declined mid-DP-engine rewrite or accepting p90/max above target for this
+fixture class.
