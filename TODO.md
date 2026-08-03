@@ -2768,3 +2768,15 @@ Verified purely mechanical: full lib suite 554/0/5, `human_solver` 65/0, `benchm
 `generate_mapping_site` 17/0, mapping-site JS tests passing, and - most importantly -
 `benchmark_optimal_solutions`'s `TOTAL_MISMATCHES` unchanged at exactly 3363, proving zero behavior
 change across the whole pass despite touching 27 files.
+
+## 2 new optimal-solution fixtures added, 0 clamped (2026-08-03)
+
+Added `java-nextcloud-android-add-two-function-calls` and `json-nextcloud-server-deleted-pair`.
+Both match codediff's diff exactly - no clamping needed.
+
+**Quality baseline updated anyway**: corpus grew from 176 to 178 fixtures, so
+`research/quality_baseline.txt`'s `MS_PER_FIXTURE` moved (2132.9 -> 2143.4 - machine noise, well
+under the Makefile's 2x warning threshold); `TOTAL_MISMATCHES` stayed exactly 3363, confirming these
+2 fixtures contribute 0. `make update-quality-baseline` ran straight through. `cargo test --release
+--features test-fixtures --lib nextcloud`: 14/0/0 (covers both new fixtures alongside the other
+nextcloud-derived cases).
