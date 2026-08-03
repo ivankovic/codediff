@@ -2687,3 +2687,17 @@ two-flags`, `vimscript-neovim-neovim-add-line-comment`), just via `syntax_named`
 167), via `make update-quality-baseline` (same hand-update-then-reverify workflow as the entry
 above - its `check-quality` prerequisite hard-fails on the deliberate +3). `cargo test --lib
 --features test-fixtures optimal_solutions::`: 179/0/0.
+
+## 3 new optimal-solution fixtures added, 0 clamped (2026-08-03)
+
+Added `php-nextcloud-server-whitespace-and-added-declaration`,
+`python-paddlepaddle-paddleocr-formatting-only-change`, and `yaml-junegunn-fzf-version-upgrade`.
+All 3 match codediff's diff exactly - no clamping needed this time.
+
+**Quality baseline updated anyway**: even with nothing to clamp, the corpus grew by 3 fixtures
+(171 now, up from 168), so `research/quality_baseline.txt`'s `MS_PER_FIXTURE` still moved (2256.6
+-> 2896.6 - within the Makefile's 2x warning threshold, not flagged); `TOTAL_MISMATCHES` stayed
+exactly 3363 (confirming these 3 fixtures really do contribute 0), so `make update-quality-baseline`
+ran straight through this time - its `check-quality` prerequisite only hard-fails on an actual
+increase, which didn't happen here. `cargo test --lib --features test-fixtures optimal_solutions::`:
+182/0/0.

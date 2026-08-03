@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("php-nextcloud-server-whitespace-and-added-declaration")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "php-nextcloud-server-whitespace-and-added-declaration",
+    )
 }
