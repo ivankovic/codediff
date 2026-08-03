@@ -159,7 +159,7 @@ use codediff::code::Code;
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, NodeStatus,
-    is_inherited_removed, rebuild_caches, status_after, status_before,
+    is_inherited_removed, path_refs, rebuild_caches, status_after, status_before,
 };
 use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node, precompute_paths};
 
@@ -231,8 +231,7 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
         );
     }
 
-    let mut parser = tree_sitter::Parser::new();
-    let (mut before, mut after) = code_pair_from_dir(&dir, &mut parser)
+    let (mut before, mut after) = code_pair_from_dir(&dir)
         .with_context(|| format!("Failed to load test case from {:?}", dir))?
         .ok_or_else(|| {
             anyhow!(
@@ -408,8 +407,7 @@ fn default_promoted_name(source: &SampleSource) -> String {
 fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
     let dir = samples_root().join(name);
 
-    let mut parser = tree_sitter::Parser::new();
-    let (mut before, mut after) = code_pair_from_dir(&dir, &mut parser)
+    let (mut before, mut after) = code_pair_from_dir(&dir)
         .with_context(|| format!("Failed to load sample from {:?}", dir))?
         .ok_or_else(|| anyhow!("No before/after fixture found in samples/{}", name))?;
 
@@ -918,10 +916,6 @@ fn walk_visible<'a>(
     for child in node.children(&mut cursor) {
         walk_visible(child, depth + 1, collapsed, hidden, out);
     }
-}
-
-fn path_refs(path: &[String]) -> Vec<&str> {
-    path.iter().map(String::as_str).collect()
 }
 
 /// Node IDs whose entire subtree -- the node itself and every descendant -- has `NodeStatus`

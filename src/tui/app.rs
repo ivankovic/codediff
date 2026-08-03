@@ -473,8 +473,7 @@ impl App {
                 },
                 AppScreen::SelectTheme => self.draw_theme_dialog(frame, area),
                 AppScreen::Diffing => {
-                    let status = Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center);
-                    frame.render_widget(status, area);
+                    frame.render_widget(diffing_status_paragraph(), area);
                     Ok(())
                 }
                 AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
@@ -541,8 +540,7 @@ impl App {
 
     /// Draw the Fast/Exact prompt as a popup over the "Diffing…" status behind it.
     fn draw_diff_mode_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
-        let status = Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center);
-        frame.render_widget(status, area);
+        frame.render_widget(diffing_status_paragraph(), area);
         let Some(dialog) = self.diff_mode_dialog.as_mut() else {
             return Ok(());
         };
@@ -561,6 +559,13 @@ impl App {
         frame.render_widget(Clear, popup);
         modal.draw(frame, popup)
     }
+}
+
+/// The centered "Diffing…" status shown while a background diff computation is in flight -
+/// shared by `render`'s `AppScreen::Diffing` arm and `draw_diff_mode_dialog` (the Fast/Exact
+/// prompt's own background), which previously each built the identical `Paragraph` themselves.
+fn diffing_status_paragraph() -> Paragraph<'static> {
+    Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center)
 }
 
 /// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's

@@ -27,12 +27,11 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::metadata;
-use codediff::stats::filesystem::find_git_repositories;
+use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
 use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::Reservoir;
 
@@ -152,17 +151,10 @@ fn main() -> Result<()> {
     let mut reservoirs: HashMap<String, Reservoir<Row>> = HashMap::new();
     let mut capacities: HashMap<String, usize> = HashMap::new();
 
-    for repo_path in &repo_paths {
-        let repository_name = repo_path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-
-        print!("Scanning {}... ", repository_name);
-        let _ = std::io::stdout().flush();
-        if let Err(e) = sample_repository(
+    for_each_repository(&repo_paths, |repo_path, repository_name| {
+        sample_repository(
             repo_path,
-            &repository_name,
+            repository_name,
             args.language.as_deref(),
             args.max_commits_per_repo,
             args.count,
@@ -171,13 +163,8 @@ fn main() -> Result<()> {
             &mut reservoirs,
             &mut capacities,
             &mut rng,
-        ) {
-            eprintln!("Failed to process {:?}: {:?}", repo_path, e);
-        } else {
-            println!("done");
-        }
-        let _ = std::io::stdout().flush();
-    }
+        )
+    });
 
     let added: usize = reservoirs.values().map(|r| r.items.len()).sum();
     write_csv(&output, existing_rows, reservoirs)?;

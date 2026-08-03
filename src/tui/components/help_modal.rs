@@ -22,7 +22,7 @@ use ratatui::{
     layout::Rect,
     prelude::Stylize,
     style::{Color, Style},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use super::Component;
@@ -99,7 +99,9 @@ impl Component for HelpModal {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        frame.render_widget(Clear, area);
+        // `area` is already cleared by the caller (`app::draw_help_modal`, same as every other
+        // popup's own draw site) before this runs - clearing it a second time here would be a
+        // no-op, not a correctness issue, so this was only ever wasted work, not a visible bug.
         let block = Block::default()
             .title(
                 " Help - j/k scroll, ? or Esc to close "

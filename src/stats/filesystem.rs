@@ -17,6 +17,7 @@
  */
 use anyhow::Result;
 use crossbeam_channel::Sender;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -40,6 +41,33 @@ pub fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
 
     repo_paths.sort();
     Ok(repo_paths)
+}
+
+/// Runs `process` once per repository in `repo_paths`, printing "Scanning {name}... " before and
+/// "done" (or the error) after each - the identical progress-reporting wrapper
+/// `sample_code_pairs.rs` and `sample_test_diffs.rs` each hand-rolled around their own
+/// differently-shaped per-repository sampling call. `process` gets the repository's path and its
+/// derived directory-name (empty string if the path has none); a returned `Err` is reported to
+/// stderr and does not stop the remaining repositories from being processed.
+pub fn for_each_repository(
+    repo_paths: &[PathBuf],
+    mut process: impl FnMut(&Path, &str) -> Result<()>,
+) {
+    for repo_path in repo_paths {
+        let repository_name = repo_path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        print!("Scanning {repository_name}... ");
+        let _ = std::io::stdout().flush();
+        if let Err(e) = process(repo_path, &repository_name) {
+            eprintln!("Failed to process {repo_path:?}: {e:?}");
+        } else {
+            println!("done");
+        }
+        let _ = std::io::stdout().flush();
+    }
 }
 
 pub fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> {
@@ -104,6 +132,48 @@ mod tests {
         assert!(found.contains(&nested_file));
         assert!(!found.contains(&anomalous_file));
         assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn for_each_repository_visits_every_path_with_its_derived_name() {
+        let repo_paths = vec![PathBuf::from("/repos/alpha"), PathBuf::from("/repos/beta")];
+
+        let mut visited = Vec::new();
+        for_each_repository(&repo_paths, |path, name| {
+            visited.push((path.to_path_buf(), name.to_string()));
+            Ok(())
+        });
+
+        assert_eq!(
+            visited,
+            vec![
+                (PathBuf::from("/repos/alpha"), "alpha".to_string()),
+                (PathBuf::from("/repos/beta"), "beta".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn for_each_repository_keeps_going_after_one_repository_errors() {
+        let repo_paths = vec![
+            PathBuf::from("/repos/fails"),
+            PathBuf::from("/repos/succeeds"),
+        ];
+
+        let mut visited = Vec::new();
+        for_each_repository(&repo_paths, |path, _name| {
+            if path.ends_with("fails") {
+                anyhow::bail!("simulated failure");
+            }
+            visited.push(path.to_path_buf());
+            Ok(())
+        });
+
+        assert_eq!(
+            visited,
+            vec![PathBuf::from("/repos/succeeds")],
+            "the second repository should still be processed after the first one errors"
+        );
     }
 
     #[test]

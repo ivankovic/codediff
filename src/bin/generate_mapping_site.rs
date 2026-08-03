@@ -109,7 +109,10 @@ fn main() -> Result<()> {
         // see `human_mapping::line_mismatches_for`'s own doc comment for why: it's the only
         // granularity Unix `diff` (which has no notion of an AST node) can be scored at all, so
         // it's what lets these two columns sit side by side and mean the same thing.
-        let mismatches = human_mapping::line_mismatches_for(name, before, after)
+        // `_for_mapping`, not `line_mismatches_for(name, ...)`: `mapping` is already loaded above
+        // for `render_fixture_page` - re-loading (and re-JSON-parsing) the same file a second time
+        // per fixture would be pure waste across the ~175-fixture corpus.
+        let mismatches = human_mapping::line_mismatches_for_mapping(&mapping, before, after)
             .with_context(|| format!("computing line mismatches for '{name}'"))?;
         index_entries.push(IndexEntry {
             name: name.clone(),
@@ -175,8 +178,6 @@ fn render_fixture_page(
         before.contents.as_bytes(),
         'b',
         &caches,
-        status_before,
-        is_identical_before,
         &before_quiet_sizes,
         true,
     );
@@ -185,8 +186,6 @@ fn render_fixture_page(
         after.contents.as_bytes(),
         'a',
         &caches,
-        status_after,
-        is_identical_after,
         &after_quiet_sizes,
         true,
     );
@@ -284,26 +283,30 @@ const OMIT_THRESHOLD: usize = 20;
 /// Recursively renders `node` and its subtree. `side` is `'b'` (before) or `'a'` (after) - used
 /// both as the id-namespace prefix (so before/after tree-sitter node ids, which can collide in
 /// value between the two independently-parsed trees, never collide in the DOM) and to pick which
-/// half of `caches` to read a match from. `identical_fn` (`is_identical_before`/`is_identical_after`)
-/// tells a `Matched` node apart from a real edit that happens to still be paired
-/// (`Update`/`MatchButNotIdentical`) - see the `changed` class below and viewer.js's "hide
-/// identical matches" toggle, which relies on it to tell the two apart since both share the
-/// `status-matched` class. `quiet_sizes` (see `fully_quiet_subtree_sizes`) maps a fully-quiet
-/// node's id to its subtree's node count; `force_open` overrides both the closed-by-default and
-/// the omit-with-placeholder treatment for `node` itself (but not its descendants) - used to keep
-/// the tree root fully rendered and open even on the rare fixture where it happens to be entirely
+/// half of `caches` every per-side lookup below reads from (`status_before`/`status_after`,
+/// `is_identical_before`/`_after`, `match_operation_before`/`_after`, `is_moved_before`/`_after`) -
+/// each an `if side == 'b' { ... } else { ... }` inline, not a caller-selected function pointer:
+/// `fully_quiet_subtree_sizes`/`mark_fully_quiet` still take `status_fn`/`identical_fn` as function
+/// pointers (they have no `side` of their own to dispatch on - they're a separate, whole-tree pass
+/// that runs *before* `render_node`, over one side at a time), but within `render_node` itself
+/// `side` is always in scope, so there is no reason for two different dispatch conventions in one
+/// function. `quiet_sizes` (see `fully_quiet_subtree_sizes`) maps a fully-quiet node's id to its
+/// subtree's node count; `force_open` overrides both the closed-by-default and the
+/// omit-with-placeholder treatment for `node` itself (but not its descendants) - used to keep the
+/// tree root fully rendered and open even on the rare fixture where it happens to be entirely
 /// quiet (otherwise the page would load empty or collapsed).
 fn render_node(
     node: Node,
     src: &[u8],
     side: char,
     caches: &Caches,
-    status_fn: fn(Node, &Caches) -> NodeStatus,
-    identical_fn: fn(Node, &Caches) -> bool,
     quiet_sizes: &HashMap<usize, usize>,
     force_open: bool,
 ) -> String {
-    let status = status_fn(node, caches);
+    let status = match side {
+        'b' => status_before(node, caches),
+        _ => status_after(node, caches),
+    };
     // Folds `NodeStatus`'s with-children/inherited distinction down to one of four colors: that
     // distinction matters for `human_solver`'s editing workflow (has this exact node been marked,
     // or only an ancestor), but a read-only viewer just needs "is this deleted", not why.
@@ -328,7 +331,11 @@ fn render_node(
     // A second, independent class on top of `status_class`: a `Matched` pair can still be a real
     // edit (`Update`/`MatchButNotIdentical`), which the "hide identical matches" toggle needs to
     // keep visible right alongside deleted/inserted nodes, unlike a genuinely-`Identical` match.
-    let changed_class = if status == NodeStatus::Matched && !identical_fn(node, caches) {
+    let is_identical = match side {
+        'b' => is_identical_before(node, caches),
+        _ => is_identical_after(node, caches),
+    };
+    let changed_class = if status == NodeStatus::Matched && !is_identical {
         " changed"
     } else {
         ""
@@ -389,16 +396,7 @@ fn render_node(
         let mut children = String::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            children.push_str(&render_node(
-                child,
-                src,
-                side,
-                caches,
-                status_fn,
-                identical_fn,
-                quiet_sizes,
-                false,
-            ));
+            children.push_str(&render_node(child, src, side, caches, quiet_sizes, false));
         }
         let kind_label = escape_html_text(node.kind());
         let open_attr = if force_open || quiet_size.is_none() {
@@ -633,16 +631,7 @@ mod tests {
         let root = tree.root_node();
         let caches = Caches::default();
 
-        let html = render_node(
-            root,
-            source.as_bytes(),
-            'b',
-            &caches,
-            status_before,
-            is_identical_before,
-            &HashMap::new(),
-            true,
-        );
+        let html = render_node(root, source.as_bytes(), 'b', &caches, &HashMap::new(), true);
 
         assert!(
             html.starts_with(r#"<details class="node status-unmarked" id="b-"#),
@@ -687,8 +676,6 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -714,49 +701,14 @@ mod tests {
     }
 
     #[test]
-    fn render_node_marks_a_non_identical_matched_node_as_changed() {
+    fn render_node_marks_a_non_identical_matched_node_as_changed_with_its_own_operation_class() {
         let source = "fn f() {}\n";
         let before_tree = parse_rust(source);
         let after_tree = parse_rust(source);
         let before_root = before_tree.root_node();
         let after_root = after_tree.root_node();
 
-        for operation in [HumanOperation::Update, HumanOperation::MatchButNotIdentical] {
-            let mapping = HumanMapping {
-                entries: vec![HumanMappingEntry {
-                    operation,
-                    before_path: Some(vec![]),
-                    after_path: Some(vec![]),
-                }],
-            };
-            let caches = rebuild_caches(&mapping.entries, before_root, after_root);
-
-            let before_html = render_node(
-                before_root,
-                source.as_bytes(),
-                'b',
-                &caches,
-                status_before,
-                is_identical_before,
-                &HashMap::new(),
-                true,
-            );
-
-            assert!(
-                before_html.contains("status-matched changed"),
-                "{operation:?} should render matched *and* changed: {before_html}"
-            );
-        }
-    }
-
-    #[test]
-    fn render_node_gives_update_and_matchbutnotidentical_different_operation_classes() {
-        let source = "fn f() {}\n";
-        let before_tree = parse_rust(source);
-        let after_tree = parse_rust(source);
-        let before_root = before_tree.root_node();
-        let after_root = after_tree.root_node();
-
+        // (operation, an operation-specific class it must carry (empty if none), one it must not)
         for (operation, expected_class, unexpected_class) in [
             (HumanOperation::Update, "op-update", "op-moved"),
             (HumanOperation::MatchButNotIdentical, "", "op-update"),
@@ -775,12 +727,14 @@ mod tests {
                 source.as_bytes(),
                 'b',
                 &caches,
-                status_before,
-                is_identical_before,
                 &HashMap::new(),
                 true,
             );
 
+            assert!(
+                before_html.contains("status-matched changed"),
+                "{operation:?} should render matched *and* changed: {before_html}"
+            );
             if !expected_class.is_empty() {
                 assert!(
                     before_html.contains(expected_class),
@@ -840,8 +794,6 @@ mod tests {
             source_a.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -878,8 +830,6 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &HashMap::new(),
             true,
         );
@@ -975,7 +925,9 @@ mod tests {
         let mut c = stmt_a.walk();
         let call_expr_a = stmt_a.children(&mut c).next().unwrap();
         caches.before_match.insert(call_expr_a.id(), usize::MAX);
-        caches.before_identical.insert(call_expr_a.id(), false);
+        caches
+            .before_operation
+            .insert(call_expr_a.id(), HumanOperation::Update);
 
         let quiet = fully_quiet_subtree_sizes(root, &caches, status_before, is_identical_before);
 
@@ -1011,8 +963,6 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &quiet_sizes,
             true, // force_open: the root itself must stay open/rendered despite being fully unmarked
         );
@@ -1043,16 +993,7 @@ mod tests {
             "fixture assumption broken: function_item is only {function_item_size} nodes"
         );
 
-        let html = render_node(
-            root,
-            source.as_bytes(),
-            'b',
-            &caches,
-            status_before,
-            is_identical_before,
-            &quiet_sizes,
-            true,
-        );
+        let html = render_node(root, source.as_bytes(), 'b', &caches, &quiet_sizes, true);
 
         assert!(
             html.contains(&format!("+{function_item_size} nodes collapsed")),
@@ -1111,8 +1052,6 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &quiet_sizes,
             true,
         );
@@ -1178,8 +1117,6 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
-            status_before,
-            is_identical_before,
             &quiet_sizes,
             true,
         );

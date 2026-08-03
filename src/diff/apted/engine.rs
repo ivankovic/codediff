@@ -22,6 +22,16 @@ use super::common::{
     ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel,
 };
 
+/// Whether `APTED_DEBUG` is set, read once and cached - `gted`/`spf_a` check this at every debug
+/// write point on the hottest part of the algorithm (`gted` recurses over every node in the tree
+/// decomposition), so re-querying the environment there on every call would be pure per-call
+/// overhead for a flag that can't change mid-run.
+fn apted_debug() -> bool {
+    static DEBUG: std::sync::LazyLock<bool> =
+        std::sync::LazyLock::new(|| std::env::var("APTED_DEBUG").is_ok());
+    *DEBUG
+}
+
 /// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
 /// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
 /// the way Java does - Java's `delta`/`strategy` are the same `float[][]`, reused in place once
@@ -828,7 +838,7 @@ pub(crate) fn spf_a(
                                 l_f_last + 1 - it1_pre_l_off,
                                 r_g_minus1_in_pre_l + 1 - it2_pre_l_off,
                             )] as u64;
-                            if std::env::var("APTED_DEBUG").is_ok() {
+                            if apted_debug() {
                                 eprintln!("spfA write-A: delta[{b}][{a}] = {v}");
                             }
                             delta.set(b, a, v);
@@ -843,7 +853,7 @@ pub(crate) fn spf_a(
                                 l_f_last - it1_pre_l_off,
                                 r_g_minus1_in_pre_l + 1 - it2_pre_l_off,
                             )] as u64;
-                            if std::env::var("APTED_DEBUG").is_ok() {
+                            if apted_debug() {
                                 eprintln!("spfA write-B: delta[{b}][{a}] = {v}");
                             }
                             delta.set(b, a, v);
@@ -1063,7 +1073,7 @@ pub(crate) fn spf_a(
                             r_f_last + 1 - it1_pre_r_off,
                             l_g_minus1_in_pre_r + 1 - it2_pre_r_off,
                         )] as u64;
-                        if std::env::var("APTED_DEBUG").is_ok() {
+                        if apted_debug() {
                             eprintln!("spfA write-C: delta[{b}][{a}] = {v}");
                         }
                         delta.set(b, a, v);
@@ -1077,7 +1087,7 @@ pub(crate) fn spf_a(
                             r_f_last - it1_pre_r_off,
                             l_g_minus1_in_pre_r + 1 - it2_pre_r_off,
                         )] as u64;
-                        if std::env::var("APTED_DEBUG").is_ok() {
+                        if apted_debug() {
                             eprintln!("spfA write-D: delta[{b}][{a}] = {v}");
                         }
                         delta.set(b, a, v);
@@ -1923,7 +1933,7 @@ pub(crate) fn gted(
             }
             current_path_node = parent;
         }
-        if std::env::var("APTED_DEBUG").is_ok() {
+        if apted_debug() {
             eprintln!(
                 "gted T1-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
             );
@@ -1961,7 +1971,7 @@ pub(crate) fn gted(
         }
         current_path_node = parent;
     }
-    if std::env::var("APTED_DEBUG").is_ok() {
+    if apted_debug() {
         eprintln!(
             "gted T2-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
         );

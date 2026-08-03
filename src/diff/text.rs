@@ -363,24 +363,6 @@ impl TextDiff {
         }
         self.after_ranges.clone()
     }
-
-    /// For the given range and side of the diff, return all RangeMatches.
-    ///
-    /// Note that the union of the resulting matches will cover the input range, but it **can**
-    /// be bigger than the input range. In other words, we will not return partial ranges, but
-    /// rather the biggest range possible for the first and last operation in the result.
-    pub fn for_range(&self, range: &TextRange, side: usize) -> Vec<RangeMatch> {
-        let all_ranges = if side == 0 {
-            &self.before_ranges
-        } else {
-            &self.after_ranges
-        };
-        all_ranges
-            .iter()
-            .filter(|rm| rm.source.intersects(range))
-            .cloned()
-            .collect()
-    }
 }
 
 /**

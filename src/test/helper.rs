@@ -605,8 +605,6 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
         .join("data")
         .join("diffs");
 
-    let mut parser = tree_sitter::Parser::new();
-
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
@@ -614,7 +612,7 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
         if path.is_dir() {
             let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
 
-            if let Some(pair) = code_pair_from_dir(&path, &mut parser)? {
+            if let Some(pair) = code_pair_from_dir(&path)? {
                 result.insert(dir_name, pair);
             }
         }
@@ -630,10 +628,7 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
 * not an error, since `handmade_test_code_pairs` tolerates directories that aren't (yet) complete
 * test cases.
 */
-pub fn code_pair_from_dir(
-    path: &Path,
-    parser: &mut tree_sitter::Parser,
-) -> Result<Option<(Code, Code)>> {
+pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
     let mut before_code = None;
     let mut after_code = None;
 
@@ -677,10 +672,8 @@ pub fn code_pair_from_dir(
     // `ensure_parsed`, not `parse` - see `handmade_test_code`'s doc comment for why leaving
     // `ast_metadata` uncached here silently turns every downstream `metadata_of` call into a full
     // recompute, and why this is now safe against the stale-root-id hazard that blocked the first
-    // attempt at this fix. `parser` (still accepted for signature compatibility with existing
-    // callers) is no longer used - `ensure_parsed` builds its own short-lived `tree_sitter::Parser`
-    // internally.
-    let _ = &parser;
+    // attempt at this fix. No `tree_sitter::Parser` needed here at all - `ensure_parsed` builds its
+    // own short-lived one internally.
     if before.metadata.language.is_some() {
         before.ensure_parsed()?;
     }

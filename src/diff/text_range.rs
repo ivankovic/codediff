@@ -118,7 +118,9 @@ impl TextRange {
     /// # Arguments
     ///
     /// * `ts_range` - The TreeSitter Range to convert
-    /// * `columns_per_row` - A slice where each element represents the number of columns in that row (not used currently, kept for API compatibility)
+    /// * `columns_per_row` - A slice where each element represents the number of columns in that
+    ///   row, used to detect an end point landing exactly at end-of-row and normalize it to
+    ///   `(next row, 0)` per this module's convention (see the normalization step below)
     pub fn from_treesitter_range(ts_range: Range, columns_per_row: &[usize]) -> Self {
         let mut end_row = ts_range.end_point.row;
         let mut end_column = ts_range.end_point.column;

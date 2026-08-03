@@ -60,7 +60,7 @@
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use codediff::code::{Code, Language};
-use codediff::diff::{self, NodeCache};
+use codediff::diff;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
 use csv::Writer;
@@ -204,19 +204,65 @@ fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)>
     }
 }
 
+/// Path to an external diff tool's binary, read from the `env_var` environment variable - not
+/// bundled or auto-installed, since each is a separate project this codebase merely shells out to.
+/// `hint` is folded into the "not set" error to say specifically what to point the variable at
+/// (each call site's own doc comment gives the fuller install story). Shared by
+/// `gumtree_bin`/`difftastic_bin`/`diffsitter_bin`, which used to each hand-roll this identical
+/// env-var-lookup -> `PathBuf` -> `is_file` check -> `bail!` sequence independently.
+fn external_tool_bin(env_var: &str, hint: &str) -> Result<std::path::PathBuf> {
+    let path = std::env::var(env_var).with_context(|| format!("{env_var} is not set - {hint}"))?;
+    let path = std::path::PathBuf::from(path);
+    if !path.is_file() {
+        bail!("{env_var}={:?} does not exist or is not a file", path);
+    }
+    Ok(path)
+}
+
 /// Path to the GumTree CLI script (`bin/gumtree` in its built distribution), from the `GUMTREE_BIN`
 /// environment variable - not bundled or auto-installed, since it's a separate JVM project with
 /// its own build (JDK 17 + Gradle; see the project's own install docs). Deliberately errors loudly
 /// rather than silently skipping: unlike a language `ExternalTool::supports` excludes, a missing
 /// binary for a language it claims to support is a real configuration problem.
 fn gumtree_bin() -> Result<std::path::PathBuf> {
-    let path = std::env::var("GUMTREE_BIN")
-        .context("GUMTREE_BIN is not set - point it at GumTree's built bin/gumtree script")?;
-    let path = std::path::PathBuf::from(path);
-    if !path.is_file() {
-        bail!("GUMTREE_BIN={:?} does not exist or is not a file", path);
+    external_tool_bin(
+        "GUMTREE_BIN",
+        "point it at GumTree's built bin/gumtree script",
+    )
+}
+
+/// Writes `before`/`after`'s contents into two fresh temp files - shared by every `ExternalTool`
+/// that needs real files on disk to shell out to (GumTree, difftastic, diffsitter all take file
+/// paths, not stdin), which previously each hand-rolled this identical "build a
+/// `NamedTempFile`, write the contents, wrap both errors with which side failed" sequence.
+/// `suffix`, when `Some`, gives both files the same extension (e.g. `".rs"`) - GumTree and
+/// difftastic each key some of their own behavior off the file extension even when also told
+/// explicitly which language/generator to use, so those two need a real one; diffsitter is told
+/// its language purely via `-t` and doesn't care, so its own call site passes `None`.
+fn write_temp_pair(
+    before: &Code,
+    after: &Code,
+    suffix: Option<&str>,
+) -> Result<(tempfile::NamedTempFile, tempfile::NamedTempFile)> {
+    let mut before_builder = tempfile::Builder::new();
+    let mut after_builder = tempfile::Builder::new();
+    if let Some(suffix) = suffix {
+        before_builder.suffix(suffix);
+        after_builder.suffix(suffix);
     }
-    Ok(path)
+    let mut before_file = before_builder
+        .tempfile()
+        .context("creating before temp file")?;
+    let mut after_file = after_builder
+        .tempfile()
+        .context("creating after temp file")?;
+    before_file
+        .write_all(before.contents.as_bytes())
+        .context("writing before temp file")?;
+    after_file
+        .write_all(after.contents.as_bytes())
+        .context("writing after temp file")?;
+    Ok((before_file, after_file))
 }
 
 /// Runs the real GumTree CLI (`textdiff ... -f JSON`) and reduces its output to the same per-line
@@ -240,18 +286,7 @@ fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bo
         .with_context(|| format!("no GumTree generator for {language:?}"))?;
     let gumtree = gumtree_bin()?;
 
-    let mut before_file = tempfile::Builder::new()
-        .suffix(&format!(".{ext}"))
-        .tempfile()?;
-    let mut after_file = tempfile::Builder::new()
-        .suffix(&format!(".{ext}"))
-        .tempfile()?;
-    before_file
-        .write_all(before.contents.as_bytes())
-        .context("writing before temp file")?;
-    after_file
-        .write_all(after.contents.as_bytes())
-        .context("writing after temp file")?;
+    let (before_file, after_file) = write_temp_pair(before, after, Some(&format!(".{ext}")))?;
 
     let output = Command::new(&gumtree)
         .args(["textdiff", "-g", generator, "-f", "JSON"])
@@ -381,18 +416,7 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
         let Some((generator, ext)) = gumtree_generator(language) else {
             continue;
         };
-        let mut before_file = tempfile::Builder::new()
-            .suffix(&format!(".{ext}"))
-            .tempfile()?;
-        let mut after_file = tempfile::Builder::new()
-            .suffix(&format!(".{ext}"))
-            .tempfile()?;
-        before_file
-            .write_all(before.contents.as_bytes())
-            .context("writing before temp file")?;
-        after_file
-            .write_all(after.contents.as_bytes())
-            .context("writing after temp file")?;
+        let (before_file, after_file) = write_temp_pair(before, after, Some(&format!(".{ext}")))?;
         requests.push_str(
             &serde_json::json!({
                 "id": name,
@@ -504,26 +528,14 @@ fn gumtree_line_range(contents: &str, start: usize, end: usize) -> std::ops::Ran
 /// `/var/tmp/codediff-tools/bin/difft`, outside this checkout and outside the system-wide cargo
 /// bin directory) and point `DIFFT_BIN` at the result.
 fn difftastic_bin() -> Result<std::path::PathBuf> {
-    let path = std::env::var("DIFFT_BIN")
-        .context("DIFFT_BIN is not set - point it at a built `difft` binary")?;
-    let path = std::path::PathBuf::from(path);
-    if !path.is_file() {
-        bail!("DIFFT_BIN={:?} does not exist or is not a file", path);
-    }
-    Ok(path)
+    external_tool_bin("DIFFT_BIN", "point it at a built `difft` binary")
 }
 
 /// Path to the `diffsitter` binary, from the `DIFFSITTER_BIN` environment variable - see
 /// `difftastic_bin`. Install with
 /// `cargo install --root /var/tmp/codediff-tools diffsitter`.
 fn diffsitter_bin() -> Result<std::path::PathBuf> {
-    let path = std::env::var("DIFFSITTER_BIN")
-        .context("DIFFSITTER_BIN is not set - point it at a built `diffsitter` binary")?;
-    let path = std::path::PathBuf::from(path);
-    if !path.is_file() {
-        bail!("DIFFSITTER_BIN={:?} does not exist or is not a file", path);
-    }
-    Ok(path)
+    external_tool_bin("DIFFSITTER_BIN", "point it at a built `diffsitter` binary")
 }
 
 /// File extension difftastic's own language auto-detection maps back to `language`, confirmed
@@ -602,18 +614,7 @@ fn difftastic_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec
         .with_context(|| format!("no difftastic extension mapping for {language:?}"))?;
     let difft = difftastic_bin()?;
 
-    let mut before_file = tempfile::Builder::new()
-        .suffix(&format!(".{ext}"))
-        .tempfile()?;
-    let mut after_file = tempfile::Builder::new()
-        .suffix(&format!(".{ext}"))
-        .tempfile()?;
-    before_file
-        .write_all(before.contents.as_bytes())
-        .context("writing before temp file")?;
-    after_file
-        .write_all(after.contents.as_bytes())
-        .context("writing after temp file")?;
+    let (before_file, after_file) = write_temp_pair(before, after, Some(&format!(".{ext}")))?;
 
     let output = Command::new(&difft)
         .args(["--display", "json"])
@@ -688,14 +689,7 @@ fn diffsitter_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec
         .with_context(|| format!("no diffsitter file type mapping for {language:?}"))?;
     let diffsitter = diffsitter_bin()?;
 
-    let mut before_file = tempfile::NamedTempFile::new().context("creating before temp file")?;
-    let mut after_file = tempfile::NamedTempFile::new().context("creating after temp file")?;
-    before_file
-        .write_all(before.contents.as_bytes())
-        .context("writing before temp file")?;
-    after_file
-        .write_all(after.contents.as_bytes())
-        .context("writing after temp file")?;
+    let (before_file, after_file) = write_temp_pair(before, after, None)?;
 
     let output = Command::new(&diffsitter)
         .args(["-n", "-r", "json", "-t", file_type])
@@ -820,10 +814,8 @@ fn score_fixture(
     gumtree_warm_ms: Option<Vec<f64>>,
 ) -> Result<Row> {
     let language = before.metadata.language.unwrap_or_default();
-    let human_diff = human_mapping::as_ast_diff(name, before, after)?;
-    let node_cache = NodeCache::build(before, after);
-    let (human_before, human_after) =
-        human_mapping::touched_lines(before, after, &human_diff, &node_cache);
+    let (human_before, human_after, node_cache) =
+        human_mapping::human_touched_lines_for(name, before, after)?;
     let total_lines = human_before.len() + human_after.len();
 
     // Mismatch/accuracy counts are computed once, on the first repeat only - the algorithms under
@@ -892,10 +884,8 @@ fn score_fixture(
 /// for understanding why a fixture's mismatch count is what it is.
 fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
     let language = before.metadata.language.unwrap_or_default();
-    let human_diff = human_mapping::as_ast_diff(name, before, after)?;
-    let node_cache = NodeCache::build(before, after);
-    let (human_before, human_after) =
-        human_mapping::touched_lines(before, after, &human_diff, &node_cache);
+    let (human_before, human_after, node_cache) =
+        human_mapping::human_touched_lines_for(name, before, after)?;
 
     let codediff_diff = diff::diff_code(before, after);
     let codediff_ast = codediff_diff

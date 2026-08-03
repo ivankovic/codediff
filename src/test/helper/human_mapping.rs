@@ -124,7 +124,11 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
     Ok(())
 }
 
-fn path_refs(path: &[String]) -> Vec<&str> {
+/// `pub`, not private: `src/bin/human_solver.rs` (a separate binary crate that depends on this
+/// one, so `pub(crate)` wouldn't reach it) needs the identical `Vec<String>` -> `Vec<&str>`
+/// conversion (for the same `node_for_path`/`PathCache::resolve` calls this module makes) and
+/// previously carried its own byte-for-byte copy rather than reusing this one.
+pub fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
 }
 
@@ -165,21 +169,16 @@ pub struct Caches {
     pub after_match: HashMap<usize, usize>,
     pub before_removed: HashMap<usize, bool>,
     pub after_removed: HashMap<usize, bool>,
-    /// Whether a matched node's pair was recorded as [`HumanOperation::Identical`] (`true`) or
-    /// [`HumanOperation::Update`]/[`HumanOperation::MatchButNotIdentical`] (`false`). `before_match`/
-    /// `after_match` alone can't tell these apart - both write the same node-id pair into those maps
-    /// regardless of which of the three operations produced them - so a second map is needed for any
-    /// consumer (e.g. `generate_mapping_site`'s "hide identical matches" toggle) that cares whether a
-    /// match is a real edit or genuinely unchanged. Absent key means "not recorded" (e.g. a `Caches`
-    /// built by hand rather than via `rebuild_caches`), which callers should treat as identical, to
-    /// match matched nodes' pre-existing default rendering/quietness.
-    pub before_identical: HashMap<usize, bool>,
-    pub after_identical: HashMap<usize, bool>,
     /// The exact [`HumanOperation`] (`Identical`/`Update`/`MatchButNotIdentical`) a matched node's
-    /// pair was recorded as - a finer-grained sibling of `before_identical`/`after_identical`,
-    /// which only preserves the identical/not-identical split. `generate_mapping_site` uses this to
-    /// color `Update` (a leaf whose text changed) differently from `MatchButNotIdentical` (a
-    /// container whose subtree differs somewhere, or a confirmed cross-kind pairing).
+    /// pair was recorded as. `before_match`/`after_match` alone can't tell these apart - both write
+    /// the same node-id pair into those maps regardless of which of the three operations produced
+    /// them - so a consumer that cares whether a match is a real edit or genuinely unchanged (e.g.
+    /// `generate_mapping_site`'s "hide identical matches" toggle, which treats anything other than
+    /// `Identical` as a real edit; or its `Update`-vs-`MatchButNotIdentical` coloring, which needs
+    /// the exact operation) reads this map, not `before_match`/`after_match` directly. Absent key
+    /// means "not recorded" (e.g. a `Caches` built by hand rather than via `rebuild_caches`), which
+    /// [`is_identical_before`]/[`is_identical_after`] treat as identical, to match matched nodes'
+    /// pre-existing default rendering/quietness.
     pub before_operation: HashMap<usize, HumanOperation>,
     pub after_operation: HashMap<usize, HumanOperation>,
     /// Whether a matched node's `before_path` and `after_path` differ - i.e. the node sits at a
@@ -216,9 +215,6 @@ pub fn rebuild_caches(
                 let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
                 caches.before_match.insert(b.id(), a.id());
                 caches.after_match.insert(a.id(), b.id());
-                let identical = entry.operation == HumanOperation::Identical;
-                caches.before_identical.insert(b.id(), identical);
-                caches.after_identical.insert(a.id(), identical);
                 caches.before_operation.insert(b.id(), entry.operation);
                 caches.after_operation.insert(a.id(), entry.operation);
                 let moved = before_path != after_path;
@@ -266,29 +262,6 @@ pub fn is_inherited_removed(node: Node, removed: &HashMap<usize, bool>) -> bool 
     false
 }
 
-/// Whether a `Matched` before-node's pair was recorded as `Identical` rather than
-/// `Update`/`MatchButNotIdentical`. Meaningless (and unconsulted) for any other [`NodeStatus`].
-/// Defaults to `true` when `node` isn't in `before_identical` at all - either because it isn't
-/// matched, or because `caches` was built by hand rather than via [`rebuild_caches`] (as several
-/// tests do), in which case treating it as identical preserves those matched nodes' existing
-/// "quiet"/undecorated rendering.
-pub fn is_identical_before(node: Node, caches: &Caches) -> bool {
-    caches
-        .before_identical
-        .get(&node.id())
-        .copied()
-        .unwrap_or(true)
-}
-
-/// After-side counterpart of [`is_identical_before`].
-pub fn is_identical_after(node: Node, caches: &Caches) -> bool {
-    caches
-        .after_identical
-        .get(&node.id())
-        .copied()
-        .unwrap_or(true)
-}
-
 /// The exact [`HumanOperation`] a matched before-node's pair was recorded as, or `None` if `node`
 /// isn't matched at all (or `caches` was built by hand rather than via [`rebuild_caches`]).
 pub fn match_operation_before(node: Node, caches: &Caches) -> Option<HumanOperation> {
@@ -298,6 +271,21 @@ pub fn match_operation_before(node: Node, caches: &Caches) -> Option<HumanOperat
 /// After-side counterpart of [`match_operation_before`].
 pub fn match_operation_after(node: Node, caches: &Caches) -> Option<HumanOperation> {
     caches.after_operation.get(&node.id()).copied()
+}
+
+/// Whether a `Matched` before-node's pair was recorded as `Identical` rather than
+/// `Update`/`MatchButNotIdentical`. Meaningless (and unconsulted) for any other [`NodeStatus`].
+/// Defaults to `true` when [`match_operation_before`] returns `None` - either because `node` isn't
+/// matched, or because `caches` was built by hand rather than via [`rebuild_caches`] (as several
+/// tests do), in which case treating it as identical preserves those matched nodes' existing
+/// "quiet"/undecorated rendering.
+pub fn is_identical_before(node: Node, caches: &Caches) -> bool {
+    match_operation_before(node, caches).is_none_or(|op| op == HumanOperation::Identical)
+}
+
+/// After-side counterpart of [`is_identical_before`].
+pub fn is_identical_after(node: Node, caches: &Caches) -> bool {
+    match_operation_after(node, caches).is_none_or(|op| op == HumanOperation::Identical)
 }
 
 /// Whether a matched before-node's `before_path` differed from its pair's `after_path` - see
@@ -583,6 +571,19 @@ pub fn as_ast_diff(
     after: &crate::code::Code,
 ) -> Result<ASTDiff> {
     let mapping = load(name)?;
+    as_ast_diff_for_mapping(&mapping, before, after)
+}
+
+/// Same as [`as_ast_diff`], but takes an already-loaded [`HumanMapping`] instead of loading (and
+/// JSON-parsing) `name`'s file itself. Callers that already have the mapping in hand for another
+/// reason (e.g. `generate_mapping_site`'s per-fixture loop, which loads it once to render that
+/// fixture's own page) should call this directly rather than [`as_ast_diff`], which would
+/// otherwise re-read and re-parse the same `human_mapping.json` a second time.
+pub fn as_ast_diff_for_mapping(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<ASTDiff> {
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
     let after_ast = after.ast.as_ref().context("After code has no AST")?;
     let before_root = before_ast.root_node();
@@ -1072,6 +1073,42 @@ pub struct LineMismatches {
 }
 
 /**
+* The human mapping's own per-line touched/untouched projection (see [`touched_lines`]), plus the
+* [`NodeCache`] built along the way - handed back, not just consumed internally, because every
+* caller of this function goes on to project a *second* diff (codediff's own, or an external
+* tool's) onto the same `before`/`after` pair via [`touched_lines`], which also needs a
+* `NodeCache` - returning the one already built here means that second projection doesn't need its
+* own separate `NodeCache::build` call.
+*
+* Shared by `benchmark_other`'s `score_fixture`/`print_details` and [`line_mismatches_for_mapping`]
+* below, which otherwise each repeated this exact "resolve the human mapping against a fresh
+* `ASTDiff`, then reduce it to per-line labels" recipe independently.
+*/
+pub fn human_touched_lines_for_mapping(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<(Vec<bool>, Vec<bool>, NodeCache)> {
+    let human_diff = as_ast_diff_for_mapping(mapping, before, after)?;
+    let node_cache = NodeCache::build(before, after);
+    let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
+    Ok((human_before, human_after, node_cache))
+}
+
+/// Same as [`human_touched_lines_for_mapping`], but loads `name`'s `human_mapping.json` itself
+/// rather than taking an already-loaded [`HumanMapping`] - see [`as_ast_diff_for_mapping`]'s doc
+/// comment for why a caller that already has the mapping in hand should prefer the `_for_mapping`
+/// form instead.
+pub fn human_touched_lines_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<(Vec<bool>, Vec<bool>, NodeCache)> {
+    let mapping = load(name)?;
+    human_touched_lines_for_mapping(&mapping, before, after)
+}
+
+/**
 * Computes [`LineMismatches`] for one fixture: codediff's own diff and Unix `diff`, each reduced to
 * per-line touched/untouched labels and compared against the human mapping's own projection of the
 * same shape (see [`touched_lines`]/[`as_ast_diff`]).
@@ -1088,9 +1125,20 @@ pub fn line_mismatches_for(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<LineMismatches> {
-    let human_diff = as_ast_diff(name, before, after)?;
-    let node_cache = NodeCache::build(before, after);
-    let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
+    let mapping = load(name)?;
+    line_mismatches_for_mapping(&mapping, before, after)
+}
+
+/// Same as [`line_mismatches_for`], but takes an already-loaded [`HumanMapping`] instead of
+/// loading `name`'s file itself - see [`as_ast_diff_for_mapping`]'s doc comment for why a caller
+/// that already has the mapping in hand should prefer this.
+pub fn line_mismatches_for_mapping(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<LineMismatches> {
+    let (human_before, human_after, node_cache) =
+        human_touched_lines_for_mapping(mapping, before, after)?;
     let total_lines = human_before.len() + human_after.len();
 
     let codediff_diff = crate::diff::diff_code(before, after);
@@ -1232,6 +1280,17 @@ mod tests {
     use crate::code::Language;
     use crate::test::helper::path_for_node;
 
+    /// Same convention as `generate_mapping_site.rs`'s and `human_solver.rs`'s own `parse_rust`
+    /// test helpers - a one-line stand-in for the `Parser::new`/`set_language`/`parse` sequence
+    /// this module's tests would otherwise repeat by hand.
+    fn parse_rust(source: &str) -> tree_sitter::Tree {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
+            .unwrap();
+        parser.parse(source, None).unwrap()
+    }
+
     #[test]
     fn round_trips_through_json() -> Result<()> {
         let mapping = HumanMapping {
@@ -1325,12 +1384,8 @@ mod tests {
     fn rebuild_caches_distinguishes_identical_from_update_and_match_but_not_identical() -> Result<()>
     {
         let source = "fn f() {\n    let a = 1;\n    let b = 2;\n    let c = 3;\n}\n";
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
-            .unwrap();
-        let before_tree = parser.parse(source, None).unwrap();
-        let after_tree = parser.parse(source, None).unwrap();
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
         let before_root = before_tree.root_node();
         let after_root = after_tree.root_node();
 
@@ -1423,12 +1478,8 @@ mod tests {
     fn rebuild_caches_flags_an_identical_match_at_a_different_path_as_moved() -> Result<()> {
         let before_source = "fn f() {\n    a();\n    b();\n}\n";
         let after_source = "fn f() {\n    b();\n    a();\n}\n";
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(&crate::code::language::to_treesitter(&Language::Rust).unwrap())
-            .unwrap();
-        let before_tree = parser.parse(before_source, None).unwrap();
-        let after_tree = parser.parse(after_source, None).unwrap();
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
         let before_root = before_tree.root_node();
         let after_root = after_tree.root_node();
 

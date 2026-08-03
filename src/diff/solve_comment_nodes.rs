@@ -94,28 +94,17 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     }
 }
 
-/// Find the immediately preceding sibling that is a comment node and hasn't been matched yet
+/// Find the immediately preceding sibling that is a comment node and hasn't been matched yet.
+/// `Node::prev_sibling` (unnamed - includes every child of the parent, not just named ones) gives
+/// this directly; no need to manually scan the parent's children looking for `node` and
+/// remembering whichever came just before it.
 fn find_immediate_preceding_comment_sibling<'a>(
     node: Node<'a>,
     already_matched: &HashSet<usize>,
 ) -> Option<(Node<'a>, usize)> {
-    let parent = node.parent()?;
-    let node_id = node.id();
-
-    let mut cursor = parent.walk();
-    let mut prev_sibling: Option<Node> = None;
-
-    for child in parent.children(&mut cursor) {
-        if child.id() == node_id {
-            let prev = prev_sibling?;
-            let prev_id = prev.id();
-            return (is_comment(prev.kind()) && !already_matched.contains(&prev_id))
-                .then_some((prev, prev_id));
-        }
-        prev_sibling = Some(child);
-    }
-
-    None
+    let prev = node.prev_sibling()?;
+    let prev_id = prev.id();
+    (is_comment(prev.kind()) && !already_matched.contains(&prev_id)).then_some((prev, prev_id))
 }
 
 #[cfg(test)]

@@ -2742,3 +2742,29 @@ improvement, not a regression, well under the Makefile's 2x warning threshold ei
 `TOTAL_MISMATCHES` stayed exactly 3363, confirming these five contribute 0. `make
 update-quality-baseline` ran straight through (no hard-fail this time, since nothing regressed).
 `cargo test --lib --features test-fixtures optimal_solutions::`: 187/0/0.
+
+## Whole-repository code health pass (2026-08-03, user-requested: "look for everything")
+
+10 parallel subsystem-scoped review agents (apted engine, diff/nodes/text pipeline, code/hash/
+metadata, TUI, human_solver, mapping-site generator, benchmark tools, stats/sampling tools, and
+two more) covered the entire codebase rather than just the current session's diff. Of the findings,
+19 mechanical, behavior-preserving fixes were applied; dozens of larger/riskier findings (mostly
+architectural suggestions or changes that would need call-site behavior changes to verify) were
+deliberately skipped rather than rushed.
+
+Representative fixes: `apted::engine` gained a memoized `apted_debug()` (`LazyLock<bool>`)
+replacing 6 repeated `std::env::var("APTED_DEBUG").is_ok()` calls; `code/hash.rs` and
+`benchmark_other.rs` each had a 4x-copy-pasted block extracted into one helper
+(`record`/`external_tool_bin`/`write_temp_pair`); `stats/filesystem.rs` gained
+`for_each_repository`, replacing near-identical hand-rolled repo-loop-with-progress-printing code
+in `sample_code_pairs.rs` and `sample_test_diffs.rs`; several dead fields/functions were removed
+(`Metadata::columns_for_row`, `diff::text::for_range`, a redundant `Clear` widget render in
+`help_modal`, an unused `strum::Display` derive on `tui::actions::Action`); `human_mapping::
+path_refs` had to become fully `pub` (not `pub(crate)`) so `human_solver.rs` - a separate binary
+crate, not a submodule - could call it, which is a recurring gotcha in this workspace: every
+`src/bin/*.rs` file is its own crate depending on the library as an external dependency.
+
+Verified purely mechanical: full lib suite 554/0/5, `human_solver` 65/0, `benchmark_other` 7/0,
+`generate_mapping_site` 17/0, mapping-site JS tests passing, and - most importantly -
+`benchmark_optimal_solutions`'s `TOTAL_MISMATCHES` unchanged at exactly 3363, proving zero behavior
+change across the whole pass despite touching 27 files.

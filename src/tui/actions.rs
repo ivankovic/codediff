@@ -17,8 +17,6 @@
  */
 use std::path::PathBuf;
 
-use strum::Display;
-
 use crate::diff::DiffMode;
 use crate::diff::text::RangeMatch;
 use crate::tui::theme::OverlayTheme;
@@ -51,7 +49,7 @@ pub struct DiffSessionData {
     pub comment_only: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     Tick,
     Render,

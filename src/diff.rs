@@ -32,8 +32,6 @@ pub mod solve_syntax_aware_matching;
 pub mod text;
 pub mod text_range;
 
-use std::collections::HashMap;
-
 use tree_sitter::Node;
 
 use crate::code::{Code, Language};
@@ -580,33 +578,21 @@ impl ASTDiff {
      * Useful in tests.
      */
     pub fn is_complete(&self, before: &Code, after: &Code, node_cache: &NodeCache) -> bool {
-        // Create sets of all nodes seen in mappings
-        let mut seen_before_nodes = HashMap::new();
-        let mut seen_after_nodes = HashMap::new();
-
-        for ((before_id, after_id), mapping) in &self.mapping {
-            seen_before_nodes.insert(before_id, mapping);
-            seen_after_nodes.insert(after_id, mapping);
-        }
-
-        // Check that all nodes in before tree are covered
+        // `before_node_map`/`after_node_map` already record exactly "is this node covered by some
+        // mapping" (every `add_mapping` call inserts into both) - no need to re-derive that from
+        // `self.mapping` into fresh maps first.
+        let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         for node_id in node_cache.before.keys() {
-            if !seen_before_nodes.contains_key(node_id) {
-                // Check if this is a root node that might not need mapping
-                if node_id == &before.ast.as_ref().unwrap().root_node().id() {
-                    continue;
-                }
+            // Check if this is a root node that might not need mapping
+            if *node_id != before_root_id && !self.before_node_map.contains_key(node_id) {
                 return false;
             }
         }
 
-        // Check that all nodes in after tree are covered
+        let after_root_id = after.ast.as_ref().unwrap().root_node().id();
         for node_id in node_cache.after.keys() {
-            if !seen_after_nodes.contains_key(node_id) {
-                // Check if this is a root node that might not need mapping
-                if node_id == &after.ast.as_ref().unwrap().root_node().id() {
-                    continue;
-                }
+            // Check if this is a root node that might not need mapping
+            if *node_id != after_root_id && !self.after_node_map.contains_key(node_id) {
                 return false;
             }
         }

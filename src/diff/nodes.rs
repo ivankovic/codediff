@@ -41,10 +41,10 @@ pub fn map_identical_descendants<'a>(
     while let Some((before_parent, after_parent)) = stack.pop() {
         let mut before_cursor = before_parent.walk();
         let mut after_cursor = after_parent.walk();
-        let before_children: Vec<_> = before_parent.children(&mut before_cursor).collect();
-        let after_children: Vec<_> = after_parent.children(&mut after_cursor).collect();
+        let before_children = before_parent.children(&mut before_cursor);
+        let after_children = after_parent.children(&mut after_cursor);
 
-        for (before_child, after_child) in before_children.into_iter().zip(after_children) {
+        for (before_child, after_child) in before_children.zip(after_children) {
             if before_child.kind() != after_child.kind() {
                 continue;
             }

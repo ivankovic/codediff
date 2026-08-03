@@ -19,7 +19,6 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{Frame, layout::Rect, prelude::Stylize, style::Color, widgets::ListItem};
 use strum::IntoEnumIterator;
-use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, move_selection, render_list_dialog};
 use crate::tui::actions::Action;
@@ -52,10 +51,6 @@ impl ThemeDialog {
 }
 
 impl Component for ThemeDialog {
-    fn register_action_handler(&mut self, _tx: UnboundedSender<Action>) -> Result<()> {
-        Ok(())
-    }
-
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         match key.code {
             KeyCode::Up => {

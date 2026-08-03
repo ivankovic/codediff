@@ -55,6 +55,19 @@ use crate::diff::nodes::is_commutative_container;
 * @param code The Code structure containing the AST to hash
 * @param metadata Mutable reference to ASTMetadata that will be populated with hash data
 */
+/// Inserts `node_id -> hash` into `forward` and appends `node_id` to `reverse`'s bucket for
+/// `hash` - the same "store both directions of one hash map" pair `hash_code` below repeats once
+/// per hash kind (full/structural/kind-and-value/kind-only).
+fn record(
+    forward: &mut rustc_hash::FxHashMap<usize, u64>,
+    reverse: &mut rustc_hash::FxHashMap<u64, Vec<usize>>,
+    node_id: usize,
+    hash: u64,
+) {
+    forward.insert(node_id, hash);
+    reverse.entry(hash).or_default().push(node_id);
+}
+
 pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     // Clear existing data in the metadata
     metadata.node_to_full_hash.clear();
@@ -146,40 +159,30 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         );
         let kind_only_hash = compute_kind_only_hash(&node, &kind_only_child_hashes, language);
 
-        // Store full hash mappings
-        metadata.node_to_full_hash.insert(node_id, full_hash);
-        metadata
-            .full_hash_to_node
-            .entry(full_hash)
-            .or_default()
-            .push(node_id);
-
-        // Store structural hash mappings
-        metadata
-            .node_to_structural_hash
-            .insert(node_id, structural_hash);
-        metadata
-            .structural_hash_to_node
-            .entry(structural_hash)
-            .or_default()
-            .push(node_id);
-
-        metadata
-            .node_to_kind_and_value_hash
-            .insert(node_id, kind_and_value_hash);
-        metadata
-            .kind_and_value_hash_to_node
-            .entry(kind_and_value_hash)
-            .or_default()
-            .push(node_id);
-        metadata
-            .node_to_kind_only_hash
-            .insert(node_id, kind_only_hash);
-        metadata
-            .kind_only_hash_to_node
-            .entry(kind_only_hash)
-            .or_default()
-            .push(node_id);
+        record(
+            &mut metadata.node_to_full_hash,
+            &mut metadata.full_hash_to_node,
+            node_id,
+            full_hash,
+        );
+        record(
+            &mut metadata.node_to_structural_hash,
+            &mut metadata.structural_hash_to_node,
+            node_id,
+            structural_hash,
+        );
+        record(
+            &mut metadata.node_to_kind_and_value_hash,
+            &mut metadata.kind_and_value_hash_to_node,
+            node_id,
+            kind_and_value_hash,
+        );
+        record(
+            &mut metadata.node_to_kind_only_hash,
+            &mut metadata.kind_only_hash_to_node,
+            node_id,
+            kind_only_hash,
+        );
     }
 
     Ok(())

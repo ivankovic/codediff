@@ -796,12 +796,12 @@ pub(crate) fn emit_match(
     let mut total = root_cost;
 
     if let Some(info) = ctx.before_meta.node_info.get(&before_id) {
-        for child in filter_mapped_nodes(info.children.clone(), &diff.before_node_map) {
+        for child in filter_mapped_nodes(&info.children, &diff.before_node_map) {
             total += emit_before_subtree(child, ctx, diff);
         }
     }
     if let Some(info) = ctx.after_meta.node_info.get(&after_id) {
-        for child in filter_mapped_nodes(info.children.clone(), &diff.after_node_map) {
+        for child in filter_mapped_nodes(&info.children, &diff.after_node_map) {
             if matches!(ctx.after_decision.get(&child), Some(AfterDecision::Insert)) {
                 total += emit_after_subtree(child, ctx, diff);
             }
@@ -847,7 +847,7 @@ pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut
     // its children be independently classified.
     let mut total = COST_DELETE;
     if let Some(info) = ctx.before_meta.node_info.get(&before_id) {
-        for child in filter_mapped_nodes(info.children.clone(), &diff.before_node_map) {
+        for child in filter_mapped_nodes(&info.children, &diff.before_node_map) {
             total += emit_before_subtree(child, ctx, diff);
         }
     }
@@ -886,7 +886,7 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
 
     let mut total = COST_INSERT;
     if let Some(info) = ctx.after_meta.node_info.get(&after_id) {
-        for child in filter_mapped_nodes(info.children.clone(), &diff.after_node_map) {
+        for child in filter_mapped_nodes(&info.children, &diff.after_node_map) {
             total += emit_after_subtree(child, ctx, diff);
         }
     }
@@ -1373,13 +1373,18 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
 }
 
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/
-/// `diff.after_node_map` for the before/after side respectively).
+/// `diff.after_node_map` for the before/after side respectively). Takes `node_ids` by reference,
+/// not by value: every `emit_*`/`emit_match` call site below already has a borrowed
+/// `&info.children` in hand and previously had to `.clone()` it just to satisfy an owned-`Vec`
+/// signature this function never needed (it only ever reads each id, never mutates or reuses the
+/// input `Vec` itself).
 pub(crate) fn filter_mapped_nodes(
-    node_ids: Vec<usize>,
+    node_ids: &[usize],
     node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Vec<usize> {
     node_ids
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|node_id| !node_map.contains_key(node_id))
         .collect()
 }
@@ -2364,8 +2369,8 @@ pub(crate) fn resolve_forest(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
-    let before_root_ids = filter_mapped_nodes(before_root_ids, &diff.before_node_map);
-    let after_root_ids = filter_mapped_nodes(after_root_ids, &diff.after_node_map);
+    let before_root_ids = filter_mapped_nodes(&before_root_ids, &diff.before_node_map);
+    let after_root_ids = filter_mapped_nodes(&after_root_ids, &diff.after_node_map);
     if before_root_ids.is_empty() && after_root_ids.is_empty() {
         return;
     }
