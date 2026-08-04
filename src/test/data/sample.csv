@@ -67,7 +67,7 @@ JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backe
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,json-nextcloud-server-deleted-pair
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,
-JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/styles/radix-maia/pagination.json,
+JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/styles/radix-maia/pagination.json,json-shadcn-ui-ui-react-code-in-string-constant
 JSON,shadcn-ui-ui.git,47c47eaed21524b5263011e080d0cd52bc794a6f,apps/v4/public/r/styles/radix-vega/hover-card.json,json-shadcn-ui-ui-string-value-update-string-is-code
 Java,Genymobile-scrcpy.git,3acffaae57238ee47e05f97f8e762a04550fdad8,server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java,
 Java,Genymobile-scrcpy.git,69b836930a1d33d2aeebd17eed67c264c084c37d,server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java,java-scrcpy-public-to-protected
@@ -108,7 +108,7 @@ LUA,neovim-neovim.git,249f305bbcddf10264835c5845035a42030d9184,test/functional/u
 LUA,neovim-neovim.git,3325536150eda0de4dc69f25beca416c0a0b3e3a,test/functional/ui/screen.lua,
 LUA,neovim-neovim.git,844caca881f85fa4e143fbfa982fba48590e8a60,test/functional/ui/cmdline2_spec.lua,
 LUA,neovim-neovim.git,b99cdd08de42804b0ea2448d6f9f4e476b931b80,runtime/lua/vim/lsp/client.lua,
-LUA,neovim-neovim.git,dec3c6fa346b298e7feb72398f9fdd5d59c11444,test/functional/testnvim.lua,
+LUA,neovim-neovim.git,dec3c6fa346b298e7feb72398f9fdd5d59c11444,test/functional/testnvim.lua,lua-neovim-neovim-add-if-around-one-line
 PHP,WordPress-WordPress.git,1f11618effb7fd4dfde2658804adef51b66d5e60,wp-includes/version.php,php-wordpress-wordpress-version-update
 PHP,WordPress-WordPress.git,268fc794c929d790f423c03e309578dffa03d777,wp-content/themes/twentytwenty/inc/template-tags.php,
 PHP,WordPress-WordPress.git,2ab763418b2093f06a2b2ce0afa8bd8c2283cc9c,wp-includes/script-loader.php,
@@ -127,7 +127,7 @@ Python,django-django.git,d82f25d3f0f4eb7be721a72d0e79a8d13d394d32,tests/template
 Python,langflow-ai-langflow.git,324caf486c2274efcbeaf8648f5165c76c38c6ce,src/backend/base/langflow/logging/logger.py,
 Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/zsh.py,python-thefuck-multiline-string-change
 Python,pandas-dev-pandas.git,1a753531c565e11d4d78912d09b9343945da9363,pandas/core/window/rolling.py,
-Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/attention/_fa3.py,
+Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/attention/_fa3.py,python-pytorch-pytorch-add-param-to-many-places-and-update-one
 Python,ytdl-org-youtube-dl.git,2500300c2a5986ace34390aa473a8bd51f83622c,devscripts/make_lazy_extractors.py,python-ytdl-add-import-and-function-call
 Ruby,Homebrew-brew.git,0c34674121a5c1e6dfb14993e397adfddf440364,Library/Homebrew/dev-cmd/bump.rb,
 Ruby,Homebrew-brew.git,239d748c9d8e869bc5d940242b42059dfdcb5bf6,Library/Homebrew/cmd/deps.rb,
@@ -151,11 +151,11 @@ Rust,vercel-next.js.git,5c70b4beaa80ec7031284153ba012b243788ef1e,turbopack/crate
 Rust,zed-industries-zed.git,e9e71431bb26ce554d4ed2024569745df6dd9047,crates/worktree/src/worktree.rs,
 ShellScript,Genymobile-scrcpy.git,c0e2e27cf9eb38a95b324ba9aeeb34dab6d2e72f,server/build_without_gradle.sh,shellscript-genymobile-scrcpy-add-two-flags
 ShellScript,ansible-ansible.git,35750ed3218e7bce68b21f473cecb0a3b9d60321,test/integration/targets/template_jinja2_non_native/runme.sh,shellscript-ansible-ansible-simple-deletion
-ShellScript,ansible-ansible.git,99708930841723f3ecc20e95e82a0cd780003dbd,.azure-pipelines/commands/windows.sh,
+ShellScript,ansible-ansible.git,99708930841723f3ecc20e95e82a0cd780003dbd,.azure-pipelines/commands/windows.sh,shellscript-ansible-ansible-add-variable-and-string-expansion
 ShellScript,langchain-ai-langchain.git,07fa576de1c4d6485331691d4ac8cabc6d80f960,libs/partners/chroma/scripts/lint_imports.sh,
 ShellScript,nextcloud-server.git,9741f5f17d95418178c64a106624f8e525a59e75,autotest.sh,shellscript-nextcloud-server-change-invocation-string
 ShellScript,nvm-sh-nvm.git,552db40622bb7a82d9c6d67d2d6bcf3694b47e30,nvm.sh,shellscript-nvm-sh-nvm-upgrade-version-string
-ShellScript,pi-hole-pi-hole.git,95ae51bbdbb028625b541466c2f1caabfeb2301c,advanced/Scripts/piholeDebug.sh,
+ShellScript,pi-hole-pi-hole.git,95ae51bbdbb028625b541466c2f1caabfeb2301c,advanced/Scripts/piholeDebug.sh,shellscript-pi-hole-pi-hole-sql-code-in-string-constant
 ShellScript,pytorch-pytorch.git,fa8028ada56dd49831539ac0612e47167030087f,.ci/pytorch/check_binary.sh,shellscript-pytorch-pytorch-change-invocation-string
 ShellScript,scikit-learn-scikit-learn.git,5464d9a6ce1fc872282bf943c8f40b0829f43ed2,build_tools/azure/install.sh,shellscript-scikit-learn-scikit-learn-string-to-regex
 ShellScript,torvalds-linux.git,3b4a3a00de8770f3a60c1fa483921ce37415132d,scripts/kconfig/merge_config.sh,shellscript-torvalds-linux-double-equals-to-equals
@@ -181,7 +181,7 @@ TSX,shadcn-ui-ui.git,687f09817b614a3450f0f56779edf367082e1e53,apps/v4/registry/b
 TSX,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/examples/base/ui/radio-group.tsx,
 TypeScript,excalidraw-excalidraw.git,6959a363f0ba8d0e8b05442f4c8f3cc4a2e00ca6,packages/excalidraw/appState.ts,typescript-excalidraw-excalidraw-add-values-to-lists
 TypeScript,excalidraw-excalidraw.git,86cfeb714c63bf7efccf5c26bf1f30522395f5db,packages/excalidraw/utils.ts,
-TypeScript,microsoft-TypeScript.git,16beff101ae1dae0600820ebf22632ac8a40cfc8,src/testRunner/transpileRunner.ts,
+TypeScript,microsoft-TypeScript.git,16beff101ae1dae0600820ebf22632ac8a40cfc8,src/testRunner/transpileRunner.ts,typescript-microsoft-typescript-add-dot-js-to-import-paths
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentCompatability37.ts,typescript-typescript-add-target-comment
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentNestedInLiterals.ts,typescript-typescript-add-target-comment-2
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/implicitAnyFunctionOverloadWithImplicitAnyReturnType.ts,typescript-typescript-add-target-comment-3

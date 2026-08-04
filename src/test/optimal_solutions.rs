@@ -180,6 +180,8 @@ mod json_nextcloud_server_deleted_pair;
 #[cfg(test)]
 mod json_radarr_radarr_rename_string_key;
 #[cfg(test)]
+mod json_shadcn_ui_ui_react_code_in_string_constant;
+#[cfg(test)]
 mod json_shadcn_ui_ui_string_value_update_string_is_code;
 #[cfg(test)]
 mod kotlin_add_data_class;
@@ -209,6 +211,8 @@ mod kotlin_small_api_change;
 mod lua_awesome_only_comment_change;
 #[cfg(test)]
 mod lua_awesomewm_awesome_align_to_halign;
+#[cfg(test)]
+mod lua_neovim_neovim_add_if_around_one_line;
 #[cfg(test)]
 mod lua_neovim_one_added_line;
 #[cfg(test)]
@@ -241,6 +245,8 @@ mod python_bugfix_loop;
 mod python_openhands_openhands_change_string_constant;
 #[cfg(test)]
 mod python_paddlepaddle_paddleocr_formatting_only_change;
+#[cfg(test)]
+mod python_pytorch_pytorch_add_param_to_many_places_and_update_one;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
@@ -302,6 +308,8 @@ mod rust_zed_git_panel_settings;
 #[cfg(test)]
 mod rust_zed_workspace_tasks;
 #[cfg(test)]
+mod shellscript_ansible_ansible_add_variable_and_string_expansion;
+#[cfg(test)]
 mod shellscript_ansible_ansible_simple_deletion;
 #[cfg(test)]
 mod shellscript_genymobile_scrcpy_add_two_flags;
@@ -309,6 +317,8 @@ mod shellscript_genymobile_scrcpy_add_two_flags;
 mod shellscript_nextcloud_server_change_invocation_string;
 #[cfg(test)]
 mod shellscript_nvm_sh_nvm_upgrade_version_string;
+#[cfg(test)]
+mod shellscript_pi_hole_pi_hole_sql_code_in_string_constant;
 #[cfg(test)]
 mod shellscript_pytorch_pytorch_change_invocation_string;
 #[cfg(test)]
@@ -333,6 +343,8 @@ mod typescript_add_type_annotations;
 mod typescript_async_await;
 #[cfg(test)]
 mod typescript_excalidraw_excalidraw_add_values_to_lists;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_dot_js_to_import_paths;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_target_comment;
 #[cfg(test)]
