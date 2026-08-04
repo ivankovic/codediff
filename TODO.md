@@ -3060,3 +3060,58 @@ files" case), and one alternative instantiation (hash-based Myers-diff of unmatc
 size) identified as a better-fitting next candidate for `rust-tauri-cli-ios-dev`'s specific shape.
 Not implemented - no code changed as a result of this exploration (both the `resolve_forest`
 instrumentation and its driving test were thrown away after use, confirmed via `git status`).
+
+## Follow-up: the residual's actual *shape* (not just counts) was measured, and it's remarkably uniform - and points directly at an existing, already-safe mechanism (2026-08-04, user-requested)
+
+User asked what the residual tree shapes actually *are*, prompted by the surprising "no asymmetric
+residual anywhere" finding above. Deeper throwaway instrumentation (both deleted after use) walking
+each dominant `resolve_forest` call's residual via the existing `maximal_unmatched_roots` helper -
+querying from each root's *children*, not the root itself, since `maximal_unmatched_roots` short-
+circuits without recursing whenever the queried id isn't in `node_map` yet, which every container id
+here never is (deciding it is the point of the call) - plus a `kind_and_value_hash` overlap fraction
+per blob (loose, position-ignoring: "does this node's exact hash occur *somewhere* on the other
+side"), across the same 7 known-slow fixtures.
+
+**The shape is startlingly uniform across every single dominant call, every fixture, every
+language**: a handful (3-8) of trivially-matched, tiny wrapper/signature tokens (keywords, param
+lists, return types - individually 0-30 nodes, always ~90-100% hash-reuse, essentially free), plus
+**exactly one** large, undivided "body" blob - `compound_statement`/`body_statement`/`function_body`/
+`class_body`/`block`/`declaration_list`, depending on language - that accounts for 90%+ of the
+residual's total size. Nothing scattered; no fixture had its unmatched content spread across many
+medium islands. It's always "one function/method/class/namespace's body, whole."
+
+**That one body blob is itself 89-100% hash-reuse against the other side, in every single case**
+(`cpp-opencv`'s 5387-node blob: 100%; `ruby-homebrew`'s 1569-1575-node ones: 100%; `c-postgres`'s
+197-996-node ones: 89-98%; `cpp-ladybird`'s: 81-100%; `kotlin-nextcloud`'s: 91-99%; `c-linux`'s:
+94%; `rust-tauri`'s: 99%). None of these are "genuinely novel content needing real combinatorial
+reasoning" in the sense of comparing two substantially *different* things - by this loose multiset
+measure, nearly every node in every dominant blob has an exact counterpart somewhere on the other
+side. (Caveat repeated from the entry above: multiset hash overlap ignoring position is necessary
+but not sufficient for "safely matchable" - the established false-positive risk with unscoped
+hash-based pre-matching, documented on `resolve_forest`'s own doc comment, still applies to a naive
+version of this.)
+
+**The direct-child count of every one of these blobs is far below `FLAT_MIN_CHILDREN`/
+`FLAT_CONTAINER_MIN_CHILDREN` (50)** - ranging from 1 (Kotlin's `function_body`, which wraps a
+single nested statement list one level down) to 36 (`ruby-homebrew`'s biggest `body_statement`),
+typically 10-30. This is the concrete, missing piece: `solve_large_flat_subtrees`'s Myers-diff fast
+path is *already* the right, *already-safe* tool for exactly this shape (it's not a general
+unscoped hash-matching pass - it only ever compares the direct children of one specific, already-
+identity-matched parent pair, which is what makes it safe) - it's just gated behind a child-count
+threshold calibrated for a different regime (wide config/data literals with 50+ properties) that
+structurally can never fire for "a function body with 10-36 statements," which is exactly the shape
+driving every dominant slow call found in this corpus. The threshold conflates two different things:
+"is this sequence long" (its original design target) and "is comparing this sequence via Myers
+cheaper than the full APTED alternative" (what actually matters here) - a compound_statement with
+14 direct children but hundreds-to-thousands of total descendant nodes (each statement its own
+deep subexpression tree) fails the first test while being exactly the case that needs the second.
+
+**Not yet implemented or measured**: whether lowering/removing `FLAT_MIN_CHILDREN` (or replacing it
+with a cost-aware trigger - e.g. "try Myers on direct children whenever the container's total
+subtree size exceeds some threshold, regardless of direct-child count, and only fall back to full
+APTED if Myers' own edit distance across children comes out large") would actually reproduce the
+same optimal mappings `benchmark_optimal_solutions` already scores these fixtures against, and by
+how much it would speed up the specific calls measured here. This is the natural next step if this
+thread gets picked back up - a much better-targeted lever than either the abandoned branch-and-bound
+attempt or the not-applicable asymmetric-residual solver, since it reuses an existing, already-
+verified-safe mechanism rather than adding a new one.
