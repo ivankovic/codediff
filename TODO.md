@@ -2944,3 +2944,119 @@ the rest of the original top-10 list. Every fixture in that list is now either f
 narrow lever - consistent with the `/goal` investigation's standing conclusion that the remaining
 gap needs either the declined mid-DP-engine rewrite or accepting p90/max above target for this
 fixture class.
+
+## Idea written down for exploration: a portfolio of complete-solution heuristics as a branch-and-bound incumbent for APTED (2026-08-04, user-proposed)
+
+User's proposal: instead of one generic cheap fallback as the branch-and-bound incumbent (already
+tried above and killed - 3.65x-996x too loose against real APTED cost, see "First tried and
+abandoned: branch-and-bound with an incumbent inside APTED"), run a *series* of narrow heuristic
+solvers before each expensive `apted::for_nodes` call. Each solver either returns `None` (its
+specific shape doesn't apply) or a **complete, valid** mapping with its cost - never a partial
+solution, since only a complete mapping's cost is a sound upper bound. Take the minimum cost across
+whichever solvers fired, and use that to prune APTED's search. Named example shapes: "only insert
+operations", "only delete operations", "and so on." Explicitly fine if any individual solver only
+ever fires on a tiny fraction of fixtures - "at the moment that could be anywhere between 0 and 0.5%
+of the total problem space, which is millions of files" - same "narrow is fine" framing as the
+`is_semantically_structural` arms above, just applied to the DP-bounding problem instead of the
+candidate-recognition problem.
+
+**Why this is a meaningfully different proposal from the already-killed generic-fallback attempt,
+not a re-run of it**: the earlier attempt evaluated *one* fixed, non-adaptive heuristic
+(`for_roots_fallback`'s whole-fragment-hash-then-delete+insert) across the *entire* residual forest
+of a whole-file diff. It was loose because it can't express partial/rename-level reuse *at all* - any
+fixture needing that (which is most of them) got an upper bound the true optimal beats by 1-3 orders
+of magnitude. A *portfolio* of shape-specific solvers is different in kind: for the specific shapes
+where the true optimal solution genuinely *is* "insert everything"/"delete everything"/"exactly one
+node changed, everything else identical", the matching solver's answer isn't just an upper bound -
+it's the exact optimum, computed in O(residual size) instead of paying for tree-edit-distance's own
+superlinear cost. The portfolio framing means each new fixture shape only needs its *own* solver to
+be tight; shapes with no matching solver fall back to plain unbounded APTED, exactly as today - this
+can only ever help, never regress accuracy (every solver's own output is a real, valid, complete
+mapping by construction) or add cost to calls that stay unmatched by any solver (a `None` check is
+cheap by design).
+
+**Concretely, one solver in this portfolio is not just a tight upper bound but a *provably exact*
+one, and directly explains a case already found this session**: `cpp-opencv-add-test-case`'s
+735ms `large_flat_subtree_container` call (see the entry above) hands `apted::for_nodes` the
+*entire* ~5000-node namespace container even though everything inside except the one brand-new
+`TEST(...)` block was already pre-matched by the time that call runs. If a cheap pre-check (walking
+`before_root_ids`/`after_root_ids`'s recursive descendants against `diff.before_node_map`/
+`after_node_map`, something `resolve_forest` doesn't currently do) finds the unmatched residual is
+**entirely on one side** (all remaining unmatched nodes are after-only, or all before-only), then
+"insert everything left" (or "delete everything left") isn't a heuristic guess *for that specific
+call* - it's the only possible completion, since with nothing unmatched on the other side there is
+nothing left to rename/reuse against. This "asymmetric residual" case is a strict generalization of
+`resolve_forest`'s own existing `before_root_ids.is_empty()`/`after_root_ids.is_empty()` fast path
+(see `common.rs`) - that check only fires when the *root id list itself* is empty; the gap is that a
+container call's root id list is never empty (it's the container's own single id) even when
+everything recursively inside one side of it already is.
+
+**Proposed implementation strategy - deliberately *not* touching APTED's DP internals**: the
+already-declined "mid-DP abort-budget engine rewrite" is real engineering inside the correctness-
+critical tree-edit-distance core, with a hard problem the earlier abandoned attempt's writeup
+identified precisely - pruning inside the shared, memoized delta table risks corrupting backtrace
+reconstruction for *other* callers of the same subresults. This proposal doesn't need that: run the
+solver portfolio and take the best complete solution `U` (cost, mapping) *before* calling
+`apted::for_nodes` at all; separately compute a cheap, sound **lower bound** `L` on the true optimal
+(the classic unit-cost tree-edit-distance lower bound: `max(|before|, |after|) - overlap`, where
+`overlap` is the multiset intersection size of `{kind, value}` hashes - cheap, already close to what
+phase 1's hash descent computes). If `L >= U`, `U` is *provably* optimal - apply its mapping directly
+and skip the real APTED call entirely, with zero risk to the DP engine since it's never invoked for
+that pair. If `L < U` (or no solver fired), fall through to today's unmodified `apted::for_nodes` -
+identical behavior to now. This is a bypass around expensive calls, not a rewrite of what happens
+inside them, so the risk profile is closer to the safe `is_semantically_structural`-arm fixes above
+than to the declined DP-engine work - even though the *goal* (a tighter incumbent) is the same one
+that motivated the declined proposal.
+
+**Measured (throwaway `RESIDUAL_DEBUG`-gated instrumentation in `resolve_forest`, deleted after
+use): the asymmetric-residual hypothesis does *not* hold for a single one of this corpus's known
+dominant calls.** Logged `(before_total, before_unmatched, after_total, after_unmatched)` for every
+`resolve_forest` call across all 7 previously-profiled slow fixtures
+(`cpp-opencv-add-test-case`, `rust-tauri-cli-ios-dev`, `ruby-homebrew-add-or-expression`,
+`c-postgres-real-logic-change`, `cpp-ladybird-refactor-variables-if-changes`, `kotlin-nextcloud-a-
+few-small-removals`, `c-linux-small-change-struct-to-char`). Every single dominant call has
+*substantial* unmatched content on **both** sides, never zero on either - not even close for most:
+
+- `cpp-opencv-add-test-case`'s `large_flat_subtree_container` call (the 730ms one): before_unmatched
+  288, after_unmatched 871 - skewed (consistent with "mostly one new function"), but 288 is far from
+  zero, so "insert everything left" would have been **wrong**, not just imprecise.
+- `rust-tauri-cli-ios-dev`'s `syntax_named` call (the 337ms one): before_unmatched 436 of 818 total,
+  after_unmatched 438 of 820 - essentially half of `run_dev`'s body unmatched on *both* sides, in
+  matching proportions. Not asymmetric at all; this is "near-identical content that was simply never
+  given the chance to hash-match at a finer grain" (see below).
+- Every `ruby-homebrew`/`c-postgres`/`cpp-ladybird`/`kotlin-nextcloud`/`c-linux` dominant call: same
+  pattern, several with unmatched == total on *both* sides (e.g. `cpp-ladybird`'s 305/305 and
+  400/859 pairs - zero pre-matching happened at all, not "some but not all").
+
+**Conclusion: the specific, provably-exact "asymmetric residual -> insert/delete-all" shortcut,
+while theoretically sound, doesn't apply to any call currently known to dominate this corpus's slow
+fixtures** - not because it's wrong, but because the fixtures that make it onto a "10 slowest"
+list are, almost by selection, exactly the ones that *need* real rename/reuse reasoning (a pure
+insert/delete-shaped diff is already cheap today, via `resolve_forest`'s existing root-id-list-empty
+fast path - it never becomes a slow outlier in the first place). This doesn't kill the broader
+portfolio idea, but it does mean: the concrete case that motivated writing it down
+(`cpp-opencv-add-test-case`'s container call) needs a *different* solver shape than "asymmetric
+residual", and the promised value for "millions of files" is real but orthogonal to *this*
+corpus's specific slow-outlier list - pure-insert/delete diffs are common in the wild, just not
+among fixtures selected for being hard.
+
+**A different, more promising lead this measurement surfaced**: `rust-tauri-cli-ios-dev`'s shape
+(before_unmatched ≈ after_unmatched, both ≈ half of comparable totals) looks like a good match for
+a *different* portfolio solver: "Myers-LCS-diff the two sides' still-unmatched children by hash
+equality" - structurally the same mechanism `solve_large_flat_subtrees`'s existing flat-tree fast
+path already uses, just currently gated behind `FLAT_CONTAINER_MIN_CHILDREN`/`FLAT_MIN_CHILDREN`
+(50 direct children) and only tried for a node's *single largest* flat descendant, not generally
+available as a portfolio solver at any size. This is close to (but not identical to) the already-
+shelved "generalize the flat-tree Myers fast path from leaf-only to any-child" idea from the
+`ruby-homebrew` investigation earlier in this file - worth revisiting specifically as *one member of
+this portfolio* rather than a standalone pipeline change, now that "narrow is fine" is the explicit
+bar. Not measured whether it would actually reproduce the exact optimal for `run_dev` specifically -
+next step if this thread is picked back up.
+
+**Where this leaves the idea**: written down, partially explored, one specific instantiation
+(asymmetric residual) measured and found not to apply to any *currently known* slow fixture (though
+still architecturally sound and worth keeping in the portfolio design for the wider "millions of
+files" case), and one alternative instantiation (hash-based Myers-diff of unmatched children, any
+size) identified as a better-fitting next candidate for `rust-tauri-cli-ios-dev`'s specific shape.
+Not implemented - no code changed as a result of this exploration (both the `resolve_forest`
+instrumentation and its driving test were thrown away after use, confirmed via `git status`).
