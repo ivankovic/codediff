@@ -21,8 +21,17 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // 2026-08-05: dropped 1141 -> 856 by teaching `nodes::is_reference` that XML's `element` is a
+    // reference node (see that function's own doc comment) - this ~1200-entry Android
+    // `strings.xml` file was tripping `EXPENSIVE_RESIDUAL_THRESHOLD` (94% of the file unmatched
+    // despite being 99.9% byte-identical to `after`) purely because every `<string name="...">
+    // ...</string>` entry is far smaller than `min_subtree_size` (45), so exact-hash matching
+    // never got the chance to find them. The remaining 856 are all `CharData` whitespace
+    // separators between entries (every inter-element `"\n    "` text node is byte-identical to
+    // every other one) - positional-ambiguity noise once the real content matches, same class of
+    // gap as `json-radarr-radarr-rename-string-key`'s repeated `,` tokens, not a new problem.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-nextcloud-android-delete-element",
-        1141,
+        856,
     )
 }

@@ -270,8 +270,21 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
         Language::LUA => node_kind == "chunk" || node_kind == "function_declaration",
         Language::Vimscript => node_kind == "script_file" || node_kind == "function_definition",
         // Data formats and configuration - root nodes only
-        Language::JSON | Language::YAML | Language::XML => {
-            node_kind == "document" || node_kind == "fragment"
+        Language::JSON | Language::YAML => node_kind == "document" || node_kind == "fragment",
+        // XML's `element` (any tag, e.g. `<string name="...">...</string>`) gets the same
+        // reference-node exception JSON/YAML's own entries above and everything else in this
+        // function relies on: `NodeSelectionConfig::min_subtree_size` (45) otherwise excludes it
+        // from exact-hash matching entirely, since a single leaf-ish element is far smaller than
+        // that - confirmed 2026-08-05 (`TODO.md`) on `xml-nextcloud-android-delete-element`, a
+        // ~1200-entry Android `strings.xml` file where every entry parses to ~16 nodes. Without
+        // this, phases 1-5 left 94% of the file (20124/21396 nodes) unmatched despite being
+        // 99.9% byte-identical text, tripping `EXPENSIVE_RESIDUAL_THRESHOLD` and substituting the
+        // crude Myers fallback for the whole file. Safe the same way every other reference-node
+        // exception here is: this only ever *enables candidacy* for exact-hash matching, which
+        // still requires byte-identical subtrees to actually match anything - it can widen what's
+        // eligible to be found, never produce a wrong match.
+        Language::XML => {
+            node_kind == "document" || node_kind == "fragment" || node_kind == "element"
         }
         // Other languages - root node only as fallback
         _ => false,

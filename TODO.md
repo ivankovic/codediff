@@ -3342,3 +3342,61 @@ pre-existing, unrelated baseline) with this scoping.
 **Not yet revisited**: whether `lua-neovim-neovim-add-if-around-one-line`/`python-pytorch-...`/
 `shellscript-ansible-...`'s pre-existing failures are worth root-causing - out of scope for this
 entry (confirmed unrelated, not introduced or touched by any of this session's work).
+
+## `xml-nextcloud-android-delete-element{,-2}`: XML's `element` was never a reference node, so a 94%-unmatched residual tripped the expensive-fallback guard on a 99.9%-identical file (2026-08-05, user-requested: "focus on quality... top 20 mismatches")
+
+Asked to look for patterns across the top-20-by-mismatch-count fixtures. The top two by a wide
+margin - `xml-nextcloud-android-delete-element` (1141) and `-2` (1125), a combined 67% of the whole
+corpus's ~3382 mismatches - were both attributed (in an earlier entry adding these fixtures) to
+`DiffMode::Fast`'s deliberate `EXPENSIVE_RESIDUAL_THRESHOLD` speed/quality tradeoff, not a bug.
+User's framing: XML doesn't have semantic structure the way other languages do (functions, classes)
+- what XML-specific diffing algorithms exist? Checked whether that framing actually holds before
+answering the literature question.
+
+**The textual diff is one line** (`<string name="drawer_item_groupfolders">Hópamöppur</string>`
+deleted from a ~1200-entry Android `strings.xml`) - the file is 99.9% byte-identical. Measured
+directly (throwaway instrumentation on `PendingDiff`, deleted after use): heading into phase 6,
+**20124 of 21396 before-side nodes (94%) were still unmatched** despite that. Root cause: every
+`<string name="...">...</string>` entry parses to `element` (~16 nodes: `element`/`STag`/`<`/`Name`/
+`Attribute`/`Name`/`=`/`AttValue`/`"`×2/`>`/`content`/`CharData`/`ETag`/`</`/`Name`/`>`) - far under
+`NodeSelectionConfig::min_subtree_size` (45), so exact-hash matching (phase 1) never got the
+candidacy to even *try* matching them, unless a node also qualifies as a reference node (which
+bypasses the size floor entirely). `nodes::is_reference`'s `XML` arm only recognized the document
+root - exactly the same class of gap already found and fixed for C#/Ruby/PHP/YAML (see those
+entries above), just never checked for XML. The user's framing wasn't quite right empirically: XML
+elements with an identity attribute (`name`, here) are structurally the same shape as YAML's
+`key: value` pairs (already special-cased) - the codebase just never learned to recognize it.
+
+**Fix**: added `element` to `is_reference`'s `XML` arm (`nodes.rs`). Safe by construction, the same
+way every other reference-node exception here is: it only *enables candidacy* for exact-hash
+matching, which still requires byte-identical subtrees to match anything - widens what can be
+found, can never produce a wrong match.
+
+**Result**: residual 20124 -> 1182 (94% reduction), no longer trips `EXPENSIVE_RESIDUAL_THRESHOLD`
+at all. Mismatches: `xml-nextcloud-android-delete-element` 1141 -> 856, `-2` 1125 -> 910 - both
+clamps updated with the new counts. Corpus-wide: **TOTAL_MISMATCHES 3382 -> 2882 (-500, -14.8%)**,
+fully isolated - diffed the complete per-fixture output before/after and confirmed *zero* other
+fixtures changed at all (not even `xml-odoo-odoo-change-value`'s own mismatch count, still 0).
+
+**What's left in the remaining 856/910 isn't a new problem**: every one is a `CharData` whitespace
+separator (`"\n    "`) between entries - byte-identical to every other inter-element whitespace
+node in the file, so any pairing among them is equally valid. Same class of positional-ambiguity
+gap as `json-radarr-radarr-rename-string-key`'s repeated `,` tokens (pattern 3 from the top-20
+survey) - not something a reference-node or name-extraction fix can close further.
+
+**Verified**: full suite green (only the two clamps above changed); `check-quality` numbers above
+from a fresh `benchmark_optimal_solutions` run. Quality baseline not yet updated to 2882 - pending
+whichever commit lands this, per the established "update deliberately" convention.
+
+**On XML-specific diffing algorithms** (the literature question this investigation started from):
+turns out mostly moot for *this* gap - the fix needed was teaching this codebase's existing
+reference-node/exact-hash machinery about XML's own structure, not a different algorithm. The
+published XML-diff literature (XyDiff/X-Diff/DiffXML/MH-Diff-style approaches) mostly exists to
+solve two problems this project's tree-sitter+APTED approach already handles differently: (a)
+matching elements by an identity key across a mostly-unordered attribute/child model (XPath- or
+key-based node signatures) - covered here by exact-hash matching plus, if this ever gets revisited,
+an `is_semantically_structural` arm keying off `name`/`id`-like attributes the way YAML's `key`
+field already does; (b) cost-modeling XML's specific edit operations (attribute updates vs. element
+moves) - already subsumed by the existing unit-cost tree edit distance model. Worth revisiting only
+if a *future* XML fixture's gap turns out to need genuine unordered-attribute-set semantics APTED's
+ordered-tree model can't express - not indicated by anything found this round.
