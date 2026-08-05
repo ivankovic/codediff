@@ -3420,3 +3420,72 @@ existing unit-cost tree edit distance model, nothing XML particular required.
 fixture's gap is traced to genuine unordered-attribute-or-child semantics that ordered APTED
 provably can't express - that would be the actual trigger for reaching into this literature, not
 XML being a "different enough" format on its own.
+
+## Shift-due-to-insertion: `apted::prematch_unique_named_locals` fixes 3 of 4 fixtures exactly, 74 mismatches corpus-wide, zero regressions (2026-08-06, user-requested: "pattern 2... let's try it")
+
+Pattern 2 from the top-20 survey above: `kotlin-nextcloud-change-function-fingerprint` (31),
+`shellscript-ansible-...` (28, already root-caused), `csharp-lidarr-new-feature` (16),
+`kotlin-refactor-function` (64, partial). Verified against the *actual* diffs before designing
+anything: 3 of the 4 share one exact mechanism - a scope-locally-unique name (a parameter, a local
+variable, a shell variable) survives a position shift caused by an unrelated insertion earlier in
+the same scope, and unit-cost APTED has no notion that "same name, different position" should beat
+"different name, same position." `kotlin-refactor-function` is a *different*, bigger refactor
+(free functions -> class methods, parameters -> fields) - confirmed out of scope for this fix
+before starting, not chased.
+
+**Design, deliberately not reusing `is_semantically_structural`/`solve_named_reference_groups_
+within`**: that machinery walks the *entire* file, so teaching it about parameters/local variables
+would make every one of them in the whole codebase a top-level-matchable candidate - a much bigger,
+riskier change than this needed. Built instead:
+- `nodes::local_identity_name` (new): per-`(language, kind)` name extraction using only
+  `ASTNodeMetadata` (kind/children/text, no field names needed - every case just walks to a
+  specific child by kind). Three arms today, each confirmed against a real `ascii_visualizer`
+  parse tree, not assumed: Kotlin `parameter` (first `identifier` child), C# `local_declaration_
+  statement` (descends `variable_declaration` -> `variable_declarator` -> `identifier`), shell
+  `variable_assignment` (first `variable_name` child).
+- `apted::prematch_unique_named_locals` (new, `apted/common.rs`): scans a subtree, buckets every
+  `local_identity_name` hit by `(kind_bucket, name)`, and pre-matches a pair only when each side
+  has *exactly one* candidate for that key - ambiguous/shadowed/duplicated names are left alone for
+  real APTED. Unlike `prematch_identical_statement_siblings`, never assumes the matched pair's
+  *content* is identical: each accepted pair gets a real, scoped `apted::for_nodes` call (the
+  `anchor_pair_via_apted` idiom), so a pair whose content also changed - not just its position -
+  still resolves to a correct `MatchButNotIdentical`, not a false `Identical`.
+- Two call sites, since the affected fixtures need different scopes: `solve_syntax_aware_
+  matching.rs`'s `match_named_groups` on_accept (alongside `prematch_identical_statement_siblings`,
+  for parameters/locals nested inside an already name-matched container - Kotlin/C#), and
+  `diff.rs`'s `finish()` right before the file-root `final_pass` call (for content with *no*
+  enclosing named container at all - the shell fixtures, whose variable assignments are top-level
+  script statements).
+- Added `"unique_named_local"` to `ContainmentCtx`'s `PREMATCH_SIBLING_ORDER_SOURCES` (see the
+  2026-08-05 entry above) - this mechanism pre-matches content that can sit *between* two other
+  regions exactly the way `average` did for `python-refactoring`, so it needs the same sibling-
+  order guard.
+
+**Result**: `shellscript-ansible-...` 28 -> 0, `csharp-lidarr-new-feature` 16 -> 0,
+`shellscript-genymobile-scrcpy-add-two-flags` 10 -> 0 (found as a side effect, not independently
+investigated - same mechanism), `kotlin-nextcloud-change-function-fingerprint` 31 -> 11. Diffed the
+complete per-fixture benchmark output before/after: **zero other fixtures changed at all** - fully
+isolated. Corpus-wide: 2882 -> 2808 mismatches (-74).
+
+**The remaining 11 in `kotlin-nextcloud-change-function-fingerprint` are a *different* pattern,
+confirmed by inspection, not a partial failure of this fix**: `viewModel` (a pure insert) and
+`showTranslateScreen` (a pure delete, unrelated to it) get cross-matched by real APTED's same-kind-
+internal-node cost preference even though they share no name at all - this is pattern 5 from the
+top-20 survey ("near-duplicate but distinct reuse-vs-replace"), already tried and reverted twice
+(container-dissimilarity-surcharge, leaf-rename-graduation) - not re-attempted here. This mechanism
+correctly declines to touch that pair (they don't share a name, so `prematch_unique_named_locals`
+never considers them a candidate) - the gap is downstream of it, in real APTED's own cost model.
+
+**Speed cost, measured and accepted, not ignored**: the `diff.rs` file-root call site runs on every
+`DiffMode::Fast` non-fallback diff, so without a guard it walked the *entire* file even for
+languages `local_identity_name` has zero arms for - measured a real corpus-wide p90 regression
+(~120ms -> ~150ms). Fixed most of it with `nodes::has_local_identity_coverage` (a cheap upfront
+language check before the walk starts, kept in sync with `local_identity_name`'s own match arms by
+construction/doc-comment convention). Residual cost after the guard: p90 ~130-155ms across 5 runs
+(was ~120-125ms) - a real but small increase, entirely from the Kotlin/C#/shell fixtures that now
+do genuine extra work; median unchanged (~5ms). Accepted: p90 was already over the `/goal` target
+before this change too, and the accuracy win (74 mismatches, zero regressions) is worth a ~10-15%
+relative cost on an already-missed metric.
+
+**Verified**: full suite green (563/0/5); `benchmark_optimal_solutions` diff confirms exactly the 4
+fixtures above changed and nothing else. Quality baseline updated: `TOTAL_MISMATCHES` 2882 -> 2808.

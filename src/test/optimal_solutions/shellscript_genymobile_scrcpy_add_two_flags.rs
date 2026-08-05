@@ -21,8 +21,10 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // 2026-08-06: fixed exactly (10 -> 0), a side effect of `apted::prematch_unique_named_locals`
+    // (added for `shellscript-ansible-...`'s shift-due-to-insertion gap - see that fixture's own
+    // comment and `TODO.md`) - not independently investigated, but the same mechanism.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "shellscript-genymobile-scrcpy-add-two-flags",
-        10,
     )
 }

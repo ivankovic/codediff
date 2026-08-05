@@ -21,8 +21,18 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // 2026-08-06: dropped 31 -> 11 via `apted::prematch_unique_named_locals` - `TaskView`'s
+    // `capability`/`showTaskActions` parameters keep their names but shift position when a new
+    // `viewModel` parameter is inserted before them; now pre-matched by parameter name (see
+    // `TODO.md`'s "shift-due-to-insertion" entry). The remaining 11 are a different, already-
+    // investigated-and-declined-to-fix pattern: `viewModel` (a pure insert) and
+    // `showTranslateScreen` (a pure delete, unrelated to it) get cross-matched by real APTED's
+    // same-kind-internal-node cost preference, even though they share no name - the "near-
+    // duplicate but distinct reuse-vs-replace" gap (see `kotlin-remove-function`/`rust-algorithm-
+    // change`), tried and reverted twice already (`TODO.md`, container-dissimilarity-surcharge
+    // and leaf-rename-graduation) - not re-attempted here.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-change-function-fingerprint",
-        31,
+        11,
     )
 }

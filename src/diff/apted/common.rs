@@ -1400,6 +1400,127 @@ pub(crate) fn prematch_identical_statement_siblings(
     }
 }
 
+/// Recursive collector behind [`prematch_unique_named_locals`]: every descendant of `node_id`
+/// (inclusive) for which `nodes::local_identity_name` returns an identity, bucketed by
+/// `(kind_bucket, name)`. Stops descending into anything already in `node_map` - matching
+/// `PostorderIndexer::build`'s own pruning, since a resolved subtree has nothing further to offer
+/// here and would otherwise double-count. Deliberately does *not* stop at nested function/closure
+/// boundaries: searching the whole subtree only makes the caller's uniqueness check *stricter*
+/// (two same-named locals in different nested scopes count as 2, correctly disqualifying the
+/// name, rather than being silently invisible to each other).
+fn collect_local_identities(
+    node_id: usize,
+    meta: &ASTMetadata,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+    language: &Language,
+    groups: &mut rustc_hash::FxHashMap<(&'static str, String), Vec<usize>>,
+) {
+    if node_map.contains_key(&node_id) {
+        return;
+    }
+    let Some(info) = meta.node_info.get(&node_id) else {
+        return;
+    };
+    if let Some(key) = nodes::local_identity_name(node_id, meta, language) {
+        groups.entry(key).or_default().push(node_id);
+    }
+    for &child_id in &info.children {
+        collect_local_identities(child_id, meta, node_map, language, groups);
+    }
+}
+
+/// Pre-matches scope-locally-named entities (parameters, local variable declarations, shell
+/// variable assignments - see `nodes::local_identity_name`) within `before_id`/`after_id`'s
+/// subtree whose name is unique on both sides, before that pair's own real APTED call.
+///
+/// **The gap this closes**: when new content is inserted mid-sequence (a new parameter, a new
+/// local variable), everything after it shifts position. Unit-cost APTED has no notion that "same
+/// name, different position" should beat "different name, same position" - it just prices
+/// whichever pairing is cheaper under the raw cost model, which the shifted-identity pairing
+/// often wins by accident (see `shellscript-ansible-ansible-add-variable-and-string-expansion`'s
+/// test comment for a fully-worked cost example: matching by coincidental array-index position
+/// beat matching by variable name by exactly 1 unit). Confirmed 2026-08-06 (`TODO.md`) on three
+/// fixtures across three languages (Kotlin parameters, C# local variables, shell variable
+/// assignments) - the same mechanism, recurring.
+///
+/// **Safety**: only pre-matches a pair when each side has *exactly one* candidate with that
+/// `(kind_bucket, name)` key - an ambiguous (shadowed, overloaded, or duplicated) name is left
+/// alone for real APTED to resolve however it can, never guessed at. Unlike
+/// `prematch_identical_statement_siblings`, this never assumes the matched pair's *content* is
+/// identical - each accepted pair gets a real, scoped `apted::for_nodes` call (the same idiom
+/// `anchor_pair_via_apted` uses), so a pair whose content also changed (not just its position)
+/// still gets a correct `MatchButNotIdentical` resolution instead of a false `Identical`.
+pub(crate) fn prematch_unique_named_locals(
+    before_id: usize,
+    after_id: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let language = before_meta.language;
+    if !nodes::has_local_identity_coverage(&language) {
+        return;
+    }
+
+    let mut before_groups: rustc_hash::FxHashMap<(&'static str, String), Vec<usize>> =
+        rustc_hash::FxHashMap::default();
+    collect_local_identities(
+        before_id,
+        before_meta,
+        &diff.before_node_map,
+        &language,
+        &mut before_groups,
+    );
+    if before_groups.is_empty() {
+        return;
+    }
+    let mut after_groups: rustc_hash::FxHashMap<(&'static str, String), Vec<usize>> =
+        rustc_hash::FxHashMap::default();
+    collect_local_identities(
+        after_id,
+        after_meta,
+        &diff.after_node_map,
+        &language,
+        &mut after_groups,
+    );
+    if after_groups.is_empty() {
+        return;
+    }
+
+    let mut pairs: Vec<(usize, usize)> = before_groups
+        .iter()
+        .filter(|(_, ids)| ids.len() == 1)
+        .filter_map(|(key, before_ids)| {
+            let after_ids = after_groups.get(key)?;
+            (after_ids.len() == 1).then(|| (before_ids[0], after_ids[0]))
+        })
+        .collect();
+    // Deterministic order (`HashMap` iteration order isn't) - and processing outer-to-inner by
+    // document position, though any accepted pair here is already disjoint from every other by
+    // construction (each node id appears in at most one bucket), so this is about reproducibility
+    // across runs, not about later pairs depending on earlier ones the way some other passes do.
+    pairs.sort_unstable_by_key(|&(b, _)| {
+        before_meta
+            .node_info
+            .get(&b)
+            .map(|i| i.preorder_index)
+            .unwrap_or(usize::MAX)
+    });
+
+    for (before_child, after_child) in pairs {
+        for_nodes(
+            before_meta,
+            after_meta,
+            vec![before_child],
+            vec![after_child],
+            Algorithm::Apted,
+            source,
+            diff,
+        );
+    }
+}
+
 // --- DiffMode::Fast's whole-residual fallback: Myers O(ND) sequence diff, generalized from
 // `resolve_flat_tree_pair`'s one-parent's-direct-children scope to the entire still-unmatched
 // forest under a root pair. ---
@@ -2571,7 +2692,11 @@ pub(crate) struct ContainmentCtx<'a> {
 
 /// `source` tags whose `resolve_forest` call should get `ContainmentCtx`'s sibling-order check -
 /// see that struct's doc comment for why this isn't every `source`.
-const PREMATCH_SIBLING_ORDER_SOURCES: &[&str] = &["syntax_named", "large_flat_subtree_container"];
+const PREMATCH_SIBLING_ORDER_SOURCES: &[&str] = &[
+    "syntax_named",
+    "large_flat_subtree_container",
+    "unique_named_local",
+];
 
 impl<'a> ContainmentCtx<'a> {
     fn build(

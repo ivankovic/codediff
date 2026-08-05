@@ -396,6 +396,24 @@ impl<'code> PendingDiff<'code> {
         if use_fallback {
             apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
         } else {
+            // Pre-match top-level scope-locally-named entities (e.g. shell variable assignments
+            // with no enclosing named container at all, so `solve_syntax_aware_matching`'s own
+            // call to this never fires for them) whose name is unique and survives a position
+            // shift caused by an unrelated insertion elsewhere in the file - see
+            // `apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion").
+            if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref())
+            {
+                let before_metadata = crate::code::metadata::metadata_of(before);
+                let after_metadata = crate::code::metadata::metadata_of(after);
+                apted::prematch_unique_named_locals(
+                    before_ast.root_node().id(),
+                    after_ast.root_node().id(),
+                    &before_metadata,
+                    &after_metadata,
+                    "unique_named_local",
+                    &mut ast_diff,
+                );
+            }
             apted::for_roots(
                 before,
                 after,

@@ -291,6 +291,80 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
     }
 }
 
+/// A *scope-local* identity name for nodes like parameters, local variable declarations, and
+/// shell variable assignments - the same kind of stable identity signal `is_semantically_
+/// structural` provides for top-level declarations, but deliberately **not** layered onto that
+/// function or the global name-resolution pipeline it feeds (`solve_named_reference_groups`):
+/// that walks the *entire* file, so adding parameters/local variables there would make every one
+/// of them in the whole codebase a top-level-matchable candidate - a much bigger, riskier change
+/// than the narrow, per-container mechanism this is for (`apted::prematch_unique_named_locals`)
+/// needs. Returns `(kind_bucket, name)` if `node_id` is a kind of node this should consider;
+/// `kind_bucket` disambiguates same-named entities of different kinds (a parameter named `x`
+/// must never match a local variable also named `x`).
+///
+/// Uses only `ASTNodeMetadata` (kind/children/text), not a real `tree_sitter::Node` - consistent
+/// with everything else in `apted/common.rs` this feeds, and sufficient here since every case
+/// below only needs to walk to a specific child by *kind*, not by field name.
+///
+/// Confirmed against real parse trees for each arm below (a throwaway `ascii_visualizer` dump per
+/// language, 2026-08-06) - not assumed from other languages' grammars.
+///
+/// Cheap upfront filter for `apted::prematch_unique_named_locals`'s file-root-level call site
+/// (`diff.rs`, phase 6): that call runs unconditionally on every diff regardless of language, so
+/// without this, every fixture pays a full O(n) tree walk (`collect_local_identities`) that can
+/// never find anything for the many languages `local_identity_name` has no arm for - measured
+/// (`TODO.md`) to cost a real, corpus-wide p90 regression (~120ms -> ~150ms) before this guard was
+/// added. Keep in sync with `local_identity_name`'s own `match` arms by construction: both list
+/// exactly the same languages, on purpose, so a future language added to one is easy to notice is
+/// missing from the other.
+pub(crate) fn has_local_identity_coverage(language: &Language) -> bool {
+    matches!(
+        language,
+        Language::Kotlin | Language::CSharp | Language::ShellScript
+    )
+}
+
+pub(crate) fn local_identity_name(
+    node_id: usize,
+    meta: &ASTMetadata,
+    language: &Language,
+) -> Option<(&'static str, String)> {
+    let info = meta.node_info.get(&node_id)?;
+    let first_child_of_kind = |parent_id: usize, wanted: &str| -> Option<usize> {
+        meta.node_info
+            .get(&parent_id)?
+            .children
+            .iter()
+            .copied()
+            .find(|&c| meta.node_info.get(&c).is_some_and(|i| i.kind == wanted))
+    };
+    match (language, info.kind.as_str()) {
+        // `parameter` - "task: Task" - first child is the `identifier` naming it.
+        (Language::Kotlin, "parameter") => {
+            let name_id = first_child_of_kind(node_id, "identifier")?;
+            let text = meta.node_info.get(&name_id)?.text.clone();
+            Some(("parameter", text))
+        }
+        // `local_declaration_statement` - "var resources = ...;" - descends through
+        // `variable_declaration` -> `variable_declarator` -> the declared `identifier`. Keyed on
+        // the *statement*, not the declarator, so the whole `var x = ...` re-anchors as one unit.
+        (Language::CSharp, "local_declaration_statement") => {
+            let decl_id = first_child_of_kind(node_id, "variable_declaration")?;
+            let declarator_id = first_child_of_kind(decl_id, "variable_declarator")?;
+            let name_id = first_child_of_kind(declarator_id, "identifier")?;
+            let text = meta.node_info.get(&name_id)?.text.clone();
+            Some(("local_declaration_statement", text))
+        }
+        // `variable_assignment` - `group="${args[4]}"` - first child is the `variable_name`.
+        (Language::ShellScript, "variable_assignment") => {
+            let name_id = first_child_of_kind(node_id, "variable_name")?;
+            let text = meta.node_info.get(&name_id)?.text.clone();
+            Some(("variable_assignment", text))
+        }
+        _ => None,
+    }
+}
+
 /*
 * Semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
 * typically enforced by the compiler in some way. For example, there can only ever be ONE

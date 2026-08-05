@@ -235,6 +235,17 @@ fn match_named_groups(
                 "syntax_named",
                 diff,
             );
+            // Pre-match parameters/local variables whose name is unique within this candidate
+            // and survives a position shift caused by an unrelated insertion elsewhere in the
+            // same scope - see that function's own doc comment ("shift-due-to-insertion").
+            apted::prematch_unique_named_locals(
+                before_id,
+                after_id,
+                before_metadata,
+                after_metadata,
+                "unique_named_local",
+                diff,
+            );
             apted::for_nodes(
                 before_metadata,
                 after_metadata,
