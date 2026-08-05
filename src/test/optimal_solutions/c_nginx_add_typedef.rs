@@ -53,8 +53,13 @@ fn optimal_solution() -> Result<()> {
     //  update pwd to cb_data, and then pay the insert cost to insert field_identifier "pwd".
     //  However, for humans, it is much better to match "pwd" to "pwd", even if the kinds differ. So
     //  the optimal solution has to allow for identifier and field_identifier node kinds to match.
+    // 2026-08-05: dropped 62 -> 50 as a side effect of `prematch_identical_statement_siblings`
+    // (`apted::common`) pre-matching more of this function's unchanged statements before its own
+    // real APTED call, plus `ContainmentCtx`'s sibling-order-consistency check (added the same day
+    // to fix a real regression that same pre-matching pass caused elsewhere, see
+    // `python_refactoring.rs`) - see `TODO.md`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-nginx-add-typedef",
-        62,
+        50,
     )
 }

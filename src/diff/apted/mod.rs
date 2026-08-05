@@ -27,6 +27,7 @@ mod common;
 mod engine;
 mod zhang_shasha;
 
+pub(crate) use common::prematch_identical_statement_siblings;
 pub use common::{Algorithm, for_nodes, for_roots};
 
 use crate::code::Code;

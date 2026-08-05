@@ -1257,6 +1257,149 @@ fn resolve_flat_tree_pair(
     );
 }
 
+/// Minimum direct-child count worth pre-matching via [`prematch_identical_statement_siblings`] -
+/// much lower than `FLAT_MIN_CHILDREN` (50). Safe to set low: unlike [`resolve_flat_tree_pair`],
+/// that function never commits a non-match to delete/insert (see its own doc comment), so there is
+/// no accuracy downside to trying it on a small sequence - only wasted lookup overhead on a
+/// candidate with almost no children, which this excludes.
+const STATEMENT_PREMATCH_MIN_CHILDREN: usize = 4;
+
+/// Finds the largest `nodes::is_statement_sequence_body` descendant (inclusive of `root_id`
+/// itself) via a plain walk - deliberately *not* `ASTMetadata::node_to_widest_subtree_node` (see
+/// `is_statement_sequence_body`'s own doc comment for why that kind-agnostic precomputation can
+/// pick the wrong, wider-but-irrelevant node). Bounded by `root_id`'s own subtree size (one
+/// function/method, not the whole file), so a plain walk is cheap enough here - unlike
+/// `solve_large_flat_subtrees`'s `largest_flat_container_in`, which needed the O(1) precomputation
+/// specifically because it searches from the whole file's *many* top-level items.
+fn widest_statement_sequence_body(root_id: usize, meta: &ASTMetadata) -> Option<(usize, usize)> {
+    // Breadth-first, and returns the *first* (shallowest) match, not the widest one found overall
+    // - a real regression this shape once had (`TODO.md`, 2026-08-05): a Python `for` loop's own
+    // body is *also* a `block` (the same kind Python uses for a function's own top-level body), so
+    // searching for "the widest `block` anywhere inside" could pick the outer function body on one
+    // side of a diff but an inner loop's body on the other (whichever happened to have more direct
+    // children that specific side), pairing two unrelated statement sequences. A candidate's own
+    // top-level body is always the *shallowest* match - nothing legitimately "more it" can be
+    // nested inside a shallower body of the same kind - so stopping at the first BFS level that
+    // has any match at all, rather than continuing to search deeper for something wider, both
+    // fixes that ambiguity and is cheaper (no need to walk past the level that already answered).
+    let mut level = vec![root_id];
+    while !level.is_empty() {
+        let mut best: Option<(usize, usize)> = None;
+        let mut next_level = Vec::new();
+        for id in level {
+            let Some(info) = meta.node_info.get(&id) else {
+                continue;
+            };
+            if nodes::is_statement_sequence_body(&info.kind) {
+                let count = info.children.len();
+                if best.is_none_or(|(best_count, _)| count > best_count) {
+                    best = Some((count, id));
+                }
+            } else {
+                next_level.extend(info.children.iter().copied());
+            }
+        }
+        if best.is_some() {
+            return best;
+        }
+        level = next_level;
+    }
+    None
+}
+
+/// Pre-matches the byte-identical *direct children* of `before_id`/`after_id`'s own statement-
+/// sequence body (`widest_statement_sequence_body` above) - intended to run right before a
+/// named-group candidate's own container-wide `apted::for_nodes` call, so that call's
+/// `PostorderIndexer` (which prunes any node already in `diff.before_node_map`/`after_node_map` -
+/// see `PostorderIndexer::build`) has far less left to index once the mostly-unchanged statements
+/// around one real edit are already resolved.
+///
+/// **Deliberately not `resolve_flat_tree_pair`, and not gated the same way**: that function is
+/// safe at any size *because* it commits every remaining child to delete/insert once Myers can't
+/// pair it - a sound tradeoff when there are enough siblings that a wrong call on one or two of
+/// them barely moves the total, which is exactly what `FLAT_MIN_CHILDREN` = 50 is calibrated for.
+/// For a function body with 10-40 statements, that tradeoff inverts: the 1-2 statements that
+/// genuinely differ are worth a real, correctness-preserving tree-edit-distance resolution, not a
+/// hard-committed guess. This function only ever emits the identical *matches* Myers finds
+/// (`emit_identical_subtree`, exact scoped hash matches - the same safety property
+/// `resolve_flat_tree_pair`'s matched half already has) and leaves everything else in `diff`
+/// completely untouched, so the real APTED call that follows still gets to resolve those
+/// genuinely-different statements properly - this can only ever shrink that call's own residual,
+/// never take a decision away from it.
+///
+/// Measured live (2026-08-05, `TODO.md`): every dominant slow `apted::for_nodes` call examined in
+/// this corpus (`rust-tauri-cli-ios-dev`, `ruby-homebrew-add-or-expression`, `cpp-ladybird-
+/// refactor-variables-if-changes`, `c-linux-small-change-struct-to-char`) resolves to exactly this
+/// shape: one large body blob, well under 50 direct children, 83-97% of them byte-identical to a
+/// sibling on the other side.
+pub(crate) fn prematch_identical_statement_siblings(
+    before_id: usize,
+    after_id: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let Some((before_count, before_flat)) = widest_statement_sequence_body(before_id, before_meta)
+    else {
+        return;
+    };
+    let Some((after_count, after_flat)) = widest_statement_sequence_body(after_id, after_meta)
+    else {
+        return;
+    };
+    if before_count < STATEMENT_PREMATCH_MIN_CHILDREN
+        || after_count < STATEMENT_PREMATCH_MIN_CHILDREN
+    {
+        return;
+    }
+
+    let Some(before_info) = before_meta.node_info.get(&before_flat) else {
+        return;
+    };
+    let Some(after_info) = after_meta.node_info.get(&after_flat) else {
+        return;
+    };
+    let before_children: Vec<usize> = before_info
+        .children
+        .iter()
+        .copied()
+        .filter(|id| !diff.before_node_map.contains_key(id))
+        .collect();
+    let after_children: Vec<usize> = after_info
+        .children
+        .iter()
+        .copied()
+        .filter(|id| !diff.after_node_map.contains_key(id))
+        .collect();
+    if before_children.is_empty() || after_children.is_empty() {
+        return;
+    }
+
+    let before_hashes: Vec<u64> = before_children
+        .iter()
+        .map(|&id| before_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+    let after_hashes: Vec<u64> = after_children
+        .iter()
+        .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+        .collect();
+
+    let Some(pairs) = myers_lcs(&before_hashes, &after_hashes, FLAT_MAX_EDIT) else {
+        return;
+    };
+    for (bi, ai) in pairs {
+        emit_identical_subtree(
+            before_children[bi],
+            after_children[ai],
+            before_meta,
+            after_meta,
+            source,
+            diff,
+        );
+    }
+}
+
 // --- DiffMode::Fast's whole-residual fallback: Myers O(ND) sequence diff, generalized from
 // `resolve_flat_tree_pair`'s one-parent's-direct-children scope to the entire still-unmatched
 // forest under a root pair. ---
@@ -2274,6 +2417,103 @@ fn compute_pruned_targets(
     memo
 }
 
+/// The `(before_id, after_id)` pairs where a walk down from `root_ids` first hits `node_map` on
+/// either side - i.e. exactly the points where `PostorderIndexer::build`'s own `visit()` stops
+/// and excludes a subtree. Never recurses past such a node: everything below it is pruned too,
+/// the same invariant `compute_pruned_targets` relies on. Walks from *both* sides and unions the
+/// results by `before_id` (a pruned chunk should be reachable from both root lists, but walking
+/// only one side risks silently missing it if reachability ever differs) so `ContainmentCtx` sees
+/// every gap pruning left in this forest.
+fn collect_pruned_chunk_pairs(
+    before_root_ids: &[usize],
+    after_root_ids: &[usize],
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    diff: &ASTDiff,
+) -> Vec<(usize, usize)> {
+    fn visit(
+        node_id: usize,
+        meta: &ASTMetadata,
+        node_map: &rustc_hash::FxHashMap<usize, usize>,
+        out: &mut Vec<usize>,
+    ) {
+        if node_map.contains_key(&node_id) {
+            out.push(node_id);
+            return;
+        }
+        if let Some(info) = meta.node_info.get(&node_id) {
+            for &child_id in &info.children {
+                visit(child_id, meta, node_map, out);
+            }
+        }
+    }
+    let mut pairs: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
+    let mut before_roots = Vec::new();
+    for &root_id in before_root_ids {
+        visit(root_id, before_meta, &diff.before_node_map, &mut before_roots);
+    }
+    for id in before_roots {
+        if let Some(&after_id) = diff.before_node_map.get(&id) {
+            pairs.insert(id, after_id);
+        }
+    }
+    let mut after_roots = Vec::new();
+    for &root_id in after_root_ids {
+        visit(root_id, after_meta, &diff.after_node_map, &mut after_roots);
+    }
+    for id in after_roots {
+        if let Some(&before_id) = diff.after_node_map.get(&id) {
+            pairs.entry(before_id).or_insert(id);
+        }
+    }
+    pairs.into_iter().collect()
+}
+
+/// Longest subsequence of `pairs` (which must already be sorted by `.0`) whose `.1` values are
+/// also strictly increasing, found via patience sorting (`O(n log n)`) and reconstructed via
+/// parent pointers.
+///
+/// Why this is needed: not every pruned pair is a safe sibling-order fixed point.
+/// `solve_moved_subtrees`/`solve_greedy_anchor_blocks` and similar passes can legitimately match
+/// content that was genuinely *moved*, which leaves pruned pairs whose before/after order
+/// disagrees with some other pruned pair's. Treating a disagreeing pair as a fixed point would
+/// forbid perfectly valid pairings elsewhere for a move that's supposed to be exactly that: out
+/// of order. Keeping only the longest mutually order-consistent run - and silently dropping
+/// everything that conflicts with it - means a real move never trips the sibling-order check,
+/// at the cost of not enforcing that check across the move itself (no worse than before this
+/// check existed). Confirmed necessary, not just theoretical: an early version without this
+/// filter regressed `c-cpython-autogenerated-code` (33 -> 58 mismatches) via exactly this
+/// mechanism - repeated, reordered `case` bodies pruned by `greedy_anchor_block`.
+fn longest_increasing_by_second(pairs: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    if pairs.is_empty() {
+        return Vec::new();
+    }
+    // `tails[k]` = index into `pairs` of the smallest-tailed increasing run of length `k + 1`
+    // found so far; `parent[i]` = index of the element preceding `i` in `i`'s own best run.
+    let mut tails: Vec<usize> = Vec::new();
+    let mut parent: Vec<Option<usize>> = vec![None; pairs.len()];
+    for i in 0..pairs.len() {
+        let val = pairs[i].1;
+        let pos = tails.partition_point(|&t| pairs[t].1 < val);
+        if pos > 0 {
+            parent[i] = Some(tails[pos - 1]);
+        }
+        if pos == tails.len() {
+            tails.push(i);
+        } else {
+            tails[pos] = i;
+        }
+    }
+    let mut result = Vec::with_capacity(tails.len());
+    let mut cur = tails.last().copied();
+    while let Some(i) = cur {
+        result.push(pairs[i]);
+        cur = parent[i];
+    }
+    result.reverse();
+    result
+}
+
 /// Per-`resolve_forest`-call context letting `ren()` refuse pairings that would contradict a
 /// mapping some earlier pass already fixed. `PostorderIndexer` prunes already-matched descendants
 /// out of the forest entirely, so without this, nothing stops the DP from matching a "hollowed
@@ -2285,16 +2525,53 @@ fn compute_pruned_targets(
 /// `if`/`else` wrapper statement was getting matched deep inside the sibling `if` branch its own
 /// child had already been pruned into, for free, since both were internal nodes of the same kind.)
 ///
+/// A second, related check covers pruning's other blind spot: an *unrelated sibling* of a pruned
+/// node. That has no ancestor-descendant relationship to the pruned node at all, so the check
+/// above can never catch it, yet the DP is just as free to match it across the pruned node's
+/// former position as it is a hollowed-out ancestor. Concretely (the `python-refactoring` case
+/// this was added for): once `average = total / count` is pre-matched and excised, nothing stops
+/// `total = 0`'s `total` (positioned *before* `average` in the source) from being matched to some
+/// unrelated `total` occurrence positioned *after* `average`'s counterpart, silently reordering
+/// past a fixed point. Guarded the same way: `before_anchor_preorders`/`after_anchor_preorders`
+/// hold the sorted `preorder_index` of every *trusted* pruned chunk root reachable from this
+/// forest's roots (via `collect_pruned_chunk_pairs`, filtered down by
+/// `longest_increasing_by_second` - see its doc comment for why not every pruned pair is safe to
+/// trust), and a candidate pairing is only allowed if both nodes have the same *rank* - the same
+/// count of trusted anchors preceding them - on their respective side. Comparing raw
+/// `preorder_index` this way is safe for ancestor-descendant pairs too (an ancestor's
+/// `preorder_index` always precedes all of its own descendants', so it can never be mis-ranked as
+/// "after" a pruned node nested inside it) - no separate ancestor exclusion needed.
+///
+/// This second check is deliberately scoped to `source`s known to pre-match content the *same*
+/// way `python-refactoring` needed guarding (currently `prematch_identical_statement_siblings`'s
+/// two callers, `"syntax_named"`/`"large_flat_subtree_container"` - see `PREMATCH_SIBLING_ORDER_
+/// SOURCES`), not enabled for every `resolve_forest` call the way the ancestor check above is.
+/// Measured directly why: turning it on unconditionally regressed `c-cpython-autogenerated-code`
+/// (33 -> 58 mismatches, later 35 with the `longest_increasing_by_second` filter above, still not
+/// clean) via its `"greedy_anchor_block"`/`"final_pass"` calls, which anchor near-identical
+/// *repeated* `case` bodies by content similarity, not by strict positional order - the opposite
+/// of what this check assumes about its anchors. Rather than chase that heuristic's non-order-
+/// preserving behavior through the LIS filter too, this stays opt-in per `source` until a second
+/// caller actually needs it.
+///
 /// Built once per `resolve_forest` call and threaded down into `forest_dist` everywhere it's
 /// invoked (both the keyroot sweep and the backtrace). Parent maps are only built when the
 /// corresponding pruned-targets map is non-empty, so the common case (nothing pruned in this
-/// particular forest) costs nothing beyond two empty-map lookups.
+/// particular forest) costs nothing beyond a few empty-collection checks.
 pub(crate) struct ContainmentCtx<'a> {
     before_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
     after_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
     before_parents: &'a rustc_hash::FxHashMap<usize, usize>,
     after_parents: &'a rustc_hash::FxHashMap<usize, usize>,
+    before_anchor_preorders: Vec<usize>,
+    after_anchor_preorders: Vec<usize>,
+    before_meta: &'a ASTMetadata,
+    after_meta: &'a ASTMetadata,
 }
+
+/// `source` tags whose `resolve_forest` call should get `ContainmentCtx`'s sibling-order check -
+/// see that struct's doc comment for why this isn't every `source`.
+const PREMATCH_SIBLING_ORDER_SOURCES: &[&str] = &["syntax_named", "large_flat_subtree_container"];
 
 impl<'a> ContainmentCtx<'a> {
     fn build(
@@ -2303,11 +2580,42 @@ impl<'a> ContainmentCtx<'a> {
         before_meta: &'a ASTMetadata,
         after_meta: &'a ASTMetadata,
         diff: &ASTDiff,
+        source: &str,
     ) -> Self {
         let before_pruned_targets =
             compute_pruned_targets(before_root_ids, before_meta, &diff.before_node_map);
         let after_pruned_targets =
             compute_pruned_targets(after_root_ids, after_meta, &diff.after_node_map);
+        let (before_anchor_preorders, after_anchor_preorders) =
+            if PREMATCH_SIBLING_ORDER_SOURCES.contains(&source) {
+                let mut anchor_preorders: Vec<(usize, usize)> = collect_pruned_chunk_pairs(
+                    before_root_ids,
+                    after_root_ids,
+                    before_meta,
+                    after_meta,
+                    diff,
+                )
+                .into_iter()
+                .filter_map(|(b, a)| {
+                    let bp = before_meta.node_info.get(&b)?.preorder_index;
+                    let ap = after_meta.node_info.get(&a)?.preorder_index;
+                    Some((bp, ap))
+                })
+                .collect();
+                anchor_preorders.sort_unstable();
+                // Only the longest mutually order-consistent run is trusted as sibling-order
+                // fixed points - see `longest_increasing_by_second`'s doc comment for why. Both
+                // projections come out already sorted: `.0` because it's a subsequence of
+                // `anchor_preorders` (sorted by `.0`), `.1` because that's exactly what the LIS
+                // enforces.
+                let trusted = longest_increasing_by_second(&anchor_preorders);
+                (
+                    trusted.iter().map(|&(b, _)| b).collect(),
+                    trusted.iter().map(|&(_, a)| a).collect(),
+                )
+            } else {
+                (Vec::new(), Vec::new())
+            };
         // Parent maps are precomputed once per file in `ASTMetadata` (see `node_to_parent`), so
         // borrowing them here - even when this particular forest has nothing pruned and won't
         // end up using them - costs nothing beyond the borrow itself.
@@ -2316,13 +2624,18 @@ impl<'a> ContainmentCtx<'a> {
             after_pruned_targets,
             before_parents: &before_meta.node_to_parent,
             after_parents: &after_meta.node_to_parent,
+            before_anchor_preorders,
+            after_anchor_preorders,
+            before_meta,
+            after_meta,
         }
     }
 
     /// Adjusts a `ren()`-computed `base` cost: if matching `before_id` to `after_id` would
-    /// contradict where an already-pruned descendant of either landed, escalate to
-    /// `FORBIDDEN_RENAME_COST` so the DP looks elsewhere. `base` is returned unchanged whenever
-    /// neither side has any pruned descendants to check (the common case).
+    /// contradict where an already-pruned descendant of either landed, or would cross an
+    /// unrelated pruned sibling in a way that reorders it, escalate to `FORBIDDEN_RENAME_COST` so
+    /// the DP looks elsewhere. `base` is returned unchanged whenever there's nothing pruned to
+    /// check against (the common case).
     pub(crate) fn adjust(&self, before_id: usize, after_id: usize, base: u64) -> u64 {
         if base >= FORBIDDEN_RENAME_COST {
             return base;
@@ -2341,6 +2654,25 @@ impl<'a> ContainmentCtx<'a> {
                 .any(|&t| !is_ancestor_or_self(before_id, t, self.before_parents))
             {
                 return FORBIDDEN_RENAME_COST;
+            }
+        }
+        if !self.before_anchor_preorders.is_empty() || !self.after_anchor_preorders.is_empty() {
+            let before_pre = self
+                .before_meta
+                .node_info
+                .get(&before_id)
+                .map(|info| info.preorder_index);
+            let after_pre = self
+                .after_meta
+                .node_info
+                .get(&after_id)
+                .map(|info| info.preorder_index);
+            if let (Some(bp), Some(ap)) = (before_pre, after_pre) {
+                let rank_before = self.before_anchor_preorders.partition_point(|&p| p < bp);
+                let rank_after = self.after_anchor_preorders.partition_point(|&p| p < ap);
+                if rank_before != rank_after {
+                    return FORBIDDEN_RENAME_COST;
+                }
             }
         }
         base
@@ -2431,6 +2763,7 @@ pub(crate) fn resolve_forest(
         before_meta,
         after_meta,
         diff,
+        source,
     );
 
     // `compute_delta` (engine.rs) is now containment-aware: `EngineCtx.containment` is threaded

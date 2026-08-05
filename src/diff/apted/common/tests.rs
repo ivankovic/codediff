@@ -128,6 +128,7 @@ fn assert_distance_matches_oracle_pruned(
         before_meta,
         after_meta,
         &diff,
+        "test_oracle_fuzz",
     );
 
     let mut oracle_delta = compute_delta_zhang_shasha(

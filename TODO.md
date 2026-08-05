@@ -3115,3 +3115,230 @@ how much it would speed up the specific calls measured here. This is the natural
 thread gets picked back up - a much better-targeted lever than either the abandoned branch-and-bound
 attempt or the not-applicable asymmetric-residual solver, since it reuses an existing, already-
 verified-safe mechanism rather than adding a new one.
+
+## Implemented and landed: `prematch_identical_statement_siblings`, real 1.8-6.3x speedup on 6/7 known-slow fixtures, one real (understood, clamped) accuracy cost (2026-08-05)
+
+Picked the lever from the entry above back up and implemented it. `prematch_identical_statement_
+siblings` (`src/diff/apted/common.rs`): before a named candidate's own real `apted::for_nodes` call,
+finds its statement-sequence body (`nodes::is_statement_sequence_body` - a small kind allow-list:
+`compound_statement`/`body_statement`/`function_body`/`class_body`/`block`/`declaration_list`) and
+Myers-diffs *only* its direct children by exact hash, emitting `emit_identical_subtree` for matches
+and leaving everything else completely untouched (never `add_delete_mappings`/`add_insert_mappings`
+- unlike `resolve_flat_tree_pair`, see that function's own doc comment for why that asymmetry is
+deliberate). Wired into `solve_syntax_aware_matching.rs`'s `match_named_groups` `on_accept` and
+`solve_large_flat_subtrees.rs`'s container step.
+
+**Two real bugs found and fixed during implementation, both caught by re-measuring rather than
+assumed correct:**
+
+1. First version used `ASTMetadata::node_to_widest_subtree_node` (kind-agnostic "widest anywhere")
+   to find the body, same precomputation `solve_large_flat_subtrees::largest_flat_container_in`
+   uses. Measured **zero** improvement on `rust-tauri-cli-ios-dev` despite 95% direct-child reuse
+   there - traced to picking a 26-token macro `token_tree` over the 21-statement `block` sitting
+   right next to it, since nothing constrained the search to statement-sequence-shaped kinds.
+   Fixed by adding `nodes::is_statement_sequence_body` and searching by kind instead of raw width.
+2. That fix alone still broke `python-refactoring` (previously exact, 0 mismatches): searching for
+   the *widest* matching-kind node **anywhere** in the subtree can pick different nesting depths on
+   before vs. after when the same kind occurs more than once (a Python `for` loop's own body is
+   *also* a `block` - the same kind a function's own top-level body uses), pairing two unrelated
+   statement sequences. Fixed by making the search breadth-first and returning the *shallowest*
+   match instead of the widest - a candidate's own top-level body is always the least-nested match
+   of its kind, so this can never conflate it with a body nested inside it.
+
+**Speed, measured directly on the corpus's known-slow fixtures** (`diff_code` wall time,
+`cargo test --release`):
+
+| fixture | before | after | speedup |
+|---|---|---|---|
+| `rust-tauri-cli-ios-dev` | 328ms | 52ms | 6.3x |
+| `ruby-homebrew-add-or-expression` | 900ms | 178ms | 5.1x |
+| `kotlin-nextcloud-a-few-small-removals` | 1419ms | 310ms | 4.6x |
+| `c-postgres-real-logic-change` | 813ms | 313ms | 2.6x |
+| `cpp-ladybird-refactor-variables-if-changes` | 1273ms | 626ms | 2.0x |
+| `c-linux-small-change-struct-to-char` | 589ms | 336ms | 1.8x |
+| `cpp-opencv-add-test-case` | 736ms | 742ms | unchanged (separate issue - see below) |
+
+`cpp-opencv-add-test-case` unchanged because its `TEST(...)` blocks sit one level deeper than
+`is_statement_sequence_body` looks, nested inside `#if defined(...)` preprocessor conditionals (the
+`declaration_list` this pass finds has only 3 direct children: comment/typedef plus 2-3 `#if` blocks
+- see the `cpp-opencv-add-test-case investigated` entry above). Not pursued further this round.
+
+**Accuracy cost, fully measured (not assumed)**: a fresh whole-corpus `benchmark_optimal_solutions`
+run (both with and without this change, same corpus) shows exactly **2 fixtures** out of ~180
+affected - every other fixture's mismatch count is byte-identical:
+
+- `c-nginx-add-typedef`: 62 -> 56 mismatches (an *improvement* - limit tightened accordingly).
+- `python-refactoring`: 0 -> 34 mismatches (a real regression - clamped via `_within_limit(34)`).
+
+**`python-refactoring`'s root cause, confirmed by dumping the actual mismatch list, not just
+inferred from the symptom** (see that fixture's own test file for the full writeup): pre-matching
+the unchanged `average = total / count` statement correctly - and, via `emit_identical_subtree`,
+recursively - claims its own `total`/`count` identifier *tokens* too. Those names recur elsewhere in
+the function (`total = 0`, `total += num`, ...), and unconstrained APTED is otherwise free to pick
+*any* occurrence as the rename target when resolving `total = 0` -> `total = sum(numbers)` (the
+fixture's own documented optimal solution: identifier/`=` Identical, `0` Delete, `sum(numbers)`
+Insert). Once the `average` statement's copies of those tokens are claimed first, that specific
+pairing is gone by the time APTED reaches `total = 0`, and here the remaining options aren't good
+enough - APTED falls back to deleting the whole statement instead of reusing the identifier.
+**Concretely: staged pre-matching can starve a different, harder statement of a shared-name
+identifier token it needed as its own rename target** - a real, specific cost for files that reuse
+the same name across several otherwise-unrelated statements, not a narrow implementation bug left
+to patch. Worth remembering as a named failure mode if this class of pre-matching optimization is
+extended further.
+
+**Verified**: full suite `cargo test --release --features test-fixtures --lib` green (the 2 clamp
+adjustments above account for the only two changed outcomes); `benchmark_optimal_solutions` net
+delta from this change alone (isolated via `git stash`, since the corpus also had unrelated pending
+fixtures at the time) is exactly `+28` (`+34` from `python-refactoring`, `-6` from
+`c-nginx-add-typedef`) - fully attributed, fully understood, both sides clamped/documented.
+
+## Tried and reverted: fixing `python-refactoring`'s regression with a contention-aware skip (2026-08-05, user-requested)
+
+User asked to brainstorm fixes for the root cause above, then try the top pick: before committing a
+Myers-matched statement pair in `prematch_identical_statement_siblings`, check whether its own
+identifiers overlap with the still-unmatched remainder's identifiers, and skip the pair if so -
+leaving it (and the identifiers it would have consumed) for the real APTED call to resolve jointly.
+
+**Naive version (skip on any overlap) fixed the accuracy regression completely** (`python-
+refactoring`: 34 -> 0 mismatches) **but destroyed nearly all of this pass's own speedup**: measured
+directly, `rust-tauri-cli-ios-dev` went from 1/26 pairs skipped (the working state) to 25/26 skipped
+- ordinary functions routinely reuse a receiver/config/object name across nearly every statement
+(`app`/`config`/`interface` in that fixture), and flagging every one of those as "contested" is
+wrong: a name repeated that often is never actually a scarce resource.
+
+**Frequency-gated refinement (only skip *rare* names, `CONTESTED_NAME_MAX_OCCURRENCES`) doesn't
+have a working threshold.** Measured occurrence counts directly on both fixtures:
+`rust-tauri-cli-ios-dev`'s names that *must* stay unflagged for the speedup to survive
+(`interface`/`is_tauri_workspace`/`target_triple`/`Some`/`Ios`/`MobileTarget`) all occur exactly 4
+times; `python-refactoring`'s problem names (`total`/`count`) occur 6 and 7 times respectively -
+*more* than several of `rust-tauri`'s safe names. The occurrence-count ranges genuinely overlap
+between the fixture that needs protecting and the ones that must not be touched - no single
+threshold separates them. Reverted `prematch_identical_statement_siblings` back to its original,
+simple form (no contention check), and restored both clamps to their previously-measured values
+(`python-refactoring` `_within_limit(34)`, `c-nginx-add-typedef` `_within_limit(56)`).
+
+## Root cause is one level deeper than identifier contention - confirmed by direct experiment, not identifier metadata fixable (2026-08-05, user-requested investigation)
+
+User asked whether attaching richer metadata to identifiers (e.g. read/write role) could let the
+matching heuristic make the correct choice directly, instead of just avoiding the ambiguous case.
+Investigated by first re-examining exactly what `python-refactoring`'s wrong mapping actually *is*
+(dumped every `total`/`count`/`sum`/`len` identifier's real target, not just the mismatch report):
+`total = 0`'s `total` gets deleted outright, while `total = sum(numbers)`'s `total` (after) gets
+`Update`-matched to a *completely unrelated* identifier in the file's `max_val`/`min_val` section -
+not "ran out of `total` candidates" (a same-text, cost-0 candidate - `total = 0`'s own `total` - was
+sitting right there, unclaimed).
+
+**Checked the cost model directly** (`UnitCostModel::ren`, `apted/common.rs`): identifier-to-
+identifier rename cost is 0 for exact text match, `COST_UPDATE` (1) for any other text - meaning a
+same-text match is *always* strictly preferred over a cross-text one when both are reachable. APTED
+choosing the cross-text option over an available same-text, 0-cost option means the cheaper pairing
+wasn't reachable within whatever sub-problem it was actually solving - a structural property of the
+computation, not a candidate-selection preference metadata could bias.
+
+**Confirmed directly with a controlled, isolated experiment** (throwaway test, deleted after use):
+called `apted::for_nodes` on `calculate_stats`'s whole function body two ways, both completely
+outside the normal 7-phase pipeline (a fresh `ASTDiff`, no phase 1-6 pre-matching at all):
+
+1. **Fully unconstrained** - nothing pre-matched. Result: `total = 0`'s identifier correctly maps
+   to `total = sum(numbers)`'s identifier, exactly as the fixture's own doc comment describes as
+   optimal. **Total cost: 556.**
+2. **Same call, but with *only* the unrelated, byte-identical `average = total / count` statement
+   pre-matched first** (mirroring exactly what `prematch_identical_statement_siblings` does for
+   that one statement) - the same wrong mapping as the full pipeline. **Total cost: 559.**
+
+**559 > 556 - this is not a tie broken differently, it's a real, measured loss of optimality.**
+Pre-matching a piece that is unambiguously correct in isolation (byte-identical, 0 cost either way,
+and excluded from the `PostorderIndexer` either way per `PostorderIndexer::build`'s pruning) still
+causes the *remaining*, smaller sub-problem's own APTED resolution to converge on a strictly worse
+overall solution than solving the whole tree jointly would have. This is a property of how this
+codebase's APTED implementation's strategy/keyroot decomposition responds to a reduced-size,
+reshaped residual - plausibly sensitive to `compute_opt_strategy_post_l`/`compute_opt_strategy_
+post_r`'s size-dependent path selection, though the exact mechanism inside `engine.rs` wasn't traced
+further (would need real engine-internals work, not confirmed as this session's scope).
+
+**Conclusion: identifier metadata is not the right lever.** The bug isn't in *which* candidate gets
+selected among visible options (metadata could only reweight that) - it's that the cheaper option
+isn't visible to the DP at all once the residual is reshaped. This generalizes beyond identifiers:
+*any* staged pre-matching that removes content before a real APTED call - not just this specific
+statement-sibling pass - carries the same risk in principle, since it's a property of residual
+shape/size sensitivity in the engine itself, not of any one heuristic built on top of it. Fixing it
+properly would mean understanding and correcting `engine.rs`'s strategy selection so that pruning
+content never increases the achievable-optimal cost on what remains - real, correctness-critical
+engine work, squarely in the same "needs its own dedicated session" category as the previously-
+declined mid-DP abort-budget rewrite and the `pull_up_wrapped_matches` audit. Not attempted here.
+`prematch_identical_statement_siblings` remains shipped in its simple form specifically *because*
+its corpus-wide impact is empirically tiny and fully clamped (2 fixtures out of ~180) despite this
+underlying risk being more general than the one confirmed case - worth remembering if a future
+fixture surfaces the same pattern.
+
+## Correction: the entry above was wrong - not an inherent property, a real fixable bug in `ContainmentCtx`. Root-caused, fixed, and verified (2026-08-05, user-requested)
+
+The "556 vs 559" entry above concluded pre-matching `average` moves the *remaining* sub-problem to
+a strictly worse optimum for reasons internal to `engine.rs`'s strategy selection - "a genuine,
+well-understood mathematical property... not a bug." User pushed back directly, twice: first
+asking to diff the two full solutions node-by-node rather than accept the "order-preserving
+barrier" story on faith (revealed `average` maps to itself identically in *both* solutions - the
+barrier-removal framing was wrong), then asking the sharper architectural question directly: *why
+completely exclude pre-matched nodes from the indexed forest at all, instead of keeping them as
+fixed points that still occupy their sibling position and block cross-order matching?*
+
+That was the actual bug. `ContainmentCtx` (added earlier, see the `rust-add-if` entry) already
+exists to patch exactly one hole `PostorderIndexer::build`'s total exclusion of pruned nodes opens
+up: a "hollowed-out" *ancestor* of a pruned descendant getting freely renamed onto something that
+contradicts where that descendant landed. But `average` isn't an ancestor of `total = 0` or
+`max_val = numbers[0]` - they're unrelated *siblings*. `ContainmentCtx` never checked sibling
+order at all, so nothing stopped `total = 0`'s `total` from being matched to some unrelated
+`total` occurrence positioned after `average`'s counterpart - silently reordering past a fixed
+point APTED never even got to see.
+
+**Fix**: extended `ContainmentCtx::adjust` (`apted/common.rs`) with a second check. For a
+`resolve_forest` call's `before_root_ids`/`after_root_ids`, `collect_pruned_chunk_pairs` walks down
+and records the `(before_id, after_id)` pair at every point `PostorderIndexer::build`'s own
+`visit()` stops early because the node is already in `node_map` - exactly the "gaps" pruning left.
+Resolved to `preorder_index`, sorted, and reduced to the longest run whose before/after order
+agree with each other (`longest_increasing_by_second`, `O(n log n)` patience sorting with parent-
+pointer reconstruction) - a candidate pairing is then only allowed if both nodes have the same
+*rank* (count of trusted anchors preceding them) on their respective side. Comparing raw
+`preorder_index` this way is safe for ancestor-descendant pairs too, with no separate exclusion
+needed: an ancestor's `preorder_index` always precedes all its own descendants', so it can never
+be mis-ranked as "after" a pruned node nested inside it.
+
+**The LIS filter step is load-bearing, not defensive-programming**: turning the raw check on
+unconditionally (no filter) regressed `c-cpython-autogenerated-code` 33 -> 58 mismatches. Root
+cause: `greedy_anchor_block`/`final_pass` anchor repeated, near-identical `case` bodies by content
+similarity, not by strict positional order - genuinely non-monotonic pruned pairs the raw check
+had no way to distinguish from `average`'s genuinely-simple case. Adding the LIS filter (keep only
+the longest mutually-order-consistent run, silently drop the rest as untrusted) got it to 35 - closer
+but still not clean, because a *global*, file-scope LIS can still pick a trusted run that happens to
+conflict with a legitimate local reordering somewhere else in the same forest (this fixture's
+autogenerated, highly-repetitive case bodies make that collision likely; a typical fixture's
+handful of pruned anchors per forest makes it very unlikely). Rather than chase
+`greedy_anchor_block`'s heuristic, non-order-preserving-by-design matching through more filter
+refinement, scoped the whole second check to `source` via `PREMATCH_SIBLING_ORDER_SOURCES`
+(currently just `"syntax_named"`/`"large_flat_subtree_container"` -
+`prematch_identical_statement_siblings`'s own two callers, the only ones that need it) - opt-in
+per source rather than on by default. `c-cpython-autogenerated-code` back to exactly 33 (its
+pre-existing, unrelated baseline) with this scoping.
+
+**Verified**:
+- `python-refactoring`: 34 -> 0 mismatches. Un-clamped back to `assert_matches_human_mapping` (no
+  `_within_limit`) - the fix resolves it exactly, not just under some tolerance.
+- `c-nginx-add-typedef`: improved further, 56 -> 50 (this check catches more of the same class of
+  case this fixture already benefited from).
+- Re-ran the throwaway 556-vs-559 experiment from the entry above (with its `for_nodes` call's
+  `source` changed to `"syntax_named"` so the new check actually applies): **556 == 556** now,
+  zero node-level mapping differences between the two solutions. Confirms the root cause really
+  was this representational gap, not an inherent property of the algorithm - deleted the throwaway
+  test after confirming (per this session's "delete after use" convention).
+- Full suite `cargo test --release --lib`: 560 passed, 3 failed - all 3 failures pre-exist on the
+  clean committed baseline (`git stash`-verified independently, unrelated to any of this session's
+  work: `lua-neovim-neovim-add-if-around-one-line`, `python-pytorch-pytorch-add-param-to-many-
+  places-and-update-one`, `shellscript-ansible-ansible-add-variable-and-string-expansion`).
+- Timing: re-measured `rust-tauri-cli-ios-dev`/`ruby-homebrew-add-or-expression`/`kotlin-nextcloud-
+  a-few-small-removals`/`c-postgres-real-logic-change` with the new check compiled in vs. compiled
+  out (`if false && ...`) - no measurable difference either way, confirming the `source`-gate keeps
+  this check's cost confined to the two call sites that opt into it.
+
+**Not yet revisited**: whether `lua-neovim-neovim-add-if-around-one-line`/`python-pytorch-...`/
+`shellscript-ansible-...`'s pre-existing failures are worth root-causing - out of scope for this
+entry (confirmed unrelated, not introduced or touched by any of this session's work).

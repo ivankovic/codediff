@@ -222,6 +222,19 @@ fn match_named_groups(
         },
         None,
         |before_id, after_id, diff| {
+            // Pre-match this candidate's mostly-unchanged statement sequence (if it has one)
+            // before paying for the real APTED call below - see that function's own doc comment.
+            // Purely additive: it only ever emits exact, scoped hash matches, never a guess, so
+            // the APTED call that follows still resolves everything it would have anyway, just
+            // with less left to do.
+            apted::prematch_identical_statement_siblings(
+                before_id,
+                after_id,
+                before_metadata,
+                after_metadata,
+                "syntax_named",
+                diff,
+            );
             apted::for_nodes(
                 before_metadata,
                 after_metadata,

@@ -156,6 +156,19 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             );
         }
 
+        // Also pre-match any *other* mostly-unchanged statement sequence still left inside this
+        // item (e.g. the item's own body, if the flat descendant found above was something else
+        // entirely - a nested data literal, not the item's top-level statements) - see that
+        // function's own doc comment. Purely additive, same as the pre-match above.
+        apted::prematch_identical_statement_siblings(
+            before_id,
+            after_id,
+            &before_metadata,
+            &after_metadata,
+            "large_flat_subtree_container",
+            diff,
+        );
+
         // Diff the top-level item itself (flat descendant, and anything just pre-matched above,
         // already in `diff` -> pruned).
         apted::for_nodes(

@@ -59,5 +59,21 @@ use crate::test;
 //  subtree is an add.
 #[test]
 fn matches_human_solution() -> Result<()> {
+    // 2026-08-05: `prematch_identical_statement_siblings` (`apted::common`) briefly regressed this
+    // fixture. It pre-matches this function's byte-identical `average = total / count` statement,
+    // excising it (and its `total`/`count` identifier tokens) from the forest APTED sees before
+    // real APTED runs. That exposed a real gap in `ContainmentCtx`: it only forbade a pairing that
+    // contradicted where a pruned *descendant* landed relative to a hollowed-out *ancestor*, not
+    // one that silently reordered past an unrelated pruned *sibling* (there's no ancestor-
+    // descendant relationship between `average` and `total = 0` to catch). Without that guard,
+    // `total = 0`'s `total` could match some unrelated `total` occurrence positioned after
+    // `average`'s counterpart, losing the rename-target pairing needed to resolve `total = 0` ->
+    // `total = sum(numbers)` (the fixture's documented optimal solution) and falling back to a
+    // wholesale statement delete instead.
+    //
+    // Fixed at the root by extending `ContainmentCtx::adjust` with a sibling-order-consistency
+    // check: every pruned chunk's root position (`preorder_index`) is recorded, and a candidate
+    // pairing is only allowed if both nodes have the same count of pruned anchors preceding them
+    // on their respective side - see `ContainmentCtx`'s doc comment in `apted/common.rs`.
     test::helper::human_mapping::assert_matches_human_mapping("python-refactoring")
 }

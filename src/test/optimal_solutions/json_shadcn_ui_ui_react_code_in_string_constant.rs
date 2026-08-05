@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("json-shadcn-ui-ui-react-code-in-string-constant")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "json-shadcn-ui-ui-react-code-in-string-constant",
+    )
 }
