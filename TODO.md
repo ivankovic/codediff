@@ -3385,18 +3385,38 @@ gap as `json-radarr-radarr-rename-string-key`'s repeated `,` tokens (pattern 3 f
 survey) - not something a reference-node or name-extraction fix can close further.
 
 **Verified**: full suite green (only the two clamps above changed); `check-quality` numbers above
-from a fresh `benchmark_optimal_solutions` run. Quality baseline not yet updated to 2882 - pending
-whichever commit lands this, per the established "update deliberately" convention.
+from a fresh `benchmark_optimal_solutions` run. Landed in commit `5455836`, which also ran `make
+update-quality-baseline` - `research/quality_baseline.txt`'s `TOTAL_MISMATCHES` now reads 2882.
 
 **On XML-specific diffing algorithms** (the literature question this investigation started from):
-turns out mostly moot for *this* gap - the fix needed was teaching this codebase's existing
-reference-node/exact-hash machinery about XML's own structure, not a different algorithm. The
-published XML-diff literature (XyDiff/X-Diff/DiffXML/MH-Diff-style approaches) mostly exists to
-solve two problems this project's tree-sitter+APTED approach already handles differently: (a)
-matching elements by an identity key across a mostly-unordered attribute/child model (XPath- or
-key-based node signatures) - covered here by exact-hash matching plus, if this ever gets revisited,
-an `is_semantically_structural` arm keying off `name`/`id`-like attributes the way YAML's `key`
-field already does; (b) cost-modeling XML's specific edit operations (attribute updates vs. element
-moves) - already subsumed by the existing unit-cost tree edit distance model. Worth revisiting only
-if a *future* XML fixture's gap turns out to need genuine unordered-attribute-set semantics APTED's
-ordered-tree model can't express - not indicated by anything found this round.
+turns out mostly moot for *this particular* gap - the fix needed was teaching this codebase's
+existing reference-node/exact-hash machinery about XML's own structure, not a different algorithm.
+Surveyed the published XML-diff literature anyway, since the question is worth a real answer
+independent of this one fixture:
+
+- **XyDiff, X-Diff, MH-Diff** (and similar tree-to-tree XML diff tools) build a node *signature*
+  from tag name + attributes + a stable identity key (often a user-designated `id`/`key`-like
+  attribute) specifically because they assume XML's children and attributes are frequently
+  *semantically unordered* - a `<person>` with `<name>` before `<age>` means the same thing as the
+  reverse, which classic ordered tree-edit-distance penalizes. This is the core thing that class of
+  algorithm buys over plain ordered TED.
+- **DiffXML** and similar tools additionally focus on producing an XML-native edit script (XUpdate-
+  style insert/delete/move/update operations addressed by XPath) rather than a generic tree
+  mapping - a delivery-format concern, not a matching-algorithm one.
+
+Neither problem is actually live in this corpus right now. (a) Identity-key matching under
+unordered semantics: this project already has an answer for the *matching* half - exact-hash
+matching (now XML-eligible via this fix) plus, if a future fixture needs it, an
+`is_semantically_structural` arm keying off a `name`/`id`-like attribute the exact same way YAML's
+`key` field already does - not a new algorithm, the same pattern used for every other supported
+language. What this project does *not* have is any handling for genuinely *unordered* sibling
+matching (APTED's cost model is strictly ordered) - but nothing found this round indicates a real
+XML fixture actually needs attribute/child reordering tolerance; every observed gap was either the
+reference-node bug fixed here or plain positional ambiguity among identical siblings, same as
+non-XML fixtures get. (b) XML-specific edit-operation cost modeling: already subsumed by the
+existing unit-cost tree edit distance model, nothing XML particular required.
+
+**Conclusion: not worth adopting a dedicated XML-diff algorithm.** Revisit only if a *future* XML
+fixture's gap is traced to genuine unordered-attribute-or-child semantics that ordered APTED
+provably can't express - that would be the actual trigger for reaching into this literature, not
+XML being a "different enough" format on its own.
