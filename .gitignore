@@ -21,6 +21,15 @@ tmp/
 # snapshots kept for historical comparison).
 **/research/ablation/*
 
+# pdflatex/bibtex build byproducts for research/papers/* - regenerated on every build, not part of
+# the versioned record (unlike the checked-in main.tex/main.bbl/main.pdf in the same directory).
+# Scoped to research/papers/ rather than a bare *.log so this doesn't shadow the deliberately
+# tracked *.log files under research/results/.
+**/research/papers/**/*.aux
+**/research/papers/**/*.blg
+**/research/papers/**/*.log
+**/research/papers/**/*.out
+
 # ---> Python, only used in research/ directory.
 
 # Byte-compiled / optimized / DLL files
