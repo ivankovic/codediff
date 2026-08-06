@@ -222,6 +222,8 @@ mod php_nextcloud_server_whitespace_and_added_declaration;
 #[cfg(test)]
 mod php_wordpress_wordpress_add_null_to_return;
 #[cfg(test)]
+mod php_wordpress_wordpress_update_doccomment;
+#[cfg(test)]
 mod php_wordpress_wordpress_version_update;
 #[cfg(test)]
 mod php_wordpress_wordpress_version_update_2;
@@ -306,6 +308,8 @@ mod rust_turbopack_persistence_tools_main;
 #[cfg(test)]
 mod rust_zed_git_panel_settings;
 #[cfg(test)]
+mod rust_zed_industries_zed_add_argument;
+#[cfg(test)]
 mod rust_zed_workspace_tasks;
 #[cfg(test)]
 mod shellscript_ansible_ansible_add_variable_and_string_expansion;
@@ -381,3 +385,5 @@ mod yaml_mastodon_mastodon_add_block_pair_translation;
 mod yaml_mastodon_remove_one_pair;
 #[cfg(test)]
 mod yaml_mozilla_pdf_single_value_update;
+#[cfg(test)]
+mod yaml_twbs_bootstrap_version_pin_with_comment;
