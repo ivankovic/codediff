@@ -113,6 +113,24 @@ choice of which optional heuristics to enable come from measurement, not assumpt
 human-verified ground-truth corpus, reporting accuracy, speed, and robustness for all five.
 Section~\ref{sec:conclusion} concludes.
 
+This paper makes the following contributions:
+\begin{itemize}
+  \item It reports an empirical study of \NumRepos{} real-world open-source repositories, showing
+  that existing diff tooling's worst-case assumptions are rarely reached in the common case, but
+  that the tail is real and large enough that a production tool must handle both regimes.
+  \item It details \textsc{CodeDiff}, a seven-phase diffing pipeline that combines APTED's exact
+  tree edit distance, GumTree's source-code-specific heuristics, and Myers' sequence diff into one
+  production-engineered tool, without introducing a new matching algorithm.
+  \item It demonstrates, via a leave-one-out ablation study, that a heuristic's published accuracy
+  gain does not automatically transfer when reused in a different pipeline evaluated against a
+  different corpus: one of GumTree's own two heuristics helps \textsc{CodeDiff}'s pipeline, the
+  other measurably hurts it.
+  \item It reports a head-to-head accuracy, speed, and robustness comparison against GumTree, Unix
+  \texttt{diff}, difftastic, and diffsitter on a 98-fixture, human-verified ground-truth corpus,
+  showing that combining established techniques reaches competitive accuracy and speed without
+  displacing what each individual tool already does well.
+\end{itemize}
+
 \section{Existing State of the Art}
 \label{sec:background}
 
@@ -169,11 +187,16 @@ Formal treatments of the algorithms in Section~\ref{sec:background} report worst
 complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
 This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
 documentation states that it targets research use, not production deployment at scale - a
-reasonable scope for its own goals, but one that leaves open the question a production tool must
-answer: how large is $n$ in real code, and how often does it reach that size? A tool engineered
-only against a worst-case bound risks two failure modes. It can over-engineer for inputs that
-never occur in practice. It can under-engineer for a real tail its asymptotic analysis never
-quantified. Answering this needs measurement, not further asymptotic analysis.
+reasonable scope for its own goals, but one that leaves open a question every production diff
+tool must answer:
+
+\textbf{RQ1 (Scale).} Does the scale of real-world source files, ASTs, and commits match the
+assumptions existing diff-tooling designs are built on - how large is $n$ in real code, and how
+often does it reach that size?
+
+A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
+for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
+analysis never quantified. Answering RQ1 needs measurement, not further asymptotic analysis.
 
 We measure this directly. We built a corpus of \NumRepos{} open-source repositories, drawn from
 the Gentoo Linux distribution's package list and popular repositories on GitHub. We cloned every
@@ -215,8 +238,13 @@ The largest file in the corpus has \AstMax{} AST nodes. Byte size and AST node c
 correlation, Pearson $r = \CorrelationR{}$, which simplifies to
 $|\text{AST}| \approx \text{bytes} / 5$ for quick estimates. Arafat and Riehle report that 47.5\%
 of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
-over 10{,}000 lines still occur. Section~\ref{sec:pipeline} turns these numbers into
-\textsc{CodeDiff}'s own concrete design targets.
+over 10{,}000 lines still occur.
+
+\textbf{RA1.} Existing tools' worst-case assumptions are rarely reached in the common case - most
+files and most commits are small - but the tail is real and large enough to matter: files up to
+\AstMax{} AST nodes and commits over 10{,}000 lines both occur in this corpus. A production diff
+tool must be engineered for both regimes, not only the common case. Section~\ref{sec:pipeline}
+turns this answer into \textsc{CodeDiff}'s own concrete design targets.
 
 \section{CodeDiff}
 \label{sec:pipeline}
@@ -305,6 +333,21 @@ kind and sibling position, not by parser-internal node identity, since that iden
 across separate parses of the same file. This human-authored mapping is the ground truth every
 number in this section is measured against.
 
+This section answers three further research questions, building on RQ1's finding that a real,
+non-negligible tail of large files and commits exists alongside a small common case.
+
+\textbf{RQ2 (Shape).} When applied to real-world code changes, does existing diff tooling recover
+the actual shape of the change - a rename, a move, a restructure - rather than defaulting to
+delete-plus-insert?
+
+\textbf{RQ3 (Heuristic transfer).} Do diffing heuristics shown effective in one pipeline and
+corpus retain that effectiveness when reused in a different pipeline and evaluated against a
+different corpus?
+
+\textbf{RQ4 (Production viability).} Can a production-grade syntax-aware diffing tool be built by
+combining established techniques, rather than new matching algorithms, and still reach accuracy,
+speed, and robustness competitive with specialized tools?
+
 \textbf{Ablation study.} \textsc{CodeDiff} has four optional heuristic passes, each behind its own
 flag: import-node normalization, flow-control arm matching, bottom-up expansion (phases 3 and 5),
 and move-detection recovery (phase 7). A 2026 leave-one-out ablation study measured each pass's
@@ -340,10 +383,13 @@ other three ship disabled.
   \end{tabular}
 \end{table}
 
-This result matters beyond \textsc{CodeDiff}'s own defaults. A technique documented as helpful in
-its original paper, on its original evaluation corpus, is not guaranteed to help inside a
-different pipeline, evaluated against a different corpus. \textsc{CodeDiff} measures this directly
-for every optional pass, rather than assuming a result from the literature transfers unchanged.
+\textbf{RA3.} No, not uniformly: of the two heuristics adapted from GumTree, only move-detection
+recovery transfers its measured benefit into this pipeline; bottom-up expansion, GumTree's other
+contribution, is net-negative here despite being validated as helpful in GumTree's own evaluation,
+on GumTree's own pipeline and corpus. A technique documented as helpful in its original paper is
+not guaranteed to help inside a different pipeline evaluated against a different corpus.
+\textsc{CodeDiff} measures this directly for every optional pass, rather than assuming a result
+from the literature transfers unchanged.
 
 \textbf{Comparison tools.} We place \textsc{CodeDiff} alongside four established tools, on the same
 98-fixture corpus: GumTree (v4.0.0-beta8)~\cite{gumtreediff-2014}, Unix \texttt{diff}, and the two
@@ -370,6 +416,12 @@ same human mapping (Table~\ref{tab:accuracy-vs-others}, Figure~\ref{fig:accuracy
 varies: diffsitter's compiled-in grammar set matches 83 of the 98 fixtures' languages, GumTree's
 generator set matches 97, and the rest match all 98 - each tool's own row is scored only on its own
 applicable subset, not padded with unscored fixtures.
+
+\textbf{RA2.} Not entirely: among the four pre-existing tools alone (Table~\ref{tab:accuracy-vs-others},
+excluding \textsc{CodeDiff}'s own row), mismatch rates range from 1.055\% (Unix \texttt{diff}) to
+1.897\% (diffsitter) of lines against the human mapping, and no AST-aware tool among them beats
+plain line-based \texttt{diff} on this measure. Syntax-awareness alone does not guarantee a tool
+recovers the shape of a change more faithfully than a line-based one does.
 
 \begin{table}
   \caption{Line-level mismatches against human ground truth, each tool scored on its own
@@ -448,6 +500,13 @@ because the repository's history had since been rewritten, not a \textsc{CodeDif
 completed all 507 remaining pairs with zero panics and zero timeouts. This is a sampled,
 bounded-scale result, not a claim over the full \NumRepos{}-repository corpus, but it is
 consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:problem-space}.
+
+\textbf{RA4.} Yes: combining established techniques rather than inventing new ones,
+\textsc{CodeDiff} reaches 99.8\% AST-node accuracy against human-verified ground truth, the lowest
+line-level mismatch rate of the five tools compared, wall-clock latency faster than GumTree and
+difftastic at the median, and zero panics or timeouts across the sampled robustness evaluation.
+Building a production-grade syntax-aware diffing tool did not require a new matching algorithm,
+only careful combination and measurement of existing ones.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
