@@ -134,6 +134,8 @@ mod java_add_logging;
 #[cfg(test)]
 mod java_fix_array_index;
 #[cfg(test)]
+mod java_genymobile_scrcpy_change_some_android_version_constant;
+#[cfg(test)]
 mod java_nextcloud_android_add_two_function_calls;
 #[cfg(test)]
 mod java_protobuf_add_two_annotations;
@@ -194,6 +196,8 @@ mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod kotlin_nextcloud_a_few_small_removals;
 #[cfg(test)]
+mod kotlin_nextcloud_android_dot_to_question_mark_dot;
+#[cfg(test)]
 mod kotlin_nextcloud_android_extract_argument_into_variable;
 #[cfg(test)]
 mod kotlin_nextcloud_change_function_fingerprint;
@@ -211,6 +215,8 @@ mod kotlin_small_api_change;
 mod lua_awesome_only_comment_change;
 #[cfg(test)]
 mod lua_awesomewm_awesome_align_to_halign;
+#[cfg(test)]
+mod lua_awesomewm_awesome_comment_changes_and_additions;
 #[cfg(test)]
 mod lua_neovim_neovim_add_if_around_one_line;
 #[cfg(test)]
@@ -257,6 +263,10 @@ mod python_thefuck_multiline_string_change;
 mod python_ytdl_add_import_and_function_call;
 #[cfg(test)]
 mod ruby_homebrew_add_or_expression;
+#[cfg(test)]
+mod ruby_junegunn_fzf_add_test_case;
+#[cfg(test)]
+mod ruby_junegunn_fzf_add_test_case_2;
 #[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
@@ -318,6 +328,8 @@ mod shellscript_ansible_ansible_simple_deletion;
 #[cfg(test)]
 mod shellscript_genymobile_scrcpy_add_two_flags;
 #[cfg(test)]
+mod shellscript_langchain_ai_langchain_some_interesting_raw_string_to_string_content;
+#[cfg(test)]
 mod shellscript_nextcloud_server_change_invocation_string;
 #[cfg(test)]
 mod shellscript_nvm_sh_nvm_upgrade_version_string;
@@ -336,7 +348,13 @@ mod swift_swiftlang_swift_comment_change;
 #[cfg(test)]
 mod swift_swiftlang_swift_comment_change_2;
 #[cfg(test)]
+mod tsx_excalidraw_excalidraw_import_path_change;
+#[cfg(test)]
 mod tsx_material_remove_import;
+#[cfg(test)]
+mod tsx_mui_material_ui_move_colour_to_a_new_attribute;
+#[cfg(test)]
+mod tsx_shadcn_ui_ui_add_attribute;
 #[cfg(test)]
 mod typescript_add_error_handling;
 #[cfg(test)]
@@ -366,15 +384,25 @@ mod vimscript_junegunn_fzf_condition_canges;
 #[cfg(test)]
 mod vimscript_neovim_neovim_add_a_few_lines;
 #[cfg(test)]
+mod vimscript_neovim_neovim_add_a_few_lines_one_after_the_other;
+#[cfg(test)]
 mod vimscript_neovim_neovim_add_line_comment;
+#[cfg(test)]
+mod xml_mozilla_firefox_firefox_add_a_few_attributes;
 #[cfg(test)]
 mod xml_nextcloud_android_delete_element;
 #[cfg(test)]
 mod xml_nextcloud_android_delete_element_2;
 #[cfg(test)]
+mod xml_odoo_odoo_add_attribute;
+#[cfg(test)]
+mod xml_odoo_odoo_add_two_attributes;
+#[cfg(test)]
 mod xml_odoo_odoo_change_value;
 #[cfg(test)]
 mod yaml_ansible_ansible_add_two_sequence_items;
+#[cfg(test)]
+mod yaml_ansible_ansible_double_quote_scalar_change_possible_treesitter_weakness;
 #[cfg(test)]
 mod yaml_axios_axios_update_string_value;
 #[cfg(test)]
