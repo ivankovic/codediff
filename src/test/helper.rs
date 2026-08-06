@@ -912,13 +912,119 @@ mod tests {
         Ok(())
     }
 
+    /// 1-3 fixtures per language (smallest/fastest available, preferring real-world diffs over
+    /// synthetic ones), used by [`test_path_for_node_round_trips_through_node_for_path`] instead
+    /// of the full corpus. That test's cost scales with total corpus size (every node of every
+    /// fixture, before and after), so a handful of multi-hundred-KB fixtures (e.g.
+    /// `rust-zed-industries-zed-add-argument`, `ruby-junegunn-fzf-add-test-case*`,
+    /// `xml-odoo-odoo-add-two-attributes`) dominated its runtime (~490s of a ~715s suite run) while
+    /// adding no coverage the smaller fixtures in the same language don't already provide - the
+    /// path<->node round-trip property doesn't depend on tree size.
+    const ROUND_TRIP_SAMPLE_FIXTURES: &[&str] = &[
+        // c
+        "c-freeciv-add-parameter-to-function",
+        "c-htop-remove-function-declaration",
+        "c-ffmpeg-added-typedef-to-enum",
+        // cpp
+        "cpp-add-templates",
+        "cpp-fix-segfault",
+        "cpp-tensorflow-switch-to-primitive-types",
+        // csharp
+        "csharp-sonarr-change-type",
+        "csharp-lidarr-new-feature",
+        "csharp-jellyfin-sql-query-fix",
+        // css
+        "css-add-property",
+        "css-wordpress-reformat",
+        "css-playwright-add-class-selector",
+        // go
+        "go-lazygit-switch-to-strings",
+        "go-gin-add-function",
+        "go-prometheus-single-comment-change",
+        // html
+        "html-fatedier-add-attribute",
+        "html-hugo-tag-to-selfclosing-tag",
+        "html-ladybird-delete-attribute",
+        // java
+        "java-fix-array-index",
+        "java-genymobile-scrcpy-change-some-android-version-constant",
+        "java-scrcpy-remove-or-expression",
+        // javascript
+        "javascript-add-destructuring",
+        "javascript-fix-promises",
+        "javascript-twbs-bootstrap-comment-version-update",
+        // json (no synthetic fixture exists for this language)
+        "json-shadcn-ui-ui-string-value-update-string-is-code",
+        "json-nextcloud-server-deleted-pair",
+        "json-shadcn-ui-ui-react-code-in-string-constant",
+        // kotlin
+        "kotlin-add-null-check",
+        "kotlin-nextcloud-whitespace-only-change",
+        "kotlin-remove-function",
+        // lua (no synthetic fixture exists for this language)
+        "lua-awesomewm-awesome-align-to-halign",
+        "lua-neovim-one-added-line",
+        "lua-awesomewm-awesome-comment-changes-and-additions",
+        // php (no synthetic fixture exists for this language)
+        "php-nextcloud-server-whitespace-and-added-declaration",
+        "php-wordpress-wordpress-version-update",
+        "php-nextcloud-change-doccomment",
+        // python
+        "python-added-if-block-small",
+        "python-openhands-openhands-change-string-constant",
+        "python-thefuck-multiline-string-change",
+        // ruby: only one fixture is small - the other two are ~250KB+ and defeat the point
+        "ruby-homebrew-add-or-expression",
+        // rust: the literal "hello world" fixture, plus 2 more
+        "rust-hello-world-added-message",
+        "rust-add-if",
+        "rust-sniffnet-protocol",
+        // shellscript
+        "shellscript-ansible-ansible-simple-deletion",
+        "shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content",
+        "shellscript-genymobile-scrcpy-add-two-flags",
+        // swift: all 3 existing fixtures are small and real
+        "swift-swiftlang-swift-comment-change-2",
+        "swift-swiftlang-swift-comment-change",
+        "swift-nextcloud-ios-call-different-function",
+        // tsx (no synthetic fixture exists for this language)
+        "tsx-shadcn-ui-ui-add-attribute",
+        "tsx-excalidraw-excalidraw-import-path-change",
+        "tsx-material-remove-import",
+        // typescript
+        "typescript-microsoft-typescript-comment-change",
+        "typescript-microsoft-typescript-add-target-comment",
+        "typescript-microsoft-typescript-add-dot-js-to-import-paths",
+        // vimscript: only 2 small fixtures exist, the rest are 65KB+
+        "vimscript-neovim-neovim-add-a-few-lines",
+        "vimscript-neovim-neovim-add-a-few-lines-one-after-the-other",
+        // xml: only 2 small fixtures exist, the rest are 200KB+
+        "xml-mozilla-firefox-firefox-add-a-few-attributes",
+        "xml-odoo-odoo-change-value",
+        // yaml
+        "yaml-junegunn-fzf-version-upgrade",
+        "yaml-axios-axios-update-string-value",
+        "yaml-twbs-bootstrap-version-pin-with-comment",
+    ];
+
     #[test]
     fn test_path_for_node_round_trips_through_node_for_path() -> Result<()> {
         // path_for_node must be the exact inverse of node_for_path for every node in a tree,
-        // since human-authored mappings are compared against fresh diffs purely by path.
+        // since human-authored mappings are compared against fresh diffs purely by path. Runs
+        // against a per-language sample (see `ROUND_TRIP_SAMPLE_FIXTURES`) rather than the whole
+        // corpus - this property doesn't depend on tree size, and the full corpus takes minutes.
         let test_diffs = handmade_test_code_pairs()?;
+        let sampled: Vec<_> = test_diffs
+            .iter()
+            .filter(|(name, _)| ROUND_TRIP_SAMPLE_FIXTURES.contains(&name.as_str()))
+            .collect();
+        assert_eq!(
+            sampled.len(),
+            ROUND_TRIP_SAMPLE_FIXTURES.len(),
+            "a name in ROUND_TRIP_SAMPLE_FIXTURES doesn't match any directory under src/test/data/diffs/ (typo, or fixture renamed/removed)"
+        );
 
-        for (name, (before, after)) in &test_diffs {
+        for (name, (before, after)) in sampled {
             for (label, code) in [("before", before), ("after", after)] {
                 let ast = code
                     .ast
