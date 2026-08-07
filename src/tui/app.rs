@@ -489,16 +489,16 @@ impl App {
     }
 
     /// Draw the Before/After panels, with an optional one-line diff-summary status bar above them
-    /// (`self.diff_summary` - see `Action::DiffReady`'s handler) and an optional one-line error
+    /// (`self.diff_summary` - see `Action::DiffReady`'s handler), an optional one-line error
     /// banner below them (`self.last_error`, e.g. an unsupported file type on the most recent file
-    /// pick). Either, both, or neither can be present at once - the layout only reserves space for
-    /// whichever of the two actually has something to show.
+    /// pick), and an always-visible footer line below everything (cursor position plus a compact
+    /// key-hint reference - see `draw_footer`). The status bar and error banner are each present
+    /// or absent independently; the layout only reserves space for whichever actually has
+    /// something to show. The footer's row is always reserved, unlike those two: it's the primary
+    /// discoverability aid for a user who hasn't yet thought to press `?`, so unlike the status
+    /// bar/error banner it can't be conditionally absent without defeating its own purpose.
     fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
-        if self.diff_summary.is_none() && self.last_error.is_none() {
-            return self.diff_viewer.draw(frame, area);
-        }
-
-        let mut constraints = Vec::with_capacity(3);
+        let mut constraints = Vec::with_capacity(4);
         if self.diff_summary.is_some() {
             constraints.push(Constraint::Length(1));
         }
@@ -506,6 +506,7 @@ impl App {
         if self.last_error.is_some() {
             constraints.push(Constraint::Length(1));
         }
+        constraints.push(Constraint::Length(1));
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
@@ -523,8 +524,36 @@ impl App {
                 Paragraph::new(message.as_str()).style(Style::new().fg(Color::Red)),
                 layout[next],
             );
+            next += 1;
         }
+        self.draw_footer(frame, layout[next]);
         Ok(())
+    }
+
+    /// The always-visible footer: the focused panel's cursor position on the left, a compact
+    /// key-hint reference on the right. Pressing `?` still shows the full keybinding/color
+    /// reference (`help_modal.rs`) - this is deliberately just the handful of most-used keys, so a
+    /// first-time user has *some* signal that keybindings exist at all without having to already
+    /// know to press `?` first.
+    fn draw_footer(&self, frame: &mut ratatui::Frame, area: Rect) {
+        let position = match self.diff_viewer.focused_cursor_position() {
+            Some((row, col)) => format!("Ln {}, Col {}", row + 1, col + 1),
+            None => String::new(),
+        };
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(20), Constraint::Min(1)])
+            .split(area);
+        frame.render_widget(
+            Paragraph::new(position).style(Style::new().fg(Color::DarkGray)),
+            layout[0],
+        );
+        frame.render_widget(
+            Paragraph::new(FOOTER_HINTS)
+                .style(Style::new().fg(Color::DarkGray))
+                .alignment(Alignment::Right),
+            layout[1],
+        );
     }
 
     /// Draw the theme picker as a popup over the (still-visible) viewer behind it.
@@ -560,6 +589,10 @@ impl App {
         modal.draw(frame, popup)
     }
 }
+
+/// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
+/// a full reference (that's `?`/`help_modal.rs`'s job).
+const FOOTER_HINTS: &str = "?:help  o:open  n/p:next/prev  Tab:switch  q:quit";
 
 /// The centered "Diffing…" status shown while a background diff computation is in flight -
 /// shared by `render`'s `AppScreen::Diffing` arm and `draw_diff_mode_dialog` (the Fast/Exact
@@ -1005,6 +1038,29 @@ mod tests {
                 summary.label()
             );
         }
+        Ok(())
+    }
+
+    /// The footer's key hints must render regardless of whether the status bar or error banner
+    /// are present - it's the primary discoverability aid for `?`, so it can't be conditionally
+    /// absent the way those two are (see `draw_viewer`'s own doc comment).
+    #[test]
+    fn draw_viewer_always_shows_the_footer_key_hints() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        assert!(app.diff_summary.is_none());
+        assert!(app.last_error.is_none());
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains("?:help"),
+            "expected the footer's key hints to be drawn even with no status bar or error banner"
+        );
         Ok(())
     }
 

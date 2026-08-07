@@ -191,6 +191,20 @@ impl DiffViewer {
         self.active_panel
     }
 
+    /// The focused panel's cursor position (0-indexed row, col), or `None` if that panel has no
+    /// file loaded yet - shown in `app.rs`'s footer line.
+    pub fn focused_cursor_position(&self) -> Option<(usize, usize)> {
+        let viewer = match self.active_panel {
+            Panel::Before => &self.left_viewer,
+            Panel::After => &self.right_viewer,
+        };
+        if viewer.line_count() == 0 {
+            return None;
+        }
+        let state = viewer.state();
+        Some((state.cursor_row, state.cursor_col))
+    }
+
     /// Load a single file (no diff overlay yet) into the "Before" panel.
     pub fn set_before_file(&mut self, path: PathBuf) -> Result<()> {
         self.left_viewer.load_file(path)
@@ -560,6 +574,26 @@ mod tests {
         viewer.toggle_active_panel();
         assert!(viewer.left_viewer.state().is_focused);
         assert!(!viewer.right_viewer.state().is_focused);
+    }
+
+    #[test]
+    fn focused_cursor_position_is_none_before_any_file_is_loaded() {
+        let viewer = DiffViewer::new();
+        assert_eq!(viewer.focused_cursor_position(), None);
+    }
+
+    #[test]
+    fn focused_cursor_position_reflects_the_active_panels_cursor() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+
+        viewer.focused_viewer().set_cursor_position(0, 3);
+        assert_eq!(viewer.focused_cursor_position(), Some((0, 3)));
+
+        // Tab moves focus to "After" - the footer should now follow that panel's cursor instead.
+        viewer.toggle_active_panel();
+        viewer.focused_viewer().set_cursor_position(0, 2);
+        assert_eq!(viewer.focused_cursor_position(), Some((0, 2)));
     }
 
     /// Test that moving the cursor on the active side moves the inactive side's cursor to
