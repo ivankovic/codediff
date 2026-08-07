@@ -133,6 +133,9 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
 /// from `solve_named_reference_groups` - which runs *after* `solve_large_flat_subtrees` and so
 /// never gets the chance (see `solve_large_flat_subtrees`'s own doc comment for why that ordering
 /// can't simply be reversed).
+// Each parameter is genuinely distinct context (both roots and their ids, both metadata sets, the
+// source, the diff) - a params struct here would just relocate the same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn solve_named_reference_groups_within(
     before_root: Node,
     before_root_id: usize,

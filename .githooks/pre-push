@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+#  This file is part of the CodeDiff code diffing tool.
+#
+#  Copyright (C) 2026 Marko Ivankovic
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Runs the fast, deterministic subset of what .github/workflows/ci.yml checks, so a push doesn't
+# have to round-trip through GitHub Actions to discover a formatting mistake or a broken build.
+#
+# Deliberately NOT a full CI mirror:
+#   - `cargo clippy` here, not CI's `cargo build --release` + `cargo test` per feature config -
+#     this crate's release profile is `lto = "fat"`, `codegen-units = 1` (see Cargo.toml), which
+#     makes a release build genuinely slow; `cargo clippy` catches the same compile errors (it's a
+#     strict superset of `cargo check`) plus lint violations, in a fraction of the time and
+#     without running any tests at all. CI still runs the real build+test matrix and remains the
+#     authoritative gate.
+#   - `cargo audit` is skipped - it needs `cargo-audit` installed and a network call to the
+#     RustSec advisory database, and it depends on Cargo.lock, not on what this push changed.
+# Enable this hook with `make install-hooks` (or `git config core.hooksPath .githooks` by hand).
+# Skip it once, deliberately, with `git push --no-verify`.
+
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-push: cargo fmt --check"
+cargo fmt --check
+
+# Mirrors build-and-test's feature matrix (see ci.yml's own comment on why each of these three is
+# its own compilation unit) and CI's own (undocumented until now, see clippy job's own comment)
+# per-feature-config `cargo clippy -D warnings` gate.
+for features in "" "test-fixtures" "stats"; do
+    label="${features:-default}"
+    echo "pre-push: cargo clippy --tests --features \"$features\" -- -D warnings ($label)"
+    cargo clippy --tests --features "$features" -- -D warnings
+done
+
+if command -v node >/dev/null 2>&1; then
+    echo "pre-push: human_mapping site JS tests"
+    node assets/mapping_site/index.test.js
+else
+    echo "pre-push: node not found, skipping human_mapping site JS tests (CI still runs these)"
+fi
+
+echo "pre-push: all checks passed"

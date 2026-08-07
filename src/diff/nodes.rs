@@ -2419,7 +2419,7 @@ class Calculator:
                 let bid = find_semantic_node(before_root, &Language::Python, &before, &key);
                 let aid = find_semantic_node(after_root, &Language::Python, &after, &key);
                 bid.zip(aid)
-                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                    .is_some_and(|(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(
@@ -2589,7 +2589,7 @@ class Calculator {
                 let bid = find_semantic_node(before_root, &Language::Kotlin, &before, &key);
                 let aid = find_semantic_node(after_root, &Language::Kotlin, &after, &key);
                 bid.zip(aid)
-                    .map_or(false, |(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
+                    .is_some_and(|(bid, aid)| diff.mapping.contains_key(&(bid, aid)))
             })
             .collect();
         assert_eq!(
@@ -2721,13 +2721,13 @@ class Calculator {
 ///
 /// Used to find the right anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]
 /// - deliberately a kind allow-list, not "whichever descendant happens to have the most direct
-/// children" (`ASTMetadata::node_to_widest_subtree_node`, which `solve_large_flat_subtrees` uses):
-/// confirmed live that the latter can pick an unrelated, wider, but semantically irrelevant sibling
-/// instead - a Rust function containing a macro call whose `token_tree` has more raw tokens than
-/// the function's own `block` has statements gets the `token_tree` instead, missing the actual
-/// statement sequence entirely (measured on `rust-tauri-cli-ios-dev`: picked a 26-token `token_tree`
-/// over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
-/// matching there at all).
+///   children" (`ASTMetadata::node_to_widest_subtree_node`, which `solve_large_flat_subtrees` uses):
+///   confirmed live that the latter can pick an unrelated, wider, but semantically irrelevant sibling
+///   instead - a Rust function containing a macro call whose `token_tree` has more raw tokens than
+///   the function's own `block` has statements gets the `token_tree` instead, missing the actual
+///   statement sequence entirely (measured on `rust-tauri-cli-ios-dev`: picked a 26-token `token_tree`
+///   over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
+///   matching there at all).
 ///
 /// Not exhaustive - only the kinds this session's own measurements confirmed against real
 /// fixtures (`TODO.md`, 2026-08-05). Safe to extend as more languages show the same pattern: this

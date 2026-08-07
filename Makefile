@@ -59,6 +59,15 @@ build: test
 install:
 	cargo install --path . --force
 
+# Points git at the checked-in .githooks/ directory (not the default, untracked .git/hooks/), so
+# `git push` runs the fast subset of what CI checks (cargo fmt --check, a per-feature-config
+# `cargo check`, the mapping-site JS tests - see .githooks/pre-push's own comment for why it's a
+# subset, not a full CI mirror) before the push leaves your machine. One-time, per clone - git
+# does not do this automatically just because .githooks/ exists in the repo.
+install-hooks:
+	git config core.hooksPath .githooks
+	@echo "pre-push hook enabled (git config core.hooksPath .githooks) - see .githooks/pre-push"
+
 # Scores codediff's diffing accuracy against the human-authored ground truth corpus in
 # src/test/data/ - the project's own primary regression gate for any change to the diff
 # algorithm (see TODO.md). --features test-fixtures: this binary needs codediff::test's

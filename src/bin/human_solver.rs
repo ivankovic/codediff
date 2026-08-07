@@ -1638,7 +1638,7 @@ fn kind_mismatch_modal(before_node: Node, after_node: Node, recursive: bool) -> 
 /// hash) for a pair with children. Shared by [`action_match`] and [`action_match_to_end`], which
 /// both just need the resulting operation before continuing their own, differing follow-up logic
 /// - unlike [`action_match_subtree`]'s leaf case, which resolves and returns immediately instead
-/// of continuing, so it classifies its own leaf pairs inline rather than sharing this helper.
+///   of continuing, so it classifies its own leaf pairs inline rather than sharing this helper.
 fn classify_match_operation(
     before_node: Node,
     after_node: Node,
@@ -2299,6 +2299,10 @@ fn action_insert(
     ))
 }
 
+// Each parameter is genuinely distinct context (the mapping, focus, both sides' flattened node
+// lists, both cursors, both roots, the caches) - a params struct here would just relocate the
+// same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 fn action_unmark(
     mapping: &mut HumanMapping,
     focus: Focus,
@@ -2541,6 +2545,10 @@ fn render_panel(
 const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
     codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
+// Each parameter is genuinely distinct rendering context (the frame, app state, both sides'
+// flattened node lists, the caches, both raw sources, both unmarked counts) - a params struct
+// here would just relocate the same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 fn draw_ui(
     frame: &mut Frame,
     app: &mut App,

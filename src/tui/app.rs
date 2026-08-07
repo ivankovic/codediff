@@ -1123,11 +1123,11 @@ mod tests {
     /// `dispatch_event_to_active_screen` in the same event cycle (since `self.screen` is already
     /// `Help` by the time that call happens), and `HelpModal` treats `?` as its own close key too
     /// - so the same keypress that opens it would immediately close it again, meaning it would
-    /// never visibly show up at all. `handle_events` itself can't be unit-tested directly (it
-    /// owns a real `UI`/terminal, which every other test in this module also avoids), so this
-    /// pins the hazard at the one layer that is testable: simulating exactly the state
-    /// `handle_events` leaves behind right after opening the modal, and confirming that
-    /// re-delivering the same keystroke to it would indeed cancel it.
+    ///   never visibly show up at all. `handle_events` itself can't be unit-tested directly (it
+    ///   owns a real `UI`/terminal, which every other test in this module also avoids), so this
+    ///   pins the hazard at the one layer that is testable: simulating exactly the state
+    ///   `handle_events` leaves behind right after opening the modal, and confirming that
+    ///   re-delivering the same keystroke to it would indeed cancel it.
     #[test]
     fn redelivering_the_opening_keystroke_would_immediately_close_the_help_modal() {
         use crossterm::event::{KeyEvent, KeyModifiers};

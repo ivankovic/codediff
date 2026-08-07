@@ -1037,7 +1037,7 @@ fn test_apted_engine_matches_oracle_fuzz() {
 
 /// Fisher-Yates shuffle, used by `gen_random_pruning` to pick a random subset of leaves on
 /// each side without repeats.
-fn shuffle(rng: &mut Rng, v: &mut Vec<usize>) {
+fn shuffle(rng: &mut Rng, v: &mut [usize]) {
     for i in (1..v.len()).rev() {
         let j = rng.range(i + 1);
         v.swap(i, j);

@@ -21,6 +21,29 @@ jobs:
 
       - run: cargo fmt --check
 
+  clippy:
+    name: cargo clippy (${{ matrix.features == '' && 'default' || matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same reasoning as build-and-test's matrix below: each feature config is its own
+        # compilation unit (see Cargo.toml's [features]), so each needs its own clippy pass, not
+        # just a single default-feature run.
+        features: ["", "test-fixtures", "stats"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-${{ matrix.features }}
+
+      - run: cargo clippy --tests --features "${{ matrix.features }}" -- -D warnings
+
   audit:
     name: cargo audit
     runs-on: ubuntu-latest

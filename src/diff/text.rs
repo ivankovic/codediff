@@ -1160,10 +1160,10 @@ mod tests {
 
     /// Past the edit-distance cap, `myers_lcs` gives up and the whole file is treated as replaced
     /// - one Delete covering all of before, one Insert covering all of after - rather than paying
-    /// for an unbounded search. Exercises `plain_text_line_diff_with_max_edit` with a small cap
-    /// rather than the real `PLAIN_TEXT_MAX_EDIT` (10,000): actually reaching that cap costs
-    /// O(10,000²) - ~1.6GB and genuinely slow - which the "gave up" *logic* doesn't need paying
-    /// for just to verify it fires and produces the right ranges.
+    ///   for an unbounded search. Exercises `plain_text_line_diff_with_max_edit` with a small cap
+    ///   rather than the real `PLAIN_TEXT_MAX_EDIT` (10,000): actually reaching that cap costs
+    ///   O(10,000²) - ~1.6GB and genuinely slow - which the "gave up" *logic* doesn't need paying
+    ///   for just to verify it fires and produces the right ranges.
     #[test]
     fn plain_text_line_diff_replaces_the_whole_file_past_the_edit_cap() {
         const SMALL_CAP: usize = 20;

@@ -116,6 +116,10 @@ pub fn build_extended_node_list(
 * hash in the new pipeline) rather than threading a second, matcher-specific hash through the
 * caller.
 */
+// Each parameter is genuinely distinct context (both sides' `Code`, the node cache, the two hash
+// maps, the diff, the node-list selector closure) - a params struct here would just relocate the
+// same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn solve_with_hash_map(
     before: &Code,
     after: &Code,

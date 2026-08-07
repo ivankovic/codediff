@@ -1197,6 +1197,10 @@ fn backtrack_myers(
 }
 
 /// Resolve a flat-tree root pair via Myers sequence diff and emit all mappings into `diff`.
+// Each parameter is a genuinely distinct piece of context (both roots, both metadata sets, the
+// pre-computed children, the source string, the mutable diff) - grouping them into a struct built
+// once at this single call site would just move the same information around, not clarify it.
+#[allow(clippy::too_many_arguments)]
 fn resolve_flat_tree_pair(
     before_root: usize,
     after_root: usize,
@@ -1835,6 +1839,10 @@ fn collect_after_subtree_targets(
 ///    more expensive (a same-kind rename is 0 vs. the 2 the delete+insert paid), so if the DP
 ///    didn't take it, it was blocked by then-conflicting descendant matches or tied; the
 ///    containment guard re-checks against the *current* (post-validation, post-pull-up) decisions.
+// Each parameter is genuinely distinct read/mutable state (both metadata sets, the diff, the
+// parent-lookup tables, the two decision maps) - a params struct here would just relocate the
+// same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 fn improve_slot_alignment(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -2159,6 +2167,10 @@ const LARGE_SLOT_SUBTREE: usize = 20;
 
 /// Whether promoting deleted `b` / inserted `a` (same kind, corresponding slots) to a match is
 /// consistent with everything already decided, and plausible to a human.
+// Each parameter is genuinely distinct evidence this decision consults (both node ids, both
+// metadata sets, the diff, the parent tables, the decision maps) - a params struct here would
+// just relocate the same fields, not reduce them.
+#[allow(clippy::too_many_arguments)]
 fn slot_promotion_allowed(
     b: usize,
     a: usize,
@@ -2830,6 +2842,10 @@ pub enum Algorithm {
     Apted,
 }
 
+// Each parameter is genuinely distinct context (both root-id lists, both metadata sets, the
+// algorithm choice, the diff) - a params struct here would just relocate the same fields, not
+// reduce them.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_forest(
     before_root_ids: Vec<usize>,
     after_root_ids: Vec<usize>,

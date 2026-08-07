@@ -126,6 +126,11 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
 * `test` - `cargo test`.
 * `build` - `cargo test` + `cargo build --release --features stats` (needed by every dataset/stats
   target below).
+* `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.
+* `install-hooks` - one-time setup that points git at `.githooks/pre-push`, which runs the fast
+  subset of what CI checks (`cargo fmt --check`, a per-feature-config `cargo check`, the
+  mapping-site JS tests) before a `git push` leaves your machine - see that file's own comment for
+  exactly what it does and does not cover. `git push --no-verify` skips it for one push.
 * `view-diff NAME=<fixture>` - opens one `src/test/data/diffs/` fixture's before/after side by
   side in nvim's diff mode.
 * `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
@@ -232,8 +237,12 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
 Every push and pull request runs (see `.github/workflows/ci.yml`):
 
 * `cargo fmt --check`
-* `cargo build` + `cargo test`, once each for the three Cargo feature configs (default,
+* `cargo clippy --tests -- -D warnings`, once each for the three Cargo feature configs (default,
   `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
+* `cargo build` + `cargo test`, once each for the same three feature configs
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
+* The `human_mapping` site's own vanilla-JS tests (`assets/mapping_site/index.test.js`)
 
-All of these checks must pass before a PR is done.
+All of these checks must pass before a PR is done. `make install-hooks` runs the fast subset of
+these (fmt, clippy, the JS tests) locally before every `git push`, so most failures show up before
+CI does - see "Makefile targets" above.
