@@ -48,6 +48,9 @@ in every example below.
   panel, in blue.
 * `n`/`p` — jump straight to the next or previous change. This skips unchanged lines entirely. It
   wraps around at the start or end of the file.
+* `/` — search the focused panel for text. `Enter` jumps to the nearest match and highlights every
+  match in blue. `Esc` cancels; an empty query clears the current search's highlights. `>`/`<` step
+  to the next/previous match once a search is active.
 * `Page Up`/`Page Down`/`Home`/`End` — scroll.
 * `q` or `Esc` — quit. If a dialog is open, `Esc` cancels the dialog instead.
 

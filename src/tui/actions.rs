@@ -91,4 +91,7 @@ pub enum Action {
     },
     /// The user answered the `SelectDiffMode` prompt.
     DiffModeSelected(DiffMode),
+    /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
+    /// cursor to the nearest match and highlight every match.
+    SearchSubmitted(String),
 }

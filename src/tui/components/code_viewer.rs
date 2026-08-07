@@ -188,6 +188,33 @@ impl CodeViewer {
         self.state.change_count_and_index()
     }
 
+    /// Search this file for case-insensitive occurrences of `query`, replacing any previous
+    /// search, and jump the cursor to the nearest match at or after the current position (wrapping
+    /// to the first match otherwise) - what pressing Enter in the search modal does. Clears any
+    /// existing highlighted matches with no jump if `query` matches nothing (including an empty
+    /// query).
+    pub fn search(&mut self, query: &str) {
+        self.state.search_matches = self.widget.find_matches(query);
+        if let Some((row, col)) = self.state.nearest_search_match_position() {
+            self.set_cursor_position(row, col);
+        }
+    }
+
+    /// Move the cursor to the next (`forward = true`) or previous (`forward = false`) search
+    /// match (`>`/`<`) - see `CodeViewerState::next_search_match_position`. A no-op if there's no
+    /// active search.
+    pub fn jump_to_search_match(&mut self, forward: bool) {
+        if let Some((row, col)) = self.state.next_search_match_position(forward) {
+            self.set_cursor_position(row, col);
+        }
+    }
+
+    /// Total current search matches and how many are at or before the cursor - see
+    /// `CodeViewerState::search_match_count_and_index`.
+    pub fn search_match_count_and_index(&self) -> Option<(usize, usize)> {
+        self.state.search_match_count_and_index()
+    }
+
     /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
     /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
     /// to match the active panel's cursor destination.
@@ -394,5 +421,54 @@ mod tests {
         viewer.set_cursor_position(0, 1);
         viewer.move_cursor_horizontal(0);
         assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (0, 1));
+    }
+
+    #[test]
+    fn search_jumps_the_cursor_to_the_first_match_at_or_after_the_cursor() {
+        let mut viewer = viewer_with("foo\nbar\nfoo bar\n");
+        viewer.search("bar");
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (1, 0));
+    }
+
+    #[test]
+    fn search_with_no_matches_leaves_the_cursor_untouched() {
+        let mut viewer = viewer_with("foo\nbar\n");
+        viewer.set_cursor_position(1, 1);
+        viewer.search("xyz");
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (1, 1));
+        assert_eq!(viewer.search_match_count_and_index(), None);
+    }
+
+    #[test]
+    fn jump_to_search_match_steps_forward_and_wraps() {
+        let mut viewer = viewer_with("bar\nfoo\nbar\n");
+        viewer.search("bar");
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (0, 0));
+
+        viewer.jump_to_search_match(true);
+        assert_eq!((viewer.state.cursor_row, viewer.state.cursor_col), (2, 0));
+
+        viewer.jump_to_search_match(true);
+        assert_eq!(
+            (viewer.state.cursor_row, viewer.state.cursor_col),
+            (0, 0),
+            "forward past the last match should wrap to the first"
+        );
+    }
+
+    #[test]
+    fn search_match_count_and_index_reflects_the_active_search() {
+        let mut viewer = viewer_with("bar\nfoo\nbar\n");
+        assert_eq!(
+            viewer.search_match_count_and_index(),
+            None,
+            "no active search yet"
+        );
+
+        viewer.search("bar");
+        assert_eq!(viewer.search_match_count_and_index(), Some((1, 2)));
+
+        viewer.jump_to_search_match(true);
+        assert_eq!(viewer.search_match_count_and_index(), Some((2, 2)));
     }
 }

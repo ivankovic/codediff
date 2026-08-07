@@ -75,7 +75,7 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   files.
 - **Complexity:** Low.
 
-## Phase 2: Search / find-in-file
+## Phase 2: Search / find-in-file (DONE, 2026-08-07)
 
 - **Problem:** No way to search for text within a file; the only navigation aids are cursor
   movement and jump-to-next-change.
@@ -85,6 +85,20 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
 - **Impact:** Standard, expected editor/pager feature; currently the biggest missing usability
   primitive.
 - **Complexity:** Medium.
+- **Status:** IMPLEMENTED (2026-08-07). `/` opens `SearchModal` (new text-entry dialog, same visual
+  scaffold as `ThemeDialog`/`FileDialog` but no list to select from). Enter emits
+  `Action::SearchSubmitted`, resolved by `App::handle_search_submitted` into
+  `DiffViewer::search`/`CodeViewer::search`/`CodeViewerWidget::find_matches` (case-insensitive,
+  per-line substring search - matches never span a line break). `>`/`<` step between matches
+  (`CodeViewerState::next_search_match_position`), a distinct pair from `n`/`p` rather than
+  overloading them, since `help_modal.rs` already documents those as change-navigation. Matches
+  render in the same `cross_highlight_bg` blue as the cursor's cross-panel highlight - a dedicated
+  search color was deliberately deferred (would need touching `OverlayPalette` across all 8 themes
+  and their distinctness tests, a separate chunk of work with its own failure mode). The footer's
+  `match N/M` replaces `change N/M` while a search is active rather than showing both, to stay
+  inside the footer's fixed-width left column. `CodeViewerState::next_position`/`count_and_index`
+  were extracted as free functions shared between change-navigation (`n`/`p`) and search-navigation
+  (`>`/`<`), which turned out to need identical wrap-around/counting logic.
 
 ## Phase 3: Jump-to-line
 

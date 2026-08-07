@@ -130,6 +130,34 @@ impl DiffViewer {
         self.sync_scroll();
     }
 
+    /// Search the focused panel for `query`, replacing any previous search, and jump its cursor to
+    /// the nearest match - what pressing Enter in the search modal does, then push the resulting
+    /// matched node onto the other panel's cross-highlight like any other cursor movement.
+    pub fn search(&mut self, query: &str) {
+        self.focused_viewer().search(query);
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
+    /// Move the focused panel's cursor to the next (`forward = true`) or previous (`forward =
+    /// false`) search match (`>`/`<`), and sync the cross-highlight/scroll same as any other
+    /// cursor movement.
+    pub fn jump_to_search_match(&mut self, forward: bool) {
+        self.focused_viewer().jump_to_search_match(forward);
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
+    /// The focused panel's total search matches and how many are at or before the cursor - shown
+    /// in `app.rs`'s footer, in place of `change N/M`, while a search is active.
+    pub fn focused_search_match_count_and_index(&self) -> Option<(usize, usize)> {
+        let viewer = match self.active_panel {
+            Panel::Before => &self.left_viewer,
+            Panel::After => &self.right_viewer,
+        };
+        viewer.search_match_count_and_index()
+    }
+
     /// Push the focused panel's current cursor destination onto the other panel's
     /// cross-highlight, and move the other panel's cursor to follow the matched leaf node;
     /// call after anything that can change the cursor or the focused panel.
@@ -325,6 +353,17 @@ impl Component for DiffViewer {
             }
             crossterm::event::KeyCode::Char('p') => {
                 self.jump_to_change(false);
+                Ok(Some(Action::Render))
+            }
+            // >/< jump the cursor between search matches (see the `/` search modal), the same
+            // wrap-around convention as n/p - a distinct pair rather than overloading n/p, since
+            // help_modal.rs already documents those as change-navigation specifically.
+            crossterm::event::KeyCode::Char('>') => {
+                self.jump_to_search_match(true);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('<') => {
+                self.jump_to_search_match(false);
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::PageUp => {
@@ -745,5 +784,50 @@ mod tests {
 
         viewer.jump_to_change(false);
         assert_eq!(viewer.left_viewer.state().cursor_row, 2);
+    }
+
+    /// `search` (the `/` modal's Enter) must operate on the focused panel and, like every other
+    /// cursor movement, sync the resulting position onto the other panel's cross-highlight.
+    #[test]
+    fn search_jumps_the_focused_panel_and_syncs_the_other_panel() {
+        let mut viewer = DiffViewer::new();
+        let mut data = sample_diff_data();
+        data.before_contents = "foo\nbar\nfoo bar\n".to_string();
+        data.after_contents = "xyz\n".to_string();
+        viewer.load_diff(&data);
+
+        viewer.search("bar");
+        assert_eq!(viewer.left_viewer.state().cursor_row, 1);
+        assert_eq!(viewer.focused_search_match_count_and_index(), Some((1, 2)));
+    }
+
+    /// `>`/`<` (`jump_to_search_match`) step through matches on the focused panel and wrap around,
+    /// same convention as `n`/`p`.
+    #[test]
+    fn jump_to_search_match_steps_through_matches_on_the_focused_panel() {
+        let mut viewer = DiffViewer::new();
+        let mut data = sample_diff_data();
+        data.before_contents = "bar\nfoo\nbar\n".to_string();
+        viewer.load_diff(&data);
+
+        viewer.search("bar");
+        assert_eq!(viewer.left_viewer.state().cursor_row, 0);
+
+        viewer.jump_to_search_match(true);
+        assert_eq!(viewer.left_viewer.state().cursor_row, 2);
+
+        viewer.jump_to_search_match(true);
+        assert_eq!(
+            viewer.left_viewer.state().cursor_row,
+            0,
+            "forward past the last match should wrap to the first"
+        );
+    }
+
+    #[test]
+    fn focused_search_match_count_and_index_is_none_before_any_search() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+        assert_eq!(viewer.focused_search_match_count_and_index(), None);
     }
 }

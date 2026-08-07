@@ -43,6 +43,7 @@ use crate::tui::components::{
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
     help_modal::HelpModal,
+    search_modal::SearchModal,
     theme_dialog::ThemeDialog,
 };
 use crate::tui::events::Event;
@@ -67,6 +68,8 @@ pub enum AppScreen {
     SelectDiffMode,
     /// The `?` keybinding reference is open, drawn over the (still-visible) viewer.
     Help,
+    /// The `/` search modal is open, drawn over the (still-visible) viewer.
+    Search,
 }
 
 /// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
@@ -86,7 +89,8 @@ fn esc_should_quit(screen: AppScreen) -> bool {
         AppScreen::SelectFile
         | AppScreen::SelectTheme
         | AppScreen::SelectDiffMode
-        | AppScreen::Help => false,
+        | AppScreen::Help
+        | AppScreen::Search => false,
     }
 }
 
@@ -100,6 +104,7 @@ pub struct App {
     theme_dialog: Option<ThemeDialog>,
     diff_mode_dialog: Option<DiffModeDialog>,
     help_modal: Option<HelpModal>,
+    search_modal: Option<SearchModal>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -157,6 +162,7 @@ impl App {
             theme_dialog: None,
             diff_mode_dialog: None,
             help_modal: None,
+            search_modal: None,
             action_tx,
             action_rx,
             pending_diff_mode_tx: Arc::new(Mutex::new(None)),
@@ -250,6 +256,12 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
+                KeyCode::Char('/') if self.screen == AppScreen::Viewer => {
+                    self.search_modal = Some(SearchModal::new());
+                    self.screen = AppScreen::Search;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
                 _ => {}
             }
         }
@@ -295,6 +307,10 @@ impl App {
                 None => Ok(None),
             },
             AppScreen::Help => match self.help_modal.as_mut() {
+                Some(modal) => modal.handle_events(Some(event)),
+                None => Ok(None),
+            },
+            AppScreen::Search => match self.search_modal.as_mut() {
                 Some(modal) => modal.handle_events(Some(event)),
                 None => Ok(None),
             },
@@ -375,6 +391,7 @@ impl App {
                         Some(DiffModeDialog::new(*unmatched_before, *unmatched_after));
                     self.screen = AppScreen::SelectDiffMode;
                 }
+                Action::SearchSubmitted(query) => self.handle_search_submitted(query.clone()),
                 Action::DiffModeSelected(mode) => {
                     if let Some(tx) = self
                         .pending_diff_mode_tx
@@ -439,7 +456,16 @@ impl App {
         self.file_dialog = None;
         self.theme_dialog = None;
         self.help_modal = None;
+        self.search_modal = None;
         self.dialog_target = None;
+        self.screen = AppScreen::Viewer;
+    }
+
+    /// Apply a search query from the search modal: jump the focused panel's cursor to the nearest
+    /// match and highlight every match, then return to the normal viewer screen.
+    fn handle_search_submitted(&mut self, query: String) {
+        self.diff_viewer.search(&query);
+        self.search_modal = None;
         self.screen = AppScreen::Viewer;
     }
 
@@ -502,6 +528,7 @@ impl App {
                 }
                 AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
                 AppScreen::Help => self.draw_help_modal(frame, area),
+                AppScreen::Search => self.draw_search_modal(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -571,7 +598,12 @@ impl App {
                 left_parts.push(counts_text);
             }
         }
-        if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
+        // While a search is active, its progress replaces "change N/M" rather than sitting
+        // alongside it - both convey "progress through a list of positions," and showing both at
+        // once would risk overflowing the footer's fixed-width left column on a narrow terminal.
+        if let Some((index, total)) = self.diff_viewer.focused_search_match_count_and_index() {
+            left_parts.push(format!("match {index}/{total}"));
+        } else if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
             left_parts.push(format!("change {index}/{total}"));
         }
         if let Some(mode) = self.diff_mode {
@@ -627,11 +659,27 @@ impl App {
         frame.render_widget(Clear, popup);
         modal.draw(frame, popup)
     }
+
+    /// Draw the `/` search input as a popup over the (still-visible) viewer behind it, with a real
+    /// blinking terminal cursor at the end of the typed query - same convention as the focused
+    /// code panel's own cursor (`CodeViewer::cursor_screen_position`).
+    fn draw_search_modal(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(modal) = self.search_modal.as_mut() else {
+            return Ok(());
+        };
+        let popup = modal.popup_area(area);
+        frame.render_widget(Clear, popup);
+        modal.draw(frame, popup)?;
+        let (x, y) = modal.cursor_screen_position(popup);
+        frame.set_cursor(x, y);
+        Ok(())
+    }
 }
 
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
-const FOOTER_HINTS: &str = "?:help  o:open  n/p:next/prev  Tab:switch  q:quit";
+const FOOTER_HINTS: &str = "?:help  o:open  n/p:next/prev  /:search  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
 /// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
@@ -968,6 +1016,7 @@ mod tests {
         assert!(!esc_should_quit(AppScreen::SelectTheme));
         assert!(!esc_should_quit(AppScreen::SelectDiffMode));
         assert!(!esc_should_quit(AppScreen::Help));
+        assert!(!esc_should_quit(AppScreen::Search));
     }
 
     #[test]
@@ -1013,6 +1062,52 @@ mod tests {
         assert_eq!(
             action,
             Some(Action::DialogCancelled),
+            "confirms why handle_events must skip re-dispatching the keystroke that just opened \
+             this screen, not just document it"
+        );
+    }
+
+    #[test]
+    fn handle_search_submitted_jumps_the_focused_panel_and_returns_to_the_viewer_screen() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.screen = AppScreen::Search;
+        app.search_modal = Some(SearchModal::new());
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "foo\nbar\n".to_string(),
+            after_contents: "foo\nbar\n".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+            comment_only: false,
+            mode: DiffMode::Fast,
+        });
+
+        app.handle_search_submitted("bar".to_string());
+
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.search_modal.is_none());
+        assert_eq!(app.diff_viewer.focused_cursor_position(), Some((1, 0)));
+    }
+
+    /// Same hazard as `redelivering_the_opening_keystroke_would_immediately_close_the_help_modal`,
+    /// but for `/`: `SearchModal` treats every `Char` key as "append to the query," so without
+    /// `handle_events`'s `globally_handled` guard, the very keystroke that opens the modal would
+    /// also reach it in the same event cycle and seed the query with a stray `/`.
+    #[test]
+    fn redelivering_the_opening_keystroke_would_seed_the_search_query_with_a_stray_slash() {
+        use crossterm::event::{KeyEvent, KeyModifiers};
+
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.search_modal = Some(SearchModal::new());
+        app.screen = AppScreen::Search;
+
+        let event = Event::Key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE));
+        app.dispatch_event_to_active_screen(event).unwrap();
+
+        assert_eq!(
+            app.search_modal.unwrap().query(),
+            "/",
             "confirms why handle_events must skip re-dispatching the keystroke that just opened \
              this screen, not just document it"
         );
@@ -1216,6 +1311,52 @@ mod tests {
         assert!(
             rendered_text(&terminal).contains("change 1/1"),
             "expected the footer to show change progress once the focused panel has a change"
+        );
+        Ok(())
+    }
+
+    /// While a search is active, the footer's progress indicator must show "match N/M" - not
+    /// "change N/M" - even when the diff itself also has changes, since the two would otherwise
+    /// compete for the same fixed-width footer column (see `draw_footer`'s own comment).
+    #[test]
+    fn draw_viewer_shows_search_match_progress_in_the_footer_in_place_of_change_progress()
+    -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "foo\nbar\nfoo bar\n".to_string(),
+            after_contents: "foo\nbar\nfoo bar\n".to_string(),
+            before_ranges: vec![crate::diff::text::RangeMatch {
+                source: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                destination: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                operation: crate::diff::text::TextOperation::Update,
+            }],
+            after_ranges: vec![crate::diff::text::RangeMatch {
+                source: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                destination: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                operation: crate::diff::text::TextOperation::Update,
+            }],
+            comment_only: false,
+            mode: DiffMode::Fast,
+        });
+        app.diff_viewer.search("bar");
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("match 1/2"),
+            "expected the footer to show search-match progress"
+        );
+        assert!(
+            !text.contains("change 1/"),
+            "change progress must be replaced, not shown alongside, search-match progress"
         );
         Ok(())
     }

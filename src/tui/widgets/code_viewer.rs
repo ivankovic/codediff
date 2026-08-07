@@ -133,6 +133,45 @@ fn range_at(ranges: &[RangeMatch], order: &[usize], row: usize, col: usize) -> O
     ((row, col) < (r.end_row, r.end_column)).then_some(candidate)
 }
 
+/// The nearest position in `positions` (assumed sorted) strictly after (`forward = true`) or
+/// before (`forward = false`) `cursor`, wrapping around at the ends rather than stopping - shared
+/// by change navigation (`n`/`p`) and search navigation (`>`/`<`), which both jump in exactly this
+/// way, just over a different position list.
+fn next_position(
+    positions: &[(usize, usize)],
+    cursor: (usize, usize),
+    forward: bool,
+) -> Option<(usize, usize)> {
+    if forward {
+        positions
+            .iter()
+            .find(|&&pos| pos > cursor)
+            .or_else(|| positions.first())
+            .copied()
+    } else {
+        positions
+            .iter()
+            .rev()
+            .find(|&&pos| pos < cursor)
+            .or_else(|| positions.last())
+            .copied()
+    }
+}
+
+/// Total entries in `positions`, and how many sit at or before `cursor` (1-indexed) - shared by
+/// `change_count_and_index` and `search_match_count_and_index`. `None` if `positions` is empty.
+fn count_and_index(positions: &[(usize, usize)], cursor: (usize, usize)) -> Option<(usize, usize)> {
+    if positions.is_empty() {
+        return None;
+    }
+    let index = positions
+        .iter()
+        .filter(|&&pos| pos <= cursor)
+        .count()
+        .max(1);
+    Some((index, positions.len()))
+}
+
 /// Returns the `[start_column, end_column)` portion of `range` that falls on `row`, given the
 /// number of characters on that row, or `None` if `range` doesn't cover any part of `row`.
 fn columns_on_row(range: &TextRange, row: usize, row_len: usize) -> Option<(usize, usize)> {
@@ -222,6 +261,10 @@ pub struct CodeViewerState {
     /// only `highlight_destination` pushed from the focused side - never both on the same panel,
     /// and never the unfocused side's own stale cursor position.
     pub is_focused: bool,
+    /// Every current search match (from the `/` search modal), painted in the same blue as
+    /// `highlight_destination` - see `CodeViewerWidget::find_matches`. Empty when no search is
+    /// active.
+    pub search_matches: Vec<TextRange>,
 }
 
 impl CodeViewerState {
@@ -246,6 +289,7 @@ impl CodeViewerState {
         self.cursor_row = row;
         self.cursor_col = col;
         self.highlight_destination = None;
+        self.search_matches = Vec::new();
     }
 
     /// Every change's `(row, column)` start position (anything but `Identical`/the `NotYetSet`
@@ -272,29 +316,27 @@ impl CodeViewerState {
             .collect()
     }
 
+    /// Every current search match's `(row, column)` start position, in document order -
+    /// `CodeViewerWidget::find_matches` already produces them row-major, left-to-right, so this is
+    /// just a projection.
+    fn search_positions(&self) -> Vec<(usize, usize)> {
+        self.search_matches
+            .iter()
+            .map(|range| (range.start_row, range.start_column))
+            .collect()
+    }
+
     /// The `(row, column)` of the start of the nearest actual change strictly after (`forward =
     /// true`) or before (`forward = false`) the cursor's current position - what `n`/`p` jump to.
     /// Wraps around (forward past the last change goes to the first, and vice versa) rather than
     /// stopping at the ends, same convention as a search's `n`/`N`. `None` if there are no changes
     /// at all (e.g. two identical files).
     pub fn next_change_position(&self, forward: bool) -> Option<(usize, usize)> {
-        let cursor = (self.cursor_row, self.cursor_col);
-        let changes = self.change_positions();
-
-        if forward {
-            changes
-                .iter()
-                .find(|&&pos| pos > cursor)
-                .or_else(|| changes.first())
-                .copied()
-        } else {
-            changes
-                .iter()
-                .rev()
-                .find(|&&pos| pos < cursor)
-                .or_else(|| changes.last())
-                .copied()
-        }
+        next_position(
+            &self.change_positions(),
+            (self.cursor_row, self.cursor_col),
+            forward,
+        )
     }
 
     /// Total distinct changes, and how many of them sit at or before the cursor's current
@@ -303,13 +345,40 @@ impl CodeViewerState {
     /// (as `next_change_position` always does) counts that change itself, so pressing `n`
     /// repeatedly counts 1, 2, 3, ... in step with each jump.
     pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
+        count_and_index(&self.change_positions(), (self.cursor_row, self.cursor_col))
+    }
+
+    /// The nearest search match at or after the cursor, wrapping to the very first match if the
+    /// cursor is past every match - what pressing Enter in the search modal jumps to. Unlike
+    /// `next_search_match_position` (strictly after, so repeated `>` presses always advance),
+    /// landing exactly on a match counts here: this is the *first* jump for a fresh search, not a
+    /// step from a previous one, so a match right under the cursor should still be found.
+    pub fn nearest_search_match_position(&self) -> Option<(usize, usize)> {
         let cursor = (self.cursor_row, self.cursor_col);
-        let changes = self.change_positions();
-        if changes.is_empty() {
-            return None;
-        }
-        let index = changes.iter().filter(|&&pos| pos <= cursor).count().max(1);
-        Some((index, changes.len()))
+        let positions = self.search_positions();
+        positions
+            .iter()
+            .find(|&&pos| pos >= cursor)
+            .or_else(|| positions.first())
+            .copied()
+    }
+
+    /// The `(row, column)` of the start of the nearest search match strictly after (`forward =
+    /// true`) or before (`forward = false`) the cursor - what `>`/`<` jump to. Same wrap-around
+    /// convention as `next_change_position`.
+    pub fn next_search_match_position(&self, forward: bool) -> Option<(usize, usize)> {
+        next_position(
+            &self.search_positions(),
+            (self.cursor_row, self.cursor_col),
+            forward,
+        )
+    }
+
+    /// Total current search matches, and how many sit at or before the cursor (1-indexed) - the
+    /// "match N/M" the footer shows in place of "change N/M" while a search is active. `None` when
+    /// there are no matches (including when no search has been run yet).
+    pub fn search_match_count_and_index(&self) -> Option<(usize, usize)> {
+        count_and_index(&self.search_positions(), (self.cursor_row, self.cursor_col))
     }
 
     /// The index into `ranges` of the range covering the cursor's current position, if any (the
@@ -478,6 +547,41 @@ impl CodeViewerWidget {
             .unwrap_or(0)
     }
 
+    /// Every case-insensitive occurrence of `query` in the file, in document order, as `TextRange`s
+    /// (always `start_row == end_row`: a search match never spans a line break, unlike diff
+    /// ranges). Empty for an empty query. Columns are character offsets into the *original* line,
+    /// matching every other column in this module (`cursor_col`, `columns_on_row`).
+    ///
+    /// Matches char-by-char against the original line rather than lowercasing the whole line and
+    /// searching that: `str::to_lowercase` isn't length-preserving for every character (e.g. 'İ'
+    /// becomes two characters), so a byte offset found in a lowercased copy doesn't reliably map
+    /// back to a column in the original - it would shift every match after such a character by
+    /// however many characters the lowercasing added, misaligning the highlight.
+    pub fn find_matches(&self, query: &str) -> Vec<TextRange> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let lower_query: Vec<char> = query.chars().flat_map(char::to_lowercase).collect();
+        let query_len = lower_query.len();
+        let mut matches = Vec::new();
+        for (row, line) in self.contents.lines().enumerate() {
+            let chars: Vec<char> = line.chars().collect();
+            if chars.len() < query_len {
+                continue;
+            }
+            'starts: for start in 0..=(chars.len() - query_len) {
+                for (offset, &query_char) in lower_query.iter().enumerate() {
+                    let mut lowered = chars[start + offset].to_lowercase();
+                    if lowered.next() != Some(query_char) || lowered.next().is_some() {
+                        continue 'starts;
+                    }
+                }
+                matches.push(TextRange::new(row, start, row, start + query_len));
+            }
+        }
+        matches
+    }
+
     /// The area inside this widget's own border, given the full area it would be rendered into -
     /// or `area` unchanged if `hide_border` means there's no border to inset for. Exposed so
     /// callers (e.g. terminal-cursor placement in `CodeViewer`) can compute screen coordinates
@@ -632,6 +736,22 @@ impl CodeViewerWidget {
             }
         }
 
+        // Search matches (from the `/` modal), painted in the same blue as the cross-highlight -
+        // both mean "this is the thing you're pointing at." Usually empty (no active search), so
+        // this loop is a no-op on every other frame.
+        for search_match in &state.search_matches {
+            if let Some((start_col, end_col)) = columns_on_row(search_match, row, row_len) {
+                line = paint_columns(
+                    &line,
+                    start_col,
+                    end_col,
+                    Style::new()
+                        .fg(palette.overlay_fg)
+                        .bg(palette.cross_highlight_bg),
+                );
+            }
+        }
+
         // The cross-highlight pushed from the focused side's cursor; only relevant on the
         // unfocused side (the focused side already shows its own cursor highlight above), so
         // switching focus can never paint both blues onto the same panel at once.
@@ -764,6 +884,42 @@ mod tests {
         // Reaching here at all (no panic) is the actual assertion; also confirm it still produced
         // real output rather than silently going blank.
         assert!(!widget.highlighted_lines.is_empty());
+    }
+
+    #[test]
+    fn find_matches_finds_case_insensitive_occurrences_in_document_order() {
+        let widget = widget_with_line("Hello world\nworld hello WORLD\n");
+        let matches = widget.find_matches("world");
+        assert_eq!(
+            matches,
+            vec![
+                TextRange::new(0, 6, 0, 11),
+                TextRange::new(1, 0, 1, 5),
+                TextRange::new(1, 12, 1, 17),
+            ]
+        );
+    }
+
+    #[test]
+    fn find_matches_is_empty_for_an_empty_query_or_no_occurrences() {
+        let widget = widget_with_line("hello world\n");
+        assert_eq!(widget.find_matches(""), Vec::new());
+        assert_eq!(widget.find_matches("xyz"), Vec::new());
+    }
+
+    /// U+0130 (Turkish dotted capital 'İ') lowercases to *two* characters ('i' plus a combining
+    /// dot above) under Rust's locale-independent `to_lowercase`. Naively lowercasing the whole
+    /// line before searching, then mapping a byte offset back through the *lowercased* copy, would
+    /// shift every match after it by one column - matching char-by-char against the original line
+    /// avoids that entirely, so "world" must still be found at its true column (2), not one column
+    /// later.
+    #[test]
+    fn find_matches_columns_are_correct_when_lowercasing_changes_character_count() {
+        let widget = widget_with_line("İ world\n");
+        assert_eq!(
+            widget.find_matches("world"),
+            vec![TextRange::new(0, 2, 0, 7)]
+        );
     }
 
     /// The palette `widget_with_line`'s widget uses, since it never overrides `overlay_theme`.
@@ -1064,6 +1220,132 @@ mod tests {
         state.cursor_row = 9;
         state.cursor_col = 0;
         assert_eq!(state.change_count_and_index(), Some((3, 3)));
+    }
+
+    /// Three search matches on rows 1, 4, and 8 - shared setup for the search-navigation tests,
+    /// mirroring `state_with_three_changes_on_rows_2_5_and_9` above.
+    fn state_with_three_search_matches_on_rows_1_4_and_8() -> CodeViewerState {
+        CodeViewerState {
+            search_matches: vec![
+                TextRange::new(1, 0, 1, 4),
+                TextRange::new(4, 2, 4, 6),
+                TextRange::new(8, 1, 8, 5),
+            ],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn nearest_search_match_position_finds_the_match_at_or_after_the_cursor() {
+        let mut state = state_with_three_search_matches_on_rows_1_4_and_8();
+        state.cursor_row = 0;
+        state.cursor_col = 0;
+        assert_eq!(state.nearest_search_match_position(), Some((1, 0)));
+
+        state.cursor_row = 4;
+        state.cursor_col = 2;
+        assert_eq!(
+            state.nearest_search_match_position(),
+            Some((4, 2)),
+            "sitting exactly on a match should find that match, unlike next_change_position's \
+             strictly-after semantics - this is the first jump for a fresh search"
+        );
+
+        state.cursor_row = 9;
+        state.cursor_col = 0;
+        assert_eq!(
+            state.nearest_search_match_position(),
+            Some((1, 0)),
+            "past the last match should wrap to the first"
+        );
+    }
+
+    #[test]
+    fn nearest_search_match_position_is_none_with_no_matches() {
+        let state = CodeViewerState::default();
+        assert_eq!(state.nearest_search_match_position(), None);
+    }
+
+    #[test]
+    fn next_search_match_position_wraps_around_at_the_ends() {
+        let mut state = state_with_three_search_matches_on_rows_1_4_and_8();
+
+        state.cursor_row = 4;
+        state.cursor_col = 2;
+        assert_eq!(
+            state.next_search_match_position(true),
+            Some((8, 1)),
+            "sitting exactly on a match should jump to the *next* one, not stay put"
+        );
+
+        state.cursor_row = 8;
+        state.cursor_col = 5; // past the last match
+        assert_eq!(
+            state.next_search_match_position(true),
+            Some((1, 0)),
+            "forward past the last match should wrap to the first"
+        );
+
+        state.cursor_row = 0;
+        state.cursor_col = 0; // before the first match
+        assert_eq!(
+            state.next_search_match_position(false),
+            Some((8, 1)),
+            "backward before the first match should wrap to the last"
+        );
+    }
+
+    #[test]
+    fn search_match_count_and_index_counts_matches_at_or_before_the_cursor() {
+        let mut state = state_with_three_search_matches_on_rows_1_4_and_8();
+
+        state.cursor_row = 0;
+        state.cursor_col = 0;
+        assert_eq!(state.search_match_count_and_index(), Some((1, 3)));
+
+        state.cursor_row = 4;
+        state.cursor_col = 2;
+        assert_eq!(state.search_match_count_and_index(), Some((2, 3)));
+
+        state.cursor_row = 8;
+        state.cursor_col = 5;
+        assert_eq!(state.search_match_count_and_index(), Some((3, 3)));
+    }
+
+    #[test]
+    fn search_match_count_and_index_is_none_with_no_matches() {
+        let state = CodeViewerState::default();
+        assert_eq!(state.search_match_count_and_index(), None);
+    }
+
+    #[test]
+    fn load_ranges_clears_any_previous_search_matches() {
+        let mut state = state_with_three_search_matches_on_rows_1_4_and_8();
+        state.load_ranges(Vec::new());
+        assert_eq!(state.search_matches, Vec::new());
+    }
+
+    /// `overlay_row` paints search matches in the same blue as the cross-highlight - see
+    /// `cross_highlight_destination_uses_bright_blue_with_explicit_foreground` below for the
+    /// non-search case this mirrors.
+    #[test]
+    fn overlay_row_paints_search_matches_in_the_cross_highlight_color() {
+        let widget = widget_with_line("hello world");
+        let state = CodeViewerState {
+            search_matches: vec![TextRange::new(0, 6, 0, 11)],
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let span = line
+            .spans
+            .iter()
+            .find(|span| span.content == "world")
+            .expect("highlighted span");
+        let palette = default_palette();
+        assert_eq!(span.style.bg, Some(palette.cross_highlight_bg));
+        assert_eq!(span.style.fg, Some(palette.overlay_fg));
     }
 
     /// `cursor_destination` resolves the cursor's current position to the matched range's
