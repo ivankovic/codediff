@@ -34,14 +34,6 @@ test: test-mapping-site-js
 test-mapping-site-js:
 	node assets/mapping_site/index.test.js
 
-# Opens a test fixture's before/after files side by side in nvim. Usage: make view-diff NAME=rust-add-if
-view-diff:
-	@if [ -z "$(NAME)" ]; then \
-		echo "usage: make view-diff NAME=<fixture-name>  (e.g. rust-add-if - see src/test/data/diffs/)" >&2; \
-		exit 1; \
-	fi
-	./src/test/view_test_diff.sh $(NAME)
-
 # --features stats: every target below this one (file-stats, commit-stats, sample-pairs,
 # benchmark-pairs, and the language-specific variants) runs a stats-gated binary
 # (file_stats/commit_stats/sample_code_pairs/benchmark_diff_pairs) that doesn't exist in
