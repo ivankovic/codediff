@@ -140,9 +140,13 @@ mod java_fix_array_index;
 #[cfg(test)]
 mod java_genymobile_scrcpy_change_some_android_version_constant;
 #[cfg(test)]
+mod java_genymobile_scrcpy_switch_from_three_exceptions_to_one;
+#[cfg(test)]
 mod java_nextcloud_android_add_two_function_calls;
 #[cfg(test)]
 mod java_protobuf_add_two_annotations;
+#[cfg(test)]
+mod java_protocolbuffers_protobuf_add_a_method;
 #[cfg(test)]
 mod java_protocolbuffers_protobuf_add_import_and_update_field_access;
 #[cfg(test)]
@@ -199,6 +203,8 @@ mod kotlin_add_validation;
 mod kotlin_fix_loop_bug;
 #[cfg(test)]
 mod kotlin_nextcloud_a_few_small_removals;
+#[cfg(test)]
+mod kotlin_nextcloud_android_add_a_feature;
 #[cfg(test)]
 mod kotlin_nextcloud_android_dot_to_question_mark_dot;
 #[cfg(test)]
@@ -310,6 +316,8 @@ mod rust_next_font_imports_generator;
 #[cfg(test)]
 mod rust_no_change;
 #[cfg(test)]
+mod rust_rust_lang_rust_add_key_to_function_arguments_and_call_sites;
+#[cfg(test)]
 mod rust_rustdesk_add_item;
 #[cfg(test)]
 mod rust_rustdesk_add_one_slice_element;
@@ -416,6 +424,8 @@ mod vimscript_neovim_neovim_add_line_comment;
 #[cfg(test)]
 mod vimscript_neovim_neovim_i_have_no_idea_what_this_diff_does;
 #[cfg(test)]
+mod vimscript_neovim_neovim_improved_asserts;
+#[cfg(test)]
 mod xml_microsoft_terminal_multiline_string_constant_change;
 #[cfg(test)]
 mod xml_mozilla_firefox_firefox_add_a_few_attributes;
@@ -445,5 +455,7 @@ mod yaml_mastodon_mastodon_add_block_pair_translation;
 mod yaml_mastodon_remove_one_pair;
 #[cfg(test)]
 mod yaml_mozilla_pdf_single_value_update;
+#[cfg(test)]
+mod yaml_n8n_io_n8n_add_performance_check_to_ci_config;
 #[cfg(test)]
 mod yaml_twbs_bootstrap_version_pin_with_comment;
