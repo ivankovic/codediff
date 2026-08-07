@@ -224,6 +224,8 @@ mod lua_awesomewm_awesome_comment_changes_and_additions;
 #[cfg(test)]
 mod lua_neovim_neovim_add_if_around_one_line;
 #[cfg(test)]
+mod lua_neovim_neovim_add_new_logic;
+#[cfg(test)]
 mod lua_neovim_neovim_constant_changes;
 #[cfg(test)]
 mod lua_neovim_neovim_if_flips_two_branches;
@@ -273,6 +275,8 @@ mod python_ytdl_add_import_and_function_call;
 mod ruby_homebrew_add_or_expression;
 #[cfg(test)]
 mod ruby_homebrew_brew_change_heredoc_to_string;
+#[cfg(test)]
+mod ruby_homebrew_brew_function_callsite_argument_change;
 #[cfg(test)]
 mod ruby_junegunn_fzf_add_test_case;
 #[cfg(test)]
@@ -411,6 +415,8 @@ mod vimscript_neovim_neovim_add_a_few_lines_one_after_the_other;
 mod vimscript_neovim_neovim_add_line_comment;
 #[cfg(test)]
 mod vimscript_neovim_neovim_i_have_no_idea_what_this_diff_does;
+#[cfg(test)]
+mod xml_microsoft_terminal_multiline_string_constant_change;
 #[cfg(test)]
 mod xml_mozilla_firefox_firefox_add_a_few_attributes;
 #[cfg(test)]

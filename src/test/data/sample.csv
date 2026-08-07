@@ -105,7 +105,7 @@ LUA,awesomeWM-awesome.git,869e63fcdc5ea836f22e935b1eb52fffefb759b3,lib/wibox/wid
 LUA,awesomeWM-awesome.git,88c65a71ddd9ef5b6c18cef576580a4bf7c691dd,tests/examples/wibox/container/arcchart/paddings.lua,lua-awesomewm-awesome-align-to-halign
 LUA,neovim-neovim.git,0501c5fd0959895b18d8166c6c034cdf1832edf3,runtime/lua/vim/lsp/buf.lua,lua-neovim-neovim-if-flips-two-branches
 LUA,neovim-neovim.git,249f305bbcddf10264835c5845035a42030d9184,test/functional/ui/options_spec.lua,lua-neovim-one-added-line
-LUA,neovim-neovim.git,3325536150eda0de4dc69f25beca416c0a0b3e3a,test/functional/ui/screen.lua,
+LUA,neovim-neovim.git,3325536150eda0de4dc69f25beca416c0a0b3e3a,test/functional/ui/screen.lua,lua-neovim-neovim-add-new-logic
 LUA,neovim-neovim.git,844caca881f85fa4e143fbfa982fba48590e8a60,test/functional/ui/cmdline2_spec.lua,lua-neovim-neovim-constant-changes
 LUA,neovim-neovim.git,b99cdd08de42804b0ea2448d6f9f4e476b931b80,runtime/lua/vim/lsp/client.lua,
 LUA,neovim-neovim.git,dec3c6fa346b298e7feb72398f9fdd5d59c11444,test/functional/testnvim.lua,lua-neovim-neovim-add-if-around-one-line
@@ -135,7 +135,7 @@ Ruby,Homebrew-brew.git,561d925fa317dfead3f888cf827625b6524b573e,Library/Homebrew
 Ruby,Homebrew-brew.git,64f62f694d3327ca8ac914b1b5fdc15426bf2274,Library/Homebrew/api/formula.rb,ruby-homebrew-add-or-expression
 Ruby,Homebrew-brew.git,7f333c6b51a8f1c5f955c80e20a8057edc92c067,Library/Homebrew/cmd/reinstall.rb,
 Ruby,Homebrew-brew.git,d58ce5dc4482cff792126703eebe789cdb2296b8,Library/Homebrew/test/livecheck/strategy/github_releases_spec.rb,
-Ruby,Homebrew-brew.git,e72e57910cce57177c139868e2ab43dd2efca160,Library/Homebrew/test/livecheck/skip_conditions_spec.rb,
+Ruby,Homebrew-brew.git,e72e57910cce57177c139868e2ab43dd2efca160,Library/Homebrew/test/livecheck/skip_conditions_spec.rb,ruby-homebrew-brew-function-callsite-argument-change
 Ruby,junegunn-fzf.git,24ff66d4a9d6889988e4d7e373f33f4098870b9e,test/test_go.rb,ruby-junegunn-fzf-add-test-case
 Ruby,junegunn-fzf.git,3148b0f3e88f8a116491135dc10a7ce6d96899bf,test/test_go.rb,ruby-junegunn-fzf-add-test-case-2
 Ruby,mastodon-mastodon.git,7788281759e9bbed23c1ecd4f76ccaa7734eb617,spec/services/activitypub/process_featured_item_service_spec.rb,
@@ -199,7 +199,7 @@ Vimscript,neovim-neovim.git,7b7e8cc724584d9d40cfa84516c8294f4b60d2b9,test/old/te
 Vimscript,neovim-neovim.git,8754118213d79d316f740e739201b34639b4c8f6,test/old/testdir/test_tagjump.vim,vimscript-neovim-neovim-add-line-comment
 Vimscript,neovim-neovim.git,9ca69488cf08d78609ad4baef50bbcbbc937a9b7,runtime/pack/dist/opt/matchit/autoload/matchit.vim,
 Vimscript,neovim-neovim.git,a4ee34a165ef5b190378740d2c4ce15410f0f477,runtime/ftplugin/rst.vim,vimscript-neovim-neovim-add-a-few-lines
-XML,microsoft-terminal.git,1283c0f5b99a2961673249fa77c6b986efb5086c,build/StoreSubmission/Stable/PDPs/pt-BR/PDP.xml,
+XML,microsoft-terminal.git,1283c0f5b99a2961673249fa77c6b986efb5086c,build/StoreSubmission/Stable/PDPs/pt-BR/PDP.xml,xml-microsoft-terminal-multiline-string-constant-change
 XML,mozilla-firefox-firefox.git,5f65e4c7945324f374671ca09cb10d25f1cd3ffe,mobile/android/android-components/components/feature/app-links/src/main/res/values-be/strings.xml,xml-mozilla-firefox-firefox-add-a-few-attributes
 XML,mozilla-firefox-firefox.git,5f65e4c7945324f374671ca09cb10d25f1cd3ffe,mobile/android/android-components/components/feature/app-links/src/main/res/values-hsb/strings.xml,
 XML,nextcloud-android.git,275220d89e07a10816eb4aca5e23c4ff7419ebc2,app/src/main/res/values-is/strings.xml,xml-nextcloud-android-delete-element
