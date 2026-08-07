@@ -932,11 +932,7 @@ mod tests {
 
     #[test]
     fn skip_matched_nodes_test() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (_, after) = test_diffs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (_, after) = test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
@@ -998,11 +994,8 @@ mod tests {
 
     #[test]
     fn solve_for_hello_world_added_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (before, after) =
+            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1119,12 +1112,9 @@ mod tests {
 
     #[test]
     fn solve_for_hello_world_deleted_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (after, before) =
+            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1158,9 +1148,8 @@ mod tests {
 
     #[test]
     fn solve_for_leetcode_1_bugfix() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
+        let (after, before) = test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
         let diff = ASTDiff {
             ..Default::default()
@@ -1196,7 +1185,16 @@ mod tests {
     #[test]
     #[ignore = "slow"]
     fn is_always_valid() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
+        // Runs against the per-language unit test set (see `UNIT_TEST_FIXTURES`) rather than the
+        // whole corpus - validity/completeness is a property every real diff should have
+        // regardless of fixture size, so a representative sample gives the same signal at a
+        // fraction of the corpus's parse cost. Still `#[ignore]`: `for_roots`'s cost is driven by
+        // tree shape (residual size after cheap matching), not node count, so a couple of these
+        // small-by-node-count fixtures (e.g. `c-ffmpeg-added-typedef-to-enum`,
+        // `lua-neovim-one-added-line`) are themselves 100+ seconds through the real algorithm -
+        // see TODO.md for that as a diff-engine perf issue, independent of this test.
+        let test_diffs =
+            test::helper::handmade_test_code_pairs_for(test::helper::UNIT_TEST_FIXTURES)?;
 
         for (diff_name, (before, after)) in test_diffs {
             let mut diff = ASTDiff {
@@ -1223,11 +1221,8 @@ mod tests {
 
     #[test]
     fn hello_world_added_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (before, after) =
+            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1272,13 +1267,9 @@ mod tests {
 
     #[test]
     fn hello_world_deleted_message() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-
         // Note that we flipped after and before so the addition becomes a deletion.
-        let (after, before) = test_diffs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (after, before) =
+            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1321,8 +1312,6 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-
         // This test case is a common python edit: adding an if and identing a few lines after the
         // if.
         //
@@ -1382,7 +1371,7 @@ mod tests {
         //  This is important because this test case makes naive "just do the simple edit distance"
         //  algorithms fail, since those would not usually consider the ability to modify the
         //  parent of a node twice.
-        let (before, after) = test_diffs.get("python-added-if-block").unwrap().clone();
+        let (before, after) = test::helper::handmade_test_code_pair("python-added-if-block")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1451,10 +1440,8 @@ mod tests {
 
     #[test]
     fn python_added_if_block_reverse() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-
         // Note that we do a sneaky and flip (before, after) to get a delete instead of an add.
-        let (after, before) = test_diffs.get("python-added-if-block").unwrap().clone();
+        let (after, before) = test::helper::handmade_test_code_pair("python-added-if-block")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1590,9 +1577,8 @@ mod tests {
 
     #[test]
     fn leetcode_1_bugfix() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
+        let (after, before) = test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
@@ -1626,8 +1612,7 @@ mod tests {
 
     #[test]
     fn no_change_skips_already_matched_nodes() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
+        let (before, after) = test::helper::handmade_test_code_pair("rust-no-change")?;
 
         // First, run the full diff algorithm which should match all nodes
         let mut diff = ASTDiff {
@@ -1667,8 +1652,6 @@ mod tests {
     #[test]
     #[ignore = "slow"]
     fn all_handmade_diffs_have_expected_costs() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
-
         // Static map of expected costs for each diff
         let expected_costs: std::collections::HashMap<&str, u64> = [
             ("rust-no-change", 0),
@@ -1689,6 +1672,12 @@ mod tests {
         .iter()
         .cloned()
         .collect();
+
+        // Only load exactly these 14 named fixtures - not the whole corpus. The lookup below
+        // already only checks entries in `expected_costs`, so pulling in the rest of the corpus
+        // (~210 more fixtures with no entry here) would have just been wasted parse time.
+        let names: Vec<&str> = expected_costs.keys().copied().collect();
+        let test_diffs = test::helper::handmade_test_code_pairs_for(&names)?;
 
         for (diff_name, (before, after)) in test_diffs {
             let mut diff = ASTDiff {
@@ -1736,12 +1725,8 @@ mod tests {
 
     #[test]
     fn python_added_if_block_small() -> Result<()> {
-        let test_diffs = test::helper::handmade_test_code_pairs()?;
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test_diffs
-            .get("python-added-if-block-small")
-            .unwrap()
-            .clone();
+        let (after, before) = test::helper::handmade_test_code_pair("python-added-if-block-small")?;
 
         let mut diff = ASTDiff {
             ..Default::default()

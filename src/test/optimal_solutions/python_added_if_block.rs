@@ -23,8 +23,7 @@ use anyhow::Result;
 
 #[test]
 fn python_added_if_block() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("python-added-if-block").unwrap().clone();
+    let (before, after) = test::helper::handmade_test_code_pair("python-added-if-block")?;
 
     let diff = diff::diff_code(&before, &after);
 

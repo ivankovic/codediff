@@ -23,8 +23,7 @@ use anyhow::Result;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
+    let (before, after) = test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
     let diff = diff::diff_code(&before, &after);
 

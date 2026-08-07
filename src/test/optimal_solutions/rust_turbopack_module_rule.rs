@@ -34,11 +34,7 @@ fn matches_human_solution() -> Result<()> {
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get("rust-turbopack-module-rule")
-        .unwrap()
-        .clone();
+    let (before, after) = test::helper::handmade_test_code_pair("rust-turbopack-module-rule")?;
 
     let diff = diff::diff_code(&before, &after);
 

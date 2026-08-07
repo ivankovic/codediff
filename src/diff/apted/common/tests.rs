@@ -1194,8 +1194,7 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
     // a mapping that matches a node to a DIFFERENT node than what APTED would
     // naturally choose, then verify that APTED doesn't create a second mapping
     // for the same node.
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-leetcode-1-bugfix").unwrap().clone();
+    let (before, after) = helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1295,11 +1294,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     // pass already made (here, faked by hand, same technique as
     // test_already_matched_nodes_are_skipped), and still discovering the nested-reuse
     // match (the print(...) call moved one level deeper) for everything else.
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get("python-added-if-block-small")
-        .unwrap()
-        .clone();
+    let (before, after) = helper::handmade_test_code_pair("python-added-if-block-small")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1368,8 +1363,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
 
 #[test]
 fn test_no_change() -> Result<()> {
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
+    let (before, after) = helper::handmade_test_code_pair("rust-no-change")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1398,11 +1392,7 @@ fn test_no_change() -> Result<()> {
 
 #[test]
 fn test_hello_world_added_message() -> Result<()> {
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get("rust-hello-world-added-message")
-        .unwrap()
-        .clone();
+    let (before, after) = helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1448,11 +1438,7 @@ fn test_hello_world_added_message() -> Result<()> {
 
 #[test]
 fn test_hello_world_removed_message() -> Result<()> {
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get("rust-hello-world-removed-message")
-        .unwrap()
-        .clone();
+    let (before, after) = helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1498,11 +1484,7 @@ fn test_hello_world_removed_message() -> Result<()> {
 
 #[test]
 fn test_python_added_if_block_small() -> Result<()> {
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get("python-added-if-block-small")
-        .unwrap()
-        .clone();
+    let (before, after) = helper::handmade_test_code_pair("python-added-if-block-small")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1538,8 +1520,7 @@ fn test_python_added_if_block() -> Result<()> {
     // Larger, more realistic version of test_python_added_if_block_small: a function
     // definition precedes the if-block, and the wrapped statement is an f-string print
     // call. Pins that the nested-reuse fix generalizes beyond the minimal repro.
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("python-added-if-block").unwrap().clone();
+    let (before, after) = helper::handmade_test_code_pair("python-added-if-block")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
@@ -1592,8 +1573,7 @@ fn test_rust_add_if() -> Result<()> {
     // and with the existing if/else demoted to an `else if` branch (nested one level
     // deeper as the new if's else_clause) instead of nested inside a block - guards
     // against tree-sitter-shape-specific assumptions in the fix.
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-add-if").unwrap().clone();
+    let (before, after) = helper::handmade_test_code_pair("rust-add-if")?;
 
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();

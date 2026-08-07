@@ -1302,8 +1302,7 @@ mod tests {
 
     #[test]
     fn no_change_all_ranges() -> Result<()> {
-        let code_pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = code_pairs.get("rust-no-change").unwrap().clone();
+        let (before, after) = test::helper::handmade_test_code_pair("rust-no-change")?;
         let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::Diff::from_code(&before, &after);
 
@@ -1396,11 +1395,8 @@ mod tests {
 
     #[test]
     fn hello_world_added_message_all_ranges() -> Result<()> {
-        let code_pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = code_pairs
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (before, after) =
+            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
         let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::Diff::from_code(&before, &after);
 
@@ -1651,8 +1647,7 @@ mod tests {
 
     #[test]
     fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
-        let code_pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = code_pairs.get("python-added-if-block").unwrap().clone();
+        let (before, after) = test::helper::handmade_test_code_pair("python-added-if-block")?;
         let node_cache = NodeCache::build(&before, &after);
         let diff = crate::diff::Diff::from_code(&before, &after);
 

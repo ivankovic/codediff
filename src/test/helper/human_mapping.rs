@@ -906,11 +906,8 @@ pub fn compute_mismatches_with_config(
     name: &str,
     config: &crate::diff::HeuristicConfig,
 ) -> Result<Vec<String>> {
-    let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get(name)
-        .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
-    compute_mismatches_for_with_config(name, before, after, config)
+    let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+    compute_mismatches_for_with_config(name, &before, &after, config)
 }
 
 /**
@@ -1163,13 +1160,13 @@ pub fn line_mismatches_for_mapping(
 
 /**
 * Same as [`compute_mismatches`], but takes an already-loaded before/after pair instead of looking
-* it up in a freshly-fetched `handmade_test_code_pairs()` map.
+* it up via [`crate::test::helper::handmade_test_code_pair`].
 *
 * Callers that check many fixtures in a loop (e.g. `benchmark_optimal_solutions`) should load the
-* map once and call this directly with a borrowed pair, rather than going through
-* `compute_mismatches` once per fixture - `handmade_test_code_pairs()` is memoized, but every call
-* still clones the *entire* map to hand back an owned one, which is O(fixture count) work just to
-* reach a single entry.
+* full `handmade_test_code_pairs()` map once and call this directly with a borrowed pair, rather
+* than going through `compute_mismatches` once per fixture - that map clone is O(fixture count)
+* work just to reach a single entry, whereas `handmade_test_code_pair` only pays for the one
+* fixture it's asked for.
 */
 pub fn compute_mismatches_for(
     name: &str,
@@ -1368,10 +1365,9 @@ mod tests {
     fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
         // rust-no-change is fully identical before/after, so codediff and Unix diff both agree
         // with the (trivially all-untouched) human mapping perfectly.
-        let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-no-change").unwrap();
+        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
-        let result = line_mismatches_for("rust-no-change", before, after)?;
+        let result = line_mismatches_for("rust-no-change", &before, &after)?;
 
         assert_eq!(result.codediff, 0);
         assert_eq!(result.unix_diff, 0);
@@ -1527,8 +1523,7 @@ mod tests {
     #[test]
     fn detects_a_correct_hand_written_mapping_for_rust_no_change() -> Result<()> {
         // rust-no-change is fully identical before/after, so every node should match itself.
-        let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
+        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let before_ast = before.ast.as_ref().unwrap();
         let root = before_ast.root_node();
@@ -1571,8 +1566,7 @@ mod tests {
     #[test]
     fn detects_an_incorrect_hand_written_mapping() -> Result<()> {
         // Deliberately claim the root is deleted, which is false for rust-no-change.
-        let test_diffs = crate::test::helper::handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
+        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let before_ast = before.ast.as_ref().unwrap();
         let root = before_ast.root_node();

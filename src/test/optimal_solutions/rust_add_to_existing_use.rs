@@ -23,8 +23,7 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-add-to-existing-use").unwrap().clone();
+    let (before, after) = test::helper::handmade_test_code_pair("rust-add-to-existing-use")?;
 
     let diff = diff::diff_code(&before, &after);
 

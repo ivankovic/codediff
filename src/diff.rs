@@ -866,12 +866,10 @@ mod tests {
     /// flakiness in an unoptimized debug build, not because the fast path is expected to need it.
     #[test]
     fn rust_completely_unrelated_main_files_resolves_fast_under_default_fast_mode() -> Result<()> {
-        let pairs = test::helper::handmade_test_code_pairs()?;
-        let (before, after) = pairs
-            .get("rust-completely-unrelated-main-files")
-            .expect("fixture should be loadable from src/test/data/diffs/");
+        let (before, after) =
+            test::helper::handmade_test_code_pair("rust-completely-unrelated-main-files")?;
 
-        let pending = Diff::pending(before, after);
+        let pending = Diff::pending(&before, &after);
         assert!(
             pending.looks_expensive(),
             "this fixture's residual (~40%/~86% unmatched) should trip the guard - counts: {:?}",
@@ -879,7 +877,7 @@ mod tests {
         );
 
         let started = std::time::Instant::now();
-        let diff = Diff::from_code(before, after);
+        let diff = Diff::from_code(&before, &after);
         let elapsed = started.elapsed();
 
         assert!(diff.ast.is_some());

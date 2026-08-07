@@ -23,8 +23,7 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-add-value-to-enum").unwrap().clone();
+    let (before, after) = test::helper::handmade_test_code_pair("rust-add-value-to-enum")?;
 
     let diff = diff::diff_code(&before, &after);
 
@@ -85,8 +84,7 @@ fn matches_human_solution() -> Result<()> {
 
 #[test]
 fn optimal_solution_for_reversed_diff() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (after, before) = test_diffs.get("rust-add-value-to-enum").unwrap().clone();
+    let (after, before) = test::helper::handmade_test_code_pair("rust-add-value-to-enum")?;
 
     let diff = diff::diff_code(&before, &after);
 

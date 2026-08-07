@@ -23,8 +23,7 @@ use anyhow::Result;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    let test_diffs = test::helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs.get("rust-hash-optimization").unwrap().clone();
+    let (before, after) = test::helper::handmade_test_code_pair("rust-hash-optimization")?;
 
     let diff = diff::diff_code(&before, &after);
 

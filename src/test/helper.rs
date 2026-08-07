@@ -18,7 +18,7 @@
 pub mod human_mapping;
 pub mod optimal_iud;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 #[cfg(feature = "stats")]
 use git2::{Repository, Signature};
 use std::collections::HashMap;
@@ -588,13 +588,7 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
 fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
     let mut result = HashMap::new();
 
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("test")
-        .join("data")
-        .join("diffs");
-
-    for entry in fs::read_dir(root)? {
+    for entry in fs::read_dir(diffs_root())? {
         let entry = entry?;
         let path = entry.path();
 
@@ -609,6 +603,156 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
 
     Ok(result)
 }
+
+fn diffs_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs")
+}
+
+/**
+* Loads exactly one named fixture from `src/test/data/diffs/<name>/`, without touching the rest
+* of the corpus. Unlike [`handmade_test_code_pairs`], which parses and caches all ~220+ fixtures
+* on first call, this parses only `name` - the first call for a given `name` pays one fixture's
+* parse cost, not the whole corpus's. Subsequent calls for the same `name` (from other tests) hit
+* a per-name cache and are free.
+*
+* Most tests only ever look up one or two specific fixtures by name (see
+* [`compute_mismatches_with_config`] and most callers in `apted/common/tests.rs`), so this is the
+* right default for new test code. A test that wants coverage across every language without a
+* specific fixture in mind should use [`UNIT_TEST_FIXTURES`] via [`handmade_test_code_pairs_for`]
+* instead - reach for [`handmade_test_code_pairs`] (the full corpus) only when a test genuinely
+* can't be satisfied by that sample (e.g. `test_handmade_test_code_pairs_returns_all_diffs`, or a
+* `#[ignore = "slow"]` full-corpus check).
+*/
+pub fn handmade_test_code_pair(name: &str) -> Result<(Code, Code)> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<HashMap<String, (Code, Code)>>> =
+        std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+
+    if let Some(pair) = cache.lock().unwrap().get(name) {
+        return Ok(pair.clone());
+    }
+
+    let pair = code_pair_from_dir(&diffs_root().join(name))?
+        .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
+    cache.lock().unwrap().insert(name.to_string(), pair.clone());
+    Ok(pair)
+}
+
+/**
+* Same as [`handmade_test_code_pair`], but for a batch of names at once - for tests that sample a
+* handful of fixtures across languages (see `UNIT_TEST_FIXTURES`) rather than needing just one.
+* Each name still goes through the same per-name cache, so this is just a convenience wrapper, not
+* a separate loading path.
+*/
+pub fn handmade_test_code_pairs_for(names: &[&str]) -> Result<HashMap<String, (Code, Code)>> {
+    names
+        .iter()
+        .map(|&name| Ok((name.to_string(), handmade_test_code_pair(name)?)))
+        .collect()
+}
+
+/// 1-3 fixtures per language (smallest/fastest available, preferring real-world diffs over
+/// synthetic ones, each well under the corpus's largest fixtures) - the "unit test set" for tests
+/// that need coverage across every supported language but not the full ~220-fixture corpus. Chosen
+/// for small file size / node count, which is a reliable proxy for parse cost - but *not* for the
+/// cost of running the real diff algorithm (`for_roots`/APTED) on a fixture, which is driven by
+/// tree shape, not size (see the 2026-08-07 TODO.md entry: two of these fixtures are 100+ seconds
+/// through `for_roots` despite being small by node count). A caller that only needs to parse this
+/// set (a path<->node round trip, a size check) gets a fast, representative sample; a caller that
+/// runs the actual diff algorithm over it (e.g. `is_always_valid`) should stay `#[ignore = "slow"]`.
+/// See [`test_path_for_node_round_trips_through_node_for_path`] for the original motivating case (a
+/// handful of multi-hundred-KB fixtures were dominating that test's runtime while adding no
+/// coverage the smaller fixtures in the same language don't already provide).
+pub const UNIT_TEST_FIXTURES: &[&str] = &[
+    // c
+    "c-freeciv-add-parameter-to-function",
+    "c-htop-remove-function-declaration",
+    "c-ffmpeg-added-typedef-to-enum",
+    // cpp
+    "cpp-add-templates",
+    "cpp-fix-segfault",
+    "cpp-tensorflow-switch-to-primitive-types",
+    // csharp
+    "csharp-sonarr-change-type",
+    "csharp-lidarr-new-feature",
+    "csharp-jellyfin-sql-query-fix",
+    // css
+    "css-add-property",
+    "css-wordpress-reformat",
+    "css-playwright-add-class-selector",
+    // go
+    "go-lazygit-switch-to-strings",
+    "go-gin-add-function",
+    "go-prometheus-single-comment-change",
+    // html
+    "html-fatedier-add-attribute",
+    "html-hugo-tag-to-selfclosing-tag",
+    "html-ladybird-delete-attribute",
+    // java
+    "java-fix-array-index",
+    "java-genymobile-scrcpy-change-some-android-version-constant",
+    "java-scrcpy-remove-or-expression",
+    // javascript
+    "javascript-add-destructuring",
+    "javascript-fix-promises",
+    "javascript-twbs-bootstrap-comment-version-update",
+    // json (no synthetic fixture exists for this language)
+    "json-shadcn-ui-ui-string-value-update-string-is-code",
+    "json-nextcloud-server-deleted-pair",
+    "json-shadcn-ui-ui-react-code-in-string-constant",
+    // kotlin
+    "kotlin-add-null-check",
+    "kotlin-nextcloud-whitespace-only-change",
+    "kotlin-remove-function",
+    // lua (no synthetic fixture exists for this language)
+    "lua-awesomewm-awesome-align-to-halign",
+    "lua-neovim-one-added-line",
+    "lua-awesomewm-awesome-comment-changes-and-additions",
+    // php (no synthetic fixture exists for this language)
+    "php-nextcloud-server-whitespace-and-added-declaration",
+    "php-wordpress-wordpress-version-update",
+    "php-nextcloud-change-doccomment",
+    // python
+    "python-added-if-block-small",
+    "python-openhands-openhands-change-string-constant",
+    "python-thefuck-multiline-string-change",
+    // ruby: only one fixture is small - the other two are ~250KB+ and defeat the point
+    "ruby-homebrew-add-or-expression",
+    // rust: the literal "hello world" fixture, plus 2 more
+    "rust-hello-world-added-message",
+    "rust-add-if",
+    "rust-sniffnet-protocol",
+    // shellscript
+    "shellscript-ansible-ansible-simple-deletion",
+    "shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content",
+    "shellscript-genymobile-scrcpy-add-two-flags",
+    // swift: all 3 existing fixtures are small and real
+    "swift-swiftlang-swift-comment-change-2",
+    "swift-swiftlang-swift-comment-change",
+    "swift-nextcloud-ios-call-different-function",
+    // tsx (no synthetic fixture exists for this language)
+    "tsx-shadcn-ui-ui-add-attribute",
+    "tsx-excalidraw-excalidraw-import-path-change",
+    "tsx-material-remove-import",
+    // typescript
+    "typescript-microsoft-typescript-comment-change",
+    "typescript-microsoft-typescript-add-target-comment",
+    "typescript-microsoft-typescript-add-dot-js-to-import-paths",
+    // vimscript: only 2 small fixtures exist, the rest are 65KB+
+    "vimscript-neovim-neovim-add-a-few-lines",
+    "vimscript-neovim-neovim-add-a-few-lines-one-after-the-other",
+    // xml: only 2 small fixtures exist, the rest are 200KB+
+    "xml-mozilla-firefox-firefox-add-a-few-attributes",
+    "xml-odoo-odoo-change-value",
+    // yaml
+    "yaml-junegunn-fzf-version-upgrade",
+    "yaml-axios-axios-update-string-value",
+    "yaml-twbs-bootstrap-version-pin-with-comment",
+];
 
 /// Reads one `before.<ext>.test`/`after.<ext>.test` file into an unparsed `Code`, with its
 /// `metadata.path` set - shared by both sides of [`code_pair_from_dir`].
@@ -898,119 +1042,20 @@ mod tests {
         Ok(())
     }
 
-    /// 1-3 fixtures per language (smallest/fastest available, preferring real-world diffs over
-    /// synthetic ones), used by [`test_path_for_node_round_trips_through_node_for_path`] instead
-    /// of the full corpus. That test's cost scales with total corpus size (every node of every
-    /// fixture, before and after), so a handful of multi-hundred-KB fixtures (e.g.
-    /// `rust-zed-industries-zed-add-argument`, `ruby-junegunn-fzf-add-test-case*`,
-    /// `xml-odoo-odoo-add-two-attributes`) dominated its runtime (~490s of a ~715s suite run) while
-    /// adding no coverage the smaller fixtures in the same language don't already provide - the
-    /// path<->node round-trip property doesn't depend on tree size.
-    const ROUND_TRIP_SAMPLE_FIXTURES: &[&str] = &[
-        // c
-        "c-freeciv-add-parameter-to-function",
-        "c-htop-remove-function-declaration",
-        "c-ffmpeg-added-typedef-to-enum",
-        // cpp
-        "cpp-add-templates",
-        "cpp-fix-segfault",
-        "cpp-tensorflow-switch-to-primitive-types",
-        // csharp
-        "csharp-sonarr-change-type",
-        "csharp-lidarr-new-feature",
-        "csharp-jellyfin-sql-query-fix",
-        // css
-        "css-add-property",
-        "css-wordpress-reformat",
-        "css-playwright-add-class-selector",
-        // go
-        "go-lazygit-switch-to-strings",
-        "go-gin-add-function",
-        "go-prometheus-single-comment-change",
-        // html
-        "html-fatedier-add-attribute",
-        "html-hugo-tag-to-selfclosing-tag",
-        "html-ladybird-delete-attribute",
-        // java
-        "java-fix-array-index",
-        "java-genymobile-scrcpy-change-some-android-version-constant",
-        "java-scrcpy-remove-or-expression",
-        // javascript
-        "javascript-add-destructuring",
-        "javascript-fix-promises",
-        "javascript-twbs-bootstrap-comment-version-update",
-        // json (no synthetic fixture exists for this language)
-        "json-shadcn-ui-ui-string-value-update-string-is-code",
-        "json-nextcloud-server-deleted-pair",
-        "json-shadcn-ui-ui-react-code-in-string-constant",
-        // kotlin
-        "kotlin-add-null-check",
-        "kotlin-nextcloud-whitespace-only-change",
-        "kotlin-remove-function",
-        // lua (no synthetic fixture exists for this language)
-        "lua-awesomewm-awesome-align-to-halign",
-        "lua-neovim-one-added-line",
-        "lua-awesomewm-awesome-comment-changes-and-additions",
-        // php (no synthetic fixture exists for this language)
-        "php-nextcloud-server-whitespace-and-added-declaration",
-        "php-wordpress-wordpress-version-update",
-        "php-nextcloud-change-doccomment",
-        // python
-        "python-added-if-block-small",
-        "python-openhands-openhands-change-string-constant",
-        "python-thefuck-multiline-string-change",
-        // ruby: only one fixture is small - the other two are ~250KB+ and defeat the point
-        "ruby-homebrew-add-or-expression",
-        // rust: the literal "hello world" fixture, plus 2 more
-        "rust-hello-world-added-message",
-        "rust-add-if",
-        "rust-sniffnet-protocol",
-        // shellscript
-        "shellscript-ansible-ansible-simple-deletion",
-        "shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content",
-        "shellscript-genymobile-scrcpy-add-two-flags",
-        // swift: all 3 existing fixtures are small and real
-        "swift-swiftlang-swift-comment-change-2",
-        "swift-swiftlang-swift-comment-change",
-        "swift-nextcloud-ios-call-different-function",
-        // tsx (no synthetic fixture exists for this language)
-        "tsx-shadcn-ui-ui-add-attribute",
-        "tsx-excalidraw-excalidraw-import-path-change",
-        "tsx-material-remove-import",
-        // typescript
-        "typescript-microsoft-typescript-comment-change",
-        "typescript-microsoft-typescript-add-target-comment",
-        "typescript-microsoft-typescript-add-dot-js-to-import-paths",
-        // vimscript: only 2 small fixtures exist, the rest are 65KB+
-        "vimscript-neovim-neovim-add-a-few-lines",
-        "vimscript-neovim-neovim-add-a-few-lines-one-after-the-other",
-        // xml: only 2 small fixtures exist, the rest are 200KB+
-        "xml-mozilla-firefox-firefox-add-a-few-attributes",
-        "xml-odoo-odoo-change-value",
-        // yaml
-        "yaml-junegunn-fzf-version-upgrade",
-        "yaml-axios-axios-update-string-value",
-        "yaml-twbs-bootstrap-version-pin-with-comment",
-    ];
-
     #[test]
     fn test_path_for_node_round_trips_through_node_for_path() -> Result<()> {
         // path_for_node must be the exact inverse of node_for_path for every node in a tree,
         // since human-authored mappings are compared against fresh diffs purely by path. Runs
-        // against a per-language sample (see `ROUND_TRIP_SAMPLE_FIXTURES`) rather than the whole
-        // corpus - this property doesn't depend on tree size, and the full corpus takes minutes.
-        let test_diffs = handmade_test_code_pairs()?;
-        let sampled: Vec<_> = test_diffs
-            .iter()
-            .filter(|(name, _)| ROUND_TRIP_SAMPLE_FIXTURES.contains(&name.as_str()))
-            .collect();
+        // against a per-language sample (see `UNIT_TEST_FIXTURES`) rather than the whole corpus -
+        // this property doesn't depend on tree size, and the full corpus takes minutes.
+        let sampled = handmade_test_code_pairs_for(UNIT_TEST_FIXTURES)?;
         assert_eq!(
             sampled.len(),
-            ROUND_TRIP_SAMPLE_FIXTURES.len(),
-            "a name in ROUND_TRIP_SAMPLE_FIXTURES doesn't match any directory under src/test/data/diffs/ (typo, or fixture renamed/removed)"
+            UNIT_TEST_FIXTURES.len(),
+            "a name in UNIT_TEST_FIXTURES doesn't match any directory under src/test/data/diffs/ (typo, or fixture renamed/removed)"
         );
 
-        for (name, (before, after)) in sampled {
+        for (name, (before, after)) in &sampled {
             for (label, code) in [("before", before), ("after", after)] {
                 let ast = code
                     .ast
@@ -1145,13 +1190,7 @@ mod tests {
 
     #[test]
     fn test_handmade_test_code_pairs_no_change_diff() -> Result<()> {
-        let diffs = handmade_test_code_pairs()?;
-
-        assert!(!diffs.is_empty(), "Should have found some test code pairs");
-
-        assert!(diffs.contains_key("rust-no-change"));
-
-        let (before, after) = diffs.get("rust-no-change").unwrap();
+        let (before, after) = handmade_test_code_pair("rust-no-change")?;
 
         assert_ne!(before.contents, "");
         assert_ne!(after.contents, "");
@@ -1166,8 +1205,7 @@ mod tests {
     #[test]
     fn test_entire_path_has_mapping() -> Result<()> {
         // Use rust-no-change since all nodes should have Identical mapping
-        let test_diffs = handmade_test_code_pairs()?;
-        let (before, after) = test_diffs.get("rust-no-change").unwrap().clone();
+        let (before, after) = handmade_test_code_pair("rust-no-change")?;
 
         let diff = crate::diff::diff_code(&before, &after);
         let diff_ast = diff.ast.unwrap();
@@ -1227,11 +1265,7 @@ mod tests {
         )?);
 
         // Test with rust-hello-world-added-message where we know function_item has MatchButNotIdentical
-        let test_diffs2 = handmade_test_code_pairs()?;
-        let (before2, after2) = test_diffs2
-            .get("rust-hello-world-added-message")
-            .unwrap()
-            .clone();
+        let (before2, after2) = handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff2 = crate::diff::diff_code(&before2, &after2);
         let diff_ast2 = diff2.ast.unwrap();

@@ -3489,3 +3489,18 @@ relative cost on an already-missed metric.
 
 **Verified**: full suite green (563/0/5); `benchmark_optimal_solutions` diff confirms exactly the 4
 fixtures above changed and nothing else. Quality baseline updated: `TOTAL_MISMATCHES` 2882 -> 2808.
+
+## Two corpus fixtures pathologically slow through `for_roots`, found while building a fixture sample set (2026-08-07)
+
+While slimming full-corpus test iteration down to a per-language sample (see `UNIT_TEST_FIXTURES`
+in `src/test/helper.rs`), timed every candidate fixture through the real diff algorithm
+(`for_roots`, release build) rather than assuming node count predicts cost. Most of the ~58
+candidates ran in well under a second; a handful took single-digit seconds; two were outliers by
+two orders of magnitude: `c-ffmpeg-added-typedef-to-enum` (248s) and `lua-neovim-one-added-line`
+(172s). Both are small by node count (under the 5000-node cap that was otherwise a fine proxy for
+every other fixture measured) - this is a tree-shape pathology, not a size one, consistent with the
+Zhang-Shasha/APTED blowup-on-large-residuals root cause already on file for this project. Not
+investigated further here (out of scope for a test-speed task) - `is_always_valid` was kept
+`#[ignore = "slow"]` specifically because of this. Both fixtures are also part of the full corpus
+`benchmark_optimal_solutions`/`benchmark_other` iterate, so whatever causes this is already costing
+real time there too, uninvestigated.
