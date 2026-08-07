@@ -49,6 +49,16 @@ view-diff:
 build: test
 	cargo build --release --features stats
 
+# Installs codediff from this checkout onto PATH (~/.cargo/bin by default), so `codediff` and any
+# `git difftool`/`git diff` config pointing at it matches this working tree - including
+# uncommitted changes, since `cargo install --path .` builds from whatever's on disk, not HEAD -
+# instead of whatever was last installed. `--force` overwrites an existing install rather than
+# erroring, since the whole point of this target is "make PATH match what's here now". No `test`/
+# `build` prerequisite: `cargo install` does its own release build already, so depending on
+# either would just force a redundant one first.
+install:
+	cargo install --path . --force
+
 # Scores codediff's diffing accuracy against the human-authored ground truth corpus in
 # src/test/data/ - the project's own primary regression gate for any change to the diff
 # algorithm (see TODO.md). --features test-fixtures: this binary needs codediff::test's

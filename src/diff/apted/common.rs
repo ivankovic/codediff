@@ -2575,7 +2575,12 @@ fn collect_pruned_chunk_pairs(
     let mut pairs: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
     let mut before_roots = Vec::new();
     for &root_id in before_root_ids {
-        visit(root_id, before_meta, &diff.before_node_map, &mut before_roots);
+        visit(
+            root_id,
+            before_meta,
+            &diff.before_node_map,
+            &mut before_roots,
+        );
     }
     for id in before_roots {
         if let Some(&after_id) = diff.before_node_map.get(&id) {

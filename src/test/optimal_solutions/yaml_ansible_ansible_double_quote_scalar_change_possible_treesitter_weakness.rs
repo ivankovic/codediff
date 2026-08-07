@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("yaml-ansible-ansible-double-quote-scalar-change-possible-treesitter-weakness")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "yaml-ansible-ansible-double-quote-scalar-change-possible-treesitter-weakness",
+    )
 }

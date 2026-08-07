@@ -401,8 +401,7 @@ impl<'code> PendingDiff<'code> {
             // call to this never fires for them) whose name is unique and survives a position
             // shift caused by an unrelated insertion elsewhere in the file - see
             // `apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion").
-            if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref())
-            {
+            if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
                 let before_metadata = crate::code::metadata::metadata_of(before);
                 let after_metadata = crate::code::metadata::metadata_of(after);
                 apted::prematch_unique_named_locals(
