@@ -28,6 +28,10 @@ use crate::diff::{
 use super::engine::compute_delta;
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
+/// Cost for updating a literal leaf's value (string/number/etc. contents changed) - medium cost,
+/// between `COST_UPDATE` (identifiers/operators, cheap to rename) and a full delete+insert.
+const COST_LITERAL_UPDATE: u64 = 2;
+
 /// Cost model for APTED - unit cost model
 pub(crate) struct UnitCostModel {
     /// The language both sides of the diff are parsed as, consulted by `ren` to allow a small,
@@ -69,7 +73,7 @@ impl UnitCostModel {
                     0 // Identical
                 } else if is_literal_kind(&node1.kind) {
                     // Literals (strings, numbers, etc.) - medium cost
-                    2
+                    COST_LITERAL_UPDATE
                 } else {
                     // Identifiers are cheap to update (common in refactorings); generic
                     // punctuation/operators are also low cost.

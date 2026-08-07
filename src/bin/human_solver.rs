@@ -1619,6 +1619,45 @@ fn subtree_match_operation(
     }
 }
 
+/// Builds the `NeedsModal` outcome for a before/after cursor pair whose kinds don't match -
+/// shared by every action that requires same-kind nodes before it can proceed. `recursive`
+/// distinguishes a single-node match attempt (`m`, `false`) from a whole-subtree one (`M`, `true`)
+/// - see [`Modal::ConfirmKindMismatch`].
+fn kind_mismatch_modal(before_node: Node, after_node: Node, recursive: bool) -> ActionOutcome {
+    ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
+        before_id: before_node.id(),
+        after_id: after_node.id(),
+        before_kind: before_node.kind().to_string(),
+        after_kind: after_node.kind().to_string(),
+        recursive,
+    })
+}
+
+/// Classifies a same-kind cursor pair as it would be auto-classified by a single `m` press:
+/// `Identical`/`Update` by raw text for a leaf pair, or via [`subtree_match_operation`] (content
+/// hash) for a pair with children. Shared by [`action_match`] and [`action_match_to_end`], which
+/// both just need the resulting operation before continuing their own, differing follow-up logic
+/// - unlike [`action_match_subtree`]'s leaf case, which resolves and returns immediately instead
+/// of continuing, so it classifies its own leaf pairs inline rather than sharing this helper.
+fn classify_match_operation(
+    before_node: Node,
+    after_node: Node,
+    before_src: &[u8],
+    after_src: &[u8],
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
+) -> HumanOperation {
+    if before_node.child_count() == 0 && after_node.child_count() == 0 {
+        if node_values_equal(before_node, after_node, before_src, after_src) {
+            HumanOperation::Identical
+        } else {
+            HumanOperation::Update
+        }
+    } else {
+        subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn action_match(
     mapping: &mut HumanMapping,
@@ -1651,24 +1690,17 @@ fn action_match(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
-            before_id: before_node.id(),
-            after_id: after_node.id(),
-            before_kind: before_node.kind().to_string(),
-            after_kind: after_node.kind().to_string(),
-            recursive: false,
-        }));
+        return Ok(kind_mismatch_modal(before_node, after_node, false));
     }
 
-    let operation = if before_node.child_count() == 0 && after_node.child_count() == 0 {
-        if node_values_equal(before_node, after_node, before_src, after_src) {
-            HumanOperation::Identical
-        } else {
-            HumanOperation::Update
-        }
-    } else {
-        subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
-    };
+    let operation = classify_match_operation(
+        before_node,
+        after_node,
+        before_src,
+        after_src,
+        before_hash,
+        after_hash,
+    );
     apply_match_entry(
         mapping,
         before_root,
@@ -1754,24 +1786,17 @@ fn action_match_to_end(
         if before_node.kind() != after_node.kind() {
             app.before.cursor_id = before_node.id();
             app.after.cursor_id = after_node.id();
-            return Ok(ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
-                before_id: before_node.id(),
-                after_id: after_node.id(),
-                before_kind: before_node.kind().to_string(),
-                after_kind: after_node.kind().to_string(),
-                recursive: false,
-            }));
+            return Ok(kind_mismatch_modal(before_node, after_node, false));
         }
 
-        let operation = if before_node.child_count() == 0 && after_node.child_count() == 0 {
-            if node_values_equal(before_node, after_node, before_src, after_src) {
-                HumanOperation::Identical
-            } else {
-                HumanOperation::Update
-            }
-        } else {
-            subtree_match_operation(before_node.id(), after_node.id(), before_hash, after_hash)
-        };
+        let operation = classify_match_operation(
+            before_node,
+            after_node,
+            before_src,
+            after_src,
+            before_hash,
+            after_hash,
+        );
         app.mapping.entries.push(HumanMappingEntry {
             operation,
             before_path: before_paths.get(&before_node.id()).cloned(),
@@ -1854,13 +1879,7 @@ fn action_match_subtree(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
-            before_id: before_node.id(),
-            after_id: after_node.id(),
-            before_kind: before_node.kind().to_string(),
-            after_kind: after_node.kind().to_string(),
-            recursive: true,
-        }));
+        return Ok(kind_mismatch_modal(before_node, after_node, true));
     }
 
     // A leaf top pair has no children to auto-fill, so resolve it immediately like `m` does.
@@ -4068,9 +4087,6 @@ fn action_save(mapping: &mut HumanMapping, dirty: &mut bool, name: &str) -> Resu
     })
 }
 
-/// A name must be non-empty, start with a letter (so `module_name` -- which just swaps `-` for
-/// `_` -- produces a valid Rust identifier) and contain only characters safe to use directly as
-/// a directory name.
 /// Rust keywords (2015 through 2024 edition, strict and reserved). `module_name` turns a case
 /// name directly into a module identifier (`-` -> `_`), so a name that collides with one of these
 /// would produce a stub that fails to compile -- caught here instead, before anything is written.
@@ -4082,6 +4098,9 @@ const RUST_KEYWORDS: &[&str] = &[
     "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
 ];
 
+/// A name must be non-empty, start with a letter (so `module_name` -- which just swaps `-` for
+/// `_` -- produces a valid Rust identifier) and contain only characters safe to use directly as
+/// a directory name.
 fn validate_new_case_name(name: &str) -> Result<()> {
     if name.is_empty() {
         bail!("Name cannot be empty");
@@ -6333,7 +6352,7 @@ mod tests {
             "IdHashAnc"
         );
         assert_eq!(
-            reason_label(ASTMappingReason::FullymappingSubtrees),
+            reason_label(ASTMappingReason::FullyMappingSubtrees),
             "FullMap"
         );
         assert_eq!(

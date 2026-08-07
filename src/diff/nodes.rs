@@ -1621,21 +1621,6 @@ pub fn flow_control_similarity_of_sets(
     intersection as f64 / union as f64
 }
 
-/// Fraction of non-wildcard arm signatures shared between two flow-control containers (Jaccard
-/// similarity: shared signatures / all distinct signatures across both sides).
-///
-/// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
-/// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
-pub fn flow_control_similarity(
-    before_arms: &[FlowControlArm],
-    after_arms: &[FlowControlArm],
-) -> f64 {
-    flow_control_similarity_of_sets(
-        &flow_control_signature_set(before_arms),
-        &flow_control_signature_set(after_arms),
-    )
-}
-
 /// Substrings that mark a call/macro as "meant for the programmer" (logging, error bailouts,
 /// assertions, debug prints) rather than output meant for the end user. Matched against the
 /// *lowercased last segment* of the callee path (e.g. `log::error!` -> "error",
@@ -1889,7 +1874,10 @@ fn f(s: &str) {
 
         // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4). Wildcards
         // excluded from both sets entirely, so a trivial `_`<->`_` match can't inflate the score.
-        let score = flow_control_similarity(&before_arms, &after_arms);
+        let score = flow_control_similarity_of_sets(
+            &flow_control_signature_set(&before_arms),
+            &flow_control_signature_set(&after_arms),
+        );
         assert!(
             (score - 0.5).abs() < 1e-9,
             "expected 2/4 = 0.5, got {score}"
@@ -2724,6 +2712,40 @@ class Calculator {
     }
 }
 
+/// Recognizes the node kind that directly holds a function/method/class/namespace's own ordered
+/// sequence of statements or members - `compound_statement` (C/C++), `body_statement` (Ruby),
+/// `function_body`/`class_body` (Kotlin), `block` (Rust), `declaration_list` (C++ namespaces).
+/// Language-agnostic by design: every one of these strings is unambiguous on its own (no two
+/// supported grammars reuse the same kind name for something else), so - unlike most classifiers
+/// in this file - there is no need to also gate on `Language`.
+///
+/// Used to find the right anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]
+/// - deliberately a kind allow-list, not "whichever descendant happens to have the most direct
+/// children" (`ASTMetadata::node_to_widest_subtree_node`, which `solve_large_flat_subtrees` uses):
+/// confirmed live that the latter can pick an unrelated, wider, but semantically irrelevant sibling
+/// instead - a Rust function containing a macro call whose `token_tree` has more raw tokens than
+/// the function's own `block` has statements gets the `token_tree` instead, missing the actual
+/// statement sequence entirely (measured on `rust-tauri-cli-ios-dev`: picked a 26-token `token_tree`
+/// over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
+/// matching there at all).
+///
+/// Not exhaustive - only the kinds this session's own measurements confirmed against real
+/// fixtures (`TODO.md`, 2026-08-05). Safe to extend as more languages show the same pattern: this
+/// is a pure performance pre-pass (see that function's doc comment for why a missing or wrong
+/// entry here only costs a missed optimization, never a wrong answer), so a narrow list is a
+/// reasonable starting point, not a correctness risk.
+pub fn is_statement_sequence_body(node_kind: &str) -> bool {
+    matches!(
+        node_kind,
+        "compound_statement"
+            | "body_statement"
+            | "function_body"
+            | "class_body"
+            | "block"
+            | "declaration_list"
+    )
+}
+
 /// Returns true if the given node kind represents a container whose children are order-independent.
 /// For these containers, the order of children doesn't affect the semantic meaning.
 ///
@@ -2766,40 +2788,6 @@ class Calculator {
 /// localization JSON object was landing 100% of its mapping on the expensive `APTED` fallback
 /// before that fix, vs. instantly beforehand) is the model for what fixing the rest should do too,
 /// now that the plumbing actually respects this function's answer.
-/// Recognizes the node kind that directly holds a function/method/class/namespace's own ordered
-/// sequence of statements or members - `compound_statement` (C/C++), `body_statement` (Ruby),
-/// `function_body`/`class_body` (Kotlin), `block` (Rust), `declaration_list` (C++ namespaces).
-/// Language-agnostic by design: every one of these strings is unambiguous on its own (no two
-/// supported grammars reuse the same kind name for something else), so - unlike most classifiers
-/// in this file - there is no need to also gate on `Language`.
-///
-/// Used to find the right anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]
-/// - deliberately a kind allow-list, not "whichever descendant happens to have the most direct
-/// children" (`ASTMetadata::node_to_widest_subtree_node`, which `solve_large_flat_subtrees` uses):
-/// confirmed live that the latter can pick an unrelated, wider, but semantically irrelevant sibling
-/// instead - a Rust function containing a macro call whose `token_tree` has more raw tokens than
-/// the function's own `block` has statements gets the `token_tree` instead, missing the actual
-/// statement sequence entirely (measured on `rust-tauri-cli-ios-dev`: picked a 26-token `token_tree`
-/// over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
-/// matching there at all).
-///
-/// Not exhaustive - only the kinds this session's own measurements confirmed against real
-/// fixtures (`TODO.md`, 2026-08-05). Safe to extend as more languages show the same pattern: this
-/// is a pure performance pre-pass (see that function's doc comment for why a missing or wrong
-/// entry here only costs a missed optimization, never a wrong answer), so a narrow list is a
-/// reasonable starting point, not a correctness risk.
-pub fn is_statement_sequence_body(node_kind: &str) -> bool {
-    matches!(
-        node_kind,
-        "compound_statement"
-            | "body_statement"
-            | "function_body"
-            | "class_body"
-            | "block"
-            | "declaration_list"
-    )
-}
-
 pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {

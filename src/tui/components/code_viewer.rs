@@ -261,24 +261,6 @@ impl CodeViewer {
         self.state.viewport_height = height;
     }
 
-    /// Enable syntax highlighting with optional theme
-    pub fn enable_syntax_highlighting(&mut self, theme: Option<String>) {
-        self.widget.enable_syntax_highlighting();
-        if let Some(t) = theme {
-            self.widget.set_theme(t);
-        }
-    }
-
-    /// Disable syntax highlighting
-    pub fn disable_syntax_highlighting(&mut self) {
-        self.widget.disable_syntax_highlighting();
-    }
-
-    /// Check if syntax highlighting is enabled
-    pub fn is_syntax_highlighting_enabled(&self) -> bool {
-        self.widget.is_syntax_highlighting_enabled()
-    }
-
     /// Get reference to the state
     pub fn state(&self) -> &crate::tui::widgets::code_viewer::CodeViewerState {
         &self.state

@@ -868,7 +868,11 @@ pub(crate) fn spf_a(
                         l_f2 -= 1;
                     }
                 }
-                // TODO: first pointers can be precomputed
+                // Inherited from APTED.java's own `spfA`: `fta`'s chain here is walked fresh on
+                // every outer iteration rather than cached, a known but unclaimed micro-
+                // optimization (not correctness-affecting - `fta` itself doesn't change during
+                // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
+                // measured bottleneck.
                 let mut l_g_iter = l_g_first;
                 while l_g_iter >= l_g_last {
                     t[(l_g_iter - it2_pre_l_off, r_g - it2_pre_r_off)] =
@@ -1101,7 +1105,11 @@ pub(crate) fn spf_a(
                         r_f2 -= 1;
                     }
                 }
-                // TODO: first pointers can be precomputed
+                // Inherited from APTED.java's own `spfA`: `fta`'s chain here is walked fresh on
+                // every outer iteration rather than cached, a known but unclaimed micro-
+                // optimization (not correctness-affecting - `fta` itself doesn't change during
+                // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
+                // measured bottleneck.
                 let mut r_g_iter = r_g_first2;
                 while r_g_iter >= r_g_last2 {
                     t[(l_g - it2_pre_l_off, r_g_iter - it2_pre_r_off)] =
@@ -1424,15 +1432,19 @@ pub(crate) fn spf_path(
     )]
 }
 
+/// Sentinel cost for a disabled INNER candidate, shared by `compute_opt_strategy_post_l` and
+/// `compute_opt_strategy_post_r` (mirror-image twins, see the former's doc comment). Keeps the
+/// same comparison structure as a plain `i64::MAX` would, with enough headroom below `i64::MAX`
+/// that summing several of them (the `cost1_I`/`cost2_I` propagation in both functions) can't
+/// overflow.
+const INNER_DISABLED: i64 = i64::MAX / 4;
+
 /// Direct port of APTED.java's `computeOptStrategy_postL`: for every `(v, w)` pair, picks
 /// whichever of v's LEFT/RIGHT/INNER path or w's LEFT/RIGHT/INNER path minimizes the cost of the
 /// single-path sweep `gted` would have to run, and encodes that choice as a signed path id (see
 /// `getStrategyPathType`/`gted`'s decode). Costs are `i64` here rather than Java's `float` - the
 /// products involved (`size * krSum`) are well within `i64` range for any real input, and exact
-/// integers sidestep the precision loss `float` would have on a "subtree size" scale; the
-/// `INNER_DISABLED` sentinel keeps the same comparison structure as a plain `i64::MAX` would,
-/// with enough headroom below `i64::MAX` that summing several of them (the `cost1_I`/`cost2_I`
-/// propagation below) can't overflow.
+/// integers sidestep the precision loss `float` would have on a "subtree size" scale.
 ///
 /// `clamp_to_left_right`, *not* in the Java original, disables the two INNER candidates at
 /// selection time only (the `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally) -
@@ -1451,8 +1463,6 @@ pub(crate) fn compute_opt_strategy_post_l(
     after_idx: &AptedIndexer,
     clamp_to_left_right: bool,
 ) -> StrategyTable {
-    const INNER_DISABLED: i64 = i64::MAX / 4;
-
     let size1 = before_idx.size;
     let size2 = after_idx.size;
     let mut strategy = StrategyTable::new(size1, size2);
@@ -1638,8 +1648,6 @@ pub(crate) fn compute_opt_strategy_post_r(
     after_idx: &AptedIndexer,
     clamp_to_left_right: bool,
 ) -> StrategyTable {
-    const INNER_DISABLED: i64 = i64::MAX / 4;
-
     let size1 = before_idx.size;
     let size2 = after_idx.size;
     let mut strategy = StrategyTable::new(size1, size2);
@@ -1902,12 +1910,12 @@ pub(crate) fn gted(
     // scalar computation that writes nothing into `delta`. This must be `||`, not `&&`: any
     // size-1-side pair that instead falls through to spf_path/spf_a gets its boundary cells
     // *written* by that call's keyroot sweep, clobbering the values `ted_init` already deposited
-    // for exactly these size-1-side pairs (confirmed via a 10-node repro,
-    // debug_check_gted_return_n10 - `&&` let an off-path `gted(id3-alone, id8-subtree)` call run
-    // spf_path (then still named spf_l), which overwrote `ted_init`'s delta[id3][id9]=0
-    // mid-computation, corrupting a sibling spf_a call's read of that same cell even though the
-    // final delta value looked correct again by the time `gted` returned). Since `ted_init`
-    // already covers every size-1-side cell spf_path could otherwise write, this loses no coverage.
+    // for exactly these size-1-side pairs (confirmed via a 10-node repro, commit `60453b6`: `&&`
+    // let an off-path `gted(id3-alone, id8-subtree)` call run spf_path (then still named spf_l),
+    // which overwrote `ted_init`'s delta[id3][id9]=0 mid-computation, corrupting a sibling spf_a
+    // call's read of that same cell even though the final delta value looked correct again by the
+    // time `gted` returned). Since `ted_init` already covers every size-1-side cell spf_path could
+    // otherwise write, this loses no coverage.
     if size1 <= 1 || size2 <= 1 {
         return spf1(ctx, current1, current2);
     }

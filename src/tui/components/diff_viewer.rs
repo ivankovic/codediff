@@ -219,11 +219,12 @@ impl DiffViewer {
         self.sync_focus();
     }
 
-    /// Get the filename of the active viewer
+    /// Get the filename of the active viewer, or a hint to press `o` if it has no file loaded yet
+    /// - matches dual-panel mode's own title bar, which uses the same fallback (see `draw`).
     fn active_filename(&self) -> String {
         match self.active_panel {
-            Panel::Before => self.left_viewer.filename(),
-            Panel::After => self.right_viewer.filename(),
+            Panel::Before => self.left_viewer.filename_or_hint(),
+            Panel::After => self.right_viewer.filename_or_hint(),
         }
     }
 
@@ -249,15 +250,7 @@ impl Component for DiffViewer {
         self.update_display_mode(area.width);
 
         if self.display_mode == DisplayMode::Dual {
-            // Split the area into two halves
-            let divider = area.width / 2;
-            let left_area = Rect::new(area.x, area.y, divider, area.height);
-            let right_area = Rect::new(
-                area.x + divider + 1,
-                area.y,
-                area.width - divider - 1,
-                area.height,
-            );
+            let (left_area, right_area) = split_panels(area);
 
             self.left_viewer.init(left_area)?;
             self.right_viewer.init(right_area)?;
@@ -368,13 +361,7 @@ impl Component for DiffViewer {
                 }
                 Ok(Some(Action::Render))
             }
-            _ => {
-                // Let individual viewers handle other keys
-                // For now, just forward to both
-                let _ = self.left_viewer.handle_key_event(key)?;
-                let _ = self.right_viewer.handle_key_event(key)?;
-                Ok(None)
-            }
+            _ => Ok(None),
         }
     }
 
@@ -419,14 +406,7 @@ impl Component for DiffViewer {
 
         if self.display_mode == DisplayMode::Dual {
             // Dual panel mode: show both side by side
-            let divider_x = area.width / 2;
-            let left_area = Rect::new(area.x, area.y, divider_x, area.height);
-            let right_area = Rect::new(
-                area.x + divider_x + 1,
-                area.y,
-                area.width - divider_x - 1,
-                area.height,
-            );
+            let (left_area, right_area) = split_panels(area);
 
             let left_filename = self.left_viewer.filename_or_hint();
             let left_block = panel_block(
@@ -498,6 +478,21 @@ impl Component for DiffViewer {
 
         Ok(())
     }
+}
+
+/// Splits a dual-panel area into (left, right) halves with a one-column gap for the divider,
+/// shared by [`DiffViewer::init`] (sizing viewports before anything is drawn) and
+/// [`DiffViewer::draw`] (the actual layout) so the two can never silently diverge.
+fn split_panels(area: Rect) -> (Rect, Rect) {
+    let divider = area.width / 2;
+    let left_area = Rect::new(area.x, area.y, divider, area.height);
+    let right_area = Rect::new(
+        area.x + divider + 1,
+        area.y,
+        area.width - divider - 1,
+        area.height,
+    );
+    (left_area, right_area)
 }
 
 /// Build a dual-mode panel's border block, showing a thicker border and a bold title on

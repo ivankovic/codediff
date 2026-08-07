@@ -42,21 +42,17 @@ struct Args {
     queue_capacity: usize,
 }
 
-/// Process multiple repositories in parallel using async
-async fn process_repositories_parallel(
+fn process_repositories_parallel(
     repo_paths: &[PathBuf],
     db_path: &Path,
     n_threads: usize,
     queue_capacity: usize,
 ) -> Result<()> {
-    // Create a channel for repository processing results
     let (result_tx, result_rx) = bounded::<HashMap<(String, String), DiffStats>>(queue_capacity);
 
-    // Create a fixed-size thread pool for processing repositories
     let mut workers = Vec::with_capacity(n_threads);
     let (repo_tx, repo_rx) = bounded::<(PathBuf, PathBuf, usize, usize)>(queue_capacity);
 
-    // Spawn worker threads
     for _ in 0..n_threads {
         let repo_rx = repo_rx.clone();
         let result_tx = result_tx.clone();
@@ -66,7 +62,6 @@ async fn process_repositories_parallel(
             {
                 println!("Processing {}", repo_path.display());
 
-                // Process this repository synchronously
                 let result =
                     repository_stats(&repo_path, &db_path, worker_threads, worker_queue_capacity);
 
@@ -89,7 +84,6 @@ async fn process_repositories_parallel(
     }
     drop(result_tx);
 
-    // Queue all repositories for processing
     for repo_path in repo_paths {
         let repo_path = repo_path.to_path_buf();
         let db_path = db_path.to_path_buf();
@@ -102,19 +96,16 @@ async fn process_repositories_parallel(
     }
     drop(repo_tx);
 
-    // Collect results and write to SQLite incrementally
     let mut total_pairs = 0;
     while let Ok(stats) = result_rx.recv() {
         let count = stats.len();
         total_pairs += count;
 
-        // Write stats to SQLite immediately
         export_stats_sqlite(db_path, stats)?;
 
         println!("Processed {} (commit, path) pairs", count);
     }
 
-    // Wait for all workers to finish
     for worker in workers {
         let _ = worker.join();
     }
@@ -127,8 +118,7 @@ async fn process_repositories_parallel(
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = Args::parse();
 
     let base_path = &args.path;
@@ -136,7 +126,6 @@ async fn main() -> Result<()> {
     let n_threads = args.threads.unwrap_or_else(num_cpus::get);
     let queue_capacity = args.queue_capacity;
 
-    // Find all git repositories in subfolders
     let repo_paths = codediff::stats::filesystem::find_git_repositories(base_path)?;
 
     if repo_paths.is_empty() {
@@ -146,8 +135,7 @@ async fn main() -> Result<()> {
 
     println!("Found {} git repositories to process", repo_paths.len());
 
-    // Process all repositories in parallel
-    process_repositories_parallel(&repo_paths, db_path, n_threads, queue_capacity).await?;
+    process_repositories_parallel(&repo_paths, db_path, n_threads, queue_capacity)?;
 
     Ok(())
 }
@@ -327,16 +315,13 @@ fn process_delta_loop(
 fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffStats> {
     let mut result = stats.clone();
 
-    // Skip processing if this is a known anomalous path
     let file_path = Path::new(&result.relative_file_path);
     if metadata::is_anomalous(file_path) {
         return Ok(result);
     }
 
-    // Detect language from file path
     let language = detect_language_from_path(&result.relative_file_path);
 
-    // Create Code objects for before and after versions if not already set
     if result.before.is_none() && !before.is_empty() {
         result.before = Some(Code::from_string(before, &language));
     }
@@ -344,7 +329,6 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
         result.after = Some(Code::from_string(after, &language));
     }
 
-    // Count lines from Code objects
     result.lines_before = result
         .before
         .as_ref()
@@ -354,7 +338,6 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
         .as_ref()
         .map_or(0, |code| code.contents.lines().count() as u64);
 
-    // Count nodes from ASTs if available
     result.nodes_before = result
         .before
         .as_ref()

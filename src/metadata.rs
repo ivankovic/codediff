@@ -35,7 +35,6 @@ static WELL_KNOWN_ANOMALOUS_PATHS: &[&str] = &[
     "libavcodec/hq_hqadata.h",
     "libavcodec/ralfdata.h",
     "libavcodec/twinvq_data.h",
-    "libavcodec/metasound_data.h",
     // Swift
     "swiftlang-swift.git/test",
 ];

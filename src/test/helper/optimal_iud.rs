@@ -1264,7 +1264,7 @@ mod tests {
         assert_eq!(
             added_expression_node_mapping.cost,
             COST_INSERT * 12,
-            "String content mapping cost should be COST_UPDATE"
+            "The added statement's 12-node subtree should cost COST_INSERT per node"
         );
 
         Ok(())
@@ -1313,7 +1313,7 @@ mod tests {
         assert_eq!(
             deleted_expression_node_mapping.cost,
             COST_DELETE * 12,
-            "String content mapping cost should be COST_UPDATE"
+            "The deleted statement's 12-node subtree should cost COST_DELETE per node"
         );
 
         Ok(())
@@ -1610,14 +1610,15 @@ mod tests {
         let before_root_id = before_ast.root_node().id();
         let after_root_id = after_ast.root_node().id();
 
-        // Check that root node has IdenticalHash reason
+        // The root nodes differ (a real bugfix, not identical code), so they're resolved by the
+        // optimal insert/update/delete solver rather than a hash match.
         let root_mapping = diff
             .mapping
             .get(&(before_root_id, after_root_id))
             .expect("Root node should be mapped");
         assert_eq!(root_mapping.reason, ASTMappingReason::OptimalIDU,);
 
-        // A fully identical code can never have a cost.
+        // The bugfix's minimal edit script costs 41.
         assert_eq!(root_mapping.cost, 41);
 
         Ok(())
@@ -1758,7 +1759,8 @@ mod tests {
         let before_root_id = before_ast.root_node().id();
         let after_root_id = after_ast.root_node().id();
 
-        // Check that root node has IdenticalHash reason
+        // The root nodes differ (an added if-block, not identical code), so they're resolved by
+        // the optimal insert/update/delete solver rather than a hash match.
         let root_mapping = diff
             .mapping
             .get(&(before_root_id, after_root_id))

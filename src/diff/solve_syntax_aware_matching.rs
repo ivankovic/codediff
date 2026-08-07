@@ -168,6 +168,26 @@ pub(crate) fn solve_named_reference_groups_within(
     );
 }
 
+/// Flattens one side's `(kind, fully_resolved_name) -> [node_id]` groups into a single candidate
+/// list, sorted by `preorder_index` - shared by both sides of [`match_named_groups`].
+fn flatten_and_sort_candidates(
+    groups: HashMap<(String, String), Vec<usize>>,
+    metadata: &crate::code::ASTMetadata,
+) -> Vec<(usize, (String, String))> {
+    let mut candidates: Vec<(usize, (String, String))> = groups
+        .into_iter()
+        .flat_map(|(key, ids)| ids.into_iter().map(move |id| (id, key.clone())))
+        .collect();
+    candidates.sort_by_key(|(id, _)| {
+        metadata
+            .node_info
+            .get(id)
+            .map(|i| i.preorder_index)
+            .unwrap_or(usize::MAX)
+    });
+    candidates
+}
+
 /// Shared by [`solve_named_reference_groups`] and [`solve_named_reference_groups_within`]: flatten
 /// both sides' `(kind, fully_resolved_name) -> [node_id]` groups into candidate lists and run
 /// `grouped_greedy_matcher` over them - see `solve_named_reference_groups`'s doc comment for the
@@ -184,28 +204,8 @@ fn match_named_groups(
     // `preorder_index` to satisfy its determinism contract - `collect_fully_resolved_groups`'
     // per-key `Vec`s are already in document order, but the flattened union across keys needs
     // its own global sort (`HashMap` key iteration order is not deterministic).
-    let mut before_candidates: Vec<(usize, (String, String))> = before_groups
-        .iter()
-        .flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone())))
-        .collect();
-    before_candidates.sort_by_key(|(id, _)| {
-        before_metadata
-            .node_info
-            .get(id)
-            .map(|i| i.preorder_index)
-            .unwrap_or(usize::MAX)
-    });
-    let mut after_candidates: Vec<(usize, (String, String))> = after_groups
-        .iter()
-        .flat_map(|(key, ids)| ids.iter().map(move |&id| (id, key.clone())))
-        .collect();
-    after_candidates.sort_by_key(|(id, _)| {
-        after_metadata
-            .node_info
-            .get(id)
-            .map(|i| i.preorder_index)
-            .unwrap_or(usize::MAX)
-    });
+    let before_candidates = flatten_and_sort_candidates(before_groups, before_metadata);
+    let after_candidates = flatten_and_sort_candidates(after_groups, after_metadata);
 
     grouped_greedy_matcher::solve(
         diff,

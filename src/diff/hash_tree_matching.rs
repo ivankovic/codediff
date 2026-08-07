@@ -52,7 +52,7 @@ impl Default for NodeSelectionConfig {
 }
 
 impl NodeSelectionConfig {
-    /// Create a node list selector function that can be passed to `solve_with_node_list`.
+    /// Create a node list selector function that can be passed to `solve_with_hash_map`.
     ///
     /// The selector includes reference nodes plus any nodes that meet the depth/size thresholds,
     /// sorted by subtree size (largest first) and then by start byte for deterministic ordering.
@@ -101,8 +101,8 @@ pub fn build_extended_node_list(
 }
 
 /**
-* Six-phase pipeline rework (`TODO.md`, 2026-07-17): the generalized, reusable version of
-* [`solve_with_node_list`] phase 1 is built around. The old `HashMatchSpec` reads a *named* field
+* Seven-phase pipeline rework (`TODO.md`, 2026-07-17): the generalized, reusable version of
+* [`solve_with_hash_map`] phase 1 is built around. The old `HashMatchSpec` reads a *named* field
 * off `ASTMetadata` via a function pointer (`|m| &m.node_to_full_hash`) - baking in "there is one
 * fixed hash per purpose" and requiring a new `HashMatchSpec` variant (plus `ASTMappingReason`
 * wiring) for every new hash algorithm. This version takes the before-side hash map and the
@@ -175,7 +175,7 @@ pub(crate) fn solve_with_hash_map(
             continue;
         };
 
-        // Same tiebreak rationale as `solve_with_node_list`: proximity in the file, not discovery
+        // Same tiebreak rationale as `solve_with_hash_map`: proximity in the file, not discovery
         // order, is what tells true duplicates apart from unrelated hash collisions.
         let Some(&after_node_id) = after_candidates
             .iter()
@@ -236,7 +236,7 @@ pub(crate) fn solve_with_hash_map(
                     .mapping
                     .get_mut(&(before_parent.id(), after_parent.id()))
                 {
-                    mapping.reason = ASTMappingReason::FullymappingSubtrees;
+                    mapping.reason = ASTMappingReason::FullyMappingSubtrees;
                     mapping.operation = ASTMappingOperation::MatchButNotIdentical;
                     mapping.cost = crate::diff::COST_UPDATE;
                 }
@@ -265,7 +265,7 @@ pub(crate) fn solve_with_hash_map(
         // (inclusive) is downgraded from `Identical` to `MatchButNotIdentical` too - a container
         // is never a true no-op match if anything inside it, at any depth, wasn't. Reason is left
         // alone for these ancestors (only the node that's actually a commutative container with
-        // reordered children gets `FullymappingSubtrees` - see above); they didn't reorder
+        // reordered children gets `FullyMappingSubtrees` - see above); they didn't reorder
         // anything themselves, they just aren't a pure `Identical` match anymore either.
         for reordered_id in reordered_ids {
             let mut cur = reordered_id;
@@ -325,11 +325,11 @@ pub(crate) fn solve_with_hash_map(
 * Returns the pairs plus a `reordered` flag: true if `before_parent` is a commutative container
 * and at least one pair's after-side document-order index differs from its before-side index -
 * i.e. content-wise nothing changed, but the children's actual order did. The caller uses this to
-* distinguish `FullymappingSubtrees` (matched via order-independence, order genuinely changed)
+* distinguish `FullyMappingSubtrees` (matched via order-independence, order genuinely changed)
 * from a plain `IdenticalHash`/`StructurallyIdenticalSubtrees` match (order-independence didn't
 * need to do anything, because nothing moved) - see the user request this responds to ("we do need
 * a way to distinguish between truly identical and reordered") and `ASTMappingReason::
-* FullymappingSubtrees`'s doc comment.
+* FullyMappingSubtrees`'s doc comment.
 */
 fn pair_children_for_descent<'a>(
     before_parent: tree_sitter::Node<'a>,

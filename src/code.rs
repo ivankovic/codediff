@@ -308,7 +308,7 @@ pub struct ASTMetadata {
     ///
     /// Deliberately a `Vec`, not a `HashSet`: nodes are pushed in the same deterministic traversal
     /// order every time (see `hash::hash_code`), so which duplicate a caller picks first (e.g.
-    /// `hash_tree_matching::solve_with_node_list`'s candidate selection) is reproducible run to
+    /// `hash_tree_matching::solve_with_hash_map`'s candidate selection) is reproducible run to
     /// run. A `HashSet` here previously made that choice depend on the hasher's per-instance random
     /// seed, silently changing codediff's output between otherwise-identical runs whenever a hash
     /// had more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).

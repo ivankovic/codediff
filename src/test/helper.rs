@@ -333,19 +333,8 @@ pub fn mapping_for_path<'a>(
 }
 
 /**
-* Returns true if all nodes along the given path in both trees have the same mapping operation.
-*
-* This function is useful for checking that a sequence of nodes that all have the same mapping
-* and path prefixes. For each node along the path (including intermediate nodes), it checks
-* that the corresponding nodes in the before and after trees have a mapping with the expected
-* operation.
-*
-* @param path The path to check in both trees (same path for before and after)
-* @param before_root The root node of the before tree
-* @param after_root The root node of the after tree
-* @param diff The ASTDiff containing the mappings
-* @param expected_operation The expected ASTMappingOperation that all nodes should have
-* @return true if all nodes along the path have the expected mapping operation
+* Returns true if every node along `path` (including intermediate nodes, not just the final one),
+* resolved in both `before_root` and `after_root`, has a mapping in `diff` with `expected_operation`.
 */
 pub fn entire_path_has_mapping<'a>(
     path: &[&str],
@@ -621,6 +610,19 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
     Ok(result)
 }
 
+/// Reads one `before.<ext>.test`/`after.<ext>.test` file into an unparsed `Code`, with its
+/// `metadata.path` set - shared by both sides of [`code_pair_from_dir`].
+fn load_side(file_path: &Path) -> Result<Code> {
+    let contents = fs::read_to_string(file_path)?;
+    let mut code = Code {
+        contents,
+        ..Default::default()
+    };
+    code.metadata.path = Some(file_path.with_extension(""));
+    metadata::hermetic_expand(&mut code.metadata);
+    Ok(code)
+}
+
 /**
 * Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair out of a single directory
 * (a test case under `src/test/data/diffs/`, or a sampled candidate under
@@ -644,23 +646,9 @@ pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
                 .into_owned();
 
             if file_name.starts_with("before.") && file_name.ends_with(".test") {
-                let contents = fs::read_to_string(&file_path)?;
-                let mut code = Code {
-                    contents,
-                    ..Default::default()
-                };
-                code.metadata.path = Some(file_path.with_extension(""));
-                metadata::hermetic_expand(&mut code.metadata);
-                before_code = Some(code);
+                before_code = Some(load_side(&file_path)?);
             } else if file_name.starts_with("after.") && file_name.ends_with(".test") {
-                let contents = fs::read_to_string(&file_path)?;
-                let mut code = Code {
-                    contents,
-                    ..Default::default()
-                };
-                code.metadata.path = Some(file_path.with_extension(""));
-                metadata::hermetic_expand(&mut code.metadata);
-                after_code = Some(code);
+                after_code = Some(load_side(&file_path)?);
             }
         }
     }
@@ -882,8 +870,6 @@ mod tests {
         //             )
         //         ;
         //       }
-        //
-        //  The code is identical, so the minimal diff script is just empty.
 
         let ast = code.ast.unwrap();
 

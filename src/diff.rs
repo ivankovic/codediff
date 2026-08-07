@@ -622,10 +622,7 @@ impl ASTDiff {
      * Returns true if the node is mapped in any subtree.
      */
     pub fn is_node_mapped(&self, node_id: &usize) -> bool {
-        if self.before_node_map.contains_key(node_id) || self.after_node_map.contains_key(node_id) {
-            return true;
-        }
-        false
+        self.before_node_map.contains_key(node_id) || self.after_node_map.contains_key(node_id)
     }
 
     /**
@@ -721,7 +718,7 @@ pub enum ASTMappingReason {
     /// enum variants, struct fields, import lists) but are otherwise unchanged - distinguishes
     /// "this is genuinely untouched" (`IdenticalHash`/`StructurallyIdenticalSubtrees`) from "this
     /// matched only because the new pipeline's hashes are order-independent for commutative
-    /// containers, and the order actually did change" (this variant). Before the six-phase
+    /// containers, and the order actually did change" (this variant). Before the seven-phase
     /// pipeline rework (`TODO.md`, 2026-07-17/18), this reason was produced by the now-removed
     /// `solve_commutative_structural_trees` pass, which used a separate third hash dedicated to
     /// order-independence; the rework folded that order-independence directly into
@@ -732,7 +729,7 @@ pub enum ASTMappingReason {
     /// (2026-07-18, at the user's request: "we do need a way to distinguish between truly
     /// identical and reordered") to keep making that distinction under the new mechanism - see
     /// `hash_tree_matching::pair_children_for_descent`'s reorder detection.
-    FullymappingSubtrees,
+    FullyMappingSubtrees,
     /// The subtrees of the nodes are structurally identical, but the values of leaf nodes differ.
     /// E.g., a constant value was changed but the code structure is identical.
     StructurallyIdenticalSubtrees,
@@ -788,7 +785,7 @@ impl ASTMappingReason {
         match self {
             ASTMappingReason::IdenticalHash => "IdHash",
             ASTMappingReason::IdenticalHashOfAncestor => "IdHashAnc",
-            ASTMappingReason::FullymappingSubtrees => "FullMap",
+            ASTMappingReason::FullyMappingSubtrees => "FullMap",
             ASTMappingReason::StructurallyIdenticalSubtrees => "StructId",
             ASTMappingReason::StructurallyIdenticalAncestor => "StructAnc",
             ASTMappingReason::OptimalIDU => "OptIDU",

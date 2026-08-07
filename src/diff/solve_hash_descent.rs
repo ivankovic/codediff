@@ -82,9 +82,9 @@ pub fn solve(
     }
 }
 
-/// Builds a normalized-import-path hash map (import nodes only, hashed by
-/// `solve_import_nodes::normalize_import_path`'s output) and runs it through the same generalized
-/// engine as the other two hash algorithms - see the module doc comment.
+/// Builds a normalized-import-path hash map (import nodes only, hashed by this file's own
+/// `normalize_import_path` output) and runs it through the same generalized engine as the other
+/// two hash algorithms - see the module doc comment.
 fn solve_import_path_hash(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let before_metadata = metadata_of(before);
     let after_metadata = metadata_of(after);
@@ -281,7 +281,7 @@ mod tests {
     /// change must be distinguishable from a genuinely untouched one - see the user request this
     /// responds to ("we do need a way to distinguish between truly identical and reordered", then
     /// "make reordering cost more than 0 and change operation to MatchButNotIdentical") and
-    /// `ASTMappingReason::FullymappingSubtrees`'s doc comment.
+    /// `ASTMappingReason::FullyMappingSubtrees`'s doc comment.
     #[test]
     fn reordered_commutative_container_is_distinguished_from_truly_identical() {
         let before = Code::from_string("use std::{a, b, c};\nfn f() {}\n", &Language::Rust);
@@ -302,8 +302,8 @@ mod tests {
             .expect("reordered use_list should still be matched");
         assert_eq!(
             mapping.reason,
-            ASTMappingReason::FullymappingSubtrees,
-            "a reordered-but-unchanged use_list must be tagged FullymappingSubtrees, not plain IdenticalHash"
+            ASTMappingReason::FullyMappingSubtrees,
+            "a reordered-but-unchanged use_list must be tagged FullyMappingSubtrees, not plain IdenticalHash"
         );
         assert_eq!(
             mapping.operation,
@@ -322,8 +322,8 @@ mod tests {
         let fn_mapping = diff.mapping.get(&(before_fn.id(), after_fn.id())).unwrap();
         assert_ne!(
             fn_mapping.reason,
-            ASTMappingReason::FullymappingSubtrees,
-            "an untouched, non-reordered node must not be tagged FullymappingSubtrees"
+            ASTMappingReason::FullyMappingSubtrees,
+            "an untouched, non-reordered node must not be tagged FullyMappingSubtrees"
         );
 
         // `use_declaration` and `scoped_use_list` wrap `use_list` but aren't commutative
@@ -342,10 +342,10 @@ mod tests {
         );
         assert_eq!(use_decl_mapping.cost, COST_UPDATE);
         // The ancestor itself didn't reorder anything - only the actual commutative container
-        // gets tagged FullymappingSubtrees.
+        // gets tagged FullyMappingSubtrees.
         assert_ne!(
             use_decl_mapping.reason,
-            ASTMappingReason::FullymappingSubtrees
+            ASTMappingReason::FullyMappingSubtrees
         );
     }
 
