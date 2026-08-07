@@ -205,6 +205,16 @@ impl DiffViewer {
         Some((state.cursor_row, state.cursor_col))
     }
 
+    /// The focused panel's total distinct changes and how many are at or before the cursor - see
+    /// `CodeViewer::change_count_and_index` - shown in `app.rs`'s footer line after `n`/`p`.
+    pub fn focused_change_count_and_index(&self) -> Option<(usize, usize)> {
+        let viewer = match self.active_panel {
+            Panel::Before => &self.left_viewer,
+            Panel::After => &self.right_viewer,
+        };
+        viewer.change_count_and_index()
+    }
+
     /// Load a single file (no diff overlay yet) into the "Before" panel.
     pub fn set_before_file(&mut self, path: PathBuf) -> Result<()> {
         self.left_viewer.load_file(path)
@@ -544,6 +554,7 @@ mod tests {
             before_ranges: Vec::new(),
             after_ranges: Vec::new(),
             comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
         }
     }
 
@@ -636,6 +647,7 @@ mod tests {
                 },
             ],
             comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
         };
 
         viewer.load_diff(&data);
@@ -708,6 +720,7 @@ mod tests {
                 },
             ],
             comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
         };
         viewer.load_diff(&data);
 

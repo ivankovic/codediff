@@ -248,18 +248,13 @@ impl CodeViewerState {
         self.highlight_destination = None;
     }
 
-    /// The `(row, column)` of the start of the nearest actual change (anything but `Identical`/
-    /// the `NotYetSet` sentinel, and not a zero-width placeholder) strictly after (`forward =
-    /// true`) or before (`forward = false`) the cursor's current position - what `n`/`p` jump to.
-    /// Wraps around (forward past the last change goes to the first, and vice versa) rather than
-    /// stopping at the ends, same convention as a search's `n`/`N`. `None` if there are no changes
-    /// at all (e.g. two identical files).
-    pub fn next_change_position(&self, forward: bool) -> Option<(usize, usize)> {
-        let cursor = (self.cursor_row, self.cursor_col);
+    /// Every change's `(row, column)` start position (anything but `Identical`/the `NotYetSet`
+    /// sentinel, and not a zero-width placeholder), in document order - the ordered list
+    /// `next_change_position`/`change_count_and_index` both walk.
+    fn change_positions(&self) -> Vec<(usize, usize)> {
         // `range_order` is already sorted by source start position, and filtering preserves that
-        // order, so `changes` comes out sorted with no extra work.
-        let changes: Vec<(usize, usize)> = self
-            .range_order
+        // order, so this comes out sorted with no extra work.
+        self.range_order
             .iter()
             .map(|&i| &self.ranges[i])
             .filter(|range_match| {
@@ -274,7 +269,17 @@ impl CodeViewerState {
                     range_match.source.start_column,
                 )
             })
-            .collect();
+            .collect()
+    }
+
+    /// The `(row, column)` of the start of the nearest actual change strictly after (`forward =
+    /// true`) or before (`forward = false`) the cursor's current position - what `n`/`p` jump to.
+    /// Wraps around (forward past the last change goes to the first, and vice versa) rather than
+    /// stopping at the ends, same convention as a search's `n`/`N`. `None` if there are no changes
+    /// at all (e.g. two identical files).
+    pub fn next_change_position(&self, forward: bool) -> Option<(usize, usize)> {
+        let cursor = (self.cursor_row, self.cursor_col);
+        let changes = self.change_positions();
 
         if forward {
             changes
@@ -290,6 +295,21 @@ impl CodeViewerState {
                 .or_else(|| changes.last())
                 .copied()
         }
+    }
+
+    /// Total distinct changes, and how many of them sit at or before the cursor's current
+    /// position (1-indexed) - the "change N/M" the footer shows after `n`/`p`. `None` if there are
+    /// no changes at all, same condition as `next_change_position`. Landing exactly on a change
+    /// (as `next_change_position` always does) counts that change itself, so pressing `n`
+    /// repeatedly counts 1, 2, 3, ... in step with each jump.
+    pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
+        let cursor = (self.cursor_row, self.cursor_col);
+        let changes = self.change_positions();
+        if changes.is_empty() {
+            return None;
+        }
+        let index = changes.iter().filter(|&&pos| pos <= cursor).count().max(1);
+        Some((index, changes.len()))
     }
 
     /// The index into `ranges` of the range covering the cursor's current position, if any (the
@@ -1005,6 +1025,45 @@ mod tests {
         }]);
         assert_eq!(state.next_change_position(true), None);
         assert_eq!(state.next_change_position(false), None);
+    }
+
+    #[test]
+    fn change_count_and_index_is_none_when_the_file_has_no_changes() {
+        let mut state = CodeViewerState::default();
+        state.load_ranges(vec![RangeMatch {
+            source: TextRange::new(0, 0, 5, 0),
+            destination: TextRange::zero(),
+            operation: TextOperation::Identical,
+        }]);
+        assert_eq!(state.change_count_and_index(), None);
+    }
+
+    /// Landing exactly on a change (as `next_change_position` always does) must count that change
+    /// itself, so repeatedly pressing `n` counts 1, 2, 3 in step with each jump rather than lagging
+    /// or double-counting.
+    #[test]
+    fn change_count_and_index_counts_changes_at_or_before_the_cursor() {
+        let mut state = state_with_three_changes_on_rows_2_5_and_9();
+
+        state.cursor_row = 0;
+        state.cursor_col = 0;
+        assert_eq!(
+            state.change_count_and_index(),
+            Some((1, 3)),
+            "before the first change, index should still report 1, not 0"
+        );
+
+        state.cursor_row = 2;
+        state.cursor_col = 0;
+        assert_eq!(state.change_count_and_index(), Some((1, 3)));
+
+        state.cursor_row = 5;
+        state.cursor_col = 0;
+        assert_eq!(state.change_count_and_index(), Some((2, 3)));
+
+        state.cursor_row = 9;
+        state.cursor_col = 0;
+        assert_eq!(state.change_count_and_index(), Some((3, 3)));
     }
 
     /// `cursor_destination` resolves the cursor's current position to the matched range's

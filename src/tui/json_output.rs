@@ -305,6 +305,7 @@ mod tests {
                 },
             ],
             comment_only: false,
+            mode: DiffMode::Fast,
         }
     }
 

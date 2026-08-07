@@ -47,6 +47,11 @@ pub struct DiffSessionData {
     /// itself is gone, so this can't be recomputed later from `before_ranges`/`after_ranges` alone
     /// the way `diff::text::summarize_diff`'s other cases can.
     pub comment_only: bool,
+    /// Which `DiffMode` actually produced this result - `Fast` unless the user picked `Exact` from
+    /// the "this diff is unusually large" prompt, or the file pair never tripped that prompt at
+    /// all (see `compute_diff_interactive`). Shown in `app.rs`'s footer so a user can't forget
+    /// which one they're looking at.
+    pub mode: DiffMode,
 }
 
 #[derive(Debug, Clone, PartialEq)]

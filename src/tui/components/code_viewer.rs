@@ -182,6 +182,12 @@ impl CodeViewer {
         }
     }
 
+    /// Total distinct changes and how many are at or before the cursor - see
+    /// `CodeViewerState::change_count_and_index`.
+    pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
+        self.state.change_count_and_index()
+    }
+
     /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
     /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
     /// to match the active panel's cursor destination.

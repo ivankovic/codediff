@@ -6,7 +6,7 @@ and the README's "Using the TUI" section, not general advice. Organized into uni
 picked up and solved one at a time, roughly in priority order. Mark an item done in place
 (`**Status:** IMPLEMENTED (date)`) rather than deleting it, same convention as `src/diff/TODO.md`.
 
-## Phase 1: Persistent status/footer line
+## Phase 1: Persistent status/footer line (DONE, 2026-08-07 - all 5 sub-items implemented)
 
 The single highest-value item: one component fixes several gaps below at once, and it's low-risk
 since it doesn't touch existing keybinding dispatch. Today the *only* status feedback is a one-line
@@ -23,6 +23,8 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
 - **Impact:** Fixes the core discoverability gap without requiring a user to already know `?`
   exists.
 - **Complexity:** Low.
+- **Status:** IMPLEMENTED (2026-08-07). `App::draw_footer`, always-reserved row in `draw_viewer`;
+  `FOOTER_HINTS` const.
 
 ### Change count summary for the common case
 - **Problem:** `DiffSummary`'s categorical labels (`NewFile`, `WhitespaceOnly`, ...) cover the
@@ -32,6 +34,9 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
 - **Files:** `app.rs`, `diff::text` (existing line-operation counting).
 - **Impact:** Every diff gets a real, glanceable summary, not just the special cases.
 - **Complexity:** Low-Medium.
+- **Status:** IMPLEMENTED (2026-08-07). `diff::text::change_counts` (counts each side's own
+  `line_operations` independently, `Update` counted once from the after side only to avoid double
+  counting); `App::change_counts` field, set on `Action::DiffReady`; `format_change_counts`.
 
 ### "Change N of M" during `n`/`p` navigation
 - **Problem:** `n`/`p` jump straight to the next/previous change but give no sense of progress or
@@ -43,6 +48,9 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   (`jump_to_change`), `app.rs` (footer draw).
 - **Impact:** Turns blind stepping into a real navigation aid, especially on large diffs.
 - **Complexity:** Medium (needs a stored/derived total, not just a next-position lookup).
+- **Status:** IMPLEMENTED (2026-08-07). `CodeViewerState::change_positions` factored out of
+  `next_change_position` and reused by new `change_count_and_index` (counts change positions at or
+  before the cursor, 1-indexed); threaded up through `CodeViewer`/`DiffViewer`.
 
 ### Cursor position indicator
 - **Problem:** No line/column shown anywhere, unlike essentially every text editor.
@@ -52,12 +60,16 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   state already exists, just needs exposing).
 - **Impact:** Standard editor affordance; near-zero cost since the state already exists.
 - **Complexity:** Low.
+- **Status:** IMPLEMENTED (2026-08-07). `DiffViewer::focused_cursor_position`.
 
 ### Active diff-mode indicator
 - **Problem:** After the initial Fast/Exact prompt (`diff_mode_dialog.rs`) resolves, there's no
   ongoing indication of which mode produced the visible diff - a user can forget whether they're
   looking at the precise or approximate result.
 - **Solution:** Small persistent label in the footer or panel title, e.g. `[fast]`/`[exact]`.
+- **Status:** IMPLEMENTED (2026-08-07). `DiffSessionData::mode` (threaded through
+  `assemble_diff_session_data`/`compute_diff`/`compute_diff_interactive`); `App::diff_mode` field;
+  `format_diff_mode`.
 - **Files:** `app.rs` (wherever the resolved `DiffMode` is already stored post-dialog).
 - **Impact:** Removes a real source of confusion about result trustworthiness on big/unrelated
   files.

@@ -484,6 +484,44 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
     ops
 }
 
+/// Line-level +/-/~ counts for a completed diff - e.g. for a compact status-bar summary like
+/// `+12 -4 ~2`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChangeCounts {
+    pub insertions: usize,
+    pub deletions: usize,
+    pub updates: usize,
+}
+
+/// Counts each side's own [`line_operations`] output independently: `Insert` from the after side
+/// (a line that exists only in after), `Delete` from the before side (a line that exists only in
+/// before). `Update` is counted once, from the after side only - an updated line exists on both
+/// sides at the same row, so counting it from both sides would double it.
+pub fn change_counts(
+    before_contents: &str,
+    after_contents: &str,
+    before_ranges: &[RangeMatch],
+    after_ranges: &[RangeMatch],
+) -> ChangeCounts {
+    let before_ops = line_operations(before_ranges, before_contents.split('\n').count());
+    let after_ops = line_operations(after_ranges, after_contents.split('\n').count());
+
+    ChangeCounts {
+        insertions: after_ops
+            .iter()
+            .filter(|op| **op == TextOperation::Insert)
+            .count(),
+        deletions: before_ops
+            .iter()
+            .filter(|op| **op == TextOperation::Delete)
+            .count(),
+        updates: after_ops
+            .iter()
+            .filter(|op| **op == TextOperation::Update)
+            .count(),
+    }
+}
+
 /// A quick, common-case classification of a diff's overall shape. Most variants are cheap enough
 /// to compute on every completed diff (see `summarize_diff`) from data `TextDiff` already
 /// produces, no extra tree-sitter/AST work needed - `CommentOnly` is the one exception, which
@@ -827,6 +865,38 @@ mod tests {
         }];
         let ops = line_operations(&ranges, 3);
         assert_eq!(ops, vec![TextOperation::Identical; 3]);
+    }
+
+    /// `before` is `"a\nb\nc"` (3 lines), `after` is `"a\nX\nc\nd"` (4 lines): row 1 updated
+    /// (`b` -> `X`, present as an Update range on both sides), row 3 inserted (`d`, only on the
+    /// after side). Update must be counted once, not twice, even though both sides carry an Update
+    /// range for the same row.
+    #[test]
+    fn change_counts_tallies_insertions_deletions_and_updates_without_double_counting() {
+        let update_range = |row: usize| RangeMatch {
+            source: TextRange::new(row, 0, row, 1),
+            destination: TextRange::new(row, 0, row, 1),
+            operation: TextOperation::Update,
+        };
+        let before_ranges = vec![update_range(1)];
+        let after_ranges = vec![
+            update_range(1),
+            RangeMatch {
+                source: TextRange::new(3, 0, 3, 1),
+                destination: TextRange::new(3, 0, 3, 1),
+                operation: TextOperation::Insert,
+            },
+        ];
+
+        let counts = change_counts("a\nb\nc", "a\nX\nc\nd", &before_ranges, &after_ranges);
+        assert_eq!(
+            counts,
+            ChangeCounts {
+                insertions: 1,
+                deletions: 0,
+                updates: 1,
+            }
+        );
     }
 
     #[test]

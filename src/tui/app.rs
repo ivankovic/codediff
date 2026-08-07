@@ -31,7 +31,10 @@ use std::sync::{Arc, Mutex};
 use crate::code::{Code, Language};
 use crate::diff::{
     Diff, DiffMode, NodeCache,
-    text::{DiffSummary, TextDiff, is_comment_only_diff, summarize_diff_with_comment_check},
+    text::{
+        ChangeCounts, DiffSummary, TextDiff, change_counts, is_comment_only_diff,
+        summarize_diff_with_comment_check,
+    },
 };
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::components::{
@@ -128,6 +131,14 @@ pub struct App {
     /// Cleared on `StartDiff`/`DiffFailed` so a stale summary from the *previous* diff never shows
     /// while a new one is loading or after it fails.
     diff_summary: Option<DiffSummary>,
+    /// Line-level +/-/~ counts for the currently loaded diff (see `diff::text::change_counts`),
+    /// shown in the footer. Same lifecycle as `diff_summary` - computed once on `Action::DiffReady`,
+    /// cleared on `StartDiff`/`DiffFailed`.
+    change_counts: Option<ChangeCounts>,
+    /// Which `DiffMode` produced the currently loaded diff (see `DiffSessionData::mode`), shown in
+    /// the footer so a user can't forget whether they're looking at the fast, approximate result
+    /// or the exact one. Same lifecycle as `diff_summary`/`change_counts`.
+    diff_mode: Option<DiffMode>,
 
     should_exit: bool,
     should_suspend: bool,
@@ -156,6 +167,8 @@ impl App {
             after_path: None,
             last_error: None,
             diff_summary: None,
+            change_counts: None,
+            diff_mode: None,
             should_exit: false,
             should_suspend: false,
         })
@@ -315,6 +328,8 @@ impl App {
                 Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
                     self.diff_summary = None;
+                    self.change_counts = None;
+                    self.diff_mode = None;
                     self.start_diff(before.clone(), after.clone());
                 }
                 Action::DiffReady(data) => {
@@ -328,6 +343,13 @@ impl App {
                         &data.after_ranges,
                         data.comment_only,
                     );
+                    self.change_counts = Some(change_counts(
+                        &data.before_contents,
+                        &data.after_contents,
+                        &data.before_ranges,
+                        &data.after_ranges,
+                    ));
+                    self.diff_mode = Some(data.mode);
                 }
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");
@@ -335,6 +357,8 @@ impl App {
                     self.screen = AppScreen::Viewer;
                     self.file_dialog = None;
                     self.diff_summary = None;
+                    self.change_counts = None;
+                    self.diff_mode = None;
                 }
                 Action::Error(message) => {
                     error!("{message}");
@@ -530,22 +554,37 @@ impl App {
         Ok(())
     }
 
-    /// The always-visible footer: the focused panel's cursor position on the left, a compact
-    /// key-hint reference on the right. Pressing `?` still shows the full keybinding/color
-    /// reference (`help_modal.rs`) - this is deliberately just the handful of most-used keys, so a
+    /// The always-visible footer: the focused panel's cursor position, the diff's +/-/~ line
+    /// counts, and its progress through `n`/`p` navigation on the left; a compact key-hint
+    /// reference on the right. Pressing `?` still shows the full keybinding/color reference
+    /// (`help_modal.rs`) - this is deliberately just the handful of most-used keys, so a
     /// first-time user has *some* signal that keybindings exist at all without having to already
     /// know to press `?` first.
     fn draw_footer(&self, frame: &mut ratatui::Frame, area: Rect) {
-        let position = match self.diff_viewer.focused_cursor_position() {
-            Some((row, col)) => format!("Ln {}, Col {}", row + 1, col + 1),
-            None => String::new(),
-        };
+        let mut left_parts = Vec::with_capacity(3);
+        if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
+            left_parts.push(format!("Ln {}, Col {}", row + 1, col + 1));
+        }
+        if let Some(counts) = self.change_counts {
+            let counts_text = format_change_counts(counts);
+            if !counts_text.is_empty() {
+                left_parts.push(counts_text);
+            }
+        }
+        if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
+            left_parts.push(format!("change {index}/{total}"));
+        }
+        if let Some(mode) = self.diff_mode {
+            left_parts.push(format_diff_mode(mode));
+        }
+        let left = left_parts.join("   ");
+
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(20), Constraint::Min(1)])
+            .constraints([Constraint::Length(70), Constraint::Min(1)])
             .split(area);
         frame.render_widget(
-            Paragraph::new(position).style(Style::new().fg(Color::DarkGray)),
+            Paragraph::new(left).style(Style::new().fg(Color::DarkGray)),
             layout[0],
         );
         frame.render_widget(
@@ -593,6 +632,33 @@ impl App {
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
 const FOOTER_HINTS: &str = "?:help  o:open  n/p:next/prev  Tab:switch  q:quit";
+
+/// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
+/// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
+/// covered by the status bar above).
+fn format_change_counts(counts: ChangeCounts) -> String {
+    let mut parts = Vec::with_capacity(3);
+    if counts.insertions > 0 {
+        parts.push(format!("+{}", counts.insertions));
+    }
+    if counts.deletions > 0 {
+        parts.push(format!("-{}", counts.deletions));
+    }
+    if counts.updates > 0 {
+        parts.push(format!("~{}", counts.updates));
+    }
+    parts.join(" ")
+}
+
+/// Formats the currently loaded diff's `DiffMode` as a compact footer label - `[fast]`/`[exact]`,
+/// so a user can't forget which one they're looking at once the initial prompt (`draw_diff_mode_
+/// dialog`, only shown when `PendingDiff::looks_expensive()` trips) is long gone.
+fn format_diff_mode(mode: DiffMode) -> String {
+    match mode {
+        DiffMode::Fast => "[fast]".to_string(),
+        DiffMode::Exact => "[exact]".to_string(),
+    }
+}
 
 /// The centered "Diffing…" status shown while a background diff computation is in flight -
 /// shared by `render`'s `AppScreen::Diffing` arm and `draw_diff_mode_dialog` (the Fast/Exact
@@ -660,6 +726,7 @@ fn assemble_diff_session_data(
     before_code: &Code,
     after_code: &Code,
     diff: &Diff,
+    mode: DiffMode,
 ) -> Result<DiffSessionData> {
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
@@ -677,6 +744,7 @@ fn assemble_diff_session_data(
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
         comment_only,
+        mode,
     })
 }
 
@@ -698,7 +766,7 @@ pub(crate) fn compute_diff(
     let pending = Diff::pending(&before_code, &after_code);
     let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
     let diff = pending.finish(mode);
-    let data = assemble_diff_session_data(before, after, &before_code, &after_code, &diff)?;
+    let data = assemble_diff_session_data(before, after, &before_code, &after_code, &diff, mode)?;
     Ok((data, fallback_used))
 }
 
@@ -735,7 +803,7 @@ fn compute_diff_interactive(
     };
 
     let diff = pending.finish(mode);
-    assemble_diff_session_data(before, after, &before_code, &after_code, &diff)
+    assemble_diff_session_data(before, after, &before_code, &after_code, &diff, mode)
 }
 
 /// If `code` has no detected language and no content (the `/dev/null` case handled by
@@ -1064,6 +1132,119 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn format_change_counts_omits_zero_categories() {
+        assert_eq!(
+            format_change_counts(ChangeCounts {
+                insertions: 12,
+                deletions: 4,
+                updates: 2,
+            }),
+            "+12 -4 ~2"
+        );
+        assert_eq!(
+            format_change_counts(ChangeCounts {
+                insertions: 3,
+                deletions: 0,
+                updates: 0,
+            }),
+            "+3"
+        );
+        assert_eq!(
+            format_change_counts(ChangeCounts {
+                insertions: 0,
+                deletions: 0,
+                updates: 0,
+            }),
+            ""
+        );
+    }
+
+    #[test]
+    fn draw_viewer_shows_change_counts_in_the_footer_when_set() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.change_counts = Some(ChangeCounts {
+            insertions: 12,
+            deletions: 4,
+            updates: 2,
+        });
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains("+12 -4 ~2"),
+            "expected the change counts to be drawn in the footer"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn draw_viewer_shows_change_progress_in_the_footer_once_the_focused_panel_has_changes()
+    -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "a\nb\nc".to_string(),
+            after_contents: "a\nb\nc".to_string(),
+            before_ranges: vec![crate::diff::text::RangeMatch {
+                source: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                destination: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                operation: crate::diff::text::TextOperation::Update,
+            }],
+            after_ranges: vec![crate::diff::text::RangeMatch {
+                source: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                destination: crate::diff::text_range::TextRange::new(1, 0, 1, 1),
+                operation: crate::diff::text::TextOperation::Update,
+            }],
+            comment_only: false,
+            mode: DiffMode::Fast,
+        });
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains("change 1/1"),
+            "expected the footer to show change progress once the focused panel has a change"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn format_diff_mode_labels_each_mode() {
+        assert_eq!(format_diff_mode(DiffMode::Fast), "[fast]");
+        assert_eq!(format_diff_mode(DiffMode::Exact), "[exact]");
+    }
+
+    #[test]
+    fn draw_viewer_shows_the_active_diff_mode_in_the_footer_when_set() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_mode = Some(DiffMode::Exact);
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains("[exact]"),
+            "expected the active diff mode to be drawn in the footer"
+        );
+        Ok(())
+    }
+
     /// Regression guard for the layout math in `draw_viewer`: both a summary bar (top) and an
     /// error banner (bottom) must be able to show at once, around the panels in the middle -
     /// dynamic `Vec<Constraint>` indexing is exactly the kind of code an off-by-one silently
@@ -1108,6 +1289,7 @@ mod tests {
                 operation: crate::diff::text::TextOperation::Insert,
             }],
             comment_only: false,
+            mode: DiffMode::Fast,
         };
 
         let summary = summarize_diff_with_comment_check(
@@ -1140,6 +1322,7 @@ mod tests {
             before_ranges: ranges.clone(),
             after_ranges: ranges,
             comment_only: true,
+            mode: DiffMode::Fast,
         };
 
         let summary = summarize_diff_with_comment_check(
