@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("yaml-n8n-io-n8n-add-performance-check-to-ci-config")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "yaml-n8n-io-n8n-add-performance-check-to-ci-config",
+    )
 }
