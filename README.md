@@ -79,7 +79,14 @@ you redirect output to a file.
 
 ## Git integration
 
-`codediff` doubles as a `git difftool` backend:
+`codediff` doubles as a `git difftool` backend. Run the interactive setup wizard, which asks
+whether to configure it globally or for the current repository only:
+
+```
+codediff git configure
+```
+
+Or configure it by hand:
 
 ```
 git config difftool.codediff.cmd 'codediff "$LOCAL" "$REMOTE"'
@@ -90,9 +97,16 @@ Run `git config diff.tool codediff` to make plain `git difftool` use codediff by
 needing `--tool`. If you do not want git to ask "view diff ... [Y/n]?" before every file, run `git
 config difftool.prompt false`.
 
+**`git difftool` opens the interactive TUI. `git diff` and `git log -p` never do.** `git diff`
+pipes its output through git's pager, and a full-screen TUI cannot draw onto a pipe, so codediff
+always falls back to plain text there regardless of terminal or `GIT_EXTERNAL_DIFF` config (see
+"Headless / batch mode" above). If you want the interactive viewer from git, use `git difftool`,
+not `git diff`. If `git difftool` still doesn't open interactively over SSH, reconnect with
+`ssh -t` — the session needs an allocated pseudo-terminal; tmux panes always have one, so tmux
+itself is never the cause.
+
 codediff also works directly with `git diff` and `git log -p`, through `GIT_EXTERNAL_DIFF`. This
-path needs no `difftool` config, but it is always non-interactive (see "Headless / batch mode"
-above):
+path needs no `difftool` config:
 
 ```
 GIT_EXTERNAL_DIFF=codediff git diff
@@ -101,6 +115,10 @@ GIT_EXTERNAL_DIFF=codediff git diff
 Files with no tree-sitter grammar (an unrecognized extension, or none at all - `Makefile`,
 `Dockerfile`, ...) fall back to a plain line-level diff instead of the syntax-aware one, so a
 change touching one of them never blocks `git diff` from showing the rest.
+
+## Editor integration
+
+For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
 
 # Guiding principles
 
