@@ -1104,7 +1104,12 @@ fn flat_children(
 
 /// Myers O(ND) LCS on two sequences of hashes. Returns matched `(a_idx, b_idx)` pairs
 /// in ascending order, or `None` if the edit distance exceeds `max_edit`.
-fn myers_lcs(a: &[u64], b: &[u64], max_edit: usize) -> Option<Vec<(usize, usize)>> {
+///
+/// `pub(crate)`, re-exported through `apted::myers_lcs`: also used by `diff::text::
+/// plain_text_line_diff` (a plain line-level diff for files with no tree-sitter grammar), the one
+/// caller outside this module - same primitive, applied to hashed lines instead of hashed subtree
+/// roots.
+pub(crate) fn myers_lcs(a: &[u64], b: &[u64], max_edit: usize) -> Option<Vec<(usize, usize)>> {
     let n = a.len();
     let m = b.len();
     if n == 0 || m == 0 {

@@ -365,6 +365,181 @@ impl TextDiff {
     }
 }
 
+/// `myers_lcs`'s edit-distance search gives up past this and falls back to treating the whole
+/// file as replaced. `myers_lcs` allocates O(max_edit²) `usize`s and does O(max_edit²) work in
+/// the worst case (two sides with no common lines at all) - at 10,000 that's ~1.6GB and a
+/// genuinely slow search, so this only pays that cost for a file pair that's actually that
+/// different; an ordinary edit to a large file (even a 10k-line one) finds its solution and
+/// returns long before reaching the cap, since Myers' search terminates as soon as it finds the
+/// *actual* edit distance, however small, rather than always running to `max_edit`. Deliberately
+/// much higher than `apted::common::FALLBACK_MAX_EDIT` (1000): that one bounds a residual
+/// *subtree* forest, typically small even for a large file, while this one bounds whole-file
+/// *lines*, where 1000 was too easy to exceed on real config/lockfile-sized files with a
+/// legitimately large (but not pathological) number of changed lines.
+const PLAIN_TEXT_MAX_EDIT: usize = 10_000;
+
+/// A plain line-level diff (Myers LCS over hashed lines, no AST) for files with no tree-sitter
+/// grammar - `app::compute_diff`'s fallback when either side's `Code::ast` is `None` (an
+/// unrecognized extension, e.g. a `Makefile`). Returns `(before_ranges, after_ranges)`, the same
+/// shape `TextDiff::all(0)`/`all(1)` produce, so every downstream consumer (the TUI's overlay
+/// rendering, `headless::render_text_diff`, `json_output::build_side`, `change_counts`,
+/// `DiffSummary`) works unchanged - none of them actually require an AST, only a `RangeMatch`
+/// list.
+///
+/// Only ever produces `Identical`/`Insert`/`Delete` - there is no AST-level node identity to
+/// detect an `Update` (a changed line one side, at the same position) or a `Move` (a line
+/// relocated elsewhere) from, so a changed line renders as an adjacent delete+insert pair instead
+/// of a single `Update`, same as a plain `diff -u`.
+pub fn plain_text_line_diff(before: &str, after: &str) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    plain_text_line_diff_with_max_edit(before, after, PLAIN_TEXT_MAX_EDIT)
+}
+
+/// `plain_text_line_diff`'s actual implementation, parameterized on the edit-distance cap so
+/// tests can exercise the "gave up" path with a small cap instead of paying `PLAIN_TEXT_MAX_EDIT`
+/// squared (10,000² ≈ 1.6GB and genuinely slow) just to prove that path exists.
+fn plain_text_line_diff_with_max_edit(
+    before: &str,
+    after: &str,
+    max_edit: usize,
+) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    let before_lines: Vec<&str> = before.lines().collect();
+    let after_lines: Vec<&str> = after.lines().collect();
+
+    let before_hashes = hash_lines(&before_lines);
+    let after_hashes = hash_lines(&after_lines);
+
+    match crate::diff::apted::myers_lcs(&before_hashes, &after_hashes, max_edit) {
+        Some(pairs) => build_line_ranges(before_lines.len(), after_lines.len(), &pairs),
+        None => whole_file_replaced(before_lines.len(), after_lines.len()),
+    }
+}
+
+fn hash_lines(lines: &[&str]) -> Vec<u64> {
+    use std::hash::{Hash, Hasher};
+    lines
+        .iter()
+        .map(|line| {
+            let mut hasher = rustc_hash::FxHasher::default();
+            line.hash(&mut hasher);
+            hasher.finish()
+        })
+        .collect()
+}
+
+/// One whole line as a `TextRange`: `(row, 0)` to `(row + 1, 0)` - this module's convention for
+/// "all of row, including its own line break" (see `text_range.rs`'s doc comment on referring to
+/// a full row via `(row + 1, 0)`).
+fn whole_line_range(row: usize) -> TextRange {
+    TextRange::new(row, 0, row + 1, 0)
+}
+
+/// Walks `pairs` (matched `(before_row, after_row)`, ascending in both - an LCS matching
+/// preserves relative order on both sides) once, emitting one `Identical` `RangeMatch` per match
+/// and one merged `Delete`/`Insert` `RangeMatch` per *gap* between matches (so a multi-line
+/// block reads, and n/p-navigates, as a single change rather than one per line).
+///
+/// Every unmatched run's `destination` is anchored at the other side's most recently confirmed
+/// match, advanced past it via `right_limit` - the exact convention `diff::text::
+/// advance_and_build_range` uses for the AST path's own plain Insert/Delete ranges, so the
+/// cross-panel cursor lands at "where this content would be if it existed on the other side"
+/// instead of at a coordinate-space-confused row (before-side and after-side rows generally
+/// diverge once there's been any earlier insert/delete).
+fn build_line_ranges(
+    before_line_count: usize,
+    after_line_count: usize,
+    pairs: &[(usize, usize)],
+) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    let mut before_ranges = Vec::new();
+    let mut after_ranges = Vec::new();
+
+    let mut next_before_row = 0;
+    let mut next_after_row = 0;
+    let mut last_before_match = TextRange::zero();
+    let mut last_after_match = TextRange::zero();
+
+    for &(bi, ai) in pairs {
+        if bi > next_before_row {
+            before_ranges.push(RangeMatch {
+                source: TextRange::new(next_before_row, 0, bi, 0),
+                destination: last_after_match.right_limit(),
+                operation: TextOperation::Delete,
+            });
+        }
+        if ai > next_after_row {
+            after_ranges.push(RangeMatch {
+                source: TextRange::new(next_after_row, 0, ai, 0),
+                destination: last_before_match.right_limit(),
+                operation: TextOperation::Insert,
+            });
+        }
+
+        let before_line = whole_line_range(bi);
+        let after_line = whole_line_range(ai);
+        before_ranges.push(RangeMatch {
+            source: before_line.clone(),
+            destination: after_line.clone(),
+            operation: TextOperation::Identical,
+        });
+        after_ranges.push(RangeMatch {
+            source: after_line.clone(),
+            destination: before_line.clone(),
+            operation: TextOperation::Identical,
+        });
+
+        last_before_match = before_line;
+        last_after_match = after_line;
+        next_before_row = bi + 1;
+        next_after_row = ai + 1;
+    }
+
+    if before_line_count > next_before_row {
+        before_ranges.push(RangeMatch {
+            source: TextRange::new(next_before_row, 0, before_line_count, 0),
+            destination: last_after_match.right_limit(),
+            operation: TextOperation::Delete,
+        });
+    }
+    if after_line_count > next_after_row {
+        after_ranges.push(RangeMatch {
+            source: TextRange::new(next_after_row, 0, after_line_count, 0),
+            destination: last_before_match.right_limit(),
+            operation: TextOperation::Insert,
+        });
+    }
+
+    (before_ranges, after_ranges)
+}
+
+/// `myers_lcs` gave up (edit distance past `PLAIN_TEXT_MAX_EDIT`): treat the whole file as
+/// replaced rather than paying for an unbounded search - same fallback-of-a-fallback
+/// `apted::common::resolve_residual_forest_via_myers_lcs` already uses for the same reason. No
+/// range at all for an empty side, matching `diff::text::ranges`'s own `(None, None)` "no code on
+/// either side" case.
+fn whole_file_replaced(
+    before_line_count: usize,
+    after_line_count: usize,
+) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    let before_ranges = if before_line_count == 0 {
+        Vec::new()
+    } else {
+        vec![RangeMatch {
+            source: TextRange::new(0, 0, before_line_count, 0),
+            destination: TextRange::zero(),
+            operation: TextOperation::Delete,
+        }]
+    };
+    let after_ranges = if after_line_count == 0 {
+        Vec::new()
+    } else {
+        vec![RangeMatch {
+            source: TextRange::new(0, 0, after_line_count, 0),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        }]
+    };
+    (before_ranges, after_ranges)
+}
+
 /**
 * A textual range match. For a given source match, it provides the operation for that range and
 * optionally the matching range on the destination side.
@@ -830,6 +1005,232 @@ mod tests {
     use anyhow::Result;
 
     use super::*;
+
+    /// Every non-Identical range's source row span, in order - the shape of assertion these tests
+    /// care about (what changed, and in what order), without pinning down destination anchors
+    /// line by line.
+    fn changed_row_spans(ranges: &[RangeMatch]) -> Vec<(TextOperation, usize, usize)> {
+        ranges
+            .iter()
+            .filter(|r| r.operation != TextOperation::Identical)
+            .map(|r| (r.operation.clone(), r.source.start_row, r.source.end_row))
+            .collect()
+    }
+
+    #[test]
+    fn plain_text_line_diff_matches_identical_lines() {
+        let (before, after) = plain_text_line_diff("a\nb\nc\n", "a\nb\nc\n");
+        assert!(changed_row_spans(&before).is_empty());
+        assert!(changed_row_spans(&after).is_empty());
+        assert_eq!(before.len(), 3, "every line should get an Identical range");
+        assert!(
+            before
+                .iter()
+                .all(|r| r.operation == TextOperation::Identical)
+        );
+    }
+
+    #[test]
+    fn plain_text_line_diff_finds_a_pure_insertion() {
+        let (before, after) = plain_text_line_diff("a\nc\n", "a\nb\nc\n");
+        assert_eq!(changed_row_spans(&before), vec![]);
+        assert_eq!(
+            changed_row_spans(&after),
+            vec![(TextOperation::Insert, 1, 2)]
+        );
+    }
+
+    #[test]
+    fn plain_text_line_diff_finds_a_pure_deletion() {
+        let (before, after) = plain_text_line_diff("a\nb\nc\n", "a\nc\n");
+        assert_eq!(
+            changed_row_spans(&before),
+            vec![(TextOperation::Delete, 1, 2)]
+        );
+        assert_eq!(changed_row_spans(&after), vec![]);
+    }
+
+    /// A changed line has no AST-level identity to recognize as an `Update` - it renders as an
+    /// adjacent delete+insert pair instead, same as a plain `diff -u`.
+    #[test]
+    fn plain_text_line_diff_treats_a_changed_line_as_delete_plus_insert() {
+        let (before, after) = plain_text_line_diff("a\nOLD\nc\n", "a\nNEW\nc\n");
+        assert_eq!(
+            changed_row_spans(&before),
+            vec![(TextOperation::Delete, 1, 2)]
+        );
+        assert_eq!(
+            changed_row_spans(&after),
+            vec![(TextOperation::Insert, 1, 2)]
+        );
+    }
+
+    /// Non-contiguous matches (matched, gap on both sides, matched, gap on both sides, matched) -
+    /// the case most likely to expose a grouping bug, since a naive implementation might zip the
+    /// two sides' gaps together instead of walking each side's own row space independently.
+    #[test]
+    fn plain_text_line_diff_handles_non_contiguous_matches() {
+        let before = "same0\nDEL_A\nsame1\nDEL_B\nDEL_C\nsame2\n";
+        let after = "same0\nINS_A\nINS_B\nsame1\nsame2\n";
+        let (before_ranges, after_ranges) = plain_text_line_diff(before, after);
+
+        assert_eq!(
+            changed_row_spans(&before_ranges),
+            vec![(TextOperation::Delete, 1, 2), (TextOperation::Delete, 3, 5)],
+            "before's two unmatched runs (rows 1 and 3-4) must stay separate, not merge across \
+             the row-2 match"
+        );
+        assert_eq!(
+            changed_row_spans(&after_ranges),
+            vec![(TextOperation::Insert, 1, 3)],
+            "after's contiguous unmatched run (rows 1-2) must merge into one range"
+        );
+
+        // same0 (before row 0) matches after row 0; same1 (before row 2) matches after row 3;
+        // same2 (before row 5) matches after row 4.
+        let matches: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Identical)
+            .map(|r| (r.source.start_row, r.destination.start_row))
+            .collect();
+        assert_eq!(matches, vec![(0, 0), (2, 3), (5, 4)]);
+    }
+
+    /// The cross-panel cursor anchor for an unmatched run must land right after the nearest
+    /// *preceding* match in the other side's coordinate space - not at the unmatched run's own
+    /// row number, which is a different (and generally diverging) coordinate space once earlier
+    /// insertions/deletions have shifted the two sides out of alignment.
+    #[test]
+    fn plain_text_line_diff_anchors_unmatched_runs_at_the_preceding_matchs_destination() {
+        // before: same0, DEL, same1        (3 lines)
+        // after:  same0, INS_A, INS_B, same1  (4 lines) - "same1" sits at a different row on
+        // each side (before row 2, after row 3), so a correct anchor must use the *destination*
+        // coordinate space, not reuse the source row number.
+        let before = "same0\nDEL\nsame1\n";
+        let after = "same0\nINS_A\nINS_B\nsame1\n";
+        let (before_ranges, after_ranges) = plain_text_line_diff(before, after);
+
+        let delete = before_ranges
+            .iter()
+            .find(|r| r.operation == TextOperation::Delete)
+            .expect("before should have one Delete range");
+        assert_eq!(
+            delete.destination.start_row, 1,
+            "the deleted before-row-1 line has no real counterpart, so its cross-highlight \
+             anchor should sit right after same0's match (after row 0), i.e. after row 1"
+        );
+
+        let insert = after_ranges
+            .iter()
+            .find(|r| r.operation == TextOperation::Insert)
+            .expect("after should have one Insert range");
+        assert_eq!(
+            insert.destination.start_row, 1,
+            "the inserted after-rows have no real counterpart, so its cross-highlight anchor \
+             should sit right after same0's match (before row 0), i.e. before row 1"
+        );
+    }
+
+    #[test]
+    fn plain_text_line_diff_handles_empty_before_as_a_pure_insertion() {
+        let (before, after) = plain_text_line_diff("", "a\nb\n");
+        assert!(before.is_empty());
+        assert_eq!(
+            changed_row_spans(&after),
+            vec![(TextOperation::Insert, 0, 2)]
+        );
+    }
+
+    #[test]
+    fn plain_text_line_diff_handles_empty_after_as_a_pure_deletion() {
+        let (before, after) = plain_text_line_diff("a\nb\n", "");
+        assert_eq!(
+            changed_row_spans(&before),
+            vec![(TextOperation::Delete, 0, 2)]
+        );
+        assert!(after.is_empty());
+    }
+
+    #[test]
+    fn plain_text_line_diff_treats_two_empty_files_as_no_changes() {
+        let (before, after) = plain_text_line_diff("", "");
+        assert!(before.is_empty());
+        assert!(after.is_empty());
+    }
+
+    /// Past the edit-distance cap, `myers_lcs` gives up and the whole file is treated as replaced
+    /// - one Delete covering all of before, one Insert covering all of after - rather than paying
+    /// for an unbounded search. Exercises `plain_text_line_diff_with_max_edit` with a small cap
+    /// rather than the real `PLAIN_TEXT_MAX_EDIT` (10,000): actually reaching that cap costs
+    /// O(10,000²) - ~1.6GB and genuinely slow - which the "gave up" *logic* doesn't need paying
+    /// for just to verify it fires and produces the right ranges.
+    #[test]
+    fn plain_text_line_diff_replaces_the_whole_file_past_the_edit_cap() {
+        const SMALL_CAP: usize = 20;
+        let before: String = (0..SMALL_CAP + 10)
+            .map(|i| format!("before-unique-line-{i}\n"))
+            .collect();
+        let after: String = (0..SMALL_CAP + 10)
+            .map(|i| format!("after-unique-line-{i}\n"))
+            .collect();
+        let (before_ranges, after_ranges) =
+            plain_text_line_diff_with_max_edit(&before, &after, SMALL_CAP);
+
+        assert_eq!(before_ranges.len(), 1);
+        assert_eq!(before_ranges[0].operation, TextOperation::Delete);
+        assert_eq!(
+            before_ranges[0].source.end_row,
+            SMALL_CAP + 10,
+            "the single Delete range should cover every line, not just part of the file"
+        );
+
+        assert_eq!(after_ranges.len(), 1);
+        assert_eq!(after_ranges[0].operation, TextOperation::Insert);
+        assert_eq!(after_ranges[0].source.end_row, SMALL_CAP + 10);
+    }
+
+    /// Confirms the real, production `PLAIN_TEXT_MAX_EDIT` actually is large enough to cover a
+    /// realistic large-file edit - a 10,000-line file with a change scattered across it (not just
+    /// a handful of lines) - without falling back to "whole file replaced". Cheap despite the
+    /// large line count: Myers' search terminates at the *actual* edit distance, not the cap, so
+    /// this only costs O(changed_lines²), not O(PLAIN_TEXT_MAX_EDIT²).
+    #[test]
+    fn plain_text_line_diff_handles_a_ten_thousand_line_file_with_scattered_changes() {
+        let before: String = (0..10_000).map(|i| format!("line-{i}\n")).collect();
+        let after: String = (0..10_000)
+            .map(|i| {
+                if i % 137 == 0 {
+                    format!("changed-line-{i}\n")
+                } else {
+                    format!("line-{i}\n")
+                }
+            })
+            .collect();
+        let (before_ranges, after_ranges) = plain_text_line_diff(&before, &after);
+
+        assert!(
+            before_ranges
+                .iter()
+                .any(|r| r.operation == TextOperation::Delete),
+            "a real per-line diff should find the scattered deletes, not give up and replace the \
+             whole file: got {} before ranges",
+            before_ranges.len()
+        );
+        assert!(
+            after_ranges
+                .iter()
+                .any(|r| r.operation == TextOperation::Insert),
+            "a real per-line diff should find the scattered inserts, not give up and replace the \
+             whole file: got {} after ranges",
+            after_ranges.len()
+        );
+        assert!(
+            before_ranges.len() > 10,
+            "10,000/137 ≈ 73 scattered changes should produce many small ranges, not one giant \
+             replaced-whole-file range: got {} before ranges",
+            before_ranges.len()
+        );
+    }
 
     /// Regression guard: a real one-token change (e.g. renaming a call inside an otherwise
     /// unchanged statement) can leave the same row covered by both an Update range (the token)

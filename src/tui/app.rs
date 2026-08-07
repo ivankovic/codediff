@@ -33,7 +33,7 @@ use crate::diff::{
     Diff, DiffMode, NodeCache,
     text::{
         ChangeCounts, DiffSummary, TextDiff, change_counts, is_comment_only_diff,
-        summarize_diff_with_comment_check,
+        plain_text_line_diff, summarize_diff_with_comment_check,
     },
 };
 use crate::tui::actions::{Action, DiffSessionData};
@@ -142,8 +142,14 @@ pub struct App {
     change_counts: Option<ChangeCounts>,
     /// Which `DiffMode` produced the currently loaded diff (see `DiffSessionData::mode`), shown in
     /// the footer so a user can't forget whether they're looking at the fast, approximate result
-    /// or the exact one. Same lifecycle as `diff_summary`/`change_counts`.
+    /// or the exact one. Same lifecycle as `diff_summary`/`change_counts`. Ignored in the footer
+    /// when `plain_text_fallback` is set - see that field's own doc comment.
     diff_mode: Option<DiffMode>,
+    /// Whether the currently loaded diff came from `diff::text::plain_text_line_diff` (see
+    /// `DiffSessionData::plain_text_fallback`) rather than the AST pipeline - shown in the footer
+    /// as `[plain text]` instead of `diff_mode`'s `[fast]`/`[exact]`, since neither of those
+    /// labels means anything when no AST algorithm ran at all. Same lifecycle as `diff_mode`.
+    plain_text_fallback: bool,
 
     should_exit: bool,
     should_suspend: bool,
@@ -175,6 +181,7 @@ impl App {
             diff_summary: None,
             change_counts: None,
             diff_mode: None,
+            plain_text_fallback: false,
             should_exit: false,
             should_suspend: false,
         })
@@ -346,6 +353,7 @@ impl App {
                     self.diff_summary = None;
                     self.change_counts = None;
                     self.diff_mode = None;
+                    self.plain_text_fallback = false;
                     self.start_diff(before.clone(), after.clone());
                 }
                 Action::DiffReady(data) => {
@@ -366,6 +374,7 @@ impl App {
                         &data.after_ranges,
                     ));
                     self.diff_mode = Some(data.mode);
+                    self.plain_text_fallback = data.plain_text_fallback;
                 }
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");
@@ -375,6 +384,7 @@ impl App {
                     self.diff_summary = None;
                     self.change_counts = None;
                     self.diff_mode = None;
+                    self.plain_text_fallback = false;
                 }
                 Action::Error(message) => {
                     error!("{message}");
@@ -606,7 +616,12 @@ impl App {
         } else if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
             left_parts.push(format!("change {index}/{total}"));
         }
-        if let Some(mode) = self.diff_mode {
+        // `[fast]`/`[exact]` describe which AST algorithm ran; neither means anything for a
+        // plain-text fallback (no AST algorithm ran at all), so that label takes over instead of
+        // sitting alongside a misleading one.
+        if self.plain_text_fallback {
+            left_parts.push("[plain text]".to_string());
+        } else if let Some(mode) = self.diff_mode {
             left_parts.push(format_diff_mode(mode));
         }
         let left = left_parts.join("   ");
@@ -737,6 +752,15 @@ fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
 
 /// Parse both files, applying the `/dev/null` fallback below. Shared prefix of `compute_diff`
 /// (headless/no-prompt callers) and `compute_diff_interactive` (the TUI's pause-capable path).
+///
+/// Does not require either side to have parsed successfully: a side with no tree-sitter grammar
+/// (unrecognized extension, e.g. a `Makefile`) comes back with `ast: None` rather than an error -
+/// `compute_diff`/`compute_diff_interactive` check for that themselves and route to
+/// `diff::text::plain_text_line_diff` instead of the AST pipeline, rather than failing outright.
+/// Before that fallback existed, this bailed with "unsupported or unrecognized file type" here,
+/// which - via `headless`/`json_output`'s non-interactive callers - propagated as a fatal exit;
+/// under `GIT_EXTERNAL_DIFF`, a non-zero exit for any one file aborts the *entire* multi-file
+/// `git diff`, not just that file's view.
 fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
     let mut before_code = Code::from_file(before)?;
     let mut after_code = Code::from_file(after)?;
@@ -745,24 +769,15 @@ fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
     // handing us `/dev/null` for the missing side (see README's "Git integration" section).
     // `/dev/null` reads back as empty content with no extension, so `Code::from_file` can't
     // detect a language for it and leaves `ast` unset - re-parse that side as empty content in
-    // the *other* side's language instead of failing outright, so the diff shows a normal
-    // whole-file insert/delete rather than an "unrecognized file type" error. This is the only
-    // situation where the two sides may legitimately disagree on detected language, so it's safe
-    // to only kick in when the empty side's own language genuinely couldn't be determined.
+    // the *other* side's language instead of leaving it unsupported, so the diff shows a normal
+    // whole-file insert/delete rather than falling back to a plain-text diff for no reason. This
+    // is the only situation where the two sides may legitimately disagree on detected language,
+    // so it's safe to only kick in when the empty side's own language genuinely couldn't be
+    // determined.
     let before_language = before_code.metadata.language;
     let after_language = after_code.metadata.language;
     substitute_missing_language(&mut before_code, after_language, before);
     substitute_missing_language(&mut after_code, before_language, after);
-
-    if before_code.ast.is_none() {
-        anyhow::bail!(
-            "unsupported or unrecognized file type: {}",
-            before.display()
-        );
-    }
-    if after_code.ast.is_none() {
-        anyhow::bail!("unsupported or unrecognized file type: {}", after.display());
-    }
 
     Ok((before_code, after_code))
 }
@@ -793,14 +808,43 @@ fn assemble_diff_session_data(
         after_ranges: text_diff.all(1),
         comment_only,
         mode,
+        plain_text_fallback: false,
     })
+}
+
+/// `assemble_diff_session_data`'s counterpart for the plain-text fallback (see
+/// `DiffSessionData::plain_text_fallback`'s doc comment): no `Diff`/`ASTDiff` exists, so this
+/// builds `before_ranges`/`after_ranges` from `diff::text::plain_text_line_diff` directly instead
+/// of `TextDiff::from`. `comment_only` is always `false` - there's no AST, so no concept of a
+/// comment node to check.
+fn assemble_plain_text_diff_session_data(
+    before_path: &Path,
+    after_path: &Path,
+    before_code: &Code,
+    after_code: &Code,
+    mode: DiffMode,
+) -> DiffSessionData {
+    let (before_ranges, after_ranges) =
+        plain_text_line_diff(&before_code.contents, &after_code.contents);
+    DiffSessionData {
+        before_path: before_path.to_path_buf(),
+        after_path: after_path.to_path_buf(),
+        before_contents: before_code.contents.clone(),
+        after_contents: after_code.contents.clone(),
+        before_ranges,
+        after_ranges,
+        comment_only: false,
+        mode,
+        plain_text_fallback: true,
+    }
 }
 
 /// Parse, diff and compute the textual ranges needed to display the result, using `mode`
 /// unconditionally - no prompting, for callers with no interactive UI to ask (headless mode, and
 /// any caller that just wants a diff). Returns whether `DiffMode::Fast`'s guard silently
-/// substituted the cheaper fallback for phase 6 (always `false` under `DiffMode::Exact`), so
-/// headless mode can warn about it.
+/// substituted the cheaper fallback for phase 6 (always `false` under `DiffMode::Exact`, and
+/// under the plain-text fallback below - no AST algorithm ran at all, so the guard never had a
+/// chance to trip), so headless mode can warn about it.
 ///
 /// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
 /// terminal-independent diff computation either way - only what happens to the result (draw it
@@ -811,6 +855,11 @@ pub(crate) fn compute_diff(
     mode: DiffMode,
 ) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
+    if before_code.ast.is_none() || after_code.ast.is_none() {
+        let data =
+            assemble_plain_text_diff_session_data(before, after, &before_code, &after_code, mode);
+        return Ok((data, false));
+    }
     let pending = Diff::pending(&before_code, &after_code);
     let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
     let diff = pending.finish(mode);
@@ -832,6 +881,18 @@ fn compute_diff_interactive(
     pending_diff_mode_tx: &Arc<Mutex<Option<oneshot::Sender<DiffMode>>>>,
 ) -> Result<DiffSessionData> {
     let (before_code, after_code) = parse_before_after(before, after)?;
+    if before_code.ast.is_none() || after_code.ast.is_none() {
+        // No AST on at least one side: there's no tree-edit-distance algorithm to run at all, so
+        // the Fast/Exact prompt below (gated on `PendingDiff::looks_expensive`, which needs an
+        // AST) doesn't apply here either - go straight to the plain-text fallback.
+        return Ok(assemble_plain_text_diff_session_data(
+            before,
+            after,
+            &before_code,
+            &after_code,
+            DiffMode::Fast,
+        ));
+    }
     let pending = Diff::pending(&before_code, &after_code);
 
     let mode = if pending.looks_expensive() {
@@ -982,15 +1043,34 @@ mod tests {
         Ok(())
     }
 
-    /// The `/dev/null` fallback only kicks in for a genuinely empty, language-less side - it must
-    /// not paper over the case where neither side has a recognizable language at all.
+    /// The `/dev/null` fallback only kicks in for a genuinely empty, language-less side - a pair
+    /// where neither side is empty (so there's real content on both sides, just no recognizable
+    /// language) must fall through to the plain-text diff instead, not bail. Before that fallback
+    /// existed, this bailed with "unsupported or unrecognized file type" - see
+    /// `parse_before_after`'s own doc comment on why that used to be worse than it sounds
+    /// (`GIT_EXTERNAL_DIFF` treats any non-zero exit as aborting the *whole* multi-file
+    /// `git diff`, not just this one file).
     #[test]
-    fn compute_diff_still_fails_when_neither_side_has_a_recognizable_language() {
+    fn compute_diff_falls_back_to_plain_text_when_neither_side_has_a_recognizable_language()
+    -> Result<()> {
         let before = write_temp_file("hello");
         let after = write_temp_file("world");
 
-        let result = compute_diff(before.path(), after.path(), DiffMode::Fast);
-        assert!(result.is_err(), "both sides unrecognized should still bail");
+        let (data, fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Fast)?;
+        assert!(
+            data.plain_text_fallback,
+            "an unrecognized language on both sides should route through plain_text_line_diff"
+        );
+        assert!(
+            !fallback_used,
+            "fallback_used means DiffMode::Fast's phase-6 guard tripped, which never applies \
+             here - no AST algorithm ran at all"
+        );
+        assert_eq!(data.before_contents, "hello");
+        assert_eq!(data.after_contents, "world");
+        assert!(!data.before_ranges.is_empty());
+        assert!(!data.after_ranges.is_empty());
+        Ok(())
     }
 
     #[test]
@@ -1081,6 +1161,7 @@ mod tests {
             after_ranges: Vec::new(),
             comment_only: false,
             mode: DiffMode::Fast,
+            plain_text_fallback: false,
         });
 
         app.handle_search_submitted("bar".to_string());
@@ -1299,6 +1380,7 @@ mod tests {
             }],
             comment_only: false,
             mode: DiffMode::Fast,
+            plain_text_fallback: false,
         });
 
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -1339,6 +1421,7 @@ mod tests {
             }],
             comment_only: false,
             mode: DiffMode::Fast,
+            plain_text_fallback: false,
         });
         app.diff_viewer.search("bar");
 
@@ -1382,6 +1465,34 @@ mod tests {
         assert!(
             rendered_text(&terminal).contains("[exact]"),
             "expected the active diff mode to be drawn in the footer"
+        );
+        Ok(())
+    }
+
+    /// `[plain text]` must take over from `[fast]`/`[exact]`, not sit alongside it - neither
+    /// `DiffMode` label means anything when no AST algorithm ran at all.
+    #[test]
+    fn draw_viewer_shows_plain_text_fallback_in_the_footer_instead_of_the_diff_mode() -> Result<()>
+    {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_mode = Some(DiffMode::Fast);
+        app.plain_text_fallback = true;
+
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("[plain text]"),
+            "expected the plain-text fallback indicator to be drawn in the footer"
+        );
+        assert!(
+            !text.contains("[fast]"),
+            "the diff_mode label must not also render alongside [plain text]"
         );
         Ok(())
     }
@@ -1431,6 +1542,7 @@ mod tests {
             }],
             comment_only: false,
             mode: DiffMode::Fast,
+            plain_text_fallback: false,
         };
 
         let summary = summarize_diff_with_comment_check(
@@ -1464,6 +1576,7 @@ mod tests {
             after_ranges: ranges,
             comment_only: true,
             mode: DiffMode::Fast,
+            plain_text_fallback: false,
         };
 
         let summary = summarize_diff_with_comment_check(

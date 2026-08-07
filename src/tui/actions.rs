@@ -49,9 +49,18 @@ pub struct DiffSessionData {
     pub comment_only: bool,
     /// Which `DiffMode` actually produced this result - `Fast` unless the user picked `Exact` from
     /// the "this diff is unusually large" prompt, or the file pair never tripped that prompt at
-    /// all (see `compute_diff_interactive`). Shown in `app.rs`'s footer so a user can't forget
-    /// which one they're looking at.
+    /// all (see `compute_diff_interactive`). Meaningless when `plain_text_fallback` is set (no
+    /// AST algorithm ran at all), same as `comment_only` in that case. Shown in `app.rs`'s footer
+    /// so a user can't forget which one they're looking at.
     pub mode: DiffMode,
+    /// Set when either side has no tree-sitter grammar (e.g. an extension-less `Makefile`), so
+    /// `before_ranges`/`after_ranges` came from `diff::text::plain_text_line_diff` (a plain
+    /// line-level Myers diff) instead of the AST-aware pipeline - see `app::compute_diff`'s
+    /// branch. Everything downstream (overlay rendering, `headless`, `json_output`,
+    /// `change_counts`, `DiffSummary`) already works on a plain `RangeMatch` list regardless of
+    /// where it came from; this field exists purely so `app.rs`'s footer can show `[plain text]`
+    /// instead of a `DiffMode` label that would otherwise misleadingly imply a structural diff ran.
+    pub plain_text_fallback: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

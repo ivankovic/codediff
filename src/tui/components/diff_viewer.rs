@@ -594,6 +594,7 @@ mod tests {
             after_ranges: Vec::new(),
             comment_only: false,
             mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
         }
     }
 
@@ -687,6 +688,7 @@ mod tests {
             ],
             comment_only: false,
             mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
         };
 
         viewer.load_diff(&data);
@@ -760,6 +762,7 @@ mod tests {
             ],
             comment_only: false,
             mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
         };
         viewer.load_diff(&data);
 

@@ -98,6 +98,10 @@ above):
 GIT_EXTERNAL_DIFF=codediff git diff
 ```
 
+Files with no tree-sitter grammar (an unrecognized extension, or none at all - `Makefile`,
+`Dockerfile`, ...) fall back to a plain line-level diff instead of the syntax-aware one, so a
+change touching one of them never blocks `git diff` from showing the rest.
+
 # Guiding principles
 
 ## Robust
