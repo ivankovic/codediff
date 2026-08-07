@@ -20,13 +20,39 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 use codediff::diff::DiffMode;
 use codediff::tui;
 
+mod git_configure;
+
+/// Top-level subcommands. Optional and coexists with `Args::paths` below (clap resolves this
+/// correctly: `codediff a.rs b.rs` still parses as two paths, not an attempt at the `git`
+/// subcommand - only `codediff git ...` is - see `main.rs`'s own tests) - `git` becomes a
+/// reserved word for the first positional the same way `add`/`commit`/etc. are for git itself,
+/// an accepted tradeoff for the vanishingly rare case of a file literally named `git`.
+#[derive(Subcommand)]
+enum Command {
+    /// git integration helpers.
+    Git {
+        #[command(subcommand)]
+        action: GitAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum GitAction {
+    /// Interactively configure codediff as git's diff tool - the `git config` commands README's
+    /// "Git integration" section otherwise asks you to run by hand.
+    Configure,
+}
+
 #[derive(Parser)]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// The files to diff, positionally. Two forms are accepted (see `resolve_before_after`):
     /// `BEFORE AFTER` (also what `git difftool` invokes a `difftool.<tool>.cmd` of
     /// `codediff "$LOCAL" "$REMOTE"` with), or git's 7-argument `GIT_EXTERNAL_DIFF` convention
@@ -140,6 +166,14 @@ fn use_color() -> bool {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+
+    if let Some(Command::Git {
+        action: GitAction::Configure,
+    }) = &args.command
+    {
+        return git_configure::run();
+    }
+
     let before_after = resolve_before_after(&args.paths)?;
 
     if should_run_json(&args) {
@@ -240,6 +274,7 @@ mod tests {
 
     fn args_with(mode: &str, headless: bool) -> Args {
         Args {
+            command: None,
             paths: Vec::new(),
             mode: mode.to_string(),
             headless,
@@ -247,6 +282,39 @@ mod tests {
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }
+    }
+
+    #[test]
+    fn git_configure_parses_as_a_subcommand() {
+        let args = Args::try_parse_from(["codediff", "git", "configure"]).unwrap();
+        assert!(matches!(
+            args.command,
+            Some(Command::Git {
+                action: GitAction::Configure
+            })
+        ));
+        assert!(args.paths.is_empty());
+    }
+
+    /// Regression guard for the `Option<Command>` + `Vec<PathBuf>` coexistence this binary
+    /// relies on: an ordinary two-file diff must still parse as `paths`, not get swallowed
+    /// attempting to match the `git` subcommand (clap resolves this correctly on its own, but
+    /// nothing else in this file would catch it silently breaking on a future clap upgrade).
+    #[test]
+    fn two_paths_still_parse_as_paths_not_a_subcommand() {
+        let args = Args::try_parse_from(["codediff", "a.rs", "b.rs"]).unwrap();
+        assert!(args.command.is_none());
+        assert_eq!(
+            args.paths,
+            vec![PathBuf::from("a.rs"), PathBuf::from("b.rs")]
+        );
+    }
+
+    #[test]
+    fn no_args_still_opens_empty_viewer() {
+        let args = Args::try_parse_from(["codediff"]).unwrap();
+        assert!(args.command.is_none());
+        assert!(args.paths.is_empty());
     }
 
     #[test]
