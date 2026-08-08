@@ -123,6 +123,15 @@
 *                  hide-solved state and the sort order persist across closing and reopening this
 *                  picker (they live on `App`, not just this modal instance) - the next `O` opens
 *                  right back where the last one left off
+*   C              open a commit from this repository's own `git log` (not a research repo): j/k
+*                  to move, Enter to list the files it changed, Enter again on one of those to
+*                  open its before/after content (before = the file at that commit's parent,
+*                  after = at the commit itself; either side is empty content, not an error, if
+*                  the file didn't exist there -- e.g. it was added or deleted by the commit), Esc
+*                  cancels either picker. Only files with a supported language are listed. Like a
+*                  sample (`O`), `s` then prompts for a name to promote it under -- but always into
+*                  `handmade/` (this *is* the handmade dataset's own source), and pre-filled with
+*                  just `<language>-` (e.g. "rust-"), since there's no second repository to name
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -157,7 +166,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
-use codediff::code::Code;
+use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::code::{Code, Language};
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, NodeStatus,
@@ -218,6 +228,9 @@ O              open a sampled candidate (src/test/data/samples/); already-promot
                  samples are marked \" - SOLVED\" -- press H inside this picker to
                  hide/show them, or s to cycle its sort order (A-Z, Z-A,
                  smallest/largest text diff first) -- both persist across O
+C              open a commit from this repo's own git log, then a file it
+                 changed -- before/after are that file at the commit's parent
+                 and at the commit itself; s promotes into handmade/
 
 ?              toggle this help
 q / Esc        quit
@@ -705,6 +718,169 @@ fn open_sample_picker_modal(
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Git-commit source (`C`): building a handmade diffs/ case directly from this repository's own
+// history, instead of from a materialized sample. Shells out to the system `git` (same approach
+// as `run_unix_diff`'s `diff -u`) rather than linking `git2`: that crate is already a dependency,
+// but only behind the `stats` feature (it pulls in openssl/libssh2 build deps for the research
+// sampling tools), and this binary only requires `test-fixtures` - adding `stats` here just to
+// list commits and read blobs would be a heavy new build requirement for a TUI tool that
+// previously needed none of it.
+// ---------------------------------------------------------------------------------------------
+
+/// The first 8 characters of a full commit hash, for compact display - `git`'s own default abbrev
+/// length. `hash` is always a full 40-character SHA here (from `list_repo_commits`'s `%H`), so this
+/// never actually needs the `.min()` clamp in practice; it's there so a shorter input can't panic.
+fn short_hash(hash: &str) -> &str {
+    &hash[..hash.len().min(8)]
+}
+
+/// Every commit in this repository's own history (not a research repo - see `diffs_root`'s
+/// sibling `samples_root`, which is what `O` reads from instead), newest first, as
+/// `(full hash, subject line)` - the `C` picker's options. Uses `\x1f` (unit separator) rather
+/// than a visible character to split the two `git log` fields, since a commit subject can contain
+/// almost anything else.
+fn list_repo_commits() -> Result<Vec<(String, String)>> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(env!("CARGO_MANIFEST_DIR"))
+        .args(["log", "--pretty=format:%H%x1f%s"])
+        .output()
+        .context("running `git log` (is git installed?)")?;
+    if !output.status.success() {
+        bail!(
+            "git log failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let (hash, summary) = line.split_once('\u{1f}')?;
+            Some((hash.to_string(), summary.to_string()))
+        })
+        .collect())
+}
+
+/// Paths changed by commit `hash`, narrowed to ones `to_treesitter` can actually parse - picking
+/// an unsupported one (e.g. a `.md` or `.toml` file, both of which `language_for_path` happily
+/// recognizes but codediff has no grammar for) would just fail at open time with a less helpful
+/// error, so it's left out of the list entirely instead. Doesn't pass `-M` (rename detection) to
+/// `git diff-tree`: a renamed-with-edits file already shows as one path here (git's default), and
+/// a pure rename with no edits showing up as a delete+add pair is an acceptable rough edge for
+/// this picker rather than something worth chasing. Also empty (not an error) for a merge commit:
+/// `git diff-tree` shows no diff for one by default (needs `-m`/`-c`, neither passed here) - the
+/// `C` picker's Enter handler folds this into the same "nothing to pick" message as a genuinely
+/// empty/unsupported-only commit, which is close enough not to be worth telling apart.
+fn list_commit_files(hash: &str) -> Result<Vec<String>> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(env!("CARGO_MANIFEST_DIR"))
+        .args(["diff-tree", "--no-commit-id", "--name-only", "-r", hash])
+        .output()
+        .context("running `git diff-tree` (is git installed?)")?;
+    if !output.status.success() {
+        bail!(
+            "git diff-tree failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|path| {
+            language_for_path(Path::new(path)).is_some_and(|lang| to_treesitter(&lang).is_some())
+        })
+        .map(|path| path.to_string())
+        .collect())
+}
+
+/// The content of `rev_path` (e.g. `"<hash>:<path>"` or `"<hash>^:<path>"`) via the system
+/// `git show`, in this repository. Empty, not an error, when `git show` exits non-zero: the one
+/// path that matters here is a file that genuinely doesn't exist at that revision (added by the
+/// commit being diffed, so it has no "before"; deleted by it, so it has no "after"; or the commit
+/// being a root commit, so `<hash>^` doesn't resolve at all) - all three are valid, expected empty
+/// sides, exactly like a missing side already means for `load_sample`/`load_case`. A `git` that
+/// can't even run is still a real error, surfaced via `.context` on `.output()` below.
+fn git_show(rev_path: &str) -> Result<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(env!("CARGO_MANIFEST_DIR"))
+        .arg("show")
+        .arg(rev_path)
+        .output()
+        .context("running `git show` (is git installed?)")?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        Ok(String::new())
+    }
+}
+
+/// Loads the before/after content for `path` as changed by commit `hash`, read straight out of
+/// git (`git_show`) rather than from any on-disk fixture - before is `path` at `hash^`, after is
+/// `path` at `hash` itself. Mirrors `load_sample`'s AST checks: bails with a clear message if
+/// either side's language has no AST (unsupported or undetected), same as a sample or real case
+/// would.
+fn load_git_commit_file(hash: &str, path: &str) -> Result<(Code, Code)> {
+    let language = language_for_path(Path::new(path)).unwrap_or(Language::Unknown);
+
+    let before_src = git_show(&format!("{hash}^:{path}"))?;
+    let after_src = git_show(&format!("{hash}:{path}"))?;
+
+    let mut before = Code::from_string(&before_src, &language);
+    let mut after = Code::from_string(&after_src, &language);
+
+    if before.ast.is_none() {
+        bail!(
+            "Before content for '{}' has no AST (unsupported or undetected language)",
+            path
+        );
+    }
+    if after.ast.is_none() {
+        bail!(
+            "After content for '{}' has no AST (unsupported or undetected language)",
+            path
+        );
+    }
+    before
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for before code")?;
+    after
+        .ensure_parsed()
+        .context("Failed to compute AST metadata for after code")?;
+
+    Ok((before, after))
+}
+
+/// A starting point for `s`'s promote-name prompt when the current case came from `C` rather than
+/// a sample: just `<language>-` (e.g. "rust-"), lowercased - unlike `default_promoted_name`,
+/// there's no second repository name to prefix with, since the source *is* this repository.
+/// Empty (no dash at all) if `path`'s language can't be determined, which in practice can't
+/// happen for a case that actually made it here: `load_git_commit_file` already requires a
+/// language with a working `to_treesitter` mapping before this case can be opened at all.
+fn default_promoted_name_for_path(path: &str) -> String {
+    match language_for_path(Path::new(path)) {
+        Some(language) => format!("{}-", language.to_string().to_lowercase()),
+        None => String::new(),
+    }
+}
+
+/// Which of `DIFF_DATASETS` `s`'s promote prompt (`Modal::PromptPromoteName`) would write the
+/// current case into - shared by that prompt's own display text and `action_promote`'s actual
+/// destination, so the two can never say something different (see the stale hardcoded "small" this
+/// replaced: the prompt's text used to name a fixed folder regardless of `source.dataset`).
+/// `None` for `CaseOrigin::Diffs`, which never raises this prompt at all (it saves directly via
+/// `action_save`) - kept in the match anyway so a fourth origin can't silently fall through here.
+fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
+    match origin {
+        CaseOrigin::Diffs => None,
+        CaseOrigin::Sample(source) => Some(source.dataset.as_str()),
+        // Always handmade: a case built by hand from this repo's own commits *is* what the
+        // handmade dataset is for, unlike a sample, which carries its own recorded provenance.
+        CaseOrigin::GitCommitFile { .. } => Some("handmade"),
+    }
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -878,36 +1054,72 @@ enum Modal {
     UnixDiffView { output: String, scroll: u16 },
     /// Raised by `?`: lists every keybinding. `?` or `Esc` while open closes it.
     Help { scroll: u16 },
+    /// Raised by `C`: pick a commit from this repository's own `git log` (see `list_repo_commits`)
+    /// to open. `j`/`k` move, `Enter` lists the files it changed (`OpenCommitFilePicker`), `Esc`
+    /// cancels. `(hash, summary)` pairs, newest first, same order `list_repo_commits` returns.
+    OpenCommitPicker {
+        commits: Vec<(String, String)>,
+        selected: usize,
+    },
+    /// Raised when a commit is chosen in `OpenCommitPicker`: pick which of the files it changed to
+    /// open. `hash`/`summary` are carried along from that commit, just for display and to build
+    /// the `OpenTarget` on `Enter`. Unlike the picker it was raised from, `Esc` here cancels
+    /// entirely rather than returning to `OpenCommitPicker` - consistent with every other modal in
+    /// this file, none of which have a "back" step either.
+    OpenCommitFilePicker {
+        hash: String,
+        summary: String,
+        files: Vec<String>,
+        selected: usize,
+    },
 }
 
-/// Which open picker (`o` or `O`) a pending switch came from, and the name selected.
+/// Which open picker (`o`, `O`, or `C`) a pending switch came from, and enough to load it.
 #[derive(Debug, Clone)]
 enum OpenTarget {
     Diffs(String),
     Sample(String),
+    /// From `C`'s file picker: `path` as changed by commit `hash` (`summary` is only carried
+    /// along for the status message once it's opened - see `run_event_loop`).
+    GitCommitFile {
+        hash: String,
+        summary: String,
+        path: String,
+    },
 }
 
 impl OpenTarget {
     fn name(&self) -> &str {
         match self {
             OpenTarget::Diffs(name) | OpenTarget::Sample(name) => name,
+            OpenTarget::GitCommitFile { path, .. } => path,
         }
     }
 }
 
-/// Where the currently open case's content lives: a committed test case, or a not-yet-promoted
-/// sample. Determines what `s` does (see `Modal::PromptPromoteName`) and what `o`/`O` need to know
-/// before switching away with unsaved changes.
+/// Where the currently open case's content lives: a committed test case, a not-yet-promoted
+/// sample, or a file read straight out of this repository's own git history (`C`). Determines what
+/// `s` does (see `Modal::PromptPromoteName`) and what `o`/`O`/`C` need to know before switching
+/// away with unsaved changes.
 #[derive(Debug, Clone)]
 enum CaseOrigin {
     Diffs,
     Sample(SampleSource),
+    /// `path` as it stood in whichever commit `C` opened it from - the commit's own hash/summary
+    /// aren't kept here since nothing after load needs them again: `App::name` already carries a
+    /// short hash (set once, in `run_event_loop`) for display, and promoting writes straight from
+    /// `before_src`/`after_src` (the content already on screen), not by re-reading git.
+    GitCommitFile {
+        path: String,
+    },
 }
 
 struct App {
     /// Name of the currently open case: a directory under src/test/data/diffs/ (if `origin` is
-    /// `Diffs`) or src/test/data/samples/ (if `origin` is `Sample`). Can change at runtime via
-    /// the `o`/`O` (open) pickers, or via promoting a sample with `s`.
+    /// `Diffs`), src/test/data/samples/ (if `origin` is `Sample`), or a `<path>@<short hash>`
+    /// display label with no directory of its own (if `origin` is `GitCommitFile`). Can change at
+    /// runtime via the `o`/`O`/`C` (open) pickers, or via promoting a sample or git-commit-sourced
+    /// case with `s`.
     name: String,
     origin: CaseOrigin,
     focus: Focus,
@@ -2677,6 +2889,7 @@ fn draw_ui(
     let dataset_tag = match &app.origin {
         CaseOrigin::Diffs => case_dataset(name).unwrap_or_else(|| "?".to_string()),
         CaseOrigin::Sample(_) => "sample".to_string(),
+        CaseOrigin::GitCommitFile { .. } => "git".to_string(),
     };
     frame.render_widget(
         Paragraph::new(format!(" human_solver — {} [{}] ", name, dataset_tag))
@@ -2780,6 +2993,7 @@ fn draw_ui(
             size,
             modal,
             name,
+            promote_target_dataset(&app.origin),
             std::str::from_utf8(before_src).unwrap_or(""),
             std::str::from_utf8(after_src).unwrap_or(""),
         );
@@ -2837,6 +3051,7 @@ fn render_modal(
     area: Rect,
     modal: &Modal,
     current_name: &str,
+    promote_dataset: Option<&str>,
     before_src: &str,
     after_src: &str,
 ) {
@@ -2881,7 +3096,7 @@ fn render_modal(
                 )
             } else {
                 format!(
-                    "'{}' has unsaved changes (it's a sample; promote it with 's' from the main view to save it).\n\nOpen '{}' anyway?\n\n[d] Discard & Open    [Esc] Cancel",
+                    "'{}' has unsaved changes (not a real test case yet; promote it with 's' from the main view to save it).\n\nOpen '{}' anyway?\n\n[d] Discard & Open    [Esc] Cancel",
                     current_name,
                     target.name()
                 )
@@ -2890,9 +3105,10 @@ fn render_modal(
         Modal::PromptPromoteName { input, error } => render_text_modal(
             frame,
             area,
-            "Promote sample to test case",
+            "Promote to test case",
             &format!(
-                "Enter a name for src/test/data/diffs/small/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                "Enter a name for src/test/data/diffs/{}/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                promote_dataset.unwrap_or("?"),
                 input,
                 error
                     .as_deref()
@@ -2917,6 +3133,17 @@ fn render_modal(
         }
         Modal::Help { scroll } => {
             render_help_modal(frame, area, *scroll);
+        }
+        Modal::OpenCommitPicker { commits, selected } => {
+            render_open_commit_picker(frame, area, commits, *selected);
+        }
+        Modal::OpenCommitFilePicker {
+            summary,
+            files,
+            selected,
+            ..
+        } => {
+            render_open_commit_file_picker(frame, area, summary, files, *selected);
         }
     }
 }
@@ -3172,6 +3399,103 @@ fn render_open_sample_picker(
     frame.render_widget(List::new(items).block(block), popup_area);
 }
 
+/// Renders the `C` picker's first step: pick a commit from this repository's own `git log`
+/// (`list_repo_commits`'s `(hash, summary)` pairs, newest first).
+fn render_open_commit_picker(
+    frame: &mut Frame,
+    area: Rect,
+    commits: &[(String, String)],
+    selected: usize,
+) {
+    let popup_area = centered_rect(70, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    let max_scroll = commits.len().saturating_sub(inner_height);
+    let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
+
+    let items: Vec<ListItem> = commits
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(inner_height.max(1))
+        .map(|(i, (hash, summary))| {
+            let style = if i == selected {
+                Style::default().bg(Color::Yellow).fg(Color::Black)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(
+                format!("{} {}", short_hash(hash), summary),
+                style,
+            )))
+        })
+        .collect();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "Open commit ({}/{}) — j/k move, Enter pick a file it changed, Esc cancel",
+            if commits.is_empty() { 0 } else { selected + 1 },
+            commits.len()
+        ))
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+
+    frame.render_widget(List::new(items).block(block), popup_area);
+}
+
+/// Renders the `C` picker's second step: pick which of `summary`'s changed files (only ones with
+/// a supported language - see `list_commit_files`) to open.
+fn render_open_commit_file_picker(
+    frame: &mut Frame,
+    area: Rect,
+    summary: &str,
+    files: &[String],
+    selected: usize,
+) {
+    let popup_area = centered_rect(70, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    let max_scroll = files.len().saturating_sub(inner_height);
+    let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
+
+    let items: Vec<ListItem> = files
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(inner_height.max(1))
+        .map(|(i, path)| {
+            let style = if i == selected {
+                Style::default().bg(Color::Yellow).fg(Color::Black)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(path.clone(), style)))
+        })
+        .collect();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "{} ({}/{}) — j/k move, Enter open, Esc cancel",
+            summary,
+            if files.is_empty() { 0 } else { selected + 1 },
+            files.len()
+        ))
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+
+    frame.render_widget(List::new(items).block(block), popup_area);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Event loop
 // ---------------------------------------------------------------------------------------------
@@ -3314,6 +3638,41 @@ fn run_event_loop(
                 }
                 Err(err) => {
                     app.status = Some(format!("Error opening sample '{}': {:#}", name, err));
+                }
+            },
+            SessionEnd::Open(OpenTarget::GitCommitFile {
+                hash,
+                summary,
+                path,
+            }) => match load_git_commit_file(&hash, &path) {
+                Ok((new_before, new_after)) => {
+                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
+                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    before = new_before;
+                    after = new_after;
+                    app.mapping = HumanMapping::default();
+                    app.name = format!("{path}@{}", short_hash(&hash));
+                    app.status = Some(format!(
+                        "Opened '{}' from commit {} \"{}\" (press s to promote it into a test \
+                         case)",
+                        path,
+                        short_hash(&hash),
+                        summary
+                    ));
+                    app.origin = CaseOrigin::GitCommitFile { path };
+                    app.before = PanelState::new(before_root_id);
+                    app.after = PanelState::new(after_root_id);
+                    app.focus = Focus::Before;
+                    app.dirty = false;
+                    app.algo_diff = None;
+                }
+                Err(err) => {
+                    app.status = Some(format!(
+                        "Error opening '{}' from commit {}: {:#}",
+                        path,
+                        short_hash(&hash),
+                        err
+                    ));
                 }
             },
         }
@@ -3777,6 +4136,13 @@ fn handle_key(
                 });
                 None
             }
+            CaseOrigin::GitCommitFile { path } => {
+                app.modal = Some(Modal::PromptPromoteName {
+                    input: default_promoted_name_for_path(path),
+                    error: None,
+                });
+                None
+            }
         },
         KeyCode::Char('o') => {
             match list_available_cases() {
@@ -3818,6 +4184,23 @@ fn handle_key(
                 }
                 Err(err) => {
                     app.status = Some(format!("Error listing samples: {:#}", err));
+                }
+            }
+            None
+        }
+        KeyCode::Char('C') => {
+            match list_repo_commits() {
+                Ok(commits) if !commits.is_empty() => {
+                    app.modal = Some(Modal::OpenCommitPicker {
+                        commits,
+                        selected: 0,
+                    });
+                }
+                Ok(_) => {
+                    app.status = Some("No commits found in this repository".to_string());
+                }
+                Err(err) => {
+                    app.status = Some(format!("Error listing commits: {:#}", err));
                 }
             }
             None
@@ -4051,6 +4434,115 @@ fn handle_modal_key(
                 }
             }
         }
+        Modal::OpenCommitPicker { commits, selected } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::OpenCommitPicker {
+                    selected: selected.saturating_sub(1),
+                    commits,
+                });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::OpenCommitPicker {
+                    selected: (selected + 1).min(commits.len().saturating_sub(1)),
+                    commits,
+                });
+            }
+            KeyCode::Enter => {
+                if let Some((hash, summary)) = commits.get(selected).cloned() {
+                    match list_commit_files(&hash) {
+                        Ok(files) if !files.is_empty() => {
+                            app.modal = Some(Modal::OpenCommitFilePicker {
+                                hash,
+                                summary,
+                                files,
+                                selected: 0,
+                            });
+                        }
+                        Ok(_) => {
+                            app.status = Some(format!(
+                                "No files with a supported language changed in commit {} \
+                                 (a merge commit shows no diff here by default - see \
+                                 `list_commit_files`)",
+                                short_hash(&hash)
+                            ));
+                            app.modal = Some(Modal::OpenCommitPicker { commits, selected });
+                        }
+                        Err(err) => {
+                            app.status = Some(format!(
+                                "Error listing files for commit {}: {:#}",
+                                short_hash(&hash),
+                                err
+                            ));
+                            app.modal = Some(Modal::OpenCommitPicker { commits, selected });
+                        }
+                    }
+                } else {
+                    app.modal = Some(Modal::OpenCommitPicker { commits, selected });
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::OpenCommitPicker { commits, selected });
+            }
+        },
+        Modal::OpenCommitFilePicker {
+            hash,
+            summary,
+            files,
+            selected,
+        } => match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.modal = Some(Modal::OpenCommitFilePicker {
+                    selected: selected.saturating_sub(1),
+                    hash,
+                    summary,
+                    files,
+                });
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.modal = Some(Modal::OpenCommitFilePicker {
+                    selected: (selected + 1).min(files.len().saturating_sub(1)),
+                    hash,
+                    summary,
+                    files,
+                });
+            }
+            KeyCode::Enter => {
+                if let Some(path) = files.get(selected).cloned() {
+                    let target = OpenTarget::GitCommitFile {
+                        hash,
+                        summary,
+                        path,
+                    };
+                    if app.dirty {
+                        let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                        app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                    } else {
+                        return Some(target);
+                    }
+                } else {
+                    app.modal = Some(Modal::OpenCommitFilePicker {
+                        hash,
+                        summary,
+                        files,
+                        selected,
+                    });
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            _ => {
+                app.modal = Some(Modal::OpenCommitFilePicker {
+                    hash,
+                    summary,
+                    files,
+                    selected,
+                });
+            }
+        },
         Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
@@ -4285,38 +4777,49 @@ fn validate_new_case_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Promotes the currently open sample (`app.origin` must be `CaseOrigin::Sample`) into a real
-/// test case under `src/test/data/diffs/<source.dataset>/<new_name>/`: copies the before/after
-/// content sitting in `before_src`/`after_src` (the same bytes currently on screen, read once
-/// from `src/test/data/samples/<app.name>/` when the sample was opened), saves
-/// human_mapping.json and the optimal_solutions stub via the normal `action_save` path, and
-/// records `new_name` against the matching row in sample.csv. On success, `app` is switched over
-/// to the new diffs/ case so subsequent `s` presses behave like a normal save.
+/// Promotes the currently open sample or git-commit-sourced case (`app.origin` must be
+/// `CaseOrigin::Sample` or `CaseOrigin::GitCommitFile`) into a real test case under
+/// `src/test/data/diffs/<dataset>/<new_name>/` (`dataset` per `promote_target_dataset`: a
+/// sample's own recorded `source.dataset`, or always `"handmade"` for a git-commit-sourced case):
+/// copies the before/after content sitting in `before_src`/`after_src` (the same bytes currently
+/// on screen), saves human_mapping.json and the optimal_solutions stub via the normal
+/// `action_save` path, and -- for a sample only, since a git-commit-sourced case has no
+/// sample.csv row to update -- records `new_name` against the matching row in sample.csv. On
+/// success, `app` is switched over to the new diffs/ case so subsequent `s` presses behave like a
+/// normal save.
 fn action_promote(
     app: &mut App,
     new_name: &str,
     before_src: &[u8],
     after_src: &[u8],
 ) -> Result<String> {
-    let CaseOrigin::Sample(source) = app.origin.clone() else {
-        bail!("Current case is not a sample");
+    let origin = app.origin.clone();
+    let (path, sample_source): (String, Option<SampleSource>) = match &origin {
+        CaseOrigin::Sample(source) => (source.path.clone(), Some(source.clone())),
+        CaseOrigin::GitCommitFile { path } => (path.clone(), None),
+        CaseOrigin::Diffs => bail!("Current case is not a sample or a git-commit-sourced case"),
     };
+    let dataset = promote_target_dataset(&origin)
+        .expect("just matched Sample or GitCommitFile above, both of which return Some")
+        .to_string();
 
     validate_new_case_name(new_name)?;
 
-    // The sample's own recorded provenance decides the target dataset folder, not a hardcoded
-    // guess - see `SampleSource::dataset`. Checked against `DIFF_DATASETS` rather than trusted
-    // outright: a bad value here (e.g. a hand-edited source.json, or a `--dataset` typo when the
-    // sample was originally materialized) would otherwise silently create a fourth diffs/
-    // folder that nothing else in this codebase knows to look in.
-    if !DIFF_DATASETS.contains(&source.dataset.as_str()) {
-        bail!(
-            "sample's recorded dataset '{}' is not one of {:?} - check source.json under \
-             src/test/data/samples/{}/",
-            source.dataset,
-            DIFF_DATASETS,
-            app.name
-        );
+    if let Some(source) = &sample_source {
+        // The sample's own recorded provenance decides the target dataset folder, not a hardcoded
+        // guess - see `SampleSource::dataset`. Checked against `DIFF_DATASETS` rather than trusted
+        // outright: a bad value here (e.g. a hand-edited source.json, or a `--dataset` typo when
+        // the sample was originally materialized) would otherwise silently create a fourth diffs/
+        // folder that nothing else in this codebase knows to look in.
+        if !DIFF_DATASETS.contains(&source.dataset.as_str()) {
+            bail!(
+                "sample's recorded dataset '{}' is not one of {:?} - check source.json under \
+                 src/test/data/samples/{}/",
+                source.dataset,
+                DIFF_DATASETS,
+                app.name
+            );
+        }
     }
 
     // Collision check spans all three dataset folders (`diffs_case_dir` searches `DIFF_DATASETS`)
@@ -4325,12 +4828,12 @@ fn action_promote(
     if diffs_case_dir(new_name).is_some() {
         bail!("'{}' already exists in src/test/data/diffs", new_name);
     }
-    let dir = diffs_root().join(&source.dataset).join(new_name);
+    let dir = diffs_root().join(&dataset).join(new_name);
 
-    let ext = Path::new(&source.path)
+    let ext = Path::new(&path)
         .extension()
         .map(|e| e.to_string_lossy().into_owned())
-        .ok_or_else(|| anyhow!("sample path {} has no extension", source.path))?;
+        .ok_or_else(|| anyhow!("path {} has no extension", path))?;
 
     fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
     fs::write(dir.join(format!("before.{ext}.test")), before_src)?;
@@ -4338,10 +4841,13 @@ fn action_promote(
 
     let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name)?;
 
-    let csv_note = match update_sample_csv(&source, new_name) {
-        Ok(true) => String::new(),
-        Ok(false) => " (source row not found in sample.csv; not updated)".to_string(),
-        Err(err) => format!(" (failed to update sample.csv: {:#})", err),
+    let csv_note = match &sample_source {
+        Some(source) => match update_sample_csv(source, new_name) {
+            Ok(true) => String::new(),
+            Ok(false) => " (source row not found in sample.csv; not updated)".to_string(),
+            Err(err) => format!(" (failed to update sample.csv: {:#})", err),
+        },
+        None => String::new(),
     };
 
     app.name = new_name.to_string();
@@ -4781,6 +5287,59 @@ mod tests {
     }
 
     #[test]
+    fn default_promoted_name_for_path_lowercases_the_detected_language() {
+        assert_eq!(default_promoted_name_for_path("src/diff.rs"), "rust-");
+        assert_eq!(default_promoted_name_for_path("scripts/tool.py"), "python-");
+    }
+
+    #[test]
+    fn default_promoted_name_for_path_is_empty_for_an_undetected_language() {
+        // Not a real reachable case in practice (`load_git_commit_file` already requires a
+        // working `to_treesitter` mapping before a case can be opened at all), but this should
+        // degrade to "no prefix", not panic, if it's ever called on something else.
+        assert_eq!(default_promoted_name_for_path("README"), "");
+    }
+
+    #[test]
+    fn promote_target_dataset_is_none_for_diffs_and_handmade_for_a_git_commit_file() {
+        assert_eq!(promote_target_dataset(&CaseOrigin::Diffs), None);
+        assert_eq!(
+            promote_target_dataset(&CaseOrigin::GitCommitFile {
+                path: "src/diff.rs".to_string(),
+            }),
+            Some("handmade")
+        );
+    }
+
+    #[test]
+    fn promote_target_dataset_is_the_samples_own_recorded_dataset() {
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc12345".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "full".to_string(),
+        };
+        assert_eq!(
+            promote_target_dataset(&CaseOrigin::Sample(source)),
+            Some("full")
+        );
+    }
+
+    #[test]
+    fn short_hash_takes_the_first_eight_characters() {
+        assert_eq!(
+            short_hash("58a776ecdef0123456789abcdef0123456789ab"),
+            "58a776ec"
+        );
+    }
+
+    #[test]
+    fn short_hash_does_not_panic_on_a_shorter_input() {
+        assert_eq!(short_hash("abc"), "abc");
+    }
+
+    #[test]
     fn advance_to_next_search_match_finds_the_next_leaf_containing_the_query_and_wraps_around() {
         let source = "fn main() {\n    alpha();\n    beta();\n}\n";
         let tree = parse_rust(source);
@@ -5079,7 +5638,7 @@ mod tests {
         };
 
         terminal
-            .draw(|f| render_modal(f, area, &modal, "test", "", ""))
+            .draw(|f| render_modal(f, area, &modal, "test", None, "", ""))
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -5089,6 +5648,33 @@ mod tests {
         );
         assert!(text.contains("alpha"), "prefilled query missing: {text}");
         assert!(text.contains("find next"), "instructions missing: {text}");
+    }
+
+    #[test]
+    fn render_modal_prompt_promote_name_shows_the_actual_target_dataset_not_a_fixed_one() {
+        // Regression guard for the bug this replaced: the prompt used to name a hardcoded
+        // "small" folder no matter what `promote_dataset` (i.e. `app.origin`) actually was.
+        let backend = ratatui::backend::TestBackend::new(90, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 90, 20);
+        let modal = Modal::PromptPromoteName {
+            input: "rust-".to_string(),
+            error: None,
+        };
+
+        terminal
+            .draw(|f| render_modal(f, area, &modal, "test", Some("handmade"), "", ""))
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("diffs/handmade/"),
+            "target dataset missing or wrong from render: {text}"
+        );
+        assert!(
+            !text.contains("diffs/small/"),
+            "stale dataset in render: {text}"
+        );
     }
 
     #[test]
@@ -5587,6 +6173,292 @@ mod tests {
     }
 
     #[test]
+    fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitPicker {
+            commits: vec![
+                ("aaa".to_string(), "first commit".to_string()),
+                ("bbb".to_string(), "second commit".to_string()),
+            ],
+            selected: 0,
+        });
+
+        // Up at the top must stay clamped at 0, not underflow.
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('k'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+        match &app.modal {
+            Some(Modal::OpenCommitPicker { selected, .. }) => assert_eq!(*selected, 0),
+            other => panic!("expected Modal::OpenCommitPicker, got {other:?}"),
+        }
+
+        // Two Downs must clamp at the last index (1), not run past it.
+        for _ in 0..2 {
+            handle_modal_key(
+                &mut app,
+                KeyCode::Char('j'),
+                &flat,
+                &flat,
+                root,
+                root,
+                &caches,
+                source.as_bytes(),
+                source.as_bytes(),
+            );
+        }
+        match &app.modal {
+            Some(Modal::OpenCommitPicker { selected, .. }) => assert_eq!(*selected, 1),
+            other => panic!("expected Modal::OpenCommitPicker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_commit_picker_esc_cancels() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitPicker {
+            commits: vec![("aaa".to_string(), "first commit".to_string())],
+            selected: 0,
+        });
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Esc,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(target.is_none());
+        assert_eq!(app.status.as_deref(), Some("Cancelled"));
+    }
+
+    #[test]
+    fn open_commit_picker_enter_on_an_unresolvable_commit_reports_an_error_without_crashing() {
+        // Doesn't depend on this repository's actual git history (which the CI checkout may only
+        // have a shallow slice of - see `list_commit_files`'s doc comment): any hash git can't
+        // resolve at all takes the same `git diff-tree` failure path, regardless of clone depth.
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitPicker {
+            commits: vec![("not-a-real-commit-hash".to_string(), "bogus".to_string())],
+            selected: 0,
+        });
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(
+            target.is_none(),
+            "an unresolvable commit must not switch cases"
+        );
+        match &app.modal {
+            Some(Modal::OpenCommitPicker { .. }) => {}
+            other => {
+                panic!("expected to stay on Modal::OpenCommitPicker after the error, got {other:?}")
+            }
+        }
+        assert!(
+            app.status.is_some(),
+            "the failure should be reported on the status line, not silently dropped"
+        );
+    }
+
+    #[test]
+    fn open_commit_file_picker_enter_opens_the_selected_file_as_an_open_target() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitFilePicker {
+            hash: "abc123".to_string(),
+            summary: "did a thing".to_string(),
+            files: vec!["src/a.rs".to_string(), "src/b.rs".to_string()],
+            selected: 1,
+        });
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        match target {
+            Some(OpenTarget::GitCommitFile {
+                hash,
+                summary,
+                path,
+            }) => {
+                assert_eq!(hash, "abc123");
+                assert_eq!(summary, "did a thing");
+                assert_eq!(path, "src/b.rs");
+            }
+            other => panic!("expected OpenTarget::GitCommitFile, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_commit_file_picker_enter_from_a_dirty_git_commit_file_case_cannot_save_directly() {
+        // Mirrors `CaseOrigin::Sample`'s existing `can_save = false`: a git-commit-sourced case
+        // isn't a real diffs/ case yet either, so it needs `s`'s promote-name prompt (from the
+        // main view), not a single-key save, before it can be switched away from.
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::GitCommitFile {
+                path: "src/current.rs".to_string(),
+            },
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        app.dirty = true;
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitFilePicker {
+            hash: "abc123".to_string(),
+            summary: "did a thing".to_string(),
+            files: vec!["src/a.rs".to_string()],
+            selected: 0,
+        });
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Enter,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(
+            target.is_none(),
+            "must not switch immediately; ConfirmDiscardUnsaved decides first"
+        );
+        match app.modal {
+            Some(Modal::ConfirmDiscardUnsaved { target, can_save }) => {
+                assert!(
+                    !can_save,
+                    "a git-commit-sourced current case cannot be saved with a single key"
+                );
+                match target {
+                    OpenTarget::GitCommitFile { path, .. } => assert_eq!(path, "src/a.rs"),
+                    other => panic!("expected OpenTarget::GitCommitFile, got {other:?}"),
+                }
+            }
+            other => panic!("expected Modal::ConfirmDiscardUnsaved, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_commit_file_picker_esc_cancels() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenCommitFilePicker {
+            hash: "abc123".to_string(),
+            summary: "did a thing".to_string(),
+            files: vec!["src/a.rs".to_string()],
+            selected: 0,
+        });
+
+        let target = handle_modal_key(
+            &mut app,
+            KeyCode::Esc,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(target.is_none());
+        assert_eq!(app.status.as_deref(), Some("Cancelled"));
+    }
+
+    #[test]
     fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_sort_order() {
         let options = vec![
             ("alpha".to_string(), false, 5),
@@ -5833,9 +6705,9 @@ mod tests {
     fn help_modal_renders_keybindings() {
         // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
         // clipped by the popup's width or height -- this test is about content, not layout.
-        let backend = ratatui::backend::TestBackend::new(140, 44);
+        let backend = ratatui::backend::TestBackend::new(140, 60);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 140, 44);
+        let area = Rect::new(0, 0, 140, 60);
 
         terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
