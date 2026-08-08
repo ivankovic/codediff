@@ -20,8 +20,9 @@
 * A helper binary for building the ground-truth AST mappings used by src/test/optimal_solutions.
 *
 * Run as `cargo run --bin human_solver -- <name>`, where `<name>` is the name of a directory under
-* `src/test/data/diffs/` (e.g. "rust-add-if"). If `<name>` is omitted, it opens the `o` case picker
-* directly so you can choose one. It opens a Ratatui TUI showing the TreeSitter ASTs
+* `src/test/data/diffs/` (e.g. "rust-add-if"). If `<name>` is omitted, the first available case
+* (alphabetically) opens instead - press `o` to pick a different one. It opens a Ratatui TUI
+* showing the TreeSitter ASTs
 * of the before and after code side by side (not the source text), lets a human walk both trees
 * independently and mark nodes as matching, deleted or inserted, and saves the result as
 * `src/test/data/diffs/<name>/human_mapping.json`. It also creates the corresponding
@@ -186,8 +187,8 @@ use codediff::test::helper::{
 )]
 struct Args {
     /// Name of the test case, i.e. the directory name under src/test/data/diffs/ (e.g.
-    /// "rust-add-if"). Always starts with a language prefix. If omitted, opens the case picker
-    /// directly.
+    /// "rust-add-if"). Always starts with a language prefix. If omitted, the first available
+    /// case (alphabetically) opens instead - press `o` to pick a different one.
     name: Option<String>,
 }
 
@@ -884,20 +885,16 @@ fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Loading a case requires an initial, valid AST pair to render behind the picker modal, so
-    // when no name is given on the command line, fall back to the first available case and
-    // immediately open the picker on top of it rather than restructuring the rest of the app to
-    // tolerate no case being loaded at all.
-    let (name, initial_picker_options) = match args.name {
-        Some(name) => (name, None),
-        None => {
-            let options = list_available_cases()?;
-            let first = options
-                .first()
-                .map(|(name, _)| name.clone())
-                .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))?;
-            (first, Some(options))
-        }
+    // Loading a case requires an initial, valid AST pair, so when no name is given on the
+    // command line, fall back to the first available case rather than restructuring the rest of
+    // the app to tolerate no case being loaded at all - press `o` to open a different one.
+    let name = match args.name {
+        Some(name) => name,
+        None => list_available_cases()?
+            .into_iter()
+            .next()
+            .map(|(name, _)| name)
+            .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))?,
     };
 
     let (before, after) = load_case(&name)?;
@@ -913,11 +910,6 @@ fn main() -> Result<()> {
         after_root_id,
         mapping,
     );
-
-    if let Some(options) = initial_picker_options {
-        let dataset_filter = app.diff_dataset_filter;
-        app.modal = Some(open_diff_picker_modal(options, &app.name, dataset_filter));
-    }
 
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
