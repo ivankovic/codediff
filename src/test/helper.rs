@@ -457,7 +457,7 @@ pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     // `Code`'s hand-written `Clone` drops `ast_metadata` back to `None` on every clone (see its
     // doc comment) - a caller of this function that clones a returned `Code` before diffing gets a
     // correct, if uncached, copy rather than one with stale root-id-keyed metadata.
-    for (_, code) in codes.iter_mut() {
+    for code in codes.values_mut() {
         if code.metadata.language.is_some() {
             code.ensure_parsed()?;
         }
