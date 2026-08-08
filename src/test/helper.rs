@@ -1128,6 +1128,65 @@ mod tests {
     }
 
     #[test]
+    fn path_cache_resolve_matches_node_for_path_for_every_node() -> Result<()> {
+        // `human_mapping::rebuild_caches` switched from a fresh `node_for_path` scan per entry to
+        // a `PathCache` per side (a real fixture with tens of thousands of entries sharing
+        // high-fanout parents turned that scan into multiple seconds; `PathCache` indexes each
+        // parent once instead) - this is the equivalence proof that swap didn't quietly change
+        // which node a path resolves to. Walks the same per-language fixture sample and derives
+        // paths the same way `test_path_for_node_round_trips_through_node_for_path` does, but
+        // resolves each one through *both* `node_for_path` and a `PathCache`, requiring the two to
+        // agree node-for-node - not just "both succeed", since a bug that resolved a *different*
+        // but still-valid node wouldn't show up as a resolution failure at all.
+        let sampled = handmade_test_code_pairs_for(UNIT_TEST_FIXTURES)?;
+
+        for (name, (before, after)) in &sampled {
+            for (label, code) in [("before", before), ("after", after)] {
+                let ast = code
+                    .ast
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{} {} has no AST", name, label));
+                let root = ast.root_node();
+                let mut cache = PathCache::new();
+
+                let mut stack = vec![root];
+                while let Some(node) = stack.pop() {
+                    let path = path_for_node(node);
+                    let path_refs: Vec<&str> = path.iter().map(String::as_str).collect();
+
+                    let via_scan = node_for_path(root, &path_refs).unwrap_or_else(|e| {
+                        panic!(
+                            "{} {}: node_for_path failed to resolve {:?}: {}",
+                            name, label, path_refs, e
+                        )
+                    });
+                    let via_cache = cache.resolve(root, &path_refs).unwrap_or_else(|e| {
+                        panic!(
+                            "{} {}: PathCache::resolve failed to resolve {:?}: {}",
+                            name, label, path_refs, e
+                        )
+                    });
+                    assert_eq!(
+                        via_scan.id(),
+                        via_cache.id(),
+                        "{} {}: node_for_path and PathCache::resolve disagreed on {:?}",
+                        name,
+                        label,
+                        path_refs
+                    );
+
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        stack.push(child);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
     #[cfg(feature = "stats")]
     fn test_path_to_repo_path() -> Result<()> {
         let test_data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

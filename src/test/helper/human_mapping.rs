@@ -43,7 +43,7 @@ use tree_sitter::Node;
 use crate::code::ASTMetadata;
 use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
-use crate::test::helper::{PathCache, node_for_path, path_for_node};
+use crate::test::helper::{PathCache, path_for_node};
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
@@ -261,6 +261,14 @@ pub fn rebuild_caches(
     after_root: Node,
 ) -> Caches {
     let mut caches = Caches::default();
+    // A `PathCache` per side, not a fresh `node_for_path` scan per entry: this runs on every
+    // fixture, on every keystroke, in `human_solver`'s live editor, and (via `rebuild_caches_for_mapping`)
+    // once per fixture across the whole corpus for `o`'s incomplete-only filter - a heavily
+    // annotated fixture (tens of thousands of entries sharing high-fanout parents) turned the
+    // per-entry rescan into several seconds each, measured up to ~2s on a single ~54k-entry
+    // fixture alone.
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
 
     for entry in entries {
         let resolved = match entry.operation {
@@ -269,8 +277,12 @@ pub fn rebuild_caches(
             | HumanOperation::MatchButNotIdentical => (|| {
                 let before_path = entry.before_path.as_ref()?;
                 let after_path = entry.after_path.as_ref()?;
-                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
-                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
+                let b = before_cache
+                    .resolve(before_root, &path_refs(before_path))
+                    .ok()?;
+                let a = after_cache
+                    .resolve(after_root, &path_refs(after_path))
+                    .ok()?;
                 caches.before_match.insert(b.id(), a.id());
                 caches.after_match.insert(a.id(), b.id());
                 caches.before_operation.insert(b.id(), entry.operation);
@@ -282,7 +294,9 @@ pub fn rebuild_caches(
             })(),
             HumanOperation::Delete | HumanOperation::DeleteWithChildren => (|| {
                 let before_path = entry.before_path.as_ref()?;
-                let b = node_for_path(before_root, &path_refs(before_path)).ok()?;
+                let b = before_cache
+                    .resolve(before_root, &path_refs(before_path))
+                    .ok()?;
                 caches.before_removed.insert(
                     b.id(),
                     entry.operation == HumanOperation::DeleteWithChildren,
@@ -291,7 +305,9 @@ pub fn rebuild_caches(
             })(),
             HumanOperation::Insert | HumanOperation::InsertWithChildren => (|| {
                 let after_path = entry.after_path.as_ref()?;
-                let a = node_for_path(after_root, &path_refs(after_path)).ok()?;
+                let a = after_cache
+                    .resolve(after_root, &path_refs(after_path))
+                    .ok()?;
                 caches.after_removed.insert(
                     a.id(),
                     entry.operation == HumanOperation::InsertWithChildren,
