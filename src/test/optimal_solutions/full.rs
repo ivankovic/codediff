@@ -15,11 +15,3 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// Mirrors src/test/data/diffs/'s three-way split (see `test::helper::DIFF_DATASETS`): each of
-// these is its own mod-list file, one `#[cfg(test)] mod <name>;` per fixture in that dataset.
-#[cfg(test)]
-mod full;
-#[cfg(test)]
-mod handmade;
-#[cfg(test)]
-mod small;
