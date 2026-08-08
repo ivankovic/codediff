@@ -114,6 +114,8 @@ mod go_lazygit_add_to_if_condition;
 #[cfg(test)]
 mod go_lazygit_switch_to_strings;
 #[cfg(test)]
+mod go_ollama_ollama_surround_block_with_if_and_function_call;
+#[cfg(test)]
 mod go_prometheus_single_comment_change;
 #[cfg(test)]
 mod go_user_slices_library;
@@ -144,6 +146,8 @@ mod java_genymobile_scrcpy_change_some_android_version_constant;
 #[cfg(test)]
 mod java_genymobile_scrcpy_switch_from_three_exceptions_to_one;
 #[cfg(test)]
+mod java_nextcloud_android_add_if_branch_with_reused_return;
+#[cfg(test)]
 mod java_nextcloud_android_add_two_function_calls;
 #[cfg(test)]
 mod java_protobuf_add_two_annotations;
@@ -166,6 +170,8 @@ mod javascript_add_event_listener;
 #[cfg(test)]
 mod javascript_fix_promises;
 #[cfg(test)]
+mod javascript_microsoft_typescript_broken_js_remove_string_fragment;
+#[cfg(test)]
 mod javascript_mozilla_firefox_add_comment;
 #[cfg(test)]
 mod javascript_refactor_arrow_func;
@@ -183,6 +189,8 @@ mod javascript_typescript_use_strict_2;
 mod javascript_typescript_very_interesting_brokn_code;
 #[cfg(test)]
 mod json_apache_string_change_version;
+#[cfg(test)]
+mod json_gorhill_ublock_add_5_pairs;
 #[cfg(test)]
 mod json_langflow_update_single_string;
 #[cfg(test)]
@@ -212,6 +220,8 @@ mod kotlin_nextcloud_android_dot_to_question_mark_dot;
 #[cfg(test)]
 mod kotlin_nextcloud_android_extract_argument_into_variable;
 #[cfg(test)]
+mod kotlin_nextcloud_android_move_from_one_mocking_library_to_other;
+#[cfg(test)]
 mod kotlin_nextcloud_change_function_fingerprint;
 #[cfg(test)]
 mod kotlin_nextcloud_remove_function;
@@ -227,6 +237,8 @@ mod kotlin_small_api_change;
 mod lua_awesome_only_comment_change;
 #[cfg(test)]
 mod lua_awesomewm_awesome_align_to_halign;
+#[cfg(test)]
+mod lua_awesomewm_awesome_change_doccomments;
 #[cfg(test)]
 mod lua_awesomewm_awesome_comment_changes_and_additions;
 #[cfg(test)]
@@ -381,6 +393,8 @@ mod tsx_apache_superset_error_handling_change;
 mod tsx_excalidraw_excalidraw_import_path_change;
 #[cfg(test)]
 mod tsx_excalidraw_excalidraw_move_from_one_struct_to_other;
+#[cfg(test)]
+mod tsx_langflow_ai_langflow_move_function_around_update_string_constant;
 #[cfg(test)]
 mod tsx_material_remove_import;
 #[cfg(test)]

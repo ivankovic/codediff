@@ -47,7 +47,7 @@ Go,gin-gonic-gin.git,c9b344118f6426e9211c2e4530ac983a541f437a,examples/upload-fi
 Go,jesseduffield-lazygit.git,89a0542a978b525dab97607dca9c6ae51ea95caf,pkg/gui/presentation/submodules.go,go-lazygit-switch-to-strings
 Go,jesseduffield-lazygit.git,c5acad777d695425491dc26319260ced9e81677d,pkg/gui/patch_exploring/state.go,go-lazygit-add-to-if-condition
 Go,kubernetes-kubernetes.git,69167c14bd5a582823eec9c361c066780cfa01b0,pkg/kubelet/apis/pods/server_unit_test.go,
-Go,ollama-ollama.git,0dabb4ef6a1aab240a59b6bb4ef82372d335e3a9,parser/parser.go,
+Go,ollama-ollama.git,0dabb4ef6a1aab240a59b6bb4ef82372d335e3a9,parser/parser.go,go-ollama-ollama-surround-block-with-if-and-function-call
 Go,prometheus-prometheus.git,e14795bbf4fbd1837a9e3428aafb40b4b1dda99d,tsdb/tsdbutil/dir_locker_test.go,go-prometheus-single-comment-change
 HTML,LadybirdBrowser-ladybird.git,d2528dd5ce8510cabc6b160ffedb054e803a84d4,Tests/LibWeb/Screenshot/input/css-border-style-double.html,html-ladybird-delete-attribute
 HTML,apache-echarts.git,139206be7adab50f0d79e4d8adf3d14bac15b1bb,test/runTest/client/index.html,
@@ -62,7 +62,7 @@ HTML,twbs-bootstrap.git,1d92d0b68f3c00c70bcc6d9a4f4f34e8f3a7be7d,site/content/do
 JSON,Radarr-Radarr.git,52a69b662d56c800e19568075625f7fbcccb5e47,src/NzbDrone.Core/Localization/Core/da.json,json-radarr-radarr-rename-string-key
 JSON,apache-superset.git,8fd34010776611e800e12481a3b6b34008142be3,superset-frontend/package.json,json-apache-string-change-version
 JSON,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/nb-NO.json,
-JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/extension/_locales/cs/messages.json,
+JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/extension/_locales/cs/messages.json,json-gorhill-ublock-add-5-pairs
 JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,json-langflow-update-single-string
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,json-nextcloud-server-deleted-pair
@@ -74,7 +74,7 @@ Java,Genymobile-scrcpy.git,69b836930a1d33d2aeebd17eed67c264c084c37d,server/src/m
 Java,Genymobile-scrcpy.git,6af4bd601f028d4e3d96eb90326a2330f03bc960,server/src/main/java/com/genymobile/scrcpy/LogUtils.java,
 Java,Genymobile-scrcpy.git,89518f49adb59dfa961f76be3f4414bffdc22cc5,server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java,java-scrcpy-remove-or-expression
 Java,Genymobile-scrcpy.git,f7b4a18b4398c013b2bed9630b7bb35eb50ad97e,server/src/main/java/com/genymobile/scrcpy/wrappers/ClipboardManager.java,java-genymobile-scrcpy-switch-from-three-exceptions-to-one
-Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,
+Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,java-nextcloud-android-add-if-branch-with-reused-return
 Java,nextcloud-android.git,dd8d79d1d914cb33b641ca058a1f9f30d811ce5f,app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java,java-nextcloud-android-add-two-function-calls
 Java,protocolbuffers-protobuf.git,20b2cd7623c554e3ee39470b70d5583ad5f26f60,java/core/src/main/java/com/google/protobuf/MessageSchema.java,java-protocolbuffers-protobuf-add-import-and-update-field-access
 Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/core/src/main/java/com/google/protobuf/Internal.java,java-protobuf-add-two-annotations
@@ -84,7 +84,7 @@ JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tes
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,javascript-typescript-use-strict-2
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,javascript-typescript-very-interesting-brokn-code
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/tupleElementTypes3.js,javascript-typescript-interesting-small-edit-refactor
-JavaScript,microsoft-TypeScript.git,96acaa52902feb1320e1d8ec8936b8669cca447d,tests/baselines/reference/tsserver/skipLibCheck/jsonly-inferred-project.js,
+JavaScript,microsoft-TypeScript.git,96acaa52902feb1320e1d8ec8936b8669cca447d,tests/baselines/reference/tsserver/skipLibCheck/jsonly-inferred-project.js,javascript-microsoft-typescript-broken-js-remove-string-fragment
 JavaScript,microsoft-TypeScript.git,d403e0850f33521c684bbecd4a24522a4dc66b33,"tests/baselines/reference/tsserver/forceConsistentCasingInFileNames/when-import,-directory-symlink-target,-and-disk-are-all-different.js",
 JavaScript,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/tsserver/projectReferences/when-file-is-not-part-of-first-config-tree-found-appConfig-not-composite-with-file-open-before-revert.js,
 JavaScript,mozilla-firefox-firefox.git,f5848b1deb702ab2647691f2591c8a5410fb5541,toolkit/modules/IndexedDB.sys.mjs,javascript-mozilla-firefox-add-comment
@@ -96,12 +96,12 @@ Kotlin,nextcloud-android.git,814a5df0488146e79a7d8092a46098176af8ea39,app/src/ma
 Kotlin,nextcloud-android.git,9142730334c907913bc1b59353dd4a2a014916c1,app/src/androidTest/java/com/nextcloud/client/ActivitiesActivityIT.kt,kotlin-nextcloud-android-dot-to-question-mark-dot
 Kotlin,nextcloud-android.git,ae3e759e615367e0a78472eb83fc7c94634fca30,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadHelper.kt,kotlin-nextcloud-android-add-a-feature
 Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/etm/pages/EtmPreferencesFragment.kt,kotlin-nextcloud-whitespace-only-change
-Kotlin,nextcloud-android.git,b73b0ae9a09a3d22f924ea744badc7a8e011cf37,app/src/test/java/com/owncloud/android/ui/activities/data/files/RemoteFilesRepositoryTest.kt,
+Kotlin,nextcloud-android.git,b73b0ae9a09a3d22f924ea744badc7a8e011cf37,app/src/test/java/com/owncloud/android/ui/activities/data/files/RemoteFilesRepositoryTest.kt,kotlin-nextcloud-android-move-from-one-mocking-library-to-other
 Kotlin,nextcloud-android.git,c9979170a73ee35bc1098aebd2e4fba82657d01f,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadWorker.kt,kotlin-nextcloud-a-few-small-removals
 Kotlin,nextcloud-android.git,d5223059a628ae3dca7279f0625ecc62d2ab2bd2,app/src/main/java/com/owncloud/android/ui/adapter/GalleryRowHolder.kt,kotlin-nextcloud-android-extract-argument-into-variable
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/awful/mouse/resize.lua,lua-awesomewm-awesome-comment-changes-and-additions
 LUA,awesomeWM-awesome.git,63def3d38d988c937e5b619e86854d85e41299c4,lib/ruled/client.lua,lua-awesome-only-comment-change
-LUA,awesomeWM-awesome.git,869e63fcdc5ea836f22e935b1eb52fffefb759b3,lib/wibox/widget/textbox.lua,
+LUA,awesomeWM-awesome.git,869e63fcdc5ea836f22e935b1eb52fffefb759b3,lib/wibox/widget/textbox.lua,lua-awesomewm-awesome-change-doccomments
 LUA,awesomeWM-awesome.git,88c65a71ddd9ef5b6c18cef576580a4bf7c691dd,tests/examples/wibox/container/arcchart/paddings.lua,lua-awesomewm-awesome-align-to-halign
 LUA,neovim-neovim.git,0501c5fd0959895b18d8166c6c034cdf1832edf3,runtime/lua/vim/lsp/buf.lua,lua-neovim-neovim-if-flips-two-branches
 LUA,neovim-neovim.git,249f305bbcddf10264835c5845035a42030d9184,test/functional/ui/options_spec.lua,lua-neovim-one-added-line
@@ -174,7 +174,7 @@ TSX,apache-superset.git,fdcb942f3c7c33cac49032ab748eb3a68eaa8bfa,superset-fronte
 TSX,excalidraw-excalidraw.git,e6c3c06c2eb552aed9241aa1e1fb72052e2caf35,packages/excalidraw/components/App.tsx,
 TSX,excalidraw-excalidraw.git,ecef5d12f4af4f70e240fc54fb626c16d005eee3,excalidraw-app/components/GitHubCorner.tsx,tsx-excalidraw-excalidraw-import-path-change
 TSX,excalidraw-excalidraw.git,f4dd23fc31e218298bacce3ab39c2556fd12e639,packages/excalidraw/components/Stats/MultiDimension.tsx,tsx-excalidraw-excalidraw-move-from-one-struct-to-other
-TSX,langflow-ai-langflow.git,87f5721d7cec5abffb938e49e959b3a52dd42450,src/frontend/src/components/core/parameterRenderComponent/components/modelInputComponent/index.tsx,
+TSX,langflow-ai-langflow.git,87f5721d7cec5abffb938e49e959b3a52dd42450,src/frontend/src/components/core/parameterRenderComponent/components/modelInputComponent/index.tsx,tsx-langflow-ai-langflow-move-function-around-update-string-constant
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,packages/mui-joy/src/styles/variantColorInheritance.test.tsx,tsx-material-remove-import
 TSX,mui-material-ui.git,8663368c5472de8076993763fa0a52f9ce55fa5d,docs/src/pages/premium-themes/onepirate/modules/views/ProductCategories.tsx,tsx-mui-material-ui-move-colour-to-a-new-attribute
 TSX,shadcn-ui-ui.git,687f09817b614a3450f0f56779edf367082e1e53,apps/v4/registry/bases/base/blocks/preview/cards/contributors.tsx,tsx-shadcn-ui-ui-add-attribute
