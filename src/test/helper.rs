@@ -560,9 +560,11 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 }
 
 /**
-* Returns handmade (before, after) pairs, as Code objects.
+* Returns every (before, after) pair in the corpus, as Code objects, swept from all of
+* `src/test/data/diffs/{handmade,small,full}/<dir>/` despite the name - see [`DIFF_DATASETS`]'s
+* doc comment for why the split doesn't matter to this function's callers.
 *
-* Note that the actual files are stored with ".test" extension in "src/test/data/diffs/<dir>/". This is so
+* Note that the actual files are stored with ".test" extension in each `<dir>/`. This is so
 * that the build system doesn't treat data as code. To make sure the files are correctly treated
 * during testing, ".test" extension is removed in this function.
 *
@@ -588,21 +590,36 @@ pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
 fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
     let mut result = HashMap::new();
 
-    for entry in fs::read_dir(diffs_root())? {
-        let entry = entry?;
-        let path = entry.path();
+    for dataset in DIFF_DATASETS {
+        let dataset_root = diffs_root().join(dataset);
+        if !dataset_root.exists() {
+            continue;
+        }
+        for entry in fs::read_dir(&dataset_root)? {
+            let entry = entry?;
+            let path = entry.path();
 
-        if path.is_dir() {
-            let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
+            if path.is_dir() {
+                let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
 
-            if let Some(pair) = code_pair_from_dir(&path)? {
-                result.insert(dir_name, pair);
+                if let Some(pair) = code_pair_from_dir(&path)? {
+                    result.insert(dir_name, pair);
+                }
             }
         }
     }
 
     Ok(result)
 }
+
+/// The corpus under `src/test/data/diffs/` is split by provenance into three sibling folders:
+/// `handmade` (hand-authored fixtures, never sampled), `small` (promoted from the small research
+/// dataset's `sample.csv`), and `full` (reserved for a future sample from the full dataset, not
+/// available on every machine - empty until then). Fixture names are unique across all three (a
+/// promoted name can't collide with a handmade one - see `human_solver`'s `action_promote`), so
+/// every reader below treats the split as an implementation detail: a name resolves to whichever
+/// of the three actually holds it, and callers never need to know which.
+pub const DIFF_DATASETS: &[&str] = &["handmade", "small", "full"];
 
 fn diffs_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -612,12 +629,22 @@ fn diffs_root() -> std::path::PathBuf {
         .join("diffs")
 }
 
+/// The directory for fixture `name`, searched across `DIFF_DATASETS` in order - the one place
+/// that resolves the on-disk dataset split into a flat name lookup. `None` if `name` isn't a
+/// directory under any of the three.
+pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
+    DIFF_DATASETS
+        .iter()
+        .map(|dataset| diffs_root().join(dataset).join(name))
+        .find(|path| path.is_dir())
+}
+
 /**
-* Loads exactly one named fixture from `src/test/data/diffs/<name>/`, without touching the rest
-* of the corpus. Unlike [`handmade_test_code_pairs`], which parses and caches all ~220+ fixtures
-* on first call, this parses only `name` - the first call for a given `name` pays one fixture's
-* parse cost, not the whole corpus's. Subsequent calls for the same `name` (from other tests) hit
-* a per-name cache and are free.
+* Loads exactly one named fixture from `src/test/data/diffs/{handmade,small,full}/<name>/`,
+* without touching the rest of the corpus. Unlike [`handmade_test_code_pairs`], which parses and
+* caches all ~220+ fixtures on first call, this parses only `name` - the first call for a given
+* `name` pays one fixture's parse cost, not the whole corpus's. Subsequent calls for the same
+* `name` (from other tests) hit a per-name cache and are free.
 *
 * Most tests only ever look up one or two specific fixtures by name (see
 * [`compute_mismatches_with_config`] and most callers in `apted/common/tests.rs`), so this is the
@@ -636,7 +663,9 @@ pub fn handmade_test_code_pair(name: &str) -> Result<(Code, Code)> {
         return Ok(pair.clone());
     }
 
-    let pair = code_pair_from_dir(&diffs_root().join(name))?
+    let dir = diffs_case_dir(name)
+        .with_context(|| format!("No test case directory found for '{}'", name))?;
+    let pair = code_pair_from_dir(&dir)?
         .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
     cache.lock().unwrap().insert(name.to_string(), pair.clone());
     Ok(pair)

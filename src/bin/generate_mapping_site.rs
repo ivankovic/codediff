@@ -191,8 +191,19 @@ fn render_fixture_page(
     );
 
     let language = before.metadata.language.unwrap_or_default();
+    // `diffs_case_dir` resolves which of `handmade`/`small`/`full` this fixture actually lives
+    // under (see `helper::DIFF_DATASETS`) - the URL needs that segment, even though every other
+    // parameter here is already in memory and doesn't otherwise touch disk.
+    let dataset = helper::diffs_case_dir(name)
+        .and_then(|dir| {
+            dir.parent()
+                .and_then(|p| p.file_name())
+                .map(|f| f.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "small".to_string());
     let source_url = format!(
-        "https://github.com/{REPO}/tree/main/src/test/data/diffs/{}",
+        "https://github.com/{REPO}/tree/main/src/test/data/diffs/{}/{}",
+        dataset,
         escape_html_attr(name)
     );
 
@@ -610,7 +621,7 @@ mod tests {
 
         assert!(
             html.contains(
-                r#"href="https://github.com/ivankovic/codediff/tree/main/src/test/data/diffs/rust-add-if""#
+                r#"href="https://github.com/ivankovic/codediff/tree/main/src/test/data/diffs/handmade/rust-add-if""#
             ),
             "expected a link straight to this fixture's own before/after files: {html}"
         );

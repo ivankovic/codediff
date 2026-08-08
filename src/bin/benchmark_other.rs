@@ -18,7 +18,7 @@
 
 //! Compares codediff against other diff tools (`ExternalTool`: Unix `diff`, GumTree, difftastic,
 //! diffsitter - more can be added), against the human-authored ground truth in
-//! `src/test/data/diffs/*/human_mapping.json` - the same corpus `benchmark_optimal_solutions`
+//! `src/test/data/diffs/*/*/human_mapping.json` - the same corpus `benchmark_optimal_solutions`
 //! scores codediff against, but at line granularity instead of AST-node granularity.
 //!
 //! GumTree, difftastic, and diffsitter are all separate, non-Cargo binaries, not bundled or

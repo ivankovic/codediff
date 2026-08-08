@@ -22,7 +22,10 @@
 *
 * These are produced by the `human_solver` binary (src/bin/human_solver.rs), which lets a human
 * walk the before/after ASTs of a test case side by side and mark nodes as matching, deleted or
-* inserted. The result is stored as JSON in `src/test/data/diffs/<name>/human_mapping.json`.
+* inserted. The result is stored as JSON in
+* `src/test/data/diffs/{handmade,small,full}/<name>/human_mapping.json` - see
+* [`super::DIFF_DATASETS`] for what the three folders mean; [`mapping_path`] is the one place that
+* resolves which of them holds a given `name`.
 *
 * Nodes are identified by *path* (see [`super::path_for_node`] / [`super::node_for_path`]) rather
 * than by TreeSitter node ID, because node IDs are arena slots that are not stable across separate
@@ -92,14 +95,25 @@ pub struct HumanMapping {
     pub entries: Vec<HumanMappingEntry>,
 }
 
-/// Path to the `human_mapping.json` file for a given test case name (e.g. "rust-add-if").
+/// Path to the `human_mapping.json` file for a given test case name (e.g. "rust-add-if"),
+/// resolved across `DIFF_DATASETS` (`super::diffs_case_dir`) like every other per-name lookup.
+/// Every caller (`load`/`save`, and the `.exists()` checks in `benchmark_optimal_solutions`/
+/// `benchmark_other`) runs after the case directory already exists - either it's an already-open
+/// case, or `human_solver`'s promote flow just created it - except when checking whether a
+/// *candidate* name is free of a mapping at all, where "doesn't exist under any dataset" is
+/// exactly the desired answer. `small` is an arbitrary but harmless fallback for a name that
+/// resolves to nothing: `.exists()` on it is still `false`, the only thing every caller checks.
 pub fn mapping_path(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("test")
-        .join("data")
-        .join("diffs")
-        .join(name)
+    super::diffs_case_dir(name)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("test")
+                .join("data")
+                .join("diffs")
+                .join("small")
+                .join(name)
+        })
         .join("human_mapping.json")
 }
 

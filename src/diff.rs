@@ -290,7 +290,7 @@ impl Diff {
 ///
 /// `Fast` is the default for every public entry point (`Diff::from_code`, `diff_code`, ...) - this
 /// is an intentional behavior change from "always run exact APTED," made to fix a measured
-/// pathological case: two completely unrelated Rust files (`src/test/data/diffs/
+/// pathological case: two completely unrelated Rust files (`src/test/data/diffs/handmade/
 /// rust-completely-unrelated-main-files/`) took **14.5 seconds** to diff, ~36x the project's
 /// stated 400ms budget, because phases 1-5 left 86% of the larger tree unmatched and phase 6 had
 /// to run full tree-edit-distance over nearly the whole thing with almost nothing to prune
