@@ -130,6 +130,8 @@ mod html_ladybird_delete_attribute;
 #[cfg(test)]
 mod html_mermaid_update_link;
 #[cfg(test)]
+mod html_twbs_bootstrap_add_the_same_attribute_in_many_places;
+#[cfg(test)]
 mod java_add_exception_handling;
 #[cfg(test)]
 mod java_add_interface;

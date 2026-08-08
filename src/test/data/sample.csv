@@ -58,7 +58,7 @@ HTML,gorhill-uBlock.git,5c029b353204a47efd8d7be22a3f741f1802780e,src/no-dashboar
 HTML,mermaid-js-mermaid.git,d7c42eb62fa208ad11a0a41185894029024e4474,cypress/platform/xss4.html,html-mermaid-update-link
 HTML,mozilla-firefox-firefox.git,99614e32b9ad06f08bdebc34ccf559296ab95e69,toolkit/components/pdfjs/content/web/viewer.html,
 HTML,mozilla-firefox-firefox.git,a5c6959314b1f185f42a314f41a454ed8652c87f,testing/web-platform/tests/orientation-sensor/RelativeOrientationSensor-iframe-access.https.html,html-firefox-update-src
-HTML,twbs-bootstrap.git,1d92d0b68f3c00c70bcc6d9a4f4f34e8f3a7be7d,site/content/docs/5.3/examples/sidebars/index.html,
+HTML,twbs-bootstrap.git,1d92d0b68f3c00c70bcc6d9a4f4f34e8f3a7be7d,site/content/docs/5.3/examples/sidebars/index.html,html-twbs-bootstrap-add-the-same-attribute-in-many-places
 JSON,Radarr-Radarr.git,52a69b662d56c800e19568075625f7fbcccb5e47,src/NzbDrone.Core/Localization/Core/da.json,json-radarr-radarr-rename-string-key
 JSON,apache-superset.git,8fd34010776611e800e12481a3b6b34008142be3,superset-frontend/package.json,json-apache-string-change-version
 JSON,excalidraw-excalidraw.git,f12ae80ba1e1364952c6c6c440ac4212acd06eab,packages/excalidraw/locales/nb-NO.json,
