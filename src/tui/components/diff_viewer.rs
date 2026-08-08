@@ -123,11 +123,14 @@ impl DiffViewer {
 
     /// Move the focused panel's cursor to the next (`forward = true`) or previous (`forward =
     /// false`) actual change (`n`/`p`), and push the resulting matched node onto the other
-    /// panel's cross-highlight, same as any other cursor movement.
+    /// panel's cross-highlight, same as any other cursor movement - but centers *both* panels'
+    /// viewports on the destination (see `CodeViewer::jump_to_change`/`sync_scroll_centered`)
+    /// rather than the usual minimal "keep visible" scroll: jumping between scattered changes
+    /// benefits from full context around the target on both sides, not just the focused one.
     pub fn jump_to_change(&mut self, forward: bool) {
         self.focused_viewer().jump_to_change(forward);
         self.sync_cross_highlight();
-        self.sync_scroll();
+        self.sync_scroll_centered();
     }
 
     /// Search the focused panel for `query`, replacing any previous search, and jump its cursor to
@@ -178,6 +181,15 @@ impl DiffViewer {
     fn sync_scroll(&mut self) {
         if let Some(dest) = self.focused_viewer().cursor_destination() {
             self.other_viewer().scroll_to_show_row(dest.start_row);
+        }
+    }
+
+    /// Same as `sync_scroll`, but centers the inactive panel's viewport on the destination row
+    /// instead of just keeping it minimally visible - see `CodeViewer::scroll_to_center_row` and
+    /// `jump_to_change` (`n`/`p`), this method's only caller.
+    fn sync_scroll_centered(&mut self) {
+        if let Some(dest) = self.focused_viewer().cursor_destination() {
+            self.other_viewer().scroll_to_center_row(dest.start_row);
         }
     }
 
@@ -802,6 +814,63 @@ mod tests {
 
         viewer.jump_to_change(false);
         assert_eq!(viewer.left_viewer.state().cursor_row, 2);
+    }
+
+    /// `n`/`p` must center *both* panels' viewports on the matched change, not just the focused
+    /// one (`sync_scroll_centered`) - otherwise the other panel could show its matched content
+    /// pinned awkwardly at the very top/bottom of the viewport even though the focused side is
+    /// nicely centered.
+    #[test]
+    fn jump_to_change_centers_both_panels() {
+        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text_range::TextRange;
+
+        let line_count = 100;
+        let change_row = 50;
+        let contents: String = (0..line_count).map(|i| format!("line{i}\n")).collect();
+        let ranges = vec![
+            RangeMatch {
+                source: TextRange::new(0, 0, change_row, 0),
+                destination: TextRange::new(0, 0, change_row, 0),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: TextRange::new(change_row, 0, change_row, 4),
+                destination: TextRange::new(change_row, 0, change_row, 4),
+                operation: TextOperation::Update,
+            },
+            RangeMatch {
+                source: TextRange::new(change_row + 1, 0, line_count, 0),
+                destination: TextRange::new(change_row + 1, 0, line_count, 0),
+                operation: TextOperation::Identical,
+            },
+        ];
+
+        let mut viewer = DiffViewer::new();
+        let data = DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: contents.clone(),
+            after_contents: contents,
+            before_ranges: ranges.clone(),
+            after_ranges: ranges,
+            comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
+        };
+        viewer.load_diff(&data);
+        viewer.left_viewer.set_viewport_height(10);
+        viewer.right_viewer.set_viewport_height(10);
+        viewer.left_viewer.set_cursor_position(0, 0);
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(viewer.left_viewer.state().scroll, 45);
+        assert_eq!(
+            viewer.right_viewer.state().scroll,
+            45,
+            "the other panel should center on its matched destination the same way"
+        );
     }
 
     /// `search` (the `/` modal's Enter) must operate on the focused panel and, like every other

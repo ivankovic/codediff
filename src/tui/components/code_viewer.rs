@@ -181,10 +181,17 @@ impl CodeViewer {
 
     /// Move the cursor to the start of the next (`forward = true`) or previous (`forward =
     /// false`) actual change, wrapping around at the ends - see `CodeViewerState::
-    /// next_change_position`. A no-op if this side has no changes at all.
+    /// next_change_position`. Unlike other cursor movement (which only scrolls the minimum
+    /// needed to keep the cursor visible - see `scroll_to_cursor`), this centers the destination
+    /// row in the viewport, clamped to the start/end of the file when centering would scroll
+    /// past either edge: jumping between scattered changes across a large file benefits from
+    /// full context around the target, not just "barely on screen" at whichever edge it
+    /// happened to enter from. A no-op if this side has no changes at all.
     pub fn jump_to_change(&mut self, forward: bool) {
-        if let Some((row, col)) = self.state.next_change_position(forward) {
-            self.set_cursor_position(row, col);
+        if let Some((row, col)) = self.state.next_change_position(forward)
+            && self.clamp_and_set_cursor(row, col)
+        {
+            self.scroll_to_center_row(self.state.cursor_row);
         }
     }
 
@@ -221,20 +228,31 @@ impl CodeViewer {
         self.state.search_match_count_and_index()
     }
 
-    /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
-    /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
-    /// to match the active panel's cursor destination.
-    pub fn set_cursor_position(&mut self, row: usize, col: usize) {
+    /// Clamp `(row, col)` to valid bounds and move the cursor there, without touching scroll.
+    /// Returns `false` (and does nothing else) if the file is empty. Shared by
+    /// `set_cursor_position` (keeps the cursor merely visible afterward) and `jump_to_change`
+    /// (centers it - see that method's own doc comment for why the two need different scroll
+    /// behavior).
+    fn clamp_and_set_cursor(&mut self, row: usize, col: usize) -> bool {
         let total_lines = self.line_count();
         if total_lines == 0 {
-            return;
+            return false;
         }
         let clamped_row = row.min(total_lines.saturating_sub(1));
         let line_len = self.widget.line_len(clamped_row);
         let clamped_col = col.min(line_len);
         self.state.cursor_row = clamped_row;
         self.state.cursor_col = clamped_col;
-        self.scroll_to_cursor();
+        true
+    }
+
+    /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
+    /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
+    /// to match the active panel's cursor destination.
+    pub fn set_cursor_position(&mut self, row: usize, col: usize) {
+        if self.clamp_and_set_cursor(row, col) {
+            self.scroll_to_cursor();
+        }
     }
 
     /// Where the cursor should be drawn on screen within `area` (the same area passed to
@@ -288,6 +306,24 @@ impl CodeViewer {
         {
             self.state.scroll = row.saturating_sub(self.state.viewport_height - 1);
         }
+    }
+
+    /// Scroll the viewport so `row` is vertically centered, without moving the cursor - unlike
+    /// `scroll_to_show_row`, this always re-centers rather than only scrolling when `row` would
+    /// otherwise fall out of view. Clamped to the start/end of the file (`max_scroll`) when
+    /// centering `row` would scroll past either edge, so a change near the very first or last
+    /// line still pins the viewport there instead of leaving dead space above/below the file.
+    /// Used by `jump_to_change` (`n`/`p`) and `DiffViewer::sync_scroll_centered`, which centers
+    /// the *other* panel on its matched destination the same way.
+    pub fn scroll_to_center_row(&mut self, row: usize) {
+        let total_lines = self.line_count();
+        if total_lines == 0 || self.state.viewport_height == 0 {
+            return;
+        }
+        let row = row.min(total_lines.saturating_sub(1));
+        let half_viewport = self.state.viewport_height / 2;
+        let max_scroll = total_lines.saturating_sub(self.state.viewport_height);
+        self.state.scroll = row.saturating_sub(half_viewport).min(max_scroll);
     }
 
     /// Get the viewport height
@@ -476,5 +512,91 @@ mod tests {
 
         viewer.jump_to_search_match(true);
         assert_eq!(viewer.search_match_count_and_index(), Some((2, 2)));
+    }
+
+    /// Builds a `line_count`-line file with an `Update` range (a "change") at each row in
+    /// `change_rows`, `Identical` elsewhere - just enough range structure for
+    /// `next_change_position`/`jump_to_change` to navigate between changes, for the centering
+    /// tests below.
+    fn viewer_with_changes_at(line_count: usize, change_rows: &[usize]) -> CodeViewer {
+        use crate::diff::text::TextOperation;
+
+        let contents: String = (0..line_count).map(|i| format!("line{i}\n")).collect();
+        let mut viewer = viewer_with(&contents);
+
+        let mut ranges = Vec::new();
+        let mut row = 0;
+        for &change_row in change_rows {
+            if change_row > row {
+                ranges.push(RangeMatch {
+                    source: TextRange::new(row, 0, change_row, 0),
+                    destination: TextRange::new(row, 0, change_row, 0),
+                    operation: TextOperation::Identical,
+                });
+            }
+            ranges.push(RangeMatch {
+                source: TextRange::new(change_row, 0, change_row, 4),
+                destination: TextRange::new(change_row, 0, change_row, 4),
+                operation: TextOperation::Update,
+            });
+            row = change_row + 1;
+        }
+        if row < line_count {
+            ranges.push(RangeMatch {
+                source: TextRange::new(row, 0, line_count, 0),
+                destination: TextRange::new(row, 0, line_count, 0),
+                operation: TextOperation::Identical,
+            });
+        }
+        viewer.set_ranges(ranges);
+        viewer
+    }
+
+    /// `n`/`p` (`jump_to_change`) must *center* the destination row, not just scroll the minimum
+    /// needed to keep it visible: a change already inside the viewport should still cause a
+    /// re-center, unlike `move_cursor_vertical`/other movement (`scroll_to_show_row`).
+    #[test]
+    fn jump_to_change_centers_the_destination_row() {
+        let mut viewer = viewer_with_changes_at(100, &[50]);
+        viewer.set_viewport_height(10);
+        viewer.scroll_to_show_row(0); // destination (50) is already technically "visible"-adjacent
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(viewer.state.cursor_row, 50);
+        assert_eq!(
+            viewer.state.scroll, 45,
+            "row 50 centered in a 10-row viewport should scroll to 50 - 10/2 = 45"
+        );
+    }
+
+    /// A change near the very start of the file can't be centered without scrolling above line
+    /// 0 - the viewport should pin to the start instead of leaving dead space above the file.
+    #[test]
+    fn jump_to_change_clamps_to_the_start_of_the_file() {
+        let mut viewer = viewer_with_changes_at(100, &[2]);
+        viewer.set_viewport_height(10);
+        viewer.scroll_to_show_row(50); // start far from the destination
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(viewer.state.cursor_row, 2);
+        assert_eq!(viewer.state.scroll, 0);
+    }
+
+    /// A change near the very end of the file can't be centered without scrolling past the last
+    /// line - the viewport should pin to the end instead of leaving dead space below the file.
+    #[test]
+    fn jump_to_change_clamps_to_the_end_of_the_file() {
+        let mut viewer = viewer_with_changes_at(100, &[97]);
+        viewer.set_viewport_height(10);
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(viewer.state.cursor_row, 97);
+        assert_eq!(
+            viewer.state.scroll, 90,
+            "a 100-line file with a 10-row viewport can scroll no further than row 90"
+        );
     }
 }
