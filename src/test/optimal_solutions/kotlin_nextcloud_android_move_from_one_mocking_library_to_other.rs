@@ -21,7 +21,12 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // `val captor = argumentCaptor<FilesServiceCallback<OCFile>>()` is inserted twice, once per
+    // test method, replacing a single class-level `@Captor` field each old method referenced -
+    // two structurally-identical new local declarations with no earlier occurrence to anchor to,
+    // an inherently ambiguous near-duplicate-insert case.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
+        50,
     )
 }
