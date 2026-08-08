@@ -133,6 +133,34 @@ impl DiffViewer {
         self.sync_scroll_centered();
     }
 
+    /// `n`/`p`'s actual key handler: jumps normally if the focused panel has a change to jump
+    /// to. If it doesn't, but the *other* panel does (e.g. this is the "before" side of a diff
+    /// that's pure insertions), that's `Action::NoChangesPromptNeeded` instead of a silent no-op,
+    /// so `App` shows `NoChangesDialog` (see its own doc comment) - confirming it calls
+    /// `jump_to_change_on_other_panel` below. If neither panel has any changes at all, there is
+    /// genuinely nothing to offer, so this stays a no-op exactly as before.
+    fn jump_to_change_or_prompt(&mut self, forward: bool) -> Option<Action> {
+        if self.focused_viewer().change_count_and_index().is_some() {
+            self.jump_to_change(forward);
+            return Some(Action::Render);
+        }
+        if self.other_viewer().change_count_and_index().is_some() {
+            return Some(Action::NoChangesPromptNeeded {
+                forward,
+                empty_panel: self.active_panel,
+            });
+        }
+        Some(Action::Render)
+    }
+
+    /// Confirmed via `NoChangesDialog`: switch to the other panel (which has changes - the
+    /// dialog wouldn't have been offered otherwise) and jump `forward`/backward on it, same as a
+    /// normal `n`/`p` jump once there.
+    pub fn jump_to_change_on_other_panel(&mut self, forward: bool) {
+        self.toggle_active_panel();
+        self.jump_to_change(forward);
+    }
+
     /// Search the focused panel for `query`, replacing any previous search, and jump its cursor to
     /// the nearest match - what pressing Enter in the search modal does, then push the resulting
     /// matched node onto the other panel's cross-highlight like any other cursor movement.
@@ -163,11 +191,14 @@ impl DiffViewer {
 
     /// Push the focused panel's current cursor destination onto the other panel's
     /// cross-highlight, and move the other panel's cursor to follow the matched leaf node;
-    /// call after anything that can change the cursor or the focused panel.
+    /// call after anything that can change the cursor or the focused panel. The cursor always
+    /// follows, but the highlight itself is suppressed when the focused side sits on an
+    /// `Identical` match - see `cursor_destination_for_highlight`.
     fn sync_cross_highlight(&mut self) {
         let destination = self.focused_viewer().cursor_destination();
+        let highlight_destination = self.focused_viewer().cursor_destination_for_highlight();
         self.other_viewer()
-            .set_highlight_destination(destination.clone());
+            .set_highlight_destination(highlight_destination);
 
         // Also move the inactive side's cursor to follow the matched leaf node
         if let Some(dest_range) = destination {
@@ -208,15 +239,6 @@ impl DiffViewer {
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
         self.left_viewer.set_overlay_theme(theme);
         self.right_viewer.set_overlay_theme(theme);
-    }
-
-    /// Enable or disable the cross-highlight blue paint on both panels, toggled via `x` - see
-    /// `CodeViewerWidget::set_cross_highlight_enabled`'s doc comment. `App` owns the persisted
-    /// value (same pattern as `set_overlay_theme`/`current_theme`), so this component holds no
-    /// copy of its own.
-    pub fn set_cross_highlight_enabled(&mut self, enabled: bool) {
-        self.left_viewer.set_cross_highlight_enabled(enabled);
-        self.right_viewer.set_cross_highlight_enabled(enabled);
     }
 
     /// The panel whose cursor currently drives navigation.
@@ -367,15 +389,10 @@ impl Component for DiffViewer {
             }
             // n/p jump the cursor straight to the next/previous actual change, skipping over
             // unchanged content entirely - unlike h/j/k/l, which move one character/line at a
-            // time regardless of what's there.
-            crossterm::event::KeyCode::Char('n') => {
-                self.jump_to_change(true);
-                Ok(Some(Action::Render))
-            }
-            crossterm::event::KeyCode::Char('p') => {
-                self.jump_to_change(false);
-                Ok(Some(Action::Render))
-            }
+            // time regardless of what's there. See `jump_to_change_or_prompt`'s doc comment for
+            // what happens when the focused panel has no changes to jump to at all.
+            crossterm::event::KeyCode::Char('n') => Ok(self.jump_to_change_or_prompt(true)),
+            crossterm::event::KeyCode::Char('p') => Ok(self.jump_to_change_or_prompt(false)),
             // >/< jump the cursor between search matches (see the `/` search modal), the same
             // wrap-around convention as n/p - a distinct pair rather than overloading n/p, since
             // help_modal.rs already documents those as change-navigation specifically.
@@ -387,12 +404,6 @@ impl Component for DiffViewer {
                 self.jump_to_search_match(false);
                 Ok(Some(Action::Render))
             }
-            // Toggle the blue cross-highlight (off by default - see `CodeViewerWidget::
-            // cross_highlight_enabled`'s doc comment). Handled by bubbling an action up to `App`,
-            // not by mutating local state directly like the movement keys above: `App` owns the
-            // persisted value and needs to save it (same reason `ThemeSelected` is an action
-            // rather than a local `ThemeDialog` mutation).
-            crossterm::event::KeyCode::Char('x') => Ok(Some(Action::CrossHighlightToggled)),
             crossterm::event::KeyCode::PageUp => {
                 if self.display_mode == DisplayMode::Dual {
                     let left_lines = self.left_viewer.viewport_height();
@@ -871,6 +882,139 @@ mod tests {
             45,
             "the other panel should center on its matched destination the same way"
         );
+    }
+
+    /// A diff of pure insertions: the "before" side is 100% `Identical` (nothing was removed or
+    /// changed there), so its `n`/`p` history is empty even though the "after" side has a real
+    /// change. This is the exact scenario `Action::NoChangesPromptNeeded` exists for.
+    fn pure_insertion_diff_data() -> DiffSessionData {
+        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text_range::TextRange;
+
+        DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: "a\nb\nc\n".to_string(),
+            after_contents: "a\nb\nc\nd\n".to_string(),
+            before_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 3, 0),
+                    destination: TextRange::new(0, 0, 3, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    // `source` is *this side's own* position - zero-width here since there is no
+                    // "before" location for an insertion. `change_positions` filters zero-width
+                    // ranges out via `source.is_empty()`, which is exactly why the "before" panel
+                    // has zero navigable changes despite this entry existing at all.
+                    source: TextRange::new(3, 0, 3, 0),
+                    destination: TextRange::new(3, 0, 4, 0),
+                    operation: TextOperation::Insert,
+                },
+            ],
+            after_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 3, 0),
+                    destination: TextRange::new(0, 0, 3, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    // `source` is *this side's own* position - real and non-zero-width here
+                    // (the new "d" line genuinely exists in `after_contents`), so this one *is* a
+                    // navigable change on the "after" side.
+                    source: TextRange::new(3, 0, 4, 0),
+                    destination: TextRange::new(3, 0, 3, 0),
+                    operation: TextOperation::Insert,
+                },
+            ],
+            comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
+        }
+    }
+
+    /// `n`/`p` on the empty "before" side of a pure-insertion diff must not silently do nothing
+    /// (the old, confusing behavior) - it should ask `App` to offer switching to "after" instead.
+    #[test]
+    fn jump_to_change_prompts_when_focused_panel_has_no_changes_but_the_other_does() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&pure_insertion_diff_data());
+        assert_eq!(viewer.active_panel, Panel::Before);
+
+        let action = viewer.jump_to_change_or_prompt(true);
+        assert_eq!(
+            action,
+            Some(Action::NoChangesPromptNeeded {
+                forward: true,
+                empty_panel: Panel::Before,
+            })
+        );
+        // Declining (or not yet confirming) must not have moved anything.
+        assert_eq!(viewer.active_panel, Panel::Before);
+    }
+
+    /// The same prompt, triggered by `p` instead of `n` - the direction must be carried through
+    /// unchanged so confirming replays the right one.
+    #[test]
+    fn jump_to_change_prompt_carries_the_backward_direction_too() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&pure_insertion_diff_data());
+
+        let action = viewer.jump_to_change_or_prompt(false);
+        assert_eq!(
+            action,
+            Some(Action::NoChangesPromptNeeded {
+                forward: false,
+                empty_panel: Panel::Before,
+            })
+        );
+    }
+
+    /// Once the *other* panel is focused (e.g. after `Tab`), it's the one with the real changes,
+    /// so `n`/`p` there must jump normally - no prompt.
+    #[test]
+    fn jump_to_change_does_not_prompt_when_the_focused_panel_has_changes() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&pure_insertion_diff_data());
+        viewer.toggle_active_panel(); // focus "after", which has the real change
+
+        let action = viewer.jump_to_change_or_prompt(true);
+        assert_eq!(action, Some(Action::Render));
+        assert_eq!(
+            viewer.right_viewer.state().cursor_row,
+            3,
+            "should have jumped normally"
+        );
+    }
+
+    /// Neither side has any changes at all (e.g. two identical files) - genuinely nothing to
+    /// offer, so this must stay the same silent no-op it always was, not a pointless prompt.
+    #[test]
+    fn jump_to_change_does_not_prompt_when_neither_panel_has_changes() {
+        let mut viewer = DiffViewer::new();
+        let mut data = sample_diff_data();
+        data.before_contents = "same\n".to_string();
+        data.after_contents = "same\n".to_string();
+        viewer.load_diff(&data);
+
+        let action = viewer.jump_to_change_or_prompt(true);
+        assert_eq!(action, Some(Action::Render));
+    }
+
+    /// Confirming the prompt (`Action::NoChangesPromptConfirmed`, handled by `App` calling this)
+    /// must switch focus to the other panel and land on its change, in one step.
+    #[test]
+    fn jump_to_change_on_other_panel_switches_focus_and_jumps() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&pure_insertion_diff_data());
+        assert_eq!(viewer.active_panel, Panel::Before);
+
+        viewer.jump_to_change_on_other_panel(true);
+
+        assert_eq!(viewer.active_panel, Panel::After);
+        assert_eq!(viewer.right_viewer.state().cursor_row, 3);
+        assert!(viewer.right_viewer.state().is_focused);
+        assert!(!viewer.left_viewer.state().is_focused);
     }
 
     /// `search` (the `/` modal's Enter) must operate on the focused panel and, like every other

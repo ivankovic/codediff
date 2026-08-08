@@ -40,6 +40,8 @@ Navigation
   Tab              Switch the active panel (Before/After)
   h/j/k/l          Move the cursor left/down/up/right
   Arrow keys       Same as h/j/k/l
+                   The range under the cursor, and its match on the other panel, highlight in
+                   blue when part of a real change; unchanged content is never highlighted
   n/p              Jump to the next/previous change, skipping unchanged lines
   /                Search the focused panel (Enter jumps to nearest, Esc cancels)
                    An empty query clears the current search's highlights
@@ -50,7 +52,6 @@ Navigation
 Files and appearance
   o                Open a file selector for the active panel
   c                Open the color theme picker
-  x                Toggle the blue cross-highlight (off by default)
 
 Other
   ?                Toggle this help

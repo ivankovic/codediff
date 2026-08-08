@@ -43,6 +43,7 @@ use crate::tui::components::{
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
     help_modal::HelpModal,
+    no_changes_dialog::NoChangesDialog,
     search_modal::SearchModal,
     theme_dialog::ThemeDialog,
 };
@@ -70,6 +71,9 @@ pub enum AppScreen {
     Help,
     /// The `/` search modal is open, drawn over the (still-visible) viewer.
     Search,
+    /// `n`/`p` was pressed on a panel with no changes while the other panel has some -
+    /// `NoChangesDialog` is open, drawn over the (still-visible) viewer, offering to switch.
+    NoChangesPrompt,
 }
 
 /// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
@@ -90,7 +94,8 @@ fn esc_should_quit(screen: AppScreen) -> bool {
         | AppScreen::SelectTheme
         | AppScreen::SelectDiffMode
         | AppScreen::Help
-        | AppScreen::Search => false,
+        | AppScreen::Search
+        | AppScreen::NoChangesPrompt => false,
     }
 }
 
@@ -104,6 +109,7 @@ pub struct App {
     theme_dialog: Option<ThemeDialog>,
     diff_mode_dialog: Option<DiffModeDialog>,
     help_modal: Option<HelpModal>,
+    no_changes_dialog: Option<NoChangesDialog>,
     search_modal: Option<SearchModal>,
 
     action_tx: mpsc::UnboundedSender<Action>,
@@ -123,9 +129,6 @@ pub struct App {
     dialog_target: Option<Panel>,
     /// The currently active overlay color theme, persisted across runs (see `tui::theme`).
     current_theme: OverlayTheme,
-    /// Whether cursor movement paints the cross-panel blue "matching node" highlight, persisted
-    /// across runs (see `tui::theme`) and toggled via `x`. Off by default.
-    cross_highlight_enabled: bool,
     /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
     /// The "After" file path, once a file has been picked for that panel.
@@ -171,6 +174,7 @@ impl App {
             theme_dialog: None,
             diff_mode_dialog: None,
             help_modal: None,
+            no_changes_dialog: None,
             search_modal: None,
             action_tx,
             action_rx,
@@ -178,7 +182,6 @@ impl App {
             screen: AppScreen::default(),
             dialog_target: None,
             current_theme: OverlayTheme::default(),
-            cross_highlight_enabled: false,
             before_path: None,
             after_path: None,
             last_error: None,
@@ -196,9 +199,6 @@ impl App {
         // touches disk; only actually running the TUI reads (and may create) the config file.
         self.current_theme = theme::load_overlay_theme();
         self.diff_viewer.set_overlay_theme(self.current_theme);
-        self.cross_highlight_enabled = theme::load_cross_highlight_enabled();
-        self.diff_viewer
-            .set_cross_highlight_enabled(self.cross_highlight_enabled);
 
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
@@ -328,6 +328,10 @@ impl App {
                 Some(modal) => modal.handle_events(Some(event)),
                 None => Ok(None),
             },
+            AppScreen::NoChangesPrompt => match self.no_changes_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
         }
     }
 
@@ -400,7 +404,6 @@ impl App {
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
-                Action::CrossHighlightToggled => self.toggle_cross_highlight(),
                 Action::DiffModeChoiceNeeded {
                     unmatched_before,
                     unmatched_after,
@@ -421,6 +424,13 @@ impl App {
                     }
                     self.diff_mode_dialog = None;
                     self.screen = AppScreen::Diffing;
+                }
+                Action::NoChangesPromptNeeded {
+                    forward,
+                    empty_panel,
+                } => self.open_no_changes_prompt(*forward, *empty_panel),
+                Action::NoChangesPromptConfirmed { forward } => {
+                    self.confirm_no_changes_prompt(*forward)
                 }
                 _ => {}
             }
@@ -475,6 +485,7 @@ impl App {
         self.theme_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
+        self.no_changes_dialog = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
     }
@@ -497,13 +508,20 @@ impl App {
         self.screen = AppScreen::Viewer;
     }
 
-    /// Flip the cross-highlight toggle (`x`): update the live viewer and persist it for future
-    /// runs, same shape as `apply_theme_selection`.
-    fn toggle_cross_highlight(&mut self) {
-        self.cross_highlight_enabled = !self.cross_highlight_enabled;
-        self.diff_viewer
-            .set_cross_highlight_enabled(self.cross_highlight_enabled);
-        theme::save_cross_highlight_enabled(self.cross_highlight_enabled);
+    /// `n`/`p` on a panel with no changes while the other panel has some (`Action::
+    /// NoChangesPromptNeeded`, from `DiffViewer::jump_to_change_or_prompt`) - open the
+    /// confirmation dialog instead of the normal (silent, would-be-no-op) jump.
+    fn open_no_changes_prompt(&mut self, forward: bool, empty_panel: Panel) {
+        self.no_changes_dialog = Some(NoChangesDialog::new(forward, empty_panel));
+        self.screen = AppScreen::NoChangesPrompt;
+    }
+
+    /// The user confirmed `NoChangesDialog` (Enter) - switch to the other panel, jump on it, and
+    /// return to the normal viewer screen.
+    fn confirm_no_changes_prompt(&mut self, forward: bool) {
+        self.diff_viewer.jump_to_change_on_other_panel(forward);
+        self.no_changes_dialog = None;
+        self.screen = AppScreen::Viewer;
     }
 
     /// Run the (CPU-bound) parse+diff pipeline on a blocking thread so it never stalls the
@@ -556,6 +574,7 @@ impl App {
                 AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
                 AppScreen::Help => self.draw_help_modal(frame, area),
                 AppScreen::Search => self.draw_search_modal(frame, area),
+                AppScreen::NoChangesPrompt => self.draw_no_changes_dialog(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -706,6 +725,17 @@ impl App {
         let (x, y) = modal.cursor_screen_position(popup);
         frame.set_cursor(x, y);
         Ok(())
+    }
+
+    /// Draw the `n`/`p`-no-changes prompt as a popup over the (still-visible) viewer behind it.
+    fn draw_no_changes_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(dialog) = self.no_changes_dialog.as_mut() else {
+            return Ok(());
+        };
+        let popup = dialog.popup_area(area);
+        frame.render_widget(Clear, popup);
+        dialog.draw(frame, popup)
     }
 }
 
@@ -1244,18 +1274,84 @@ mod tests {
         let _ = std::fs::remove_file(theme::config_path());
     }
 
-    #[test]
-    fn toggle_cross_highlight_flips_state_and_persists() {
+    /// A pure-insertion diff, loaded into a fresh `App`'s viewer: the "before" side is 100%
+    /// `Identical`, so it has zero navigable changes even though "after" has a real one - the
+    /// scenario `NoChangesPromptNeeded`/`NoChangesDialog` exist for. Mirrors `DiffViewer`'s own
+    /// `pure_insertion_diff_data` test fixture; duplicated rather than shared since that one is
+    /// private to `diff_viewer.rs`'s test module.
+    fn app_with_pure_insertion_diff_loaded() -> App {
+        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text_range::TextRange;
+
         let mut app = App::new(4.0, 60.0).expect("construct App");
-        assert!(!app.cross_highlight_enabled, "off by default until toggled");
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: "a\nb\nc\n".to_string(),
+            after_contents: "a\nb\nc\nd\n".to_string(),
+            before_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 3, 0),
+                    destination: TextRange::new(0, 0, 3, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    source: TextRange::new(3, 0, 3, 0),
+                    destination: TextRange::new(3, 0, 4, 0),
+                    operation: TextOperation::Insert,
+                },
+            ],
+            after_ranges: vec![
+                RangeMatch {
+                    source: TextRange::new(0, 0, 3, 0),
+                    destination: TextRange::new(0, 0, 3, 0),
+                    operation: TextOperation::Identical,
+                },
+                RangeMatch {
+                    source: TextRange::new(3, 0, 4, 0),
+                    destination: TextRange::new(3, 0, 3, 0),
+                    operation: TextOperation::Insert,
+                },
+            ],
+            comment_only: false,
+            mode: crate::diff::DiffMode::Fast,
+            plain_text_fallback: false,
+        });
+        app
+    }
 
-        app.toggle_cross_highlight();
-        assert!(app.cross_highlight_enabled);
+    #[test]
+    fn open_no_changes_prompt_shows_the_dialog() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
 
-        app.toggle_cross_highlight();
-        assert!(!app.cross_highlight_enabled);
+        app.open_no_changes_prompt(true, Panel::Before);
 
-        let _ = std::fs::remove_file(theme::config_path());
+        assert_eq!(app.screen, AppScreen::NoChangesPrompt);
+        assert!(app.no_changes_dialog.is_some());
+    }
+
+    #[test]
+    fn confirm_no_changes_prompt_switches_panel_jumps_and_returns_to_the_viewer_screen() {
+        let mut app = app_with_pure_insertion_diff_loaded();
+        app.open_no_changes_prompt(true, Panel::Before);
+
+        app.confirm_no_changes_prompt(true);
+
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.no_changes_dialog.is_none());
+        assert_eq!(app.diff_viewer.active_panel(), Panel::After);
+        assert_eq!(app.diff_viewer.focused_cursor_position(), Some((3, 0)));
+    }
+
+    #[test]
+    fn handle_dialog_cancelled_resets_the_no_changes_dialog_too() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.open_no_changes_prompt(true, Panel::Before);
+
+        app.handle_dialog_cancelled();
+
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.no_changes_dialog.is_none());
     }
 
     fn rendered_text(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {

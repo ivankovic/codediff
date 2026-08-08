@@ -114,10 +114,16 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
-    /// The destination range matched to wherever the cursor currently sits, i.e. the range to
-    /// cross-highlight on the other panel.
+    /// The destination range matched to wherever the cursor currently sits, i.e. the range the
+    /// other panel's cursor should follow.
     pub fn cursor_destination(&self) -> Option<TextRange> {
         self.state.cursor_destination()
+    }
+
+    /// Same as `cursor_destination`, but `None` for an `Identical` match - the range to
+    /// cross-highlight on the other panel (unchanged content isn't highlighted there).
+    pub fn cursor_destination_for_highlight(&self) -> Option<TextRange> {
+        self.state.cursor_destination_for_highlight()
     }
 
     /// Set (or clear) the cross-highlighted range coming from the other panel's cursor.
@@ -134,12 +140,6 @@ impl CodeViewer {
     /// Set the palette used to paint the diff/cursor overlay, picked via the `c` theme picker.
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
         self.widget.set_overlay_theme(theme);
-    }
-
-    /// Enable or disable the cross-highlight blue paint, toggled via `x` - see
-    /// `CodeViewerWidget::set_cross_highlight_enabled`'s doc comment.
-    pub fn set_cross_highlight_enabled(&mut self, enabled: bool) {
-        self.widget.set_cross_highlight_enabled(enabled);
     }
 
     /// See `CodeViewerWidget`'s `hide_border` field.

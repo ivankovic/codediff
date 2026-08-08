@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("html-twbs-bootstrap-add-the-same-attribute-in-many-places")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "html-twbs-bootstrap-add-the-same-attribute-in-many-places",
+    )
 }

@@ -44,12 +44,10 @@ in every example below.
   Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. codediff remembers your choice across runs.
 * `?` — show every keybinding, plus copyright/license/repository info. `j`/`k` scrolls it. `?` or
   `Esc` closes it.
-* `x` — toggle the blue cross-highlight (off by default). When enabled, moving the cursor
-  highlights the range under it, and the matching range on the other panel, in blue. codediff
-  remembers your choice across runs. The other panel's cursor always follows the matched node,
-  whether or not the highlight itself is enabled.
 * Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
-  editor.
+  editor. The range under the cursor, and the matching range on the other panel, highlight in blue
+  whenever it's part of a real change; unchanged (identical) content is never highlighted. The
+  other panel's cursor always follows the matched node.
 * `n`/`p` — jump straight to the next or previous change. This skips unchanged lines entirely. It
   wraps around at the start or end of the file.
 * `/` — search the focused panel for text. `Enter` jumps to the nearest match and highlights every

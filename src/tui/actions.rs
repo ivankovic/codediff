@@ -19,6 +19,7 @@ use std::path::PathBuf;
 
 use crate::diff::DiffMode;
 use crate::diff::text::RangeMatch;
+use crate::tui::components::diff_viewer::Panel;
 use crate::tui::theme::OverlayTheme;
 
 /// One entry in a directory listing shown by the file dialog.
@@ -103,8 +104,19 @@ pub enum Action {
     /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
     /// cursor to the nearest match and highlight every match.
     SearchSubmitted(String),
-    /// The user pressed `x` in the diff viewer to flip the cross-highlight blue paint on/off -
-    /// see `CodeViewerWidget::cross_highlight_enabled`'s doc comment. Handled by `App`, which
-    /// owns and persists the current value (same reason `ThemeSelected` is an action).
-    CrossHighlightToggled,
+    /// `n`/`p` was pressed but the focused panel has no navigable changes while the *other*
+    /// panel does (e.g. the "before" side of a diff that's pure insertions - there is nothing on
+    /// that side to ever jump to). Dispatched by `DiffViewer::handle_key_event` instead of
+    /// performing the otherwise-silent no-op, so `App` can offer to switch panels instead.
+    /// `empty_panel` is the panel with no changes, for the dialog's message; `forward` is which
+    /// direction (`n`/`p`) triggered this, replayed on confirmation.
+    NoChangesPromptNeeded {
+        forward: bool,
+        empty_panel: Panel,
+    },
+    /// The user confirmed the `NoChangesPrompt` dialog (Enter) - switch to the other panel and
+    /// jump `forward`/backward on it, same as a normal `n`/`p` jump once there.
+    NoChangesPromptConfirmed {
+        forward: bool,
+    },
 }
