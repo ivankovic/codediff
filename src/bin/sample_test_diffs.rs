@@ -74,6 +74,17 @@ struct Args {
     /// long-lived project; this keeps each repo's contribution bounded.
     #[arg(long, default_value_t = 1000)]
     max_commits_per_repo: usize,
+
+    /// Which research dataset (tiny/small/full) this run's newly-sampled rows are provenance-
+    /// tagged with - recorded per row so a later promotion (`human_solver`) knows which of
+    /// `codediff::test::helper::DIFF_DATASETS` to place the fixture under. Auto-inferred from
+    /// `--repos-dir`'s parent directory name when omitted (`.../research/small/repositories` ->
+    /// "small", matching this flag's own default and `materialize_test_diffs`'s
+    /// `DEFAULT_REPO_ROOTS`); pass explicitly for a non-conventional checkout root. Rows already
+    /// on disk keep whatever dataset they were originally sampled with, even if it differs from
+    /// this run's.
+    #[arg(long)]
+    dataset: Option<String>,
 }
 
 /// A pointer to a (before, after) code pair: the actual content lives in the repository
@@ -92,9 +103,18 @@ struct Row {
     /// `human_solver`, not by this tool). Carried through unchanged on every re-run so topping up
     /// `sample.csv` never clobbers a promotion that already happened.
     promoted_to: String,
+    /// Which research dataset (tiny/small/full) this row was sampled from - see `Args::dataset`.
+    /// Carried through unchanged on every re-run, same as `promoted_to`: a row's provenance
+    /// doesn't change just because a later run happens to target a different `--repos-dir`.
+    dataset: String,
 }
 
 type SampleKey = (String, String, String);
+
+/// Historical default for any row read from a sample.csv written before provenance tracking
+/// existed - every one of those was in fact sampled from the small research checkout (the only
+/// one available when they were added), so this is a real fallback value, not a placeholder.
+const LEGACY_DATASET: &str = "small";
 
 fn default_output_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -102,6 +122,19 @@ fn default_output_path() -> PathBuf {
         .join("test")
         .join("data")
         .join("sample.csv")
+}
+
+/// `--dataset`'s auto-inference: `repos_dir`'s parent directory name, matching the
+/// `.../research/<dataset>/repositories` convention `--repos-dir`'s own default and
+/// `materialize_test_diffs`'s `DEFAULT_REPO_ROOTS` already use. `None` for a `--repos-dir` that
+/// doesn't follow that convention (e.g. a bare repository path, or a custom checkout layout) -
+/// callers should require `--dataset` explicitly in that case rather than guessing.
+fn infer_dataset(repos_dir: &Path) -> Option<String> {
+    repos_dir
+        .parent()?
+        .file_name()?
+        .to_str()
+        .map(|s| s.to_string())
 }
 
 fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
@@ -119,6 +152,7 @@ fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
             commit: record[2].to_string(),
             path: record[3].to_string(),
             promoted_to: record.get(4).unwrap_or("").to_string(),
+            dataset: record.get(5).unwrap_or(LEGACY_DATASET).to_string(),
         });
     }
     Ok(rows)
@@ -127,6 +161,16 @@ fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let output = args.output.clone().unwrap_or_else(default_output_path);
+    let dataset = match args.dataset.clone() {
+        Some(dataset) => dataset,
+        None => infer_dataset(&args.repos_dir).ok_or_else(|| {
+            anyhow::anyhow!(
+                "could not infer a dataset name from --repos-dir {:?} (expected \
+                 .../<dataset>/repositories); pass --dataset explicitly",
+                args.repos_dir
+            )
+        })?,
+    };
 
     let existing_rows = read_existing_rows(&output)?;
     let mut existing_counts: HashMap<String, usize> = HashMap::new();
@@ -158,6 +202,7 @@ fn main() -> Result<()> {
             args.language.as_deref(),
             args.max_commits_per_repo,
             args.count,
+            &dataset,
             &existing_counts,
             &existing_keys,
             &mut reservoirs,
@@ -182,6 +227,7 @@ fn sample_repository(
     language_filter: Option<&str>,
     max_commits: usize,
     target_count: usize,
+    dataset: &str,
     existing_counts: &HashMap<String, usize>,
     existing_keys: &HashSet<SampleKey>,
     reservoirs: &mut HashMap<String, Reservoir<Row>>,
@@ -243,6 +289,7 @@ fn sample_repository(
             commit: id.to_string(),
             path,
             promoted_to: String::new(),
+            dataset: dataset.to_string(),
         };
         reservoirs
             .entry(language)
@@ -275,7 +322,14 @@ fn write_csv(
         fs::create_dir_all(parent)?;
     }
     let mut writer = csv::Writer::from_path(path)?;
-    writer.write_record(["language", "repository", "commit", "path", "promoted_to"])?;
+    writer.write_record([
+        "language",
+        "repository",
+        "commit",
+        "path",
+        "promoted_to",
+        "dataset",
+    ])?;
     for row in &rows {
         writer.write_record([
             &row.language,
@@ -283,6 +337,7 @@ fn write_csv(
             &row.commit,
             &row.path,
             &row.promoted_to,
+            &row.dataset,
         ])?;
     }
     writer.flush()?;
@@ -317,6 +372,7 @@ mod tests {
             None,
             1000,
             target_count,
+            "small",
             &existing_counts,
             &existing_keys,
             &mut reservoirs,

@@ -292,13 +292,6 @@ fn samples_root() -> PathBuf {
         .join("samples")
 }
 
-/// Which of `DIFF_DATASETS` a promoted-from-sample case gets created under. Always `small`: every
-/// sample currently reachable through `O`/`samples_root()` was materialized from the small
-/// research dataset (the full dataset isn't available on this machine yet - see `DIFF_DATASETS`'s
-/// doc comment), so there is no sample today that could correctly resolve to anything else.
-/// Revisit once `materialize_test_diffs` can pull from a full-dataset checkout.
-const PROMOTE_DATASET: &str = "small";
-
 /// The dataset (`handmade`/`small`/`full`) an existing diffs/ case named `name` actually lives
 /// under, for display purposes (the title bar, prompts) - `None` if `name` isn't a case at all.
 fn case_dataset(name: &str) -> Option<String> {
@@ -462,13 +455,28 @@ fn promoted_sample_sources_at(
 /// Provenance recorded by `materialize_test_diffs` alongside each `src/test/data/samples/<name>/`
 /// fixture (`source.json`): the exact `sample.csv` row it came from. Used, when the sample is
 /// promoted, to find and update that row without having to reverse-engineer it from the
-/// (lossy: lowercased, 8-char commit) directory name.
+/// (lossy: lowercased, 8-char commit) directory name, and (`dataset`) to know which of
+/// `DIFF_DATASETS` `action_promote` should place the fixture under.
 #[derive(Debug, Clone, Deserialize)]
 struct SampleSource {
     language: String,
     repository: String,
     commit: String,
     path: String,
+    /// Which research dataset (tiny/small/full) this sample was materialized from - see
+    /// `sample_test_diffs`'s `--dataset`. Defaults to `legacy_dataset()` for a `source.json`
+    /// written before provenance tracking existed, so samples already on disk keep working
+    /// without needing to be regenerated.
+    #[serde(default = "legacy_dataset")]
+    dataset: String,
+}
+
+/// Historical default for provenance that predates this field: every sample materialized before
+/// `dataset` existed really was pulled from the small research checkout (the only one available
+/// on this machine at the time), so this is a real fallback value, not a placeholder. Shared by
+/// `SampleSource::dataset`'s serde default and `ensure_stub_test`'s dataset resolution.
+fn legacy_dataset() -> String {
+    "small".to_string()
 }
 
 /// A starting point for `s`'s promote-name prompt: `<language>-<repository>`, lowercased, with the
@@ -4278,7 +4286,7 @@ fn validate_new_case_name(name: &str) -> Result<()> {
 }
 
 /// Promotes the currently open sample (`app.origin` must be `CaseOrigin::Sample`) into a real
-/// test case under `src/test/data/diffs/<PROMOTE_DATASET>/<new_name>/`: copies the before/after
+/// test case under `src/test/data/diffs/<source.dataset>/<new_name>/`: copies the before/after
 /// content sitting in `before_src`/`after_src` (the same bytes currently on screen, read once
 /// from `src/test/data/samples/<app.name>/` when the sample was opened), saves
 /// human_mapping.json and the optimal_solutions stub via the normal `action_save` path, and
@@ -4296,13 +4304,28 @@ fn action_promote(
 
     validate_new_case_name(new_name)?;
 
+    // The sample's own recorded provenance decides the target dataset folder, not a hardcoded
+    // guess - see `SampleSource::dataset`. Checked against `DIFF_DATASETS` rather than trusted
+    // outright: a bad value here (e.g. a hand-edited source.json, or a `--dataset` typo when the
+    // sample was originally materialized) would otherwise silently create a fourth diffs/
+    // folder that nothing else in this codebase knows to look in.
+    if !DIFF_DATASETS.contains(&source.dataset.as_str()) {
+        bail!(
+            "sample's recorded dataset '{}' is not one of {:?} - check source.json under \
+             src/test/data/samples/{}/",
+            source.dataset,
+            DIFF_DATASETS,
+            app.name
+        );
+    }
+
     // Collision check spans all three dataset folders (`diffs_case_dir` searches `DIFF_DATASETS`)
     // - the flat-name lookup every other case name resolution in this file relies on breaks the
     // moment two different datasets can hold the same name.
     if diffs_case_dir(new_name).is_some() {
         bail!("'{}' already exists in src/test/data/diffs", new_name);
     }
-    let dir = diffs_root().join(PROMOTE_DATASET).join(new_name);
+    let dir = diffs_root().join(&source.dataset).join(new_name);
 
     let ext = Path::new(&source.path)
         .extension()
@@ -4344,6 +4367,7 @@ struct SampleCsvRow {
     commit: String,
     path: String,
     promoted_to: String,
+    dataset: String,
 }
 
 fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result<bool> {
@@ -4369,6 +4393,8 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
             commit: record[2].to_string(),
             path: record[3].to_string(),
             promoted_to: record.get(4).unwrap_or("").to_string(),
+            // Same historical fallback as `legacy_dataset()`/`sample_test_diffs::LEGACY_DATASET`.
+            dataset: record.get(5).unwrap_or("small").to_string(),
         });
     }
 
@@ -4389,7 +4415,14 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
     }
 
     let mut writer = csv::Writer::from_path(path).with_context(|| format!("writing {:?}", path))?;
-    writer.write_record(["language", "repository", "commit", "path", "promoted_to"])?;
+    writer.write_record([
+        "language",
+        "repository",
+        "commit",
+        "path",
+        "promoted_to",
+        "dataset",
+    ])?;
     for row in &rows {
         writer.write_record([
             &row.language,
@@ -4397,6 +4430,7 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
             &row.commit,
             &row.path,
             &row.promoted_to,
+            &row.dataset,
         ])?;
     }
     writer.flush()?;
@@ -4456,7 +4490,7 @@ fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
 /// creates the diffs/ directory before calling this) runs after that directory already exists, so
 /// there's always a real dataset to resolve, no separate parameter needed.
 fn ensure_stub_test(name: &str) -> Result<bool> {
-    let dataset = case_dataset(name).unwrap_or_else(|| PROMOTE_DATASET.to_string());
+    let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
     let stub_path = optimal_solutions_dir(&dataset).join(format!("{module}.rs"));
 
@@ -4707,12 +4741,29 @@ mod tests {
     }
 
     #[test]
+    fn sample_source_deserializes_a_legacy_source_json_missing_dataset_as_small() {
+        // No "dataset" key at all - the exact shape `materialize_test_diffs` wrote before
+        // provenance tracking existed, still sitting in every sample materialized before then.
+        let json = r#"{"language":"Rust","repository":"repo","commit":"abc123","path":"src/a.rs"}"#;
+        let source: SampleSource = serde_json::from_str(json).unwrap();
+        assert_eq!(source.dataset, "small");
+    }
+
+    #[test]
+    fn sample_source_deserializes_an_explicit_dataset_field() {
+        let json = r#"{"language":"Rust","repository":"repo","commit":"abc123","path":"src/a.rs","dataset":"full"}"#;
+        let source: SampleSource = serde_json::from_str(json).unwrap();
+        assert_eq!(source.dataset, "full");
+    }
+
+    #[test]
     fn default_promoted_name_lowercases_language_and_strips_dot_git() {
         let source = SampleSource {
             language: "Rust".to_string(),
             repository: "rustdesk-rustdesk.git".to_string(),
             commit: "abc12345".to_string(),
             path: "src/lang/kz.rs".to_string(),
+            dataset: "small".to_string(),
         };
         assert_eq!(default_promoted_name(&source), "rust-rustdesk-rustdesk");
     }
@@ -4724,6 +4775,7 @@ mod tests {
             repository: "nextcloud-android".to_string(),
             commit: "abc12345".to_string(),
             path: "app/src/main/Foo.kt".to_string(),
+            dataset: "small".to_string(),
         };
         assert_eq!(default_promoted_name(&source), "kotlin-nextcloud-android");
     }
@@ -6469,26 +6521,39 @@ mod tests {
         );
     }
 
-    fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str)]) {
+    fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str, &str)]) {
         let mut writer = csv::Writer::from_path(path).unwrap();
         writer
-            .write_record(["language", "repository", "commit", "path", "promoted_to"])
+            .write_record([
+                "language",
+                "repository",
+                "commit",
+                "path",
+                "promoted_to",
+                "dataset",
+            ])
             .unwrap();
-        for (language, repository, commit, row_path, promoted_to) in rows {
+        for (language, repository, commit, row_path, promoted_to, dataset) in rows {
             writer
-                .write_record([language, repository, commit, row_path, promoted_to])
+                .write_record([language, repository, commit, row_path, promoted_to, dataset])
                 .unwrap();
         }
         writer.flush().unwrap();
     }
 
-    fn read_csv(path: &Path) -> Vec<(String, String)> {
+    /// (path, promoted_to, dataset) per row - the three columns every test in this section
+    /// actually cares about; language/repository/commit are only there to match rows.
+    fn read_csv(path: &Path) -> Vec<(String, String, String)> {
         let mut reader = csv::Reader::from_path(path).unwrap();
         reader
             .records()
             .map(|r| {
                 let r = r.unwrap();
-                (r[3].to_string(), r.get(4).unwrap_or("").to_string())
+                (
+                    r[3].to_string(),
+                    r.get(4).unwrap_or("").to_string(),
+                    r.get(5).unwrap_or("").to_string(),
+                )
             })
             .collect()
     }
@@ -6499,8 +6564,8 @@ mod tests {
         write_csv(
             file.path(),
             &[
-                ("Rust", "repo", "abc123", "src/a.rs", ""),
-                ("Rust", "repo", "def456", "src/b.rs", ""),
+                ("Rust", "repo", "abc123", "src/a.rs", "", "small"),
+                ("Rust", "repo", "def456", "src/b.rs", "", "full"),
             ],
         );
 
@@ -6509,6 +6574,7 @@ mod tests {
             repository: "repo".to_string(),
             commit: "abc123".to_string(),
             path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
         };
         let found = update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap();
         assert!(found);
@@ -6517,8 +6583,19 @@ mod tests {
         assert_eq!(
             rows,
             vec![
-                ("src/a.rs".to_string(), "rust-new-case".to_string()),
-                ("src/b.rs".to_string(), "".to_string()),
+                (
+                    "src/a.rs".to_string(),
+                    "rust-new-case".to_string(),
+                    "small".to_string()
+                ),
+                (
+                    "src/b.rs".to_string(),
+                    "".to_string(),
+                    // Every other row's dataset must survive untouched, same as its other
+                    // columns - this is the one column a naive "just rewrite promoted_to"
+                    // implementation could plausibly clobber.
+                    "full".to_string()
+                ),
             ]
         );
     }
@@ -6526,20 +6603,27 @@ mod tests {
     #[test]
     fn update_sample_csv_returns_false_when_no_row_matches() {
         let file = NamedTempFile::new().unwrap();
-        write_csv(file.path(), &[("Rust", "repo", "abc123", "src/a.rs", "")]);
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
 
         let source = SampleSource {
             language: "Rust".to_string(),
             repository: "other-repo".to_string(),
             commit: "abc123".to_string(),
             path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
         };
         let found = update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap();
         assert!(!found);
 
         // Untouched: no row matched, so nothing should have been rewritten.
         let rows = read_csv(file.path());
-        assert_eq!(rows, vec![("src/a.rs".to_string(), "".to_string())]);
+        assert_eq!(
+            rows,
+            vec![("src/a.rs".to_string(), "".to_string(), "small".to_string())]
+        );
     }
 
     #[test]
@@ -6549,6 +6633,7 @@ mod tests {
             repository: "repo".to_string(),
             commit: "abc123".to_string(),
             path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
         };
         let found =
             update_sample_csv_at(Path::new("/nonexistent/sample.csv"), &source, "name").unwrap();
@@ -6567,8 +6652,9 @@ mod tests {
                     "abc123",
                     "src/a.rs",
                     "rust-already-promoted",
+                    "small",
                 ),
-                ("Rust", "repo", "def456", "src/b.rs", ""),
+                ("Rust", "repo", "def456", "src/b.rs", "", "small"),
             ],
         );
 

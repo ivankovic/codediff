@@ -25,8 +25,9 @@
 //! `human_solver` (its `O` picker opens a sample, `s` promotes it under a chosen name).
 //!
 //! Each fixture directory also gets a `source.json` recording the row it came from
-//! (language, repository, commit, path); `human_solver` reads it back to find and update the
-//! matching row in `sample.csv` when a sample is promoted.
+//! (language, repository, commit, path, dataset); `human_solver` reads it back both to find and
+//! update the matching row in `sample.csv` when a sample is promoted, and to know which of
+//! `codediff::test::helper::DIFF_DATASETS` to promote it into.
 //!
 //! Safe to re-run: a row whose target directory already holds byte-identical before/after
 //! content is left alone rather than rewritten or re-suffixed.
@@ -70,6 +71,12 @@ struct Row {
     repository: String,
     commit: String,
     path: String,
+    /// Which research dataset this row was sampled from (`sample_test_diffs`'s `--dataset`) -
+    /// carried unchanged into each fixture's `source.json`, purely as provenance to read back
+    /// later. Not used to pick which `repos_dir` root to search (`find_repo_path` still tries
+    /// every root in order); this only ever answers "where did this come from", never "where do
+    /// I look for it".
+    dataset: String,
 }
 
 enum Resolution {
@@ -103,6 +110,9 @@ fn read_rows(path: &Path) -> Result<Vec<Row>> {
             repository: record[1].to_string(),
             commit: record[2].to_string(),
             path: record[3].to_string(),
+            // Same historical fallback as `sample_test_diffs::LEGACY_DATASET`: every row from
+            // before provenance tracking existed was in fact sampled from the small checkout.
+            dataset: record.get(5).unwrap_or("small").to_string(),
         });
     }
     Ok(rows)
@@ -310,6 +320,7 @@ mod tests {
                 .into_owned(),
             commit,
             path,
+            dataset: "small".to_string(),
         }
     }
 
@@ -320,6 +331,7 @@ mod tests {
             repository: "GyulyVGC-sniffnet.git".to_string(),
             commit: "1a70be36eb3d50a2b7248a76056fe9b3c2f71c82".to_string(),
             path: "src/gui/pages/overview_page.rs".to_string(),
+            dataset: "small".to_string(),
         };
         assert_eq!(
             base_name(&row),
@@ -348,13 +360,15 @@ mod tests {
         let after = fs::read_to_string(dir.join("after.rs.test"))?;
         assert_ne!(before, after);
 
-        // `human_solver` needs this to look up the sample.csv row when promoting a fixture.
+        // `human_solver` needs this to look up the sample.csv row when promoting a fixture, and
+        // `dataset` to know which of DIFF_DATASETS to promote it into.
         let source: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(dir.join("source.json"))?)?;
         assert_eq!(source["language"], "Rust");
         assert_eq!(source["repository"], row.repository);
         assert_eq!(source["commit"], row.commit);
         assert_eq!(source["path"], row.path);
+        assert_eq!(source["dataset"], row.dataset);
 
         Ok(())
     }
