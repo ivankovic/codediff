@@ -161,7 +161,10 @@ use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, NodeStatus,
     is_inherited_removed, path_refs, rebuild_caches, status_after, status_before,
 };
-use codediff::test::helper::{code_pair_from_dir, node_for_path, path_for_node, precompute_paths};
+use codediff::test::helper::{
+    DIFF_DATASETS, code_pair_from_dir, diffs_case_dir, node_for_path, path_for_node,
+    precompute_paths,
+};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -219,17 +222,17 @@ q / Esc        quit
 /// Loads and parses the before/after code for a test case, by name. Parses only this one case's
 /// directory (rather than every directory under src/test/data/diffs/, as a naive
 /// `handmade_test_code_pairs`-style lookup would) since this runs on every `o`-picker open, not
-/// just at startup.
+/// just at startup. Resolves across `DIFF_DATASETS` (`handmade`/`small`/`full`) via the library's
+/// own `diffs_case_dir`, same as every other per-name lookup in this file.
 fn load_case(name: &str) -> Result<(Code, Code)> {
-    let dir = diffs_case_dir(name);
-    if !dir.is_dir() {
+    let Some(dir) = diffs_case_dir(name) else {
         let available = list_available_cases().unwrap_or_default();
         bail!(
             "No test case named '{}' found in src/test/data/diffs.\nAvailable: {}",
             name,
             available.join(", ")
         );
-    }
+    };
 
     let (mut before, mut after) = code_pair_from_dir(&dir)
         .with_context(|| format!("Failed to load test case from {:?}", dir))?
@@ -281,15 +284,28 @@ fn samples_root() -> PathBuf {
         .join("samples")
 }
 
-fn diffs_case_dir(name: &str) -> PathBuf {
-    diffs_root().join(name)
+/// Which of `DIFF_DATASETS` a promoted-from-sample case gets created under. Always `small`: every
+/// sample currently reachable through `O`/`samples_root()` was materialized from the small
+/// research dataset (the full dataset isn't available on this machine yet - see `DIFF_DATASETS`'s
+/// doc comment), so there is no sample today that could correctly resolve to anything else.
+/// Revisit once `materialize_test_diffs` can pull from a full-dataset checkout.
+const PROMOTE_DATASET: &str = "small";
+
+/// The dataset (`handmade`/`small`/`full`) an existing diffs/ case named `name` actually lives
+/// under, for display purposes (the title bar, prompts) - `None` if `name` isn't a case at all.
+fn case_dataset(name: &str) -> Option<String> {
+    diffs_case_dir(name)?
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|f| f.to_string_lossy().into_owned())
 }
 
 /// Names of every directory directly under `root` (not just the ones that successfully parse
 /// into a Code pair), for the `o`/`O` open pickers.
 fn list_dir_names(root: &Path) -> Result<Vec<String>> {
     // Not an error: `samples/` in particular won't exist at all until `materialize_test_diffs`
-    // has been run once.
+    // has been run once, and `full/` (see `DIFF_DATASETS`) is deliberately empty until the full
+    // dataset is available.
     if !root.exists() {
         return Ok(Vec::new());
     }
@@ -305,8 +321,17 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
+/// Every case name across all three dataset folders (`handmade`/`small`/`full`) - the `o` picker
+/// doesn't distinguish between them (see the title bar's `[dataset]` tag, via `case_dataset`, for
+/// where a given case actually lives), since names are unique across all three by construction
+/// (`action_promote`'s collision check spans all three too).
 fn list_available_cases() -> Result<Vec<String>> {
-    list_dir_names(&diffs_root())
+    let mut names = Vec::new();
+    for dataset in DIFF_DATASETS {
+        names.extend(list_dir_names(&diffs_root().join(dataset))?);
+    }
+    names.sort();
+    Ok(names)
 }
 
 /// Every sample directory name under src/test/data/samples/, paired with whether it has already
@@ -2571,8 +2596,12 @@ fn draw_ui(
         ])
         .split(size);
 
+    let dataset_tag = match &app.origin {
+        CaseOrigin::Diffs => case_dataset(name).unwrap_or_else(|| "?".to_string()),
+        CaseOrigin::Sample(_) => "sample".to_string(),
+    };
     frame.render_widget(
-        Paragraph::new(format!(" human_solver — {} ", name))
+        Paragraph::new(format!(" human_solver — {} [{}] ", name, dataset_tag))
             .style(Style::default().add_modifier(Modifier::BOLD)),
         chunks[0],
     );
@@ -2781,7 +2810,7 @@ fn render_modal(
             area,
             "Promote sample to test case",
             &format!(
-                "Enter a name for src/test/data/diffs/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                "Enter a name for src/test/data/diffs/small/<name>/\n(letters, digits, - and _; must not already exist)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
                 input,
                 error
                     .as_deref()
@@ -4133,12 +4162,12 @@ fn validate_new_case_name(name: &str) -> Result<()> {
 }
 
 /// Promotes the currently open sample (`app.origin` must be `CaseOrigin::Sample`) into a real
-/// test case under `src/test/data/diffs/<new_name>/`: copies the before/after content sitting in
-/// `before_src`/`after_src` (the same bytes currently on screen, read once from
-/// `src/test/data/samples/<app.name>/` when the sample was opened), saves human_mapping.json and
-/// the optimal_solutions stub via the normal `action_save` path, and records `new_name` against
-/// the matching row in sample.csv. On success, `app` is switched over to the new diffs/ case so
-/// subsequent `s` presses behave like a normal save.
+/// test case under `src/test/data/diffs/<PROMOTE_DATASET>/<new_name>/`: copies the before/after
+/// content sitting in `before_src`/`after_src` (the same bytes currently on screen, read once
+/// from `src/test/data/samples/<app.name>/` when the sample was opened), saves
+/// human_mapping.json and the optimal_solutions stub via the normal `action_save` path, and
+/// records `new_name` against the matching row in sample.csv. On success, `app` is switched over
+/// to the new diffs/ case so subsequent `s` presses behave like a normal save.
 fn action_promote(
     app: &mut App,
     new_name: &str,
@@ -4151,10 +4180,13 @@ fn action_promote(
 
     validate_new_case_name(new_name)?;
 
-    let dir = diffs_case_dir(new_name);
-    if dir.exists() {
+    // Collision check spans all three dataset folders (`diffs_case_dir` searches `DIFF_DATASETS`)
+    // - the flat-name lookup every other case name resolution in this file relies on breaks the
+    // moment two different datasets can hold the same name.
+    if diffs_case_dir(new_name).is_some() {
         bail!("'{}' already exists in src/test/data/diffs", new_name);
     }
+    let dir = diffs_root().join(PROMOTE_DATASET).join(new_name);
 
     let ext = Path::new(&source.path)
         .extension()
@@ -4282,25 +4314,35 @@ fn module_name(name: &str) -> String {
     name.replace('-', "_")
 }
 
-fn optimal_solutions_dir() -> PathBuf {
+/// `optimal_solutions/` mirrors `diffs/`'s three-way split (see `DIFF_DATASETS`): `dataset`'s
+/// fixtures get their stub test files here, alongside `optimal_solutions/<dataset>.rs`'s mod-list
+/// (see `optimal_solutions_mod_file`).
+fn optimal_solutions_dir(dataset: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
         .join("optimal_solutions")
+        .join(dataset)
 }
 
-fn optimal_solutions_mod_file() -> PathBuf {
+fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
-        .join("optimal_solutions.rs")
+        .join("optimal_solutions")
+        .join(format!("{dataset}.rs"))
 }
 
-/// Creates `optimal_solutions/<name>.rs` if it doesn't already exist, and makes sure it's
-/// registered in `optimal_solutions.rs`. Returns whether the stub `.rs` file was newly created.
+/// Creates `optimal_solutions/<dataset>/<name>.rs` if it doesn't already exist, and makes sure
+/// it's registered in `optimal_solutions/<dataset>.rs`. Returns whether the stub `.rs` file was
+/// newly created. `dataset` is resolved from `name`'s actual location under `diffs/`
+/// (`case_dataset`) - every caller (an already-open existing case, or `action_promote`, which
+/// creates the diffs/ directory before calling this) runs after that directory already exists, so
+/// there's always a real dataset to resolve, no separate parameter needed.
 fn ensure_stub_test(name: &str) -> Result<bool> {
+    let dataset = case_dataset(name).unwrap_or_else(|| PROMOTE_DATASET.to_string());
     let module = module_name(name);
-    let stub_path = optimal_solutions_dir().join(format!("{module}.rs"));
+    let stub_path = optimal_solutions_dir(&dataset).join(format!("{module}.rs"));
 
     let created = if stub_path.exists() {
         false
@@ -4313,15 +4355,15 @@ fn ensure_stub_test(name: &str) -> Result<bool> {
         true
     };
 
-    insert_mod_declaration(&module)?;
+    insert_mod_declaration(&dataset, &module)?;
 
     Ok(created)
 }
 
-/// Adds `#[cfg(test)]\nmod <module>;` to optimal_solutions.rs, keeping the list sorted, unless
-/// it's already present.
-fn insert_mod_declaration(module: &str) -> Result<()> {
-    let mod_file = optimal_solutions_mod_file();
+/// Adds `#[cfg(test)]\nmod <module>;` to `optimal_solutions/<dataset>.rs`, keeping the list
+/// sorted, unless it's already present.
+fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> {
+    let mod_file = optimal_solutions_mod_file(dataset);
     let content =
         fs::read_to_string(&mod_file).with_context(|| format!("reading {:?}", mod_file))?;
 
@@ -5078,7 +5120,7 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let area = Rect::new(0, 0, 40, 12);
 
-        let body = "Enter a name for src/test/data/diffs/<name>/\n(letters, digits, - and _; must not already exist)\n\n> rust-rustdesk-\n\n[Enter] confirm   [Esc] cancel";
+        let body = "Enter a name for src/test/data/diffs/small/<name>/\n(letters, digits, - and _; must not already exist)\n\n> rust-rustdesk-\n\n[Enter] confirm   [Esc] cancel";
         terminal
             .draw(|f| render_text_modal(f, area, "Promote sample to test case", body))
             .unwrap();
