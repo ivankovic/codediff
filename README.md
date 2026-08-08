@@ -38,11 +38,12 @@ in every example below.
 
 * `Tab` — switch the active panel.
 * `o` — open a file selector for the active panel. Once both panels have a file, codediff computes
-  and draws the diff between them automatically. Green means inserted. Red means deleted. Dark
-  green means updated. Yellow means moved.
+  and draws the diff between them automatically, color-coded by change type (inserted, deleted,
+  updated, moved) using the current overlay theme - see `c` below.
 * `c` — open the color theme picker. Built-in themes: Dark (default), Solarized Dark, Solarized
   Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. codediff remembers your choice across runs.
-* `?` — show every keybinding and the diff-color legend. `j`/`k` scrolls it. `?` or `Esc` closes it.
+* `?` — show every keybinding, plus copyright/license/repository info. `j`/`k` scrolls it. `?` or
+  `Esc` closes it.
 * `x` — toggle the blue cross-highlight (off by default). When enabled, moving the cursor
   highlights the range under it, and the matching range on the other panel, in blue. codediff
   remembers your choice across runs. The other panel's cursor always follows the matched node,

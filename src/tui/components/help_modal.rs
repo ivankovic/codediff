@@ -28,10 +28,13 @@ use ratatui::{
 use super::Component;
 use crate::tui::actions::Action;
 
-/// Static reference sheet of every keybinding, kept in one place so it can't drift out of sync
-/// with individual handlers the way a comment scattered across several files could. Mirrors
-/// (and should be kept in sync with) README.md's "Using the TUI" section and
-/// `src/bin/human_solver.rs`'s own `HELP_TEXT`/`?` modal, which this is modeled on.
+/// Static reference sheet of every keybinding plus an About section (copyright, license,
+/// repository), kept in one place so the keybindings can't drift out of sync with individual
+/// handlers the way a comment scattered across several files could. Mirrors (and should be kept
+/// in sync with) README.md's "Using the TUI" section and `src/bin/human_solver.rs`'s own
+/// `HELP_TEXT`/`?` modal, which this is modeled on. Deliberately has no diff-color legend: the
+/// actual colors are theme-dependent (see `tui::theme::OverlayTheme`), so a fixed "Green means
+/// inserted" description would be wrong for most non-default themes.
 const HELP_TEXT: &str = "\
 Navigation
   Tab              Switch the active panel (Before/After)
@@ -53,13 +56,12 @@ Other
   ?                Toggle this help
   q or Esc         Quit (Esc cancels an open dialog instead, while one is open)
 
-Diff colors
-  Green            Inserted
-  Red              Deleted
-  Dark green       Updated
-  Yellow           Moved
-  Blue             Search matches, and - if enabled with x - the range under the cursor and its
-                   match on the other panel
+About
+  codediff - fast, syntax-aware code diffing using tree-sitter ASTs
+  Copyright (C) 2026 Marko Ivankovic
+  License: GNU Affero General Public License v3 or later
+           https://www.gnu.org/licenses/
+  Repository: https://github.com/ivankovic/codediff
 ";
 
 /// The `?` popup: a static, scrollable keybinding/color-legend reference. Modeled on
@@ -186,6 +188,7 @@ mod tests {
         let buffer = terminal.backend().buffer().clone();
         let rendered: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
         assert!(rendered.contains("Navigation"));
-        assert!(rendered.contains("Diff colors"));
+        assert!(rendered.contains("About"));
+        assert!(rendered.contains("Copyright"));
     }
 }
