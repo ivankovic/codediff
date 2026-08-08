@@ -7270,6 +7270,7 @@ mod tests {
                 before_path: Some(path_for_node(d_before)),
                 after_path: Some(path_for_node(d_after)),
             }],
+            ..Default::default()
         };
 
         let function_before = before_root.child(0).unwrap();
@@ -7329,6 +7330,7 @@ mod tests {
                 before_path: Some(path_for_node(before_stmt_a)),
                 after_path: Some(path_for_node(after_stmt_b)), // deliberately wrong partner
             }],
+            ..Default::default()
         };
 
         let function_before = before_root.child(0).unwrap();

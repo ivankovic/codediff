@@ -614,7 +614,10 @@ mod tests {
         let source = "fn f() {}\n";
         let before = Code::from_string(source, &Language::Rust);
         let after = Code::from_string(source, &Language::Rust);
-        let mapping = HumanMapping { entries: vec![] };
+        let mapping = HumanMapping {
+            entries: vec![],
+            ..Default::default()
+        };
 
         let html =
             render_fixture_page("rust-add-if", &before, &after, &mapping).expect("should render");
@@ -679,6 +682,7 @@ mod tests {
                 before_path: Some(vec![]),
                 after_path: Some(vec![]),
             }],
+            ..Default::default()
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
 
@@ -730,6 +734,7 @@ mod tests {
                     before_path: Some(vec![]),
                     after_path: Some(vec![]),
                 }],
+                ..Default::default()
             };
             let caches = rebuild_caches(&mapping.entries, before_root, after_root);
 
@@ -784,6 +789,7 @@ mod tests {
                     "expression_statement:2".to_string(),
                 ]),
             }],
+            ..Default::default()
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
 
@@ -833,6 +839,7 @@ mod tests {
                 before_path: Some(vec![]),
                 after_path: None,
             }],
+            ..Default::default()
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
 
@@ -1118,6 +1125,7 @@ mod tests {
                 before_path: Some(codediff::test::helper::path_for_node(block)),
                 after_path: Some(codediff::test::helper::path_for_node(block)),
             }],
+            ..Default::default()
         };
         let caches = rebuild_caches(&mapping.entries, before_root, after_root);
         let quiet_sizes =

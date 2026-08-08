@@ -1,0 +1,52 @@
+{
+  "entries": [
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "block:1",
+        "expression_statement:4"
+      ],
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "expression_statement:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:2"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:3"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:2"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:3"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": true
+    }
+  ]
+}

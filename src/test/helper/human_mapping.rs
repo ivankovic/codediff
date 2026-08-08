@@ -43,7 +43,7 @@ use tree_sitter::Node;
 use crate::code::ASTMetadata;
 use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
-use crate::test::helper::{PathCache, node_for_path};
+use crate::test::helper::{PathCache, node_for_path, path_for_node};
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
@@ -89,10 +89,44 @@ pub struct HumanMappingEntry {
     pub after_path: Option<Vec<String>>,
 }
 
+/// A set of `before_paths` nodes that may map to `after_paths` nodes in *any* consistent pairing
+/// -- used when there's genuine, human-confirmed ambiguity about which specific node should pair
+/// with which (e.g. several interchangeable/near-duplicate statements). Any pairing codediff's
+/// own diff produces counts as correct, as long as it uses `min(before_paths.len(),
+/// after_paths.len())` pairs and leaves the rest of the larger side deleted/inserted -- see
+/// [`check_group_entry`] for the actual validation, and [`representative_entries`] for the one
+/// concrete pairing used for *display*/cost purposes (never for validation).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiMapGroup {
+    /// Paths to every before-side candidate node (N of them). Order is insertion order only -- it
+    /// carries no meaning for validation, since any pairing is valid.
+    pub before_paths: Vec<Vec<String>>,
+    /// Paths to every after-side candidate node (M of them).
+    pub after_paths: Vec<Vec<String>>,
+    /// The operation every *realized* pair (whichever specific pairing codediff's diff actually
+    /// produces) is expected to have chosen. Deliberately excludes `Update`/`Delete`/`Insert`/
+    /// `DeleteWithChildren`/`InsertWithChildren`: `Update` means "same kind, no children,
+    /// different text" for one fixed pair, which doesn't have a coherent meaning across an
+    /// ambiguous N-to-M group, and the other four aren't matches at all (a group's own leftover
+    /// members are how deletion/insertion is expressed -- see [`with_children`](Self::with_children)).
+    pub operation: HumanOperation,
+    /// Whether a matched pair's entire subtree must also close within itself (every descendant of
+    /// one side maps to a descendant of the other, and vice versa -- see
+    /// [`check_subtree_maps_within`]), and a leftover (unmatched) member's entire subtree must be
+    /// deleted/inserted rather than just its own top node -- the group's equivalent of `M` vs `m`
+    /// / of `*WithChildren` vs the bare operation for a plain [`HumanMappingEntry`].
+    pub with_children: bool,
+}
+
 /// The full set of human decisions for one before/after test case.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HumanMapping {
     pub entries: Vec<HumanMappingEntry>,
+    /// Multi-map groups (see [`MultiMapGroup`]) -- absent from any `human_mapping.json` written
+    /// before this field existed, and from any current one with no groups in it, so every
+    /// existing fixture keeps parsing (and re-saving byte-for-byte) unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<MultiMapGroup>,
 }
 
 /// Path to the `human_mapping.json` file for a given test case name (e.g. "rust-add-if"),
@@ -417,6 +451,97 @@ fn check_subtree_maps_to_zero(
     }
 }
 
+/// Every node id in `node`'s subtree, `node` included.
+fn subtree_ids(node: Node) -> std::collections::HashSet<usize> {
+    let mut ids = std::collections::HashSet::new();
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        ids.insert(n.id());
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    ids
+}
+
+/// Pushes a mismatch for every node in `subtree_root`'s subtree (inclusive) whose mapped
+/// counterpart (via `node_map`) doesn't land inside `counterpart_ids` - the one-sided half of
+/// [`check_subtree_maps_within`]'s closure check. `counterpart_lookup_root` is the *other* side's
+/// full tree root, used only to describe what a wrongly-mapped-to node actually is (same role
+/// `check_subtree_maps_to_zero`'s `lookup_root` plays).
+fn check_subtree_closed_within(
+    subtree_root: Node,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+    counterpart_ids: &std::collections::HashSet<usize>,
+    counterpart_lookup_root: Node,
+    context: &str,
+    mismatches: &mut Vec<String>,
+) {
+    let mut stack = vec![subtree_root];
+    while let Some(n) = stack.pop() {
+        match node_map.get(&n.id()) {
+            Some(mapped_id) if counterpart_ids.contains(mapped_id) => {}
+            other => {
+                let mapped_kind = match other {
+                    Some(&mapped_id) => node_kind_for_id(counterpart_lookup_root, mapped_id),
+                    None => "None".to_string(),
+                };
+                mismatches.push(format!(
+                    "{}: descendant node '{}' was expected to map within the matched pair's counterpart subtree, but was mapped to {}",
+                    context,
+                    n.kind(),
+                    mapped_kind
+                ));
+            }
+        }
+
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+}
+
+/// Pushes a mismatch for every node in `before_node`'s subtree (inclusive) that isn't mapped to a
+/// node within `after_node`'s subtree (inclusive), and vice versa - i.e. the two subtrees form a
+/// *closed* pairing under `before_node_map`/`after_node_map`, with no leakage to nodes outside the
+/// pair. This is a [`MultiMapGroup`] with `with_children` set's validation for a pair that
+/// actually matched: unlike [`check_subtree_maps_to_zero`] (a fixed target, "maps to 0"), *which*
+/// pair matched is only known after the fact here - it's whichever specific before/after pair
+/// codediff's own diff happened to produce, out of the many a group allows - so this checks a
+/// structural closure property instead of a fixed set of expected node ids.
+#[allow(clippy::too_many_arguments)]
+fn check_subtree_maps_within(
+    before_node: Node,
+    after_node: Node,
+    before_node_map: &rustc_hash::FxHashMap<usize, usize>,
+    after_node_map: &rustc_hash::FxHashMap<usize, usize>,
+    before_root: Node,
+    after_root: Node,
+    context: &str,
+    mismatches: &mut Vec<String>,
+) {
+    let before_ids = subtree_ids(before_node);
+    let after_ids = subtree_ids(after_node);
+    check_subtree_closed_within(
+        before_node,
+        before_node_map,
+        &after_ids,
+        after_root,
+        context,
+        mismatches,
+    );
+    check_subtree_closed_within(
+        after_node,
+        after_node_map,
+        &before_ids,
+        before_root,
+        context,
+        mismatches,
+    );
+}
+
 /// Formats " (op X, reason Y)" for the mapping the before node actually landed in, so a mismatch
 /// message identifies which pass produced the wrong mapping (via `ASTMappingReason`), not just
 /// what it mapped to. Empty string when there's no mapping to describe.
@@ -497,8 +622,13 @@ pub fn human_mapping_cost(
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
+    // Groups contribute too, via one concrete (if arbitrary) representative pairing - see
+    // `representative_entries`'s own doc comment for why an arbitrary example is fine here even
+    // though it would never be for validation.
+    let entries = representative_entries(mapping, before_root, after_root)?;
+
     let mut total = 0u64;
-    for entry in &mapping.entries {
+    for entry in &entries {
         let (operation, subtree_size) = match entry.operation {
             HumanOperation::Identical => (ASTMappingOperation::Identical, 1),
             HumanOperation::Update => (ASTMappingOperation::Update, 1),
@@ -606,8 +736,12 @@ pub fn as_ast_diff_for_mapping(
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
+    // Groups contribute too, via one concrete representative pairing - see
+    // `representative_entries`'s own doc comment.
+    let entries = representative_entries(mapping, before_root, after_root)?;
+
     let mut diff = ASTDiff::default();
-    for entry in &mapping.entries {
+    for entry in &entries {
         let before_id = match &entry.before_path {
             Some(path) => before_cache
                 .resolve(before_root, &path_refs(path))
@@ -642,6 +776,98 @@ pub fn as_ast_diff_for_mapping(
         );
     }
     Ok(diff)
+}
+
+/**
+* `mapping.entries` plus, for each of `mapping.groups`, one *deterministic* representative
+* pairing flattened into plain [`HumanMappingEntry`] values - matched pairs (sorted by each
+* side's node start byte, then zipped pairwise) become `Identical`/`MatchButNotIdentical` entries
+* per the group's own `operation`; any leftover on the larger side becomes
+* `Delete`/`DeleteWithChildren` or `Insert`/`InsertWithChildren` per `with_children`.
+*
+* This is explicitly *a* valid solution, not *the* solution: a [`MultiMapGroup`] exists precisely
+* because many pairings are equally correct, and this function has to pick just one to produce
+* something concrete. It's used only where a single concrete example is good enough -
+* [`human_mapping_cost`] (so a group contributes to the printed cost total) and
+* [`as_ast_diff_for_mapping`] (so a group shows up in a synthetic `ASTDiff`, e.g. for
+* `benchmark_other`'s comparisons) - **never** for the actual pass/fail check, which is
+* [`check_group_entry`] instead: that one checks the real question ("does codediff's actual
+* mapping use *some* valid pairing"), not whether it happened to pick this particular one.
+*/
+pub fn representative_entries(
+    mapping: &HumanMapping,
+    before_root: Node,
+    after_root: Node,
+) -> Result<Vec<HumanMappingEntry>> {
+    let mut entries = mapping.entries.clone();
+    if mapping.groups.is_empty() {
+        return Ok(entries);
+    }
+
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+
+    for group in &mapping.groups {
+        let mut before_nodes: Vec<Node> = group
+            .before_paths
+            .iter()
+            .map(|path| {
+                before_cache
+                    .resolve(before_root, &path_refs(path))
+                    .with_context(|| format!("resolving multi-map before_path {:?}", path))
+            })
+            .collect::<Result<_>>()?;
+        let mut after_nodes: Vec<Node> = group
+            .after_paths
+            .iter()
+            .map(|path| {
+                after_cache
+                    .resolve(after_root, &path_refs(path))
+                    .with_context(|| format!("resolving multi-map after_path {:?}", path))
+            })
+            .collect::<Result<_>>()?;
+
+        // Sorted purely so the representative pairing is deterministic (stable across repeated
+        // calls, not dependent on `before_paths`/`after_paths`' original JSON order) - it doesn't
+        // need to mean anything beyond that.
+        before_nodes.sort_by_key(|n| n.start_byte());
+        after_nodes.sort_by_key(|n| n.start_byte());
+
+        let paired = before_nodes.len().min(after_nodes.len());
+        for i in 0..paired {
+            entries.push(HumanMappingEntry {
+                operation: group.operation,
+                before_path: Some(path_for_node(before_nodes[i])),
+                after_path: Some(path_for_node(after_nodes[i])),
+            });
+        }
+        let delete_op = if group.with_children {
+            HumanOperation::DeleteWithChildren
+        } else {
+            HumanOperation::Delete
+        };
+        for &b in &before_nodes[paired..] {
+            entries.push(HumanMappingEntry {
+                operation: delete_op,
+                before_path: Some(path_for_node(b)),
+                after_path: None,
+            });
+        }
+        let insert_op = if group.with_children {
+            HumanOperation::InsertWithChildren
+        } else {
+            HumanOperation::Insert
+        };
+        for &a in &after_nodes[paired..] {
+            entries.push(HumanMappingEntry {
+                operation: insert_op,
+                before_path: None,
+                after_path: Some(path_for_node(a)),
+            });
+        }
+    }
+
+    Ok(entries)
 }
 
 fn check_entry<'b, 'a>(
@@ -774,6 +1000,195 @@ fn check_entry<'b, 'a>(
                     ));
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+/**
+* Checks one [`MultiMapGroup`] against `diff_ast`'s actual output: *any* pairing between the
+* group's before/after nodes counts as correct, as long as it uses exactly `min(N, M)` pairs and
+* the rest of the larger side ends up deleted/inserted - see the struct's own doc comment.
+*
+* 1. Every before-group node must be either matched to an after-group node (recorded as a pair)
+*    or mapped to 0 (deleted) - anything else (matched to a node outside the group) is a mismatch.
+* 2. Every after-group node not already claimed by a pair from step 1 must be mapped to 0
+*    (inserted) - anything else is a mismatch, symmetric to step 1. (A leftover after-node whose
+*    actual partner *is* a before-group member can't happen without step 1 already having found
+*    that pair, given `ASTDiff`'s own before/after maps agree with each other - see
+*    `compute_mismatches_for_with_config`'s separate `is_valid` check.)
+* 3. The number of pairs actually found must equal `min(N, M)` exactly - this is what catches
+*    codediff deleting *and* inserting instead of matching when it could have: each individual
+*    node's fate can look locally valid (deleted is a valid fate, inserted is a valid fate) while
+*    the group as a whole still under-matched, which steps 1-2 alone wouldn't catch.
+* 4. Every pair found must use the group's declared `operation` - not skipped, so a group can't
+*    quietly stop caring whether codediff chose the right kind of match.
+* 5. If `with_children`: every matched pair's whole subtree must close within itself
+*    ([`check_subtree_maps_within`]), and every leftover member's whole subtree must be
+*    deleted/inserted ([`check_subtree_maps_to_zero`]) - not just its own top node.
+*/
+fn check_group_entry<'b, 'a>(
+    group: &MultiMapGroup,
+    before_root: Node<'b>,
+    after_root: Node<'a>,
+    diff_ast: &ASTDiff,
+    mismatches: &mut Vec<String>,
+    before_cache: &mut PathCache<'b>,
+    after_cache: &mut PathCache<'a>,
+) -> Result<()> {
+    let before_nodes: Vec<Node<'b>> = group
+        .before_paths
+        .iter()
+        .map(|path| {
+            before_cache
+                .resolve(before_root, &path_refs(path))
+                .with_context(|| format!("resolving multi-map before_path {:?}", path))
+        })
+        .collect::<Result<_>>()?;
+    let after_nodes: Vec<Node<'a>> = group
+        .after_paths
+        .iter()
+        .map(|path| {
+            after_cache
+                .resolve(after_root, &path_refs(path))
+                .with_context(|| format!("resolving multi-map after_path {:?}", path))
+        })
+        .collect::<Result<_>>()?;
+
+    let context = format!(
+        "multi-map group ({} before <-> {} after, {:?}{})",
+        before_nodes.len(),
+        after_nodes.len(),
+        group.operation,
+        if group.with_children {
+            ", with children"
+        } else {
+            ""
+        }
+    );
+
+    let expected_op = match group.operation {
+        HumanOperation::Identical => ASTMappingOperation::Identical,
+        HumanOperation::MatchButNotIdentical => ASTMappingOperation::MatchButNotIdentical,
+        other => {
+            mismatches.push(format!(
+                "{context}: operation must be Identical or MatchButNotIdentical, got {other:?}"
+            ));
+            return Ok(());
+        }
+    };
+
+    let after_ids: std::collections::HashSet<usize> = after_nodes.iter().map(Node::id).collect();
+
+    let mut matched_pairs: Vec<(Node<'b>, Node<'a>)> = Vec::new();
+    let mut leftover_before: Vec<Node<'b>> = Vec::new();
+    for &b in &before_nodes {
+        let actual = diff_ast.before_node_map.get(&b.id()).copied();
+        match actual {
+            Some(0) => leftover_before.push(b),
+            Some(a_id) if after_ids.contains(&a_id) => {
+                let a = *after_nodes
+                    .iter()
+                    .find(|n| n.id() == a_id)
+                    .expect("a_id came from after_ids, which is built from after_nodes");
+                matched_pairs.push((b, a));
+            }
+            other => {
+                let mapped_kind = match other {
+                    Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
+                    None => "None".to_string(),
+                };
+                mismatches.push(format!(
+                    "{context}: before node '{}' was expected to match within the group or be deleted, but it mapped to {}{}",
+                    b.kind(),
+                    mapped_kind,
+                    actual_mapping_info(diff_ast, b.id(), other)
+                ));
+            }
+        }
+    }
+
+    let matched_after_ids: std::collections::HashSet<usize> =
+        matched_pairs.iter().map(|(_, a)| a.id()).collect();
+    let mut leftover_after: Vec<Node<'a>> = Vec::new();
+    for &a in &after_nodes {
+        if matched_after_ids.contains(&a.id()) {
+            continue;
+        }
+        let actual = diff_ast.after_node_map.get(&a.id()).copied();
+        match actual {
+            Some(0) => leftover_after.push(a),
+            other => {
+                let mapped_kind = match other {
+                    Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
+                    None => "None".to_string(),
+                };
+                mismatches.push(format!(
+                    "{context}: after node '{}' was expected to match within the group or be inserted, but it mapped to {}{}",
+                    a.kind(),
+                    mapped_kind,
+                    actual_mapping_info_after(diff_ast, a.id(), other)
+                ));
+            }
+        }
+    }
+
+    let expected_matched = before_nodes.len().min(after_nodes.len());
+    if matched_pairs.len() != expected_matched {
+        mismatches.push(format!(
+            "{context}: expected exactly {expected_matched} pair(s) matched within the group, but codediff matched {}",
+            matched_pairs.len()
+        ));
+    }
+
+    for &(b, a) in &matched_pairs {
+        match diff_ast.mapping.get(&(b.id(), a.id())) {
+            Some(actual_mapping) if actual_mapping.operation == expected_op => {}
+            Some(actual_mapping) => mismatches.push(format!(
+                "{context}: pair '{}' <-> '{}' expected codediff operation {expected_op:?}, but it chose {:?}",
+                b.kind(),
+                a.kind(),
+                actual_mapping.operation
+            )),
+            None => mismatches.push(format!(
+                "{context}: pair '{}' <-> '{}' are mapped to each other but have no ASTMapping entry (unexpected)",
+                b.kind(),
+                a.kind()
+            )),
+        }
+    }
+
+    if group.with_children {
+        for &(b, a) in &matched_pairs {
+            check_subtree_maps_within(
+                b,
+                a,
+                &diff_ast.before_node_map,
+                &diff_ast.after_node_map,
+                before_root,
+                after_root,
+                &context,
+                mismatches,
+            );
+        }
+        for &b in &leftover_before {
+            check_subtree_maps_to_zero(
+                b,
+                &diff_ast.before_node_map,
+                &format!("{context} (leftover delete)"),
+                mismatches,
+                after_root,
+            );
+        }
+        for &a in &leftover_after {
+            check_subtree_maps_to_zero(
+                a,
+                &diff_ast.after_node_map,
+                &format!("{context} (leftover insert)"),
+                mismatches,
+                before_root,
+            );
         }
     }
 
@@ -1251,6 +1666,17 @@ pub fn compute_mismatches_for_with_config(
             &mut after_cache,
         )?;
     }
+    for group in &mapping.groups {
+        check_group_entry(
+            group,
+            before_root,
+            after_root,
+            &diff_ast,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+    }
 
     Ok(mismatches)
 }
@@ -1330,6 +1756,7 @@ mod tests {
                     after_path: None,
                 },
             ],
+            ..Default::default()
         };
 
         let json = serde_json::to_string_pretty(&mapping)?;
@@ -1346,6 +1773,68 @@ mod tests {
             HumanOperation::DeleteWithChildren
         );
         assert!(round_tripped.entries[1].after_path.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn deserializes_legacy_json_with_no_groups_key_as_empty_groups() -> Result<()> {
+        // The exact shape every `human_mapping.json` had before `groups` existed - every one of
+        // the 220+ files on disk right now looks like this.
+        let json = r#"{"entries":[]}"#;
+        let mapping: HumanMapping = serde_json::from_str(json)?;
+        assert!(mapping.groups.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn serializing_a_mapping_with_no_groups_omits_the_groups_key() -> Result<()> {
+        // The other half of backward compatibility: an untouched fixture must re-save
+        // byte-for-byte identical to before `groups` existed, not grow a `"groups": []` no-op.
+        let mapping = HumanMapping::default();
+        let json = serde_json::to_string(&mapping)?;
+        assert!(
+            !json.contains("groups"),
+            "expected no \"groups\" key when empty: {json}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn resaving_an_existing_fixture_produces_byte_identical_json() -> Result<()> {
+        // The concrete proof that adding `groups` doesn't touch any of the 220+ fixtures that
+        // don't use it: load a real one, re-serialize it the same way `save()` does, and diff.
+        let original = fs::read_to_string(mapping_path("rust-add-if"))?;
+        let mapping: HumanMapping = serde_json::from_str(&original)?;
+        assert!(
+            mapping.groups.is_empty(),
+            "fixture assumption broken: rust-add-if unexpectedly has groups already"
+        );
+        let resaved = serde_json::to_string_pretty(&mapping)?;
+        assert_eq!(resaved.trim_end(), original.trim_end());
+        Ok(())
+    }
+
+    #[test]
+    fn round_trips_a_multi_map_group_through_json() -> Result<()> {
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: vec![vec!["a:1".to_string()], vec!["a:2".to_string()]],
+                after_paths: vec![vec!["b:1".to_string()]],
+                operation: HumanOperation::Identical,
+                with_children: true,
+            }],
+        };
+
+        let json = serde_json::to_string_pretty(&mapping)?;
+        let round_tripped: HumanMapping = serde_json::from_str(&json)?;
+
+        assert_eq!(round_tripped.groups.len(), 1);
+        assert_eq!(round_tripped.groups[0].before_paths.len(), 2);
+        assert_eq!(round_tripped.groups[0].after_paths.len(), 1);
+        assert_eq!(round_tripped.groups[0].operation, HumanOperation::Identical);
+        assert!(round_tripped.groups[0].with_children);
 
         Ok(())
     }
@@ -1564,7 +2053,10 @@ mod tests {
             after_path: Some(path_for_node(root)),
         }];
 
-        let mapping = HumanMapping { entries };
+        let mapping = HumanMapping {
+            entries,
+            ..Default::default()
+        };
 
         let diff = crate::diff::diff_code(&before, &after);
         let diff_ast = diff.ast.unwrap();
@@ -1604,7 +2096,10 @@ mod tests {
             after_path: None,
         }];
 
-        let mapping = HumanMapping { entries };
+        let mapping = HumanMapping {
+            entries,
+            ..Default::default()
+        };
 
         let diff = crate::diff::diff_code(&before, &after);
         let diff_ast = diff.ast.unwrap();
@@ -1627,6 +2122,573 @@ mod tests {
 
         assert!(!mismatches.is_empty());
 
+        Ok(())
+    }
+
+    /// The `block` directly inside the first (only) function in `root` - a small, reusable stand
+    /// in for "the body of `fn main() { ... }`" that several multi-map tests below need.
+    fn function_block(root: Node) -> Node {
+        let function_item = root.child(0).unwrap();
+        let mut c = function_item.walk();
+        function_item
+            .children(&mut c)
+            .find(|n| n.kind() == "block")
+            .unwrap()
+    }
+
+    /// Every `expression_statement` directly inside `function_block(root)`.
+    fn function_body_statements(root: Node) -> Vec<Node> {
+        let block = function_block(root);
+        let mut c = block.walk();
+        block
+            .children(&mut c)
+            .filter(|n| n.kind() == "expression_statement")
+            .collect()
+    }
+
+    /// First node of kind `kind` found by a preorder walk from `root` (`root` itself included).
+    /// Panics if there isn't one - a test-only convenience, not a general-purpose lookup.
+    fn find_first<'a>(root: Node<'a>, kind: &str) -> Node<'a> {
+        let mut stack = vec![root];
+        while let Some(n) = stack.pop() {
+            if n.kind() == kind {
+                return n;
+            }
+            let mut c = n.walk();
+            for child in n.children(&mut c) {
+                stack.push(child);
+            }
+        }
+        panic!("no node of kind {kind:?} found under {:?}", root.kind());
+    }
+
+    /// Walks `before`'s and `after`'s subtrees in lockstep (same shape, since both come from
+    /// parsing the *same* source text) and adds an `Identical` mapping for every corresponding
+    /// node pair - builds a fully self-consistent baseline `ASTDiff` for
+    /// `check_subtree_maps_within` tests, which (like a real diff that's already passed
+    /// `ASTDiff::is_valid`) need every single descendant, not just the top pair, to have an
+    /// entry - not just the ones a test cares about.
+    fn map_identical_subtrees(diff: &mut ASTDiff, before: Node, after: Node) {
+        let mut stack = vec![(before, after)];
+        while let Some((b, a)) = stack.pop() {
+            diff.add_mapping(
+                b.id(),
+                a.id(),
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Identical,
+                    reason: ASTMappingReason::default(),
+                },
+            );
+            let mut bc = b.walk();
+            let mut ac = a.walk();
+            let b_children: Vec<Node> = b.children(&mut bc).collect();
+            let a_children: Vec<Node> = a.children(&mut ac).collect();
+            assert_eq!(
+                b_children.len(),
+                a_children.len(),
+                "map_identical_subtrees requires before/after of identical shape"
+            );
+            stack.extend(b_children.into_iter().zip(a_children));
+        }
+    }
+
+    /// Marks every node in `node`'s subtree (inclusive) deleted (mapped to 0) - the before-side
+    /// counterpart of `map_identical_subtrees`, for building a fully self-consistent "this whole
+    /// subtree is gone" baseline.
+    fn map_before_subtree_deleted(diff: &mut ASTDiff, node: Node) {
+        let mut stack = vec![node];
+        while let Some(n) = stack.pop() {
+            diff.add_mapping(
+                n.id(),
+                0,
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Delete,
+                    reason: ASTMappingReason::default(),
+                },
+            );
+            let mut c = n.walk();
+            for child in n.children(&mut c) {
+                stack.push(child);
+            }
+        }
+    }
+
+    #[test]
+    fn check_group_entry_passes_for_a_real_diff_that_matches_duplicates_within_the_group()
+    -> Result<()> {
+        // The motivating case: three identical foo() calls before, two after - codediff (the
+        // real algorithm, not a hand-rolled diff) has to pick *some* two of the three to match
+        // and delete the third, and whichever two it picks should be accepted.
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n    bar();\n}\n";
+        let after_source = "fn main() {\n    bar();\n    foo();\n    foo();\n}\n";
+        let before = crate::code::Code::from_string(before_source, &Language::Rust);
+        let after = crate::code::Code::from_string(after_source, &Language::Rust);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        let before_foos: Vec<Node> = function_body_statements(before_root)
+            .into_iter()
+            .filter(|n| {
+                n.utf8_text(before_source.as_bytes())
+                    .unwrap()
+                    .starts_with("foo")
+            })
+            .collect();
+        let after_foos: Vec<Node> = function_body_statements(after_root)
+            .into_iter()
+            .filter(|n| {
+                n.utf8_text(after_source.as_bytes())
+                    .unwrap()
+                    .starts_with("foo")
+            })
+            .collect();
+        assert_eq!(before_foos.len(), 3);
+        assert_eq!(after_foos.len(), 2);
+
+        let group = MultiMapGroup {
+            before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+            after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+            operation: HumanOperation::Identical,
+            with_children: true,
+        };
+
+        let diff = crate::diff::diff_code(&before, &after);
+        let diff_ast = diff.ast.context("Diff has no AST")?;
+
+        let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff_ast,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+
+        assert!(mismatches.is_empty(), "{:?}", mismatches);
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_fails_when_codediff_deletes_and_inserts_instead_of_matching() -> Result<()>
+    {
+        // Both before foo()s deleted, both after foo()s inserted - each individual node's fate is
+        // locally valid (deleted and inserted are both allowed fates), but the group as a whole
+        // under-matched: with N == M == 2, zero pairs should be left over.
+        let source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+
+        let group = MultiMapGroup {
+            before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+            after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+            operation: HumanOperation::Identical,
+            with_children: false,
+        };
+
+        let mut diff = ASTDiff::default();
+        for &b in &before_foos {
+            diff.add_mapping(
+                b.id(),
+                0,
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Delete,
+                    reason: ASTMappingReason::default(),
+                },
+            );
+        }
+        for &a in &after_foos {
+            diff.add_mapping(
+                0,
+                a.id(),
+                ASTMapping {
+                    cost: 0,
+                    operation: ASTMappingOperation::Insert,
+                    reason: ASTMappingReason::default(),
+                },
+            );
+        }
+
+        let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+
+        assert_eq!(mismatches.len(), 1, "{:?}", mismatches);
+        assert!(
+            mismatches[0].contains("expected exactly 2 pair(s) matched"),
+            "{}",
+            mismatches[0]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_fails_when_a_member_matches_outside_the_group() -> Result<()> {
+        let before_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    qux();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_stmts = function_body_statements(after_root);
+        let after_foo = after_stmts[0];
+        let after_qux = after_stmts[1];
+
+        // Group covers both before foo()s but only the real after foo() - qux() is deliberately
+        // left out of the group entirely.
+        let group = MultiMapGroup {
+            before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+            after_paths: vec![path_for_node(after_foo)],
+            operation: HumanOperation::Identical,
+            with_children: false,
+        };
+
+        let mut diff = ASTDiff::default();
+        diff.add_mapping(
+            before_foos[0].id(),
+            after_foo.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::default(),
+            },
+        );
+        // The second foo() is a group member too, but here it's mapped to qux() - a real node,
+        // just not one that's part of this group - instead of being deleted.
+        diff.add_mapping(
+            before_foos[1].id(),
+            after_qux.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::MatchButNotIdentical,
+                reason: ASTMappingReason::default(),
+            },
+        );
+
+        let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+
+        assert_eq!(mismatches.len(), 1, "{:?}", mismatches);
+        assert!(
+            mismatches[0].contains("expected to match within the group or be deleted"),
+            "{}",
+            mismatches[0]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_with_children_fails_when_a_descendant_leaks_outside_the_matched_subtree()
+    -> Result<()> {
+        let source = "fn main() {\n    foo();\n    bar();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let block_before = function_block(before_root);
+        let block_after = function_block(after_root);
+
+        let mut diff = ASTDiff::default();
+        map_identical_subtrees(&mut diff, block_before, block_after);
+
+        // Corrupt: bar();'s own top-level entry now claims it was deleted, even though it's still
+        // sitting inside the matched block's subtree - exactly the leak
+        // `check_subtree_maps_within` exists to catch.
+        let bar_before = function_body_statements(before_root)[1];
+        diff.add_mapping(
+            bar_before.id(),
+            0,
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Delete,
+                reason: ASTMappingReason::default(),
+            },
+        );
+
+        let group = MultiMapGroup {
+            before_paths: vec![path_for_node(block_before)],
+            after_paths: vec![path_for_node(block_after)],
+            operation: HumanOperation::Identical,
+            with_children: true,
+        };
+
+        let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+
+        assert!(!mismatches.is_empty());
+        assert!(
+            mismatches.iter().any(|m| m.contains("counterpart subtree")),
+            "{:?}",
+            mismatches
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_with_children_fails_when_a_leftover_members_descendant_is_not_deleted()
+    -> Result<()> {
+        let before_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let g0 = function_body_statements(after_root)[0];
+        let f0 = before_foos[0];
+        let f1 = before_foos[1];
+
+        let mut diff = ASTDiff::default();
+        map_identical_subtrees(&mut diff, f0, g0);
+        map_before_subtree_deleted(&mut diff, f1);
+
+        // Corrupt: f1's own "foo" identifier is left mapped to the survivor's identifier instead
+        // of being deleted along with the rest of f1's subtree - a leftover member under
+        // `with_children` must be *fully* swept, not just its own top node.
+        let f1_ident = find_first(f1, "identifier");
+        let g0_ident = find_first(g0, "identifier");
+        diff.add_mapping(
+            f1_ident.id(),
+            g0_ident.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::default(),
+            },
+        );
+
+        let group = MultiMapGroup {
+            before_paths: vec![path_for_node(f0), path_for_node(f1)],
+            after_paths: vec![path_for_node(g0)],
+            operation: HumanOperation::Identical,
+            with_children: true,
+        };
+
+        let mut mismatches = Vec::new();
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff,
+            &mut mismatches,
+            &mut before_cache,
+            &mut after_cache,
+        )?;
+
+        assert!(!mismatches.is_empty());
+        assert!(
+            mismatches
+                .iter()
+                .any(|m| m.contains("expected to be removed")),
+            "{:?}",
+            mismatches
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn representative_entries_pairs_equal_sized_groups_by_start_byte() -> Result<()> {
+        let source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: false,
+            }],
+        };
+
+        let entries = representative_entries(&mapping, before_root, after_root)?;
+        assert_eq!(entries.len(), 2);
+        for entry in &entries {
+            assert_eq!(entry.operation, HumanOperation::Identical);
+            assert!(entry.before_path.is_some());
+            assert!(entry.after_path.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn representative_entries_puts_the_surplus_before_nodes_on_delete_with_children() -> Result<()>
+    {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+        assert_eq!(before_foos.len(), 3);
+        assert_eq!(after_foos.len(), 2);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: true,
+            }],
+        };
+
+        let entries = representative_entries(&mapping, before_root, after_root)?;
+        let matched: Vec<_> = entries
+            .iter()
+            .filter(|e| e.operation == HumanOperation::Identical)
+            .collect();
+        let deleted: Vec<_> = entries
+            .iter()
+            .filter(|e| e.operation == HumanOperation::DeleteWithChildren)
+            .collect();
+        assert_eq!(matched.len(), 2, "{:?}", entries);
+        assert_eq!(deleted.len(), 1, "{:?}", entries);
+        assert!(deleted[0].after_path.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn representative_entries_puts_the_surplus_after_nodes_on_plain_insert() -> Result<()> {
+        let before_source = "fn main() {\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+        assert_eq!(before_foos.len(), 1);
+        assert_eq!(after_foos.len(), 2);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: false,
+            }],
+        };
+
+        let entries = representative_entries(&mapping, before_root, after_root)?;
+        let matched: Vec<_> = entries
+            .iter()
+            .filter(|e| e.operation == HumanOperation::Identical)
+            .collect();
+        let inserted: Vec<_> = entries
+            .iter()
+            .filter(|e| e.operation == HumanOperation::Insert)
+            .collect();
+        assert_eq!(matched.len(), 1, "{:?}", entries);
+        assert_eq!(inserted.len(), 1, "{:?}", entries);
+        assert!(inserted[0].before_path.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn as_ast_diff_for_mapping_projects_a_group_through_its_representative_pairing() -> Result<()> {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before = crate::code::Code::from_string(before_source, &Language::Rust);
+        let after = crate::code::Code::from_string(after_source, &Language::Rust);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+        assert_eq!(before_foos.len(), 3);
+        assert_eq!(after_foos.len(), 2);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: true,
+            }],
+        };
+
+        let diff = as_ast_diff_for_mapping(&mapping, &before, &after)?;
+
+        let matched_pairs = before_foos
+            .iter()
+            .filter(|n| {
+                diff.before_node_map
+                    .get(&n.id())
+                    .is_some_and(|&after_id| after_id != 0)
+            })
+            .count();
+        let deleted = before_foos
+            .iter()
+            .filter(|n| diff.before_node_map.get(&n.id()) == Some(&0))
+            .count();
+        assert_eq!(matched_pairs, 2, "{:?}", diff.before_node_map);
+        assert_eq!(deleted, 1, "{:?}", diff.before_node_map);
+        for n in &after_foos {
+            assert_ne!(
+                diff.after_node_map.get(&n.id()),
+                None,
+                "every after foo() should appear in the synthetic diff's after_node_map"
+            );
+        }
         Ok(())
     }
 

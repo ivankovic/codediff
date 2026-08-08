@@ -92,6 +92,8 @@ mod rust_hello_world_removed_message;
 #[cfg(test)]
 mod rust_leetcode_1_bugfix;
 #[cfg(test)]
+mod rust_multi_map_duplicate_calls;
+#[cfg(test)]
 mod rust_next_font_imports_generator;
 #[cfg(test)]
 mod rust_no_change;
