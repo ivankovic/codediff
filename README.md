@@ -43,9 +43,12 @@ in every example below.
 * `c` — open the color theme picker. Built-in themes: Dark (default), Solarized Dark, Solarized
   Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. codediff remembers your choice across runs.
 * `?` — show every keybinding and the diff-color legend. `j`/`k` scrolls it. `?` or `Esc` closes it.
+* `x` — toggle the blue cross-highlight (off by default). When enabled, moving the cursor
+  highlights the range under it, and the matching range on the other panel, in blue. codediff
+  remembers your choice across runs. The other panel's cursor always follows the matched node,
+  whether or not the highlight itself is enabled.
 * Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
-  editor. codediff highlights the range under the cursor, and the matching range on the other
-  panel, in blue.
+  editor.
 * `n`/`p` — jump straight to the next or previous change. This skips unchanged lines entirely. It
   wraps around at the start or end of the file.
 * `/` — search the focused panel for text. `Enter` jumps to the nearest match and highlights every

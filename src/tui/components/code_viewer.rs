@@ -128,6 +128,12 @@ impl CodeViewer {
         self.widget.set_overlay_theme(theme);
     }
 
+    /// Enable or disable the cross-highlight blue paint, toggled via `x` - see
+    /// `CodeViewerWidget::set_cross_highlight_enabled`'s doc comment.
+    pub fn set_cross_highlight_enabled(&mut self, enabled: bool) {
+        self.widget.set_cross_highlight_enabled(enabled);
+    }
+
     /// See `CodeViewerWidget`'s `hide_border` field.
     pub fn set_hide_border(&mut self, hide: bool) {
         self.widget.set_hide_border(hide);

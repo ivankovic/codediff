@@ -186,9 +186,16 @@ fn blend_toward_base(accent: (u8, u8, u8), base: (u8, u8, u8), base_weight: f32)
 
 /// On-disk representation of the persisted theme choice. A dedicated struct (rather than
 /// persisting `OverlayTheme` directly) so the config file has a named `theme = "..."` field.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ThemeConfig {
     theme: OverlayTheme,
+    /// Whether cursor movement paints the cross-panel "matching node" blue highlight (`x` toggles
+    /// this - see `tui/components/diff_viewer.rs`). `#[serde(default)]` so a config file written
+    /// before this field existed still loads: missing means `false`, matching the field's own
+    /// off-by-default intent (added 2026-08-08 at the user's request - the highlight was
+    /// previously always on with no way to turn it off).
+    #[serde(default)]
+    cross_highlight_enabled: bool,
 }
 
 /// The config file's path: a dotfile in the current working directory, per the exploratory-
@@ -210,25 +217,45 @@ pub(crate) fn config_path() -> PathBuf {
 /// load a small struct, store it back to an exact path - at the cost of being a much smaller,
 /// less general-purpose library.
 pub fn load_overlay_theme() -> OverlayTheme {
-    load_from(config_path())
+    load_from(config_path()).theme
 }
 
-/// Persist the user's theme choice for future runs. Failures (e.g. a read-only working
-/// directory) are non-fatal: the choice simply won't survive a restart.
+/// Persist the user's theme choice for future runs, without disturbing the persisted
+/// cross-highlight setting. Failures (e.g. a read-only working directory) are non-fatal: the
+/// choice simply won't survive a restart.
 pub fn save_overlay_theme(theme: OverlayTheme) {
-    save_to(config_path(), theme);
+    let path = config_path();
+    let mut config = load_from(path.clone());
+    config.theme = theme;
+    save_to(path, config);
 }
 
-/// `load_overlay_theme`/`save_overlay_theme`, parameterized by path so tests can exercise the
+/// Load the persisted cross-highlight toggle (`x` in the diff viewer - see
+/// `tui/components/diff_viewer.rs`), or `false` (off by default) if the config file doesn't
+/// exist yet or fails to parse.
+pub fn load_cross_highlight_enabled() -> bool {
+    load_from(config_path()).cross_highlight_enabled
+}
+
+/// Persist the user's cross-highlight toggle for future runs, without disturbing the persisted
+/// theme choice. Same non-fatal-failure behavior as `save_overlay_theme`.
+pub fn save_cross_highlight_enabled(enabled: bool) {
+    let path = config_path();
+    let mut config = load_from(path.clone());
+    config.cross_highlight_enabled = enabled;
+    save_to(path, config);
+}
+
+/// Shared by every `load_*`/`save_*` pair above, parameterized by path so tests can exercise the
 /// round-trip against a temp file instead of mutating the process's actual working directory.
-fn load_from(path: PathBuf) -> OverlayTheme {
-    confy::load_path::<ThemeConfig>(path)
-        .map(|c| c.theme)
-        .unwrap_or_default()
+/// Loads (or saves) the *whole* config, not just one field, so setting one persisted value never
+/// clobbers another already on disk.
+fn load_from(path: PathBuf) -> ThemeConfig {
+    confy::load_path::<ThemeConfig>(path).unwrap_or_default()
 }
 
-fn save_to(path: PathBuf, theme: OverlayTheme) {
-    let _ = confy::store_path(path, ThemeConfig { theme });
+fn save_to(path: PathBuf, config: ThemeConfig) {
+    let _ = confy::store_path(path, config);
 }
 
 #[cfg(test)]
@@ -239,18 +266,67 @@ mod tests {
     #[test]
     fn save_then_load_round_trips_the_chosen_theme() {
         let file = tempfile::NamedTempFile::new().expect("temp file");
-        save_to(file.path().to_path_buf(), OverlayTheme::SolarizedLight);
+        save_to(
+            file.path().to_path_buf(),
+            ThemeConfig {
+                theme: OverlayTheme::SolarizedLight,
+                cross_highlight_enabled: false,
+            },
+        );
         assert_eq!(
-            load_from(file.path().to_path_buf()),
+            load_from(file.path().to_path_buf()).theme,
             OverlayTheme::SolarizedLight
         );
+    }
+
+    #[test]
+    fn save_then_load_round_trips_the_cross_highlight_toggle() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        save_to(
+            file.path().to_path_buf(),
+            ThemeConfig {
+                theme: OverlayTheme::default(),
+                cross_highlight_enabled: true,
+            },
+        );
+        assert!(load_from(file.path().to_path_buf()).cross_highlight_enabled);
+    }
+
+    /// `save_overlay_theme`/`save_cross_highlight_enabled` each read-modify-write the whole
+    /// config so setting one field can never silently reset the other back to its default -
+    /// exercised here directly against `load_from`/`save_to` (the public functions always target
+    /// `config_path()`, the process's real cwd, so this simulates their read-modify-write against
+    /// a temp file instead).
+    #[test]
+    fn saving_one_field_does_not_clobber_the_other() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        let path = file.path().to_path_buf();
+        save_to(
+            path.clone(),
+            ThemeConfig {
+                theme: OverlayTheme::Dracula,
+                cross_highlight_enabled: false,
+            },
+        );
+
+        let mut config = load_from(path.clone());
+        config.cross_highlight_enabled = true;
+        save_to(path.clone(), config);
+
+        let reloaded = load_from(path);
+        assert_eq!(
+            reloaded.theme,
+            OverlayTheme::Dracula,
+            "theme should survive an unrelated cross_highlight_enabled save"
+        );
+        assert!(reloaded.cross_highlight_enabled);
     }
 
     #[test]
     fn load_from_a_missing_file_falls_back_to_default_without_erroring() {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("does-not-exist.toml");
-        assert_eq!(load_from(path), OverlayTheme::default());
+        assert_eq!(load_from(path), ThemeConfig::default());
     }
 
     #[test]

@@ -47,6 +47,7 @@ Navigation
 Files and appearance
   o                Open a file selector for the active panel
   c                Open the color theme picker
+  x                Toggle the blue cross-highlight (off by default)
 
 Other
   ?                Toggle this help
@@ -57,7 +58,8 @@ Diff colors
   Red              Deleted
   Dark green       Updated
   Yellow           Moved
-  Blue             The range under the cursor, its match on the other panel, and search matches
+  Blue             Search matches, and - if enabled with x - the range under the cursor and its
+                   match on the other panel
 ";
 
 /// The `?` popup: a static, scrollable keybinding/color-legend reference. Modeled on

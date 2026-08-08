@@ -123,6 +123,9 @@ pub struct App {
     dialog_target: Option<Panel>,
     /// The currently active overlay color theme, persisted across runs (see `tui::theme`).
     current_theme: OverlayTheme,
+    /// Whether cursor movement paints the cross-panel blue "matching node" highlight, persisted
+    /// across runs (see `tui::theme`) and toggled via `x`. Off by default.
+    cross_highlight_enabled: bool,
     /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
     /// The "After" file path, once a file has been picked for that panel.
@@ -175,6 +178,7 @@ impl App {
             screen: AppScreen::default(),
             dialog_target: None,
             current_theme: OverlayTheme::default(),
+            cross_highlight_enabled: false,
             before_path: None,
             after_path: None,
             last_error: None,
@@ -192,6 +196,9 @@ impl App {
         // touches disk; only actually running the TUI reads (and may create) the config file.
         self.current_theme = theme::load_overlay_theme();
         self.diff_viewer.set_overlay_theme(self.current_theme);
+        self.cross_highlight_enabled = theme::load_cross_highlight_enabled();
+        self.diff_viewer
+            .set_cross_highlight_enabled(self.cross_highlight_enabled);
 
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
@@ -393,6 +400,7 @@ impl App {
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
+                Action::CrossHighlightToggled => self.toggle_cross_highlight(),
                 Action::DiffModeChoiceNeeded {
                     unmatched_before,
                     unmatched_after,
@@ -487,6 +495,15 @@ impl App {
         theme::save_overlay_theme(selected_theme);
         self.theme_dialog = None;
         self.screen = AppScreen::Viewer;
+    }
+
+    /// Flip the cross-highlight toggle (`x`): update the live viewer and persist it for future
+    /// runs, same shape as `apply_theme_selection`.
+    fn toggle_cross_highlight(&mut self) {
+        self.cross_highlight_enabled = !self.cross_highlight_enabled;
+        self.diff_viewer
+            .set_cross_highlight_enabled(self.cross_highlight_enabled);
+        theme::save_cross_highlight_enabled(self.cross_highlight_enabled);
     }
 
     /// Run the (CPU-bound) parse+diff pipeline on a blocking thread so it never stalls the
@@ -1223,6 +1240,20 @@ mod tests {
         assert_eq!(app.current_theme, OverlayTheme::SolarizedLight);
         assert_eq!(app.screen, AppScreen::Viewer);
         assert!(app.theme_dialog.is_none());
+
+        let _ = std::fs::remove_file(theme::config_path());
+    }
+
+    #[test]
+    fn toggle_cross_highlight_flips_state_and_persists() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        assert!(!app.cross_highlight_enabled, "off by default until toggled");
+
+        app.toggle_cross_highlight();
+        assert!(app.cross_highlight_enabled);
+
+        app.toggle_cross_highlight();
+        assert!(!app.cross_highlight_enabled);
 
         let _ = std::fs::remove_file(theme::config_path());
     }

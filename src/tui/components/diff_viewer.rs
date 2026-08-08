@@ -198,6 +198,15 @@ impl DiffViewer {
         self.right_viewer.set_overlay_theme(theme);
     }
 
+    /// Enable or disable the cross-highlight blue paint on both panels, toggled via `x` - see
+    /// `CodeViewerWidget::set_cross_highlight_enabled`'s doc comment. `App` owns the persisted
+    /// value (same pattern as `set_overlay_theme`/`current_theme`), so this component holds no
+    /// copy of its own.
+    pub fn set_cross_highlight_enabled(&mut self, enabled: bool) {
+        self.left_viewer.set_cross_highlight_enabled(enabled);
+        self.right_viewer.set_cross_highlight_enabled(enabled);
+    }
+
     /// The panel whose cursor currently drives navigation.
     fn focused_viewer(&mut self) -> &mut CodeViewer {
         match self.active_panel {
@@ -366,6 +375,12 @@ impl Component for DiffViewer {
                 self.jump_to_search_match(false);
                 Ok(Some(Action::Render))
             }
+            // Toggle the blue cross-highlight (off by default - see `CodeViewerWidget::
+            // cross_highlight_enabled`'s doc comment). Handled by bubbling an action up to `App`,
+            // not by mutating local state directly like the movement keys above: `App` owns the
+            // persisted value and needs to save it (same reason `ThemeSelected` is an action
+            // rather than a local `ThemeDialog` mutation).
+            crossterm::event::KeyCode::Char('x') => Ok(Some(Action::CrossHighlightToggled)),
             crossterm::event::KeyCode::PageUp => {
                 if self.display_mode == DisplayMode::Dual {
                     let left_lines = self.left_viewer.viewport_height();

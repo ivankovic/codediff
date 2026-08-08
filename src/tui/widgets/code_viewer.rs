@@ -423,6 +423,14 @@ pub struct CodeViewerWidget {
     /// The palette used to paint the diff/cursor overlay (not the syntax-highlighting theme
     /// above); user-selectable via the `c` theme picker, see `tui/theme.rs`.
     overlay_theme: OverlayTheme,
+    /// Whether cursor movement paints the "matching node" blue highlight in `overlay_row` (both
+    /// the focused side's own cursor-range paint and the unfocused side's pushed
+    /// `highlight_destination`) - user-toggleable via `x`, see `tui/components/diff_viewer.rs`.
+    /// Off by default (per user request, 2026-08-08): the highlight was previously always on with
+    /// no way to turn it off. Doesn't affect cursor *movement* itself (the other panel's cursor
+    /// still follows the matched node - see `DiffViewer::sync_cross_highlight`), or search-match
+    /// highlighting (a different feature that happens to share the same color).
+    cross_highlight_enabled: bool,
     /// Skip this widget's own bordered title block (filename + language) entirely, rendering the
     /// code flush with `area` instead. Set by single-panel `DiffViewer` mode, whose own outer
     /// block already shows the panel name, filename, and language in one header line - drawing
@@ -446,6 +454,7 @@ impl Default for CodeViewerWidget {
             syntax_highlighting: true,
             highlighted_lines: Vec::new(),
             overlay_theme: OverlayTheme::default(),
+            cross_highlight_enabled: false,
             hide_border: false,
         }
     }
@@ -526,6 +535,12 @@ impl CodeViewerWidget {
     /// `highlighted_lines`.
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
         self.overlay_theme = theme;
+    }
+
+    /// Enable or disable the cross-highlight blue paint - see `cross_highlight_enabled`'s own doc
+    /// comment. Same "no cache rebuild needed" reasoning as `set_overlay_theme`.
+    pub fn set_cross_highlight_enabled(&mut self, enabled: bool) {
+        self.cross_highlight_enabled = enabled;
     }
 
     /// See the `hide_border` field's doc comment.
@@ -724,7 +739,7 @@ impl CodeViewerWidget {
             // (see `CodeViewer::cursor_screen_position`), not by this overlay. Only the focused
             // side draws this: an unfocused side's own `cursor_row`/`cursor_col` is just wherever
             // it was left, not a live cursor, so painting it here would show a stale highlight.
-            if state.is_focused && cursor_range == Some(index) {
+            if self.cross_highlight_enabled && state.is_focused && cursor_range == Some(index) {
                 line = paint_columns(
                     &line,
                     start_col,
@@ -755,7 +770,8 @@ impl CodeViewerWidget {
         // The cross-highlight pushed from the focused side's cursor; only relevant on the
         // unfocused side (the focused side already shows its own cursor highlight above), so
         // switching focus can never paint both blues onto the same panel at once.
-        if !state.is_focused
+        if self.cross_highlight_enabled
+            && !state.is_focused
             && let Some(destination) = &state.highlight_destination
             && let Some((start_col, end_col)) = columns_on_row(destination, row, row_len)
         {
@@ -965,12 +981,89 @@ mod tests {
         );
     }
 
+    /// The cross-highlight is off by default (2026-08-08, at the user's request - it used to be
+    /// always on with no way to turn it off): a fresh widget must paint neither the focused
+    /// side's own cursor range nor the unfocused side's pushed `highlight_destination` blue, even
+    /// though both would otherwise qualify.
+    #[test]
+    fn cross_highlight_is_disabled_by_default() {
+        let widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let focused_state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 0,
+            viewport_height: 1,
+            is_focused: true,
+            ..Default::default()
+        };
+        let palette = default_palette();
+        let focused_span = &widget.overlay_row(0, &focused_state).spans[0];
+        assert_ne!(
+            focused_span.style.bg,
+            Some(palette.cross_highlight_bg),
+            "focused cursor range must not be painted blue until enabled"
+        );
+
+        let unfocused_state = CodeViewerState {
+            is_focused: false,
+            highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
+            viewport_height: 1,
+            ..Default::default()
+        };
+        assert!(
+            widget
+                .overlay_row(0, &unfocused_state)
+                .spans
+                .iter()
+                .all(|span| span.style.bg != Some(palette.cross_highlight_bg)),
+            "pushed highlight_destination must not be painted blue until enabled"
+        );
+    }
+
+    /// `set_cross_highlight_enabled` must actually change what gets painted, with no rebuild step
+    /// required - same "no cache rebuild" reasoning as `set_overlay_theme_changes_painted_colors`.
+    #[test]
+    fn set_cross_highlight_enabled_toggles_the_paint() {
+        let mut widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 0,
+            viewport_height: 1,
+            is_focused: true,
+            ..Default::default()
+        };
+        let palette = default_palette();
+
+        assert_ne!(
+            widget.overlay_row(0, &state).spans[0].style.bg,
+            Some(palette.cross_highlight_bg)
+        );
+        widget.set_cross_highlight_enabled(true);
+        assert_eq!(
+            widget.overlay_row(0, &state).spans[0].style.bg,
+            Some(palette.cross_highlight_bg)
+        );
+        widget.set_cross_highlight_enabled(false);
+        assert_ne!(
+            widget.overlay_row(0, &state).spans[0].style.bg,
+            Some(palette.cross_highlight_bg)
+        );
+    }
+
     /// The range under the cursor's exact (row, column) position likewise needs the explicit
     /// foreground, and its background must be the brighter cross-highlight blue rather than the
     /// (dimmer) diff color underneath it.
     #[test]
     fn cursor_overlay_uses_bright_blue_with_explicit_foreground() {
-        let widget = widget_with_line("hello world");
+        let mut widget = widget_with_line("hello world");
+        widget.set_cross_highlight_enabled(true);
         let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
         let range_order = build_range_order(&ranges);
         let state = CodeViewerState {
@@ -997,7 +1090,8 @@ mod tests {
     /// own never-moving cursor kept matching this check regardless of focus.
     #[test]
     fn unfocused_panel_does_not_highlight_its_own_cursor_range() {
-        let widget = widget_with_line("hello world");
+        let mut widget = widget_with_line("hello world");
+        widget.set_cross_highlight_enabled(true); // exercise the is_focused gate, not this one
         let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
         let range_order = build_range_order(&ranges);
         let state = CodeViewerState {
@@ -1366,7 +1460,8 @@ mod tests {
     /// that range isn't a diff (e.g. an `Identical` range with no background of its own).
     #[test]
     fn cross_highlight_destination_uses_bright_blue_with_explicit_foreground() {
-        let widget = widget_with_line("hello world");
+        let mut widget = widget_with_line("hello world");
+        widget.set_cross_highlight_enabled(true);
         let state = CodeViewerState {
             is_focused: false,
             highlight_destination: Some(TextRange::new(0, 6, 0, 11)),

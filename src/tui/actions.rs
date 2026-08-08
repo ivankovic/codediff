@@ -103,4 +103,8 @@ pub enum Action {
     /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
     /// cursor to the nearest match and highlight every match.
     SearchSubmitted(String),
+    /// The user pressed `x` in the diff viewer to flip the cross-highlight blue paint on/off -
+    /// see `CodeViewerWidget::cross_highlight_enabled`'s doc comment. Handled by `App`, which
+    /// owns and persists the current value (same reason `ThemeSelected` is an action).
+    CrossHighlightToggled,
 }
