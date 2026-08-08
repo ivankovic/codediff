@@ -39,6 +39,12 @@ pub struct CodeViewer {
     state: crate::tui::widgets::code_viewer::CodeViewerState,
     /// Action sender
     command_tx: Option<UnboundedSender<Action>>,
+    /// The column `move_cursor_vertical` (up/down) tries to return to on each move, remembered
+    /// across a run of vertical moves even while an intervening short/indented line forces
+    /// `cursor_col` somewhere else - the "sticky column" most text editors implement, so
+    /// `k k k j j j` lands back where it started instead of drifting left. `None` means "not
+    /// sticky yet" (any other cursor movement resets it - see `clamp_and_set_cursor`).
+    desired_col: Option<usize>,
 }
 
 impl CodeViewer {
@@ -72,6 +78,7 @@ impl CodeViewer {
     fn reset_state(&mut self) {
         self.state.scroll = 0;
         self.state.load_ranges(Vec::new());
+        self.desired_col = None;
     }
 
     /// Get the total number of lines
@@ -103,6 +110,7 @@ impl CodeViewer {
     /// on the first navigable (non zero-width) range.
     pub fn set_ranges(&mut self, ranges: Vec<RangeMatch>) {
         self.state.load_ranges(ranges);
+        self.desired_col = None;
         self.scroll_to_cursor();
     }
 
@@ -139,27 +147,37 @@ impl CodeViewer {
         self.widget.set_hide_border(hide);
     }
 
-    /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, clamping the
-    /// column to the new line's length, and scroll to keep it visible.
+    /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, keeping it on
+    /// the same "sticky" column across a run of vertical moves (see `desired_col`'s doc comment)
+    /// rather than the destination row's actual column - except where that column doesn't land
+    /// on real content on the new line: past the last non-whitespace character, it's pulled back
+    /// to it; before the first (i.e. in the line's own indentation), it's pushed forward to it.
+    /// Scrolls to keep the cursor visible afterward.
     pub fn move_cursor_vertical(&mut self, direction: i32) {
         let total_lines = self.line_count();
         if total_lines == 0 || direction == 0 {
             return;
         }
+        let target_col = *self.desired_col.get_or_insert(self.state.cursor_col);
+
         let new_row = (self.state.cursor_row as isize + direction.signum() as isize)
             .clamp(0, total_lines as isize - 1) as usize;
         self.state.cursor_row = new_row;
-        self.state.cursor_col = self.state.cursor_col.min(self.widget.line_len(new_row));
+        self.state.cursor_col =
+            clamp_to_non_whitespace(target_col, &self.widget.line_text(new_row));
         self.scroll_to_cursor();
     }
 
     /// Move the cursor left (`direction < 0`) or right (`direction > 0`) by one character,
     /// wrapping to the end of the previous line / start of the next line at row boundaries, like
-    /// a normal text cursor.
+    /// a normal text cursor. Resets `desired_col` - an explicit horizontal move always means the
+    /// user wants *this* column from now on, not whatever `move_cursor_vertical` was last sticky
+    /// on.
     pub fn move_cursor_horizontal(&mut self, direction: i32) {
         if direction == 0 {
             return;
         }
+        self.desired_col = None;
         if direction < 0 {
             if self.state.cursor_col > 0 {
                 self.state.cursor_col -= 1;
@@ -232,7 +250,9 @@ impl CodeViewer {
     /// Returns `false` (and does nothing else) if the file is empty. Shared by
     /// `set_cursor_position` (keeps the cursor merely visible afterward) and `jump_to_change`
     /// (centers it - see that method's own doc comment for why the two need different scroll
-    /// behavior).
+    /// behavior). Resets `desired_col` - every caller of this is an explicit reposition (search,
+    /// change navigation, cross-panel cursor sync), not `move_cursor_vertical`'s own sticky
+    /// column, so a later vertical move should start fresh from wherever this lands.
     fn clamp_and_set_cursor(&mut self, row: usize, col: usize) -> bool {
         let total_lines = self.line_count();
         if total_lines == 0 {
@@ -243,6 +263,7 @@ impl CodeViewer {
         let clamped_col = col.min(line_len);
         self.state.cursor_row = clamped_row;
         self.state.cursor_col = clamped_col;
+        self.desired_col = None;
         true
     }
 
@@ -342,6 +363,33 @@ impl CodeViewer {
     }
 }
 
+/// The `[first, last)` non-whitespace column bounds of `line` (character indices; `last` is one
+/// past the last non-whitespace character, i.e. itself a valid cursor column - a cursor there
+/// sits immediately after that character, same convention as `line_len`/`cursor_col`), or `None`
+/// if `line` is empty or entirely whitespace, in which case there's no content to snap to.
+fn non_whitespace_bounds(line: &str) -> Option<(usize, usize)> {
+    let mut first = None;
+    let mut last = None;
+    for (i, c) in line.chars().enumerate() {
+        if !c.is_whitespace() {
+            first.get_or_insert(i);
+            last = Some(i + 1);
+        }
+    }
+    first.zip(last)
+}
+
+/// Clamp `col` into `line`'s non-whitespace bounds (see `non_whitespace_bounds`) - used by
+/// `move_cursor_vertical` so a "sticky" column never lands inside a line's leading indentation
+/// or past its actual content into trailing whitespace. Falls back to the plain `[0, line_len]`
+/// clamp on an empty/all-whitespace line, where there's nothing to snap to.
+fn clamp_to_non_whitespace(col: usize, line: &str) -> usize {
+    match non_whitespace_bounds(line) {
+        Some((first, last)) => col.clamp(first, last),
+        None => col.min(line.chars().count()),
+    }
+}
+
 impl Component for CodeViewer {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
@@ -391,6 +439,117 @@ mod tests {
         let mut viewer = CodeViewer::new();
         viewer.load_contents(PathBuf::from("test.txt"), contents.to_string());
         viewer
+    }
+
+    #[test]
+    fn non_whitespace_bounds_finds_the_first_and_last_non_whitespace_columns() {
+        assert_eq!(non_whitespace_bounds("  foo bar  "), Some((2, 9)));
+        assert_eq!(non_whitespace_bounds("foo"), Some((0, 3)));
+        assert_eq!(non_whitespace_bounds(""), None);
+        assert_eq!(non_whitespace_bounds("    "), None, "all-whitespace line");
+    }
+
+    #[test]
+    fn clamp_to_non_whitespace_pulls_back_from_trailing_whitespace() {
+        assert_eq!(clamp_to_non_whitespace(20, "  foo  "), 5);
+    }
+
+    #[test]
+    fn clamp_to_non_whitespace_pushes_forward_from_leading_whitespace() {
+        assert_eq!(clamp_to_non_whitespace(0, "    foo"), 4);
+    }
+
+    #[test]
+    fn clamp_to_non_whitespace_leaves_a_column_within_bounds_untouched() {
+        assert_eq!(clamp_to_non_whitespace(5, "  foo bar  "), 5);
+    }
+
+    #[test]
+    fn clamp_to_non_whitespace_falls_back_to_the_plain_clamp_on_an_all_whitespace_line() {
+        assert_eq!(clamp_to_non_whitespace(10, "     "), 5);
+        assert_eq!(clamp_to_non_whitespace(10, ""), 0);
+    }
+
+    /// The defining "sticky column" case: a column that survives an intervening short/indented
+    /// line and reappears once a line wide enough for it comes back around - not just "clamp to
+    /// whatever the immediately previous line allowed".
+    #[test]
+    fn move_cursor_vertical_remembers_the_desired_column_across_a_shorter_line() {
+        let mut viewer = viewer_with("hello world\nhi\nhello again\n");
+        viewer.set_cursor_position(0, 8); // inside "world"
+
+        viewer.move_cursor_vertical(1); // onto "hi" (len 2) - column must clamp down
+        assert_eq!(viewer.state.cursor_col, 2);
+
+        viewer.move_cursor_vertical(1); // onto "hello again" - long enough for column 8 again
+        assert_eq!(
+            viewer.state.cursor_col, 8,
+            "should return to the original desired column, not stay clamped at 2"
+        );
+    }
+
+    #[test]
+    fn move_cursor_vertical_clamps_past_the_end_of_line_to_the_last_non_whitespace_column() {
+        let mut viewer = viewer_with("hello world\nfoo   \n");
+        viewer.set_cursor_position(0, 10); // near the end of "hello world"
+
+        viewer.move_cursor_vertical(1); // onto "foo   " (trailing whitespace)
+        assert_eq!(
+            viewer.state.cursor_col, 3,
+            "should land right after 'foo', not on the trailing whitespace"
+        );
+    }
+
+    #[test]
+    fn move_cursor_vertical_clamps_before_the_first_non_whitespace_column() {
+        let mut viewer = viewer_with("x\n    indented\n");
+        viewer.set_cursor_position(0, 0);
+
+        viewer.move_cursor_vertical(1); // onto "    indented"
+        assert_eq!(
+            viewer.state.cursor_col, 4,
+            "should land on the 'i' of 'indented', not inside the leading whitespace"
+        );
+    }
+
+    #[test]
+    fn move_cursor_vertical_does_not_panic_on_an_all_whitespace_line() {
+        let mut viewer = viewer_with("hello\n   \nworld\n");
+        viewer.set_cursor_position(0, 4);
+
+        viewer.move_cursor_vertical(1); // onto the all-whitespace line
+        assert_eq!(
+            viewer.state.cursor_col, 3,
+            "plain clamp: min(4, line_len=3)"
+        );
+
+        viewer.move_cursor_vertical(1); // onto "world" - the original desired column (4) returns
+        assert_eq!(viewer.state.cursor_col, 4);
+    }
+
+    #[test]
+    fn move_cursor_horizontal_resets_the_sticky_column() {
+        let mut viewer = viewer_with("hello world\nhi\nhello again\n");
+        viewer.set_cursor_position(0, 8);
+        viewer.move_cursor_vertical(1); // sticky column now 8, clamped to 2 (end of "hi")
+        viewer.move_cursor_horizontal(-1); // explicit horizontal move: now col 1 on "hi"
+
+        viewer.move_cursor_vertical(1); // onto "hello again" - should use the new column (1)
+        assert_eq!(
+            viewer.state.cursor_col, 1,
+            "an explicit horizontal move should replace the old sticky column, not the reverse"
+        );
+    }
+
+    #[test]
+    fn set_cursor_position_resets_the_sticky_column() {
+        let mut viewer = viewer_with("hello world\nhi\nhello again\n");
+        viewer.set_cursor_position(0, 8);
+        viewer.move_cursor_vertical(1); // sticky column now 8, clamped to 2 on "hi"
+        viewer.set_cursor_position(1, 1); // explicit reposition, still on "hi"
+
+        viewer.move_cursor_vertical(1); // onto "hello again" - should use the new column (1)
+        assert_eq!(viewer.state.cursor_col, 1);
     }
 
     #[test]

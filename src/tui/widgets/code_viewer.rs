@@ -562,6 +562,17 @@ impl CodeViewerWidget {
             .unwrap_or(0)
     }
 
+    /// The raw text of `row` (syntax-highlighting spans concatenated back into plain text - they
+    /// wrap the same characters, never add or remove any), or empty if `row` is out of bounds.
+    /// Same indexing/cost as `line_len` - used to find whitespace boundaries for "sticky column"
+    /// vertical cursor movement (see `CodeViewer::move_cursor_vertical`).
+    pub fn line_text(&self, row: usize) -> String {
+        self.highlighted_lines
+            .get(row)
+            .map(|line| line.spans.iter().map(|s| s.content.as_ref()).collect())
+            .unwrap_or_default()
+    }
+
     /// Every case-insensitive occurrence of `query` in the file, in document order, as `TextRange`s
     /// (always `start_row == end_row`: a search match never spans a line break, unlike diff
     /// ranges). Empty for an empty query. Columns are character offsets into the *original* line,
