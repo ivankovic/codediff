@@ -40,7 +40,7 @@ use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanOperation, MarkKind, NodeStatus, is_identical_after, is_identical_before,
     is_moved_after, is_moved_before, match_operation_after, match_operation_before, rebuild_caches,
-    status_after, status_before,
+    rebuild_caches_for_mapping, status_after, status_before,
 };
 
 /// `owner/repo`, used both for the "file an issue" link (rewritten client-side in viewer.js) and
@@ -154,7 +154,7 @@ fn render_fixture_page(
         .context("After code has no AST")?
         .root_node();
 
-    let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+    let caches = rebuild_caches_for_mapping(mapping, before_root, after_root);
     // Most fixtures' human_mapping.json only annotates a few hundred nodes out of many thousands
     // (see human_mapping_cost's own doc comment) - the rest is untouched code the human considered
     // unchanged - but a few fixtures (e.g. auto-generated files matched near-exhaustively) instead

@@ -241,6 +241,16 @@ pub struct Caches {
     /// hand-edited or stale mapping file). Surfaced by callers (e.g. `human_solver`'s footer)
     /// rather than treated as fatal, so a bad mapping file doesn't block the caller outright.
     pub unresolved: usize,
+    /// Node id -> index into `HumanMapping::groups`, for every node listed in a group's
+    /// `before_paths` (whichever side the id belongs to has its own map) - both the members a
+    /// group's representative pairing actually matched *and* its leftover members, unlike
+    /// `before_match`/`before_removed` above, which only see whichever single outcome
+    /// [`representative_entries`] picked. Populated only by [`rebuild_caches_for_mapping`] (plain
+    /// [`rebuild_caches`] has no `groups` to read), used so a consumer can render a group-derived
+    /// node distinctly from a plain one, and so `u` (in `human_solver`) can find and remove a
+    /// whole group by any one of its members rather than just the one representative pair.
+    pub before_group: HashMap<usize, usize>,
+    pub after_group: HashMap<usize, usize>,
 }
 
 /// Builds lookup caches from `entries`, skipping (and counting) any entry that doesn't resolve
@@ -292,6 +302,45 @@ pub fn rebuild_caches(
 
         if resolved.is_none() {
             caches.unresolved += 1;
+        }
+    }
+
+    caches
+}
+
+/// Same as [`rebuild_caches`], but also folds in `mapping.groups`: every group's members are
+/// flattened into one concrete representative pairing via [`representative_entries`] first, so a
+/// grouped node's [`NodeStatus`] (`Matched`, or `Marked` deleted/inserted for a leftover member)
+/// comes back exactly like a plain entry's would. On top of that, `before_group`/`after_group` are
+/// populated for *every* listed member of every group - not just whichever one
+/// `representative_entries` happened to pair - by resolving `before_paths`/`after_paths` directly.
+///
+/// If a group's paths fail to resolve against the current trees (a stale or hand-edited mapping
+/// file), [`representative_entries`] is skipped in favor of `mapping.entries` alone rather than
+/// failing outright - same "don't let one bad group block the whole caller" posture
+/// [`rebuild_caches`] already takes for a single bad entry (`unresolved`), just without a precise
+/// per-group count, since there's no single caller today that needs one.
+pub fn rebuild_caches_for_mapping(
+    mapping: &HumanMapping,
+    before_root: Node,
+    after_root: Node,
+) -> Caches {
+    let entries = representative_entries(mapping, before_root, after_root)
+        .unwrap_or_else(|_| mapping.entries.clone());
+    let mut caches = rebuild_caches(&entries, before_root, after_root);
+
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+    for (idx, group) in mapping.groups.iter().enumerate() {
+        for path in &group.before_paths {
+            if let Ok(node) = before_cache.resolve(before_root, &path_refs(path)) {
+                caches.before_group.insert(node.id(), idx);
+            }
+        }
+        for path in &group.after_paths {
+            if let Ok(node) = after_cache.resolve(after_root, &path_refs(path)) {
+                caches.after_group.insert(node.id(), idx);
+            }
         }
     }
 
@@ -2639,6 +2688,75 @@ mod tests {
         assert_eq!(matched.len(), 1, "{:?}", entries);
         assert_eq!(inserted.len(), 1, "{:?}", entries);
         assert!(inserted[0].before_path.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn rebuild_caches_for_mapping_reports_group_membership_and_status_for_every_member()
+    -> Result<()> {
+        // 3 before foo()s, 2 after foo()s, with_children - one before-foo is a leftover delete,
+        // the other two are matched. `rebuild_caches_for_mapping` should report NodeStatus for all
+        // three the way a plain entry would (Matched or Marked-deleted), AND list all three (not
+        // just the matched pair) in `before_group`/`after_group`.
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+        assert_eq!(before_foos.len(), 3);
+        assert_eq!(after_foos.len(), 2);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: true,
+            }],
+        };
+
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+
+        for node in &before_foos {
+            assert_eq!(
+                caches.before_group.get(&node.id()),
+                Some(&0),
+                "every before group member should be listed, matched or not"
+            );
+            assert_ne!(
+                status_before(*node, &caches),
+                NodeStatus::Unmarked,
+                "every before group member should have a real status, not Unmarked"
+            );
+        }
+        for node in &after_foos {
+            assert_eq!(caches.after_group.get(&node.id()), Some(&0));
+            assert_ne!(status_after(*node, &caches), NodeStatus::Unmarked);
+        }
+
+        let matched_count = before_foos
+            .iter()
+            .filter(|n| status_before(**n, &caches) == NodeStatus::Matched)
+            .count();
+        let deleted_count = before_foos
+            .iter()
+            .filter(|n| {
+                matches!(
+                    status_before(**n, &caches),
+                    NodeStatus::Marked {
+                        kind: MarkKind::Deleted,
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(matched_count, 2);
+        assert_eq!(deleted_count, 1);
         Ok(())
     }
 

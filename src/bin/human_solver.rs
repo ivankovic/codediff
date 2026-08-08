@@ -171,8 +171,9 @@ use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::code::{Code, Language};
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
-    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, NodeStatus,
-    is_inherited_removed, path_refs, rebuild_caches, status_after, status_before,
+    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, MultiMapGroup,
+    NodeStatus, is_inherited_removed, path_refs, rebuild_caches, rebuild_caches_for_mapping,
+    status_after, status_before,
 };
 use codediff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, diffs_case_dir, node_for_path, path_for_node,
@@ -201,11 +202,21 @@ Left/h         collapse current node, or go to its parent
 Right/l        expand current node, or go to its first child
 g / G          jump to first / last visible node
 
-m / M          match cursor nodes (M also recurses into matching children)
+m / M          match cursor nodes (M also recurses into matching children);
+                 with a pending multi-map selection (see x), commits it as a
+                 group instead (M asserts the matched subtree closes over
+                 itself, without auto-filling descendants the way plain M does)
 f              repeat m until end of file or a kind mismatch needs your input
 d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree
-u              unmark the focused cursor node
+u              unmark the focused cursor node, or remove its whole multi-map
+                 group if it's a group member
+x              toggle the focused cursor node in/out of a pending multi-map
+                 selection -- select several nodes on each side, then m/M to
+                 commit them as a group where any Before node may pair with
+                 any After node (leftovers on the larger side become
+                 delete/insert); mixed kinds ask for confirmation first
+c              clear the pending multi-map selection
 a / A          align other panel to the human mapping / to codediff's mapping
 p              run codediff's own diff, show its verdict next to each node
 r              toggle showing the ASTMappingReason (which pass matched it) next
@@ -997,6 +1008,17 @@ enum Modal {
         /// auto-matches the rest of the subtree.
         recursive: bool,
     },
+    /// Raised by `m`/`M` when a multi-map selection (see `App::before_multi_select`/
+    /// `after_multi_select`, toggled by `x`) is non-empty but its members don't all share one AST
+    /// node kind. Same "confirm before doing something codediff's own diff would never produce"
+    /// posture as `ConfirmKindMismatch`, generalized to a set of ids instead of a single pair.
+    ConfirmMultiMapGroup {
+        before_ids: Vec<usize>,
+        after_ids: Vec<usize>,
+        operation: HumanOperation,
+        with_children: bool,
+        kinds: Vec<String>,
+    },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open. Each
     /// option is paired with which of `DIFF_DATASETS` it lives under; `d` cycles `dataset_filter`
     /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time. Like
@@ -1153,6 +1175,14 @@ struct App {
     /// next time, so `/` then `Enter` repeats the same search from wherever the cursor landed,
     /// without retyping it.
     last_search: Option<String>,
+    /// Node ids pending inclusion in a multi-map group, toggled by `x` (and cleared by `c` or by
+    /// `m`/`M` committing them). Plain node ids rather than borrowed `Node`s, the same convention
+    /// `PanelState::cursor_id` already uses, since `App` outlives any one parse of `before`/
+    /// `after` (a case switch reparses both trees under the same `App`). Cleared on every case
+    /// switch (see `run_event_loop`'s three `SessionEnd::Open` arms) since an id from the old
+    /// trees could otherwise collide with an unrelated node in the new ones.
+    before_multi_select: std::collections::BTreeSet<usize>,
+    after_multi_select: std::collections::BTreeSet<usize>,
 }
 
 impl App {
@@ -1184,6 +1214,8 @@ impl App {
             sample_sort_order: SampleSortOrder::Alphabetical,
             diff_dataset_filter: None,
             last_search: None,
+            before_multi_select: std::collections::BTreeSet::new(),
+            after_multi_select: std::collections::BTreeSet::new(),
         }
     }
 }
@@ -1431,7 +1463,7 @@ fn advance_both_to_next_unmarked(
     before_root: Node,
     after_root: Node,
 ) {
-    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
     advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
@@ -1444,7 +1476,7 @@ fn advance_before_to_next_unmarked(
     before_root: Node,
     after_root: Node,
 ) {
-    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
     advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
 }
 
@@ -1456,7 +1488,7 @@ fn advance_after_to_next_unmarked(
     before_root: Node,
     after_root: Node,
 ) {
-    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
 
@@ -1827,6 +1859,51 @@ fn find_node_by_id<'a>(flat: &[(Node<'a>, usize)], id: usize) -> Option<Node<'a>
     flat.iter().find(|(n, _)| n.id() == id).map(|(n, _)| *n)
 }
 
+/// Finds a node anywhere in `root`'s subtree by id, unlike [`find_node_by_id`], which only looks
+/// among the (possibly collapsed/hidden) visible rows a `flat` slice covers. Used only when
+/// resolving a multi-map selection at commit time: a node toggled into `App::before_multi_select`/
+/// `after_multi_select` with `x` can end up hidden by a later `Left`/`H` press on an ancestor
+/// before `m`/`M` commits the group, and it must still resolve correctly then.
+fn find_node_anywhere(root: Node, id: usize) -> Option<Node> {
+    let mut stack = vec![root];
+    while let Some(n) = stack.pop() {
+        if n.id() == id {
+            return Some(n);
+        }
+        let mut cursor = n.walk();
+        for child in n.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    None
+}
+
+/// Removes any existing [`MultiMapGroup`] that shares a node (on either side) with `before_ids`/
+/// `after_ids` - the group-level counterpart of [`remove_entries_touching`], used so committing a
+/// new multi-map selection can't leave a stale group half-referencing a node that just got
+/// reassigned to a different group or a plain match.
+fn remove_groups_touching(
+    groups: &mut Vec<MultiMapGroup>,
+    before_ids: &std::collections::HashSet<usize>,
+    after_ids: &std::collections::HashSet<usize>,
+    before_root: Node,
+    after_root: Node,
+) {
+    groups.retain(|group| {
+        let touches_before = group.before_paths.iter().any(|p| {
+            node_for_path(before_root, &path_refs(p))
+                .ok()
+                .is_some_and(|n| before_ids.contains(&n.id()))
+        });
+        let touches_after = group.after_paths.iter().any(|p| {
+            node_for_path(after_root, &path_refs(p))
+                .ok()
+                .is_some_and(|n| after_ids.contains(&n.id()))
+        });
+        !(touches_before || touches_after)
+    });
+}
+
 fn is_strict_descendant_of(node: Node, ancestor: Node) -> bool {
     let mut current = node;
     while let Some(parent) = current.parent() {
@@ -1924,6 +2001,198 @@ fn subtree_match_operation(
     } else {
         HumanOperation::MatchButNotIdentical
     }
+}
+
+/// Classifies a multi-map selection's operation the same way [`subtree_match_operation`]
+/// classifies a single pair - by full-content hash - generalized to a set: `Identical` only if
+/// *every* selected node, on both sides, shares the exact same hash (the whole selection really is
+/// N interchangeable copies of one subtree), `MatchButNotIdentical` otherwise. Never `Update` -
+/// see `MultiMapGroup::operation`'s own doc comment for why a group has no single fixed pair to
+/// call a text edit against.
+fn multi_map_group_operation(
+    before_ids: &std::collections::BTreeSet<usize>,
+    after_ids: &std::collections::BTreeSet<usize>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
+) -> HumanOperation {
+    let mut hashes = before_ids
+        .iter()
+        .filter_map(|id| before_hash.get(id).copied())
+        .chain(
+            after_ids
+                .iter()
+                .filter_map(|id| after_hash.get(id).copied()),
+        );
+    let first = hashes.next();
+    if first.is_some() && hashes.all(|h| Some(h) == first) {
+        HumanOperation::Identical
+    } else {
+        HumanOperation::MatchButNotIdentical
+    }
+}
+
+/// Commits `before_ids`/`after_ids` (a confirmed multi-map selection - see `App::before_multi_select`/
+/// `after_multi_select`) as a new [`MultiMapGroup`], clearing out any prior plain entry or group
+/// that touched one of these nodes first (the group-level equivalent of [`apply_match_entry`]'s own
+/// "replace whatever was there" behavior for a single pair).
+fn commit_multi_map_group(
+    mapping: &mut HumanMapping,
+    before_root: Node,
+    after_root: Node,
+    before_ids: &std::collections::BTreeSet<usize>,
+    after_ids: &std::collections::BTreeSet<usize>,
+    operation: HumanOperation,
+    with_children: bool,
+) -> Result<String> {
+    let mut before_nodes = before_ids
+        .iter()
+        .map(|&id| {
+            find_node_anywhere(before_root, id)
+                .context("A selected Before node could no longer be found in the tree")
+        })
+        .collect::<Result<Vec<Node>>>()?;
+    let mut after_nodes = after_ids
+        .iter()
+        .map(|&id| {
+            find_node_anywhere(after_root, id)
+                .context("A selected After node could no longer be found in the tree")
+        })
+        .collect::<Result<Vec<Node>>>()?;
+    // Deterministic, parse-stable order - not the arena-id order iterating a `BTreeSet<usize>`
+    // would otherwise produce (see the project's benchmark-determinism-fix lesson on node ids as
+    // ordering keys), and the same order `representative_entries` sorts its own pairing by.
+    before_nodes.sort_by_key(|n| n.start_byte());
+    after_nodes.sort_by_key(|n| n.start_byte());
+
+    let before_id_set: std::collections::HashSet<usize> = before_ids.iter().copied().collect();
+    let after_id_set: std::collections::HashSet<usize> = after_ids.iter().copied().collect();
+    remove_entries_touching(
+        &mut mapping.entries,
+        &before_id_set,
+        &after_id_set,
+        before_root,
+        after_root,
+    );
+    remove_groups_touching(
+        &mut mapping.groups,
+        &before_id_set,
+        &after_id_set,
+        before_root,
+        after_root,
+    );
+    if with_children {
+        // A member's descendants must stay free to close over whichever specific pair codediff's
+        // own diff actually realizes (see `check_subtree_maps_within`) - a leftover pre-existing
+        // entry on one would otherwise pin a pairing the group deliberately leaves open, or flatly
+        // contradict a leftover member's "this whole subtree must be removed" requirement. Same
+        // "with-children can't coexist with a descendant mark" invariant `d`/`i`'s own
+        // `clear_before_descendants`/`clear_after_descendants` calls already enforce.
+        for &node in &before_nodes {
+            clear_before_descendants(&mut mapping.entries, node, before_root);
+        }
+        for &node in &after_nodes {
+            clear_after_descendants(&mut mapping.entries, node, after_root);
+        }
+    }
+
+    let (before_count, after_count) = (before_nodes.len(), after_nodes.len());
+    mapping.groups.push(MultiMapGroup {
+        before_paths: before_nodes.into_iter().map(path_for_node).collect(),
+        after_paths: after_nodes.into_iter().map(path_for_node).collect(),
+        operation,
+        with_children,
+    });
+
+    Ok(format!(
+        "Committed multi-map group: {} before, {} after node(s), {:?}{}",
+        before_count,
+        after_count,
+        operation,
+        if with_children { " with children" } else { "" }
+    ))
+}
+
+/// What `m`/`M` does when the multi-map selection (`App::before_multi_select`/`after_multi_select`)
+/// is non-empty: infers the group's operation (see [`multi_map_group_operation`]), then either
+/// commits it directly (every selected node shares one AST kind) or raises
+/// `Modal::ConfirmMultiMapGroup` first - the group-level counterpart of [`kind_mismatch_modal`].
+#[allow(clippy::too_many_arguments)]
+fn action_commit_multi_map_group(
+    mapping: &mut HumanMapping,
+    before_root: Node,
+    after_root: Node,
+    before_ids: &std::collections::BTreeSet<usize>,
+    after_ids: &std::collections::BTreeSet<usize>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
+    caches: &Caches,
+    with_children: bool,
+) -> Result<ActionOutcome> {
+    if before_ids.is_empty() || after_ids.is_empty() {
+        bail!(
+            "Multi-map group needs at least one selected node on both sides (x to select, c to clear)"
+        );
+    }
+
+    // Same precondition `action_match`/`action_match_subtree` enforce for a single pair: a member
+    // sitting under an ancestor already marked deleted/inserted-with-children can't also be
+    // committed into a group without producing a self-contradictory mapping.
+    for &id in before_ids {
+        if let Some(node) = find_node_anywhere(before_root, id)
+            && is_inherited_removed(node, &caches.before_removed)
+        {
+            bail!(
+                "Before node '{}' is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)",
+                node.kind()
+            );
+        }
+    }
+    for &id in after_ids {
+        if let Some(node) = find_node_anywhere(after_root, id)
+            && is_inherited_removed(node, &caches.after_removed)
+        {
+            bail!(
+                "After node '{}' is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)",
+                node.kind()
+            );
+        }
+    }
+
+    let operation = multi_map_group_operation(before_ids, after_ids, before_hash, after_hash);
+
+    let kinds: Vec<String> = before_ids
+        .iter()
+        .filter_map(|&id| find_node_anywhere(before_root, id))
+        .chain(
+            after_ids
+                .iter()
+                .filter_map(|&id| find_node_anywhere(after_root, id)),
+        )
+        .map(|n| n.kind().to_string())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    if kinds.len() > 1 {
+        return Ok(ActionOutcome::NeedsModal(Modal::ConfirmMultiMapGroup {
+            before_ids: before_ids.iter().copied().collect(),
+            after_ids: after_ids.iter().copied().collect(),
+            operation,
+            with_children,
+            kinds,
+        }));
+    }
+
+    let msg = commit_multi_map_group(
+        mapping,
+        before_root,
+        after_root,
+        before_ids,
+        after_ids,
+        operation,
+        with_children,
+    )?;
+    Ok(ActionOutcome::Done(msg))
 }
 
 /// Builds the `NeedsModal` outcome for a before/after cursor pair whose kinds don't match -
@@ -2064,7 +2333,7 @@ fn action_match_to_end(
     after_hash: &rustc_hash::FxHashMap<usize, u64>,
 ) -> Result<ActionOutcome> {
     let mut matched = 0usize;
-    let mut caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let mut caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
     let before_paths = precompute_paths(before_root);
     let after_paths = precompute_paths(after_root);
 
@@ -2621,18 +2890,35 @@ fn action_unmark(
     after_root: Node,
     caches: &Caches,
 ) -> Result<String> {
-    let (id, node, removed) = match focus {
+    let (id, node, removed, group) = match focus {
         Focus::Before => (
             before_cursor,
             find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?,
             &caches.before_removed,
+            caches.before_group.get(&before_cursor).copied(),
         ),
         Focus::After => (
             after_cursor,
             find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?,
             &caches.after_removed,
+            caches.after_group.get(&after_cursor).copied(),
         ),
     };
+
+    // A group member (whichever specific pair `representative_entries` realized, or a leftover)
+    // isn't recorded as its own `mapping.entries` item at all - the whole group is one
+    // `MultiMapGroup` in `mapping.groups` - so `u` here removes that entire group rather than
+    // trying (and failing) to find a single direct entry to drop.
+    if let Some(group_idx) = group
+        && group_idx < mapping.groups.len()
+    {
+        let removed_group = mapping.groups.remove(group_idx);
+        return Ok(format!(
+            "Removed multi-map group ({} before, {} after node(s))",
+            removed_group.before_paths.len(),
+            removed_group.after_paths.len()
+        ));
+    }
 
     let before_id = if focus == Focus::Before {
         Some(id)
@@ -2755,6 +3041,7 @@ fn render_panel(
     algo_diff: Option<&ASTDiff>,
     show_reason: bool,
     total_unmarked: usize,
+    multi_selected: &std::collections::BTreeSet<usize>,
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
     panel.viewport_height = inner_height;
@@ -2776,6 +3063,15 @@ fn render_panel(
         };
 
         let (glyph, mut style) = status_glyph_and_style(status);
+        // A "g" suffix marks a node whose match/delete/insert outcome came from a `MultiMapGroup`
+        // rather than a plain entry - `caches.before_group`/`after_group` cover every group
+        // member (matched *and* leftover), not just whichever pair `representative_entries`
+        // realized, so this is accurate for both.
+        let in_group = match side {
+            Side::Before => caches.before_group.contains_key(&node.id()),
+            Side::After => caches.after_group.contains_key(&node.id()),
+        };
+        let group_marker = if in_group { "g" } else { "" };
         let (algo_glyph, disagrees) = algo_diff
             .map(|diff_ast| {
                 let algo_status = match side {
@@ -2806,13 +3102,20 @@ fn render_panel(
         let indent = "  ".repeat(depth);
         let marker = if disagrees { " *" } else { "" };
         let text = format!(
-            "{}{}{} {}{}",
+            "{}{}{}{} {}{}",
             indent,
             glyph,
+            group_marker,
             algo_glyph,
             node_label(node, src),
             marker
         );
+
+        // Pending multi-map selection (`x`, not yet committed by `m`/`M`) - a distinct color so
+        // it reads as "about to become a group", separate from any already-committed status.
+        if multi_selected.contains(&node.id()) {
+            style = style.fg(Color::Magenta).add_modifier(Modifier::BOLD);
+        }
 
         if idx == cursor_idx {
             style = style
@@ -2896,7 +3199,7 @@ fn draw_ui(
 
     if single_panel {
         let panel_area = chunks[1];
-        let (title, flat, panel, side, src, total_unmarked) = match app.focus {
+        let (title, flat, panel, side, src, total_unmarked, multi_selected) = match app.focus {
             Focus::Before => (
                 "Before",
                 before_flat,
@@ -2904,6 +3207,7 @@ fn draw_ui(
                 Side::Before,
                 before_src,
                 before_unmarked,
+                &app.before_multi_select,
             ),
             Focus::After => (
                 "After",
@@ -2912,6 +3216,7 @@ fn draw_ui(
                 Side::After,
                 after_src,
                 after_unmarked,
+                &app.after_multi_select,
             ),
         };
         render_panel(
@@ -2927,6 +3232,7 @@ fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             total_unmarked,
+            multi_selected,
         );
     } else {
         let panels = Layout::default()
@@ -2947,6 +3253,7 @@ fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             before_unmarked,
+            &app.before_multi_select,
         );
         render_panel(
             frame,
@@ -2961,11 +3268,12 @@ fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             after_unmarked,
+            &app.after_multi_select,
         );
     }
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  x select for multi-map  c clear selection  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -3059,6 +3367,25 @@ fn render_modal(
             &format!(
                 "Before: {}\nAfter:  {}\n\nAre you sure you want to add this mapping? (y/n)",
                 before_kind, after_kind
+            ),
+        ),
+        Modal::ConfirmMultiMapGroup {
+            before_ids,
+            after_ids,
+            operation,
+            with_children,
+            kinds,
+        } => render_text_modal(
+            frame,
+            area,
+            "Multi-map group has mixed node kinds!",
+            &format!(
+                "{} Before node(s), {} After node(s), kinds: {}\nWill be recorded as {:?}{}.\n\nAre you sure you want to add this group? (y/n)",
+                before_ids.len(),
+                after_ids.len(),
+                kinds.join(", "),
+                operation,
+                if *with_children { " with children" } else { "" }
             ),
         ),
         Modal::OpenDiffPicker {
@@ -3538,7 +3865,7 @@ fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Resu
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
-    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
 
     // Recomputed fresh whenever frame state is rebuilt, so `H` can't show a subtree as hidden
     // after it's actually been un-marked, or vice versa.
@@ -3603,6 +3930,8 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.before_multi_select.clear();
+                    app.after_multi_select.clear();
                     app.status = Some(format!("Opened '{}'", app.name));
                 }
                 Err(err) => {
@@ -3623,6 +3952,8 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.before_multi_select.clear();
+                    app.after_multi_select.clear();
                     app.status = Some(format!(
                         "Opened sample '{}' (press s to promote it into a test case)",
                         app.name
@@ -3657,6 +3988,8 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.before_multi_select.clear();
+                    app.after_multi_select.clear();
                 }
                 Err(err) => {
                     app.status = Some(format!(
@@ -3908,23 +4241,41 @@ fn handle_key(
             None
         }
         KeyCode::Char('m') => {
-            match action_match(
-                &mut app.mapping,
-                before_flat,
-                after_flat,
-                app.before.cursor_id,
-                app.after.cursor_id,
-                before_root,
-                after_root,
-                caches,
-                before_src,
-                after_src,
-                before_hash,
-                after_hash,
-            ) {
+            let outcome = if app.before_multi_select.is_empty() && app.after_multi_select.is_empty()
+            {
+                action_match(
+                    &mut app.mapping,
+                    before_flat,
+                    after_flat,
+                    app.before.cursor_id,
+                    app.after.cursor_id,
+                    before_root,
+                    after_root,
+                    caches,
+                    before_src,
+                    after_src,
+                    before_hash,
+                    after_hash,
+                )
+            } else {
+                action_commit_multi_map_group(
+                    &mut app.mapping,
+                    before_root,
+                    after_root,
+                    &app.before_multi_select,
+                    &app.after_multi_select,
+                    before_hash,
+                    after_hash,
+                    caches,
+                    false,
+                )
+            };
+            match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
+                    app.before_multi_select.clear();
+                    app.after_multi_select.clear();
                     advance_both_to_next_unmarked(
                         app,
                         before_flat,
@@ -3957,25 +4308,43 @@ fn handle_key(
             None
         }
         KeyCode::Char('M') => {
-            match action_match_subtree(
-                &mut app.mapping,
-                before_flat,
-                after_flat,
-                app.before.cursor_id,
-                app.after.cursor_id,
-                before_root,
-                after_root,
-                caches,
-                before_src,
-                after_src,
-                before_hash,
-                after_hash,
-                &mut app.before.collapsed,
-                &mut app.after.collapsed,
-            ) {
+            let outcome = if app.before_multi_select.is_empty() && app.after_multi_select.is_empty()
+            {
+                action_match_subtree(
+                    &mut app.mapping,
+                    before_flat,
+                    after_flat,
+                    app.before.cursor_id,
+                    app.after.cursor_id,
+                    before_root,
+                    after_root,
+                    caches,
+                    before_src,
+                    after_src,
+                    before_hash,
+                    after_hash,
+                    &mut app.before.collapsed,
+                    &mut app.after.collapsed,
+                )
+            } else {
+                action_commit_multi_map_group(
+                    &mut app.mapping,
+                    before_root,
+                    after_root,
+                    &app.before_multi_select,
+                    &app.after_multi_select,
+                    before_hash,
+                    after_hash,
+                    caches,
+                    true,
+                )
+            };
+            match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
+                    app.before_multi_select.clear();
+                    app.after_multi_select.clear();
                     advance_both_to_next_unmarked(
                         app,
                         before_flat,
@@ -4051,6 +4420,27 @@ fn handle_key(
                 app.dirty = true;
             }
             Some(res)
+        }
+        KeyCode::Char('x') => {
+            let (cursor_id, selected) = match focus {
+                Focus::Before => (app.before.cursor_id, &mut app.before_multi_select),
+                Focus::After => (app.after.cursor_id, &mut app.after_multi_select),
+            };
+            if !selected.remove(&cursor_id) {
+                selected.insert(cursor_id);
+            }
+            app.status = Some(format!(
+                "Multi-map selection: {} before, {} after node(s) (m/M to commit as a group, c to clear)",
+                app.before_multi_select.len(),
+                app.after_multi_select.len()
+            ));
+            None
+        }
+        KeyCode::Char('c') => {
+            app.before_multi_select.clear();
+            app.after_multi_select.clear();
+            app.status = Some("Cleared multi-map selection".to_string());
+            None
         }
         KeyCode::Char('p') => {
             let diff = diff_code(before, after);
@@ -4271,6 +4661,53 @@ fn handle_modal_key(
                     before_kind,
                     after_kind,
                     recursive,
+                });
+            }
+        },
+        Modal::ConfirmMultiMapGroup {
+            before_ids,
+            after_ids,
+            operation,
+            with_children,
+            kinds,
+        } => match code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let before_set: std::collections::BTreeSet<usize> =
+                    before_ids.iter().copied().collect();
+                let after_set: std::collections::BTreeSet<usize> =
+                    after_ids.iter().copied().collect();
+                app.status = Some(
+                    match commit_multi_map_group(
+                        &mut app.mapping,
+                        before_root,
+                        after_root,
+                        &before_set,
+                        &after_set,
+                        operation,
+                        with_children,
+                    ) {
+                        Ok(msg) => {
+                            app.dirty = true;
+                            msg
+                        }
+                        Err(err) => format!("Error: {:#}", err),
+                    },
+                );
+                app.before_multi_select.clear();
+                app.after_multi_select.clear();
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                app.status = Some("Cancelled: multi-map group has mixed node kinds".to_string());
+                app.before_multi_select.clear();
+                app.after_multi_select.clear();
+            }
+            _ => {
+                app.modal = Some(Modal::ConfirmMultiMapGroup {
+                    before_ids,
+                    after_ids,
+                    operation,
+                    with_children,
+                    kinds,
                 });
             }
         },
@@ -5219,6 +5656,7 @@ mod tests {
                     None,
                     false,
                     424242,
+                    &std::collections::BTreeSet::new(),
                 )
             })
             .unwrap();
@@ -6753,6 +7191,18 @@ mod tests {
         (statements[0], statements[1])
     }
 
+    /// Every `expression_statement` directly in the function body - unlike `two_statements`,
+    /// doesn't assume a fixed count, so it works for the 2/3-identical-`foo()`-call fixtures the
+    /// multi-map group tests below use.
+    fn block_statements(root: Node) -> Vec<Node> {
+        let block = find_first(root, "block").unwrap();
+        let mut cursor = block.walk();
+        block
+            .children(&mut cursor)
+            .filter(|n| n.kind() == "expression_statement")
+            .collect()
+    }
+
     fn mark_subtree_matched(node: Node, caches: &mut Caches) {
         caches.before_match.insert(node.id(), usize::MAX);
         let mut cursor = node.walk();
@@ -7622,6 +8072,705 @@ mod tests {
         assert_eq!(
             reason_detail(ASTMappingReason::BottomUpExpansion),
             "BottomUp"
+        );
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Multi-map groups (Phase 2: x/c selection, m/M commit, u removal)
+    // -----------------------------------------------------------------------------------------
+
+    #[test]
+    fn multi_map_group_operation_is_identical_only_when_every_member_shares_one_hash() {
+        let mut before_hash = rustc_hash::FxHashMap::default();
+        let mut after_hash = rustc_hash::FxHashMap::default();
+        before_hash.insert(1, 42);
+        before_hash.insert(2, 42);
+        after_hash.insert(10, 42);
+        after_hash.insert(11, 42);
+
+        let before_ids: std::collections::BTreeSet<usize> = [1, 2].into_iter().collect();
+        let after_ids: std::collections::BTreeSet<usize> = [10, 11].into_iter().collect();
+
+        assert_eq!(
+            multi_map_group_operation(&before_ids, &after_ids, &before_hash, &after_hash),
+            HumanOperation::Identical
+        );
+
+        after_hash.insert(11, 99);
+        assert_eq!(
+            multi_map_group_operation(&before_ids, &after_ids, &before_hash, &after_hash),
+            HumanOperation::MatchButNotIdentical
+        );
+    }
+
+    #[test]
+    fn commit_multi_map_group_replaces_any_prior_entry_touching_its_nodes() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+        assert_eq!(before_foos.len(), 3);
+        assert_eq!(after_foos.len(), 2);
+
+        // A pre-existing plain entry pairing the first before-foo with the first after-foo, which
+        // the new group commit (covering all 3/2) should displace.
+        let mut mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(path_for_node(before_foos[0])),
+                after_path: Some(path_for_node(after_foos[0])),
+            }],
+            ..Default::default()
+        };
+
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            HumanOperation::Identical,
+            true,
+        )
+        .unwrap();
+
+        assert!(
+            mapping.entries.is_empty(),
+            "the pre-existing plain entry touching a group member should be removed: {:?}",
+            mapping.entries
+        );
+        assert_eq!(mapping.groups.len(), 1);
+        assert_eq!(mapping.groups[0].before_paths.len(), 3);
+        assert_eq!(mapping.groups[0].after_paths.len(), 2);
+        assert!(mapping.groups[0].with_children);
+    }
+
+    #[test]
+    fn commit_multi_map_group_replaces_a_prior_group_sharing_a_node() {
+        let source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+
+        let first_pair_before: std::collections::BTreeSet<usize> =
+            [before_foos[0].id(), before_foos[1].id()]
+                .into_iter()
+                .collect();
+        let first_pair_after: std::collections::BTreeSet<usize> =
+            [after_foos[0].id(), after_foos[1].id()]
+                .into_iter()
+                .collect();
+        let mut mapping = HumanMapping::default();
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &first_pair_before,
+            &first_pair_after,
+            HumanOperation::Identical,
+            false,
+        )
+        .unwrap();
+        assert_eq!(mapping.groups.len(), 1);
+
+        // A second group sharing before_foos[1] with the first should replace it, not coexist.
+        let second_before: std::collections::BTreeSet<usize> =
+            [before_foos[1].id(), before_foos[2].id()]
+                .into_iter()
+                .collect();
+        let second_after: std::collections::BTreeSet<usize> =
+            [after_foos[2].id()].into_iter().collect();
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &second_before,
+            &second_after,
+            HumanOperation::Identical,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            mapping.groups.len(),
+            1,
+            "the first group should have been dropped, not left alongside the second: {:?}",
+            mapping.groups
+        );
+        assert_eq!(mapping.groups[0].before_paths.len(), 2);
+    }
+
+    #[test]
+    fn commit_multi_map_group_orders_paths_by_source_position_not_by_arena_id() {
+        // A `BTreeSet<usize>` orders by node id, not source position - parse-unstable (same
+        // lesson as this project's benchmark-determinism-fix). The committed group's paths must
+        // come out in source order regardless, so re-selecting the same nodes in a later session
+        // can't shuffle a `human_mapping.json` that otherwise didn't change.
+        let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let stmts = block_statements(root);
+        assert_eq!(stmts.len(), 3);
+
+        let mut mapping = HumanMapping::default();
+        let ids: std::collections::BTreeSet<usize> = stmts.iter().map(|n| n.id()).collect();
+        commit_multi_map_group(
+            &mut mapping,
+            root,
+            root,
+            &ids,
+            &ids,
+            HumanOperation::Identical,
+            false,
+        )
+        .unwrap();
+
+        let expected: Vec<Vec<String>> = stmts.iter().map(|n| path_for_node(*n)).collect();
+        assert_eq!(
+            mapping.groups[0].before_paths, expected,
+            "paths should be ordered by source position (a, b, c)"
+        );
+        assert_eq!(mapping.groups[0].after_paths, expected);
+    }
+
+    #[test]
+    fn commit_multi_map_group_with_children_clears_a_pre_existing_descendant_entry() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+        assert_eq!(before_foos.len(), 2);
+        assert_eq!(after_foos.len(), 1);
+
+        // A stale entry on a descendant of `before_foos[0]` (its inner `call_expression`),
+        // pointing at some unrelated after node - exactly what a `with_children` commit must
+        // sweep, the same way `d`/`i`'s own `clear_before_descendants`/`clear_after_descendants`
+        // calls already do for a plain delete/insert-with-children mark.
+        let descendant = find_first(before_foos[0], "call_expression").unwrap();
+        let mut mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(path_for_node(descendant)),
+                after_path: Some(path_for_node(after_foos[0])),
+            }],
+            ..Default::default()
+        };
+
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            HumanOperation::Identical,
+            true,
+        )
+        .unwrap();
+
+        assert!(
+            mapping.entries.is_empty(),
+            "the stale descendant entry should have been cleared by the with_children commit: {:?}",
+            mapping.entries
+        );
+        assert_eq!(mapping.groups.len(), 1);
+    }
+
+    #[test]
+    fn action_commit_multi_map_group_errors_when_a_member_is_under_a_deleted_with_children_ancestor()
+     {
+        let before_source =
+            "fn main() {\n    if true {\n        foo();\n        foo();\n    }\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let if_expr = find_first(before_root, "if_expression").unwrap();
+        let inner_block = find_first(if_expr, "block").unwrap();
+        let mut cursor = inner_block.walk();
+        let before_foos: Vec<Node> = inner_block
+            .children(&mut cursor)
+            .filter(|n| n.kind() == "expression_statement")
+            .collect();
+        assert_eq!(before_foos.len(), 2);
+
+        let after_foos = block_statements(after_root);
+        assert_eq!(after_foos.len(), 2);
+
+        let mut mapping = HumanMapping::default();
+        let mut caches = Caches::default();
+        caches.before_removed.insert(if_expr.id(), true);
+
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        let result = action_commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            &no_hashes,
+            &no_hashes,
+            &caches,
+            false,
+        );
+        match result {
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("covered by an ancestor's delete-with-children mark"),
+                "{err}"
+            ),
+            Ok(_) => panic!(
+                "expected an error: a selected node sits under an ancestor already marked deleted-with-children"
+            ),
+        }
+        assert!(mapping.groups.is_empty());
+    }
+
+    #[test]
+    fn action_commit_multi_map_group_errors_when_one_side_is_empty() {
+        let source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mut mapping = HumanMapping::default();
+        let before_ids: std::collections::BTreeSet<usize> = block_statements(before_root)
+            .iter()
+            .map(|n| n.id())
+            .collect();
+        let after_ids = std::collections::BTreeSet::new();
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        let result = action_commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            &no_hashes,
+            &no_hashes,
+            &Caches::default(),
+            false,
+        );
+        match result {
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("at least one selected node on both sides"),
+                "{err}"
+            ),
+            Ok(_) => panic!("expected an error when one side of the selection is empty"),
+        }
+        assert!(mapping.groups.is_empty());
+    }
+
+    #[test]
+    fn action_commit_multi_map_group_raises_a_modal_for_mixed_kinds() {
+        let before_source = "fn main() {\n    foo();\n    let x = 1;\n}\n";
+        let after_source = "fn main() {\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let block = find_first(before_root, "block").unwrap();
+        let mut cursor = block.walk();
+        let before_nodes: Vec<Node> = block
+            .children(&mut cursor)
+            .filter(|n| n.kind() == "expression_statement" || n.kind() == "let_declaration")
+            .collect();
+        assert_eq!(before_nodes.len(), 2);
+        assert_ne!(before_nodes[0].kind(), before_nodes[1].kind());
+
+        let after_nodes = block_statements(after_root);
+        assert_eq!(after_nodes.len(), 1);
+
+        let mut mapping = HumanMapping::default();
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_nodes.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_nodes.iter().map(|n| n.id()).collect();
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        let outcome = action_commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            &no_hashes,
+            &no_hashes,
+            &Caches::default(),
+            false,
+        )
+        .unwrap();
+
+        match outcome {
+            ActionOutcome::NeedsModal(Modal::ConfirmMultiMapGroup { kinds, .. }) => {
+                assert!(kinds.len() > 1, "{:?}", kinds);
+            }
+            ActionOutcome::Done(msg) => {
+                panic!("expected a mixed-kinds confirmation, action completed instead: {msg}")
+            }
+            ActionOutcome::NeedsModal(other) => {
+                panic!("expected ConfirmMultiMapGroup, got {other:?}")
+            }
+        }
+        assert!(
+            mapping.groups.is_empty(),
+            "nothing should commit until the modal is confirmed"
+        );
+    }
+
+    #[test]
+    fn action_commit_multi_map_group_commits_directly_when_kinds_match() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+        let mut mapping = HumanMapping::default();
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        let outcome = action_commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            &no_hashes,
+            &no_hashes,
+            &Caches::default(),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, ActionOutcome::Done(_)));
+        assert_eq!(mapping.groups.len(), 1);
+        // No content hashes were supplied (`no_hashes`), so every lookup misses and the group
+        // falls back to `MatchButNotIdentical` - see `multi_map_group_operation`.
+        assert_eq!(
+            mapping.groups[0].operation,
+            HumanOperation::MatchButNotIdentical
+        );
+        assert!(mapping.groups[0].with_children);
+    }
+
+    #[test]
+    fn action_unmark_on_a_group_member_removes_the_whole_group() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+
+        let mut mapping = HumanMapping::default();
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            HumanOperation::Identical,
+            false,
+        )
+        .unwrap();
+        assert_eq!(mapping.groups.len(), 1);
+
+        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+
+        // Any one member - here, the leftover before-foo that landed on Delete rather than a
+        // matched pair - should be enough to drop the whole group.
+        let leftover = before_foos
+            .iter()
+            .find(|n| {
+                caches.before_group.contains_key(&n.id())
+                    && !caches.before_match.contains_key(&n.id())
+            })
+            .expect("exactly one before-foo should be the group's leftover");
+
+        let msg = action_unmark(
+            &mut mapping,
+            Focus::Before,
+            &before_flat,
+            &after_flat,
+            leftover.id(),
+            after_foos[0].id(),
+            before_root,
+            after_root,
+            &caches,
+        )
+        .unwrap();
+
+        assert!(msg.contains("Removed multi-map group"), "{msg}");
+        assert!(mapping.groups.is_empty());
+    }
+
+    #[test]
+    fn handle_key_x_toggles_multi_select_and_c_clears_both_sides() {
+        let source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let before_foos = block_statements(before_root);
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        app.before.cursor_id = before_foos[0].id();
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let caches = Caches::default();
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        handle_key(
+            &mut app,
+            KeyCode::Char('x'),
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+        assert_eq!(app.before_multi_select.len(), 1);
+        assert!(app.before_multi_select.contains(&before_foos[0].id()));
+
+        // Pressing x again on the same node toggles it back out.
+        handle_key(
+            &mut app,
+            KeyCode::Char('x'),
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+        assert!(app.before_multi_select.is_empty());
+
+        app.before_multi_select.insert(before_foos[0].id());
+        app.after_multi_select.insert(before_foos[1].id());
+        handle_key(
+            &mut app,
+            KeyCode::Char('c'),
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+        assert!(app.before_multi_select.is_empty());
+        assert!(app.after_multi_select.is_empty());
+    }
+
+    #[test]
+    fn handle_key_m_with_a_pending_selection_commits_a_multi_map_group() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            before_root.id(),
+            after_root.id(),
+            HumanMapping::default(),
+        );
+        app.before_multi_select = before_foos.iter().map(|n| n.id()).collect();
+        app.after_multi_select = after_foos.iter().map(|n| n.id()).collect();
+
+        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
+        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
+        let no_hashes = rustc_hash::FxHashMap::default();
+
+        handle_key(
+            &mut app,
+            KeyCode::Char('m'),
+            &before_flat,
+            &after_flat,
+            before_root,
+            after_root,
+            &caches,
+            before_source.as_bytes(),
+            after_source.as_bytes(),
+            &no_hashes,
+            &no_hashes,
+            &Code::from_string(before_source, &Language::Rust),
+            &Code::from_string(after_source, &Language::Rust),
+        );
+
+        assert_eq!(app.mapping.groups.len(), 1, "{:?}", app.mapping.groups);
+        assert!(app.mapping.entries.is_empty(), "{:?}", app.mapping.entries);
+        assert!(app.dirty);
+        assert!(
+            app.before_multi_select.is_empty() && app.after_multi_select.is_empty(),
+            "the selection should be cleared once committed"
+        );
+        // `m`, not `M`: the committed group should not require subtree closure.
+        assert!(!app.mapping.groups[0].with_children);
+    }
+
+    #[test]
+    fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let before_foos = block_statements(before_root);
+        let after_foos = block_statements(after_root);
+
+        let mut mapping = HumanMapping::default();
+        let before_ids: std::collections::BTreeSet<usize> =
+            before_foos.iter().map(|n| n.id()).collect();
+        let after_ids: std::collections::BTreeSet<usize> =
+            after_foos.iter().map(|n| n.id()).collect();
+        commit_multi_map_group(
+            &mut mapping,
+            before_root,
+            after_root,
+            &before_ids,
+            &after_ids,
+            HumanOperation::Identical,
+            false,
+        )
+        .unwrap();
+
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+        let flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let mut panel = PanelState::new(before_root.id());
+
+        // Mark one before-foo (not part of any group) as a pending multi-map selection, to prove
+        // it renders distinctly from the already-committed group members.
+        let mut pending = std::collections::BTreeSet::new();
+        let plain_node = find_first(before_root, "function_item").unwrap();
+        pending.insert(plain_node.id());
+
+        let backend = ratatui::backend::TestBackend::new(60, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 60, 20);
+
+        terminal
+            .draw(|f| {
+                render_panel(
+                    f,
+                    area,
+                    "Before",
+                    &flat,
+                    &mut panel,
+                    &caches,
+                    Side::Before,
+                    before_source.as_bytes(),
+                    true,
+                    None,
+                    false,
+                    0,
+                    &pending,
+                );
+            })
+            .unwrap();
+
+        // `render_panel` draws inside a bordered `Block`, so row 0 and column 0 of the buffer are
+        // the border itself - list content starts at row 1, column 1.
+        let content = terminal.backend().buffer().content();
+        let plain_row_idx = flat
+            .iter()
+            .position(|(n, _)| n.id() == plain_node.id())
+            .unwrap()
+            + 1;
+        let group_row_idx = flat
+            .iter()
+            .position(|(n, _)| n.id() == before_foos[0].id())
+            .unwrap()
+            + 1;
+
+        let plain_cell = &content[plain_row_idx * 60 + 1];
+        assert_eq!(
+            plain_cell.fg,
+            Color::Magenta,
+            "a pending multi-map selection should render in a distinct color"
+        );
+
+        let group_row_text: String = (0..60)
+            .map(|col| content[group_row_idx * 60 + col].symbol())
+            .collect();
+        assert!(
+            group_row_text.contains('g'),
+            "a group-derived match should carry the 'g' marker: {group_row_text:?}"
         );
     }
 }
