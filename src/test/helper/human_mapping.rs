@@ -883,13 +883,17 @@ fn describe_nondeterminism_with_config(
 * Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
 * returns every point of disagreement between the two (empty if they fully agree).
 *
-* Also re-parses the before/after source two more times from scratch and re-diffs, comparing all
-* three results by node *path* (not ID - see [`describe_nondeterminism`]) against each other:
-* `diff_code` is supposed to be a pure function of its source text, so any difference between
-* independently-parsed runs means some pass is relying on something other than the source text
-* (e.g. an unordered `HashMap`/`HashSet` iteration, or a tree-sitter arena node ID used as a sort
-* key) to pick a winner - which would otherwise silently make every mismatch count in this suite,
-* and in `benchmark_optimal_solutions` (which shares this function), unreliable from run to run.
+* For fixtures in [`crate::test::helper::UNIT_TEST_FIXTURES`], also re-parses the before/after
+* source two more times from scratch and re-diffs, comparing all three results by node *path* (not
+* ID - see [`describe_nondeterminism`]) against each other: `diff_code` is supposed to be a pure
+* function of its source text, so any difference between independently-parsed runs means some pass
+* is relying on something other than the source text (e.g. an unordered `HashMap`/`HashSet`
+* iteration, or a tree-sitter arena node ID used as a sort key) to pick a winner - which would
+* otherwise silently make every mismatch count in this suite, and in `benchmark_optimal_solutions`
+* (which shares this function), unreliable from run to run. Sampled rather than run for every
+* fixture (2026-08-08): this quadruples the diff pipeline's cost per fixture it runs on, and a
+* nondeterminism bug is a property of a code path, not a specific fixture - the per-language sample
+* exercises every language's pipeline the same way the full corpus would.
 *
 * Shared by `assert_matches_human_mapping` (which just turns a non-empty result into a test
 * failure) and the `benchmark_optimal_solutions` binary (which wants the raw count across every
@@ -1197,8 +1201,17 @@ pub fn compute_mismatches_for_with_config(
 
     let node_cache = NodeCache::build(before, after);
     let language = before.metadata.language.unwrap_or_default();
-    let mut mismatches =
-        describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config);
+    // Sampled, not run for every fixture: the determinism check alone triples the diff pipeline's
+    // cost (3 extra full runs on top of the real one above), and a nondeterminism bug (unordered
+    // HashMap/HashSet iteration, an arena node ID used as a sort key) is a property of a *code
+    // path*, not a specific fixture - the per-language `UNIT_TEST_FIXTURES` sample exercises every
+    // language's pipeline the same way the full corpus would, at a fraction of the cost. See
+    // TODO.md's 2026-08-08 entry for the corpus-wide timing that motivated this.
+    let mut mismatches = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name) {
+        describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config)
+    } else {
+        Vec::new()
+    };
 
     // Check that the produced diff is valid
     if !diff_ast.is_valid(before, after, &node_cache) {

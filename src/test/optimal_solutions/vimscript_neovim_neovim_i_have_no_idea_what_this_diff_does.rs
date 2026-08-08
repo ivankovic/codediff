@@ -21,6 +21,11 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // Was ~30s/run (~120s total with the determinism check) before the 2026-08-08
+    // `solve_large_flat_subtrees` fixes (kind-uniqueness top-level identity + recursing the
+    // Myers-unmatched residual through APTED instead of atomically deleting/inserting it) let this
+    // fixture's giant, deeply-nested dictionary finally get matched properly - now 0.17s at the
+    // same 0-mismatch exactness as before. See TODO.md's 2026-08-08 entry for the full writeup.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does",
     )

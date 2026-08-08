@@ -26,16 +26,15 @@ fn optimal_solution() -> Result<()> {
     // threaded through a large call's `argument_list`; one existing slot changes from
     // `None,  # page_table,` to `block_table,  # block_table,`. This falls inside
     // `solve_large_flat_subtrees`'s Myers-based matching, which only pairs *byte-identical*
-    // hashes and commits every non-match straight to delete/insert (a deliberate speed tradeoff -
-    // see `resolve_flat_tree_pair`'s own doc comment) rather than running real tree-edit-distance
-    // on the residual. `None` (before, kind `none`) and `block_table` (after, kind `identifier`)
-    // were never going to be Myers-paired - and even a real APTED pass wouldn't merge them
-    // anyway: `none`/`identifier` aren't on `kinds_update_allowed`'s list, so a forced update
-    // would cost `COST_DELETE + COST_INSERT + 1` (3), strictly more than the delete+insert (2)
-    // codediff actually produced. Both the `None`/`identifier` and the trailing comment end up
-    // deleted-and-reinserted rather than updated in place.
+    // hashes; since 2026-08-08 the residual it can't pair recurses through real APTED instead of
+    // committing straight to delete/insert (see TODO.md's 2026-08-08 entry), which is why this
+    // dropped from 2 mismatches to 1 - the trailing comment now resolves correctly. The remaining
+    // one is genuinely unavoidable: `None` (before, kind `none`) and `block_table` (after, kind
+    // `identifier`) aren't on `kinds_update_allowed`'s list, so even real APTED's forced-update
+    // cost (`COST_DELETE + COST_INSERT + 1` = 3) loses to plain delete+insert (2) - there's no
+    // cheaper mapping to find.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-pytorch-pytorch-add-param-to-many-places-and-update-one",
-        2,
+        1,
     )
 }

@@ -1196,6 +1196,18 @@ fn backtrack_myers(
     matches
 }
 
+/// Above this many Myers-unmatched entries on either side, [`resolve_flat_tree_pair`] falls back
+/// to the old atomic delete/insert behavior instead of recursing them through APTED - see that
+/// function's doc comment for why the recursion exists and why it needs a cap at all. Deliberately
+/// small (not `FLAT_MAX_EDIT`'s 1000): the residual here is exactly the content Myers *couldn't*
+/// place, i.e. plausibly-real edits worth resolving properly, not the "so much changed, don't
+/// bother" case `FLAT_MAX_EDIT` guards against - but each entry can itself be an arbitrarily large
+/// subtree, so recursing an unbounded *number* of them would reintroduce the same "large residual,
+/// full tree-edit-distance" cost this whole fast path exists to avoid. 20 covers "a handful of
+/// entries were actually edited" (confirmed against the fixtures that motivated this - see TODO.md
+/// 2026-08-08) with real margin while still bailing out for a large-scale rewrite.
+const FLAT_UNMATCHED_RECURSE_LIMIT: usize = 20;
+
 /// Resolve a flat-tree root pair via Myers sequence diff and emit all mappings into `diff`.
 // Each parameter is a genuinely distinct piece of context (both roots, both metadata sets, the
 // pre-computed children, the source string, the mutable diff) - grouping them into a struct built
@@ -1237,13 +1249,53 @@ fn resolve_flat_tree_pair(
                     diff,
                 );
             }
-            for (i, &id) in before_children.iter().enumerate() {
-                if !before_matched[i] {
+            let before_unmatched: Vec<usize> = before_children
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !before_matched[*i])
+                .map(|(_, &id)| id)
+                .collect();
+            let after_unmatched: Vec<usize> = after_children
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !after_matched[*i])
+                .map(|(_, &id)| id)
+                .collect();
+
+            // A Myers-unmatched entry only failed *exact-hash* equality - it can still share real
+            // structure with an entry on the other side (a small edit inside an otherwise-
+            // unchanged dictionary/list entry, say). Recurse the leftover through real APTED
+            // (bounded by `FLAT_UNMATCHED_RECURSE_LIMIT`, see its doc comment) instead of
+            // unconditionally treating every one of them as fully replaced - `resolve_forest`
+            // still has delete/insert available for genuinely unrelated pairs, so this can only
+            // find *more* reuse than the atomic version, never less. Confirmed against a live case
+            // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: one dictionary entry
+            // out of ~185 had an internal edit; the atomic version deleted+inserted all ~40 of its
+            // descendant nodes instead of recognizing the ~38 that were untouched - see TODO.md's
+            // 2026-08-08 entry).
+            if !before_unmatched.is_empty()
+                && !after_unmatched.is_empty()
+                && before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+                && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+            {
+                let cost_model = UnitCostModel {
+                    language: before_meta.language,
+                };
+                resolve_forest(
+                    before_unmatched,
+                    after_unmatched,
+                    before_meta,
+                    after_meta,
+                    &cost_model,
+                    Algorithm::Apted,
+                    source,
+                    diff,
+                );
+            } else {
+                for &id in &before_unmatched {
                     add_delete_mappings(id, before_meta, source, diff);
                 }
-            }
-            for (i, &id) in after_children.iter().enumerate() {
-                if !after_matched[i] {
+                for &id in &after_unmatched {
                     add_insert_mappings(id, after_meta, source, diff);
                 }
             }

@@ -1717,15 +1717,14 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         "all 100 identical tokens should be matched"
     );
 
-    // "old_value" (before child 51) should be deleted; "new_value" (after child 51) inserted.
-    assert!(
-        diff.mapping.contains_key(&(51, 0)),
-        "old_value token should be deleted"
+    // "old_value" (before child 51) and "new_value" (after child 51) are the only Myers-unmatched
+    // pair on each side, so the 2026-08-08 residual-recursion fix (see TODO.md) resolves them
+    // through real APTED instead of an atomic delete+insert - same kind ("token"), so an Update is
+    // the cheaper, more accurate edit than delete+insert would have been.
+    let changed_mapping = diff.mapping.get(&(51, 51)).expect(
+        "changed token pair should be recursively resolved, not atomically deleted/inserted",
     );
-    assert!(
-        diff.mapping.contains_key(&(0, 51)),
-        "new_value token should be inserted"
-    );
+    assert_eq!(changed_mapping.operation, ASTMappingOperation::Update);
 
     Ok(())
 }

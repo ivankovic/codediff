@@ -21,11 +21,11 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    // 15 mismatches inside the one function the edit touches: same-kind-sibling ambiguity in a
-    // 1732-line file with hundreds of near-duplicate test functions - see TODO.md's "1 new
-    // optimal-solution fixture added, clamped" entry.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Was 15 mismatches (same-kind-sibling ambiguity in a 1732-line file with hundreds of
+    // near-duplicate test functions - see TODO.md's "1 new optimal-solution fixture added,
+    // clamped" entry) until the 2026-08-08 `solve_large_flat_subtrees` fixes incidentally
+    // resolved it too - see TODO.md's 2026-08-08 entry.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-add-line-comment",
-        15,
     )
 }

@@ -139,6 +139,15 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         // one (deliberately - see this function's doc comment) and so never gets the chance. See
         // `solve_named_reference_groups_within`'s doc comment for the confirmed live cases this
         // fixes.
+        //
+        // Tried moving both pre-match calls here to *before* the Myers call above (2026-08-08),
+        // hoping they'd rescue reusable substructure inside a flat-descendant entry that changed
+        // internally (see TODO.md's vimscript entry) before Myers atomically deletes+inserts it.
+        // Zero effect - identical mismatch count and content. Neither helper fires on a
+        // `dictionnary_entry`: `solve_named_reference_groups_within` only matches named
+        // declarations, `prematch_identical_statement_siblings` only matches statement sequences,
+        // and a dictionary entry is neither. Reverted; left as a doc note so this isn't
+        // re-attempted without a reason to expect a different result.
         if let (Some(&before_node), Some(&after_node)) = (
             node_cache.before.get(&before_id),
             node_cache.after.get(&after_id),
@@ -187,7 +196,8 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 /// established - `nodes::is_semantically_structural`'s cross-language name extraction first,
 /// falling back to a macro's own callee name (Rust `macro_invocation`, which
 /// `is_semantically_structural` does not cover - see that function's doc comment for why: it's
-/// about compiler-enforced-unique declarations, and a macro invocation is neither).
+/// about compiler-enforced-unique declarations, and a macro invocation is neither), then a
+/// kind-uniqueness fallback (see below) for children neither of those cover at all.
 fn top_level_identities(
     root_node: tree_sitter::Node,
     metadata: &ASTMetadata,
@@ -195,10 +205,12 @@ fn top_level_identities(
     code: &Code,
 ) -> HashMap<(String, String), usize> {
     let mut result = HashMap::new();
+    let mut identified_ids = std::collections::HashSet::new();
     let mut cursor = root_node.walk();
     for child in root_node.children(&mut cursor) {
         if let Some(key) = nodes::is_semantically_structural(&child, language, code) {
             result.entry(key).or_insert(child.id());
+            identified_ids.insert(child.id());
             continue;
         }
         if child.kind() == "macro_invocation"
@@ -207,8 +219,46 @@ fn top_level_identities(
             result
                 .entry(("macro_invocation".to_string(), name))
                 .or_insert(child.id());
+            identified_ids.insert(child.id());
         }
     }
+
+    // Kind-uniqueness fallback: a top-level child with no name and no macro-callee identity (a
+    // control-flow/block wrapper - `if`/`try`/`while`/... - has neither) is still unambiguously
+    // identifiable if its *kind* appears exactly once among root's direct children on this side:
+    // there is nothing else on this side it could positionally correspond to, the same reasoning
+    // `only_named_child` (below) already uses for a whole-file single-value root, just scoped to
+    // "unique by kind among *several* top-level items" instead of "the only item at all" -
+    // deliberately skipped when `root_node` has at most one named child at all, leaving that
+    // narrower, kind-agnostic case entirely to `only_named_child` below (matching a before/after
+    // pair whose single root value's *kind* changed entirely - e.g. a JSON file rewritten from an
+    // object to an array - is exactly the case a kind-keyed lookup here can't express, since the
+    // two sides would get different keys and silently fail to match at all instead of falling
+    // through to that mechanism). Exists because a large flat data literal can be buried
+    // arbitrarily deep inside such a wrapper (an `if`/`try` guard around most of a script's body,
+    // say) with nothing above it in the tree to name-match on - confirmed against a live case
+    // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: a single top-level
+    // `if_statement` wrapping a 370-direct-child `dictionnary` 8 levels down; `final_apted` alone
+    // took ~30s per diff with this pass unable to reach it, ~instant once matched here - see
+    // TODO.md's 2026-08-08 entry).
+    if root_node.named_child_count() > 1 {
+        let mut kind_counts: HashMap<&str, usize> = HashMap::new();
+        let mut cursor = root_node.walk();
+        for child in root_node.children(&mut cursor) {
+            if !identified_ids.contains(&child.id()) {
+                *kind_counts.entry(child.kind()).or_default() += 1;
+            }
+        }
+        let mut cursor = root_node.walk();
+        for child in root_node.children(&mut cursor) {
+            if !identified_ids.contains(&child.id()) && kind_counts.get(child.kind()) == Some(&1) {
+                result
+                    .entry((child.kind().to_string(), String::new()))
+                    .or_insert(child.id());
+            }
+        }
+    }
+
     result
 }
 
