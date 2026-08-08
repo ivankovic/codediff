@@ -165,7 +165,7 @@ Swift,nextcloud-ios.git,b6dddea2df91b94b3653110c4421d312a9910516,iOSClient/Netwo
 Swift,nextcloud-ios.git,bbe81791f45a9e78210b83cff2b181d6d204ca64,iOSClient/Main/NCMainNavigationController.swift,
 Swift,nextcloud-ios.git,bf284ac5bb885ece12934dde3bfbee45ea2ff5db,iOSClient/Networking/NCNetworking+NextcloudKitDelegate.swift,
 Swift,nextcloud-ios.git,ef634377e7e034566457a94fb1985e18d5642c15,iOSClient/Utility/Maintenance.swift,swift-nextcloud-ios-call-different-function
-Swift,swiftlang-swift.git,0266a0a0dffb7b0f92cd0d934fb6b39af249cdff,test/AutoDiff/validation-test/closure_specialization/multi_bb_no_bte.swift,
+Swift,swiftlang-swift.git,0266a0a0dffb7b0f92cd0d934fb6b39af249cdff,test/AutoDiff/validation-test/closure_specialization/multi_bb_no_bte.swift,swift-swiftlang-swift-enable-checks-remove-todo-comment
 Swift,swiftlang-swift.git,39521e18c2f53e4890a4e7e6905434a20b801d32,utils/swift-dev-utils/Sources/CrashReduce/CrashLog.swift,
 Swift,swiftlang-swift.git,cd7ca397e3a3386e571a4974ec7e58398e0908b8,validation-test/IDE/crashers/Parser-parseParameterClause-844783.swift,swift-swiftlang-swift-comment-change
 Swift,swiftlang-swift.git,f2798f8ff420ed83454fed70586be86ba088eef1,test/Constraints/issue-85942.swift,swift-swiftlang-swift-comment-change-2
@@ -201,7 +201,7 @@ Vimscript,neovim-neovim.git,9ca69488cf08d78609ad4baef50bbcbbc937a9b7,runtime/pac
 Vimscript,neovim-neovim.git,a4ee34a165ef5b190378740d2c4ce15410f0f477,runtime/ftplugin/rst.vim,vimscript-neovim-neovim-add-a-few-lines
 XML,microsoft-terminal.git,1283c0f5b99a2961673249fa77c6b986efb5086c,build/StoreSubmission/Stable/PDPs/pt-BR/PDP.xml,xml-microsoft-terminal-multiline-string-constant-change
 XML,mozilla-firefox-firefox.git,5f65e4c7945324f374671ca09cb10d25f1cd3ffe,mobile/android/android-components/components/feature/app-links/src/main/res/values-be/strings.xml,xml-mozilla-firefox-firefox-add-a-few-attributes
-XML,mozilla-firefox-firefox.git,5f65e4c7945324f374671ca09cb10d25f1cd3ffe,mobile/android/android-components/components/feature/app-links/src/main/res/values-hsb/strings.xml,
+XML,mozilla-firefox-firefox.git,5f65e4c7945324f374671ca09cb10d25f1cd3ffe,mobile/android/android-components/components/feature/app-links/src/main/res/values-hsb/strings.xml,xml-mozilla-firefox-firefox-add-a-few-translations-and-a-few-attributes
 XML,nextcloud-android.git,275220d89e07a10816eb4aca5e23c4ff7419ebc2,app/src/main/res/values-is/strings.xml,xml-nextcloud-android-delete-element
 XML,nextcloud-android.git,a28b3fdd3d24f159e0bd3212a3ceb9abbebea960,app/src/main/res/values-it/strings.xml,xml-nextcloud-android-delete-element-2
 XML,nextcloud-android.git,e3204931c6efe32c39239dfc93d3c88b153f45d1,app/src/main/res/values-hr/strings.xml,xml-nextcloud-android-add-few-translations

@@ -386,6 +386,8 @@ mod swift_swiftlang_swift_comment_change;
 #[cfg(test)]
 mod swift_swiftlang_swift_comment_change_2;
 #[cfg(test)]
+mod swift_swiftlang_swift_enable_checks_remove_todo_comment;
+#[cfg(test)]
 mod tsx_apache_superset_add_test_case;
 #[cfg(test)]
 mod tsx_apache_superset_error_handling_change;
@@ -445,6 +447,8 @@ mod vimscript_neovim_neovim_improved_asserts;
 mod xml_microsoft_terminal_multiline_string_constant_change;
 #[cfg(test)]
 mod xml_mozilla_firefox_firefox_add_a_few_attributes;
+#[cfg(test)]
+mod xml_mozilla_firefox_firefox_add_a_few_translations_and_a_few_attributes;
 #[cfg(test)]
 mod xml_nextcloud_android_add_few_translations;
 #[cfg(test)]
