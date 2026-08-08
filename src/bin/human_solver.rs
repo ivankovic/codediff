@@ -235,7 +235,9 @@ s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it
 o              open a different test case (src/test/data/diffs/); press d inside
                  this picker to cycle which dataset it's narrowed to (all,
-                 handmade, small, full) -- persists across o
+                 handmade, small, full), or H to narrow to cases with at
+                 least one unmarked node left (first press scans the whole
+                 corpus, so it can take a few seconds) -- both persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\" -- press H inside this picker to
                  hide/show them, or s to cycle its sort order (A-Z, Z-A,
@@ -364,30 +366,45 @@ fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
 
 /// `options` (`list_available_cases`'s output) narrowed to just `filter`'s dataset - or every
 /// entry's name, unsorted-relative-to-each-other-again since `options` is already alphabetical,
-/// when `filter` is `None` ("all").
+/// when `filter` is `None` ("all") - and, if `hide_complete` is set, further narrowed to cases
+/// `completeness` marks as having at least one `NodeStatus::Unmarked` node left (see
+/// `diff_case_is_incomplete`). A case missing from `completeness` (not yet scanned, or
+/// `compute_diff_completeness` couldn't load it) is kept visible under `hide_complete` too - fail
+/// open, since hiding something the scan never actually confirmed as done would be misleading.
 fn visible_diff_options(
     options: &[(String, &'static str)],
     filter: Option<&'static str>,
+    hide_complete: bool,
+    completeness: Option<&std::collections::HashMap<String, bool>>,
 ) -> Vec<String> {
     options
         .iter()
         .filter(|(_, dataset)| filter.is_none_or(|f| *dataset == f))
+        .filter(|(name, _)| {
+            !hide_complete
+                || completeness
+                    .and_then(|m| m.get(name))
+                    .copied()
+                    .unwrap_or(true)
+        })
         .map(|(name, _)| name.clone())
         .collect()
 }
 
 /// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case
-/// already open, so it starts selected if it's still visible under `dataset_filter`), and the
-/// persisted `dataset_filter` (`App::diff_dataset_filter`) - same shape as
-/// `open_sample_picker_modal` for `O`, and for the same reason: keeping the real logic here, not
-/// in the `KeyCode::Char('o')`/`'d'` handlers, makes it unit-testable without real files under
-/// src/test/data/diffs/.
+/// already open, so it starts selected if it's still visible under `dataset_filter`/
+/// `hide_complete`), and the persisted `dataset_filter`/`hide_complete` (`App::diff_dataset_filter`/
+/// `diff_hide_complete`) - same shape as `open_sample_picker_modal` for `O`, and for the same
+/// reason: keeping the real logic here, not in the `KeyCode::Char('o')`/`'d'`/`'H'` handlers,
+/// makes it unit-testable without real files under src/test/data/diffs/.
 fn open_diff_picker_modal(
     options: Vec<(String, &'static str)>,
     current_name: &str,
     dataset_filter: Option<&'static str>,
+    hide_complete: bool,
+    completeness: Option<&std::collections::HashMap<String, bool>>,
 ) -> Modal {
-    let visible = visible_diff_options(&options, dataset_filter);
+    let visible = visible_diff_options(&options, dataset_filter, hide_complete, completeness);
     let selected = visible
         .iter()
         .position(|name| name == current_name)
@@ -397,6 +414,7 @@ fn open_diff_picker_modal(
         options,
         selected,
         dataset_filter,
+        hide_complete,
     }
 }
 
@@ -411,6 +429,80 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
             .and_then(|i| DIFF_DATASETS.get(i + 1))
             .copied(),
     }
+}
+
+/// Whether any node in `root`'s subtree has `NodeStatus::Unmarked` under `caches` - short-circuits
+/// on the first one found, so only a fully-annotated ("complete") fixture pays for a full walk.
+fn tree_has_unmarked_node(
+    root: Node,
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) -> bool {
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if status_fn(node, caches) == NodeStatus::Unmarked {
+            return true;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    false
+}
+
+/// Whether `name`'s current human-authored mapping leaves any node, in either its before or after
+/// tree, `NodeStatus::Unmarked` - i.e. whether there's still annotation work left on it. `None` if
+/// the case's code or mapping couldn't be loaded at all - no `human_mapping.json` yet, a directory
+/// that doesn't parse as a valid case, or (rarer) source that no longer parses. `compute_diff_completeness`
+/// treats every one of those the same as `Some(true)` ("needs attention"), rather than silently
+/// excluding a broken case from the incomplete-only view - a case that fails to load is exactly
+/// the kind of thing this filter should surface, not hide. Pressing Enter on it in the picker
+/// still goes through `load_case`'s own error handling as normal; this function doesn't change
+/// what opening it does, only whether `H` shows it.
+fn diff_case_is_incomplete(name: &str) -> Option<bool> {
+    let dir = diffs_case_dir(name)?;
+    let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
+    let mapping = human_mapping::load(name).ok()?;
+    let before_root = before.ast.as_ref()?.root_node();
+    let after_root = after.ast.as_ref()?.root_node();
+    let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+    Some(
+        tree_has_unmarked_node(before_root, &caches, status_before)
+            || tree_has_unmarked_node(after_root, &caches, status_after),
+    )
+}
+
+/// Refreshes just `name`'s entry in `App::diff_completeness`, if the cache has been built at all
+/// this session - called after a save, since that's the only way a case's completeness can change
+/// mid-session, and a targeted single-fixture refresh is cheap, unlike rebuilding the whole cache
+/// (see that field's own doc comment for why that's worth avoiding).
+fn refresh_diff_completeness(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_completeness
+        && let Some(incomplete) = diff_case_is_incomplete(name)
+    {
+        map.insert(name.to_string(), incomplete);
+    }
+}
+
+/// Builds `App::diff_completeness` for every case `list_available_cases` currently lists - the
+/// `o` picker's `H` toggle needs this for the whole corpus before it can filter, unlike `O`'s
+/// `hide_solved` (a cheap lookup against sample.csv, no parsing involved). Practical to run across
+/// this repo's whole ~230-fixture corpus (roughly 10s, most of it parsing rather than the
+/// unmarked-node check itself) specifically because `rebuild_caches_for_mapping` resolves every
+/// entry's path through a `PathCache` rather than rescanning siblings per entry - see
+/// `rebuild_caches`'s own doc comment for the very different cost that used to be.
+fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
+    let Ok(options) = list_available_cases() else {
+        return std::collections::HashMap::new();
+    };
+    options
+        .into_iter()
+        .map(|(name, _)| {
+            let incomplete = diff_case_is_incomplete(&name).unwrap_or(true);
+            (name, incomplete)
+        })
+        .collect()
 }
 
 /// Every sample directory name under src/test/data/samples/, paired with whether it has already
@@ -1021,13 +1113,15 @@ enum Modal {
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open. Each
     /// option is paired with which of `DIFF_DATASETS` it lives under; `d` cycles `dataset_filter`
-    /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time. Like
-    /// `OpenSamplePicker`, `selected` indexes into the filtered view (`visible_diff_options`), not
-    /// `options` itself.
+    /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time, and `H`
+    /// toggles `hide_complete` (narrowing to cases with at least one unmarked node left - see
+    /// `diff_case_is_incomplete`/`App::diff_completeness`). Like `OpenSamplePicker`, `selected`
+    /// indexes into the filtered view (`visible_diff_options`), not `options` itself.
     OpenDiffPicker {
         options: Vec<(String, &'static str)>,
         selected: usize,
         dataset_filter: Option<&'static str>,
+        hide_complete: bool,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with whether it has already been promoted into
@@ -1171,6 +1265,18 @@ struct App {
     /// e.g. just `handmade` sticks across closing and reopening the picker. `None` shows all
     /// three datasets.
     diff_dataset_filter: Option<&'static str>,
+    /// The `o` picker's "incomplete only" filter (toggled by `H` inside it), persisted here for
+    /// the same reason as `diff_dataset_filter` above.
+    diff_hide_complete: bool,
+    /// Cache of, for every case `list_available_cases` lists, whether it has at least one
+    /// `NodeStatus::Unmarked` node left (see `diff_case_is_incomplete`) - `None` until the first
+    /// time `H` is pressed inside the `o` picker, since scanning the whole corpus (parsing every
+    /// case's before/after code, not just listing directory names) takes real wall-clock time -
+    /// roughly 10s across this repo's own ~230 fixtures as of this writing. Kept for the rest of
+    /// the session once built; refreshed for just the current case's own entry after `s` saves it,
+    /// rather than dropped and rebuilt from scratch, so repeated saves while triaging incomplete
+    /// cases don't each cost a fresh full scan.
+    diff_completeness: Option<std::collections::HashMap<String, bool>>,
     /// The last text searched for with `/` (`Modal::PromptSearch`), if any - pre-fills the prompt
     /// next time, so `/` then `Enter` repeats the same search from wherever the cursor landed,
     /// without retyping it.
@@ -1213,6 +1319,8 @@ impl App {
             sample_hide_solved: false,
             sample_sort_order: SampleSortOrder::Alphabetical,
             diff_dataset_filter: None,
+            diff_hide_complete: false,
+            diff_completeness: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
             after_multi_select: std::collections::BTreeSet::new(),
@@ -3296,6 +3404,7 @@ fn draw_ui(
             promote_target_dataset(&app.origin),
             std::str::from_utf8(before_src).unwrap_or(""),
             std::str::from_utf8(after_src).unwrap_or(""),
+            app.diff_completeness.as_ref(),
         );
     }
 }
@@ -3346,6 +3455,7 @@ fn centered_rect_at_least(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_modal(
     frame: &mut Frame,
     area: Rect,
@@ -3354,6 +3464,7 @@ fn render_modal(
     promote_dataset: Option<&str>,
     before_src: &str,
     after_src: &str,
+    diff_completeness: Option<&std::collections::HashMap<String, bool>>,
 ) {
     match modal {
         Modal::ConfirmKindMismatch {
@@ -3392,8 +3503,17 @@ fn render_modal(
             options,
             selected,
             dataset_filter,
+            hide_complete,
         } => {
-            render_open_diff_picker(frame, area, options, *selected, *dataset_filter);
+            render_open_diff_picker(
+                frame,
+                area,
+                options,
+                *selected,
+                *dataset_filter,
+                *hide_complete,
+                diff_completeness,
+            );
         }
         Modal::OpenSamplePicker {
             options,
@@ -3606,14 +3726,17 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
 /// The `o` picker. Like `render_open_sample_picker`, the dataset-filtered view
 /// (`visible_diff_options`) is recomputed here from `options`/`dataset_filter` rather than
 /// carried on the modal itself, so the two can never drift out of sync.
+#[allow(clippy::too_many_arguments)]
 fn render_open_diff_picker(
     frame: &mut Frame,
     area: Rect,
     options: &[(String, &'static str)],
     selected: usize,
     dataset_filter: Option<&'static str>,
+    hide_complete: bool,
+    completeness: Option<&std::collections::HashMap<String, bool>>,
 ) {
-    let visible = visible_diff_options(options, dataset_filter);
+    let visible = visible_diff_options(options, dataset_filter, hide_complete, completeness);
 
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
@@ -3640,8 +3763,9 @@ fn render_open_diff_picker(
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open diff [{}] ({}/{}) — j/k move, d dataset, Enter open, Esc cancel",
+            "Open diff [{}]{} ({}/{}) — j/k move, d dataset, H incomplete-only, Enter open, Esc cancel",
             dataset_filter.unwrap_or("all"),
+            if hide_complete { " [incomplete only]" } else { "" },
             selected + 1,
             visible.len()
         ))
@@ -4510,7 +4634,13 @@ fn handle_key(
             None
         }
         KeyCode::Char('s') => match &app.origin {
-            CaseOrigin::Diffs => Some(action_save(&mut app.mapping, &mut app.dirty, &app.name)),
+            CaseOrigin::Diffs => {
+                let result = action_save(&mut app.mapping, &mut app.dirty, &app.name);
+                if result.is_ok() {
+                    refresh_diff_completeness(app, &app.name.clone());
+                }
+                Some(result)
+            }
             CaseOrigin::Sample(source) => {
                 app.modal = Some(Modal::PromptPromoteName {
                     input: default_promoted_name(source),
@@ -4533,6 +4663,8 @@ fn handle_key(
                         options,
                         &app.name,
                         app.diff_dataset_filter,
+                        app.diff_hide_complete,
+                        app.diff_completeness.as_ref(),
                     ));
                 }
                 Ok(_) => {
@@ -4715,14 +4847,21 @@ fn handle_modal_key(
             options,
             selected,
             dataset_filter,
+            hide_complete,
         } => {
-            let visible = visible_diff_options(&options, dataset_filter);
+            let visible = visible_diff_options(
+                &options,
+                dataset_filter,
+                hide_complete,
+                app.diff_completeness.as_ref(),
+            );
             match code {
                 KeyCode::Up | KeyCode::Char('k') => {
                     app.modal = Some(Modal::OpenDiffPicker {
                         selected: selected.saturating_sub(1),
                         options,
                         dataset_filter,
+                        hide_complete,
                     });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
@@ -4730,6 +4869,7 @@ fn handle_modal_key(
                         selected: (selected + 1).min(visible.len().saturating_sub(1)),
                         options,
                         dataset_filter,
+                        hide_complete,
                     });
                 }
                 KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -4743,6 +4883,33 @@ fn handle_modal_key(
                         options,
                         current_name.as_deref().unwrap_or(&app.name),
                         new_filter,
+                        hide_complete,
+                        app.diff_completeness.as_ref(),
+                    ));
+                }
+                // Deliberately `H` only, not `h`/`H` the way `O`'s sample picker binds its own
+                // (cheap, instant) hide-solved toggle: this one can take several real seconds the
+                // first time it's pressed in a session (see the comment below), so an accidental
+                // lowercase `h` - reached for as `Left`/`collapse` muscle memory from the main
+                // view - shouldn't be able to trigger it.
+                KeyCode::Char('H') => {
+                    let current_name = visible.get(selected).cloned();
+                    // Computed lazily, once per session (see `App::diff_completeness`'s own doc
+                    // comment for why this isn't done eagerly on every `o` press) - scanning the
+                    // whole corpus takes real wall-clock time, so this key press can take a few
+                    // seconds the first time it's pressed in a session.
+                    if app.diff_completeness.is_none() {
+                        app.diff_completeness = Some(compute_diff_completeness());
+                    }
+                    let new_hide_complete = !hide_complete;
+                    // Persisted on App too - see the `d`/`D` arm just above for why.
+                    app.diff_hide_complete = new_hide_complete;
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        current_name.as_deref().unwrap_or(&app.name),
+                        dataset_filter,
+                        new_hide_complete,
+                        app.diff_completeness.as_ref(),
                     ));
                 }
                 KeyCode::Enter => {
@@ -4759,6 +4926,7 @@ fn handle_modal_key(
                             options,
                             selected,
                             dataset_filter,
+                            hide_complete,
                         });
                     }
                 }
@@ -4770,6 +4938,7 @@ fn handle_modal_key(
                         options,
                         selected,
                         dataset_filter,
+                        hide_complete,
                     });
                 }
             }
@@ -4975,7 +5144,10 @@ fn handle_modal_key(
         Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
-                    Ok(_) => return Some(target),
+                    Ok(_) => {
+                        refresh_diff_completeness(app, &app.name.clone());
+                        return Some(target);
+                    }
                     Err(err) => {
                         app.status = Some(format!(
                             "Save failed ({:#}); not opening '{}'.",
@@ -5269,6 +5441,7 @@ fn action_promote(
     fs::write(dir.join(format!("after.{ext}.test")), after_src)?;
 
     let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name)?;
+    refresh_diff_completeness(app, new_name);
 
     let csv_note = match &sample_source {
         Some(source) => match update_sample_csv(source, new_name) {
@@ -6068,7 +6241,7 @@ mod tests {
         };
 
         terminal
-            .draw(|f| render_modal(f, area, &modal, "test", None, "", ""))
+            .draw(|f| render_modal(f, area, &modal, "test", None, "", "", None))
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -6093,7 +6266,7 @@ mod tests {
         };
 
         terminal
-            .draw(|f| render_modal(f, area, &modal, "test", Some("handmade"), "", ""))
+            .draw(|f| render_modal(f, area, &modal, "test", Some("handmade"), "", "", None))
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -6942,15 +7115,42 @@ mod tests {
         ];
 
         assert_eq!(
-            visible_diff_options(&options, None),
+            visible_diff_options(&options, None, false, None),
             vec!["alpha", "bravo", "charlie", "delta"],
             "no filter should show every dataset"
         );
         assert_eq!(
-            visible_diff_options(&options, Some("handmade")),
+            visible_diff_options(&options, Some("handmade"), false, None),
             vec!["alpha", "charlie"]
         );
-        assert_eq!(visible_diff_options(&options, Some("full")), vec!["delta"]);
+        assert_eq!(
+            visible_diff_options(&options, Some("full"), false, None),
+            vec!["delta"]
+        );
+    }
+
+    #[test]
+    fn visible_diff_options_hide_complete_excludes_only_cases_the_map_marks_complete() {
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "handmade"),
+            ("charlie".to_string(), "handmade"),
+        ];
+        let mut completeness = std::collections::HashMap::new();
+        completeness.insert("alpha".to_string(), true); // incomplete
+        completeness.insert("bravo".to_string(), false); // complete
+        // "charlie" deliberately absent - not yet scanned.
+
+        assert_eq!(
+            visible_diff_options(&options, None, true, Some(&completeness)),
+            vec!["alpha", "charlie"],
+            "complete should be hidden, incomplete and unscanned should both stay"
+        );
+        assert_eq!(
+            visible_diff_options(&options, None, false, Some(&completeness)),
+            vec!["alpha", "bravo", "charlie"],
+            "hide_complete=false should show everything regardless of the map"
+        );
     }
 
     #[test]
@@ -6977,7 +7177,7 @@ mod tests {
 
         // "charlie" is index 2 in `options`' own order, but index 1 once filtered to just
         // "handmade" - proves `selected` is computed against the filtered view, not raw options.
-        let modal = open_diff_picker_modal(options, "charlie", Some("handmade"));
+        let modal = open_diff_picker_modal(options, "charlie", Some("handmade"), false, None);
 
         match modal {
             Modal::OpenDiffPicker {
@@ -7002,7 +7202,7 @@ mod tests {
         // "alpha" is the currently open case, but it's a "handmade" fixture and the filter below
         // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
         // first visible entry instead of panicking or landing out of bounds.
-        let modal = open_diff_picker_modal(options, "alpha", Some("small"));
+        let modal = open_diff_picker_modal(options, "alpha", Some("small"), false, None);
         match modal {
             Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
@@ -7026,6 +7226,7 @@ mod tests {
             options: vec![("alpha".to_string(), "handmade")],
             selected: 0,
             dataset_filter: None,
+            hide_complete: false,
         });
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
@@ -7243,6 +7444,174 @@ mod tests {
             !solved.contains(&root.id()),
             "root has an unsolved descendant, so isn't solved"
         );
+    }
+
+    #[test]
+    fn tree_has_unmarked_node_is_false_only_once_every_node_is_marked() {
+        let tree = parse_rust("fn main() {\n    a();\n}\n");
+        let root = tree.root_node();
+
+        assert!(
+            tree_has_unmarked_node(root, &Caches::default(), status_before),
+            "nothing marked at all should be reported as having an unmarked node"
+        );
+
+        let mut caches = Caches::default();
+        mark_subtree_matched(root, &mut caches);
+        assert!(
+            !tree_has_unmarked_node(root, &caches, status_before),
+            "every node (including unnamed tokens) is marked, so none should be left unmarked"
+        );
+
+        // Unmark just the deepest leaf again - a single hole anywhere should be enough to flip
+        // the result back.
+        let stmt = find_first(root, "expression_statement").unwrap();
+        let call = find_first(stmt, "call_expression").unwrap();
+        caches.before_match.remove(&call.id());
+        assert!(
+            tree_has_unmarked_node(root, &caches, status_before),
+            "one unmarked node anywhere in the tree should be enough"
+        );
+    }
+
+    #[test]
+    fn diff_case_is_incomplete_returns_some_for_a_real_case_on_disk() {
+        // Full integrated path (`diffs_case_dir`/`code_pair_from_dir`/`human_mapping::load`, not
+        // crafted temp files) against whatever's actually checked in under src/test/data/diffs/ -
+        // skips rather than fails if none exist yet, same convention
+        // `sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk` uses for this repo's
+        // optional/local-only test data.
+        let Ok(options) = list_available_cases() else {
+            return;
+        };
+        let Some((name, _)) = options.first() else {
+            return;
+        };
+        assert!(
+            diff_case_is_incomplete(name).is_some(),
+            "a real, on-disk case should always resolve to Some(_), not None"
+        );
+    }
+
+    #[test]
+    fn open_diff_picker_h_toggles_hide_complete_using_the_cached_completeness_map() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        // Pre-seeded, so this exercises only the toggle - not the lazy full-corpus scan (see
+        // `open_diff_picker_h_computes_completeness_lazily_when_not_yet_cached` for that).
+        let mut completeness = std::collections::HashMap::new();
+        completeness.insert("alpha".to_string(), true);
+        completeness.insert("bravo".to_string(), false);
+        app.diff_completeness = Some(completeness);
+
+        app.modal = Some(Modal::OpenDiffPicker {
+            options: vec![
+                ("alpha".to_string(), "handmade"),
+                ("bravo".to_string(), "handmade"),
+            ],
+            selected: 0,
+            dataset_filter: None,
+            hide_complete: false,
+        });
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('H'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert!(
+            app.diff_hide_complete,
+            "H should persist hide_complete on App too, so the next o reopens with it"
+        );
+        match &app.modal {
+            Some(Modal::OpenDiffPicker {
+                hide_complete,
+                options,
+                ..
+            }) => {
+                assert!(*hide_complete);
+                assert_eq!(
+                    options.len(),
+                    2,
+                    "the full options list itself is untouched"
+                );
+            }
+            other => panic!("expected Modal::OpenDiffPicker to stay open, got {other:?}"),
+        }
+        assert_eq!(
+            app.diff_completeness.as_ref().unwrap().len(),
+            2,
+            "an already-cached map should not be recomputed"
+        );
+    }
+
+    #[test]
+    fn open_diff_picker_h_computes_completeness_lazily_when_not_yet_cached() {
+        // Full integrated path against whatever's actually under src/test/data/diffs/ - skips if
+        // there's nothing to scan, same convention as
+        // `diff_case_is_incomplete_returns_some_for_a_real_case_on_disk` above.
+        let Ok(options) = list_available_cases() else {
+            return;
+        };
+        if options.is_empty() {
+            return;
+        }
+
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        assert!(app.diff_completeness.is_none());
+
+        app.modal = Some(Modal::OpenDiffPicker {
+            options: options.clone(),
+            selected: 0,
+            dataset_filter: None,
+            hide_complete: false,
+        });
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('H'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        let map = app
+            .diff_completeness
+            .as_ref()
+            .expect("H should compute completeness lazily when it wasn't cached yet");
+        assert_eq!(map.len(), options.len());
     }
 
     #[test]
