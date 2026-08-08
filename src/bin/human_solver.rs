@@ -106,10 +106,12 @@
 *                  human_mapping.json and the test stub there, and records <name> against the
 *                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
 *                  other than letters/digits/-/_, or a diffs/ case with that name already exists
-*   o              open a different test case: lists every directory under src/test/data/diffs/,
-*                  j/k to move, Enter to open, Esc to cancel. If the current mapping has unsaved
-*                  changes, asks first whether to save (only offered for a real test case; see `s`
-*                  above) or discard them before switching
+*   o              open a different test case: lists every directory under
+*                  src/test/data/diffs/{handmade,small,full}/, j/k to move, Enter to open, Esc to
+*                  cancel. Press `d` inside this picker to cycle which of the three folders it's
+*                  narrowed down to (all -> handmade -> small -> full -> all - see DIFF_DATASETS).
+*                  If the current mapping has unsaved changes, asks first whether to save (only
+*                  offered for a real test case; see `s` above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
 *                  see `s` above for what happens when one of these is saved. Samples already
 *                  promoted (per sample.csv's `promoted_to` column) are marked " - SOLVED"; press
@@ -209,7 +211,9 @@ H              toggle hiding fully solved subtrees (unmarked nodes and their
 
 s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it
-o              open a different test case (src/test/data/diffs/)
+o              open a different test case (src/test/data/diffs/); press d inside
+                 this picker to cycle which dataset it's narrowed to (all,
+                 handmade, small, full) -- persists across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\" -- press H inside this picker to
                  hide/show them, or s to cycle its sort order (A-Z, Z-A,
@@ -230,7 +234,11 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
         bail!(
             "No test case named '{}' found in src/test/data/diffs.\nAvailable: {}",
             name,
-            available.join(", ")
+            available
+                .iter()
+                .map(|(n, _)| n.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     };
 
@@ -325,13 +333,66 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
 /// doesn't distinguish between them (see the title bar's `[dataset]` tag, via `case_dataset`, for
 /// where a given case actually lives), since names are unique across all three by construction
 /// (`action_promote`'s collision check spans all three too).
-fn list_available_cases() -> Result<Vec<String>> {
+fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     let mut names = Vec::new();
     for dataset in DIFF_DATASETS {
-        names.extend(list_dir_names(&diffs_root().join(dataset))?);
+        for name in list_dir_names(&diffs_root().join(dataset))? {
+            names.push((name, *dataset));
+        }
     }
-    names.sort();
+    names.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(names)
+}
+
+/// `options` (`list_available_cases`'s output) narrowed to just `filter`'s dataset - or every
+/// entry's name, unsorted-relative-to-each-other-again since `options` is already alphabetical,
+/// when `filter` is `None` ("all").
+fn visible_diff_options(
+    options: &[(String, &'static str)],
+    filter: Option<&'static str>,
+) -> Vec<String> {
+    options
+        .iter()
+        .filter(|(_, dataset)| filter.is_none_or(|f| *dataset == f))
+        .map(|(name, _)| name.clone())
+        .collect()
+}
+
+/// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case
+/// already open, so it starts selected if it's still visible under `dataset_filter`), and the
+/// persisted `dataset_filter` (`App::diff_dataset_filter`) - same shape as
+/// `open_sample_picker_modal` for `O`, and for the same reason: keeping the real logic here, not
+/// in the `KeyCode::Char('o')`/`'d'` handlers, makes it unit-testable without real files under
+/// src/test/data/diffs/.
+fn open_diff_picker_modal(
+    options: Vec<(String, &'static str)>,
+    current_name: &str,
+    dataset_filter: Option<&'static str>,
+) -> Modal {
+    let visible = visible_diff_options(&options, dataset_filter);
+    let selected = visible
+        .iter()
+        .position(|name| name == current_name)
+        .unwrap_or(0)
+        .min(visible.len().saturating_sub(1));
+    Modal::OpenDiffPicker {
+        options,
+        selected,
+        dataset_filter,
+    }
+}
+
+/// Cycles the `o` picker's dataset filter, in `DIFF_DATASETS` order, wrapping back to "all"
+/// (`None`) after the last one - `d`'s handler, same convention as `SampleSortOrder::next`.
+fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
+    match current {
+        None => Some(DIFF_DATASETS[0]),
+        Some(current) => DIFF_DATASETS
+            .iter()
+            .position(|d| *d == current)
+            .and_then(|i| DIFF_DATASETS.get(i + 1))
+            .copied(),
+    }
 }
 
 /// Every sample directory name under src/test/data/samples/, paired with whether it has already
@@ -649,7 +710,7 @@ fn main() -> Result<()> {
             let options = list_available_cases()?;
             let first = options
                 .first()
-                .cloned()
+                .map(|(name, _)| name.clone())
                 .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))?;
             (first, Some(options))
         }
@@ -670,10 +731,8 @@ fn main() -> Result<()> {
     );
 
     if let Some(options) = initial_picker_options {
-        app.modal = Some(Modal::OpenDiffPicker {
-            options,
-            selected: 0,
-        });
+        let dataset_filter = app.diff_dataset_filter;
+        app.modal = Some(open_diff_picker_modal(options, &app.name, dataset_filter));
     }
 
     let panic_hook = std::panic::take_hook();
@@ -762,10 +821,15 @@ enum Modal {
         /// auto-matches the rest of the subtree.
         recursive: bool,
     },
-    /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open.
+    /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open. Each
+    /// option is paired with which of `DIFF_DATASETS` it lives under; `d` cycles `dataset_filter`
+    /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time. Like
+    /// `OpenSamplePicker`, `selected` indexes into the filtered view (`visible_diff_options`), not
+    /// `options` itself.
     OpenDiffPicker {
-        options: Vec<String>,
+        options: Vec<(String, &'static str)>,
         selected: usize,
+        dataset_filter: Option<&'static str>,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with whether it has already been promoted into
@@ -868,6 +932,11 @@ struct App {
     /// all every time.
     sample_hide_solved: bool,
     sample_sort_order: SampleSortOrder,
+    /// The `o` picker's dataset filter (cycled by `d` - see `DIFF_DATASETS`), persisted here for
+    /// the same reason as `sample_hide_solved`/`sample_sort_order` above: so filtering down to
+    /// e.g. just `handmade` sticks across closing and reopening the picker. `None` shows all
+    /// three datasets.
+    diff_dataset_filter: Option<&'static str>,
     /// The last text searched for with `/` (`Modal::PromptSearch`), if any - pre-fills the prompt
     /// next time, so `/` then `Enter` repeats the same search from wherever the cursor landed,
     /// without retyping it.
@@ -901,6 +970,7 @@ impl App {
             show_reason: false,
             sample_hide_solved: false,
             sample_sort_order: SampleSortOrder::Alphabetical,
+            diff_dataset_filter: None,
             last_search: None,
         }
     }
@@ -2776,8 +2846,12 @@ fn render_modal(
                 before_kind, after_kind
             ),
         ),
-        Modal::OpenDiffPicker { options, selected } => {
-            render_open_picker(frame, area, options, *selected, "diff");
+        Modal::OpenDiffPicker {
+            options,
+            selected,
+            dataset_filter,
+        } => {
+            render_open_diff_picker(frame, area, options, *selected, *dataset_filter);
         }
         Modal::OpenSamplePicker {
             options,
@@ -2975,21 +3049,26 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
 /// for `O`, per `kind`), with `selected` highlighted. Scroll position is recomputed fresh each
 /// frame from `selected` (no persisted state needed) by roughly centering it in the viewport,
 /// clamped to the list's extent.
-fn render_open_picker(
+/// The `o` picker. Like `render_open_sample_picker`, the dataset-filtered view
+/// (`visible_diff_options`) is recomputed here from `options`/`dataset_filter` rather than
+/// carried on the modal itself, so the two can never drift out of sync.
+fn render_open_diff_picker(
     frame: &mut Frame,
     area: Rect,
-    options: &[String],
+    options: &[(String, &'static str)],
     selected: usize,
-    kind: &str,
+    dataset_filter: Option<&'static str>,
 ) {
+    let visible = visible_diff_options(options, dataset_filter);
+
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
 
     let inner_height = popup_area.height.saturating_sub(2) as usize;
-    let max_scroll = options.len().saturating_sub(inner_height);
+    let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
 
-    let items: Vec<ListItem> = options
+    let items: Vec<ListItem> = visible
         .iter()
         .enumerate()
         .skip(scroll)
@@ -3007,10 +3086,10 @@ fn render_open_picker(
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open {} ({}/{}) — j/k move, Enter open, Esc cancel",
-            kind,
+            "Open diff [{}] ({}/{}) — j/k move, d dataset, Enter open, Esc cancel",
+            dataset_filter.unwrap_or("all"),
             selected + 1,
-            options.len()
+            visible.len()
         ))
         .border_style(
             Style::default()
@@ -3021,7 +3100,7 @@ fn render_open_picker(
     frame.render_widget(List::new(items).block(block), popup_area);
 }
 
-/// Like `render_open_picker`, but for `O`'s sample picker: solved (already-promoted) entries are
+/// Like `render_open_diff_picker`, but for `O`'s sample picker: solved (already-promoted) entries are
 /// shown in green with a " - SOLVED" suffix, left out of the list entirely when `hide_solved` is
 /// set, and ordered per `sort_order` (cycled by `s` - see `SampleSortOrder`). Each entry also shows
 /// its `sample_diff_line_count` in parentheses, so the effect of switching to a diff-size order is
@@ -3694,8 +3773,11 @@ fn handle_key(
         KeyCode::Char('o') => {
             match list_available_cases() {
                 Ok(options) if !options.is_empty() => {
-                    let selected = options.iter().position(|o| o == &app.name).unwrap_or(0);
-                    app.modal = Some(Modal::OpenDiffPicker { options, selected });
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        &app.name,
+                        app.diff_dataset_filter,
+                    ));
                 }
                 Ok(_) => {
                     app.status = Some("No test cases found in src/test/data/diffs".to_string());
@@ -3809,35 +3891,69 @@ fn handle_modal_key(
                 });
             }
         },
-        Modal::OpenDiffPicker { options, selected } => match code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::OpenDiffPicker {
-                    selected: selected.saturating_sub(1),
-                    options,
-                });
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::OpenDiffPicker {
-                    selected: (selected + 1).min(options.len().saturating_sub(1)),
-                    options,
-                });
-            }
-            KeyCode::Enter => {
-                let target = OpenTarget::Diffs(options[selected].clone());
-                if app.dirty {
-                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
-                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
-                } else {
-                    return Some(target);
+        Modal::OpenDiffPicker {
+            options,
+            selected,
+            dataset_filter,
+        } => {
+            let visible = visible_diff_options(&options, dataset_filter);
+            match code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.modal = Some(Modal::OpenDiffPicker {
+                        selected: selected.saturating_sub(1),
+                        options,
+                        dataset_filter,
+                    });
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.modal = Some(Modal::OpenDiffPicker {
+                        selected: (selected + 1).min(visible.len().saturating_sub(1)),
+                        options,
+                        dataset_filter,
+                    });
+                }
+                KeyCode::Char('d') | KeyCode::Char('D') => {
+                    let current_name = visible.get(selected).cloned();
+                    let new_filter = next_dataset_filter(dataset_filter);
+                    // Persisted on App too (not just this modal instance) - see the sample
+                    // picker's `H`/`S` handlers for why: the next `o` should reopen with the same
+                    // filter instead of reverting to "all".
+                    app.diff_dataset_filter = new_filter;
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        current_name.as_deref().unwrap_or(&app.name),
+                        new_filter,
+                    ));
+                }
+                KeyCode::Enter => {
+                    if let Some(name) = visible.get(selected) {
+                        let target = OpenTarget::Diffs(name.clone());
+                        if app.dirty {
+                            let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                            app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                        } else {
+                            return Some(target);
+                        }
+                    } else {
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            dataset_filter,
+                        });
+                    }
+                }
+                KeyCode::Esc => {
+                    app.status = Some("Cancelled".to_string());
+                }
+                _ => {
+                    app.modal = Some(Modal::OpenDiffPicker {
+                        options,
+                        selected,
+                        dataset_filter,
+                    });
                 }
             }
-            KeyCode::Esc => {
-                app.status = Some("Cancelled".to_string());
-            }
-            _ => {
-                app.modal = Some(Modal::OpenDiffPicker { options, selected });
-            }
-        },
+        }
         Modal::OpenSamplePicker {
             options,
             selected,
@@ -5460,6 +5576,122 @@ mod tests {
             Modal::OpenSamplePicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn visible_diff_options_narrows_to_the_given_dataset() {
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "small"),
+            ("charlie".to_string(), "handmade"),
+            ("delta".to_string(), "full"),
+        ];
+
+        assert_eq!(
+            visible_diff_options(&options, None),
+            vec!["alpha", "bravo", "charlie", "delta"],
+            "no filter should show every dataset"
+        );
+        assert_eq!(
+            visible_diff_options(&options, Some("handmade")),
+            vec!["alpha", "charlie"]
+        );
+        assert_eq!(visible_diff_options(&options, Some("full")), vec!["delta"]);
+    }
+
+    #[test]
+    fn next_dataset_filter_cycles_through_diff_datasets_and_back_to_all() {
+        assert_eq!(next_dataset_filter(None), Some(DIFF_DATASETS[0]));
+        assert_eq!(
+            next_dataset_filter(Some(DIFF_DATASETS[0])),
+            Some(DIFF_DATASETS[1])
+        );
+        assert_eq!(
+            next_dataset_filter(Some(DIFF_DATASETS[1])),
+            Some(DIFF_DATASETS[2])
+        );
+        assert_eq!(next_dataset_filter(Some(DIFF_DATASETS[2])), None);
+    }
+
+    #[test]
+    fn open_diff_picker_modal_selects_the_currently_open_case_under_the_given_filter() {
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "small"),
+            ("charlie".to_string(), "handmade"),
+        ];
+
+        // "charlie" is index 2 in `options`' own order, but index 1 once filtered to just
+        // "handmade" - proves `selected` is computed against the filtered view, not raw options.
+        let modal = open_diff_picker_modal(options, "charlie", Some("handmade"));
+
+        match modal {
+            Modal::OpenDiffPicker {
+                selected,
+                dataset_filter,
+                ..
+            } => {
+                assert_eq!(selected, 1);
+                assert_eq!(dataset_filter, Some("handmade"));
+            }
+            other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_diff_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is_filtered_out()
+    {
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "small"),
+        ];
+        // "alpha" is the currently open case, but it's a "handmade" fixture and the filter below
+        // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
+        // first visible entry instead of panicking or landing out of bounds.
+        let modal = open_diff_picker_modal(options, "alpha", Some("small"));
+        match modal {
+            Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
+            other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn open_diff_picker_d_persists_dataset_filter_on_app() {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = flatten_visible(root, &app.before.collapsed, None);
+        app.modal = Some(Modal::OpenDiffPicker {
+            options: vec![("alpha".to_string(), "handmade")],
+            selected: 0,
+            dataset_filter: None,
+        });
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('d'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+        );
+
+        assert_eq!(
+            app.diff_dataset_filter,
+            Some(DIFF_DATASETS[0]),
+            "d's new filter must persist on App too, so the next o reopens with it"
+        );
     }
 
     #[test]
