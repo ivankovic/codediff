@@ -187,7 +187,7 @@ TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tes
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/implicitAnyFunctionOverloadWithImplicitAnyReturnType.ts,typescript-typescript-add-target-comment-3,small
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/Symbols/ES5SymbolProperty1.ts,typescript-microsoft-typescript-comment-change,small
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/expressions/arrayLiterals/arrayLiterals3.ts,typescript-microsoft-typescript-add-target-comment,small
-TypeScript,microsoft-playwright.git,71e9e8e102b92e10c3edfc48185c791af3a4d6f1,tests/library/agent-expect.spec.ts,,small
+TypeScript,microsoft-playwright.git,71e9e8e102b92e10c3edfc48185c791af3a4d6f1,tests/library/agent-expect.spec.ts,typescript-microsoft-playwright-add-two-test-cases,small
 TypeScript,n8n-io-n8n.git,d00a55f869c3dd3f20a438b8f65573467701528c,packages/@n8n/nodes-langchain/nodes/llms/LMLemonade/LmLemonade.node.ts,typescript-n8n-io-n8n-remove-and-add-imports,small
 Vimscript,junegunn-fzf.git,779e3cc5b551d791f9f39df8129a95365bca9da7,plugin/fzf.vim,vimscript-junegunn-fzf-condition-canges,small
 Vimscript,neovim-neovim.git,08b8fe5ab36ee3df3ce593942565d4cd318373c4,test/old/testdir/test_ins_complete.vim,,small

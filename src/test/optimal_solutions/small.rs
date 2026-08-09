@@ -338,6 +338,8 @@ mod typescript_excalidraw_excalidraw_add_function;
 #[cfg(test)]
 mod typescript_excalidraw_excalidraw_add_values_to_lists;
 #[cfg(test)]
+mod typescript_microsoft_playwright_add_two_test_cases;
+#[cfg(test)]
 mod typescript_microsoft_typescript_add_dot_js_to_import_paths;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_target_comment;
