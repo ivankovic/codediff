@@ -2154,5 +2154,36 @@
         "comment:2"
       ]
     }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "preproc_ifdef:1",
+          "declaration:2",
+          "function_declarator:1",
+          "parameter_list:1",
+          ",:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "preproc_ifdef:1",
+          "declaration:2",
+          "function_declarator:1",
+          "parameter_list:1",
+          ",:1"
+        ],
+        [
+          "preproc_ifdef:1",
+          "declaration:2",
+          "function_declarator:1",
+          "parameter_list:1",
+          ",:2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false
+    }
   ]
 }

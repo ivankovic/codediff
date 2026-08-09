@@ -80,6 +80,8 @@ mod css_add_property;
 #[cfg(test)]
 mod css_playwright_add_class_selector;
 #[cfg(test)]
+mod css_shadcn_ui_ui_completely_broken_treesitter_parsing;
+#[cfg(test)]
 mod css_wordpress_add_comment;
 #[cfg(test)]
 mod css_wordpress_format_comment_and_fix;
@@ -126,6 +128,8 @@ mod html_twbs_bootstrap_add_the_same_attribute_in_many_places;
 #[cfg(test)]
 mod java_genymobile_scrcpy_change_some_android_version_constant;
 #[cfg(test)]
+mod java_genymobile_scrcpy_refactor_for_loop_in_a_function;
+#[cfg(test)]
 mod java_genymobile_scrcpy_switch_from_three_exceptions_to_one;
 #[cfg(test)]
 mod java_nextcloud_android_add_if_branch_with_reused_return;
@@ -141,6 +145,8 @@ mod java_protocolbuffers_protobuf_add_import_and_update_field_access;
 mod java_scrcpy_public_to_protected;
 #[cfg(test)]
 mod java_scrcpy_remove_or_expression;
+#[cfg(test)]
+mod javascript_microsoft_typescript_another_test_case_marked_with_strict;
 #[cfg(test)]
 mod javascript_microsoft_typescript_broken_js_remove_string_fragment;
 #[cfg(test)]
@@ -242,13 +248,19 @@ mod python_ytdl_add_import_and_function_call;
 #[cfg(test)]
 mod ruby_homebrew_add_or_expression;
 #[cfg(test)]
+mod ruby_homebrew_brew_actual_logic_change;
+#[cfg(test)]
 mod ruby_homebrew_brew_change_heredoc_to_string;
+#[cfg(test)]
+mod ruby_homebrew_brew_enclose_block_in_rescue;
 #[cfg(test)]
 mod ruby_homebrew_brew_function_callsite_argument_change;
 #[cfg(test)]
 mod ruby_junegunn_fzf_add_test_case;
 #[cfg(test)]
 mod ruby_junegunn_fzf_add_test_case_2;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_use_context_and_new_test_case;
 #[cfg(test)]
 mod rust_rust_lang_rust_add_key_to_function_arguments_and_call_sites;
 #[cfg(test)]

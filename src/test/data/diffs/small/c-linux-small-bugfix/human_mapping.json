@@ -462500,6 +462500,96 @@
         "argument_list:1",
         "):1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "compound_statement:1",
+        "if_statement:1",
+        "else_clause:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_definition:12",
+        "compound_statement:1",
+        "if_statement:3",
+        "compound_statement:1",
+        "if_statement:1",
+        "else_clause:1",
+        "else:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1"
+        ],
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1",
+          "if:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1",
+          "if:1"
+        ],
+        [
+          "function_definition:12",
+          "compound_statement:1",
+          "if_statement:3",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "if:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false
     }
   ]
 }

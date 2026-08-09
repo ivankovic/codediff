@@ -129102,5 +129102,38 @@
         "}:1"
       ]
     }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_definition:3",
+          "compound_statement:1",
+          "if_statement:2",
+          "compound_statement:1",
+          "}:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_definition:3",
+          "compound_statement:1",
+          "if_statement:2",
+          "compound_statement:1",
+          "if_statement:1",
+          "compound_statement:1",
+          "}:1"
+        ],
+        [
+          "function_definition:3",
+          "compound_statement:1",
+          "if_statement:2",
+          "compound_statement:1",
+          "}:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false
+    }
   ]
 }

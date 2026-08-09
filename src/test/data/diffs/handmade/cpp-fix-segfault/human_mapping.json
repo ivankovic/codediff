@@ -3106,6 +3106,23 @@
         "binary_expression:1",
         "identifier:2"
       ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:1",
+        "compound_statement:1",
+        "for_statement:1",
+        "binary_expression:1",
+        "<=:1"
+      ],
+      "after_path": [
+        "function_definition:1",
+        "compound_statement:1",
+        "for_statement:1",
+        "binary_expression:1",
+        "<:1"
+      ]
     }
   ]
 }

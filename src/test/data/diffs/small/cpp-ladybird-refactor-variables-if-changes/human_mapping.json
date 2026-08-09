@@ -167579,6 +167579,108 @@
         "argument_list:1",
         "):1"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:16",
+        "compound_statement:1",
+        "}:1"
+      ],
+      "after_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:16",
+        "compound_statement:1",
+        "}:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1"
+        ],
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1",
+          "else:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1",
+          "else:1"
+        ],
+        [
+          "namespace_definition:1",
+          "declaration_list:1",
+          "function_definition:16",
+          "compound_statement:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1",
+          "if_statement:1",
+          "else_clause:1",
+          "else:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false
     }
   ]
 }

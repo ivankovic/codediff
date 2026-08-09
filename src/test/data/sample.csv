@@ -28,7 +28,7 @@ CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes
 CSS,WordPress-WordPress.git,db567e7f82022f0bfae34e83c52e2c12f11d6e46,wp-includes/css/jquery-ui-dialog.css,css-wordpress-smalll-change,small
 CSS,microsoft-playwright.git,5d5b28f782e17b2a74f208aa0d532a2e10e50651,packages/html-reporter/src/testFileView.css,css-playwright-add-class-selector,small
 CSS,mozilla-firefox-firefox.git,4305a8c706562bebf669267f5de8984053285fe4,toolkit/themes/shared/global-shared.css,,small
-CSS,shadcn-ui-ui.git,b75796ed76882f30aa86da90c71fbad14a10ccd8,apps/v4/registry/styles/style-maia.css,,small
+CSS,shadcn-ui-ui.git,b75796ed76882f30aa86da90c71fbad14a10ccd8,apps/v4/registry/styles/style-maia.css,css-shadcn-ui-ui-completely-broken-treesitter-parsing,small
 CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,csharp-lidarr-add-function,small
 CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs,csharp-lidarr-call-different-function,small
 CSharp,Lidarr-Lidarr.git,a4af75b60cdc531c2280d994a1ef1141bb7c830e,src/Lidarr.Api.V1/Calendar/CalendarController.cs,csharp-lidarr-new-feature,small
@@ -71,7 +71,7 @@ JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/
 JSON,shadcn-ui-ui.git,47c47eaed21524b5263011e080d0cd52bc794a6f,apps/v4/public/r/styles/radix-vega/hover-card.json,json-shadcn-ui-ui-string-value-update-string-is-code,small
 Java,Genymobile-scrcpy.git,3acffaae57238ee47e05f97f8e762a04550fdad8,server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java,java-genymobile-scrcpy-change-some-android-version-constant,small
 Java,Genymobile-scrcpy.git,69b836930a1d33d2aeebd17eed67c264c084c37d,server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java,java-scrcpy-public-to-protected,small
-Java,Genymobile-scrcpy.git,6af4bd601f028d4e3d96eb90326a2330f03bc960,server/src/main/java/com/genymobile/scrcpy/LogUtils.java,,small
+Java,Genymobile-scrcpy.git,6af4bd601f028d4e3d96eb90326a2330f03bc960,server/src/main/java/com/genymobile/scrcpy/LogUtils.java,java-genymobile-scrcpy-refactor-for-loop-in-a-function,small
 Java,Genymobile-scrcpy.git,89518f49adb59dfa961f76be3f4414bffdc22cc5,server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java,java-scrcpy-remove-or-expression,small
 Java,Genymobile-scrcpy.git,f7b4a18b4398c013b2bed9630b7bb35eb50ad97e,server/src/main/java/com/genymobile/scrcpy/wrappers/ClipboardManager.java,java-genymobile-scrcpy-switch-from-three-exceptions-to-one,small
 Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,java-nextcloud-android-add-if-branch-with-reused-return,small
@@ -81,7 +81,7 @@ Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/
 Java,protocolbuffers-protobuf.git,68bd6bed7923ddade82a57a6fb8274024a3cd5d8,java/core/src/main/java/com/google/protobuf/Internal.java,java-protocolbuffers-protobuf-add-a-method,small
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/AmbientModuleAndAmbientFunctionWithTheSameNameAndCommonRoot.js,javascript-typescript-add-use-strict,small
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/arrayToLocaleStringES5(target=es5).js,javascript-typescript-add-strict-3,small
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,,small
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,javascript-microsoft-typescript-another-test-case-marked-with-strict,small
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,javascript-typescript-very-interesting-brokn-code,small
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/tupleElementTypes3.js,javascript-typescript-interesting-small-edit-refactor,small
 JavaScript,microsoft-TypeScript.git,96acaa52902feb1320e1d8ec8936b8669cca447d,tests/baselines/reference/tsserver/skipLibCheck/jsonly-inferred-project.js,javascript-microsoft-typescript-broken-js-remove-string-fragment,small
@@ -129,16 +129,16 @@ Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/
 Python,pandas-dev-pandas.git,1a753531c565e11d4d78912d09b9343945da9363,pandas/core/window/rolling.py,,small
 Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/attention/_fa3.py,python-pytorch-pytorch-add-param-to-many-places-and-update-one,small
 Python,ytdl-org-youtube-dl.git,2500300c2a5986ace34390aa473a8bd51f83622c,devscripts/make_lazy_extractors.py,python-ytdl-add-import-and-function-call,small
-Ruby,Homebrew-brew.git,0c34674121a5c1e6dfb14993e397adfddf440364,Library/Homebrew/dev-cmd/bump.rb,,small
+Ruby,Homebrew-brew.git,0c34674121a5c1e6dfb14993e397adfddf440364,Library/Homebrew/dev-cmd/bump.rb,ruby-homebrew-brew-actual-logic-change,small
 Ruby,Homebrew-brew.git,239d748c9d8e869bc5d940242b42059dfdcb5bf6,Library/Homebrew/cmd/deps.rb,,small
 Ruby,Homebrew-brew.git,561d925fa317dfead3f888cf827625b6524b573e,Library/Homebrew/cask/upgrade.rb,ruby-homebrew-brew-change-heredoc-to-string,small
 Ruby,Homebrew-brew.git,64f62f694d3327ca8ac914b1b5fdc15426bf2274,Library/Homebrew/api/formula.rb,ruby-homebrew-add-or-expression,small
-Ruby,Homebrew-brew.git,7f333c6b51a8f1c5f955c80e20a8057edc92c067,Library/Homebrew/cmd/reinstall.rb,,small
+Ruby,Homebrew-brew.git,7f333c6b51a8f1c5f955c80e20a8057edc92c067,Library/Homebrew/cmd/reinstall.rb,ruby-homebrew-brew-enclose-block-in-rescue,small
 Ruby,Homebrew-brew.git,d58ce5dc4482cff792126703eebe789cdb2296b8,Library/Homebrew/test/livecheck/strategy/github_releases_spec.rb,,small
 Ruby,Homebrew-brew.git,e72e57910cce57177c139868e2ab43dd2efca160,Library/Homebrew/test/livecheck/skip_conditions_spec.rb,ruby-homebrew-brew-function-callsite-argument-change,small
 Ruby,junegunn-fzf.git,24ff66d4a9d6889988e4d7e373f33f4098870b9e,test/test_go.rb,ruby-junegunn-fzf-add-test-case,small
 Ruby,junegunn-fzf.git,3148b0f3e88f8a116491135dc10a7ce6d96899bf,test/test_go.rb,ruby-junegunn-fzf-add-test-case-2,small
-Ruby,mastodon-mastodon.git,7788281759e9bbed23c1ecd4f76ccaa7734eb617,spec/services/activitypub/process_featured_item_service_spec.rb,,small
+Ruby,mastodon-mastodon.git,7788281759e9bbed23c1ecd4f76ccaa7734eb617,spec/services/activitypub/process_featured_item_service_spec.rb,ruby-mastodon-mastodon-use-context-and-new-test-case,small
 Rust,rust-lang-rust.git,cfcbcb715c5120e481b2d1303b590a5eb2417e55,compiler/rustc_query_impl/src/execution.rs,rust-rust-lang-rust-add-key-to-function-arguments-and-call-sites,small
 Rust,rustdesk-rustdesk.git,296c6df462b1a8abdc31775200cdcfa8d59909a8,src/lang/th.rs,rust-rustdesk-rustdesk-add-two-values-to-slice,small
 Rust,rustdesk-rustdesk.git,5faf0ad3cfef1b7237e6cbca53038d76ffdc281d,src/client/io_loop.rs,,small

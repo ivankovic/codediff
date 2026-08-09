@@ -186501,5 +186501,54 @@
         "):1"
       ]
     }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_definition:21",
+          "body:1",
+          "let_statement:1",
+          "binary_operation:1",
+          "binary_operation:1",
+          "binary_operation:1"
+        ],
+        [
+          "function_definition:21",
+          "body:1",
+          "let_statement:1",
+          "binary_operation:1",
+          "binary_operation:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_definition:21",
+          "body:1",
+          "let_statement:1",
+          "binary_operation:1",
+          "binary_operation:1"
+        ],
+        [
+          "function_definition:21",
+          "body:1",
+          "let_statement:1",
+          "binary_operation:1",
+          "binary_operation:1",
+          "binary_operation:2"
+        ],
+        [
+          "function_definition:21",
+          "body:1",
+          "let_statement:1",
+          "binary_operation:1",
+          "binary_operation:1",
+          "binary_operation:2",
+          "binary_operation:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    }
   ]
 }

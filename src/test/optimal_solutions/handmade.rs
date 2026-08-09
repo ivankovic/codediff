@@ -74,6 +74,8 @@ mod rust_add_to_existing_use;
 #[cfg(test)]
 mod rust_add_value_to_enum;
 #[cfg(test)]
+mod rust_adding_to_a_list_of_identical_attributes_should_favour_near_matches;
+#[cfg(test)]
 mod rust_algorithm_change;
 #[cfg(test)]
 mod rust_cost_optimization;
