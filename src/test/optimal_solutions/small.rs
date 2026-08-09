@@ -246,6 +246,8 @@ mod python_openhands_openhands_change_string_constant;
 #[cfg(test)]
 mod python_paddlepaddle_paddleocr_formatting_only_change;
 #[cfg(test)]
+mod python_pandas_dev_pandas_doccoment_changes_only;
+#[cfg(test)]
 mod python_pytorch_pytorch_add_param_to_many_places_and_update_one;
 #[cfg(test)]
 mod python_thefuck_multiline_string_change;
@@ -309,6 +311,8 @@ mod swift_nextcloud_ios_actual_control_flow_change;
 mod swift_nextcloud_ios_actual_logic_added;
 #[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
+#[cfg(test)]
+mod swift_swiftlang_swift_actual_logic_change;
 #[cfg(test)]
 mod swift_swiftlang_swift_comment_change;
 #[cfg(test)]
