@@ -849,14 +849,35 @@ fn assemble_diff_session_data(
     Ok(DiffSessionData {
         before_path: before_path.to_path_buf(),
         after_path: after_path.to_path_buf(),
-        before_contents: before_code.contents.clone(),
-        after_contents: after_code.contents.clone(),
+        before_contents: display_safe(&before_code.contents),
+        after_contents: display_safe(&after_code.contents),
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
         comment_only,
         mode,
         plain_text_fallback: false,
     })
+}
+
+/// Replaces every literal tab with a single space, for text that's about to be stored as
+/// `DiffSessionData::before_contents`/`after_contents` - i.e. handed to `ratatui` for rendering,
+/// not to the diff engine (which already finished computing `before_ranges`/`after_ranges` against
+/// the *original* text by the time this runs).
+///
+/// `ratatui::buffer::Buffer` treats every character as exactly one cell wide, `\t` included - but
+/// a real terminal receiving a raw `\t` byte jumps its cursor to the next hardware tab stop
+/// instead, desyncing the terminal's actual cursor column from the column `ratatui`'s own Buffer
+/// model believes it's at. Every subsequent write on that line (and, since `ratatui` only
+/// redraws cells it believes changed, on later frames too) lands at the wrong screen position -
+/// exactly the "artifacts/repeated text that `?` doesn't clear" failure mode this fixes, confirmed
+/// against a real tab-indented fixture (html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody).
+///
+/// A single space, not an N-column tab-stop expansion: `\t` and `' '` are both exactly one UTF-8
+/// byte, so this is a strict length-preserving substitution - every `RangeMatch`/`TextRange`
+/// offset computed against the original tab-containing text upstream of this function stays
+/// exactly as valid against the space-substituted text it returns.
+fn display_safe(text: &str) -> String {
+    text.replace('\t', " ")
 }
 
 /// `assemble_diff_session_data`'s counterpart for the plain-text fallback (see
@@ -876,8 +897,8 @@ fn assemble_plain_text_diff_session_data(
     DiffSessionData {
         before_path: before_path.to_path_buf(),
         after_path: after_path.to_path_buf(),
-        before_contents: before_code.contents.clone(),
-        after_contents: after_code.contents.clone(),
+        before_contents: display_safe(&before_code.contents),
+        after_contents: display_safe(&after_code.contents),
         before_ranges,
         after_ranges,
         comment_only: false,
@@ -1750,6 +1771,39 @@ mod tests {
             data.comment_only,
         );
         assert_eq!(summary, Some(DiffSummary::CommentOnly));
+        Ok(())
+    }
+
+    /// Regression test for the "artifacts / repeated text that `?` doesn't clear" TUI corruption
+    /// bug: `ratatui::buffer::Buffer` treats every character (`\t` included) as exactly one cell
+    /// wide, but a real terminal receiving a raw tab byte jumps its actual cursor to the next
+    /// hardware tab stop instead - desyncing the terminal's real cursor column from the column
+    /// `ratatui`'s own Buffer model believes it's at, corrupting everything drawn afterward.
+    /// `display_safe` fixes this by replacing every `\t` with a single space (`\t` and `' '` are
+    /// both exactly one UTF-8 byte, so this can't shift any `RangeMatch`/`TextRange` offset
+    /// computed against the original text). Confirmed against the real tab-indented fixture that
+    /// exposed the bug during manual TUI testing, not just a synthetic string.
+    #[test]
+    fn compute_diff_never_puts_a_raw_tab_into_diff_session_data_contents() -> Result<()> {
+        let before = Path::new(
+            "src/test/data/diffs/small/html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody/before.html.test",
+        );
+        let after = Path::new(
+            "src/test/data/diffs/small/html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody/after.html.test",
+        );
+        // The fixture must actually contain a raw tab for this test to mean anything.
+        assert!(std::fs::read_to_string(before)?.contains('\t'));
+
+        let (data, _fallback) = compute_diff(before, after, DiffMode::Fast)?;
+
+        assert!(
+            !data.before_contents.contains('\t'),
+            "before_contents still has a raw tab byte"
+        );
+        assert!(
+            !data.after_contents.contains('\t'),
+            "after_contents still has a raw tab byte"
+        );
         Ok(())
     }
 }

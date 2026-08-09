@@ -20,13 +20,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
-use ratatui::{
-    buffer::Buffer,
-    prelude::*,
-    symbols::border,
-    text::Line,
-    widgets::{Block, Borders, StatefulWidget},
-};
+use ratatui::{buffer::Buffer, prelude::*, text::Line, widgets::StatefulWidget};
 use syntect::highlighting::{Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
 
@@ -41,9 +35,15 @@ static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 /// Static theme set loaded once
 static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 
-/// Get or initialize the syntax set
+/// Get or initialize the syntax set. `two_face::syntax::extra_newlines()` - not plain syntect
+/// `SyntaxSet::load_defaults_newlines()` - since syntect's own bundled set (derived from Sublime
+/// Text's stock package) has no definition at all for several languages this project actually
+/// diffs: Dart, Kotlin, Swift, TypeScript/TSX, and Vimscript all silently fell back to unstyled
+/// plain text before this. `two-face` bundles the much larger syntax set `bat` ships with, which
+/// covers all of those - confirmed against every `language_to_syntect` name below. Bazel/Starlark
+/// still has no definition in either set and remains an unhighlighted gap.
 fn syntax_set() -> &'static SyntaxSet {
-    SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines)
+    SYNTAX_SET.get_or_init(two_face::syntax::extra_newlines)
 }
 
 /// Get or initialize the theme set
@@ -56,7 +56,9 @@ fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
     use crate::code::Language::*;
 
     match lang {
-        Bazel => Some("Bazel"),
+        // No Bazel/Starlark definition in either syntect's own bundled set or two-face's
+        // extended one - see `syntax_set`'s doc comment.
+        Bazel => None,
         C => Some("C"),
         CPP => Some("C++"),
         CSS => Some("CSS"),
@@ -72,16 +74,19 @@ fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
         Lisp => Some("Lisp"),
         MarkDown => Some("Markdown"),
         PHP => Some("PHP"),
-        ProtoBuf => Some("Protocol Buffers"),
+        // Singular, not "Protocol Buffers" - that's how two-face's extra set names it.
+        ProtoBuf => Some("Protocol Buffer"),
         Python => Some("Python"),
         R => Some("R"),
         Ruby => Some("Ruby"),
         Rust => Some("Rust"),
         SQL => Some("SQL"),
         Scala => Some("Scala"),
-        ShellScript => Some("Bash"),
+        // Not "Bash" - neither set has a syntax literally named that.
+        ShellScript => Some("Bourne Again Shell (bash)"),
         Swift => Some("Swift"),
-        TSX => Some("TSX"),
+        // Not "TSX" - two-face's extra set names it "TypeScriptReact".
+        TSX => Some("TypeScriptReact"),
         TypeScript => Some("TypeScript"),
         Vimscript => Some("VimL"),
         YAML => Some("YAML"),
@@ -437,12 +442,6 @@ pub struct CodeViewerWidget {
     /// The palette used to paint the diff/cursor overlay (not the syntax-highlighting theme
     /// above); user-selectable via the `c` theme picker, see `tui/theme.rs`.
     overlay_theme: OverlayTheme,
-    /// Skip this widget's own bordered title block (filename + language) entirely, rendering the
-    /// code flush with `area` instead. Set by single-panel `DiffViewer` mode, whose own outer
-    /// block already shows the panel name, filename, and language in one header line - drawing
-    /// this widget's border too duplicated that same information a second time. Defaults to
-    /// `false` (border shown) so every other caller's behavior is unchanged.
-    hide_border: bool,
 }
 
 impl Default for CodeViewerWidget {
@@ -460,7 +459,6 @@ impl Default for CodeViewerWidget {
             syntax_highlighting: true,
             highlighted_lines: Vec::new(),
             overlay_theme: OverlayTheme::default(),
-            hide_border: false,
         }
     }
 }
@@ -542,11 +540,6 @@ impl CodeViewerWidget {
         self.overlay_theme = theme;
     }
 
-    /// See the `hide_border` field's doc comment.
-    pub fn set_hide_border(&mut self, hide: bool) {
-        self.hide_border = hide;
-    }
-
     /// Get the total number of lines
     pub fn line_count(&self) -> usize {
         self.highlighted_lines.len()
@@ -605,18 +598,6 @@ impl CodeViewerWidget {
             }
         }
         matches
-    }
-
-    /// The area inside this widget's own border, given the full area it would be rendered into -
-    /// or `area` unchanged if `hide_border` means there's no border to inset for. Exposed so
-    /// callers (e.g. terminal-cursor placement in `CodeViewer`) can compute screen coordinates
-    /// without duplicating `render`'s own border logic.
-    pub fn inner_area(&self, area: Rect) -> Rect {
-        if self.hide_border {
-            area
-        } else {
-            Block::default().borders(Borders::ALL).inner(area)
-        }
     }
 
     /// Get the syntax for highlighting based on language
@@ -842,23 +823,12 @@ impl StatefulWidget for &CodeViewerWidget {
     type State = CodeViewerState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let inner = if self.hide_border {
-            area
-        } else {
-            let block = Block::default()
-                .title(Line::from(vec![
-                    Span::styled(self.display_title(), Style::new().bold().fg(Color::Cyan)),
-                    Span::raw(" - "),
-                    Span::styled(self.language_name(), Style::new().fg(Color::Gray)),
-                ]))
-                .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::new().fg(Color::Gray));
-
-            let inner = block.inner(area);
-            block.render(area, buf);
-            inner
-        };
+        // No border, no title of its own - `DiffViewer` (the only caller) always draws exactly
+        // one title line above whatever area it hands this widget, in both dual- and single-panel
+        // mode. This widget used to draw a second one (filename + language) inside its own
+        // bordered block, which in dual-panel mode just repeated the filename `DiffViewer`'s own
+        // outer block already showed.
+        let inner = area;
 
         let lines = self.visible_lines(state);
 
@@ -906,6 +876,72 @@ mod tests {
             line.spans.len(),
             line.spans
         );
+    }
+
+    /// Regression test: `language_to_syntect` named several languages using syntect's own default
+    /// (Sublime stock) syntax names, which don't exist in that set at all (Dart, Kotlin, Swift,
+    /// TypeScript, TSX) or exist under a different name (`ShellScript` as "Bash" instead of
+    /// "Bourne Again Shell (bash)", `ProtoBuf` as plural instead of singular) - `find_syntax_by_name`
+    /// silently returned `None` for all of these, so every file in those languages rendered fully
+    /// unstyled with no error or indication anything was wrong. Confirms every language this
+    /// project's own `Language` enum can name resolves to a real syntax now, except the one
+    /// documented, genuine gap (Bazel/Starlark, in neither syntect's nor two-face's bundled sets).
+    #[test]
+    fn every_language_except_the_documented_bazel_gap_resolves_to_a_real_syntax() {
+        use crate::code::Language;
+
+        // `Language` doesn't derive an iterator (adding one purely for this one test wasn't
+        // worth widening a core, widely-used enum's surface) - listed by hand instead, alongside
+        // `Language::Unknown` and `Bazel`, the two that are expected to still have no syntax.
+        let languages = [
+            Language::Bazel,
+            Language::C,
+            Language::CPP,
+            Language::CSS,
+            Language::CSharp,
+            Language::Dart,
+            Language::Go,
+            Language::HTML,
+            Language::JSON,
+            Language::Java,
+            Language::JavaScript,
+            Language::Kotlin,
+            Language::LUA,
+            Language::Lisp,
+            Language::MarkDown,
+            Language::PHP,
+            Language::ProtoBuf,
+            Language::Python,
+            Language::R,
+            Language::Ruby,
+            Language::Rust,
+            Language::SQL,
+            Language::Scala,
+            Language::ShellScript,
+            Language::Swift,
+            Language::TSX,
+            Language::TypeScript,
+            Language::Vimscript,
+            Language::YAML,
+            Language::XML,
+            Language::Unknown,
+        ];
+
+        for language in languages {
+            let widget = CodeViewerWidget {
+                language: Some(language),
+                ..CodeViewerWidget::default()
+            };
+            let resolved = widget.get_syntax().is_some();
+            if matches!(language, Language::Bazel | Language::Unknown) {
+                assert!(
+                    !resolved,
+                    "{language:?} was expected to still have no syntax definition"
+                );
+            } else {
+                assert!(resolved, "{language:?} should resolve to a real syntax");
+            }
+        }
     }
 
     /// Regression test: `get_theme` used to index `theme_set.themes[name]` directly, which
@@ -1499,32 +1535,13 @@ mod tests {
         );
     }
 
-    /// `inner_area` must stop insetting for its own border once there's no border to inset for -
-    /// otherwise cursor placement (`CodeViewer::cursor_screen_position`, which calls this) would
-    /// be off by one row/column from where the content is actually drawn.
+    /// This widget never draws its own border or title (that used to be togglable via
+    /// `hide_border`/`set_hide_border`, removed once `DiffViewer` - the only caller - was made to
+    /// always draw its own single title line instead, so nothing ever needed the widget's own
+    /// border shown). Content should be flush against the top-left corner of whatever area it's
+    /// given, with no title text drawn anywhere in the buffer.
     #[test]
-    fn inner_area_is_the_full_area_when_border_is_hidden() {
-        let mut widget = widget_with_line("hello");
-        let area = Rect::new(0, 0, 20, 5);
-        assert_ne!(
-            widget.inner_area(area),
-            area,
-            "with the border shown, inner_area should be inset from the full area"
-        );
-
-        widget.set_hide_border(true);
-        assert_eq!(
-            widget.inner_area(area),
-            area,
-            "with the border hidden, there's nothing to inset for"
-        );
-    }
-
-    /// Single panel `DiffViewer` mode sets `hide_border` because its own outer block already
-    /// shows the filename and language - this pins that `render` actually honors the flag rather
-    /// than drawing its title/border unconditionally regardless.
-    #[test]
-    fn hide_border_skips_the_widgets_own_border_and_title() {
+    fn render_never_draws_its_own_border_or_title() {
         let area = Rect::new(0, 0, 20, 5);
         let mut state = CodeViewerState {
             viewport_height: 1,
@@ -1532,28 +1549,18 @@ mod tests {
         };
 
         let mut buf = Buffer::empty(area);
-        let bordered = widget_with_line("hello");
-        (&bordered).render(area, &mut buf, &mut state);
-        let bordered_text: String = buf.content().iter().map(|cell| cell.symbol()).collect();
-        assert!(
-            bordered_text.contains(&bordered.filename()),
-            "with the border shown, the widget's own title should include the filename: \
-             {bordered_text}"
-        );
-        // Content is inset by the border, so row 0 starts with a border-drawing character, not
-        // the file's own first character.
-        assert_ne!(buf.get(0, 1).symbol(), "h");
+        let widget = widget_with_line("hello");
+        (&widget).render(area, &mut buf, &mut state);
 
-        let mut buf = Buffer::empty(area);
-        let mut hidden = widget_with_line("hello");
-        hidden.set_hide_border(true);
-        (&hidden).render(area, &mut buf, &mut state);
-        let hidden_text: String = buf.content().iter().map(|cell| cell.symbol()).collect();
+        let text: String = buf.content().iter().map(|cell| cell.symbol()).collect();
         assert!(
-            !hidden_text.contains(&hidden.filename()),
-            "with the border hidden, no title should be drawn at all: {hidden_text}"
+            !text.contains(&widget.filename()),
+            "no title should ever be drawn: {text}"
         );
-        // Content is flush against the top-left corner now - no border row/column to skip.
-        assert_eq!(buf.get(0, 0).symbol(), "h");
+        assert_eq!(
+            buf.get(0, 0).symbol(),
+            "h",
+            "content should be flush against the top-left corner, no border row/column to skip"
+        );
     }
 }

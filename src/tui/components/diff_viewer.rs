@@ -18,12 +18,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use ratatui::{
-    prelude::*,
-    symbols::border,
-    text::Line,
-    widgets::{Block, Borders},
-};
+use ratatui::{prelude::*, text::Line, widgets::Paragraph};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
@@ -52,7 +47,7 @@ pub struct DiffViewer {
 }
 
 /// Display mode for the diff viewer
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 enum DisplayMode {
     /// Show both panels side by side
     #[default]
@@ -487,21 +482,11 @@ impl Component for DiffViewer {
         // Update display mode based on current width
         self.update_display_mode(area.width);
 
-        // In single panel mode, the outer block drawn below already shows the panel name,
-        // filename, and language in one header line - the inner CodeViewer's own border would
-        // just repeat the filename and language a second time. Dual mode keeps each side's own
-        // border (it's the only place the language shows at all there).
-        let hide_inner_border = self.display_mode == DisplayMode::Single;
-        self.left_viewer.set_hide_border(hide_inner_border);
-        self.right_viewer.set_hide_border(hide_inner_border);
-
-        // Update viewport heights based on current area. Dual mode nests two borders (the
-        // "Before"/"After" panel_block, plus each CodeViewer's own) - 2 rows (top+bottom) each,
-        // -4 total. Single mode now hides the inner border above, leaving only the outer block's
-        // own 2 rows.
-        let viewport_height =
-            area.height
-                .saturating_sub(if hide_inner_border { 2 } else { 4 }) as usize;
+        // No border anywhere around the code display, in either mode - see `panel_title`'s doc
+        // comment for why. Exactly one plain title row, so exactly 1 row reserved here,
+        // uniformly, rather than the old per-mode border-row bookkeeping (2 rows for a single
+        // nested border, 4 for two).
+        let viewport_height = area.height.saturating_sub(1) as usize;
         self.left_viewer.set_viewport_height(viewport_height);
         self.right_viewer.set_viewport_height(viewport_height);
 
@@ -510,38 +495,40 @@ impl Component for DiffViewer {
             let (left_area, right_area) = split_panels(area);
 
             let left_filename = self.left_viewer.filename_or_hint();
-            let left_block = panel_block(
+            let left_content = panel_title(
+                frame,
+                left_area,
                 " Before ",
                 Color::Red,
                 &left_filename,
                 self.active_panel == Panel::Before,
             );
-            let left_inner = left_block.inner(left_area);
-            frame.render_widget(left_block, left_area);
-            self.left_viewer.draw(frame, left_inner)?;
+            self.left_viewer.draw(frame, left_content)?;
 
             let right_filename = self.right_viewer.filename_or_hint();
-            let right_block = panel_block(
+            let right_content = panel_title(
+                frame,
+                right_area,
                 " After ",
                 Color::Green,
                 &right_filename,
                 self.active_panel == Panel::After,
             );
-            let right_inner = right_block.inner(right_area);
-            frame.render_widget(right_block, right_area);
-            self.right_viewer.draw(frame, right_inner)?;
+            self.right_viewer.draw(frame, right_content)?;
 
-            let focused_inner = match self.active_panel {
-                Panel::Before => left_inner,
-                Panel::After => right_inner,
+            let focused_content = match self.active_panel {
+                Panel::Before => left_content,
+                Panel::After => right_content,
             };
-            if let Some((x, y)) = self.focused_viewer().cursor_screen_position(focused_inner) {
+            if let Some((x, y)) = self
+                .focused_viewer()
+                .cursor_screen_position(focused_content)
+            {
                 frame.set_cursor(x, y);
             }
         } else {
             // Single panel mode: show only one panel at a time
-            // Determine border color based on active panel
-            let border_color = match self.active_panel {
+            let title_color = match self.active_panel {
                 Panel::Before => Color::Red,
                 Panel::After => Color::Green,
             };
@@ -554,25 +541,26 @@ impl Component for DiffViewer {
             let filename = self.active_filename();
             let language = self.active_language();
 
-            // Draw active panel with title showing filename and language
-            let block = Block::default()
-                .title(Line::from(vec![
-                    Span::styled(panel_name, Style::new().bold().fg(border_color)),
+            let layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(1), Constraint::Min(0)])
+                .split(area);
+            let (title_area, content_area) = (layout[0], layout[1]);
+
+            frame.render_widget(
+                Paragraph::new(Line::from(vec![
+                    Span::styled(panel_name, Style::new().bold().fg(title_color)),
                     Span::raw(" - "),
                     Span::styled(&filename, Style::new().bold().fg(Color::Cyan)),
                     Span::raw(" - "),
                     Span::styled(&language, Style::new().fg(Color::Gray)),
                     Span::raw(" (Tab to switch)"),
-                ]))
-                .borders(Borders::ALL)
-                .border_set(border::ROUNDED)
-                .border_style(Style::new().fg(border_color));
+                ])),
+                title_area,
+            );
+            self.focused_viewer().draw(frame, content_area)?;
 
-            let inner = block.inner(area);
-            frame.render_widget(block, area);
-            self.focused_viewer().draw(frame, inner)?;
-
-            if let Some((x, y)) = self.focused_viewer().cursor_screen_position(inner) {
+            if let Some((x, y)) = self.focused_viewer().cursor_screen_position(content_area) {
                 frame.set_cursor(x, y);
             }
         }
@@ -596,26 +584,41 @@ fn split_panels(area: Rect) -> (Rect, Rect) {
     (left_area, right_area)
 }
 
-/// Build a dual-mode panel's border block, showing a thicker border and a bold title on
-/// whichever side is active so `Tab` (and therefore `o`'s file-selector target) is visible.
-fn panel_block<'a>(name: &'static str, color: Color, filename: &str, active: bool) -> Block<'a> {
+/// Draws a dual-mode panel's plain, borderless title line - bold (and highlighted on whichever
+/// side is active, so `Tab`, and therefore `o`'s file-selector target, stays visible without a
+/// border to distinguish it) - and returns the remaining area below it for the panel's own
+/// content.
+///
+/// No `Block`/`Borders::ALL` here (nor in single-panel mode, nor in `CodeViewerWidget::render`
+/// anymore either): this and the widget's own border used to *both* draw, each with their own
+/// title showing the filename, so dual-panel mode showed it twice; single-panel mode hid the
+/// widget's own border but not consistently, leaving the two modes' framing visibly different for
+/// no reason. One plain title line, always drawn the same way in both modes, replaces both.
+fn panel_title(
+    frame: &mut Frame,
+    area: Rect,
+    name: &'static str,
+    color: Color,
+    filename: &str,
+    active: bool,
+) -> Rect {
     let title_style = if active {
         Style::new().bold().fg(Color::Black).bg(color)
     } else {
         Style::new().bold().fg(color)
     };
-    Block::default()
-        .title(Line::from(vec![
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(area);
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
             Span::styled(name, title_style),
             Span::raw(format!(" {filename}")),
-        ]))
-        .borders(Borders::ALL)
-        .border_set(if active {
-            border::THICK
-        } else {
-            border::ROUNDED
-        })
-        .border_style(Style::new().fg(color))
+        ])),
+        layout[0],
+    );
+    layout[1]
 }
 
 #[cfg(test)]
@@ -663,6 +666,78 @@ mod tests {
         viewer.toggle_active_panel();
         assert!(viewer.left_viewer.state().is_focused);
         assert!(!viewer.right_viewer.state().is_focused);
+    }
+
+    fn rendered_text(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    }
+
+    /// Regression test: dual-panel mode used to draw *two* titles per side - `panel_title`'s own
+    /// (" Before  before.txt") plus the (since-removed) `CodeViewerWidget`'s own border/title,
+    /// which repeated the filename a second time. One title per side, one filename each.
+    #[test]
+    fn draw_dual_panel_shows_each_filename_exactly_once() -> Result<()> {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+
+        let backend = ratatui::backend::TestBackend::new(240, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            viewer.draw(f, area).unwrap();
+        })?;
+        assert_eq!(
+            viewer.display_mode,
+            DisplayMode::Dual,
+            "240 columns should be wide enough for dual-panel mode"
+        );
+
+        let text = rendered_text(&terminal);
+        assert_eq!(
+            text.matches("before.txt").count(),
+            1,
+            "the Before filename should appear exactly once: {text}"
+        );
+        assert_eq!(
+            text.matches("after.txt").count(),
+            1,
+            "the After filename should appear exactly once: {text}"
+        );
+        Ok(())
+    }
+
+    /// Regression test: neither dual- nor single-panel mode should draw a border around the code
+    /// display anymore - see `panel_title`'s doc comment. Checks for the actual border-drawing
+    /// glyphs the old `Block`s used (`border::ROUNDED`/`border::THICK`), not just the filename
+    /// duplication the other regression test above already covers.
+    #[test]
+    fn draw_never_draws_a_border_around_either_panel_in_either_mode() -> Result<()> {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+        let border_glyphs = ['╭', '╮', '╰', '╯', '━', '┏', '┓', '┗', '┛', '┃'];
+
+        for (width, expected_mode) in [(240u16, DisplayMode::Dual), (100, DisplayMode::Single)] {
+            let backend = ratatui::backend::TestBackend::new(width, 24);
+            let mut terminal = ratatui::Terminal::new(backend)?;
+            terminal.draw(|f| {
+                let area = f.size();
+                viewer.draw(f, area).unwrap();
+            })?;
+            assert_eq!(viewer.display_mode, expected_mode);
+
+            let text = rendered_text(&terminal);
+            assert!(
+                !text.contains(border_glyphs),
+                "found a border glyph in {expected_mode:?} mode: {text}"
+            );
+        }
+        Ok(())
     }
 
     #[test]

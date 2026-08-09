@@ -142,11 +142,6 @@ impl CodeViewer {
         self.widget.set_overlay_theme(theme);
     }
 
-    /// See `CodeViewerWidget`'s `hide_border` field.
-    pub fn set_hide_border(&mut self, hide: bool) {
-        self.widget.set_hide_border(hide);
-    }
-
     /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, keeping it on
     /// the same "sticky" column across a run of vertical moves (see `desired_col`'s doc comment)
     /// rather than the destination row's actual column - except where that column doesn't land
@@ -276,20 +271,18 @@ impl CodeViewer {
         }
     }
 
-    /// Where the cursor should be drawn on screen within `area` (the same area passed to
-    /// `draw`), accounting for the widget's own border and the current scroll position. `None`
-    /// if the cursor's row is scrolled out of view, or its column is past the (not horizontally
-    /// scrollable) visible width.
+    /// Where the cursor should be drawn on screen within `area` (the same content area passed to
+    /// `draw` - the widget itself draws no border to account for), given the current scroll
+    /// position. `None` if the cursor's row is scrolled out of view, or its column is past the
+    /// (not horizontally scrollable) visible width.
     pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
-        let inner = self.widget.inner_area(area);
         let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
-        if row_in_viewport >= inner.height as usize || self.state.cursor_col >= inner.width as usize
-        {
+        if row_in_viewport >= area.height as usize || self.state.cursor_col >= area.width as usize {
             return None;
         }
         Some((
-            inner.x + self.state.cursor_col as u16,
-            inner.y + row_in_viewport as u16,
+            area.x + self.state.cursor_col as u16,
+            area.y + row_in_viewport as u16,
         ))
     }
 
@@ -397,7 +390,10 @@ impl Component for CodeViewer {
     }
 
     fn init(&mut self, area: Rect) -> Result<()> {
-        self.state.viewport_height = area.height.saturating_sub(2) as usize; // -2 for borders
+        // -1 for `DiffViewer`'s own single title row - see `panel_title`'s doc comment; this
+        // widget draws no border of its own. Superseded by `draw`'s own `set_viewport_height`
+        // call on every real frame - this only matters for the very first frame.
+        self.state.viewport_height = area.height.saturating_sub(1) as usize;
         Ok(())
     }
 

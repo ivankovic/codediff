@@ -6,6 +6,78 @@ and the README's "Using the TUI" section, not general advice. Organized into uni
 picked up and solved one at a time, roughly in priority order. Mark an item done in place
 (`**Status:** IMPLEMENTED (date)`) rather than deleting it, same convention as `src/diff/TODO.md`.
 
+## Bugs found during manual TUI testing, 2026-08-10 (DONE - all 3 fixed same day)
+
+Three separate bugs reported after actually using the interactive TUI (`cargo run --bin codediff
+-- BEFORE AFTER`), not a code-reading audit like the phases below. Investigated and fixed one at a
+time; kept here in the same "problem/root cause/fix" shape as the phases below for the historical
+record.
+
+### Filename shown twice in dual-panel mode; no border at all in single-panel mode
+- **Problem:** `DiffViewer::draw` (dual mode) drew an outer bordered `Block` per side showing
+  " Before <filename>", *and* `CodeViewerWidget::render` drew its own bordered `Block` inside that
+  showing "<filename> - <language>" - the filename appeared in both. Single-panel mode set
+  `hide_border` on the inner widget (so only the outer border showed there), an inconsistency
+  between the two modes for no real reason - dual mode's inner border existed only because it was
+  "the only place the language shows at all", per the code's own comment.
+- **Fix:** `CodeViewerWidget` no longer draws any border or title of its own at all (`hide_border`/
+  `set_hide_border`/`inner_area` all removed - the widget always renders content flush with
+  whatever area it's given). `DiffViewer::draw` now draws exactly one plain, borderless title row
+  above the content in *both* modes (`panel_title` for dual, an inline `Paragraph` for single) -
+  filename and language both fit on that one line, so nothing was lost by dropping the widget's
+  own copy.
+- **Files:** `widgets/code_viewer.rs` (removed the border/title branch from `render`, the
+  `hide_border` field, `set_hide_border`, `inner_area`), `components/code_viewer.rs` (removed the
+  `set_hide_border` pass-through; `cursor_screen_position`/`init` no longer inset for a border that
+  doesn't exist), `components/diff_viewer.rs` (`draw`, new `panel_title` replacing `panel_block`).
+- **Status:** IMPLEMENTED (2026-08-10). New tests: `render_never_draws_its_own_border_or_title`
+  (`widgets/code_viewer.rs`), `draw_dual_panel_shows_each_filename_exactly_once` and
+  `draw_never_draws_a_border_around_either_panel_in_either_mode` (`components/diff_viewer.rs`).
+
+### Syntax highlighting silently missing for several common languages
+- **Problem:** Not what Phase 4 below assumed (a missing *keybinding* for an otherwise-working
+  toggle) - `syntax_highlighting` already defaults to `true` and nothing disables it. The real bug:
+  `language_to_syntect` named several languages using syntect's own default (Sublime-stock) syntax
+  names, and `SyntaxSet::load_defaults_newlines()`'s bundled set has no definition at all for Dart,
+  Kotlin, Swift, TypeScript, or TSX, and uses different names than guessed for `ShellScript`
+  ("Bourne Again Shell (bash)", not "Bash") and `ProtoBuf` ("Protocol Buffer" singular, not
+  plural) - `find_syntax_by_name` silently returned `None` for all of these, so files in any of
+  those languages rendered fully unstyled, with no error or indication anything was wrong.
+- **Fix:** Switched `syntax_set()` from plain `SyntaxSet::load_defaults_newlines()` to
+  `two_face::syntax::extra_newlines()` (new `two-face` dependency - bundles the much larger syntax
+  set the `bat` CLI ships with) and corrected the three misnamed `language_to_syntect` entries.
+  Bazel/Starlark remains a genuine, documented gap - present in neither syntax set.
+- **Files:** `Cargo.toml` (new optional `two-face` dep, folded into the `tui` feature same as
+  `syntect`), `widgets/code_viewer.rs` (`syntax_set`, `language_to_syntect`).
+- **Status:** IMPLEMENTED (2026-08-10). New test:
+  `every_language_except_the_documented_bazel_gap_resolves_to_a_real_syntax`.
+
+### Real-terminal rendering corruption ("artifacts", repeated text, `?` doesn't clear it) on tab-indented files
+- **Problem:** Reported via `cargo run -r --bin codediff -- .../before.html.test .../after.html.test`
+  (a Hugo template file indented with real tab characters) - the TUI progressively corrupted its
+  own display while scrolling, and opening the `?` help modal didn't clear the corruption
+  underneath it. Root cause: `ratatui::buffer::Buffer` treats every character - `\t` included - as
+  occupying exactly one cell, but a *real* terminal receiving a raw `\t` byte jumps its actual
+  cursor to the next hardware tab stop instead. That desyncs the terminal's real cursor column
+  from the column `ratatui`'s own Buffer model believes it's at; everything drawn afterward on that
+  frame (and, since `ratatui` only ever redraws cells it believes changed, on later frames too)
+  lands at the wrong screen position. This is invisible to a `ratatui::backend::TestBackend` test,
+  which only models the Buffer, never an actual terminal's cursor-interpretation behavior - it had
+  to be tracked down against the real bug report, not discovered by reading the code or existing
+  tests.
+- **Fix:** New `display_safe` helper replaces every `\t` with a single space when
+  `DiffSessionData::before_contents`/`after_contents` are built (`assemble_diff_session_data`/
+  `assemble_plain_text_diff_session_data`) - after the diff engine has already computed
+  `before_ranges`/`after_ranges` against the original text, so this can't shift any of those
+  offsets (`\t` and `' '` are both exactly one UTF-8 byte - a strict length-preserving swap, not a
+  tab-stop-width expansion).
+- **Files:** `app.rs` (`display_safe`, its two call sites in `assemble_diff_session_data`/
+  `assemble_plain_text_diff_session_data`).
+- **Status:** IMPLEMENTED (2026-08-10). New test:
+  `compute_diff_never_puts_a_raw_tab_into_diff_session_data_contents`, against the real fixture
+  that exposed the bug (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody`), not a
+  synthetic string.
+
 ## Phase 1: Persistent status/footer line (DONE, 2026-08-07 - all 5 sub-items implemented)
 
 The single highest-value item: one component fixes several gaps below at once, and it's low-risk
@@ -125,6 +197,10 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   wired to a key), `app.rs` (key dispatch), `help_modal.rs`.
 - **Impact:** Restores a real, previously-dead-ended feature as an actual user-facing toggle.
 - **Complexity:** Low.
+- **Note (2026-08-10):** Highlighting itself was never actually off (`syntax_highlighting` already
+  defaults to `true`) - the missing-toggle-keybinding gap described above is real and still open,
+  but it's not why a user would see *no* highlighting at all. That turned out to be a different,
+  now-fixed bug: see "Syntax highlighting silently missing for several common languages" above.
 
 ## Phase 5: Change overview / minimap
 
