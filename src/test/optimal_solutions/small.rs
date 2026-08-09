@@ -150,6 +150,8 @@ mod javascript_microsoft_typescript_another_test_case_marked_with_strict;
 #[cfg(test)]
 mod javascript_microsoft_typescript_broken_js_remove_string_fragment;
 #[cfg(test)]
+mod javascript_microsoft_typescript_test_data_pretending_to_be_code_maybe_broken_parsing;
+#[cfg(test)]
 mod javascript_mozilla_firefox_add_comment;
 #[cfg(test)]
 mod javascript_twbs_bootstrap_comment_version_update;
@@ -256,6 +258,8 @@ mod ruby_homebrew_brew_enclose_block_in_rescue;
 #[cfg(test)]
 mod ruby_homebrew_brew_function_callsite_argument_change;
 #[cfg(test)]
+mod ruby_homebrew_brew_real_small_change;
+#[cfg(test)]
 mod ruby_junegunn_fzf_add_test_case;
 #[cfg(test)]
 mod ruby_junegunn_fzf_add_test_case_2;
@@ -295,6 +299,8 @@ mod shellscript_scikit_learn_scikit_learn_string_to_regex;
 mod shellscript_torvalds_linux_double_equals_to_equals;
 #[cfg(test)]
 mod swift_nextcloud_ios_actual_control_flow_change;
+#[cfg(test)]
+mod swift_nextcloud_ios_actual_logic_added;
 #[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
 #[cfg(test)]
