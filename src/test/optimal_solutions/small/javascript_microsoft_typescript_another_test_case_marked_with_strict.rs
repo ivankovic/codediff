@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("javascript-microsoft-typescript-another-test-case-marked-with-strict")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "javascript-microsoft-typescript-another-test-case-marked-with-strict",
+    )
 }
