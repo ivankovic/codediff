@@ -176,6 +176,8 @@ mod json_mastodon_add_translation;
 #[cfg(test)]
 mod json_nextcloud_server_deleted_pair;
 #[cfg(test)]
+mod json_nextcloud_server_remove_many_and_move_one;
+#[cfg(test)]
 mod json_radarr_radarr_rename_string_key;
 #[cfg(test)]
 mod json_shadcn_ui_ui_react_code_in_string_constant;
@@ -238,6 +240,8 @@ mod php_wordpress_wordpress_whitespace_only_change;
 #[cfg(test)]
 mod python_ansible_ansible_field_rename;
 #[cfg(test)]
+mod python_langflow_ai_langflow_actual_change_of_logic;
+#[cfg(test)]
 mod python_openhands_openhands_change_string_constant;
 #[cfg(test)]
 mod python_paddlepaddle_paddleocr_formatting_only_change;
@@ -275,6 +279,8 @@ mod rust_rustdesk_add_one_slice_element;
 mod rust_rustdesk_rustdesk_add_two_values_to_slice;
 #[cfg(test)]
 mod rust_rustdesk_rustdesk_string_constant_change;
+#[cfg(test)]
+mod rust_vercel_nextjs_move_from_one_struct_to_another_and_add_some_code;
 #[cfg(test)]
 mod rust_zed_industries_zed_add_argument;
 #[cfg(test)]
@@ -327,6 +333,8 @@ mod tsx_mui_material_ui_move_colour_to_a_new_attribute;
 mod tsx_shadcn_ui_ui_add_attribute;
 #[cfg(test)]
 mod tsx_shadcn_ui_ui_real_small_change;
+#[cfg(test)]
+mod typescript_excalidraw_excalidraw_add_function;
 #[cfg(test)]
 mod typescript_excalidraw_excalidraw_add_values_to_lists;
 #[cfg(test)]

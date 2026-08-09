@@ -66,7 +66,7 @@ JSON,gorhill-uBlock.git,f89de42364c04ae0c6e9b46e6c0deb510527e9b6,platform/mv3/ex
 JSON,langflow-ai-langflow.git,65a3a193ae2a0707a37d16a4f3bb47dfe7b03218,src/backend/base/langflow/initial_setup/starter_projects/Basic Prompt Chaining.json,json-langflow-update-single-string,small
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation,small
 JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/dashboard/l10n/fa.json,json-nextcloud-server-deleted-pair,small
-JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,,small
+JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sharing/l10n/nb.json,json-nextcloud-server-remove-many-and-move-one,small
 JSON,shadcn-ui-ui.git,137b1c12b7bde1318c8781680b41ae449e40df8f,apps/v4/public/r/styles/radix-maia/pagination.json,json-shadcn-ui-ui-react-code-in-string-constant,small
 JSON,shadcn-ui-ui.git,47c47eaed21524b5263011e080d0cd52bc794a6f,apps/v4/public/r/styles/radix-vega/hover-card.json,json-shadcn-ui-ui-string-value-update-string-is-code,small
 Java,Genymobile-scrcpy.git,3acffaae57238ee47e05f97f8e762a04550fdad8,server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java,java-genymobile-scrcpy-change-some-android-version-constant,small
@@ -124,7 +124,7 @@ Python,PaddlePaddle-PaddleOCR.git,416ea0ccee4fd79960e3a4363d02779f4904fb56,ppocr
 Python,ansible-ansible.git,244c2f06edd3331495de27ecce2066cfa49d1e00,lib/ansible/plugins/connection/ssh.py,,small
 Python,ansible-ansible.git,df0b417f2db6a51a7f74a6bc1bfa8e8f24676899,lib/ansible/parsing/vault/__init__.py,python-ansible-ansible-field-rename,small
 Python,django-django.git,d82f25d3f0f4eb7be721a72d0e79a8d13d394d32,tests/template_tests/test_partials.py,,small
-Python,langflow-ai-langflow.git,324caf486c2274efcbeaf8648f5165c76c38c6ce,src/backend/base/langflow/logging/logger.py,,small
+Python,langflow-ai-langflow.git,324caf486c2274efcbeaf8648f5165c76c38c6ce,src/backend/base/langflow/logging/logger.py,python-langflow-ai-langflow-actual-change-of-logic,small
 Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/zsh.py,python-thefuck-multiline-string-change,small
 Python,pandas-dev-pandas.git,1a753531c565e11d4d78912d09b9343945da9363,pandas/core/window/rolling.py,,small
 Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/attention/_fa3.py,python-pytorch-pytorch-add-param-to-many-places-and-update-one,small
@@ -147,7 +147,7 @@ Rust,rustdesk-rustdesk.git,98362eaca036588039d10d2c1e9a9260de7a310d,src/lang/kz.
 Rust,rustdesk-rustdesk.git,b99c540210a98df39b96ec65f2ec40fd703c7506,src/lang/sq.rs,rust-rustdesk-add-item,small
 Rust,rustdesk-rustdesk.git,ffddf60184731bb2c8842ef3134550390f73e43b,src/lang/it.rs,rust-rustdesk-rustdesk-string-constant-change,small
 Rust,vercel-next.js.git,5719439f24c81e62b90b7b53b332b6e615d9565b,turbopack/crates/turbo-tasks-macros/src/func.rs,,small
-Rust,vercel-next.js.git,5c70b4beaa80ec7031284153ba012b243788ef1e,turbopack/crates/turbopack-ecmascript-runtime/src/browser_runtime.rs,,small
+Rust,vercel-next.js.git,5c70b4beaa80ec7031284153ba012b243788ef1e,turbopack/crates/turbopack-ecmascript-runtime/src/browser_runtime.rs,rust-vercel-nextjs-move-from-one-struct-to-another-and-add-some-code,small
 Rust,zed-industries-zed.git,e9e71431bb26ce554d4ed2024569745df6dd9047,crates/worktree/src/worktree.rs,rust-zed-industries-zed-add-argument,small
 ShellScript,Genymobile-scrcpy.git,c0e2e27cf9eb38a95b324ba9aeeb34dab6d2e72f,server/build_without_gradle.sh,shellscript-genymobile-scrcpy-add-two-flags,small
 ShellScript,ansible-ansible.git,35750ed3218e7bce68b21f473cecb0a3b9d60321,test/integration/targets/template_jinja2_non_native/runme.sh,shellscript-ansible-ansible-simple-deletion,small
@@ -180,7 +180,7 @@ TSX,mui-material-ui.git,8663368c5472de8076993763fa0a52f9ce55fa5d,docs/src/pages/
 TSX,shadcn-ui-ui.git,687f09817b614a3450f0f56779edf367082e1e53,apps/v4/registry/bases/base/blocks/preview/cards/contributors.tsx,tsx-shadcn-ui-ui-add-attribute,small
 TSX,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/examples/base/ui/radio-group.tsx,tsx-shadcn-ui-ui-real-small-change,small
 TypeScript,excalidraw-excalidraw.git,6959a363f0ba8d0e8b05442f4c8f3cc4a2e00ca6,packages/excalidraw/appState.ts,typescript-excalidraw-excalidraw-add-values-to-lists,small
-TypeScript,excalidraw-excalidraw.git,86cfeb714c63bf7efccf5c26bf1f30522395f5db,packages/excalidraw/utils.ts,,small
+TypeScript,excalidraw-excalidraw.git,86cfeb714c63bf7efccf5c26bf1f30522395f5db,packages/excalidraw/utils.ts,typescript-excalidraw-excalidraw-add-function,small
 TypeScript,microsoft-TypeScript.git,16beff101ae1dae0600820ebf22632ac8a40cfc8,src/testRunner/transpileRunner.ts,typescript-microsoft-typescript-add-dot-js-to-import-paths,small
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentCompatability37.ts,typescript-typescript-add-target-comment,small
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentNestedInLiterals.ts,typescript-typescript-add-target-comment-2,small
