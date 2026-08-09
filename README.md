@@ -6,6 +6,9 @@
 
 Fast, robust, syntax-aware code diffing.
 
+![A screenshot showing codediff diffing a Python refactoring. It correctly identifies assignment
+operator as changed, instead of anchoring on the text as unix diff would](/readme-screenshot.png)
+
 # Installation
 
 ```
@@ -25,6 +28,10 @@ The git-history analysis tools in `src/bin/` sit behind an off-by-default `stats
 `stats` feature exists because these tools need git2 and its own OpenSSL/libssh2 build
 dependencies. The diffing tool itself does not need these dependencies. Build these tools with
 `cargo build --features stats`.
+
+## Editor integration
+
+For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
 
 # Using CodeDiff
 
@@ -117,10 +124,6 @@ GIT_EXTERNAL_DIFF=codediff git diff
 Files with no tree-sitter grammar (an unrecognized extension, or none at all - `Makefile`,
 `Dockerfile`, ...) fall back to a plain line-level diff instead of the syntax-aware one, so a
 change touching one of them never blocks `git diff` from showing the rest.
-
-## Editor integration
-
-For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
 
 # Guiding principles
 
