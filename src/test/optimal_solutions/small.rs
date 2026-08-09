@@ -116,6 +116,8 @@ mod html_fatedier_add_attribute;
 #[cfg(test)]
 mod html_firefox_update_src;
 #[cfg(test)]
+mod html_gohugoio_hugo_enclose_table_with_div_and_add_thead_tbody;
+#[cfg(test)]
 mod html_gorhill_add_tag;
 #[cfg(test)]
 mod html_hugo_tag_to_selfclosing_tag;
@@ -123,6 +125,8 @@ mod html_hugo_tag_to_selfclosing_tag;
 mod html_ladybird_delete_attribute;
 #[cfg(test)]
 mod html_mermaid_update_link;
+#[cfg(test)]
+mod html_mozilla_firefox_firefox_remove_li_around_button;
 #[cfg(test)]
 mod html_twbs_bootstrap_add_the_same_attribute_in_many_places;
 #[cfg(test)]
@@ -228,6 +232,10 @@ mod php_nextcloud_server_whitespace_and_added_declaration;
 #[cfg(test)]
 mod php_wordpress_wordpress_add_null_to_return;
 #[cfg(test)]
+mod php_wordpress_wordpress_add_rtc_check;
+#[cfg(test)]
+mod php_wordpress_wordpress_add_some_checks;
+#[cfg(test)]
 mod php_wordpress_wordpress_update_doccomment;
 #[cfg(test)]
 mod php_wordpress_wordpress_version_update;
@@ -310,6 +318,8 @@ mod swift_nextcloud_ios_actual_control_flow_change;
 #[cfg(test)]
 mod swift_nextcloud_ios_actual_logic_added;
 #[cfg(test)]
+mod swift_nextcloud_ios_add_4_functions;
+#[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
 #[cfg(test)]
 mod swift_swiftlang_swift_actual_logic_change;
@@ -366,6 +376,8 @@ mod vimscript_neovim_neovim_add_a_few_lines_one_after_the_other;
 #[cfg(test)]
 mod vimscript_neovim_neovim_add_line_comment;
 #[cfg(test)]
+mod vimscript_neovim_neovim_add_test_case_plus_edit_existing_one;
+#[cfg(test)]
 mod vimscript_neovim_neovim_i_have_no_idea_what_this_diff_does;
 #[cfg(test)]
 mod vimscript_neovim_neovim_improved_asserts;
@@ -383,6 +395,8 @@ mod xml_nextcloud_android_delete_element;
 mod xml_nextcloud_android_delete_element_2;
 #[cfg(test)]
 mod xml_odoo_odoo_add_attribute;
+#[cfg(test)]
+mod xml_odoo_odoo_add_button_roles;
 #[cfg(test)]
 mod xml_odoo_odoo_add_two_attributes;
 #[cfg(test)]

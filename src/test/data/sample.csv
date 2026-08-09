@@ -52,11 +52,11 @@ Go,prometheus-prometheus.git,e14795bbf4fbd1837a9e3428aafb40b4b1dda99d,tsdb/tsdbu
 HTML,LadybirdBrowser-ladybird.git,d2528dd5ce8510cabc6b160ffedb054e803a84d4,Tests/LibWeb/Screenshot/input/css-border-style-double.html,html-ladybird-delete-attribute,small
 HTML,apache-echarts.git,139206be7adab50f0d79e4d8adf3d14bac15b1bb,test/runTest/client/index.html,,small
 HTML,fatedier-frp.git,31f40aa9136b86d879f3495a601084eba6de873f,assets/frps/static/index.html,html-fatedier-add-attribute,small
-HTML,gohugoio-hugo.git,5be51ac3db225d5df501ed1fa1499c41d97dbf65,layouts/shortcodes/datatable-filtered.html,,small
+HTML,gohugoio-hugo.git,5be51ac3db225d5df501ed1fa1499c41d97dbf65,layouts/shortcodes/datatable-filtered.html,html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody,small
 HTML,gohugoio-hugo.git,eb06a3cd0ce98da5038e25cc9a28834b313d482c,tpl/tplimpl/embedded/templates/alias.html,html-hugo-tag-to-selfclosing-tag,small
 HTML,gorhill-uBlock.git,5c029b353204a47efd8d7be22a3f741f1802780e,src/no-dashboard.html,html-gorhill-add-tag,small
 HTML,mermaid-js-mermaid.git,d7c42eb62fa208ad11a0a41185894029024e4474,cypress/platform/xss4.html,html-mermaid-update-link,small
-HTML,mozilla-firefox-firefox.git,99614e32b9ad06f08bdebc34ccf559296ab95e69,toolkit/components/pdfjs/content/web/viewer.html,,small
+HTML,mozilla-firefox-firefox.git,99614e32b9ad06f08bdebc34ccf559296ab95e69,toolkit/components/pdfjs/content/web/viewer.html,html-mozilla-firefox-firefox-remove-li-around-button,small
 HTML,mozilla-firefox-firefox.git,a5c6959314b1f185f42a314f41a454ed8652c87f,testing/web-platform/tests/orientation-sensor/RelativeOrientationSensor-iframe-access.https.html,html-firefox-update-src,small
 HTML,twbs-bootstrap.git,1d92d0b68f3c00c70bcc6d9a4f4f34e8f3a7be7d,site/content/docs/5.3/examples/sidebars/index.html,html-twbs-bootstrap-add-the-same-attribute-in-many-places,small
 JSON,Radarr-Radarr.git,52a69b662d56c800e19568075625f7fbcccb5e47,src/NzbDrone.Core/Localization/Core/da.json,json-radarr-radarr-rename-string-key,small
@@ -111,9 +111,9 @@ LUA,neovim-neovim.git,b99cdd08de42804b0ea2448d6f9f4e476b931b80,runtime/lua/vim/l
 LUA,neovim-neovim.git,dec3c6fa346b298e7feb72398f9fdd5d59c11444,test/functional/testnvim.lua,lua-neovim-neovim-add-if-around-one-line,small
 PHP,WordPress-WordPress.git,1f11618effb7fd4dfde2658804adef51b66d5e60,wp-includes/version.php,php-wordpress-wordpress-version-update,small
 PHP,WordPress-WordPress.git,268fc794c929d790f423c03e309578dffa03d777,wp-content/themes/twentytwenty/inc/template-tags.php,php-wordpress-wordpress-update-doccomment,small
-PHP,WordPress-WordPress.git,2ab763418b2093f06a2b2ce0afa8bd8c2283cc9c,wp-includes/script-loader.php,,small
+PHP,WordPress-WordPress.git,2ab763418b2093f06a2b2ce0afa8bd8c2283cc9c,wp-includes/script-loader.php,php-wordpress-wordpress-add-some-checks,small
 PHP,WordPress-WordPress.git,622411cf95da7ac8c66361484abbcabe8679f71e,wp-admin/includes/file.php,php-wordpress-wordpress-whitespace-only-change,small
-PHP,WordPress-WordPress.git,87c17b8deb936527f63ecf2158d62799bc299240,wp-admin/includes/misc.php,,small
+PHP,WordPress-WordPress.git,87c17b8deb936527f63ecf2158d62799bc299240,wp-admin/includes/misc.php,php-wordpress-wordpress-add-rtc-check,small
 PHP,WordPress-WordPress.git,a9775c45d8461138756fa164847fb2479dd898ea,wp-admin/includes/file.php,php-wordpress-wordpress-add-null-to-return,small
 PHP,WordPress-WordPress.git,d77b57a227e03f8494289ed90dd8d9dbe7074778,wp-includes/version.php,php-wordpress-wordpress-version-update-3,small
 PHP,WordPress-WordPress.git,e3a446c81eb1e9bef97144975bd6058fedb7aa67,wp-includes/version.php,php-wordpress-wordpress-version-update-2,small
@@ -162,7 +162,7 @@ ShellScript,torvalds-linux.git,3b4a3a00de8770f3a60c1fa483921ce37415132d,scripts/
 Swift,nextcloud-ios.git,33c52794edb8b37ab92b5dc68abe944004f4329d,iOSClient/Networking/NCNetworking+Download.swift,swift-nextcloud-ios-actual-control-flow-change,small
 Swift,nextcloud-ios.git,87283c7103ff55c9ab575bfb750a0afbefbbeae7,iOSClient/Networking/E2EE/NCNetworkingE2EEUpload.swift,,small
 Swift,nextcloud-ios.git,b6dddea2df91b94b3653110c4421d312a9910516,iOSClient/Networking/NCService.swift,,small
-Swift,nextcloud-ios.git,bbe81791f45a9e78210b83cff2b181d6d204ca64,iOSClient/Main/NCMainNavigationController.swift,,small
+Swift,nextcloud-ios.git,bbe81791f45a9e78210b83cff2b181d6d204ca64,iOSClient/Main/NCMainNavigationController.swift,swift-nextcloud-ios-add-4-functions,small
 Swift,nextcloud-ios.git,bf284ac5bb885ece12934dde3bfbee45ea2ff5db,iOSClient/Networking/NCNetworking+NextcloudKitDelegate.swift,swift-nextcloud-ios-actual-logic-added,small
 Swift,nextcloud-ios.git,ef634377e7e034566457a94fb1985e18d5642c15,iOSClient/Utility/Maintenance.swift,swift-nextcloud-ios-call-different-function,small
 Swift,swiftlang-swift.git,0266a0a0dffb7b0f92cd0d934fb6b39af249cdff,test/AutoDiff/validation-test/closure_specialization/multi_bb_no_bte.swift,swift-swiftlang-swift-enable-checks-remove-todo-comment,small
@@ -190,7 +190,7 @@ TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tes
 TypeScript,microsoft-playwright.git,71e9e8e102b92e10c3edfc48185c791af3a4d6f1,tests/library/agent-expect.spec.ts,typescript-microsoft-playwright-add-two-test-cases,small
 TypeScript,n8n-io-n8n.git,d00a55f869c3dd3f20a438b8f65573467701528c,packages/@n8n/nodes-langchain/nodes/llms/LMLemonade/LmLemonade.node.ts,typescript-n8n-io-n8n-remove-and-add-imports,small
 Vimscript,junegunn-fzf.git,779e3cc5b551d791f9f39df8129a95365bca9da7,plugin/fzf.vim,vimscript-junegunn-fzf-condition-canges,small
-Vimscript,neovim-neovim.git,08b8fe5ab36ee3df3ce593942565d4cd318373c4,test/old/testdir/test_ins_complete.vim,,small
+Vimscript,neovim-neovim.git,08b8fe5ab36ee3df3ce593942565d4cd318373c4,test/old/testdir/test_ins_complete.vim,vimscript-neovim-neovim-add-test-case-plus-edit-existing-one,small
 Vimscript,neovim-neovim.git,0dfac68928778f3ed6297c5ad46a79eb9a8dc69d,test/old/testdir/test_cd.vim,vimscript-neovim-neovim-improved-asserts,small
 Vimscript,neovim-neovim.git,17555de2674fb7aa79815d815395aebfc01ea8ec,runtime/colors/zellner.vim,,small
 Vimscript,neovim-neovim.git,20a7e744441983906b3ff1c8562e05e32af50c32,test/old/testdir/test_crash.vim,vimscript-neovim-neovim-add-a-few-lines-one-after-the-other,small
@@ -207,7 +207,7 @@ XML,nextcloud-android.git,a28b3fdd3d24f159e0bd3212a3ceb9abbebea960,app/src/main/
 XML,nextcloud-android.git,e3204931c6efe32c39239dfc93d3c88b153f45d1,app/src/main/res/values-hr/strings.xml,xml-nextcloud-android-add-few-translations,small
 XML,odoo-odoo.git,0bf8df7d0a096cf8fe984c42d331404d473eeb71,addons/l10n_ro_edi/tests/test_files/from_odoo/ciusro_out_invoice_no_prefix_vat.xml,xml-odoo-odoo-change-value,small
 XML,odoo-odoo.git,2299d0d449acec4d9a1c098eb989cbf06add3a6a,addons/account/views/account_move_views.xml,xml-odoo-odoo-add-two-attributes,small
-XML,odoo-odoo.git,531b28bca89942b61ecea32daf479b2b39a5cf1c,addons/point_of_sale/static/src/app/components/popups/product_configurator_popup/product_configurator_popup.xml,,small
+XML,odoo-odoo.git,531b28bca89942b61ecea32daf479b2b39a5cf1c,addons/point_of_sale/static/src/app/components/popups/product_configurator_popup/product_configurator_popup.xml,xml-odoo-odoo-add-button-roles,small
 XML,odoo-odoo.git,859930c9ad71c9ce997723994df5b298cfc40a15,addons/point_of_sale/views/pos_order_view.xml,xml-odoo-odoo-add-attribute,small
 YAML,ansible-ansible.git,0c7dcb65cff52d92e488ff75008d9256be37734b,test/integration/targets/fetch/roles/fetch_tests/tasks/normal.yml,yaml-ansible-ansible-add-two-sequence-items,small
 YAML,ansible-ansible.git,29a298a6172b0f7dd66ca06b3aaaaf103788b84e,test/integration/targets/copy/tasks/tests.yml,yaml-ansible-ansible-double-quote-scalar-change-possible-treesitter-weakness,small
