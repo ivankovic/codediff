@@ -78,6 +78,8 @@ mod csharp_sonarr_change_type;
 #[cfg(test)]
 mod css_add_property;
 #[cfg(test)]
+mod css_mozilla_firefox_firefox_actual_style_changes;
+#[cfg(test)]
 mod css_playwright_add_class_selector;
 #[cfg(test)]
 mod css_shadcn_ui_ui_completely_broken_treesitter_parsing;
@@ -111,6 +113,8 @@ mod go_ollama_ollama_surround_block_with_if_and_function_call;
 mod go_prometheus_single_comment_change;
 #[cfg(test)]
 mod go_user_slices_library;
+#[cfg(test)]
+mod html_apache_echarts_actual_structure_change;
 #[cfg(test)]
 mod html_fatedier_add_attribute;
 #[cfg(test)]
@@ -171,6 +175,8 @@ mod javascript_typescript_use_strict_2;
 mod javascript_typescript_very_interesting_brokn_code;
 #[cfg(test)]
 mod json_apache_string_change_version;
+#[cfg(test)]
+mod json_excalidraw_excalidraw_change_translations_mostly_add;
 #[cfg(test)]
 mod json_gorhill_ublock_add_5_pairs;
 #[cfg(test)]
@@ -380,9 +386,13 @@ mod vimscript_neovim_neovim_add_line_comment;
 #[cfg(test)]
 mod vimscript_neovim_neovim_add_test_case_plus_edit_existing_one;
 #[cfg(test)]
+mod vimscript_neovim_neovim_add_two_functions_and_modify_a_few_lines;
+#[cfg(test)]
 mod vimscript_neovim_neovim_i_have_no_idea_what_this_diff_does;
 #[cfg(test)]
 mod vimscript_neovim_neovim_improved_asserts;
+#[cfg(test)]
+mod vimscript_neovim_neovim_test_debian_package_parsing_awful_string_matching;
 #[cfg(test)]
 mod xml_microsoft_terminal_multiline_string_constant_change;
 #[cfg(test)]
@@ -419,5 +429,7 @@ mod yaml_mastodon_remove_one_pair;
 mod yaml_mozilla_pdf_single_value_update;
 #[cfg(test)]
 mod yaml_n8n_io_n8n_add_performance_check_to_ci_config;
+#[cfg(test)]
+mod yaml_twbs_bootstrap_remove_v_semicolon_from_version_numbers;
 #[cfg(test)]
 mod yaml_twbs_bootstrap_version_pin_with_comment;
