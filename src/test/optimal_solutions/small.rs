@@ -322,6 +322,8 @@ mod swift_nextcloud_ios_add_4_functions;
 #[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
 #[cfg(test)]
+mod swift_nextcloud_ios_refactor_and_change;
+#[cfg(test)]
 mod swift_swiftlang_swift_actual_logic_change;
 #[cfg(test)]
 mod swift_swiftlang_swift_comment_change;
