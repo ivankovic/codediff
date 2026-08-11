@@ -25,7 +25,7 @@ clean-db:
 	rm -rf $(RESEARCH_DIR)/stats.sqlite
 
 test: test-mapping-site-js
-	cargo test
+	cargo test --release
 
 # Plain-Node regression test for the human_mapping site's own vanilla JS (assets/mapping_site/) -
 # no npm dependency, no build step, matching that directory's own convention (see index.js's header
