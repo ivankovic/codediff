@@ -230,6 +230,8 @@ mod lua_neovim_neovim_constant_changes;
 #[cfg(test)]
 mod lua_neovim_neovim_if_flips_two_branches;
 #[cfg(test)]
+mod lua_neovim_neovim_logic_change_with_some_code_re_use;
+#[cfg(test)]
 mod lua_neovim_one_added_line;
 #[cfg(test)]
 mod php_nextcloud_change_doccomment;

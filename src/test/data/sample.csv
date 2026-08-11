@@ -107,7 +107,7 @@ LUA,neovim-neovim.git,0501c5fd0959895b18d8166c6c034cdf1832edf3,runtime/lua/vim/l
 LUA,neovim-neovim.git,249f305bbcddf10264835c5845035a42030d9184,test/functional/ui/options_spec.lua,lua-neovim-one-added-line,small
 LUA,neovim-neovim.git,3325536150eda0de4dc69f25beca416c0a0b3e3a,test/functional/ui/screen.lua,lua-neovim-neovim-add-new-logic,small
 LUA,neovim-neovim.git,844caca881f85fa4e143fbfa982fba48590e8a60,test/functional/ui/cmdline2_spec.lua,lua-neovim-neovim-constant-changes,small
-LUA,neovim-neovim.git,b99cdd08de42804b0ea2448d6f9f4e476b931b80,runtime/lua/vim/lsp/client.lua,,small
+LUA,neovim-neovim.git,b99cdd08de42804b0ea2448d6f9f4e476b931b80,runtime/lua/vim/lsp/client.lua,lua-neovim-neovim-logic-change-with-some-code-re-use,small
 LUA,neovim-neovim.git,dec3c6fa346b298e7feb72398f9fdd5d59c11444,test/functional/testnvim.lua,lua-neovim-neovim-add-if-around-one-line,small
 PHP,WordPress-WordPress.git,1f11618effb7fd4dfde2658804adef51b66d5e60,wp-includes/version.php,php-wordpress-wordpress-version-update,small
 PHP,WordPress-WordPress.git,268fc794c929d790f423c03e309578dffa03d777,wp-content/themes/twentytwenty/inc/template-tags.php,php-wordpress-wordpress-update-doccomment,small
