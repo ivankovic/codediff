@@ -104,6 +104,8 @@ mod go_gin_change_import;
 #[cfg(test)]
 mod go_gin_constant_change;
 #[cfg(test)]
+mod go_kubernetes_kubernetes_add_unit_test_cases;
+#[cfg(test)]
 mod go_lazygit_add_to_if_condition;
 #[cfg(test)]
 mod go_lazygit_switch_to_strings;
@@ -256,6 +258,8 @@ mod php_wordpress_wordpress_whitespace_only_change;
 #[cfg(test)]
 mod python_ansible_ansible_field_rename;
 #[cfg(test)]
+mod python_ansible_ansible_ridiculously_long_yaml_in_string_constant_and_actual_code_changes;
+#[cfg(test)]
 mod python_langflow_ai_langflow_actual_change_of_logic;
 #[cfg(test)]
 mod python_openhands_openhands_change_string_constant;
@@ -275,6 +279,8 @@ mod ruby_homebrew_add_or_expression;
 mod ruby_homebrew_brew_actual_logic_change;
 #[cfg(test)]
 mod ruby_homebrew_brew_change_heredoc_to_string;
+#[cfg(test)]
+mod ruby_homebrew_brew_decent_amount_of_new_code_and_some_changes;
 #[cfg(test)]
 mod ruby_homebrew_brew_enclose_block_in_rescue;
 #[cfg(test)]
@@ -299,6 +305,8 @@ mod rust_rustdesk_rustdesk_add_two_values_to_slice;
 mod rust_rustdesk_rustdesk_string_constant_change;
 #[cfg(test)]
 mod rust_vercel_nextjs_move_from_one_struct_to_another_and_add_some_code;
+#[cfg(test)]
+mod rust_vercel_nextjs_refactoring_would_require_mulitmap_mapping;
 #[cfg(test)]
 mod rust_zed_industries_zed_add_argument;
 #[cfg(test)]
@@ -329,6 +337,8 @@ mod swift_nextcloud_ios_actual_logic_added;
 mod swift_nextcloud_ios_add_4_functions;
 #[cfg(test)]
 mod swift_nextcloud_ios_call_different_function;
+#[cfg(test)]
+mod swift_nextcloud_ios_move_function_and_refactor_logic;
 #[cfg(test)]
 mod swift_nextcloud_ios_refactor_and_change;
 #[cfg(test)]
