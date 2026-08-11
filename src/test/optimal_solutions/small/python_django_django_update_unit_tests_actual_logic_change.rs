@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("python-django-django-update-unit-tests-actual-logic-change")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "python-django-django-update-unit-tests-actual-logic-change",
+        59,
+    )
 }

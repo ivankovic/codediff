@@ -65,12 +65,9 @@ install-hooks:
 # algorithm (see TODO.md). --features test-fixtures: this binary needs codediff::test's
 # fixture-loading helpers, gated separately from `stats` since it needs no git2/rusqlite.
 benchmark-optimal:
-	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions
-
-# Same benchmark, but with --csv (so matching-reasons-report below has something to read) and a
-# summary of which algorithm pass (ASTMappingReason) is responsible for how much of the diff.
-benchmark-optimal-report:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
+
+benchmark-optimal-report: benchmark-optimal
 	(cd research && uv run ./analysis/matching_reasons_report.py)
 
 # Runs benchmark_other's own analysis/plotting step over whatever research/benchmark_other.csv

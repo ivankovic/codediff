@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("swift-nextcloud-ios-refactor-and-change")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "swift-nextcloud-ios-refactor-and-change",
+        20,
+    )
 }

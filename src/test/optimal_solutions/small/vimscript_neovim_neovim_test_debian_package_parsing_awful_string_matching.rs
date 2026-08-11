@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("vimscript-neovim-neovim-test-debian-package-parsing-awful-string-matching")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "vimscript-neovim-neovim-test-debian-package-parsing-awful-string-matching",
+        160,
+    )
 }

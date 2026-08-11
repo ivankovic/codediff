@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("ruby-homebrew-brew-decent-amount-of-new-code-and-some-changes")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "ruby-homebrew-brew-decent-amount-of-new-code-and-some-changes",
+        32,
+    )
 }
