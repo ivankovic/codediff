@@ -260,6 +260,8 @@ mod python_ansible_ansible_field_rename;
 #[cfg(test)]
 mod python_ansible_ansible_ridiculously_long_yaml_in_string_constant_and_actual_code_changes;
 #[cfg(test)]
+mod python_django_django_update_unit_tests_actual_logic_change;
+#[cfg(test)]
 mod python_langflow_ai_langflow_actual_change_of_logic;
 #[cfg(test)]
 mod python_openhands_openhands_change_string_constant;
@@ -399,6 +401,8 @@ mod vimscript_neovim_neovim_add_line_comment;
 mod vimscript_neovim_neovim_add_test_case_plus_edit_existing_one;
 #[cfg(test)]
 mod vimscript_neovim_neovim_add_two_functions_and_modify_a_few_lines;
+#[cfg(test)]
+mod vimscript_neovim_neovim_awful_test_case_bunch_of_hex_colours_more_data_than_code;
 #[cfg(test)]
 mod vimscript_neovim_neovim_i_have_no_idea_what_this_diff_does;
 #[cfg(test)]
