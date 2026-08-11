@@ -13,8 +13,7 @@
 \acmYear{2026}
 \acmDOI{XXXXXXX.XXXXXXX}
 \acmConference[Conference'26]{Make sure to enter the correct conference title from your rights
-  confirmation email}{June 03--05, 2026}{Woodstock, NY}
-\acmPrice{15.00}
+  confirmation email}{June 03--05, 2026}{Ludbreg, Croatia}
 \acmISBN{978-1-4503-XXXX-X/26/06}
 
 %% TODO: verify/regenerate these against the ACM CCS taxonomy tool (https://dl.acm.org/ccs) once
@@ -37,12 +36,9 @@
 \ccsdesc[500]{Software and its engineering~Software maintenance tools}
 \ccsdesc[300]{Software and its engineering~Empirical software validation}
 
-\keywords{tree edit distance, APTED, GumTree, Myers diff, source code differencing, syntax-aware
-  diffing, empirical software engineering}
+\keywords{source code differencing, syntax-aware diffing, empirical software engineering, source code tree edit distance}
 
 \title{CodeDiff: A Fast, Robust, Production-Ready, Syntax-Aware Code Diffing Tool}
-\subtitle{Building a Diffing Pipeline from APTED, GumTree, and Myers Diff, Validated Against
-  Real-World Scale and Ground Truth}
 
 \author{Marko Ivankovi\'{c}}
 \affiliation{%
@@ -80,59 +76,33 @@ each already does well.
 \section{Introduction}
 \label{sec:intro}
 
-Diffing is the task of describing how one version of a piece of code became another: which parts
-stayed the same, which changed, and how. Every version-control system, code-review tool, and merge
-algorithm depends on some notion of diff. A reviewer reads a diff to see what changed. A merge
-algorithm reads a diff to decide whether two edits conflict. A blame view, a refactoring detector,
-and a change-impact analysis all start from a diff too.
+Code diffing reffers to the process of comparing two pieces of computer code. Code diff is the set of acions required to transform one piece of code into another. Modern version control systems, and especially modern code review tools critically depend on code diffing. During a modern code review, the developers view the diff to see what in the code has changed and what has stayed the same. The quality of the diff has a big impact on the user experience during the code reivew.
 
-The diff most developers see every day is line-based. Unix \texttt{diff}, and by extension
-\texttt{git diff} and most code-review interfaces, treats a file as a sequence of lines of text and
-finds the shortest edit script between two such sequences, using Myers' algorithm~\cite{myers-1986}.
-This is fast and works for any file format, but it has no notion of the code's structure. A single
-renamed variable can touch every line that uses it. A function moved without change, or a block
-re-indented after a new wrapping condition, shows as a full deletion and a full insertion, even
-though the logic never changed. A reviewer has to reconstruct, by eye, what a syntax-aware diff
-states directly: this is the same code, moved or renamed, not new code.
+The current standard diff used by almost all developers and platforms is text, more specifically line, based. The file is treated as a sequence of lines of text and the tools find the smallest edit distance script between the two sequences. The tree common operations are: insert, delete and update. This approach requires very little compute power and is very fast even on previous generation hardware. However, in most implementations it doesn't include a move operation at all, and tools that do support a move operation only support it in limited ways. This impacts the quality of the diff, because moving code is a very frequent code change: re-factoring and extracting code into reusable functions, wrapping code in a codition, renaming variables and many more changes are all ultimately move operations that need to be represented as full deletions and full insertions if a move is not available. This leaves the developers the task of creating the diff ``by eye''. This is error prone; developers are human and can get tired and make mistakes.
 
-A syntax-aware diff addresses this by working on the abstract syntax tree (AST) instead of the raw
-text: it maps nodes of one tree onto nodes of another, so a rename is a node whose label changed
-and a move is a node whose parent changed, both directly represented, neither collapsed to
-delete-plus-insert. This is a well-studied problem with a mature research literature
-(Section~\ref{sec:background}). But a syntax-aware diff that also runs fast and reliably enough for
-production use, on every commit in a large repository, needs more than a good matching algorithm
-alone - Section~\ref{sec:problem-space} discusses why.
+One way of automatically computing high quality diffs with move operations is to use the abstract syntax tree (AST) of the code, instead of the raw text. The AST consists of nodes that represent the syntax of the code. A diff of two ASTs maps nodes from one tree to the other. A move is a mapping of nodes whose common ancestor node changed. Tree diffing is a relatively well-studied field. We provide an overview of the most important research literature in section~\ref{sec:background}. However, it lacks significant adoption in practice. We believe this is because tree diffing is markedly slower than text based diffing. The best pure tree diffing algorithms are asymptotically at best $O(nodes^3)$ and hybrid implementations that use heuristics to reduce the tree size are 10 to 100 times slower than Unix \texttt{diff}, or are fast but produce incomplete diffs.
 
-This paper presents \textsc{CodeDiff}, a syntax-aware code-diffing tool that combines established
-techniques from this literature - APTED's exact tree edit distance, GumTree's source-code-specific
-heuristics, Myers' sequence diff for flat regions - into one production-engineered pipeline
-(Section~\ref{sec:pipeline}). Both \textsc{CodeDiff}'s performance and robustness targets and its
-choice of which optional heuristics to enable come from measurement, not assumption
-(Sections~\ref{sec:problem-space} and~\ref{sec:evaluation}). Section~\ref{sec:evaluation} places
-\textsc{CodeDiff} alongside GumTree, Unix \texttt{diff}, difftastic, and diffsitter on a shared,
-human-verified ground-truth corpus, reporting accuracy, speed, and robustness for all five.
-Section~\ref{sec:conclusion} concludes.
+This paper presents \textsc{CodeDiff}, a syntax-aware code-diffing tool that combines all current state of the art research with rigorous engineering practices to meet very specific performance and robustness targets. These targets are based on a large analysis of thousands of real open source projects and the shape and size of their files and actual code changes that developers do in practice.
 
 This paper makes the following contributions:
 \begin{itemize}
   \item It reports an empirical study of \NumRepos{} real-world open-source repositories, showing
   that existing diff tooling's worst-case assumptions are rarely reached in the common case, but
-  that the tail is real and large enough that a production tool must handle both regimes.
+  that the tail is real and large enough that a production tool must be able to handle cases that push the limits of what current state of the art tree diffing algorithms are able to process.
   \item It details \textsc{CodeDiff}, a seven-phase diffing pipeline that combines APTED's exact
   tree edit distance, GumTree's source-code-specific heuristics, and Myers' sequence diff into one
-  production-engineered tool, without introducing a new matching algorithm.
-  \item It demonstrates, via a leave-one-out ablation study, that a heuristic's published accuracy
-  gain does not automatically transfer when reused in a different pipeline evaluated against a
-  different corpus: one of GumTree's own two heuristics helps \textsc{CodeDiff}'s pipeline, the
-  other measurably hurts it.
+  production-engineered tool.
   \item It reports a head-to-head accuracy, speed, and robustness comparison against GumTree, Unix
-  \texttt{diff}, difftastic, and diffsitter on a 98-fixture, human-verified ground-truth corpus,
-  showing that combining established techniques reaches competitive accuracy and speed without
-  displacing what each individual tool already does well.
+  \texttt{diff}, difftastic, and diffsitter on a human-verified ground-truth corpus,
+  showing that combining established techniques reaches superior accuracy and speed.
 \end{itemize}
 
 \section{Existing State of the Art}
 \label{sec:background}
+
+We examine two areas of the current state of the art: algorithms and implemented tools.
+
+\subsection{Algorithms}
 
 \textbf{Zhang-Shasha}~\cite{zhang-shasha-1989} gives the classic dynamic-programming algorithm for
 ordered tree edit distance. Given two rooted, ordered trees, it computes the minimum-cost sequence
@@ -162,6 +132,8 @@ shortest edit script between two flat sequences, not two trees. It underlies mos
 tools, including Unix \texttt{diff}. Its cost scales with the size of the edit script, not the size
 of the inputs, so it stays fast when two sequences are similar, exactly the common case for a
 version-controlled file.
+
+\subsection{Tools}
 
 \textbf{difftastic}~\cite{difftastic} and \textbf{diffsitter}~\cite{diffsitter} are a newer
 generation of practical, tree-sitter-based diffing tools, the same parsing layer
