@@ -107,6 +107,12 @@
 *                  human_mapping.json and the test stub there, and records <name> against the
 *                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
 *                  other than letters/digits/-/_, or a diffs/ case with that name already exists
+*   R              on a sample (opened via `O`), reject it instead of promoting it: prompts for a
+*                  reason, then records it verbatim in the matching sample.csv row's
+*                  `rejection_reason` column and sets `status` to REJECTED, leaving `promoted_to`
+*                  empty and the sample directory itself untouched. Re-prompts if the reason is
+*                  empty. Has no effect on a real test case or a git-commit-sourced case -- only a
+*                  sample has a sample.csv row to reject
 *   o              open a different test case: lists every directory under
 *                  src/test/data/diffs/{handmade,small,full}/, j/k to move, Enter to open, Esc to
 *                  cancel. Press `d` inside this picker to cycle which of the three folders it's
@@ -115,8 +121,9 @@
 *                  offered for a real test case; see `s` above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
 *                  see `s` above for what happens when one of these is saved. Samples already
-*                  promoted (per sample.csv's `promoted_to` column) are marked " - SOLVED"; press
-*                  `H` inside this picker to hide them, or `s` inside this picker to cycle its sort
+*                  promoted (per sample.csv's `status` column) are marked " - SOLVED", and rejected
+*                  ones (see `R` above) " - REJECTED"; press `H` inside this picker to hide both,
+*                  or `s` inside this picker to cycle its sort
 *                  order: alphabetical, reverse alphabetical, smallest text diff first, largest
 *                  text diff first (by changed-line count in a raw `diff -u`, not AST size) --
 *                  unlike `H`, changing sort order always jumps selection to the first (1st) entry
@@ -233,15 +240,18 @@ H              toggle hiding fully solved subtrees (unmarked nodes and their
 
 s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it
+R              on a sample, prompt for a reason and reject it instead of
+                 promoting it (recorded in sample.csv; no human mapping needed)
 o              open a different test case (src/test/data/diffs/); press d inside
                  this picker to cycle which dataset it's narrowed to (all,
                  handmade, small, full), or H to narrow to cases with at
                  least one unmarked node left (first press scans the whole
                  corpus, so it can take a few seconds) -- both persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
-                 samples are marked \" - SOLVED\" -- press H inside this picker to
-                 hide/show them, or s to cycle its sort order (A-Z, Z-A,
-                 smallest/largest text diff first) -- both persist across O
+                 samples are marked \" - SOLVED\", rejected ones \" - REJECTED\" --
+                 press H inside this picker to hide/show both, or s to cycle its
+                 sort order (A-Z, Z-A, smallest/largest text diff first) -- both
+                 persist across O
 C              open a commit from this repo's own git log, then a file it
                  changed -- before/after are that file at the commit's parent
                  and at the commit itself; s promotes into handmade/
@@ -505,29 +515,53 @@ fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
         .collect()
 }
 
-/// Every sample directory name under src/test/data/samples/, paired with whether it has already
-/// been promoted into src/test/data/diffs/. A sample counts as promoted when its `source.json`
-/// (language, repository, commit, path) matches a sample.csv row whose `promoted_to` column is
-/// non-empty -- the same join `action_promote`/`update_sample_csv` use, so it stays correct even
-/// if the promoted diffs/ case was later renamed or the sample directory has a numbered suffix.
-fn list_samples_with_status() -> Result<Vec<(String, bool)>> {
+/// A sample's disposition, as recorded in its sample.csv row's `status` column - `Sampled` if
+/// nothing has been decided yet (including when the row predates that column, or no row matches
+/// at all: the same "nothing decided" default `default_status`/`default_sample_status` already
+/// use). Drives the `O` picker's " - SOLVED"/" - REJECTED" suffixes and what `hide_solved` hides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SampleTriageStatus {
+    Sampled,
+    Promoted,
+    Rejected,
+}
+
+impl SampleTriageStatus {
+    /// Whether `hide_solved` should hide this sample: both a promotion and a rejection are a
+    /// finished triage decision -- nothing left to review -- unlike `Sampled`.
+    fn is_handled(self) -> bool {
+        matches!(
+            self,
+            SampleTriageStatus::Promoted | SampleTriageStatus::Rejected
+        )
+    }
+}
+
+/// Every sample directory name under src/test/data/samples/, paired with the triage status of the
+/// sample.csv row it came from. A sample's status is looked up by matching its `source.json`
+/// (language, repository, commit, path) against a sample.csv row -- the same join
+/// `action_promote`/`action_reject` use, so it stays correct even if a promoted diffs/ case was
+/// later renamed or the sample directory has a numbered suffix.
+fn list_samples_with_status() -> Result<Vec<(String, SampleTriageStatus)>> {
     let names = list_dir_names(&samples_root())?;
-    let promoted = promoted_sample_sources()?;
+    let statuses = sample_triage_statuses()?;
 
     Ok(names
         .into_iter()
         .map(|name| {
-            let solved = source_json_for_sample(&name)
-                .map(|source| {
-                    promoted.contains(&(
-                        source.language,
-                        source.repository,
-                        source.commit,
-                        source.path,
-                    ))
+            let status = source_json_for_sample(&name)
+                .and_then(|source| {
+                    statuses
+                        .get(&(
+                            source.language,
+                            source.repository,
+                            source.commit,
+                            source.path,
+                        ))
+                        .copied()
                 })
-                .unwrap_or(false);
-            (name, solved)
+                .unwrap_or(SampleTriageStatus::Sampled);
+            (name, status)
         })
         .collect())
 }
@@ -539,34 +573,31 @@ fn source_json_for_sample(name: &str) -> Option<SampleSource> {
     serde_json::from_str(&contents).ok()
 }
 
-fn promoted_sample_sources() -> Result<std::collections::HashSet<(String, String, String, String)>>
-{
-    promoted_sample_sources_at(&sample_csv_path())
+fn sample_triage_statuses()
+-> Result<std::collections::HashMap<(String, String, String, String), SampleTriageStatus>> {
+    sample_triage_statuses_at(&sample_csv_path())
 }
 
-/// The (language, repository, commit, path) of every row in the sample.csv at `path` whose
-/// `promoted_to` column is non-empty. Returns an empty set, not an error, if `path` doesn't exist.
-fn promoted_sample_sources_at(
+/// The triage status of every row in the sample.csv at `path`, keyed by (language, repository,
+/// commit, path). Returns an empty map, not an error, if `path` doesn't exist.
+fn sample_triage_statuses_at(
     path: &Path,
-) -> Result<std::collections::HashSet<(String, String, String, String)>> {
+) -> Result<std::collections::HashMap<(String, String, String, String), SampleTriageStatus>> {
     if !path.exists() {
-        return Ok(std::collections::HashSet::new());
+        return Ok(std::collections::HashMap::new());
     }
 
-    let mut reader = csv::Reader::from_path(path).with_context(|| format!("reading {:?}", path))?;
-    let mut promoted = std::collections::HashSet::new();
-    for record in reader.records() {
-        let record = record?;
-        if !record.get(4).unwrap_or("").is_empty() {
-            promoted.insert((
-                record[0].to_string(),
-                record[1].to_string(),
-                record[2].to_string(),
-                record[3].to_string(),
-            ));
-        }
-    }
-    Ok(promoted)
+    Ok(read_sample_csv_rows(path)?
+        .into_iter()
+        .map(|row| {
+            let status = match row.status.as_str() {
+                "PROMOTED" => SampleTriageStatus::Promoted,
+                "REJECTED" => SampleTriageStatus::Rejected,
+                _ => SampleTriageStatus::Sampled,
+            };
+            ((row.language, row.repository, row.commit, row.path), status)
+        })
+        .collect())
 }
 
 /// Provenance recorded by `materialize_test_diffs` alongside each `src/test/data/samples/<name>/`
@@ -769,13 +800,13 @@ impl SampleSortOrder {
 /// what index `selected` refers to by construction, rather than keeping two independently
 /// maintained copies of the same filter/sort logic in sync by hand.
 fn visible_sample_options(
-    options: &[(String, bool, usize)],
+    options: &[(String, SampleTriageStatus, usize)],
     hide_solved: bool,
     sort_order: SampleSortOrder,
-) -> Vec<(String, bool, usize)> {
-    let mut visible: Vec<(String, bool, usize)> = options
+) -> Vec<(String, SampleTriageStatus, usize)> {
+    let mut visible: Vec<(String, SampleTriageStatus, usize)> = options
         .iter()
-        .filter(|(_, solved, _)| !hide_solved || !*solved)
+        .filter(|(_, status, _)| !hide_solved || !status.is_handled())
         .cloned()
         .collect();
 
@@ -803,7 +834,7 @@ fn visible_sample_options(
 /// hidden), a raw-`options` position would point at the wrong row once the picker actually renders
 /// the filtered/sorted list.
 fn open_sample_picker_modal(
-    options: Vec<(String, bool, usize)>,
+    options: Vec<(String, SampleTriageStatus, usize)>,
     current_name: &str,
     hide_solved: bool,
     sort_order: SampleSortOrder,
@@ -1124,14 +1155,14 @@ enum Modal {
         hide_complete: bool,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
-    /// open. Each option is paired with whether it has already been promoted into
-    /// src/test/data/diffs/ (per sample.csv's `promoted_to` column) -- shown as " - SOLVED" and,
-    /// when `hide_solved` is set, left out of the list entirely -- and with its
-    /// `sample_diff_line_count` (computed once when the picker opens, not on every `s` press).
-    /// `selected` indexes into `visible_sample_options(&options, hide_solved, sort_order)`, not
-    /// `options` itself.
+    /// open. Each option is paired with its `SampleTriageStatus` (per the matching sample.csv
+    /// row's `status` column) -- a promotion is shown as " - SOLVED" and a rejection as
+    /// " - REJECTED", and both are left out of the list entirely when `hide_solved` is set --
+    /// and with its `sample_diff_line_count` (computed once when the picker opens, not on every
+    /// `s` press). `selected` indexes into `visible_sample_options(&options, hide_solved,
+    /// sort_order)`, not `options` itself.
     OpenSamplePicker {
-        options: Vec<(String, bool, usize)>,
+        options: Vec<(String, SampleTriageStatus, usize)>,
         selected: usize,
         hide_solved: bool,
         sort_order: SampleSortOrder,
@@ -1145,6 +1176,15 @@ enum Modal {
     /// `src/test/data/diffs/`. Re-raised with `error` set (input preserved) if the name is
     /// invalid or already in use.
     PromptPromoteName {
+        input: String,
+        error: Option<String>,
+    },
+    /// Raised by `R` when the current case is a sample: asks for a reason to reject it instead of
+    /// promoting it. Recorded as-is in sample.csv's `rejection_reason` column, with `status` set
+    /// to `REJECTED` and `promoted_to` left untouched (empty). Re-raised with `error` set (input
+    /// preserved) if the reason is empty or the sample.csv row can't be found - same posture as
+    /// `PromptPromoteName`.
+    PromptRejectReason {
         input: String,
         error: Option<String>,
     },
@@ -3555,6 +3595,19 @@ fn render_modal(
                     .unwrap_or_default(),
             ),
         ),
+        Modal::PromptRejectReason { input, error } => render_text_modal(
+            frame,
+            area,
+            "Reject sample",
+            &format!(
+                "Enter a reason this sample is being rejected (recorded as-is in sample.csv)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                input,
+                error
+                    .as_deref()
+                    .map(|e| format!("\n{}\n", e))
+                    .unwrap_or_default(),
+            ),
+        ),
         Modal::PromptSearch { input } => render_text_modal(
             frame,
             area,
@@ -3778,15 +3831,15 @@ fn render_open_diff_picker(
     frame.render_widget(List::new(items).block(block), popup_area);
 }
 
-/// Like `render_open_diff_picker`, but for `O`'s sample picker: solved (already-promoted) entries are
-/// shown in green with a " - SOLVED" suffix, left out of the list entirely when `hide_solved` is
-/// set, and ordered per `sort_order` (cycled by `s` - see `SampleSortOrder`). Each entry also shows
-/// its `sample_diff_line_count` in parentheses, so the effect of switching to a diff-size order is
-/// visible directly, not just trusted.
+/// Like `render_open_diff_picker`, but for `O`'s sample picker: handled (already-promoted or
+/// -rejected) entries are shown in green (" - SOLVED") or red (" - REJECTED"), both left out of
+/// the list entirely when `hide_solved` is set, and ordered per `sort_order` (cycled by `s` - see
+/// `SampleSortOrder`). Each entry also shows its `sample_diff_line_count` in parentheses, so the
+/// effect of switching to a diff-size order is visible directly, not just trusted.
 fn render_open_sample_picker(
     frame: &mut Frame,
     area: Rect,
-    options: &[(String, bool, usize)],
+    options: &[(String, SampleTriageStatus, usize)],
     selected: usize,
     hide_solved: bool,
     sort_order: SampleSortOrder,
@@ -3805,32 +3858,38 @@ fn render_open_sample_picker(
         .enumerate()
         .skip(scroll)
         .take(inner_height.max(1))
-        .map(|(i, (name, solved, size))| {
+        .map(|(i, (name, status, size))| {
             let style = if i == selected {
                 Style::default().bg(Color::Yellow).fg(Color::Black)
-            } else if *solved {
-                Style::default().fg(Color::Green)
             } else {
-                Style::default()
+                match status {
+                    SampleTriageStatus::Promoted => Style::default().fg(Color::Green),
+                    SampleTriageStatus::Rejected => Style::default().fg(Color::Red),
+                    SampleTriageStatus::Sampled => Style::default(),
+                }
             };
-            let label = if *solved {
-                format!("{name} ({size}) - SOLVED")
-            } else {
-                format!("{name} ({size})")
+            let suffix = match status {
+                SampleTriageStatus::Promoted => " - SOLVED",
+                SampleTriageStatus::Rejected => " - REJECTED",
+                SampleTriageStatus::Sampled => "",
             };
+            let label = format!("{name} ({size}){suffix}");
             ListItem::new(Line::from(Span::styled(label, style)))
         })
         .collect();
 
-    let solved_count = options.iter().filter(|(_, solved, _)| *solved).count();
+    let handled_count = options
+        .iter()
+        .filter(|(_, status, _)| status.is_handled())
+        .count();
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open sample ({}/{}) — j/k move, Enter open, H {} solved ({} total), s sort: {}, Esc cancel",
+            "Open sample ({}/{}) — j/k move, Enter open, H {} solved/rejected ({} total), s sort: {}, Esc cancel",
             if visible.is_empty() { 0 } else { selected + 1 },
             visible.len(),
             if hide_solved { "show" } else { "hide" },
-            solved_count,
+            handled_count,
             sort_order.label(),
         ))
         .border_style(
@@ -4141,7 +4200,9 @@ fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
     matches!(
         (modal, code),
         (
-            Some(Modal::PromptSearch { .. }) | Some(Modal::PromptPromoteName { .. }),
+            Some(Modal::PromptSearch { .. })
+                | Some(Modal::PromptPromoteName { .. })
+                | Some(Modal::PromptRejectReason { .. }),
             KeyCode::Char(_) | KeyCode::Backspace
         )
     )
@@ -4172,7 +4233,8 @@ fn run_case_session(
     // plausibly touch the mapping, a collapsed set, or `hide_solved`, so the vast majority of keys
     // still recompute every time, same as before this cache existed. The one deliberate exception
     // is `state_preserving` below: typing into a pure text-input modal (`PromptSearch`,
-    // `PromptPromoteName`) only ever mutates that modal's own `input` string, so on a large case
+    // `PromptPromoteName`, `PromptRejectReason`) only ever mutates that modal's own `input`
+    // string, so on a large case
     // there's no reason each character typed into e.g. the save-name box should re-walk both
     // entire trees from scratch, on top of doing that twice per keystroke (once for this draw, once
     // again just to interpret the next key) as this used to.
@@ -4656,6 +4718,17 @@ fn handle_key(
                 None
             }
         },
+        KeyCode::Char('R') => {
+            if matches!(app.origin, CaseOrigin::Sample(_)) {
+                app.modal = Some(Modal::PromptRejectReason {
+                    input: String::new(),
+                    error: None,
+                });
+            } else {
+                app.status = Some("Only an open sample (O) can be rejected".to_string());
+            }
+            None
+        }
         KeyCode::Char('o') => {
             match list_available_cases() {
                 Ok(options) if !options.is_empty() => {
@@ -4679,11 +4752,11 @@ fn handle_key(
         KeyCode::Char('O') => {
             match list_samples_with_status() {
                 Ok(options) if !options.is_empty() => {
-                    let options: Vec<(String, bool, usize)> = options
+                    let options: Vec<(String, SampleTriageStatus, usize)> = options
                         .into_iter()
-                        .map(|(name, solved)| {
+                        .map(|(name, status)| {
                             let size = sample_diff_line_count(&name);
-                            (name, solved, size)
+                            (name, status, size)
                         })
                         .collect();
                     app.modal = Some(open_sample_picker_modal(
@@ -5198,6 +5271,37 @@ fn handle_modal_key(
                 app.modal = Some(Modal::PromptPromoteName { input, error: None });
             }
         },
+        Modal::PromptRejectReason {
+            mut input,
+            error: _,
+        } => match code {
+            KeyCode::Enter => {
+                let reason = input.trim().to_string();
+                match action_reject(app, &reason) {
+                    Ok(msg) => app.status = Some(msg),
+                    Err(err) => {
+                        app.modal = Some(Modal::PromptRejectReason {
+                            input,
+                            error: Some(format!("{:#}", err)),
+                        });
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                app.modal = Some(Modal::PromptRejectReason { input, error: None });
+            }
+            KeyCode::Char(c) => {
+                input.push(c);
+                app.modal = Some(Modal::PromptRejectReason { input, error: None });
+            }
+            _ => {
+                app.modal = Some(Modal::PromptRejectReason { input, error: None });
+            }
+        },
         Modal::PromptSearch { mut input } => match code {
             KeyCode::Enter => {
                 let query = input.trim().to_string();
@@ -5461,6 +5565,26 @@ fn action_promote(
     ))
 }
 
+/// Rejects the currently open sample instead of promoting it: records `reason` verbatim in its
+/// sample.csv row (`rejection_reason`, with `status` set to `REJECTED`) and leaves everything else
+/// -- the sample directory, `promoted_to` -- untouched. Only a sample has a sample.csv row to
+/// update; a git-commit-sourced case (`CaseOrigin::GitCommitFile`) has nothing to reject.
+fn action_reject(app: &App, reason: &str) -> Result<String> {
+    let CaseOrigin::Sample(source) = &app.origin else {
+        bail!("Only a sample (opened via O) can be rejected");
+    };
+
+    let reason = reason.trim();
+    if reason.is_empty() {
+        bail!("Rejection reason cannot be empty");
+    }
+
+    match reject_sample(source, reason)? {
+        true => Ok(format!("Rejected '{}': {}", app.name, reason)),
+        false => bail!("source row not found in sample.csv; not updated"),
+    }
+}
+
 fn sample_csv_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -5476,6 +5600,75 @@ struct SampleCsvRow {
     path: String,
     promoted_to: String,
     dataset: String,
+    /// One of `SAMPLED`/`PROMOTED`/`REJECTED` - see `sample_test_diffs::Row::status`.
+    status: String,
+    /// Why this row was rejected instead of promoted, verbatim from `Modal::PromptRejectReason`.
+    /// Empty unless `status` is `REJECTED`.
+    rejection_reason: String,
+}
+
+/// Same backfill `sample_test_diffs::default_status` uses for a sample.csv row written before
+/// `status` existed: duplicated rather than shared across the two binaries, same as the
+/// `dataset` fallback ("small") a few lines below already is.
+fn default_sample_status(promoted_to: &str) -> &'static str {
+    if promoted_to.is_empty() {
+        "SAMPLED"
+    } else {
+        "PROMOTED"
+    }
+}
+
+fn read_sample_csv_rows(path: &Path) -> Result<Vec<SampleCsvRow>> {
+    let mut reader = csv::Reader::from_path(path).with_context(|| format!("reading {:?}", path))?;
+    let mut rows = Vec::new();
+    for record in reader.records() {
+        let record = record?;
+        let promoted_to = record.get(4).unwrap_or("").to_string();
+        let status = match record.get(6) {
+            Some(status) if !status.is_empty() => status.to_string(),
+            _ => default_sample_status(&promoted_to).to_string(),
+        };
+        rows.push(SampleCsvRow {
+            language: record[0].to_string(),
+            repository: record[1].to_string(),
+            commit: record[2].to_string(),
+            path: record[3].to_string(),
+            promoted_to,
+            // Same historical fallback as `legacy_dataset()`/`sample_test_diffs::LEGACY_DATASET`.
+            dataset: record.get(5).unwrap_or("small").to_string(),
+            status,
+            rejection_reason: record.get(7).unwrap_or("").to_string(),
+        });
+    }
+    Ok(rows)
+}
+
+fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
+    let mut writer = csv::Writer::from_path(path).with_context(|| format!("writing {:?}", path))?;
+    writer.write_record([
+        "language",
+        "repository",
+        "commit",
+        "path",
+        "promoted_to",
+        "dataset",
+        "status",
+        "rejection_reason",
+    ])?;
+    for row in rows {
+        writer.write_record([
+            &row.language,
+            &row.repository,
+            &row.commit,
+            &row.path,
+            &row.promoted_to,
+            &row.dataset,
+            &row.status,
+            &row.rejection_reason,
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
 }
 
 fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result<bool> {
@@ -5491,20 +5684,7 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
         return Ok(false);
     }
 
-    let mut reader = csv::Reader::from_path(path).with_context(|| format!("reading {:?}", path))?;
-    let mut rows: Vec<SampleCsvRow> = Vec::new();
-    for record in reader.records() {
-        let record = record?;
-        rows.push(SampleCsvRow {
-            language: record[0].to_string(),
-            repository: record[1].to_string(),
-            commit: record[2].to_string(),
-            path: record[3].to_string(),
-            promoted_to: record.get(4).unwrap_or("").to_string(),
-            // Same historical fallback as `legacy_dataset()`/`sample_test_diffs::LEGACY_DATASET`.
-            dataset: record.get(5).unwrap_or("small").to_string(),
-        });
-    }
+    let mut rows = read_sample_csv_rows(path)?;
 
     let mut found = false;
     for row in &mut rows {
@@ -5514,6 +5694,7 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
             && row.path == source.path
         {
             row.promoted_to = new_name.to_string();
+            row.status = "PROMOTED".to_string();
             found = true;
         }
     }
@@ -5522,26 +5703,45 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
         return Ok(false);
     }
 
-    let mut writer = csv::Writer::from_path(path).with_context(|| format!("writing {:?}", path))?;
-    writer.write_record([
-        "language",
-        "repository",
-        "commit",
-        "path",
-        "promoted_to",
-        "dataset",
-    ])?;
-    for row in &rows {
-        writer.write_record([
-            &row.language,
-            &row.repository,
-            &row.commit,
-            &row.path,
-            &row.promoted_to,
-            &row.dataset,
-        ])?;
+    write_sample_csv_rows(path, &rows)?;
+    Ok(true)
+}
+
+fn reject_sample(source: &SampleSource, reason: &str) -> Result<bool> {
+    reject_sample_csv_at(&sample_csv_path(), source, reason)
+}
+
+/// Marks the sample.csv row matching `source` as rejected with `reason`, preserving every other
+/// row and column untouched -- the reject counterpart of `update_sample_csv_at`. `promoted_to` is
+/// deliberately left as-is (empty, in practice: `action_reject` only ever runs against a case
+/// that's still `CaseOrigin::Sample`, which a promotion would have already moved past) since a
+/// rejected sample was never promoted. Returns `Ok(false)` (not an error) if no row matches, same
+/// reasoning as `update_sample_csv_at`.
+fn reject_sample_csv_at(path: &Path, source: &SampleSource, reason: &str) -> Result<bool> {
+    if !path.exists() {
+        return Ok(false);
     }
-    writer.flush()?;
+
+    let mut rows = read_sample_csv_rows(path)?;
+
+    let mut found = false;
+    for row in &mut rows {
+        if row.language == source.language
+            && row.repository == source.repository
+            && row.commit == source.commit
+            && row.path == source.path
+        {
+            row.rejection_reason = reason.to_string();
+            row.status = "REJECTED".to_string();
+            found = true;
+        }
+    }
+
+    if !found {
+        return Ok(false);
+    }
+
+    write_sample_csv_rows(path, &rows)?;
     Ok(true)
 }
 
@@ -5715,7 +5915,7 @@ mod tests {
     }
 
     #[test]
-    fn is_state_preserving_key_is_true_only_for_typing_in_the_two_text_input_modals() {
+    fn is_state_preserving_key_is_true_only_for_typing_in_the_three_text_input_modals() {
         assert!(is_state_preserving_key(
             Some(&Modal::PromptSearch {
                 input: String::new()
@@ -5735,12 +5935,20 @@ mod tests {
             }),
             KeyCode::Char('a')
         ));
+        assert!(is_state_preserving_key(
+            Some(&Modal::PromptRejectReason {
+                input: String::new(),
+                error: None
+            }),
+            KeyCode::Char('a')
+        ));
     }
 
     #[test]
-    fn is_state_preserving_key_is_false_for_enter_esc_on_the_same_two_modals() {
-        // Enter/Esc can search-and-move-the-cursor, promote/save, or close the modal -- all things
-        // that can change what the cached `FrameState` would report, unlike plain typing.
+    fn is_state_preserving_key_is_false_for_enter_esc_on_the_same_three_modals() {
+        // Enter/Esc can search-and-move-the-cursor, promote/save, reject, or close the modal --
+        // all things that can change what the cached `FrameState` would report, unlike plain
+        // typing.
         let search = Some(Modal::PromptSearch {
             input: "x".to_string(),
         });
@@ -5753,6 +5961,13 @@ mod tests {
         });
         assert!(!is_state_preserving_key(promote.as_ref(), KeyCode::Enter));
         assert!(!is_state_preserving_key(promote.as_ref(), KeyCode::Esc));
+
+        let reject = Some(Modal::PromptRejectReason {
+            input: "x".to_string(),
+            error: None,
+        });
+        assert!(!is_state_preserving_key(reject.as_ref(), KeyCode::Enter));
+        assert!(!is_state_preserving_key(reject.as_ref(), KeyCode::Esc));
     }
 
     #[test]
@@ -5927,6 +6142,40 @@ mod tests {
             promote_target_dataset(&CaseOrigin::Sample(source)),
             Some("full")
         );
+    }
+
+    #[test]
+    fn action_reject_bails_when_current_case_is_not_a_sample() {
+        let app = App::new(
+            "some-case".to_string(),
+            CaseOrigin::Diffs,
+            0,
+            0,
+            HumanMapping::default(),
+        );
+        let err = action_reject(&app, "not a real reason").unwrap_err();
+        assert!(format!("{:#}", err).contains("Only a sample"));
+    }
+
+    #[test]
+    fn action_reject_bails_on_an_empty_reason() {
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        let app = App::new(
+            "sample-name".to_string(),
+            CaseOrigin::Sample(source),
+            0,
+            0,
+            HumanMapping::default(),
+        );
+        // Whitespace-only trims to empty, same as a bare empty string would.
+        let err = action_reject(&app, "   ").unwrap_err();
+        assert!(format!("{:#}", err).contains("cannot be empty"));
     }
 
     #[test]
@@ -6490,10 +6739,23 @@ mod tests {
     }
 
     #[test]
-    fn open_sample_picker_marks_solved_entries_and_can_hide_them() {
+    fn open_sample_picker_marks_solved_and_rejected_entries_and_can_hide_both() {
         let options = vec![
-            ("rust-x-foo-abc12345-a".to_string(), true, 7),
-            ("rust-x-foo-def67890-b".to_string(), false, 3),
+            (
+                "rust-x-foo-abc12345-a".to_string(),
+                SampleTriageStatus::Promoted,
+                7,
+            ),
+            (
+                "rust-x-foo-def67890-b".to_string(),
+                SampleTriageStatus::Sampled,
+                3,
+            ),
+            (
+                "rust-x-foo-fed09876-c".to_string(),
+                SampleTriageStatus::Rejected,
+                2,
+            ),
         ];
 
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -6518,12 +6780,16 @@ mod tests {
             "solved marker missing: {text}"
         );
         assert!(
+            text.contains("rust-x-foo-fed09876-c (2) - REJECTED"),
+            "rejected marker missing: {text}"
+        );
+        assert!(
             text.contains("rust-x-foo-def67890-b (3)"),
             "unsolved entry missing: {text}"
         );
         assert!(
-            text.contains("1/2"),
-            "count should include both entries: {text}"
+            text.contains("1/3"),
+            "count should include all three entries: {text}"
         );
 
         terminal
@@ -6535,6 +6801,10 @@ mod tests {
         assert!(
             !text.contains("SOLVED"),
             "solved entry should be hidden: {text}"
+        );
+        assert!(
+            !text.contains("REJECTED"),
+            "rejected entry should be hidden: {text}"
         );
         assert!(
             text.contains("rust-x-foo-def67890-b"),
@@ -6552,10 +6822,10 @@ mod tests {
         // hint, sort order, key hints) that an 80-column terminal's narrow ~46-column popup
         // truncates it well before reaching "sort:" - this test cares specifically about that
         // tail end, so it needs the room.
-        let options = vec![("a".to_string(), false, 1)];
-        let backend = ratatui::backend::TestBackend::new(160, 24);
+        let options = vec![("a".to_string(), SampleTriageStatus::Sampled, 1)];
+        let backend = ratatui::backend::TestBackend::new(200, 24);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 160, 24);
+        let area = Rect::new(0, 0, 200, 24);
 
         terminal
             .draw(|f| {
@@ -6579,9 +6849,9 @@ mod tests {
     #[test]
     fn visible_sample_options_orders_by_the_requested_sort_order() {
         let options = vec![
-            ("charlie".to_string(), false, 5),
-            ("alpha".to_string(), false, 20),
-            ("bravo".to_string(), false, 1),
+            ("charlie".to_string(), SampleTriageStatus::Sampled, 5),
+            ("alpha".to_string(), SampleTriageStatus::Sampled, 20),
+            ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
         ];
 
         let names = |order| -> Vec<String> {
@@ -6632,9 +6902,9 @@ mod tests {
     #[test]
     fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
         // Regression guard for the switch from `options[selected]` to `visible.get(selected)`:
-        // with a solved entry hidden, `selected` indexes the *filtered* list, so index 1 here must
-        // resolve to "unsolved-two" (the second visible entry), not "unsolved-one" (index 1 in the
-        // unfiltered `options`) or the hidden "solved-one".
+        // with a solved entry and a rejected entry hidden, `selected` indexes the *filtered*
+        // list, so index 1 here must resolve to "unsolved-two" (the second visible entry), not
+        // "unsolved-one" (index 2 in the unfiltered `options`) or either hidden entry.
         let source = "fn main() {}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
@@ -6648,9 +6918,10 @@ mod tests {
         let flat = flatten_visible(root, &app.before.collapsed, None);
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
-                ("solved-one".to_string(), true, 0),
-                ("unsolved-one".to_string(), false, 0),
-                ("unsolved-two".to_string(), false, 0),
+                ("rejected-one".to_string(), SampleTriageStatus::Rejected, 0),
+                ("solved-one".to_string(), SampleTriageStatus::Promoted, 0),
+                ("unsolved-one".to_string(), SampleTriageStatus::Sampled, 0),
+                ("unsolved-two".to_string(), SampleTriageStatus::Sampled, 0),
             ],
             selected: 1,
             hide_solved: true,
@@ -6694,9 +6965,9 @@ mod tests {
         let flat = flatten_visible(root, &app.before.collapsed, None);
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
-                ("alpha".to_string(), false, 5),
-                ("bravo".to_string(), false, 1),
-                ("charlie".to_string(), false, 20),
+                ("alpha".to_string(), SampleTriageStatus::Sampled, 5),
+                ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
+                ("charlie".to_string(), SampleTriageStatus::Sampled, 20),
             ],
             selected: 2,
             hide_solved: false,
@@ -6750,7 +7021,7 @@ mod tests {
         );
         let flat = flatten_visible(root, &app.before.collapsed, None);
         app.modal = Some(Modal::OpenSamplePicker {
-            options: vec![("alpha".to_string(), false, 5)],
+            options: vec![("alpha".to_string(), SampleTriageStatus::Sampled, 5)],
             selected: 0,
             hide_solved: false,
             sort_order: SampleSortOrder::Alphabetical,
@@ -7064,9 +7335,9 @@ mod tests {
     #[test]
     fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_sort_order() {
         let options = vec![
-            ("alpha".to_string(), false, 5),
-            ("bravo".to_string(), false, 1),
-            ("charlie".to_string(), false, 20),
+            ("alpha".to_string(), SampleTriageStatus::Sampled, 5),
+            ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
+            ("charlie".to_string(), SampleTriageStatus::Sampled, 20),
         ];
 
         // "bravo" is index 1 in `options`' own order, but index 0 once sorted smallest-diff-first
@@ -7092,7 +7363,7 @@ mod tests {
     #[test]
     fn open_sample_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is_not_a_sample()
      {
-        let options = vec![("alpha".to_string(), false, 5)];
+        let options = vec![("alpha".to_string(), SampleTriageStatus::Sampled, 5)];
         let modal = open_sample_picker_modal(
             options,
             "not-a-sample-name",
@@ -7336,9 +7607,9 @@ mod tests {
     fn help_modal_renders_keybindings() {
         // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
         // clipped by the popup's width or height -- this test is about content, not layout.
-        let backend = ratatui::backend::TestBackend::new(140, 60);
+        let backend = ratatui::backend::TestBackend::new(140, 80);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 140, 60);
+        let area = Rect::new(0, 0, 140, 80);
 
         terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
@@ -8326,7 +8597,7 @@ mod tests {
     }
 
     #[test]
-    fn promoted_sample_sources_at_only_includes_rows_with_a_non_empty_promoted_to() {
+    fn sample_triage_statuses_at_reads_the_status_column_for_every_row() {
         let file = NamedTempFile::new().unwrap();
         write_csv(
             file.path(),
@@ -8342,21 +8613,190 @@ mod tests {
                 ("Rust", "repo", "def456", "src/b.rs", "", "small"),
             ],
         );
+        // Reject the second row so the map has one of each of the three statuses (the third being
+        // whatever `write_csv` alone leaves as its backward-compat default, exercised by the
+        // no-`status`-column case below).
+        let rejected_source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "def456".to_string(),
+            path: "src/b.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        reject_sample_csv_at(file.path(), &rejected_source, "not interesting").unwrap();
 
-        let promoted = promoted_sample_sources_at(file.path()).unwrap();
-        assert_eq!(promoted.len(), 1);
-        assert!(promoted.contains(&(
-            "Rust".to_string(),
-            "repo".to_string(),
-            "abc123".to_string(),
-            "src/a.rs".to_string(),
-        )));
+        let statuses = sample_triage_statuses_at(file.path()).unwrap();
+        assert_eq!(
+            statuses.get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "abc123".to_string(),
+                "src/a.rs".to_string(),
+            )),
+            Some(&SampleTriageStatus::Promoted)
+        );
+        assert_eq!(
+            statuses.get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "def456".to_string(),
+                "src/b.rs".to_string(),
+            )),
+            Some(&SampleTriageStatus::Rejected)
+        );
     }
 
     #[test]
-    fn promoted_sample_sources_at_is_empty_when_file_does_not_exist() {
-        let promoted = promoted_sample_sources_at(Path::new("/nonexistent/sample.csv")).unwrap();
-        assert!(promoted.is_empty());
+    fn sample_triage_statuses_at_defaults_an_unmatched_row_to_sampled() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+
+        let statuses = sample_triage_statuses_at(file.path()).unwrap();
+        assert_eq!(
+            statuses.get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "abc123".to_string(),
+                "src/a.rs".to_string(),
+            )),
+            Some(&SampleTriageStatus::Sampled)
+        );
+    }
+
+    #[test]
+    fn sample_triage_statuses_at_is_empty_when_file_does_not_exist() {
+        let statuses = sample_triage_statuses_at(Path::new("/nonexistent/sample.csv")).unwrap();
+        assert!(statuses.is_empty());
+    }
+
+    /// (path, promoted_to, dataset, status, rejection_reason) per row - like `read_csv`, but for
+    /// tests that also care about the two newest columns.
+    fn read_csv_with_status(path: &Path) -> Vec<(String, String, String, String, String)> {
+        let mut reader = csv::Reader::from_path(path).unwrap();
+        reader
+            .records()
+            .map(|r| {
+                let r = r.unwrap();
+                (
+                    r[3].to_string(),
+                    r.get(4).unwrap_or("").to_string(),
+                    r.get(5).unwrap_or("").to_string(),
+                    r.get(6).unwrap_or("").to_string(),
+                    r.get(7).unwrap_or("").to_string(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn update_sample_csv_sets_status_to_promoted() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        assert!(update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap());
+
+        let rows = read_csv_with_status(file.path());
+        assert_eq!(
+            rows,
+            vec![(
+                "src/a.rs".to_string(),
+                "rust-new-case".to_string(),
+                "small".to_string(),
+                "PROMOTED".to_string(),
+                "".to_string(),
+            )]
+        );
+    }
+
+    #[test]
+    fn reject_sample_csv_at_sets_reason_and_status_without_touching_promoted_to() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[
+                ("Rust", "repo", "abc123", "src/a.rs", "", "small"),
+                ("Rust", "repo", "def456", "src/b.rs", "", "full"),
+            ],
+        );
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        let found =
+            reject_sample_csv_at(file.path(), &source, "duplicate of an existing case").unwrap();
+        assert!(found);
+
+        let rows = read_csv_with_status(file.path());
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    "src/a.rs".to_string(),
+                    // Rejection must never populate promoted_to.
+                    "".to_string(),
+                    "small".to_string(),
+                    "REJECTED".to_string(),
+                    "duplicate of an existing case".to_string(),
+                ),
+                (
+                    "src/b.rs".to_string(),
+                    "".to_string(),
+                    "full".to_string(),
+                    "SAMPLED".to_string(),
+                    "".to_string(),
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn reject_sample_csv_at_returns_false_when_no_row_matches() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "other-repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        let found = reject_sample_csv_at(file.path(), &source, "reason").unwrap();
+        assert!(!found);
+
+        // Untouched: no row matched, so the file is never rewritten -- still the original
+        // (pre-`status`/`rejection_reason`) 6-column shape, not a backfilled 8-column one.
+        let rows = read_csv_with_status(file.path());
+        assert_eq!(
+            rows,
+            vec![(
+                "src/a.rs".to_string(),
+                "".to_string(),
+                "small".to_string(),
+                "".to_string(),
+                "".to_string(),
+            )]
+        );
     }
 
     #[test]

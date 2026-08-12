@@ -107,6 +107,13 @@ struct Row {
     /// Carried through unchanged on every re-run, same as `promoted_to`: a row's provenance
     /// doesn't change just because a later run happens to target a different `--repos-dir`.
     dataset: String,
+    /// One of `SAMPLED`/`PROMOTED`/`REJECTED` - `human_solver` moves a row from `SAMPLED` to
+    /// whichever of the other two applies when the sample is triaged (`s` to promote, `R` to
+    /// reject); this tool never sets anything but `SAMPLED` on a freshly-sampled row.
+    status: String,
+    /// Why this row was rejected instead of promoted, verbatim from `human_solver`'s reject
+    /// prompt. Empty unless `status` is `REJECTED`.
+    rejection_reason: String,
 }
 
 type SampleKey = (String, String, String);
@@ -115,6 +122,18 @@ type SampleKey = (String, String, String);
 /// existed - every one of those was in fact sampled from the small research checkout (the only
 /// one available when they were added), so this is a real fallback value, not a placeholder.
 const LEGACY_DATASET: &str = "small";
+
+/// Backfills `status` for a row read from a sample.csv written before that column existed: a
+/// non-empty `promoted_to` means it was already promoted, otherwise it's just sitting there
+/// unsampled -- there's no way a pre-existing row could be `REJECTED`, since rejection didn't
+/// exist yet either.
+fn default_status(promoted_to: &str) -> &'static str {
+    if promoted_to.is_empty() {
+        "SAMPLED"
+    } else {
+        "PROMOTED"
+    }
+}
 
 fn default_output_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -146,13 +165,20 @@ fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
     let mut rows = Vec::new();
     for record in reader.records() {
         let record = record?;
+        let promoted_to = record.get(4).unwrap_or("").to_string();
+        let status = match record.get(6) {
+            Some(status) if !status.is_empty() => status.to_string(),
+            _ => default_status(&promoted_to).to_string(),
+        };
         rows.push(Row {
             language: record[0].to_string(),
             repository: record[1].to_string(),
             commit: record[2].to_string(),
             path: record[3].to_string(),
-            promoted_to: record.get(4).unwrap_or("").to_string(),
+            promoted_to,
             dataset: record.get(5).unwrap_or(LEGACY_DATASET).to_string(),
+            status,
+            rejection_reason: record.get(7).unwrap_or("").to_string(),
         });
     }
     Ok(rows)
@@ -290,6 +316,8 @@ fn sample_repository(
             path,
             promoted_to: String::new(),
             dataset: dataset.to_string(),
+            status: "SAMPLED".to_string(),
+            rejection_reason: String::new(),
         };
         reservoirs
             .entry(language)
@@ -329,6 +357,8 @@ fn write_csv(
         "path",
         "promoted_to",
         "dataset",
+        "status",
+        "rejection_reason",
     ])?;
     for row in &rows {
         writer.write_record([
@@ -338,6 +368,8 @@ fn write_csv(
             &row.path,
             &row.promoted_to,
             &row.dataset,
+            &row.status,
+            &row.rejection_reason,
         ])?;
     }
     writer.flush()?;
