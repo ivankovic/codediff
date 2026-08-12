@@ -306,6 +306,8 @@ mod rust_rustdesk_rustdesk_actual_logic_change_in_io_loop_medium_sized_file;
 #[cfg(test)]
 mod rust_rustdesk_rustdesk_add_two_values_to_slice;
 #[cfg(test)]
+mod rust_rustdesk_rustdesk_large_file_40k_normal_feature_work;
+#[cfg(test)]
 mod rust_rustdesk_rustdesk_string_constant_change;
 #[cfg(test)]
 mod rust_vercel_nextjs_move_from_one_struct_to_another_and_add_some_code;
@@ -357,6 +359,8 @@ mod swift_swiftlang_swift_enable_checks_remove_todo_comment;
 mod tsx_apache_superset_add_test_case;
 #[cfg(test)]
 mod tsx_apache_superset_error_handling_change;
+#[cfg(test)]
+mod tsx_excalidraw_excalidraw_huge_file_with_real_logic_change;
 #[cfg(test)]
 mod tsx_excalidraw_excalidraw_import_path_change;
 #[cfg(test)]
