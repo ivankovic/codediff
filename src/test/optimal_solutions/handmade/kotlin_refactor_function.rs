@@ -21,6 +21,15 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // Two top-level functions are moved verbatim into a new class's body (method extraction). The
+    // human ground truth marks both as Delete (before) + Insert (after) - a new class, not a
+    // refactor of the existing functions. codediff's move-detection instead matches them across
+    // the new `class_declaration` wrapper, since their content is untouched - the same "container
+    // added around moved code" pattern as `java_add_exception_handling`'s documented gap, but with
+    // the *opposite* human preference (there, outer-to-outer match wins; here, no match at all is
+    // wanted). That conflict between two real fixtures is itself evidence there's no single
+    // correct general heuristic - this is fixture-specific human judgment, not a bug. Not
+    // attempted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-refactor-function",
         64,

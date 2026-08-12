@@ -430,17 +430,6 @@
         "function_item:1",
         "block:1",
         "let_declaration:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        "identifier:2"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "let_declaration:1",
         ";:1"
       ]
     },
@@ -476,19 +465,6 @@
         "call_expression:1",
         "field_expression:1",
         ".:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "for_expression:1",
-        "range_expression:1",
-        "call_expression:1",
-        "field_expression:1",
-        "field_identifier:1"
       ]
     },
     {
@@ -3568,6 +3544,34 @@
         "arguments:1",
         "):1"
       ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "range_expression:1",
+          "call_expression:1",
+          "field_expression:1",
+          "field_identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "let_declaration:1",
+          "call_expression:1",
+          "scoped_identifier:1",
+          "identifier:2"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
     }
   ]
 }

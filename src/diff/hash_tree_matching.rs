@@ -323,8 +323,19 @@ pub(crate) fn solve_with_hash_map(
 *    guarantee that *does* hold unconditionally (a `KindOnlyHash` match only guarantees kind-level
 *    multiset equality), same tiebreak methodology.
 *
-* Either tier breaks ties among same-hash candidates by document proximity, the same tiebreak the
-* top-level match itself uses.
+* Either tier breaks ties among same-hash candidates by child-ordinal proximity (`before_index` vs
+* `after_index` within their own parent's children list) - **not** absolute document byte position,
+* which the top-level match itself uses but which is unsound here: `before_parent`/`after_parent`
+* were already matched as a pair, but everything *outside* their span can still have grown or
+* shrunk from unrelated earlier edits, shifting both parents' (and every descendant's) absolute
+* byte offset by some constant delta. Nearest-by-absolute-byte-distance then silently prefers a
+* neighboring same-hash sibling over the true positional counterpart whenever that delta exceeds
+* half the local gap between siblings - confirmed against a real case
+* (`rust-firefox-webrenderer-borders`: two untouched struct definitions later in the file, byte-
+* shifted by 14 from edits earlier in the file, whose 25-27-byte comma-to-comma gaps made a
+* same-hash *neighboring* comma look closer than each comma's own correct counterpart, rotating
+* three of five `,` pairings). Child-ordinal position is relative to the already-matched parent and
+* so is immune to any shift outside that parent's own span.
 *
 * Returns the pairs plus a `reordered` flag: true if `before_parent` is a commutative container
 * and at least one pair's after-side document-order index differs from its before-side index -
@@ -385,7 +396,7 @@ fn pair_children_for_descent<'a>(
                 candidates
                     .iter()
                     .filter(|(_, c)| !used.contains(&c.id()) && c.kind() == before_child.kind())
-                    .min_by_key(|(_, c)| c.start_byte().abs_diff(before_child.start_byte()))
+                    .min_by_key(|(after_index, _)| after_index.abs_diff(before_index))
             })
             .copied();
         match found {
@@ -414,7 +425,7 @@ fn pair_children_for_descent<'a>(
         let Some(&(after_index, best)) = candidates
             .iter()
             .filter(|(_, c)| !used.contains(&c.id()) && c.kind() == before_child.kind())
-            .min_by_key(|(_, c)| c.start_byte().abs_diff(before_child.start_byte()))
+            .min_by_key(|(after_index, _)| after_index.abs_diff(before_index))
         else {
             continue;
         };

@@ -46,8 +46,8 @@ fn optimal_solution() -> Result<()> {
     //
     // There is no optimal cost difference between mapping the field_expression on the after side to
     // either of the field_expression nodes on the before side. The cost is the same either way.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "rust-firefox-webrenderer-borders",
-        18,
-    )
+    // Modeled as a `MultiMapGroup` (see `human_mapping.json`): the outer call's own closing paren
+    // and the collapsed inner call's closing paren are equally valid matches for the after side's
+    // single closing paren, so either pairing is accepted.
+    test::helper::human_mapping::assert_matches_human_mapping("rust-firefox-webrenderer-borders")
 }
