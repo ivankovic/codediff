@@ -68,6 +68,8 @@ mod python_bugfix_loop;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
+mod rust_add_comments_and_real_new_logic;
+#[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
 mod rust_add_to_existing_use;
