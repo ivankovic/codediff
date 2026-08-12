@@ -1405,6 +1405,51 @@ fn walk_visible<'a>(
     }
 }
 
+/// `flatten_visible`'s output, paired with a node id -> index lookup table built alongside it.
+/// Resolving a node id back to its position in the flat list -- almost always
+/// `PanelState::cursor_id`, to move it or to find where the cursor row is for scrolling/rendering
+/// -- used to mean an O(n) linear scan of the flat list (`.position()`/`.find()`), repeated on
+/// every cursor move, every mark, and every single redraw. On a 30k-node tree that scan alone
+/// showed up as real per-keystroke latency; this makes it O(1) instead.
+///
+/// Derefs to `[(Node, usize)]`, so any caller that only ever iterated or indexed the flat list
+/// positionally (never by node id) needs no changes at all -- it's a drop-in replacement for the
+/// bare `Vec<(Node, usize)>` `flatten_visible` used to hand back directly.
+struct FlatIndex<'a> {
+    nodes: Vec<(Node<'a>, usize)>,
+    by_id: rustc_hash::FxHashMap<usize, usize>,
+}
+
+impl<'a> FlatIndex<'a> {
+    fn new(nodes: Vec<(Node<'a>, usize)>) -> Self {
+        let by_id = nodes
+            .iter()
+            .enumerate()
+            .map(|(index, (node, _))| (node.id(), index))
+            .collect();
+        Self { nodes, by_id }
+    }
+
+    /// `id`'s position in the flat list, in O(1).
+    fn index_of(&self, id: usize) -> Option<usize> {
+        self.by_id.get(&id).copied()
+    }
+
+    /// The node with id `id`, in O(1). `None` if `id` isn't currently visible (e.g. hidden under
+    /// a collapsed ancestor, or under `H`'s hide-solved filter).
+    fn node_for_id(&self, id: usize) -> Option<Node<'a>> {
+        self.index_of(id).map(|index| self.nodes[index].0)
+    }
+}
+
+impl<'a> std::ops::Deref for FlatIndex<'a> {
+    type Target = [(Node<'a>, usize)];
+
+    fn deref(&self) -> &Self::Target {
+        &self.nodes
+    }
+}
+
 /// Node IDs whose entire subtree -- the node itself and every descendant -- has `NodeStatus`
 /// other than `Unmarked`: nothing left in it to review. Used by the `H` (hide solved) toggle to
 /// prune those subtrees from the flattened view (via `flatten_visible`'s `hidden` set) while any
@@ -1563,14 +1608,11 @@ fn algo_disagrees_after(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool
 // Navigation
 // ---------------------------------------------------------------------------------------------
 
-fn move_cursor(panel: &mut PanelState, flat: &[(Node, usize)], delta: i32) {
+fn move_cursor(panel: &mut PanelState, flat: &FlatIndex, delta: i32) {
     if flat.is_empty() {
         return;
     }
-    let idx = flat
-        .iter()
-        .position(|(n, _)| n.id() == panel.cursor_id)
-        .unwrap_or(0);
+    let idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     let new_idx = (idx as i32 + delta).clamp(0, flat.len() as i32 - 1) as usize;
     panel.cursor_id = flat[new_idx].0.id();
 }
@@ -1586,11 +1628,11 @@ fn jump_to_edge(panel: &mut PanelState, flat: &[(Node, usize)], to_start: bool) 
 /// `NodeStatus::Unmarked`, if one exists. Leaves the cursor untouched otherwise.
 fn advance_to_next_unmarked(
     panel: &mut PanelState,
-    flat: &[(Node, usize)],
+    flat: &FlatIndex,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
 ) {
-    let Some(idx) = flat.iter().position(|(n, _)| n.id() == panel.cursor_id) else {
+    let Some(idx) = flat.index_of(panel.cursor_id) else {
         return;
     };
     for (node, _) in &flat[idx + 1..] {
@@ -1606,8 +1648,8 @@ fn advance_to_next_unmarked(
 /// fresh from `app.mapping`, since the caller's caches predate the change that was just applied.
 fn advance_both_to_next_unmarked(
     app: &mut App,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
 ) {
@@ -1620,7 +1662,7 @@ fn advance_both_to_next_unmarked(
 /// delete, which only touches the Before side, so only that cursor should step forward.
 fn advance_before_to_next_unmarked(
     app: &mut App,
-    before_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
 ) {
@@ -1632,7 +1674,7 @@ fn advance_before_to_next_unmarked(
 /// insert, which only touches the After side, so only that cursor should step forward.
 fn advance_after_to_next_unmarked(
     app: &mut App,
-    after_flat: &[(Node, usize)],
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
 ) {
@@ -1645,7 +1687,7 @@ fn advance_after_to_next_unmarked(
 /// search. Returns the node landed on, or `None` if `disagrees_fn` is false for every node.
 fn advance_to_next_mismatch<'a>(
     panel: &mut PanelState,
-    flat: &[(Node<'a>, usize)],
+    flat: &FlatIndex<'a>,
     caches: &Caches,
     diff_ast: &ASTDiff,
     disagrees_fn: fn(Node, &Caches, &ASTDiff) -> bool,
@@ -1655,10 +1697,7 @@ fn advance_to_next_mismatch<'a>(
         return None;
     }
     let len = flat.len();
-    let idx = flat
-        .iter()
-        .position(|(n, _)| n.id() == panel.cursor_id)
-        .unwrap_or(0);
+    let idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     for step in 1..=len {
         let i = if forward {
             (idx + step) % len
@@ -1680,8 +1719,8 @@ fn advance_to_next_mismatch<'a>(
 fn action_next_mismatch(
     app: &mut App,
     focus: Focus,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     caches: &Caches,
     forward: bool,
 ) -> Result<String> {
@@ -1726,7 +1765,7 @@ fn action_next_mismatch(
 /// of the actual token, which is not what a human doing the AST-browser equivalent of Ctrl-F wants.
 fn advance_to_next_search_match<'a>(
     panel: &mut PanelState,
-    flat: &[(Node<'a>, usize)],
+    flat: &FlatIndex<'a>,
     src: &[u8],
     query: &str,
 ) -> Option<Node<'a>> {
@@ -1734,10 +1773,7 @@ fn advance_to_next_search_match<'a>(
         return None;
     }
     let len = flat.len();
-    let idx = flat
-        .iter()
-        .position(|(n, _)| n.id() == panel.cursor_id)
-        .unwrap_or(0);
+    let idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     for step in 1..=len {
         let i = (idx + step) % len;
         let (node, _) = flat[i];
@@ -1755,8 +1791,8 @@ fn advance_to_next_search_match<'a>(
 fn action_search(
     app: &mut App,
     focus: Focus,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_src: &[u8],
     after_src: &[u8],
     query: &str,
@@ -1773,11 +1809,10 @@ fn action_search(
     }
 }
 
-fn expand_or_descend(panel: &mut PanelState, flat: &[(Node, usize)]) {
-    let Some((node, _)) = flat.iter().find(|(n, _)| n.id() == panel.cursor_id) else {
+fn expand_or_descend(panel: &mut PanelState, flat: &FlatIndex) {
+    let Some(node) = flat.node_for_id(panel.cursor_id) else {
         return;
     };
-    let node = *node;
     if node.child_count() == 0 {
         return;
     }
@@ -1790,11 +1825,10 @@ fn expand_or_descend(panel: &mut PanelState, flat: &[(Node, usize)]) {
     }
 }
 
-fn collapse_or_ascend(panel: &mut PanelState, flat: &[(Node, usize)]) {
-    let Some((node, _)) = flat.iter().find(|(n, _)| n.id() == panel.cursor_id) else {
+fn collapse_or_ascend(panel: &mut PanelState, flat: &FlatIndex) {
+    let Some(node) = flat.node_for_id(panel.cursor_id) else {
         return;
     };
-    let node = *node;
     if node.child_count() > 0 && !panel.collapsed.contains(&node.id()) {
         panel.collapsed.insert(node.id());
         return;
@@ -1861,9 +1895,8 @@ fn align_cursor_to(
         Focus::After => &mut app.before,
     };
 
-    let was_visible = flatten_visible(other_root, &other.collapsed, None)
-        .iter()
-        .position(|(n, _)| n.id() == target_id)
+    let was_visible = FlatIndex::new(flatten_visible(other_root, &other.collapsed, None))
+        .index_of(target_id)
         .is_some_and(|idx| {
             idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1)
         });
@@ -1874,11 +1907,8 @@ fn align_cursor_to(
     other.cursor_id = target_id;
 
     if !was_visible {
-        let flat = flatten_visible(other_root, &other.collapsed, None);
-        let idx = flat
-            .iter()
-            .position(|(n, _)| n.id() == target_id)
-            .unwrap_or(0);
+        let flat = FlatIndex::new(flatten_visible(other_root, &other.collapsed, None));
+        let idx = flat.index_of(target_id).unwrap_or(0);
         let height = other.viewport_height.max(1);
         let max_scroll = flat.len().saturating_sub(height);
         other.scroll = idx.saturating_sub(height / 2).min(max_scroll);
@@ -2001,10 +2031,6 @@ fn remove_entries_touching(
             .is_some_and(|n| after_ids.contains(&n.id()));
         !(touches_before || touches_after)
     });
-}
-
-fn find_node_by_id<'a>(flat: &[(Node<'a>, usize)], id: usize) -> Option<Node<'a>> {
-    flat.iter().find(|(n, _)| n.id() == id).map(|(n, _)| *n)
 }
 
 /// Finds a node anywhere in `root`'s subtree by id, unlike [`find_node_by_id`], which only looks
@@ -2385,8 +2411,8 @@ fn classify_match_operation(
 #[allow(clippy::too_many_arguments)]
 fn action_match(
     mapping: &mut HumanMapping,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_cursor: usize,
     after_cursor: usize,
     before_root: Node,
@@ -2397,10 +2423,12 @@ fn action_match(
     before_hash: &rustc_hash::FxHashMap<usize, u64>,
     after_hash: &rustc_hash::FxHashMap<usize, u64>,
 ) -> Result<ActionOutcome> {
-    let before_node =
-        find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
-    let after_node =
-        find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
+    let before_node = before_flat
+        .node_for_id(before_cursor)
+        .context("Before cursor node not found")?;
+    let after_node = after_flat
+        .node_for_id(after_cursor)
+        .context("After cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
         bail!(
@@ -2471,8 +2499,8 @@ fn action_match(
 #[allow(clippy::too_many_arguments)]
 fn action_match_to_end(
     app: &mut App,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
     before_src: &[u8],
@@ -2486,12 +2514,10 @@ fn action_match_to_end(
     let after_paths = precompute_paths(after_root);
 
     let mut before_idx = before_flat
-        .iter()
-        .position(|(n, _)| n.id() == app.before.cursor_id)
+        .index_of(app.before.cursor_id)
         .context("Before cursor node not found")?;
     let mut after_idx = after_flat
-        .iter()
-        .position(|(n, _)| n.id() == app.after.cursor_id)
+        .index_of(app.after.cursor_id)
         .context("After cursor node not found")?;
 
     loop {
@@ -2572,8 +2598,8 @@ fn next_unmarked_index(
 #[allow(clippy::too_many_arguments)]
 fn action_match_subtree(
     mapping: &mut HumanMapping,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_cursor: usize,
     after_cursor: usize,
     before_root: Node,
@@ -2586,10 +2612,12 @@ fn action_match_subtree(
     before_collapsed: &mut std::collections::HashSet<usize>,
     after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> Result<ActionOutcome> {
-    let before_node =
-        find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
-    let after_node =
-        find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
+    let before_node = before_flat
+        .node_for_id(before_cursor)
+        .context("Before cursor node not found")?;
+    let after_node = after_flat
+        .node_for_id(after_cursor)
+        .context("After cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
         bail!(
@@ -2814,8 +2842,8 @@ fn auto_match_pair(
 #[allow(clippy::too_many_arguments)]
 fn apply_modal_choice(
     mapping: &mut HumanMapping,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
     caches: &Caches,
@@ -2829,8 +2857,8 @@ fn apply_modal_choice(
     after_collapsed: &mut std::collections::HashSet<usize>,
 ) -> String {
     let (Some(b), Some(a)) = (
-        find_node_by_id(before_flat, before_id),
-        find_node_by_id(after_flat, after_id),
+        before_flat.node_for_id(before_id),
+        after_flat.node_for_id(after_id),
     ) else {
         return "Node no longer available (tree changed?)".to_string();
     };
@@ -2927,15 +2955,16 @@ fn apply_modal_choice(
 
 fn action_delete(
     mapping: &mut HumanMapping,
-    before_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
     before_cursor: usize,
     before_root: Node,
     after_root: Node,
     with_children: bool,
     caches: &Caches,
 ) -> Result<String> {
-    let before_node =
-        find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?;
+    let before_node = before_flat
+        .node_for_id(before_cursor)
+        .context("Before cursor node not found")?;
 
     if is_inherited_removed(before_node, &caches.before_removed) {
         bail!(
@@ -2976,15 +3005,16 @@ fn action_delete(
 
 fn action_insert(
     mapping: &mut HumanMapping,
-    after_flat: &[(Node, usize)],
+    after_flat: &FlatIndex,
     after_cursor: usize,
     before_root: Node,
     after_root: Node,
     with_children: bool,
     caches: &Caches,
 ) -> Result<String> {
-    let after_node =
-        find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?;
+    let after_node = after_flat
+        .node_for_id(after_cursor)
+        .context("After cursor node not found")?;
 
     if is_inherited_removed(after_node, &caches.after_removed) {
         bail!(
@@ -3030,8 +3060,8 @@ fn action_insert(
 fn action_unmark(
     mapping: &mut HumanMapping,
     focus: Focus,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_cursor: usize,
     after_cursor: usize,
     before_root: Node,
@@ -3041,13 +3071,17 @@ fn action_unmark(
     let (id, node, removed, group) = match focus {
         Focus::Before => (
             before_cursor,
-            find_node_by_id(before_flat, before_cursor).context("Before cursor node not found")?,
+            before_flat
+                .node_for_id(before_cursor)
+                .context("Before cursor node not found")?,
             &caches.before_removed,
             caches.before_group.get(&before_cursor).copied(),
         ),
         Focus::After => (
             after_cursor,
-            find_node_by_id(after_flat, after_cursor).context("After cursor node not found")?,
+            after_flat
+                .node_for_id(after_cursor)
+                .context("After cursor node not found")?,
             &caches.after_removed,
             caches.after_group.get(&after_cursor).copied(),
         ),
@@ -3180,7 +3214,7 @@ fn render_panel(
     frame: &mut Frame,
     area: Rect,
     title: &str,
-    flat: &[(Node, usize)],
+    flat: &FlatIndex,
     panel: &mut PanelState,
     caches: &Caches,
     side: Side,
@@ -3193,10 +3227,7 @@ fn render_panel(
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
     panel.viewport_height = inner_height;
-    let cursor_idx = flat
-        .iter()
-        .position(|(n, _)| n.id() == panel.cursor_id)
-        .unwrap_or(0);
+    let cursor_idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
 
     // Only the rows actually on screen get built into `ListItem`s and have their status computed
@@ -3310,8 +3341,8 @@ const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
 fn draw_ui(
     frame: &mut Frame,
     app: &mut App,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
@@ -4012,8 +4043,8 @@ struct FrameState<'a> {
     before_src: &'a [u8],
     after_src: &'a [u8],
     caches: Caches,
-    before_flat: Vec<(Node<'a>, usize)>,
-    after_flat: Vec<(Node<'a>, usize)>,
+    before_flat: FlatIndex<'a>,
+    after_flat: FlatIndex<'a>,
     /// Counts of `Unmarked` nodes in `before_flat`/`after_flat`, for `render_panel`'s "N unmarked"
     /// header. Computed once here rather than by scanning all of `flat` on every single draw call
     /// (see `render_panel`), since on a large case that scan -- calling `status_before`/
@@ -4059,8 +4090,16 @@ fn compute_frame_state<'a>(before: &'a Code, after: &'a Code, app: &App) -> Resu
         .hide_solved
         .then(|| fully_solved_nodes(after_root, &caches, status_after));
 
-    let before_flat = flatten_visible(before_root, &app.before.collapsed, before_hidden.as_ref());
-    let after_flat = flatten_visible(after_root, &app.after.collapsed, after_hidden.as_ref());
+    let before_flat = FlatIndex::new(flatten_visible(
+        before_root,
+        &app.before.collapsed,
+        before_hidden.as_ref(),
+    ));
+    let after_flat = FlatIndex::new(flatten_visible(
+        after_root,
+        &app.after.collapsed,
+        after_hidden.as_ref(),
+    ));
 
     let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
     let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
@@ -4188,24 +4227,70 @@ fn run_event_loop(
     Ok(())
 }
 
-/// Whether `code`, delivered while `modal` is open, is guaranteed not to touch the mapping, either
-/// panel's collapsed set, or `hide_solved` -- the three things `run_case_session`'s cached
-/// `FrameState` depends on. Only typing into (or backspacing out of) `PromptSearch`'s or
-/// `PromptPromoteName`'s own `input` string qualifies: both modals only ever mutate that string in
-/// response to these keys, everything else about the case is untouched. Every other key --
-/// including Enter/Esc on these same two modals, which can search-and-move-the-cursor, promote/
-/// save, or close the modal -- is treated conservatively as "might have changed something", so the
-/// cache is thrown away and rebuilt fresh, exactly as if this function didn't exist.
-fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
+/// Keys `handle_key` (only reachable when no modal is open -- see `is_state_preserving_key`)
+/// processes without touching `App::mapping`, either panel's `collapsed` set, or
+/// `App::hide_solved`: the three things `run_case_session`'s cached `FrameState` depends on. Pure
+/// cursor movement (`j`/`k`/arrows/`Tab`/`g`/`G`/`n`/`N`), the multi-map selection (`x`/`c`, read
+/// directly off `App` by `render_panel`, not through `FrameState`), and view/display toggles
+/// (`p`/`r`/`t`/`T`/`/`/`?`) whose own state (`algo_diff`, `show_reason`) is likewise read
+/// straight off `App`. On a large case, rebuilding `FrameState` for every one of these -- which is
+/// what browsing a case mostly consists of -- used to mean paying `rebuild_caches_for_mapping`
+/// (documented up to ~2s on a heavily-annotated fixture), two `fully_solved_nodes` walks, and two
+/// `flatten_visible` walks on every single keystroke, whether or not anything `FrameState` derives
+/// from had actually changed.
+///
+/// Deliberately conservative: `h`/`l`/`a`/`A` (which sometimes mutate a `collapsed` set, depending
+/// on where the cursor already is) and `s`/`R`/`o`/`O`/`C` (which open a modal or save, and are
+/// rare enough that the existing full-rebuild cost isn't worth the extra classification surface)
+/// are NOT included here, even though some of their branches don't actually need a rebuild either
+/// -- see `handle_key` for the exact effect of every key this list omits.
+fn is_navigation_or_display_key(code: KeyCode) -> bool {
     matches!(
-        (modal, code),
-        (
-            Some(Modal::PromptSearch { .. })
-                | Some(Modal::PromptPromoteName { .. })
-                | Some(Modal::PromptRejectReason { .. }),
-            KeyCode::Char(_) | KeyCode::Backspace
-        )
+        code,
+        KeyCode::Char('q')
+            | KeyCode::Esc
+            | KeyCode::Char('?')
+            | KeyCode::Tab
+            | KeyCode::Up
+            | KeyCode::Char('k')
+            | KeyCode::Down
+            | KeyCode::Char('j')
+            | KeyCode::Char('g')
+            | KeyCode::Char('G')
+            | KeyCode::Char('x')
+            | KeyCode::Char('c')
+            | KeyCode::Char('p')
+            | KeyCode::Char('n')
+            | KeyCode::Char('N')
+            | KeyCode::Char('/')
+            | KeyCode::Char('t')
+            | KeyCode::Char('T')
+            | KeyCode::Char('r')
     )
+}
+
+/// Whether `code`, delivered in the current `modal` state, is guaranteed not to touch the mapping,
+/// either panel's collapsed set, or `hide_solved` -- the three things `run_case_session`'s cached
+/// `FrameState` depends on.
+///
+/// With no modal open, this is `is_navigation_or_display_key` (`handle_key`'s own pure-navigation
+/// keys). With a modal open, only typing into (or backspacing out of) `PromptSearch`'s,
+/// `PromptPromoteName`'s, or `PromptRejectReason`'s own `input` string qualifies: those modals only
+/// ever mutate that string in response to these keys, everything else about the case is untouched.
+/// Every other key while a modal is open -- including Enter/Esc on these same three modals, which
+/// can search-and-move-the-cursor, promote/reject/save, or close the modal -- is treated
+/// conservatively as "might have changed something", so the cache is thrown away and rebuilt
+/// fresh, exactly as if this function didn't exist.
+fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
+    match modal {
+        None => is_navigation_or_display_key(code),
+        Some(Modal::PromptSearch { .. })
+        | Some(Modal::PromptPromoteName { .. })
+        | Some(Modal::PromptRejectReason { .. }) => {
+            matches!(code, KeyCode::Char(_) | KeyCode::Backspace)
+        }
+        Some(_) => false,
+    }
 }
 
 /// Runs the event loop for a single case (before/after AST pair) until the user quits or asks to
@@ -4229,15 +4314,14 @@ fn run_case_session(
     // Cached result of `compute_frame_state` -- rebuilding both caches and re-flattening both
     // (possibly multi-thousand-node) trees is real work, so it's only redone when something that
     // could actually change it happens, not on every idle tick or every keystroke. `None` forces a
-    // fresh (potentially expensive) recompute; set back to `None` by every key that could
-    // plausibly touch the mapping, a collapsed set, or `hide_solved`, so the vast majority of keys
-    // still recompute every time, same as before this cache existed. The one deliberate exception
-    // is `state_preserving` below: typing into a pure text-input modal (`PromptSearch`,
-    // `PromptPromoteName`, `PromptRejectReason`) only ever mutates that modal's own `input`
-    // string, so on a large case
-    // there's no reason each character typed into e.g. the save-name box should re-walk both
-    // entire trees from scratch, on top of doing that twice per keystroke (once for this draw, once
-    // again just to interpret the next key) as this used to.
+    // fresh (potentially expensive) recompute; set back to `None` only by a key that could
+    // plausibly touch the mapping, a collapsed set, or `hide_solved` -- see
+    // `is_state_preserving_key`/`is_navigation_or_display_key` for the exact set that's exempted.
+    // That set is deliberately generous: browsing a case (moving the cursor, jumping between
+    // mismatches, toggling `p`/`r`/`t`/`T` display) is the overwhelming majority of keys pressed in
+    // a session, and none of it needs a rebuild, so those keys reuse this `FrameState` untouched.
+    // Only the keys that actually mutate the mapping or a collapsed set (`m`/`M`/`f`/`d`/`D`/`i`/
+    // `I`/`u`/`h`/`l`/`a`/`A`/`H`, plus text-modal Enter/Esc) still pay the full recompute.
     let mut state: Option<FrameState> = None;
 
     loop {
@@ -4351,8 +4435,8 @@ fn run_case_session(
 fn handle_key(
     app: &mut App,
     code: KeyCode,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
     caches: &Caches,
@@ -4812,8 +4896,8 @@ fn handle_key(
 fn handle_modal_key(
     app: &mut App,
     code: KeyCode,
-    before_flat: &[(Node, usize)],
-    after_flat: &[(Node, usize)],
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
     caches: &Caches,
@@ -5980,12 +6064,82 @@ mod tests {
     }
 
     #[test]
+    fn is_state_preserving_key_is_true_for_pure_navigation_and_display_keys_with_no_modal_open() {
+        for code in [
+            KeyCode::Up,
+            KeyCode::Char('k'),
+            KeyCode::Down,
+            KeyCode::Char('j'),
+            KeyCode::Tab,
+            KeyCode::Char('g'),
+            KeyCode::Char('G'),
+            KeyCode::Char('n'),
+            KeyCode::Char('N'),
+            KeyCode::Char('x'),
+            KeyCode::Char('c'),
+            KeyCode::Char('p'),
+            KeyCode::Char('r'),
+            KeyCode::Char('t'),
+            KeyCode::Char('T'),
+            KeyCode::Char('/'),
+            KeyCode::Char('?'),
+            KeyCode::Char('q'),
+            KeyCode::Esc,
+        ] {
+            assert!(
+                is_state_preserving_key(None, code),
+                "{code:?} should not force a FrameState rebuild with no modal open"
+            );
+        }
+    }
+
+    #[test]
+    fn is_state_preserving_key_is_false_for_keys_that_can_mutate_mapping_or_collapse_state() {
+        // `h`/`l`/`a`/`A` sometimes mutate a collapsed set; `m`/`M`/`f`/`d`/`D`/`i`/`I`/`u` mutate
+        // the mapping directly; `H` toggles hide_solved; `s`/`R`/`o`/`O`/`C` are left on the
+        // conservative (full-rebuild) path deliberately, per `is_navigation_or_display_key`'s doc
+        // comment - none of these must be silently added to the fast path without also auditing
+        // what they touch.
+        for code in [
+            KeyCode::Left,
+            KeyCode::Char('h'),
+            KeyCode::Right,
+            KeyCode::Char('l'),
+            KeyCode::Char('a'),
+            KeyCode::Char('A'),
+            KeyCode::Char('m'),
+            KeyCode::Char('M'),
+            KeyCode::Char('f'),
+            KeyCode::Char('d'),
+            KeyCode::Char('D'),
+            KeyCode::Char('i'),
+            KeyCode::Char('I'),
+            KeyCode::Char('u'),
+            KeyCode::Char('H'),
+            KeyCode::Char('s'),
+            KeyCode::Char('R'),
+            KeyCode::Char('o'),
+            KeyCode::Char('O'),
+            KeyCode::Char('C'),
+        ] {
+            assert!(
+                !is_state_preserving_key(None, code),
+                "{code:?} must still force a FrameState rebuild with no modal open"
+            );
+        }
+    }
+
+    #[test]
     fn count_unmarked_counts_only_nodes_with_no_match_or_delete_mark() {
         let source = "fn main() {\n    a();\n    b();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
         let (stmt_a, _) = two_statements(root);
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
 
         let mut caches = Caches::default();
         let before_unmarked = count_unmarked(&flat, &caches, status_before);
@@ -6012,7 +6166,11 @@ mod tests {
         source.push_str("}\n");
         let tree = parse_rust(&source);
         let root = tree.root_node();
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         assert!(
             flat.len() > 200,
             "fixture should be far bigger than any plausible terminal height"
@@ -6196,7 +6354,11 @@ mod tests {
         let source = "fn main() {\n    alpha();\n    beta();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let mut panel = PanelState::new(root.id());
 
         let found =
@@ -6220,7 +6382,11 @@ mod tests {
         let source = "fn main() {\n    alpha();\n    beta();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let mut panel = PanelState::new(root.id());
 
         let found =
@@ -6234,7 +6400,11 @@ mod tests {
         let source = "fn main() {\n    alpha();\n}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let mut panel = PanelState::new(root.id());
         let original_cursor = panel.cursor_id;
 
@@ -6259,8 +6429,8 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
 
         let msg = action_search(
             &mut app,
@@ -6300,7 +6470,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
 
         let err = action_search(
             &mut app,
@@ -6327,7 +6497,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::PromptSearch {
             input: "alpha".to_string(),
@@ -6367,7 +6537,7 @@ mod tests {
             HumanMapping::default(),
         );
         app.last_search = Some("previous".to_string());
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::PromptSearch {
             input: "   ".to_string(),
@@ -6406,7 +6576,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::PromptSearch {
             input: "alpha".to_string(),
@@ -6441,7 +6611,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::PromptSearch {
             input: "alp".to_string(),
@@ -6915,7 +7085,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
                 ("rejected-one".to_string(), SampleTriageStatus::Rejected, 0),
@@ -6962,7 +7132,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![
                 ("alpha".to_string(), SampleTriageStatus::Sampled, 5),
@@ -7019,7 +7189,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         app.modal = Some(Modal::OpenSamplePicker {
             options: vec![("alpha".to_string(), SampleTriageStatus::Sampled, 5)],
             selected: 0,
@@ -7058,7 +7228,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitPicker {
             commits: vec![
@@ -7117,7 +7287,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitPicker {
             commits: vec![("aaa".to_string(), "first commit".to_string())],
@@ -7155,7 +7325,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitPicker {
             commits: vec![("not-a-real-commit-hash".to_string(), "bogus".to_string())],
@@ -7202,7 +7372,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitFilePicker {
             hash: "abc123".to_string(),
@@ -7255,7 +7425,7 @@ mod tests {
             HumanMapping::default(),
         );
         app.dirty = true;
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitFilePicker {
             hash: "abc123".to_string(),
@@ -7307,7 +7477,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
         app.modal = Some(Modal::OpenCommitFilePicker {
             hash: "abc123".to_string(),
@@ -7492,7 +7662,7 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         app.modal = Some(Modal::OpenDiffPicker {
             options: vec![("alpha".to_string(), "handmade")],
             selected: 0,
@@ -7536,8 +7706,8 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
         let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
         let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
@@ -7792,7 +7962,7 @@ mod tests {
             dataset_filter: None,
             hide_complete: false,
         });
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
         handle_modal_key(
@@ -7863,7 +8033,7 @@ mod tests {
             dataset_filter: None,
             hide_complete: false,
         });
-        let flat = flatten_visible(root, &app.before.collapsed, None);
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
         handle_modal_key(
@@ -7894,7 +8064,11 @@ mod tests {
         let mut hidden = std::collections::HashSet::new();
         hidden.insert(stmt_a.id());
 
-        let flat = flatten_visible(root, &std::collections::HashSet::new(), Some(&hidden));
+        let flat = FlatIndex::new(flatten_visible(
+            root,
+            &std::collections::HashSet::new(),
+            Some(&hidden),
+        ));
 
         assert!(
             !flat.iter().any(|(n, _)| n.id() == stmt_a.id()),
@@ -7986,8 +8160,8 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
@@ -8007,7 +8181,7 @@ mod tests {
         assert!(app.dirty);
 
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
-        for (node, _) in &before_flat {
+        for (node, _) in before_flat.iter() {
             assert_ne!(
                 status_before(*node, &caches),
                 NodeStatus::Unmarked,
@@ -8050,8 +8224,8 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
@@ -8143,8 +8317,8 @@ mod tests {
             after_root.id(),
             HumanMapping::default(),
         );
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let no_hashes = rustc_hash::FxHashMap::default();
 
         let outcome = action_match_to_end(
@@ -8212,8 +8386,16 @@ mod tests {
         let before_root = before_tree.root_node();
         let after_root = after_tree.root_node();
 
-        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
-        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let before_flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
+        let after_flat = FlatIndex::new(flatten_visible(
+            after_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         assert!(
             before_flat.len() > 10_000,
             "expected a large tree, got {} nodes",
@@ -8275,8 +8457,16 @@ mod tests {
         let before_root = before_tree.root_node();
         let after_root = after_tree.root_node();
 
-        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
-        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let before_flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
+        let after_flat = FlatIndex::new(flatten_visible(
+            after_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         assert!(
             before_flat.len() > 10_000,
             "expected a large tree, got {} nodes",
@@ -8365,8 +8555,16 @@ mod tests {
 
         let function_before = before_root.child(0).unwrap();
         let function_after = after_root.child(0).unwrap();
-        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
-        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let before_flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
+        let after_flat = FlatIndex::new(flatten_visible(
+            after_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let no_hashes = rustc_hash::FxHashMap::default();
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
@@ -8425,8 +8623,16 @@ mod tests {
 
         let function_before = before_root.child(0).unwrap();
         let function_after = after_root.child(0).unwrap();
-        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
-        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let before_flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
+        let after_flat = FlatIndex::new(flatten_visible(
+            after_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let no_hashes = rustc_hash::FxHashMap::default();
         let mut before_collapsed = std::collections::HashSet::new();
         let mut after_collapsed = std::collections::HashSet::new();
@@ -9329,8 +9535,16 @@ mod tests {
         .unwrap();
         assert_eq!(mapping.groups.len(), 1);
 
-        let before_flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
-        let after_flat = flatten_visible(after_root, &std::collections::HashSet::new(), None);
+        let before_flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
+        let after_flat = FlatIndex::new(flatten_visible(
+            after_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
 
         // Any one member - here, the leftover before-foo that landed on Delete rather than a
@@ -9377,8 +9591,8 @@ mod tests {
             HumanMapping::default(),
         );
         app.before.cursor_id = before_foos[0].id();
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let caches = Caches::default();
         let no_hashes = rustc_hash::FxHashMap::default();
 
@@ -9460,8 +9674,8 @@ mod tests {
         app.before_multi_select = before_foos.iter().map(|n| n.id()).collect();
         app.after_multi_select = after_foos.iter().map(|n| n.id()).collect();
 
-        let before_flat = flatten_visible(before_root, &app.before.collapsed, None);
-        let after_flat = flatten_visible(after_root, &app.after.collapsed, None);
+        let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+        let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
         let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
         let no_hashes = rustc_hash::FxHashMap::default();
 
@@ -9520,7 +9734,11 @@ mod tests {
         .unwrap();
 
         let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
-        let flat = flatten_visible(before_root, &std::collections::HashSet::new(), None);
+        let flat = FlatIndex::new(flatten_visible(
+            before_root,
+            &std::collections::HashSet::new(),
+            None,
+        ));
         let mut panel = PanelState::new(before_root.id());
 
         // Mark one before-foo (not part of any group) as a pending multi-map selection, to prove

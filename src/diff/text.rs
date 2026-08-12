@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use tree_sitter::Node;
+use tree_sitter::{Node, Point, Range};
 
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
@@ -64,6 +64,217 @@ pub(crate) fn own_content(node: Node, source: &[u8]) -> String {
         gap_bytes.extend_from_slice(&source[pos..node.end_byte()]);
     }
     String::from_utf8_lossy(&gap_bytes).into_owned()
+}
+
+/// Like `own_content`, but returns the single contiguous gap's start point and byte range instead
+/// of concatenating every gap into a `String` - `None` if the node's own content is split across
+/// more than one gap (e.g. a container with content both before its first child and after its
+/// last). Precise sub-node positions (see `intra_node_update_ranges`) only make sense for a single
+/// contiguous span; a node with multiple gaps keeps reporting the whole node as changed, same as
+/// before this existed.
+fn own_content_span(node: Node) -> Option<(Point, usize, usize)> {
+    let mut pos = node.start_byte();
+    let mut gap_start_point = node.start_position();
+    let mut gap: Option<(Point, usize, usize)> = None;
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.start_byte() > pos {
+            if gap.is_some() {
+                return None;
+            }
+            gap = Some((gap_start_point, pos, child.start_byte()));
+        }
+        pos = pos.max(child.end_byte());
+        gap_start_point = child.end_position();
+    }
+    if node.end_byte() > pos {
+        if gap.is_some() {
+            return None;
+        }
+        gap = Some((gap_start_point, pos, node.end_byte()));
+    }
+    gap
+}
+
+/// Byte length of the longest common prefix between `a` and `b`, respecting UTF-8 character
+/// boundaries (never splits a multi-byte character) - the returned length is one past the last
+/// matching character, which is guaranteed to be a valid byte-index boundary in *both* strings:
+/// matched characters have identical `len_utf8()`, and if the comparison ran out because one
+/// string is a character-wise prefix of the other, the returned length is exactly that shorter
+/// string's own byte length (also always a valid boundary in itself, and thus in the other string
+/// too, since every character up to it matched one-for-one).
+fn common_prefix_byte_len(a: &str, b: &str) -> usize {
+    let mut len = 0;
+    let mut a_chars = a.char_indices();
+    let mut b_chars = b.chars();
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (Some((i, ca)), Some(cb)) if ca == cb => len = i + ca.len_utf8(),
+            _ => break,
+        }
+    }
+    len
+}
+
+/// Byte length of the longest common suffix between `a` and `b` - same boundary guarantees as
+/// `common_prefix_byte_len`, mirrored from the end. Callers pass strings already trimmed of their
+/// common prefix, so the returned length can never overlap it.
+fn common_suffix_byte_len(a: &str, b: &str) -> usize {
+    let mut len = 0;
+    let mut a_chars = a.chars().rev();
+    let mut b_chars = b.chars().rev();
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (Some(ca), Some(cb)) if ca == cb => len += ca.len_utf8(),
+            _ => break,
+        }
+    }
+    len
+}
+
+/// The `tree_sitter::Point` reached after advancing `offset` bytes into `text`, starting from
+/// `start`. Byte-based, not char-based, to match tree-sitter's own column convention (see
+/// `text_range::row_col_to_byte_index`'s doc comment) - `offset` must land on a char boundary of
+/// `text`, which every call site guarantees (see `common_prefix_byte_len`/`common_suffix_byte_len`
+/// above).
+fn point_at_byte_offset(text: &str, start: Point, offset: usize) -> Point {
+    let mut row = start.row;
+    let mut column = start.column;
+    for &b in &text.as_bytes()[..offset] {
+        if b == b'\n' {
+            row += 1;
+            column = 0;
+        } else {
+            column += 1;
+        }
+    }
+    Point { row, column }
+}
+
+/// Builds a `TextRange` from two `tree_sitter::Point`s directly, for sub-node spans that were
+/// never a real tree-sitter node's own range (e.g. the changed middle portion of an updated
+/// string/comment). `TextRange::from_treesitter_range` only reads the point fields of its
+/// `tree_sitter::Range` argument, not the byte fields (it recomputes end-of-row normalization from
+/// `columns_per_row` itself), so the synthetic range's byte fields are never read and left at 0.
+fn text_range_from_points(start: Point, end: Point, columns_per_row: &[usize]) -> TextRange {
+    let ts_range = Range {
+        start_byte: 0,
+        end_byte: 0,
+        start_point: start,
+        end_point: end,
+    };
+    TextRange::from_treesitter_range(ts_range, columns_per_row)
+}
+
+/// One side's own text plus what's needed to turn a byte offset into it back into a `TextRange`:
+/// the point it starts at in the full file, and that file's per-row column counts (for
+/// `text_range_from_points`'s end-of-row normalization). Bundled together purely to keep
+/// `intra_node_update_ranges` under clippy's argument-count limit - `source`/`destination` are
+/// otherwise completely independent, never compared against each other structurally.
+struct TextSpan<'a> {
+    text: &'a str,
+    start: Point,
+    columns: &'a [usize],
+}
+
+/// Splits an `Update`/`MatchButNotIdentical` node's own text into up to three sub-ranges - a
+/// common Identical prefix, the differing Update middle, and a common Identical suffix - instead
+/// of reporting the node's entire text as changed. This is what lets a small edit inside a long
+/// string, comment, or identifier highlight only the part that actually changed.
+///
+/// Falls back to a single whole-span `Update` range (`whole_source_range`, anchored via
+/// `last_non_move_range` exactly like the pre-existing behavior this replaces) when there's no
+/// common prefix or suffix at all - the two texts differ from their very first to their very last
+/// character, so there's nothing more precise to report.
+///
+/// The prefix/suffix `Identical` sub-ranges get *real* destination positions (derived from
+/// `destination_start`, the actual matched node/span's own start point) rather than the usual
+/// placeholder `last_non_move_range` anchor: unlike a plain Delete/Insert, an Update's matched
+/// counterpart really does exist at a real position, and giving `Identical` ranges fabricated
+/// destinations would risk corrupting `extend_into` accumulation if one ever merged with a
+/// genuinely-Identical neighbor range that does carry a real destination. The Update middle still
+/// uses the placeholder anchor, matching the pre-existing convention that only `Identical`
+/// ranges carry cross-file-accurate destinations.
+///
+/// Symmetric by construction: `common_prefix_byte_len`/`common_suffix_byte_len` only compare
+/// characters pairwise for equality, which doesn't depend on which string is "source" and which is
+/// "destination" - so calling this with the two texts swapped (as `ranges` does, once for
+/// before->after and once for after->before) always produces the same number of sub-ranges, with
+/// the same operations, in the same order. `ranges`'s caller is responsible for the other half of
+/// this guarantee: pushing a multi-range result straight into `ranges` rather than through the
+/// usual same-operation-neighbor-merging accumulator, since that merging depends on each side's own
+/// (possibly different) surrounding text and could otherwise make the two sides' sub-range counts
+/// diverge after accumulation even though this function itself is symmetric.
+fn intra_node_update_ranges(
+    last_non_move_range: &mut TextRange,
+    whole_source_range: TextRange,
+    source: TextSpan,
+    destination: TextSpan,
+) -> Vec<RangeMatch> {
+    let prefix_len = common_prefix_byte_len(source.text, destination.text);
+    let suffix_len =
+        common_suffix_byte_len(&source.text[prefix_len..], &destination.text[prefix_len..]);
+
+    if prefix_len == 0 && suffix_len == 0 {
+        return vec![advance_and_build_range_with_source(
+            last_non_move_range,
+            whole_source_range,
+            TextOperation::Update,
+        )];
+    }
+
+    let mut result = Vec::with_capacity(3);
+
+    if prefix_len > 0 {
+        let source_end = point_at_byte_offset(source.text, source.start, prefix_len);
+        let destination_end = point_at_byte_offset(destination.text, destination.start, prefix_len);
+        result.push(RangeMatch {
+            source: text_range_from_points(source.start, source_end, source.columns),
+            destination: text_range_from_points(
+                destination.start,
+                destination_end,
+                destination.columns,
+            ),
+            operation: TextOperation::Identical,
+        });
+    }
+
+    let source_mid_len = source.text.len() - prefix_len - suffix_len;
+    let destination_mid_len = destination.text.len() - prefix_len - suffix_len;
+    if source_mid_len > 0 || destination_mid_len > 0 {
+        let source_mid_start = point_at_byte_offset(source.text, source.start, prefix_len);
+        let source_mid_end =
+            point_at_byte_offset(source.text, source.start, source.text.len() - suffix_len);
+        result.push(advance_and_build_range_with_source(
+            last_non_move_range,
+            text_range_from_points(source_mid_start, source_mid_end, source.columns),
+            TextOperation::Update,
+        ));
+    }
+
+    if suffix_len > 0 {
+        let source_start_point =
+            point_at_byte_offset(source.text, source.start, source.text.len() - suffix_len);
+        let source_end_point = point_at_byte_offset(source.text, source.start, source.text.len());
+        let destination_start_point = point_at_byte_offset(
+            destination.text,
+            destination.start,
+            destination.text.len() - suffix_len,
+        );
+        let destination_end_point =
+            point_at_byte_offset(destination.text, destination.start, destination.text.len());
+        result.push(RangeMatch {
+            source: text_range_from_points(source_start_point, source_end_point, source.columns),
+            destination: text_range_from_points(
+                destination_start_point,
+                destination_end_point,
+                destination.columns,
+            ),
+            operation: TextOperation::Identical,
+        });
+    }
+
+    result
 }
 
 /// Returns the RangeMatches from source to destination.
@@ -120,7 +331,7 @@ fn ranges(
 
             while let Some(node) = stack.pop() {
                 if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
-                    let mut new_range = None;
+                    let mut new_ranges: Vec<RangeMatch> = Vec::new();
                     let mut descend = true;
 
                     match mapping.operation {
@@ -143,13 +354,13 @@ fn ranges(
                                 if s.start_column == d.start_column {
                                     last_non_move_range = d.clone();
 
-                                    new_range = Some(RangeMatch {
+                                    new_ranges.push(RangeMatch {
                                         source: s,
                                         destination: d,
                                         operation: TextOperation::Identical,
                                     });
                                 } else {
-                                    new_range = Some(RangeMatch {
+                                    new_ranges.push(RangeMatch {
                                         source: s,
                                         destination: d,
                                         operation: TextOperation::Move,
@@ -160,7 +371,7 @@ fn ranges(
                             }
                         }
                         ASTMappingOperation::DeleteWithChildren => {
-                            new_range = Some(advance_and_build_range(
+                            new_ranges.push(advance_and_build_range(
                                 &mut last_non_move_range,
                                 node,
                                 &source_columns,
@@ -169,7 +380,7 @@ fn ranges(
                             descend = false;
                         }
                         ASTMappingOperation::InsertWithChildren => {
-                            new_range = Some(advance_and_build_range(
+                            new_ranges.push(advance_and_build_range(
                                 &mut last_non_move_range,
                                 node,
                                 &source_columns,
@@ -178,7 +389,7 @@ fn ranges(
                             descend = false;
                         }
                         ASTMappingOperation::Delete if node.child_count() == 0 => {
-                            new_range = Some(advance_and_build_range(
+                            new_ranges.push(advance_and_build_range(
                                 &mut last_non_move_range,
                                 node,
                                 &source_columns,
@@ -186,20 +397,46 @@ fn ranges(
                             ));
                         }
                         ASTMappingOperation::Insert if node.child_count() == 0 => {
-                            new_range = Some(advance_and_build_range(
+                            new_ranges.push(advance_and_build_range(
                                 &mut last_non_move_range,
                                 node,
                                 &source_columns,
                                 TextOperation::Insert,
                             ));
                         }
+                        // See `intra_node_update_ranges`'s own doc comment for the sub-range
+                        // split (common prefix/middle/suffix) and why the prefix/suffix
+                        // `Identical` pieces get `destination_node`'s real position instead of
+                        // the placeholder `last_non_move_range` anchor every other arm here uses.
                         ASTMappingOperation::Update => {
-                            new_range = Some(advance_and_build_range(
-                                &mut last_non_move_range,
-                                node,
-                                &source_columns,
-                                TextOperation::Update,
-                            ));
+                            if let Some(&destination_node) = node_cache.get_in_any(&mapped_id) {
+                                let source_text =
+                                    node.utf8_text(source.contents.as_bytes()).unwrap_or("");
+                                let destination_text = destination_node
+                                    .utf8_text(destination.contents.as_bytes())
+                                    .unwrap_or("");
+                                new_ranges = intra_node_update_ranges(
+                                    &mut last_non_move_range,
+                                    TextRange::from_treesitter_range(node.range(), &source_columns),
+                                    TextSpan {
+                                        text: source_text,
+                                        start: node.start_position(),
+                                        columns: &source_columns,
+                                    },
+                                    TextSpan {
+                                        text: destination_text,
+                                        start: destination_node.start_position(),
+                                        columns: &destination_columns,
+                                    },
+                                );
+                            } else {
+                                new_ranges.push(advance_and_build_range(
+                                    &mut last_non_move_range,
+                                    node,
+                                    &source_columns,
+                                    TextOperation::Update,
+                                ));
+                            }
                         }
                         // A node (e.g. a comment) whose *own* un-decomposed content differs from
                         // its match - content not claimed by any of its children (`own_content`) -
@@ -226,6 +463,11 @@ fn ranges(
                         // `Identical` at the AST level - only its rendered `TextOperation` becomes
                         // `Move`, from the column shift, see the `Identical` arm above) and wrongly
                         // treated the whole enclosing block as one giant `Update`.
+                        // See `intra_node_update_ranges`'s own doc comment for the sub-range
+                        // split. `own_content_span` (unlike `own_content`) needs the node's
+                        // content to sit in a single contiguous gap to report precise positions -
+                        // when it doesn't (multiple gaps), fall back to the pre-existing
+                        // whole-node placeholder behavior below.
                         ASTMappingOperation::MatchButNotIdentical => {
                             if let Some(&destination_node) = node_cache.get_in_any(&mapped_id) {
                                 let source_content = own_content(node, source.contents.as_bytes());
@@ -233,12 +475,37 @@ fn ranges(
                                     own_content(destination_node, destination.contents.as_bytes());
                                 if !whitespace_stripped_equal(&source_content, &destination_content)
                                 {
-                                    new_range = Some(advance_and_build_range(
-                                        &mut last_non_move_range,
-                                        node,
-                                        &source_columns,
-                                        TextOperation::Update,
-                                    ));
+                                    new_ranges = match (
+                                        own_content_span(node),
+                                        own_content_span(destination_node),
+                                    ) {
+                                        (
+                                            Some((s_start, s_from, s_to)),
+                                            Some((d_start, d_from, d_to)),
+                                        ) => intra_node_update_ranges(
+                                            &mut last_non_move_range,
+                                            TextRange::from_treesitter_range(
+                                                node.range(),
+                                                &source_columns,
+                                            ),
+                                            TextSpan {
+                                                text: &source.contents[s_from..s_to],
+                                                start: s_start,
+                                                columns: &source_columns,
+                                            },
+                                            TextSpan {
+                                                text: &destination.contents[d_from..d_to],
+                                                start: d_start,
+                                                columns: &destination_columns,
+                                            },
+                                        ),
+                                        _ => vec![advance_and_build_range(
+                                            &mut last_non_move_range,
+                                            node,
+                                            &source_columns,
+                                            TextOperation::Update,
+                                        )],
+                                    };
                                     descend = false;
                                 }
                             }
@@ -248,23 +515,41 @@ fn ranges(
                         }
                     }
 
-                    if let Some(new_range) = new_range {
-                        if new_range.extends(
-                            &current_range,
-                            &source.contents,
-                            &destination.contents,
-                        ) {
-                            current_range.extend_into(&new_range);
-                        } else {
-                            if !current_range.is_zero() {
-                                ranges.push(current_range);
+                    // A node that decomposed into more than one sub-range (see
+                    // `intra_node_update_ranges`) is pushed straight into `ranges`, bypassing the
+                    // usual same-operation-neighbor-merging accumulator below: that merging
+                    // depends on each side's own surrounding text via `can_extend_with_whitespace`,
+                    // which can differ between the before->after and after->before traversals and
+                    // would risk making the two sides' final range counts diverge even though
+                    // `intra_node_update_ranges` itself always produces a symmetric sub-range
+                    // count - see that function's doc comment. A single-range result (every other
+                    // arm, plus `intra_node_update_ranges`'s own no-common-affix fallback) is
+                    // exactly the pre-existing behavior and keeps going through the accumulator.
+                    if new_ranges.len() > 1 {
+                        if !current_range.is_zero() {
+                            ranges.push(current_range);
+                        }
+                        ranges.extend(new_ranges);
+                        current_range = RangeMatch::zero();
+                    } else {
+                        for new_range in new_ranges {
+                            if new_range.extends(
+                                &current_range,
+                                &source.contents,
+                                &destination.contents,
+                            ) {
+                                current_range.extend_into(&new_range);
+                            } else {
+                                if !current_range.is_zero() {
+                                    ranges.push(current_range);
+                                }
+                                current_range = new_range;
                             }
-                            current_range = new_range;
                         }
+                    }
 
-                        if !descend {
-                            continue;
-                        }
+                    if !descend {
+                        continue;
                     }
                 }
 
@@ -294,9 +579,24 @@ fn advance_and_build_range(
     columns: &[usize],
     operation: TextOperation,
 ) -> RangeMatch {
+    advance_and_build_range_with_source(
+        last_non_move_range,
+        TextRange::from_treesitter_range(node.range(), columns),
+        operation,
+    )
+}
+
+/// Same as `advance_and_build_range`, but for a caller that already has the exact `TextRange` to
+/// use as the source (e.g. `intra_node_update_ranges`'s middle sub-range, a byte span within a
+/// node rather than a whole node's own `node.range()`).
+fn advance_and_build_range_with_source(
+    last_non_move_range: &mut TextRange,
+    source_range: TextRange,
+    operation: TextOperation,
+) -> RangeMatch {
     *last_non_move_range = last_non_move_range.right_limit();
     RangeMatch {
-        source: TextRange::from_treesitter_range(node.range(), columns),
+        source: source_range,
         destination: last_non_move_range.clone(),
         operation,
     }
@@ -2042,6 +2342,152 @@ mod tests {
                 false,
             ),
             Some(DiffSummary::RefactorMovedOnly)
+        );
+    }
+
+    /// A single-character edit inside a 20-character identifier ("long_identifier_**n**ame" ->
+    /// "long_identifier_**n**ome": common prefix "long_identifier_n", common suffix "me", one
+    /// changed character in between) must produce exactly one narrow `Update` range - not one
+    /// `Update` spanning the whole identifier, which is the bug this feature fixes.
+    #[test]
+    fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    let long_identifier_name = 5;\n}",
+            "fn main() {\n    let long_identifier_nome = 5;\n}",
+        );
+        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+
+        let updates: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(
+            updates.len(),
+            1,
+            "expected exactly one Update sub-range, got {before_ranges:?}"
+        );
+        let update = updates[0];
+        assert_eq!(update.source.start_row, 1);
+        assert_eq!(update.source.end_row, 1);
+        assert_eq!(
+            update.source.end_column - update.source.start_column,
+            1,
+            "the Update range should cover only the single changed character, not the whole \
+             20-character identifier"
+        );
+
+        let after_ranges = ranges(&after, &before, &ast, &node_cache);
+        let after_updates: Vec<_> = after_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(after_updates.len(), 1);
+        assert_eq!(
+            after_updates[0].source.end_column - after_updates[0].source.start_column,
+            1,
+            "the after->before direction must independently find the same narrow width"
+        );
+    }
+
+    /// When the two texts share no common prefix or suffix at all, there's nothing more precise
+    /// to report than the whole span - same as the pre-existing whole-node behavior.
+    #[test]
+    fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    let foo = 5;\n}",
+            "fn main() {\n    let bar = 5;\n}",
+        );
+        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+
+        let updates: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(updates.len(), 1);
+        assert_eq!(
+            updates[0].source.end_column - updates[0].source.start_column,
+            3,
+            "\"foo\" and \"bar\" share no common prefix/suffix, so the whole 3-character \
+             identifier should be reported as changed"
+        );
+    }
+
+    /// A comment's own content sits in a single gap after its `//` marker child
+    /// (`own_content_span` succeeds), so a localized change inside a comment should decompose the
+    /// same way a leaf identifier does, not report the whole comment as changed.
+    #[test]
+    fn ranges_decomposes_a_small_change_inside_a_comment() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "// hello world!\nfn main() {}",
+            "// hello universe!\nfn main() {}",
+        );
+        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+
+        let updates: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(
+            updates.len(),
+            1,
+            "expected exactly one Update sub-range inside the comment, got {before_ranges:?}"
+        );
+        assert_eq!(
+            updates[0].source.end_column - updates[0].source.start_column,
+            5,
+            "\"world\" (5 chars) should be the only part marked changed, not the whole comment"
+        );
+
+        let identical_in_comment: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| {
+                r.operation == TextOperation::Identical
+                    && r.source.start_row == 0
+                    && r.source.end_row == 0
+            })
+            .collect();
+        assert!(
+            !identical_in_comment.is_empty(),
+            "the common \"// hello \" prefix should be reported as Identical, not swallowed into \
+             the Update: {before_ranges:?}"
+        );
+    }
+
+    /// Regression guard for the risk that motivated bypassing the range-merging accumulator for
+    /// decomposed nodes (see `ranges`'s own comment on why): an unrelated insertion earlier in the
+    /// file shifts the changed identifier to a different column on each side, which is exactly the
+    /// kind of before/after asymmetry that could make accumulator-based merging diverge between
+    /// the two independently-computed range lists. `TextDiff::from` (which calls `merge_ranges`)
+    /// must not panic or misalign, and the narrow Update must still be found on both sides.
+    #[test]
+    fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    let short = 1;\n    let long_identifier_name = 5;\n}",
+            "fn main() {\n    let inserted_line = 0;\n    let short = 1;\n    \
+             let long_identifier_nome = 5;\n}",
+        );
+
+        let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
+        let before_ranges = text_diff.all(0);
+        let after_ranges = text_diff.all(1);
+
+        let before_updates: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        let after_updates: Vec<_> = after_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(before_updates.len(), 1, "{before_ranges:?}");
+        assert_eq!(after_updates.len(), 1, "{after_ranges:?}");
+        assert_eq!(
+            before_updates[0].source.end_column - before_updates[0].source.start_column,
+            1
+        );
+        assert_eq!(
+            after_updates[0].source.end_column - after_updates[0].source.start_column,
+            1
         );
     }
 }
