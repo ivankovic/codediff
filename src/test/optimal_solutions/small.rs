@@ -302,6 +302,8 @@ mod rust_rustdesk_add_item;
 #[cfg(test)]
 mod rust_rustdesk_add_one_slice_element;
 #[cfg(test)]
+mod rust_rustdesk_rustdesk_actual_logic_change_in_io_loop_medium_sized_file;
+#[cfg(test)]
 mod rust_rustdesk_rustdesk_add_two_values_to_slice;
 #[cfg(test)]
 mod rust_rustdesk_rustdesk_string_constant_change;
