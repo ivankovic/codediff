@@ -1,0 +1,7207 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string_value:1",
+        "\":1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string_value:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string_value:1",
+        "\":2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string_value:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "at_keyword:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "at_keyword:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        ";:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        ";:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "at_keyword:3"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "at_keyword:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1"
+      ],
+      "after_path": [
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        ",:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "-:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "-:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "-:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "-:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1",
+        "id_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "descendant_selector:1",
+        "id_selector:1",
+        "id_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "comment:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "-:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "-:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "rule_set:5",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        "):1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "ERROR:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1"
+      ],
+      "after_path": [
+        "at_rule:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "property_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "property_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "property_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "declaration:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "(:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "':1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "':2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "string_value:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "):1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "pseudo_class_selector:1",
+        "arguments:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "ERROR:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "selectors:1",
+        "descendant_selector:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "-:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "-:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2"
+      ],
+      "after_path": [
+        "rule_set:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "selectors:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "selectors:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:2",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        ".:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "#:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "{:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        ".:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        ".:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "-:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "ERROR:3"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "}:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "-:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "-:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "ERROR:4"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "ERROR:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "{:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "{:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "-:3"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "-:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "-:4"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "-:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3"
+      ],
+      "after_path": [
+        "rule_set:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1",
+        "#:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1",
+        "id_name:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "selectors:1",
+        "id_selector:1",
+        "id_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:3",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1"
+      ],
+      "after_path": [
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "property_name:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "property_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "integer_value:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "integer_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3"
+      ],
+      "after_path": [
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "}:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "/:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "/:2"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "or:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "or:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "-:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "ERROR:3"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        ",:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "/:3"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "/:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "/:4"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "/:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "ERROR:4"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "ERROR:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "and:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "and:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1",
+        ":::1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1",
+        ":::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "pseudo_element_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        ".:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2"
+      ],
+      "after_path": [
+        "at_rule:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "keyword_query:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "keyword_query:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "(:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "plain_value:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "plain_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "):1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        "parenthesized_value:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "postcss_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "at_rule:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:2",
+        ";:1"
+      ],
+      "after_path": [
+        "at_rule:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3"
+      ],
+      "after_path": [
+        "at_rule:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "at_keyword:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "at_keyword:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "ERROR:1",
+        "#:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "ERROR:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "at_rule:3",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "at_rule:3",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4"
+      ],
+      "after_path": [
+        "ERROR:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        ";:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4"
+      ],
+      "after_path": [
+        "rule_set:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        "nesting_selector:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        "nesting_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        ":::1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        ":::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "selectors:1",
+        "pseudo_element_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "tag_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "pseudo_class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        ".:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "class_name:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "class_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "class_selector:1",
+        "class_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "\":1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "escape_sequence:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "escape_sequence:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "escape_sequence:2"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "escape_sequence:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "\":2"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "string_value:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "rule_set:4",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:5"
+      ],
+      "after_path": [
+        "ERROR:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:5",
+        "}:1"
+      ],
+      "after_path": [
+        "ERROR:5",
+        "}:1"
+      ]
+    }
+  ]
+}
