@@ -19,15 +19,19 @@
 //! (via `sample_test_diffs`/`materialize_test_diffs`). A sampled before/after pair is a verbatim
 //! excerpt of someone else's code, not codediff's own - it isn't covered by codediff's own
 //! AGPL-3.0 license, and reusing it (even just as test-fixture input committed to this repo)
-//! needs its own provenance and license terms recorded alongside it. See
-//! `materialize_test_diffs`'s module docs and `README.md`'s "Third-party test fixtures" section.
+//! needs its own provenance and license terms recorded alongside it. `render_readme` records that
+//! as a commit-pinned link to the license file (`blob_url`) plus a best-effort label
+//! (`classify_license`), not a copy of the license text itself - see `materialize_test_diffs`'s
+//! module docs and `README.md`'s "Third-party test fixtures" section.
 
 use git2::{Repository, Tree};
 use std::fmt::Write as _;
 
 /// A license/notice file found at the root of a sampled repository's tree, at the exact commit
 /// the sample was taken from - not HEAD, and not a fresh fetch, so this always matches what the
-/// sampled file itself actually shipped under at the time.
+/// sampled file itself actually shipped under at the time. `text` is only ever used to feed
+/// `classify_license` - `render_readme` links to the file (via `blob_url`) rather than
+/// reproducing `text` itself.
 pub struct LicenseFile {
     pub filename: String,
     pub label: &'static str,
@@ -125,8 +129,8 @@ fn collect_license_files_in(
 
 /// Best-effort SPDX-style label for `text`, by matching each license's own distinctive
 /// boilerplate phrasing - not a general-purpose license classifier, just enough precision to
-/// give a human a useful hint before they read the full reproduced text `render_readme` always
-/// includes regardless of whether classification succeeds. Ordered most-specific first (e.g.
+/// give a human a useful hint without having to follow `render_readme`'s link and read the
+/// license file itself. Ordered most-specific first (e.g.
 /// LGPL/AGPL checked before the plain GPL phrase they'd otherwise also match).
 fn classify_license(text: &str) -> &'static str {
     let has = |needle: &str| text.contains(needle);
@@ -170,7 +174,7 @@ fn classify_license(text: &str) -> &'static str {
     } else if has("1. The origin of this software must not be misrepresented") {
         "zlib License"
     } else {
-        "Unrecognized license text (see full text below)"
+        "Unrecognized license text (see linked file)"
     }
 }
 
@@ -183,10 +187,33 @@ pub fn origin_remote_url(repo: &Repository) -> Option<String> {
         .and_then(|remote| remote.url().map(str::to_string))
 }
 
+/// A direct link to `path` inside `repo_url`'s hosted repository at `commit` - pinned to that
+/// exact commit (not a branch) so the link keeps pointing at the license text as it actually read
+/// when the sample was taken, even if the file is later moved, edited, or removed upstream. Only
+/// handles the three hosts `research/fetch_data/dataset.sh` actually clones from (each uses a
+/// different blob-URL scheme); any other host - or a URL that doesn't parse - returns `None`
+/// rather than guessing, since a wrong link is worse than no link (the repository/commit already
+/// recorded above `render_readme`'s license section is still enough to find the file by hand).
+fn blob_url(repo_url: &str, commit: &str, path: &str) -> Option<String> {
+    let without_scheme = repo_url.trim_end_matches('/').split_once("://")?.1;
+    let (host, rest) = without_scheme.split_once('/')?;
+    let rest = rest.trim_end_matches(".git");
+    match host {
+        "github.com" => Some(format!("https://github.com/{rest}/blob/{commit}/{path}")),
+        "gitlab.com" => Some(format!("https://gitlab.com/{rest}/-/blob/{commit}/{path}")),
+        "codeberg.org" => Some(format!(
+            "https://codeberg.org/{rest}/src/commit/{commit}/{path}"
+        )),
+        _ => None,
+    }
+}
+
 /// Renders the `README.md` written into every sample directory (and, on promotion, copied
 /// alongside its `diffs/` fixture - see `human_solver::action_promote`): where the before/after
-/// content came from, and the license it's actually under, reproduced verbatim rather than just
-/// named, since a name alone isn't sufficient attribution for most licenses' own terms.
+/// content came from, and a link to the license it's actually under (via `blob_url`, pinned to
+/// the sampled commit) rather than a copy of the license text itself - `classify_license` already
+/// gives a same-file label, and linking avoids duplicating (and letting drift) potentially long
+/// license text across hundreds of fixture directories.
 ///
 /// `unverifiable_reason`, when set, means the local repository checkout couldn't actually be
 /// inspected at this commit (see `materialize_test_diffs::backfill_promoted_readme` - typically a
@@ -226,8 +253,8 @@ pub fn render_readme(
          above, copied verbatim from the source repository at the commit above (and its single \
          parent) for use as codediff test-fixture input. This content is **not** part of \
          codediff's own codebase and is **not** covered by codediff's own AGPL-3.0 license - it \
-         remains under whatever license the source repository itself applies, reproduced below \
-         exactly as found in that repository at this commit."
+         remains under whatever license the source repository itself applies, linked below \
+         exactly as it read in that repository at this commit."
     );
     let _ = writeln!(out);
     let _ = writeln!(out, "## License");
@@ -256,14 +283,21 @@ pub fn render_readme(
     }
 
     for file in license_files {
-        let _ = writeln!(out, "### `{}` - {}", file.filename, file.label);
-        let _ = writeln!(out);
-        let _ = writeln!(out, "```");
-        out.push_str(file.text.trim_end());
-        let _ = writeln!(out);
-        let _ = writeln!(out, "```");
-        let _ = writeln!(out);
+        match repo_url.and_then(|url| blob_url(url, commit, &file.filename)) {
+            Some(link) => {
+                let _ = writeln!(out, "- `{}` - {} ({link})", file.filename, file.label);
+            }
+            None => {
+                let _ = writeln!(out, "- `{}` - {}", file.filename, file.label);
+            }
+        }
     }
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "License text is not reproduced here - follow the link(s) above (or the repository listed \
+         at the top of this file, at the commit above) for the full terms."
+    );
 
     out
 }
@@ -292,7 +326,27 @@ mod tests {
         );
         assert_eq!(
             classify_license("something nobody has ever written before"),
-            "Unrecognized license text (see full text below)"
+            "Unrecognized license text (see linked file)"
+        );
+    }
+
+    #[test]
+    fn blob_url_builds_a_commit_pinned_link_per_host() {
+        assert_eq!(
+            blob_url("https://github.com/example/repo.git", "abc123", "LICENSE"),
+            Some("https://github.com/example/repo/blob/abc123/LICENSE".to_string())
+        );
+        assert_eq!(
+            blob_url("https://gitlab.com/example/repo.git", "abc123", "LICENSE"),
+            Some("https://gitlab.com/example/repo/-/blob/abc123/LICENSE".to_string())
+        );
+        assert_eq!(
+            blob_url("https://codeberg.org/example/repo.git", "abc123", "LICENSE"),
+            Some("https://codeberg.org/example/repo/src/commit/abc123/LICENSE".to_string())
+        );
+        assert_eq!(
+            blob_url("https://example.com/example/repo.git", "abc123", "LICENSE"),
+            None
         );
     }
 
@@ -313,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn render_readme_embeds_full_license_text() {
+    fn render_readme_links_to_the_license_file_instead_of_embedding_its_text() {
         let files = vec![LicenseFile {
             filename: "LICENSE".to_string(),
             label: "MIT License",
@@ -328,8 +382,29 @@ mod tests {
             &files,
             None,
         );
-        assert!(readme.contains("### `LICENSE` - MIT License"));
-        assert!(readme.contains("Permission is hereby granted, free of charge..."));
+        assert!(readme.contains(
+            "- `LICENSE` - MIT License (https://github.com/example/repo/blob/abc123/LICENSE)"
+        ));
+        assert!(!readme.contains("Permission is hereby granted, free of charge..."));
+    }
+
+    #[test]
+    fn render_readme_lists_the_filename_without_a_link_for_an_unrecognized_host() {
+        let files = vec![LicenseFile {
+            filename: "LICENSE".to_string(),
+            label: "MIT License",
+            text: "Permission is hereby granted, free of charge...".to_string(),
+        }];
+        let readme = render_readme(
+            Some("https://example.com/example/repo"),
+            "example-repo.git",
+            "abc123",
+            "src/main.rs",
+            "small",
+            &files,
+            None,
+        );
+        assert!(readme.contains("- `LICENSE` - MIT License\n"));
     }
 
     #[test]

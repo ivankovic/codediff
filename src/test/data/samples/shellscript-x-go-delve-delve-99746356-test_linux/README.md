@@ -5,32 +5,10 @@
 - **File:** `_scripts/test_linux.sh`
 - **Research dataset:** full
 
-`before.*.test`/`after.*.test` in this directory are an unmodified excerpt of the file above, copied verbatim from the source repository at the commit above (and its single parent) for use as codediff test-fixture input. This content is **not** part of codediff's own codebase and is **not** covered by codediff's own AGPL-3.0 license - it remains under whatever license the source repository itself applies, reproduced below exactly as found in that repository at this commit.
+`before.*.test`/`after.*.test` in this directory are an unmodified excerpt of the file above, copied verbatim from the source repository at the commit above (and its single parent) for use as codediff test-fixture input. This content is **not** part of codediff's own codebase and is **not** covered by codediff's own AGPL-3.0 license - it remains under whatever license the source repository itself applies, linked below exactly as it read in that repository at this commit.
 
 ## License
 
-### `LICENSE` - MIT License
+- `LICENSE` - MIT License (https://github.com/go-delve/delve/blob/997463564b7d53d72fc4f664b4382459470eb319/LICENSE)
 
-```
-The MIT License (MIT)
-
-Copyright (c) 2014 Derek Parker
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
+License text is not reproduced here - follow the link(s) above (or the repository listed at the top of this file, at the commit above) for the full terms.

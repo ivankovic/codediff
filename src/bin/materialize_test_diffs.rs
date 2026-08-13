@@ -30,8 +30,8 @@
 //! `codediff::test::helper::DIFF_DATASETS` to promote it into.
 //!
 //! ...and a `README.md` (see `codediff::stats::license`) recording where the sampled content
-//! came from and the license it's actually under, reproduced in full - the before/after content
-//! is someone else's code, not codediff's own, and isn't covered by codediff's AGPL-3.0 license.
+//! came from and linking to the license it's actually under - the before/after content is
+//! someone else's code, not codediff's own, and isn't covered by codediff's AGPL-3.0 license.
 //! `human_solver` copies this file alongside the fixture when a sample is promoted, so the
 //! attribution travels with the content into `diffs/` too.
 //!
