@@ -1,6 +1,0 @@
-{
-  "language": "JavaScript",
-  "repository": "microsoft-TypeScript.git",
-  "commit": "f09a0e598a798102826d4a86a4d29446a5557d9b",
-  "path": "tests/baselines/reference/tsserver/projectReferences/when-file-is-not-part-of-first-config-tree-found-appConfig-not-composite-with-file-open-before-revert.js"
-}

@@ -1,6 +1,0 @@
-{
-  "language": "TSX",
-  "repository": "apache-superset.git",
-  "commit": "a6a66ca483287783729fa80757395b4282d74987",
-  "path": "superset-frontend/src/components/Datasource/DatasourceModal/index.tsx"
-}

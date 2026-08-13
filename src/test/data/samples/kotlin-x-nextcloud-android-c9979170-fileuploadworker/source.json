@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "nextcloud-android.git",
-  "commit": "c9979170a73ee35bc1098aebd2e4fba82657d01f",
-  "path": "app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadWorker.kt"
-}

@@ -1,6 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "junegunn-fzf.git",
-  "commit": "779e3cc5b551d791f9f39df8129a95365bca9da7",
-  "path": "plugin/fzf.vim"
-}

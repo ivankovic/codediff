@@ -1,6 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "neovim-neovim.git",
-  "commit": "08b8fe5ab36ee3df3ce593942565d4cd318373c4",
-  "path": "test/old/testdir/test_ins_complete.vim"
-}

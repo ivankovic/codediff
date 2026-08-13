@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "nextcloud-android.git",
-  "commit": "af0e67a309d8fee5e8bdd57661c526e2318960dd",
-  "path": "app/src/main/java/com/nextcloud/client/etm/pages/EtmPreferencesFragment.kt"
-}

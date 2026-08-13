@@ -1,6 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "n8n-io-n8n.git",
-  "commit": "c4ab0fff99527d1d1269dc5384f15a78e5df6616",
-  "path": ".github/workflows/ci-pull-requests.yml"
-}

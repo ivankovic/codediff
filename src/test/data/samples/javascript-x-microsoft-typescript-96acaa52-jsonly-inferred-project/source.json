@@ -1,6 +1,0 @@
-{
-  "language": "JavaScript",
-  "repository": "microsoft-TypeScript.git",
-  "commit": "96acaa52902feb1320e1d8ec8936b8669cca447d",
-  "path": "tests/baselines/reference/tsserver/skipLibCheck/jsonly-inferred-project.js"
-}

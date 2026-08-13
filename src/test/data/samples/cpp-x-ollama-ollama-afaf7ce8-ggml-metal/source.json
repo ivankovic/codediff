@@ -1,6 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "ollama-ollama.git",
-  "commit": "afaf7ce8c34bab8de45ca00dbd12da8cd3cc033a",
-  "path": "ml/backend/ggml/ggml/src/ggml-metal/ggml-metal.cpp"
-}

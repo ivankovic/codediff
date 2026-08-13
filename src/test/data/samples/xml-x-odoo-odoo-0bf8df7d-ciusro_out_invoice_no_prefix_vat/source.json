@@ -1,6 +1,0 @@
-{
-  "language": "XML",
-  "repository": "odoo-odoo.git",
-  "commit": "0bf8df7d0a096cf8fe984c42d331404d473eeb71",
-  "path": "addons/l10n_ro_edi/tests/test_files/from_odoo/ciusro_out_invoice_no_prefix_vat.xml"
-}

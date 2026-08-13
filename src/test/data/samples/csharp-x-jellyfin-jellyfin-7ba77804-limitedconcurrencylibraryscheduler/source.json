@@ -1,6 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "jellyfin-jellyfin.git",
-  "commit": "7ba77804c414d012df311f9a5d644078dfa4a94a",
-  "path": "MediaBrowser.Controller/LibraryTaskScheduler/LimitedConcurrencyLibraryScheduler.cs"
-}

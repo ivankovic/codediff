@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "nextcloud-android.git",
-  "commit": "9142730334c907913bc1b59353dd4a2a014916c1",
-  "path": "app/src/androidTest/java/com/nextcloud/client/ActivitiesActivityIT.kt"
-}

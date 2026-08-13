@@ -1,6 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "pi-hole-pi-hole.git",
-  "commit": "95ae51bbdbb028625b541466c2f1caabfeb2301c",
-  "path": "advanced/Scripts/piholeDebug.sh"
-}

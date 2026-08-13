@@ -1,6 +1,0 @@
-{
-  "language": "TypeScript",
-  "repository": "n8n-io-n8n.git",
-  "commit": "d00a55f869c3dd3f20a438b8f65573467701528c",
-  "path": "packages/@n8n/nodes-langchain/nodes/llms/LMLemonade/LmLemonade.node.ts"
-}

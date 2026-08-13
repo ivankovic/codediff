@@ -1,6 +1,0 @@
-{
-  "language": "Go",
-  "repository": "caddyserver-caddy.git",
-  "commit": "2faeac0a104c72e9396717406ecb7c353bf9aa64",
-  "path": "modules/caddyhttp/reverseproxy/httptransport.go"
-}

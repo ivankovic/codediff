@@ -1,6 +1,0 @@
-{
-  "language": "Rust",
-  "repository": "vercel-next.js.git",
-  "commit": "5719439f24c81e62b90b7b53b332b6e615d9565b",
-  "path": "turbopack/crates/turbo-tasks-macros/src/func.rs"
-}

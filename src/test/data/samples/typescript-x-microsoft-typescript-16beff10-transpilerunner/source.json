@@ -1,6 +1,0 @@
-{
-  "language": "TypeScript",
-  "repository": "microsoft-TypeScript.git",
-  "commit": "16beff101ae1dae0600820ebf22632ac8a40cfc8",
-  "path": "src/testRunner/transpileRunner.ts"
-}

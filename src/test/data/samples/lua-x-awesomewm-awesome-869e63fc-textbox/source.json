@@ -1,6 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "awesomeWM-awesome.git",
-  "commit": "869e63fcdc5ea836f22e935b1eb52fffefb759b3",
-  "path": "lib/wibox/widget/textbox.lua"
-}

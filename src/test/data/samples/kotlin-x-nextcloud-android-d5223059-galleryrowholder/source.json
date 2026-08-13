@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "nextcloud-android.git",
-  "commit": "d5223059a628ae3dca7279f0625ecc62d2ab2bd2",
-  "path": "app/src/main/java/com/owncloud/android/ui/adapter/GalleryRowHolder.kt"
-}

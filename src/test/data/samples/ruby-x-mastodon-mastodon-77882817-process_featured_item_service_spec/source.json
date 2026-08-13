@@ -1,6 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "mastodon-mastodon.git",
-  "commit": "7788281759e9bbed23c1ecd4f76ccaa7734eb617",
-  "path": "spec/services/activitypub/process_featured_item_service_spec.rb"
-}

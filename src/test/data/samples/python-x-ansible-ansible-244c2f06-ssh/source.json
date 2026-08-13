@@ -1,6 +1,0 @@
-{
-  "language": "Python",
-  "repository": "ansible-ansible.git",
-  "commit": "244c2f06edd3331495de27ecce2066cfa49d1e00",
-  "path": "lib/ansible/plugins/connection/ssh.py"
-}

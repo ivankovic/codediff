@@ -1,6 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "Sonarr-Sonarr.git",
-  "commit": "8c67a3bdee65aa35bdd82ac8614be875236d88de",
-  "path": "src/NzbDrone.Core/DecisionEngine/DownloadDecision.cs"
-}

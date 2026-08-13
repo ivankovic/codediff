@@ -1,6 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "tensorflow-tensorflow.git",
-  "commit": "4e38042b534e52bff29739e0a88f4276c528d435",
-  "path": "tensorflow/core/common_runtime/buf_rendezvous.cc"
-}

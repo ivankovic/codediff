@@ -1,6 +1,0 @@
-{
-  "language": "JavaScript",
-  "repository": "microsoft-TypeScript.git",
-  "commit": "01c23d68b1113a4b71acb8484f1bf78a98307933",
-  "path": "tests/baselines/reference/arrayToLocaleStringES5(target=es5).js"
-}

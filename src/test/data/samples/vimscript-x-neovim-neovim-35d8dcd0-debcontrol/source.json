@@ -1,6 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "neovim-neovim.git",
-  "commit": "35d8dcd020edbc4a59af968369a762c790f3ac36",
-  "path": "runtime/syntax/debcontrol.vim"
-}

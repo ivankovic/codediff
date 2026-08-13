@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "nextcloud-android.git",
-  "commit": "b73b0ae9a09a3d22f924ea744badc7a8e011cf37",
-  "path": "app/src/test/java/com/owncloud/android/ui/activities/data/files/RemoteFilesRepositoryTest.kt"
-}

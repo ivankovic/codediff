@@ -1,6 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "opencv-opencv.git",
-  "commit": "fac647aaeb59c84d23d12aa8af3e8f6d09c5e5f6",
-  "path": "modules/imgcodecs/test/test_png.cpp"
-}

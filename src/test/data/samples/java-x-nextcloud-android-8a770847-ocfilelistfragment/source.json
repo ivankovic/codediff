@@ -1,6 +1,0 @@
-{
-  "language": "Java",
-  "repository": "nextcloud-android.git",
-  "commit": "8a770847202267a9c8c2e0c0c78a2cb29ac7aa82",
-  "path": "app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java"
-}

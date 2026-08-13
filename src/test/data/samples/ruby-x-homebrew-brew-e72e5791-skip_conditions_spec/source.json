@@ -1,6 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "Homebrew-brew.git",
-  "commit": "e72e57910cce57177c139868e2ab43dd2efca160",
-  "path": "Library/Homebrew/test/livecheck/skip_conditions_spec.rb"
-}

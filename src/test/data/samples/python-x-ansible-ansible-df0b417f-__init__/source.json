@@ -1,6 +1,0 @@
-{
-  "language": "Python",
-  "repository": "ansible-ansible.git",
-  "commit": "df0b417f2db6a51a7f74a6bc1bfa8e8f24676899",
-  "path": "lib/ansible/parsing/vault/__init__.py"
-}

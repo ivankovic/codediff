@@ -1,6 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "torvalds-linux.git",
-  "commit": "3b4a3a00de8770f3a60c1fa483921ce37415132d",
-  "path": "scripts/kconfig/merge_config.sh"
-}

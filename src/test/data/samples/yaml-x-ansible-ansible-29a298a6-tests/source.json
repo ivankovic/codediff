@@ -1,6 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "ansible-ansible.git",
-  "commit": "29a298a6172b0f7dd66ca06b3aaaaf103788b84e",
-  "path": "test/integration/targets/copy/tasks/tests.yml"
-}

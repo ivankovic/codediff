@@ -1,6 +1,0 @@
-{
-  "language": "Go",
-  "repository": "gin-gonic-gin.git",
-  "commit": "6f94fd05c98d1043e329398f6f742dc680be9b29",
-  "path": "examples/custom-validation/server.go"
-}

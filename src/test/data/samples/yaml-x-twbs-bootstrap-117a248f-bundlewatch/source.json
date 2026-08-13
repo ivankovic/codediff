@@ -1,6 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "twbs-bootstrap.git",
-  "commit": "117a248faa02be63d4044428f4e8d41255cbe0b0",
-  "path": ".github/workflows/bundlewatch.yml"
-}

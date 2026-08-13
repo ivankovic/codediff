@@ -1,6 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "jellyfin-jellyfin.git",
-  "commit": "c8d2f436608c631e94461e70c3a7511031d32f58",
-  "path": "Jellyfin.Server/Migrations/Routines/ReseedFolderFlag.cs"
-}

@@ -1,6 +1,0 @@
-{
-  "language": "JavaScript",
-  "repository": "microsoft-TypeScript.git",
-  "commit": "3fc1f264de2aacae0c008eb4295e66833ade36d9",
-  "path": "tests/baselines/reference/tupleElementTypes3.js"
-}

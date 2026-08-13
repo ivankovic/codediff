@@ -1,6 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "neovim-neovim.git",
-  "commit": "249f305bbcddf10264835c5845035a42030d9184",
-  "path": "test/functional/ui/options_spec.lua"
-}

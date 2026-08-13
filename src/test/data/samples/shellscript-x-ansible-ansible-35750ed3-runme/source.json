@@ -1,6 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "ansible-ansible.git",
-  "commit": "35750ed3218e7bce68b21f473cecb0a3b9d60321",
-  "path": "test/integration/targets/template_jinja2_non_native/runme.sh"
-}

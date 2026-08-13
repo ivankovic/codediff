@@ -1,6 +1,0 @@
-{
-  "language": "Python",
-  "repository": "django-django.git",
-  "commit": "d82f25d3f0f4eb7be721a72d0e79a8d13d394d32",
-  "path": "tests/template_tests/test_partials.py"
-}

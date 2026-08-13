@@ -1,6 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "junegunn-fzf.git",
-  "commit": "260d160973a1df05038c93136a076ca29592e755",
-  "path": ".github/workflows/labeler.yml"
-}

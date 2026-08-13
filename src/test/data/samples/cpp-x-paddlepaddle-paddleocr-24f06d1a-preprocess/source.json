@@ -1,6 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "PaddlePaddle-PaddleOCR.git",
-  "commit": "24f06d1a1b018d90c3c16bf49e966f988f55d98d",
-  "path": "deploy/android_demo/app/src/main/cpp/preprocess.cpp"
-}

@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "immich-app-immich.git",
-  "commit": "c403e03a42bf3847d154430693f31b0f39ad6134",
-  "path": "mobile/android/app/src/main/kotlin/app/alextran/immich/core/NetworkApiPlugin.kt"
-}

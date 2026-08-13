@@ -1,6 +1,0 @@
-{
-  "language": "Java",
-  "repository": "Genymobile-scrcpy.git",
-  "commit": "6af4bd601f028d4e3d96eb90326a2330f03bc960",
-  "path": "server/src/main/java/com/genymobile/scrcpy/LogUtils.java"
-}

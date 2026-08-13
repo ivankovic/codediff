@@ -1,6 +1,0 @@
-{
-  "language": "TSX",
-  "repository": "langflow-ai-langflow.git",
-  "commit": "87f5721d7cec5abffb938e49e959b3a52dd42450",
-  "path": "src/frontend/src/components/core/parameterRenderComponent/components/modelInputComponent/index.tsx"
-}

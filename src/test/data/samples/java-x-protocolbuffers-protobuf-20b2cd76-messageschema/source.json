@@ -1,6 +1,0 @@
-{
-  "language": "Java",
-  "repository": "protocolbuffers-protobuf.git",
-  "commit": "20b2cd7623c554e3ee39470b70d5583ad5f26f60",
-  "path": "java/core/src/main/java/com/google/protobuf/MessageSchema.java"
-}

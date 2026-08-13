@@ -1,6 +1,0 @@
-{
-  "language": "Python",
-  "repository": "ytdl-org-youtube-dl.git",
-  "commit": "2500300c2a5986ace34390aa473a8bd51f83622c",
-  "path": "devscripts/make_lazy_extractors.py"
-}

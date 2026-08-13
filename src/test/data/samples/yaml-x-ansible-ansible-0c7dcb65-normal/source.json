@@ -1,6 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "ansible-ansible.git",
-  "commit": "0c7dcb65cff52d92e488ff75008d9256be37734b",
-  "path": "test/integration/targets/fetch/roles/fetch_tests/tasks/normal.yml"
-}

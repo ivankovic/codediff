@@ -1,6 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "awesomeWM-awesome.git",
-  "commit": "4bd90f0f35d0f93235f0bcf207ca16baa174f8a1",
-  "path": "lib/awful/mouse/resize.lua"
-}

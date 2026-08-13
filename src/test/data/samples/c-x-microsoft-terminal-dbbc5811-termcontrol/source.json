@@ -1,6 +1,0 @@
-{
-  "language": "C",
-  "repository": "microsoft-terminal.git",
-  "commit": "dbbc581154eb4e6f0086963eecf4983d7196caae",
-  "path": "src/cascadia/TerminalControl/TermControl.h"
-}

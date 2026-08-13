@@ -1,6 +1,0 @@
-{
-  "language": "XML",
-  "repository": "odoo-odoo.git",
-  "commit": "531b28bca89942b61ecea32daf479b2b39a5cf1c",
-  "path": "addons/point_of_sale/static/src/app/components/popups/product_configurator_popup/product_configurator_popup.xml"
-}

@@ -1,6 +1,0 @@
-{
-  "language": "Java",
-  "repository": "Genymobile-scrcpy.git",
-  "commit": "89518f49adb59dfa961f76be3f4414bffdc22cc5",
-  "path": "server/src/main/java/com/genymobile/scrcpy/video/ScreenInfo.java"
-}

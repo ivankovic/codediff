@@ -1,6 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "neovim-neovim.git",
-  "commit": "b99cdd08de42804b0ea2448d6f9f4e476b931b80",
-  "path": "runtime/lua/vim/lsp/client.lua"
-}

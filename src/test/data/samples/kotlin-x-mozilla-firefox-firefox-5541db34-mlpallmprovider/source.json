@@ -1,6 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "mozilla-firefox-firefox.git",
-  "commit": "5541db34cccc8174bbed160fa05b2d610137a19e",
-  "path": "mobile/android/android-components/components/lib/llm-mlpa/src/main/java/mozilla/components/lib/llm/mlpa/MlpaLlmProvider.kt"
-}

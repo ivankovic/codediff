@@ -1,6 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "LadybirdBrowser-ladybird.git",
-  "commit": "cfd795f907fb2c6d94453236464db53f67ccfdaf",
-  "path": "Libraries/LibWeb/IntersectionObserver/IntersectionObserver.cpp"
-}

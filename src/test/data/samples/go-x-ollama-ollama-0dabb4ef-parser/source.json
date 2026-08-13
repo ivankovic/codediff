@@ -1,6 +1,0 @@
-{
-  "language": "Go",
-  "repository": "ollama-ollama.git",
-  "commit": "0dabb4ef6a1aab240a59b6bb4ef82372d335e3a9",
-  "path": "parser/parser.go"
-}

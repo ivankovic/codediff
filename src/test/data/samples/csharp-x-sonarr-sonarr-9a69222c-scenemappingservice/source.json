@@ -1,6 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "Sonarr-Sonarr.git",
-  "commit": "9a69222c9a1c42c2571f21e2d4a2e02b90216248",
-  "path": "src/NzbDrone.Core/DataAugmentation/Scene/SceneMappingService.cs"
-}

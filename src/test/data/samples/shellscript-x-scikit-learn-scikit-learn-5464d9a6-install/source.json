@@ -1,6 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "scikit-learn-scikit-learn.git",
-  "commit": "5464d9a6ce1fc872282bf943c8f40b0829f43ed2",
-  "path": "build_tools/azure/install.sh"
-}
