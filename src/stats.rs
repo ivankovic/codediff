@@ -27,6 +27,7 @@ use crate::code::{self, Code};
 
 pub mod filesystem;
 pub mod git;
+pub mod license;
 pub mod sampling;
 
 static AUTO_GENERATED_RE: OnceLock<Regex> = OnceLock::new();

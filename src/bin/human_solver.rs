@@ -5628,6 +5628,26 @@ fn action_promote(
     fs::write(dir.join(format!("before.{ext}.test")), before_src)?;
     fs::write(dir.join(format!("after.{ext}.test")), after_src)?;
 
+    // Carries the sample's provenance/license attribution (written by `materialize_test_diffs`,
+    // via `codediff::stats::license`) forward into `diffs/` - the before/after content is
+    // someone else's code, not codediff's own, so that attribution needs to survive promotion,
+    // not just live in `samples/` until this directory gets cleaned up once triage finishes (see
+    // the `d285097` commit that deleted the small dataset's fully-triaged `samples/`). Only a
+    // `Sample` origin has a README.md to copy; `GitCommitFile` promotions are sourced from this
+    // repo's own commits, not a third-party one.
+    let readme_note = if sample_source.is_some() {
+        let readme_src = samples_root().join(&app.name).join("README.md");
+        match fs::copy(&readme_src, dir.join("README.md")) {
+            Ok(_) => String::new(),
+            Err(err) => format!(
+                " (failed to copy README.md from {:?}: {:#})",
+                readme_src, err
+            ),
+        }
+    } else {
+        String::new()
+    };
+
     let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name)?;
     refresh_diff_completeness(app, new_name);
 
@@ -5644,8 +5664,8 @@ fn action_promote(
     app.origin = CaseOrigin::Diffs;
 
     Ok(format!(
-        "Promoted to '{}'. {}{}",
-        new_name, save_msg, csv_note
+        "Promoted to '{}'. {}{}{}",
+        new_name, save_msg, csv_note, readme_note
     ))
 }
 

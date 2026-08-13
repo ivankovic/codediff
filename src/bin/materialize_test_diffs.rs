@@ -29,14 +29,23 @@
 //! update the matching row in `sample.csv` when a sample is promoted, and to know which of
 //! `codediff::test::helper::DIFF_DATASETS` to promote it into.
 //!
+//! ...and a `README.md` (see `codediff::stats::license`) recording where the sampled content
+//! came from and the license it's actually under, reproduced in full - the before/after content
+//! is someone else's code, not codediff's own, and isn't covered by codediff's AGPL-3.0 license.
+//! `human_solver` copies this file alongside the fixture when a sample is promoted, so the
+//! attribution travels with the content into `diffs/` too.
+//!
 //! Safe to re-run: a row whose target directory already holds byte-identical before/after
-//! content is left alone rather than rewritten or re-suffixed.
+//! content is left alone rather than rewritten or re-suffixed; a missing README.md is backfilled
+//! in place without touching anything else.
 use anyhow::{Result, bail};
 use clap::Parser;
 use git2::{Oid, Repository, Tree};
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use codediff::stats::license;
 
 const DEFAULT_REPO_ROOTS: &[&str] = &[
     "/var/tmp/research/tiny/repositories",
@@ -64,11 +73,13 @@ struct Args {
     #[arg(long)]
     language: Option<String>,
 
-    /// Also materialize rows `human_solver` has already triaged (`status` `PROMOTED`/
-    /// `REJECTED`), not just untriaged `SAMPLED` ones. Off by default: a promoted row's fixture
-    /// already lives under `src/test/data/diffs/`, and a rejected row was already looked at and
-    /// turned down, so re-materializing either into `samples/` is normally just wasted work and
-    /// picker clutter.
+    /// Also backfill `README.md` (provenance/license attribution) onto rows `human_solver` has
+    /// already promoted, directly into their `src/test/data/diffs/<dataset>/<promoted_to>/`
+    /// directory rather than `samples/` (which a promoted row no longer has - see
+    /// `human_solver::action_promote`, which copies this same README.md forward at promotion
+    /// time for anything promoted *after* this flag existed; this is only for rows promoted
+    /// before it did). `REJECTED` rows are never backfilled either way: nothing was ever kept on
+    /// disk for a rejected sample, so there's no directory to put a README.md in.
     #[arg(long)]
     include_triaged: bool,
 }
@@ -88,6 +99,12 @@ struct Row {
     /// `human_solver`'s triage state for this row (`SAMPLED`/`PROMOTED`/`REJECTED`) - used only
     /// to filter which rows get materialized by default; not otherwise carried into the fixture.
     status: String,
+    /// The `diffs/<dataset>/` case name this row was promoted to, if `status` is `PROMOTED` -
+    /// used only by `--include-triaged` to find that case's directory; empty otherwise. Skipped
+    /// from `source.json` (`materialize_row`'s `Serialize` use of `Row`): a freshly-materialized
+    /// `samples/` fixture is by definition not yet promoted, so this would always be empty there.
+    #[serde(skip)]
+    promoted_to: String,
 }
 
 enum Resolution {
@@ -111,6 +128,14 @@ fn default_output_dir() -> PathBuf {
         .join("samples")
 }
 
+fn diffs_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs")
+}
+
 fn read_rows(path: &Path) -> Result<Vec<Row>> {
     let mut reader = csv::Reader::from_path(path)?;
     let mut rows = Vec::new();
@@ -121,6 +146,7 @@ fn read_rows(path: &Path) -> Result<Vec<Row>> {
             repository: record[1].to_string(),
             commit: record[2].to_string(),
             path: record[3].to_string(),
+            promoted_to: record[4].to_string(),
             // Same historical fallback as `sample_test_diffs::LEGACY_DATASET`: every row from
             // before provenance tracking existed was in fact sampled from the small checkout.
             dataset: record.get(5).unwrap_or("small").to_string(),
@@ -162,11 +188,15 @@ fn main() -> Result<()> {
         {
             continue;
         }
-        if !args.include_triaged && row.status != "SAMPLED" {
+        let result = if row.status == "SAMPLED" {
+            materialize_row(row, &repo_roots, &output_dir)
+        } else if args.include_triaged && row.status == "PROMOTED" {
+            backfill_promoted_readme(row, &repo_roots)
+        } else {
             continue;
-        }
+        };
 
-        match materialize_row(row, &repo_roots, &output_dir) {
+        match result {
             Ok(Resolution::Create(dir)) => {
                 println!("created {:?}", dir);
                 created += 1;
@@ -262,6 +292,76 @@ fn resolve_target(
     bail!("too many name collisions for base name {base_name}");
 }
 
+/// Backfills `README.md` directly into an already-promoted row's
+/// `diffs/<dataset>/<promoted_to>/` directory - see `Args::include_triaged`. Unlike
+/// `materialize_row`, there's no before/after content to resolve or (re)write, since it's
+/// already there; this only ever touches README.md, and only when one isn't already present
+/// (rows promoted after `human_solver::action_promote` learned to copy this file forward already
+/// have one, and shouldn't be touched again).
+fn backfill_promoted_readme(row: &Row, repo_roots: &[PathBuf]) -> Result<Resolution> {
+    if row.promoted_to.is_empty() {
+        bail!("row has status PROMOTED but no promoted_to name recorded");
+    }
+    let dir = diffs_root().join(&row.dataset).join(&row.promoted_to);
+    if !dir.is_dir() {
+        bail!("promoted case directory {:?} does not exist", dir);
+    }
+
+    let readme_path = dir.join("README.md");
+    if readme_path.exists() {
+        return Ok(Resolution::AlreadyPresent(dir));
+    }
+
+    // A best-effort license lookup: unlike `materialize_row`, a failure here doesn't mean there's
+    // nothing to write - the before/after content and the diffs/ case itself already exist
+    // independently of whether this row's repository/commit is still reachable in the local
+    // checkout. A commit aging out of a shallow clone's `--depth` window over time is expected
+    // (see `Args::include_triaged`'s docs), and shouldn't leave an already-promoted case with no
+    // README.md at all - `render_readme`'s `unverifiable_reason` records exactly what went wrong
+    // instead, so a human knows to check the repository directly rather than assuming "no license".
+    //
+    // `repo_url` is resolved separately from `license_files`, not inside the same fallible
+    // closure: the repository itself is very likely to still be present and openable even when
+    // this specific commit has aged out of a shallow clone, so a commit-lookup failure shouldn't
+    // also throw away a repo URL that was already successfully found.
+    let repo = find_repo_path(repo_roots, &row.repository).and_then(|p| Repository::open(p).ok());
+    let repo_url = repo.as_ref().and_then(license::origin_remote_url);
+
+    let lookup: Result<Vec<license::LicenseFile>> = (|| {
+        let repo = repo.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("repository {} not found in any root", row.repository)
+        })?;
+        let commit = repo.find_commit(Oid::from_str(&row.commit)?)?;
+        let tree = commit.tree()?;
+        Ok(license::find_license_files(repo, &tree))
+    })();
+
+    let (license_files, unverifiable_reason) = match lookup {
+        Ok(license_files) => (license_files, None),
+        Err(err) => {
+            eprintln!(
+                "  note: {:?} could not be verified against the local checkout ({:#}); writing a \
+                 placeholder README.md instead",
+                dir, err
+            );
+            (Vec::new(), Some(format!("{err:#}")))
+        }
+    };
+
+    let readme = license::render_readme(
+        repo_url.as_deref(),
+        &row.repository,
+        &row.commit,
+        &row.path,
+        &row.dataset,
+        &license_files,
+        unverifiable_reason.as_deref(),
+    );
+    fs::write(&readme_path, readme)?;
+
+    Ok(Resolution::Create(dir))
+}
+
 fn materialize_row(row: &Row, repo_roots: &[PathBuf], output_dir: &Path) -> Result<Resolution> {
     let repo_path = find_repo_path(repo_roots, &row.repository)
         .ok_or_else(|| anyhow::anyhow!("repository {} not found in any root", row.repository))?;
@@ -286,11 +386,35 @@ fn materialize_row(row: &Row, repo_roots: &[PathBuf], output_dir: &Path) -> Resu
     let base = base_name(row);
     let resolution = resolve_target(output_dir, &base, &ext, &before, &after)?;
 
-    if let Resolution::Create(dir) = &resolution {
-        fs::create_dir_all(dir)?;
-        fs::write(dir.join(format!("before.{ext}.test")), &before)?;
-        fs::write(dir.join(format!("after.{ext}.test")), &after)?;
-        fs::write(dir.join("source.json"), serde_json::to_string_pretty(row)?)?;
+    let dir = match &resolution {
+        Resolution::Create(dir) => {
+            fs::create_dir_all(dir)?;
+            fs::write(dir.join(format!("before.{ext}.test")), &before)?;
+            fs::write(dir.join(format!("after.{ext}.test")), &after)?;
+            fs::write(dir.join("source.json"), serde_json::to_string_pretty(row)?)?;
+            dir
+        }
+        Resolution::AlreadyPresent(dir) => dir,
+    };
+
+    // Backfills README.md onto directories materialized before this file recorded license
+    // provenance, same "safe to re-run" spirit as `resolve_target` above - only ever written if
+    // missing, never overwritten, so a hand-edited README.md (e.g. a corrected license
+    // classification) survives a later re-run.
+    let readme_path = dir.join("README.md");
+    if !readme_path.exists() {
+        let license_files = license::find_license_files(&repo, &tree);
+        let repo_url = license::origin_remote_url(&repo);
+        let readme = license::render_readme(
+            repo_url.as_deref(),
+            &row.repository,
+            &row.commit,
+            &row.path,
+            &row.dataset,
+            &license_files,
+            None,
+        );
+        fs::write(&readme_path, readme)?;
     }
 
     Ok(resolution)
@@ -345,6 +469,8 @@ mod tests {
             commit,
             path,
             dataset: "small".to_string(),
+            status: "SAMPLED".to_string(),
+            promoted_to: String::new(),
         }
     }
 
@@ -356,6 +482,8 @@ mod tests {
             commit: "1a70be36eb3d50a2b7248a76056fe9b3c2f71c82".to_string(),
             path: "src/gui/pages/overview_page.rs".to_string(),
             dataset: "small".to_string(),
+            status: "SAMPLED".to_string(),
+            promoted_to: String::new(),
         };
         assert_eq!(
             base_name(&row),
