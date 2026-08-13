@@ -1,0 +1,8 @@
+{
+  "language": "YAML",
+  "repository": "containers-skopeo",
+  "commit": "399adc0ef8d632c4093c13457bf88944286bf015",
+  "path": ".packit.yaml",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

@@ -1,0 +1,8 @@
+{
+  "language": "Kotlin",
+  "repository": "yairm210-Unciv",
+  "commit": "0866541bf25b33ab31f52fb2bdc9c1f29b053f91",
+  "path": "tests/src/com/unciv/logic/city/CityConquestFunctionsTest.kt",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

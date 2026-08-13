@@ -1,0 +1,8 @@
+{
+  "language": "Rust",
+  "repository": "skim-rs-skim",
+  "commit": "cbd176588196b48433dac61962526231663a9823",
+  "path": "skim/src/matcher.rs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

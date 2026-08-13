@@ -1,0 +1,8 @@
+{
+  "language": "Swift",
+  "repository": "swift-emacs-swift-mode",
+  "commit": "c2fe47722fcab02a8bd40b443fc11687793591e9",
+  "path": "test/swift-files/indent/declarations.swift",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

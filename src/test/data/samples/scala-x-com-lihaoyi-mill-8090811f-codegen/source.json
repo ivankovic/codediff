@@ -1,0 +1,8 @@
+{
+  "language": "Scala",
+  "repository": "com-lihaoyi-mill",
+  "commit": "8090811f5a7682ab0d7d6a27d17152bfb1697e4e",
+  "path": "runner/meta/src/mill/meta/CodeGen.scala",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

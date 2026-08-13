@@ -1,0 +1,8 @@
+{
+  "language": "Go",
+  "repository": "cloudflare-cfssl",
+  "commit": "1a73d78a1852001b7b9c21f3eceea0e721ea6a6c",
+  "path": "vendor/github.com/prometheus/client_golang/prometheus/metric.go",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

@@ -1,0 +1,8 @@
+{
+  "language": "Go",
+  "repository": "prometheus-node_exporter",
+  "commit": "55756f07a17881fc73c680c8332c1e7770869906",
+  "path": "collector/textfile.go",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

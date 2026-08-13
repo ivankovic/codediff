@@ -1,0 +1,8 @@
+{
+  "language": "Go",
+  "repository": "darylhjd-mangadesk",
+  "commit": "59dbb0c02b63c98249bd755b137f20eee2902c5e",
+  "path": "vendor/golang.org/x/sys/unix/syscall_netbsd.go",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

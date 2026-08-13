@@ -1,0 +1,8 @@
+{
+  "language": "Rust",
+  "repository": "ReFirmLabs-binwalk",
+  "commit": "e460bddb37d668907ca894181062f4209327d3c5",
+  "path": "src/binwalk.rs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

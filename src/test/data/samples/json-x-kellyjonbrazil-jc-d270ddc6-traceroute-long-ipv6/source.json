@@ -1,0 +1,8 @@
+{
+  "language": "JSON",
+  "repository": "kellyjonbrazil-jc",
+  "commit": "d270ddc6cee04425f6aa6cfe9f20f324a0684255",
+  "path": "tests/fixtures/generic/traceroute-long-ipv6.json",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

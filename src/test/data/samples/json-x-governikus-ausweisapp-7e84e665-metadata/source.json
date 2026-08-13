@@ -1,0 +1,8 @@
+{
+  "language": "JSON",
+  "repository": "Governikus-AusweisApp",
+  "commit": "7e84e665cf04f2ee4cbc61694b22ebc5bd57f0c3",
+  "path": "src/card/simulator/metadata.json",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

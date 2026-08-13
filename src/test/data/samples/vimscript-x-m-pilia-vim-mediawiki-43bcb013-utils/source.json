@@ -1,0 +1,8 @@
+{
+  "language": "Vimscript",
+  "repository": "m-pilia-vim-mediawiki",
+  "commit": "43bcb013f50438b5c5d07bbe6e72639b8c0764e2",
+  "path": "test/utils.vim",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

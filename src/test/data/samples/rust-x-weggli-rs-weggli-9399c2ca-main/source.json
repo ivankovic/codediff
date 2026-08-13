@@ -1,0 +1,8 @@
+{
+  "language": "Rust",
+  "repository": "weggli-rs-weggli",
+  "commit": "9399c2cac29d721fc1f64952cbec5d9c86ba9592",
+  "path": "src/main.rs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

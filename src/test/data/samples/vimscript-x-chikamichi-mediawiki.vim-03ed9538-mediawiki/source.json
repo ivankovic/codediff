@@ -1,0 +1,8 @@
+{
+  "language": "Vimscript",
+  "repository": "chikamichi-mediawiki.vim",
+  "commit": "03ed9538a8a623c3fe626d07d5085d040a2cfc65",
+  "path": "ftdetect/mediawiki.vim",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

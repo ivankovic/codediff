@@ -1,0 +1,8 @@
+{
+  "language": "Scala",
+  "repository": "com-lihaoyi-mill",
+  "commit": "6ff59dd551eedf467c062993da6b7218e69ca237",
+  "path": "core/eval/src/mill/eval/SelectiveExecutionImpl.scala",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

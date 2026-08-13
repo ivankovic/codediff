@@ -1,0 +1,8 @@
+{
+  "language": "Rust",
+  "repository": "xou816-spot",
+  "commit": "9b443ac55ef3436b60a6d1ca59d8e37c7e8553b5",
+  "path": "src/app/components/settings/settings.rs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

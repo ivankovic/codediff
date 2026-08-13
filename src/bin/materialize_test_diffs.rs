@@ -63,6 +63,14 @@ struct Args {
     /// Only materialize rows for this language (matching the CSV's `language` column).
     #[arg(long)]
     language: Option<String>,
+
+    /// Also materialize rows `human_solver` has already triaged (`status` `PROMOTED`/
+    /// `REJECTED`), not just untriaged `SAMPLED` ones. Off by default: a promoted row's fixture
+    /// already lives under `src/test/data/diffs/`, and a rejected row was already looked at and
+    /// turned down, so re-materializing either into `samples/` is normally just wasted work and
+    /// picker clutter.
+    #[arg(long)]
+    include_triaged: bool,
 }
 
 #[derive(Serialize)]
@@ -77,6 +85,9 @@ struct Row {
     /// every root in order); this only ever answers "where did this come from", never "where do
     /// I look for it".
     dataset: String,
+    /// `human_solver`'s triage state for this row (`SAMPLED`/`PROMOTED`/`REJECTED`) - used only
+    /// to filter which rows get materialized by default; not otherwise carried into the fixture.
+    status: String,
 }
 
 enum Resolution {
@@ -113,6 +124,16 @@ fn read_rows(path: &Path) -> Result<Vec<Row>> {
             // Same historical fallback as `sample_test_diffs::LEGACY_DATASET`: every row from
             // before provenance tracking existed was in fact sampled from the small checkout.
             dataset: record.get(5).unwrap_or("small").to_string(),
+            // Same fallback as `sample_test_diffs::default_status`: a row from before `status`
+            // existed either has a non-empty `promoted_to` (so it was already promoted) or is
+            // just sitting there unsampled - never `REJECTED`, since rejection didn't exist yet.
+            status: record.get(6).map(str::to_string).unwrap_or_else(|| {
+                if record[4].is_empty() {
+                    "SAMPLED".to_string()
+                } else {
+                    "PROMOTED".to_string()
+                }
+            }),
         });
     }
     Ok(rows)
@@ -139,6 +160,9 @@ fn main() -> Result<()> {
         if let Some(filter) = args.language.as_deref()
             && row.language != filter
         {
+            continue;
+        }
+        if !args.include_triaged && row.status != "SAMPLED" {
             continue;
         }
 

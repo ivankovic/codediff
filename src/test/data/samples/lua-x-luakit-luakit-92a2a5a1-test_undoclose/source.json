@@ -1,0 +1,8 @@
+{
+  "language": "LUA",
+  "repository": "luakit-luakit",
+  "commit": "92a2a5a1e76018a2d4c4344abebd3034c198e8f9",
+  "path": "tests/async/test_undoclose.lua",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

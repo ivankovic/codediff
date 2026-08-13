@@ -1,0 +1,8 @@
+{
+  "language": "Kotlin",
+  "repository": "JetBrains-kotlin",
+  "commit": "61658f95fe65cf06a2fd7d351ec89c02185e9291",
+  "path": "core/compiler.common/src/org/jetbrains/kotlin/resolve/checkers/OptInDescription.kt",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

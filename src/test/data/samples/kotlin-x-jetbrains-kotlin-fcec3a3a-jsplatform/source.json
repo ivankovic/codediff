@@ -1,0 +1,8 @@
+{
+  "language": "Kotlin",
+  "repository": "JetBrains-kotlin",
+  "commit": "fcec3a3a9c722fcbd4b59b546830b3de2c89e906",
+  "path": "js/js.config/src/org/jetbrains/kotlin/platform/js/JsPlatform.kt",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

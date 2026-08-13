@@ -1,0 +1,8 @@
+{
+  "language": "Rust",
+  "repository": "fornwall-rust-script",
+  "commit": "4e128f4a864625f7959700af8ba9cbc88c9d3ec9",
+  "path": "src/manifest.rs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

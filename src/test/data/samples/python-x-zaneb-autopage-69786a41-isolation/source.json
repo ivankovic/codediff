@@ -1,0 +1,8 @@
+{
+  "language": "Python",
+  "repository": "zaneb-autopage",
+  "commit": "69786a4190f94fd4327262ae046747954ed7f0df",
+  "path": "autopage/tests/isolation.py",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

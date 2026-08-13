@@ -1,0 +1,8 @@
+{
+  "language": "Ruby",
+  "repository": "main-branch-process_executer",
+  "commit": "da1db9697e5c2be371d308d5790e44dcccf8e40b",
+  "path": "lib/process_executer/destinations/file_descriptor.rb",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

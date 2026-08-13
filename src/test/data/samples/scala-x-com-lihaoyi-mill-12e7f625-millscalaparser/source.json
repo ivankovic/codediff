@@ -1,0 +1,8 @@
+{
+  "language": "Scala",
+  "repository": "com-lihaoyi-mill",
+  "commit": "12e7f625639498dbad56ce50864a4e309d749e3a",
+  "path": "core/api/daemon/src/mill/api/daemon/internal/MillScalaParser.scala",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

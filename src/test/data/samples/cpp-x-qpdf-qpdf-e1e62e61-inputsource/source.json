@@ -1,0 +1,8 @@
+{
+  "language": "CPP",
+  "repository": "qpdf-qpdf",
+  "commit": "e1e62e610ff8d09e4a7e14caa4fd87fb6b2e2ba9",
+  "path": "libqpdf/InputSource.cc",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

@@ -1,0 +1,8 @@
+{
+  "language": "CPP",
+  "repository": "cgdb-cgdb",
+  "commit": "a7c00e7096d20944fe3eec9823f333616273f522",
+  "path": "cgdb/cgdb.cpp",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

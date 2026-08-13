@@ -1,0 +1,8 @@
+{
+  "language": "TSX",
+  "repository": "Kong-insomnia",
+  "commit": "2f4e3a8e65560efae270d2637ac9d978ce8d7c7b",
+  "path": "packages/insomnia/src/ui/components/encoding-picker.tsx",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

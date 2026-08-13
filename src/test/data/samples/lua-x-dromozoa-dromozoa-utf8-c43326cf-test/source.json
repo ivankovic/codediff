@@ -1,0 +1,8 @@
+{
+  "language": "LUA",
+  "repository": "dromozoa-dromozoa-utf8",
+  "commit": "c43326cf418807c8c791035e91d2139326766381",
+  "path": "test/test.lua",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

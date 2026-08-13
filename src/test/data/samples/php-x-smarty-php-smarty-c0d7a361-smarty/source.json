@@ -1,0 +1,8 @@
+{
+  "language": "PHP",
+  "repository": "smarty-php-smarty",
+  "commit": "c0d7a36124ac93f7c81512a55fe02f66fba8947e",
+  "path": "src/Smarty.php",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

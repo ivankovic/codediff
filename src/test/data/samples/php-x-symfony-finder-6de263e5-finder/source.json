@@ -1,0 +1,8 @@
+{
+  "language": "PHP",
+  "repository": "symfony-finder",
+  "commit": "6de263e5868b9a137602dd1e33e4d48bfae99c49",
+  "path": "Finder.php",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

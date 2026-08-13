@@ -1,0 +1,8 @@
+{
+  "language": "CSharp",
+  "repository": "cyanfish-naps2",
+  "commit": "773837e50f8d4c9a2ce4eda78b88c3aaf3090714",
+  "path": "NAPS2.Sdk/Scan/Internal/Sane/SaneScanDriver.cs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

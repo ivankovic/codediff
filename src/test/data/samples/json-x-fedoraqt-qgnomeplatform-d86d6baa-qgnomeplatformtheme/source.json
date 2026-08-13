@@ -1,0 +1,8 @@
+{
+  "language": "JSON",
+  "repository": "FedoraQt-QGnomePlatform",
+  "commit": "d86d6baab74c3e69094083715ffef4aef2e516dd",
+  "path": "src/theme/qgnomeplatformtheme.json",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

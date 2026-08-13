@@ -1,0 +1,8 @@
+{
+  "language": "YAML",
+  "repository": "draios-sysdig",
+  "commit": "63cdd56353c6953e2323fc2fd10018a8ee1fd627",
+  "path": "scripts/driverkit/config/7.3.0+driver/aarch64/ubuntu-gcp_6.5.0-1024-gcp_26~22.04.1.yaml",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

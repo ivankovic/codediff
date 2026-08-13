@@ -1,0 +1,8 @@
+{
+  "language": "Ruby",
+  "repository": "jmespath-jmespath.rb",
+  "commit": "fef3ed5f5b7489746390a194e081001400daa356",
+  "path": "spec/compliance_without_errors_spec.rb",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

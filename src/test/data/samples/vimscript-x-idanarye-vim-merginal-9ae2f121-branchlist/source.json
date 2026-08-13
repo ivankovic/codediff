@@ -1,0 +1,8 @@
+{
+  "language": "Vimscript",
+  "repository": "idanarye-vim-merginal",
+  "commit": "9ae2f12132d3ab8871d9dd6f8371149e826b7818",
+  "path": "autoload/merginal/buffers/branchList.vim",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

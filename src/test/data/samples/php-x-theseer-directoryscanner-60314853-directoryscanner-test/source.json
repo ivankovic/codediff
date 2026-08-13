@@ -1,0 +1,8 @@
+{
+  "language": "PHP",
+  "repository": "theseer-DirectoryScanner",
+  "commit": "60314853589d97c1aa294eac5b6ec56ef4758c17",
+  "path": "tests/directoryscanner.test.php",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

@@ -1,0 +1,8 @@
+{
+  "language": "TSX",
+  "repository": "greenbone-gsa",
+  "commit": "3a03e36b0240139712eaa3a5aeead436c57c2f4c",
+  "path": "src/web/pages/scanners/__tests__/ScannerComponent.test.tsx",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

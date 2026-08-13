@@ -1,0 +1,8 @@
+{
+  "language": "Java",
+  "repository": "junit-pioneer-junit-pioneer",
+  "commit": "a9735129b3f6e1e790882d8c93e273340e32cc8d",
+  "path": "src/main/java/org/junitpioneer/internal/TestNameFormatter.java",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

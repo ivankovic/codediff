@@ -1,0 +1,8 @@
+{
+  "language": "PHP",
+  "repository": "php-fig-log",
+  "commit": "e1cb6eca27ccfd46567a2837eeba62bc5fecdee2",
+  "path": "Psr/Log/Test/LoggerInterfaceTest.php",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

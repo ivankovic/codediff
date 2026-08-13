@@ -1,0 +1,8 @@
+{
+  "language": "CSharp",
+  "repository": "GLibSharp-GtkSharp",
+  "commit": "60b84d5b1bbe93a38a811a214bf93c72f620e15e",
+  "path": "Source/gio/generated/GLib_FileAttributeMatcher.cs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

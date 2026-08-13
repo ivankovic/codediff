@@ -1,0 +1,8 @@
+{
+  "language": "CSharp",
+  "repository": "ValveSoftware-openvr",
+  "commit": "15f0838a0487feb7da60acd39aab8099b994234c",
+  "path": "headers/openvr_api.cs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

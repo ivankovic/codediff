@@ -1,0 +1,8 @@
+{
+  "language": "TSX",
+  "repository": "keybase-client",
+  "commit": "d9c0c4974d26d38a48b1fb8bd0c9cc07fa80184f",
+  "path": "shared/chat/conversation/messages/special-top-message.tsx",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

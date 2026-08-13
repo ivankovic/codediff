@@ -1,0 +1,8 @@
+{
+  "language": "ShellScript",
+  "repository": "nicolargo-glances",
+  "commit": "50818213b1876314d7817d68c57482911551f941",
+  "path": "docs/build.sh",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

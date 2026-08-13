@@ -1,0 +1,8 @@
+{
+  "language": "CSharp",
+  "repository": "dotnet-script-dotnet-script",
+  "commit": "a99843d4ea2bce37ad2106bbb29149dfe56a10bf",
+  "path": "src/Dotnet.Script.Tests/ScriptExecutionTests.cs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

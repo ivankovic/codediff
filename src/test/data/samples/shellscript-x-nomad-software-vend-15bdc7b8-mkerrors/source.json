@@ -1,0 +1,8 @@
+{
+  "language": "ShellScript",
+  "repository": "nomad-software-vend",
+  "commit": "15bdc7b83f8daeb208faeb2622aa91a2c3f32c03",
+  "path": "vendor/golang.org/x/sys/unix/mkerrors.sh",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

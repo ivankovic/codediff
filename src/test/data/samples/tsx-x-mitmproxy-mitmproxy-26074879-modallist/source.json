@@ -1,0 +1,8 @@
+{
+  "language": "TSX",
+  "repository": "mitmproxy-mitmproxy",
+  "commit": "26074879818ed547d3ca44b02880fb78ee62bbb3",
+  "path": "web/src/js/components/Modal/ModalList.tsx",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

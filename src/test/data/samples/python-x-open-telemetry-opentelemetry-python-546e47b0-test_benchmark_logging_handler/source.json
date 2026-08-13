@@ -1,0 +1,8 @@
+{
+  "language": "Python",
+  "repository": "open-telemetry-opentelemetry-python",
+  "commit": "546e47b0001b40ca777515325953106e81ed8dbd",
+  "path": "opentelemetry-sdk/benchmarks/logs/test_benchmark_logging_handler.py",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

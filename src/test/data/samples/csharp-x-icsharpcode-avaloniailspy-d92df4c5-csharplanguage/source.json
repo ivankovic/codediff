@@ -1,0 +1,8 @@
+{
+  "language": "CSharp",
+  "repository": "icsharpcode-AvaloniaILSpy",
+  "commit": "d92df4c5fc3bcc434bb9c8657a18852839b3604a",
+  "path": "ILSpy.Core/Languages/CSharpLanguage.cs",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

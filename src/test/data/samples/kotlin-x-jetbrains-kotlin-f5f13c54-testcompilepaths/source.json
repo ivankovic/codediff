@@ -1,0 +1,8 @@
+{
+  "language": "Kotlin",
+  "repository": "JetBrains-kotlin",
+  "commit": "f5f13c54ea4e0b3bba61ebb397cc952d7720a713",
+  "path": "compiler/test-infrastructure-utils/testFixtures/org/jetbrains/kotlin/codegen/forTestCompile/TestCompilePaths.kt",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

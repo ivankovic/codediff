@@ -1,0 +1,8 @@
+{
+  "language": "C",
+  "repository": "intel-vpl-gpu-rt",
+  "commit": "df9b90abb3e8a6cb567fb08aaf0d9515ebdcbae2",
+  "path": "_studio/shared/include/mfx_vpp_interface.h",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

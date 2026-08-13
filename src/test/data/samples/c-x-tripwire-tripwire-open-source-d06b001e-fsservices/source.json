@@ -1,0 +1,8 @@
+{
+  "language": "C",
+  "repository": "Tripwire-tripwire-open-source",
+  "commit": "d06b001efec627f2c287cff3ed660e1182c93cd1",
+  "path": "src/core/fsservices.h",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

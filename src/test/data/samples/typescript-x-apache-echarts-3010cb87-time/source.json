@@ -1,0 +1,8 @@
+{
+  "language": "TypeScript",
+  "repository": "apache-echarts.git",
+  "commit": "3010cb8795ae6c022810c6876d47dc0b4b98fb44",
+  "path": "src/scale/Time.ts",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

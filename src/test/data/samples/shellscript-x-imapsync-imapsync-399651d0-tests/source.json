@@ -1,0 +1,8 @@
+{
+  "language": "ShellScript",
+  "repository": "imapsync-imapsync",
+  "commit": "399651d088c477435e1bf507c6f482f0b44504c2",
+  "path": "tests.sh",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

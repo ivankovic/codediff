@@ -1,0 +1,8 @@
+{
+  "language": "Scala",
+  "repository": "com-lihaoyi-mill",
+  "commit": "28b8ac2204a25a92ca617772abf11f9957e1e12d",
+  "path": "core/resolve/test/src/mill/resolve/ExpandBracesTests.scala",
+  "dataset": "full",
+  "status": "SAMPLED"
+}

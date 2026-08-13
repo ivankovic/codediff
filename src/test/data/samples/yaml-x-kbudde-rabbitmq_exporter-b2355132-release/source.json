@@ -1,0 +1,8 @@
+{
+  "language": "YAML",
+  "repository": "kbudde-rabbitmq_exporter",
+  "commit": "b23551326c66f0d3c2aa0998391991905eb066d2",
+  "path": ".github/workflows/release.yml",
+  "dataset": "full",
+  "status": "SAMPLED"
+}
