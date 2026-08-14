@@ -9090,7 +9090,7 @@ mod tests {
         assert_eq!(reason_label(ASTMappingReason::APTED("final_pass")), "APTED");
         assert_eq!(reason_label(ASTMappingReason::FlatSequenceDiff), "FlatSeq");
         assert_eq!(reason_label(ASTMappingReason::MovedSubtree), "Moved");
-        assert_eq!(reason_label(ASTMappingReason::CommentSibling), "Comment");
+        assert_eq!(reason_label(ASTMappingReason::LeadingSibling), "LeadSib");
         assert_eq!(
             reason_label(ASTMappingReason::BottomUpExpansion),
             "BottomUp"

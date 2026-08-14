@@ -21,11 +21,11 @@ pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;
-pub mod solve_comment_nodes;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_hash_descent;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_large_flat_subtrees;
+pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
 pub mod solve_similar_flow_control;
 pub mod solve_syntax_aware_matching;
@@ -225,14 +225,17 @@ impl Diff {
             config.solver_import_nodes,
         );
 
-        // Phase 2: contextual exact matching - houses solve_comment_nodes (comment-precedes-
-        // matched-node) and solve_identical_diagnostic_statements (byte-identical logging/bail/
-        // assert/printf statements). Both are cheap, high-confidence exact matches that phase 1's
-        // structural hash descent doesn't reach on its own (comments aren't part of the hashed
-        // AST shape; diagnostic statements are deliberately held back from phase 1 to avoid
-        // fragmenting a bigger match), mopping up leftovers right after phase 1 before the
-        // fuzzier phases below start guessing. Not `solve_moved_subtrees` - that's phase 7.
-        solve_comment_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        // Phase 2: contextual exact matching - houses solve_leading_siblings (a comment or
+        // attribute/decorator modifier that immediately precedes a matched node, walking a whole
+        // chain of them backward) and solve_identical_diagnostic_statements (byte-identical
+        // logging/bail/assert/printf statements). Both are cheap, high-confidence exact matches
+        // that phase 1's structural hash descent doesn't reach on its own (comments and modifiers
+        // aren't part of the hashed AST shape - `attribute_item` specifically also has no name/
+        // identity signal at all, see `solve_leading_siblings`'s own doc comment; diagnostic
+        // statements are deliberately held back from phase 1 to avoid fragmenting a bigger match),
+        // mopping up leftovers right after phase 1 before the fuzzier phases below start guessing.
+        // Not `solve_moved_subtrees` - that's phase 7.
+        solve_leading_siblings::solve(before, after, &node_cache, &mut ast_diff);
         solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
 
         // Phase 3: bottom-up expansion. Gated on `solver_bottom_up_expansion`, same net-negative
@@ -504,9 +507,13 @@ pub struct ASTDiff {
     /// reseed is pure overhead here. Converted 2026-07-26 alongside `ASTMetadata`'s remaining maps
     /// and `NodeCache`. Direct iteration of all three (not just `.get()`/`.contains_key()`) was
     /// audited first: every call site either only exists in `#[test]`s doing order-independent
-    /// assertions, or (like `solve_comment_nodes::solve`'s `current_mappings` snapshot) is
-    /// provably order-independent by construction - each entry's outcome depends only on a fixed
-    /// pre-computed snapshot, never on what an earlier same-loop iteration did.
+    /// assertions, or (like `solve_leading_siblings::solve`'s `current_mappings` snapshot, which
+    /// only freezes the *anchor* list - the "already matched" checks inside its chain-walk read
+    /// live, deliberately, so a later anchor's walk sees an earlier anchor's just-added matches)
+    /// is provably order-independent by construction: which specific leading-sibling pair a given
+    /// hop can possibly claim is fixed by sibling structure and text equality alone, not by which
+    /// anchor's turn it is, so no two anchors can ever race for the same pair with different
+    /// outcomes.
     pub mapping: rustc_hash::FxHashMap<(usize, usize), ASTMapping>,
     /// Map of nodes from the before tree to the after tree, or 0 if it is a delete.
     /// Useful if you are walking the before tree and need to look up the mapping.
@@ -755,9 +762,10 @@ pub enum ASTMappingReason {
     /// the main pipeline finished - the code didn't change, it moved (possibly into or out of a
     /// newly-inserted wrapper). See `solve_moved_subtrees`.
     MovedSubtree,
-    /// A comment node that was matched because it immediately precedes a matched node on both
-    /// before and after sides. See `solve_comment_nodes`.
-    CommentSibling,
+    /// A comment or attribute/decorator node that was matched because it's part of an unbroken
+    /// run of unmatched, textually-identical leading siblings immediately preceding an
+    /// already-matched node on both before and after sides. See `solve_leading_siblings`.
+    LeadingSibling,
     /// Neither node was matched directly, but enough of its descendants were already matched to
     /// the other's descendants (see `DICE_THRESHOLD`) that the two nodes were matched too. See
     /// `solve_bottom_up_expansion`.
@@ -791,7 +799,7 @@ impl ASTMappingReason {
             ASTMappingReason::APTED(_) => "APTED",
             ASTMappingReason::FlatSequenceDiff => "FlatSeq",
             ASTMappingReason::MovedSubtree => "Moved",
-            ASTMappingReason::CommentSibling => "Comment",
+            ASTMappingReason::LeadingSibling => "LeadSib",
             ASTMappingReason::BottomUpExpansion => "BottomUp",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
             ASTMappingReason::NormalizedImportPath => "NormImport",

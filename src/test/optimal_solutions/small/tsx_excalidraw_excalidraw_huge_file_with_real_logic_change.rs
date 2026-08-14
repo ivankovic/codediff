@@ -24,8 +24,11 @@ fn optimal_solution() -> Result<()> {
     // Known, unreviewed gap in a real-world huge TSX file - not yet root-caused. Clamped at the
     // observed count rather than requiring an exact match. Lower (or drop back to
     // `assert_matches_human_mapping`) once a fix lands.
+    // Ticked down 1892 -> 1883 as an incidental side effect of extending `solve_leading_siblings`
+    // to TypeScript/TSX decorators - same "known, unreviewed gap" class as before, not a targeted
+    // fix for this fixture specifically.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        1892,
+        1883,
     )
 }

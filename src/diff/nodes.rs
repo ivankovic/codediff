@@ -1234,6 +1234,44 @@ pub fn is_comment(kind: &str) -> bool {
     )
 }
 
+/**
+* Returns true if `kind` is an attribute/decorator/annotation node that sits as an actual
+* *sibling* of the declaration it modifies, in `language`'s grammar - as opposed to being nested
+* *inside* that declaration's own subtree (a `modifiers`/similar wrapper child), which is how most
+* grammars actually model this and needs no special handling at all: it's already covered for
+* free the moment the declaration itself matches.
+*
+* Verified per-language by parsing a small sample and inspecting the resulting tree (not just
+* going by the grammar's node-kind name, which alone doesn't tell you sibling vs. child) - see the
+* 2026-08 "digging into #1" investigation this responds to:
+*   - **Sibling** (this function returns `true`): Rust `attribute_item` (a direct sibling of the
+*     item it precedes, at any level - `#[derive(...)] struct Foo` and a top-level `#[cfg(test)]
+*     mod tests` alike), Python `decorator` (sibling of the `function_definition`/`class_definition`
+*     it precedes, both children of a wrapping `decorated_definition`), TypeScript/TSX `decorator`
+*     (sibling of the `method_definition`/... it precedes, inside `class_body`).
+*   - **Child, not sibling** (deliberately excluded - confirmed, not assumed): Java
+*     `marker_annotation`/`annotation` and Kotlin `annotation` (both nested inside a `modifiers`
+*     child of the method/class they annotate), Scala `annotation` (direct child of the
+*     `function_definition`), PHP and C# `attribute_list` (direct child of the declaration), Swift
+*     `attribute` (nested inside a `modifiers` child) - and, easy to get wrong by assuming it
+*     matches TypeScript, plain JavaScript's own `decorator` (nested inside `method_definition`,
+*     *not* a sibling the way TypeScript's is - the two grammars model this differently despite
+*     sharing the node-kind name).
+*
+* Only the sibling case benefits from `solve_leading_siblings`'s "walk backward from an
+* already-matched node" mechanism; including a child-only kind here would just never fire (its
+* node is never any other node's `prev_sibling`), which is harmless but misleading about what this
+* function actually does.
+*/
+pub fn is_leading_modifier(kind: &str, language: &Language) -> bool {
+    match language {
+        Language::Rust => kind == "attribute_item",
+        Language::Python => kind == "decorator",
+        Language::TypeScript | Language::TSX => kind == "decorator",
+        _ => false,
+    }
+}
+
 /// Character-bigram Dice similarity threshold for `leaf_texts_similar`. 0.6 keeps clear renames
 /// (`fetch_user` -> `fetch_user_data`, `user_id` -> `userId`) while rejecting unrelated
 /// identifiers that share only a stray character pair.
