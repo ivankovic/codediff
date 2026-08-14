@@ -1,0 +1,1842 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1"
+      ],
+      "after_path": [
+        "import_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "from:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "':1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "':2"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "lexical_declaration:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "const:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "`:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "`:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "${:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:2"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "${:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:2",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:3"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "${:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "arrow_function:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:3",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:4"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "`:2"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "`:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1"
+      ],
+      "after_path": [
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "default:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "default:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "template_substitution:4"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "call_expression:1",
+        "template_string:1",
+        "string_fragment:5"
+      ]
+    }
+  ]
+}

@@ -36,6 +36,8 @@ mod css_fortawesome_font_awesome_update_version_comment_3;
 #[cfg(test)]
 mod css_fortawesome_font_awesome_upgrade_version_comment;
 #[cfg(test)]
+mod css_lassekongo83_zuki_themes_fails_to_parse;
+#[cfg(test)]
 mod css_source_foundry_hack_change_font_string;
 #[cfg(test)]
 mod go_cloudflare_cfssl_change_zero_value_to_is_zero;
@@ -60,17 +62,61 @@ mod java_jflex_de_jflex_javadoc_update;
 #[cfg(test)]
 mod java_jopt_simple_jopt_simple_remove_import;
 #[cfg(test)]
+mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;
+#[cfg(test)]
+mod javascript_usebruno_bruno_add_class_to_classname_attribute;
+#[cfg(test)]
+mod javascript_usebruno_bruno_style_change;
+#[cfg(test)]
 mod json_fedoraqt_qgnomeplatform_remove_from_list;
+#[cfg(test)]
+mod json_fortawesome_font_awesome_string_change;
+#[cfg(test)]
+mod json_governikus_ausweisapp_whitespace_only;
+#[cfg(test)]
+mod json_iwalton3_jellyfin_web_jmp_gigantic_file_trivial_string_version_change;
+#[cfg(test)]
+mod json_kellyjonbrazil_jc_add_maxhops_to_traceroute;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_add_single_const;
 #[cfg(test)]
 mod lua_dromozoa_dromozoa_utf8_only_comment_text_update;
+#[cfg(test)]
+mod lua_luals_lua_language_server_add_gsub_function_call;
+#[cfg(test)]
+mod lua_luaposix_luaposix_copyright_year_change;
+#[cfg(test)]
+mod lua_teeworlds_teeworlds_add_or_expression_to_existing_if;
 #[cfg(test)]
 mod php_smarty_php_smarty_change_version_string;
 #[cfg(test)]
 mod python_bolero_murakami_sprout_change_copyright_year;
 #[cfg(test)]
 mod python_espressomd_espresso_fix_comment_typo;
+#[cfg(test)]
+mod python_persepolisdm_persepolis_add_a_single_node;
+#[cfg(test)]
+mod python_zaneb_autopage_move_time_sleep;
+#[cfg(test)]
+mod r_gtownsend_icon_one_letter_identifier_change;
+#[cfg(test)]
+mod r_mtytel_helm_dummy_file;
+#[cfg(test)]
+mod ruby_intridea_multi_json_remove_double_colon;
+#[cfg(test)]
+mod ruby_intridea_multi_json_remove_single_comma;
+#[cfg(test)]
+mod ruby_moneta_rb_moneta_change_one_identifier;
+#[cfg(test)]
+mod ruby_moneta_rb_moneta_trivial_version_update;
+#[cfg(test)]
+mod rust_xou816_spot_add_Some_around_existing_code;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_expand_import_path;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_small_change;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_version_string_change;
 #[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
 #[cfg(test)]

@@ -1,0 +1,318 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "*:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:1"
+      ],
+      "after_path": [
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:2"
+      ],
+      "after_path": [
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:3"
+      ],
+      "after_path": [
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:4"
+      ],
+      "after_path": [
+        "identifier:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:5"
+      ],
+      "after_path": [
+        "identifier:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:6"
+      ],
+      "after_path": [
+        "identifier:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:7"
+      ],
+      "after_path": [
+        "identifier:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:8"
+      ],
+      "after_path": [
+        "identifier:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:9"
+      ],
+      "after_path": [
+        "identifier:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:10"
+      ],
+      "after_path": [
+        "identifier:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:11"
+      ],
+      "after_path": [
+        "identifier:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:12"
+      ],
+      "after_path": [
+        "identifier:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:13"
+      ],
+      "after_path": [
+        "identifier:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:14"
+      ],
+      "after_path": [
+        "identifier:14"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "identifier:15"
+      ],
+      "after_path": [
+        "identifier:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:16"
+      ],
+      "after_path": [
+        "identifier:16"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:17"
+      ],
+      "after_path": [
+        "identifier:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:18"
+      ],
+      "after_path": [
+        "identifier:18"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:19"
+      ],
+      "after_path": [
+        "identifier:19"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "for:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "for:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:20"
+      ],
+      "after_path": [
+        "identifier:20"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:21"
+      ],
+      "after_path": [
+        "identifier:21"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:22"
+      ],
+      "after_path": [
+        "identifier:22"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:23"
+      ],
+      "after_path": [
+        "identifier:23"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:24"
+      ],
+      "after_path": [
+        "identifier:24"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1"
+      ],
+      "after_path": [
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "string_open:1"
+      ],
+      "after_path": [
+        "string:1",
+        "string_open:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "string_close:1"
+      ],
+      "after_path": [
+        "string:1",
+        "string_close:1"
+      ]
+    }
+  ]
+}
