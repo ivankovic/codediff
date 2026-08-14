@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-intel-vpl-gpu-rt-whitespace-only-change")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-intel-vpl-gpu-rt-whitespace-only-change",
+    )
 }

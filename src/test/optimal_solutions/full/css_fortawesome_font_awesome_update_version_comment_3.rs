@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("css-fortawesome-font-awesome-update-version-comment-3")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "css-fortawesome-font-awesome-update-version-comment-3",
+    )
 }

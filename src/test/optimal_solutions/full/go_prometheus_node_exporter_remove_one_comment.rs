@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("go-prometheus-node_exporter-remove-one-comment")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "go-prometheus-node_exporter-remove-one-comment",
+    )
 }
