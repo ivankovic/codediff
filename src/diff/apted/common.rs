@@ -1079,24 +1079,31 @@ const FLAT_MIN_CHILDREN: usize = 50;
 /// Edit-distance cap for Myers diff. If d exceeds this, we fall back to mark-as-replaced.
 const FLAT_MAX_EDIT: usize = 1000;
 
-/// Returns the unmatched direct children of `root_id` if the root has at least
-/// `FLAT_MIN_CHILDREN` unmatched children. Children may be leaves or interior nodes;
-/// all mapping helpers (`emit_identical_subtree`, `add_delete/insert_mappings`) handle
-/// subtrees recursively, so depth-1 is not a requirement.
+/// Returns `root_id`'s full direct-children list (not just the unmatched ones) if it has at
+/// least `FLAT_MIN_CHILDREN` still-unmatched children. Children may be leaves or interior nodes;
+/// all mapping helpers (`emit_identical_subtree`, `add_delete/insert_mappings`) handle subtrees
+/// recursively, so depth-1 is not a requirement.
+///
+/// Used to filter out already-matched children before returning them at all - correct as long as
+/// document order alone disambiguates the rest, but wrong once some of those already-matched
+/// children are themselves the only thing that *can* disambiguate a run of otherwise-identical
+/// siblings (e.g. XML whitespace `CharData` between already-matched `element`s - see
+/// `resolve_flat_tree_pair`'s doc comment for the mechanism and a confirmed live case). The full
+/// list, still gated on the same unmatched-count threshold, lets the caller split on those
+/// already-matched positions instead of discarding them.
 fn flat_children(
     root_id: usize,
     meta: &ASTMetadata,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Option<Vec<usize>> {
     let info = meta.node_info.get(&root_id)?;
-    let children: Vec<usize> = info
+    let unmatched_count = info
         .children
         .iter()
-        .copied()
-        .filter(|&id| !node_map.contains_key(&id))
-        .collect();
-    if children.len() >= FLAT_MIN_CHILDREN {
-        Some(children)
+        .filter(|&&id| !node_map.contains_key(&id))
+        .count();
+    if unmatched_count >= FLAT_MIN_CHILDREN {
+        Some(info.children.clone())
     } else {
         None
     }
@@ -1208,7 +1215,95 @@ fn backtrack_myers(
 /// 2026-08-08) with real margin while still bailing out for a large-scale rewrite.
 const FLAT_UNMATCHED_RECURSE_LIMIT: usize = 20;
 
+/// Splits `before_children`/`after_children` into segments delimited by children already
+/// matched in `diff` (typically resolved by an earlier phase's name-based matching, e.g.
+/// `nodes::is_reference` on XML `element`s, before this flat-diff pass ever runs) - see
+/// `resolve_flat_tree_pair`'s doc comment for why the split matters. Reduces to a single segment
+/// spanning the whole list, identical to the pre-split behavior, whenever nothing is matched yet.
+///
+/// An anchor is only used as a split point if its counterpart is still ahead of the last split
+/// point on the after side - defensive against a match that landed outside `after_children`
+/// entirely (or, in principle, out of order); either way not a usable local anchor, so it's left
+/// where it falls instead. Each returned segment is pre-filtered to drop any child still matched
+/// in `diff` (mirrors `flat_children`'s original exclusion, now applied per segment).
+fn split_into_anchored_segments(
+    before_children: &[usize],
+    after_children: &[usize],
+    diff: &ASTDiff,
+) -> Vec<(Vec<usize>, Vec<usize>)> {
+    let after_index_by_id: HashMap<usize, usize> = after_children
+        .iter()
+        .enumerate()
+        .map(|(index, &id)| (id, index))
+        .collect();
+
+    let mut segments = Vec::new();
+    let mut segment_start_before = 0;
+    let mut segment_start_after = 0;
+
+    for (before_index, &before_id) in before_children.iter().enumerate() {
+        let Some(&after_id) = diff.before_node_map.get(&before_id) else {
+            continue;
+        };
+        let Some(&after_index) = after_index_by_id.get(&after_id) else {
+            continue;
+        };
+        if after_index < segment_start_after {
+            continue;
+        }
+        segments.push((
+            before_children[segment_start_before..before_index]
+                .iter()
+                .copied()
+                .filter(|id| !diff.before_node_map.contains_key(id))
+                .collect(),
+            after_children[segment_start_after..after_index]
+                .iter()
+                .copied()
+                .filter(|id| !diff.after_node_map.contains_key(id))
+                .collect(),
+        ));
+        segment_start_before = before_index + 1;
+        segment_start_after = after_index + 1;
+    }
+    segments.push((
+        before_children[segment_start_before..]
+            .iter()
+            .copied()
+            .filter(|id| !diff.before_node_map.contains_key(id))
+            .collect(),
+        after_children[segment_start_after..]
+            .iter()
+            .copied()
+            .filter(|id| !diff.after_node_map.contains_key(id))
+            .collect(),
+    ));
+
+    segments
+}
+
 /// Resolve a flat-tree root pair via Myers sequence diff and emit all mappings into `diff`.
+///
+/// Runs Myers per segment, split at children already matched in `diff` (`split_into_anchored_
+/// segments`), rather than once over the whole pooled list of still-unmatched children. Pooling
+/// everything together - the original behavior - discards exactly the anchors that would
+/// otherwise disambiguate a run of hash-identical children: a run of N indistinguishable entries
+/// with one inserted or deleted somewhere inside gives Myers N tied-optimal alignments to choose
+/// from, and its own tie-break (not ground truth) decides which one "moved". Splitting first means
+/// each run is diffed independently between its bounding anchors, so a shift on one side of an
+/// anchor can no longer misalign anything on the other side of it - confirmed against a live case
+/// (`xml-nextcloud-android-delete-element`: one `<string>` deleted from ~1137 already-matched
+/// `element` siblings; the resulting drift chain spanned every remaining whitespace `CharData`
+/// node after it, since none of the ~1137 anchors were part of the Myers input at all).
+///
+/// Whether the whitespace immediately before or after the deleted entry is "the" deleted one
+/// remains a genuine tie even after splitting - a segment of length >1 either side of a single
+/// deletion has no ground truth to prefer one over the other. This narrows the tie to that one
+/// local segment instead of letting it propagate through the rest of the list.
+///
+/// Reduces to exactly the old single-pool behavior whenever nothing is matched yet (one segment,
+/// spanning the whole list) - the common case where the flat parent itself was just matched and
+/// none of its children have been touched by an earlier phase.
 // Each parameter is a genuinely distinct piece of context (both roots, both metadata sets, the
 // pre-computed children, the source string, the mutable diff) - grouping them into a struct built
 // once at this single call site would just move the same information around, not clarify it.
@@ -1223,91 +1318,101 @@ fn resolve_flat_tree_pair(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
-    let before_hashes: Vec<u64> = before_children
-        .iter()
-        .map(|&id| before_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
-        .collect();
-    let after_hashes: Vec<u64> = after_children
-        .iter()
-        .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
-        .collect();
+    let segments = split_into_anchored_segments(&before_children, &after_children, diff);
 
-    match myers_lcs(&before_hashes, &after_hashes, FLAT_MAX_EDIT) {
-        Some(pairs) => {
-            let mut before_matched = vec![false; before_children.len()];
-            let mut after_matched = vec![false; after_children.len()];
-            for (bi, ai) in pairs {
-                before_matched[bi] = true;
-                after_matched[ai] = true;
-                // Matched by identical hash.
-                emit_identical_subtree(
-                    before_children[bi],
-                    after_children[ai],
-                    before_meta,
-                    after_meta,
-                    source,
-                    diff,
+    let mut before_unmatched: Vec<usize> = Vec::new();
+    let mut after_unmatched: Vec<usize> = Vec::new();
+
+    for (before_seg, after_seg) in segments {
+        let before_hashes: Vec<u64> = before_seg
+            .iter()
+            .map(|&id| before_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+            .collect();
+        let after_hashes: Vec<u64> = after_seg
+            .iter()
+            .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
+            .collect();
+
+        match myers_lcs(&before_hashes, &after_hashes, FLAT_MAX_EDIT) {
+            Some(pairs) => {
+                let mut before_matched = vec![false; before_seg.len()];
+                let mut after_matched = vec![false; after_seg.len()];
+                for (bi, ai) in pairs {
+                    before_matched[bi] = true;
+                    after_matched[ai] = true;
+                    // Matched by identical hash.
+                    emit_identical_subtree(
+                        before_seg[bi],
+                        after_seg[ai],
+                        before_meta,
+                        after_meta,
+                        source,
+                        diff,
+                    );
+                }
+                before_unmatched.extend(
+                    before_seg
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| !before_matched[*i])
+                        .map(|(_, &id)| id),
+                );
+                after_unmatched.extend(
+                    after_seg
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| !after_matched[*i])
+                        .map(|(_, &id)| id),
                 );
             }
-            let before_unmatched: Vec<usize> = before_children
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !before_matched[*i])
-                .map(|(_, &id)| id)
-                .collect();
-            let after_unmatched: Vec<usize> = after_children
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !after_matched[*i])
-                .map(|(_, &id)| id)
-                .collect();
-
-            // A Myers-unmatched entry only failed *exact-hash* equality - it can still share real
-            // structure with an entry on the other side (a small edit inside an otherwise-
-            // unchanged dictionary/list entry, say). Recurse the leftover through real APTED
-            // (bounded by `FLAT_UNMATCHED_RECURSE_LIMIT`, see its doc comment) instead of
-            // unconditionally treating every one of them as fully replaced - `resolve_forest`
-            // still has delete/insert available for genuinely unrelated pairs, so this can only
-            // find *more* reuse than the atomic version, never less. Confirmed against a live case
-            // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: one dictionary entry
-            // out of ~185 had an internal edit; the atomic version deleted+inserted all ~40 of its
-            // descendant nodes instead of recognizing the ~38 that were untouched - see TODO.md's
-            // 2026-08-08 entry).
-            if !before_unmatched.is_empty()
-                && !after_unmatched.is_empty()
-                && before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
-                && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
-            {
-                let cost_model = UnitCostModel {
-                    language: before_meta.language,
-                };
-                resolve_forest(
-                    before_unmatched,
-                    after_unmatched,
-                    before_meta,
-                    after_meta,
-                    &cost_model,
-                    Algorithm::Apted,
-                    source,
-                    diff,
-                );
-            } else {
-                for &id in &before_unmatched {
+            None => {
+                // Edit distance exceeds FLAT_MAX_EDIT within this segment: mark it fully replaced.
+                for &id in &before_seg {
                     add_delete_mappings(id, before_meta, source, diff);
                 }
-                for &id in &after_unmatched {
+                for &id in &after_seg {
                     add_insert_mappings(id, after_meta, source, diff);
                 }
             }
         }
-        None => {
-            // Edit distance exceeds FLAT_MAX_EDIT: mark all children replaced.
-            for &id in &before_children {
-                add_delete_mappings(id, before_meta, source, diff);
-            }
-            for &id in &after_children {
-                add_insert_mappings(id, after_meta, source, diff);
-            }
+    }
+
+    // A Myers-unmatched entry only failed *exact-hash* equality - it can still share real
+    // structure with an entry on the other side (a small edit inside an otherwise-
+    // unchanged dictionary/list entry, say). Recurse the leftover through real APTED
+    // (bounded by `FLAT_UNMATCHED_RECURSE_LIMIT`, see its doc comment) instead of
+    // unconditionally treating every one of them as fully replaced - `resolve_forest`
+    // still has delete/insert available for genuinely unrelated pairs, so this can only
+    // find *more* reuse than the atomic version, never less. Confirmed against a live case
+    // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: one dictionary entry
+    // out of ~185 had an internal edit; the atomic version deleted+inserted all ~40 of its
+    // descendant nodes instead of recognizing the ~38 that were untouched - see TODO.md's
+    // 2026-08-08 entry). Pooled across every segment rather than recursed per segment, to match
+    // the pre-split cap and avoid many tiny APTED calls where one pooled call used to suffice.
+    if !before_unmatched.is_empty()
+        && !after_unmatched.is_empty()
+        && before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+        && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+    {
+        let cost_model = UnitCostModel {
+            language: before_meta.language,
+        };
+        resolve_forest(
+            before_unmatched,
+            after_unmatched,
+            before_meta,
+            after_meta,
+            &cost_model,
+            Algorithm::Apted,
+            source,
+            diff,
+        );
+    } else {
+        for &id in &before_unmatched {
+            add_delete_mappings(id, before_meta, source, diff);
+        }
+        for &id in &after_unmatched {
+            add_insert_mappings(id, after_meta, source, diff);
         }
     }
 

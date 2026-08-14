@@ -44,6 +44,28 @@ here so nobody re-discovers the same false positives.
   box the change was verified on); (3) `benchmark_optimal_solutions` TOTAL is unchanged, 771
   mismatches / 0.27% / 4 unsolved, identical before and after.
 
+- **`resolve_flat_tree_pair`'s pooled Myers input discarded its own anchors (apted/common.rs,
+  2026-08-14)**: the flat-tree fast path (`FLAT_MIN_CHILDREN`-gated Myers sequence diff) built its
+  input by filtering a parent's children down to the still-unmatched ones (`flat_children`) before
+  ever running Myers - which throws away exactly the already-matched siblings (e.g. XML `element`s
+  matched by `nodes::is_reference` earlier in the pipeline) that would otherwise anchor a run of
+  hash-identical children (XML whitespace `CharData` between them). With no anchors left in the
+  sequence, a run of N indistinguishable entries with one insertion/deletion gives Myers N
+  tied-optimal alignments, and its own tie-break (not ground truth) decided which one "moved" -
+  drifting every remaining entry in the run by one. Confirmed via a live case
+  (`xml-nextcloud-android-delete-element`: `flat_children` returned 1140 unmatched children out of
+  2277 total on the `content` node - the other 1137 already-matched `element`s were silently
+  excluded from the Myers input entirely). Fixed by splitting the *full* child list into segments
+  at already-matched boundaries first (`split_into_anchored_segments`) and running the existing
+  `myers_lcs` once per segment instead of once over the whole pooled list; reduces to the old
+  single-pool behavior whenever nothing is matched yet. `flat_children` now returns the full list
+  (still gated on the unmatched-child count, same threshold as before). Fixed all three affected
+  fixtures to 0 mismatches (857/910/591 -> 0/0/0); full corpus benchmark shows zero regressions
+  elsewhere and a net -2359 mismatches (23449 -> 21090). Purely a mismatch-count fix on these
+  fixtures - `algorithm_cost == human_cost` was already true, so rendered diff output is unchanged;
+  the residual tie between "whitespace before" vs. "whitespace after" a single deletion is real and
+  unavoidable, this just stops it from propagating past its own local segment.
+
 ## Not actual bugs (re-verified 2026-07-08)
 
 - **`from_treesitter_range`'s `end_row < columns_per_row.len()` guard**: the original report

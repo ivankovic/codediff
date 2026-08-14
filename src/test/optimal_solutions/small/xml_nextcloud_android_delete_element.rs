@@ -26,15 +26,19 @@ fn optimal_solution() -> Result<()> {
     // `strings.xml` file was tripping `EXPENSIVE_RESIDUAL_THRESHOLD` (94% of the file unmatched
     // despite being 99.9% byte-identical to `after`) purely because every `<string name="...">
     // ...</string>` entry is far smaller than `min_subtree_size` (45), so exact-hash matching
-    // never got the chance to find them. The remaining mismatches are all `CharData` whitespace
-    // separators between entries (every inter-element `"\n    "` text node is byte-identical to
-    // every other one) - positional-ambiguity noise once the real content matches, same class of
-    // gap as `json-radarr-radarr-rename-string-key`'s repeated `,` tokens, not a new problem. Went
-    // 856 -> 857 as an incidental side effect of the 2026-08-08 `solve_large_flat_subtrees`
-    // recursion fix (see TODO.md's 2026-08-08 entry) - one more whitespace token happened to land
-    // on a different, equally-ambiguous pick; same class of gap, not a new one.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "xml-nextcloud-android-delete-element",
-        857,
-    )
+    // never got the chance to find them. The remaining mismatches were all `CharData` whitespace
+    // separators between entries. Went 856 -> 857 as an incidental side effect of the 2026-08-08
+    // `solve_large_flat_subtrees` recursion fix.
+    //
+    // Fixed to 0: `resolve_flat_tree_pair`'s Myers pass (`apted/common.rs`) used to pool every
+    // still-unmatched flat child into one sequence diff, which silently dropped the ~1137
+    // already-matched `element` siblings surrounding each whitespace run - with no anchors left in
+    // the sequence, a run of hash-identical whitespace gives Myers many tied-optimal alignments,
+    // and its own tie-break (not ground truth) picked which one "moved" whenever an element was
+    // deleted, drifting every whitespace node after the deletion point by one. Fixed by splitting
+    // the flat child list into segments at already-matched boundaries first
+    // (`split_into_anchored_segments`) and running Myers per segment, so a shift on one side of an
+    // anchor can no longer misalign anything on the other side of it. Purely a mismatch-count fix:
+    // `algorithm_cost == human_cost` was already true here, so rendered diff output is unchanged.
+    test::helper::human_mapping::assert_matches_human_mapping("xml-nextcloud-android-delete-element")
 }

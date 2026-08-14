@@ -25,10 +25,12 @@ fn optimal_solution() -> Result<()> {
     // observed count rather than requiring an exact match. Lower (or drop back to
     // `assert_matches_human_mapping`) once a fix lands.
     // Ticked down 1892 -> 1883 as an incidental side effect of extending `solve_leading_siblings`
-    // to TypeScript/TSX decorators - same "known, unreviewed gap" class as before, not a targeted
-    // fix for this fixture specifically.
+    // to TypeScript/TSX decorators, then 1883 -> 1882 as an incidental side effect of the
+    // `resolve_flat_tree_pair` anchor-splitting fix (see `xml_nextcloud_android_delete_element.rs`'s
+    // comment) - same "known, unreviewed gap" class as before, not a targeted fix for this fixture
+    // specifically.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        1883,
+        1882,
     )
 }

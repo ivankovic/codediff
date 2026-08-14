@@ -21,10 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    // 2026-08-05: dropped 1125 -> 910 - same fix and root cause as
-    // `xml_nextcloud_android_delete_element.rs`, see that file's comment.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "xml-nextcloud-android-delete-element-2",
-        910,
-    )
+    // 2026-08-05: dropped 1125 -> 910. Fixed to 0 by the `resolve_flat_tree_pair` anchor-splitting
+    // fix - same root cause and fix as `xml_nextcloud_android_delete_element.rs`, see that file's
+    // comment.
+    test::helper::human_mapping::assert_matches_human_mapping("xml-nextcloud-android-delete-element-2")
 }

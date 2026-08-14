@@ -23,13 +23,15 @@ use crate::test;
 fn optimal_solution() -> Result<()> {
     // 6 new <string> translation entries are inserted at scattered points in this strings.xml
     // resource file. XML's uniform inter-tag whitespace CharData nodes are frequently byte-
-    // identical to each other (just "\n    " indentation), so after each insertion point the
-    // ambiguous, interchangeable whitespace nodes downstream get matched to a slightly different
-    // (but content-identical) sibling than the human's chosen correspondence - 585 of the 591
-    // mismatches are exactly this same off-by-one CharData relabeling, cascading from the same 6
-    // insertion points, not independent issues.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // identical to each other (just "\n    " indentation); 585 of the 591 mismatches were exactly
+    // this off-by-one CharData relabeling, cascading downstream from each insertion point because
+    // `resolve_flat_tree_pair`'s Myers pass pooled every unmatched whitespace node into one flat
+    // sequence with no already-matched `element` anchors left to resync against. Fixed to 0 by
+    // splitting that flat child list into segments at already-matched boundaries first
+    // (`split_into_anchored_segments`, `apted/common.rs`) so a shift after one insertion point
+    // can't drift into the next - see `xml_nextcloud_android_delete_element.rs`'s comment for the
+    // full mechanism.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "xml-nextcloud-android-add-few-translations",
-        591,
     )
 }
