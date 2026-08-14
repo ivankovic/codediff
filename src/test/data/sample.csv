@@ -1,4 +1,4 @@
-language,repository,commit,path,promoted_to,dataset,status,rejection_reason
+language,repository,commit,path,promoted_to,dataset,status,comment
 C,FFmpeg-FFmpeg.git,1d16161a8bb897a2a6f20bfcad0486e966b3f086,libswscale/ops.h,c-ffmpeg-added-typedef-to-enum,small,PROMOTED,
 C,Ondsel-Development-OndselSolver,07785b7576a0655660badd845f06ed286208da1a,OndselSolver/Part.h,c-ondsel-development-ondselsolver-add-include,full,PROMOTED,
 C,PixarAnimationStudios-OpenSubdiv,17530d964d082f9f59fd1b429c5501bb61178329,regression/common/far_utils.h,,full,SAMPLED,

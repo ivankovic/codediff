@@ -108,11 +108,19 @@
 *                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
 *                  other than letters/digits/-/_, or a diffs/ case with that name already exists
 *   R              on a sample (opened via `O`), reject it instead of promoting it: prompts for a
-*                  reason, then records it verbatim in the matching sample.csv row's
-*                  `rejection_reason` column and sets `status` to REJECTED, leaving `promoted_to`
-*                  empty and the sample directory itself untouched. Re-prompts if the reason is
-*                  empty. Has no effect on a real test case or a git-commit-sourced case -- only a
-*                  sample has a sample.csv row to reject
+*                  reason, then records it verbatim in the matching sample.csv row's `comment`
+*                  column and sets `status` to REJECTED, leaving `promoted_to` empty and the sample
+*                  directory itself untouched. Re-prompts if the reason is empty. Has no effect on
+*                  a real test case or a git-commit-sourced case -- only a sample has a sample.csv
+*                  row to reject
+*   e              on a sample (opened via `O`), enter or edit a free-form comment: prompts for
+*                  text, pre-filled with whatever's already recorded, and records it verbatim in
+*                  the matching sample.csv row's `comment` column -- unlike `R`, doesn't touch
+*                  `status`, works whether the row is SAMPLED/PROMOTED/REJECTED, and an empty
+*                  submission clears the comment rather than being rejected as invalid input. If a
+*                  comment is present when the sample is later promoted (`s`), it's also written as
+*                  a leading comment in the generated optimal_solutions test stub. Has no effect on
+*                  a real test case or a git-commit-sourced case, same as `R`
 *   o              open a different test case: lists every directory under
 *                  src/test/data/diffs/{handmade,small,full}/, j/k to move, Enter to open, Esc to
 *                  cancel. Press `d` inside this picker to cycle which of the three folders it's
@@ -246,6 +254,9 @@ s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it
 R              on a sample, prompt for a reason and reject it instead of
                  promoting it (recorded in sample.csv; no human mapping needed)
+e              on a sample, enter/edit a free-form comment (recorded in sample.csv,
+                 works regardless of status; carried into the generated test stub
+                 if present when later promoted)
 o              open a different test case (src/test/data/diffs/); press d inside
                  this picker to cycle which dataset it's narrowed to (all,
                  handmade, small, full), or H to narrow to cases with at
@@ -1184,11 +1195,23 @@ enum Modal {
         error: Option<String>,
     },
     /// Raised by `R` when the current case is a sample: asks for a reason to reject it instead of
-    /// promoting it. Recorded as-is in sample.csv's `rejection_reason` column, with `status` set
-    /// to `REJECTED` and `promoted_to` left untouched (empty). Re-raised with `error` set (input
+    /// promoting it. Recorded as-is in sample.csv's `comment` column, with `status` set to
+    /// `REJECTED` and `promoted_to` left untouched (empty). Re-raised with `error` set (input
     /// preserved) if the reason is empty or the sample.csv row can't be found - same posture as
     /// `PromptPromoteName`.
     PromptRejectReason {
+        input: String,
+        error: Option<String>,
+    },
+    /// Raised by `e` when the current case is a sample: enters or edits a free-form comment on it,
+    /// pre-filled with whatever's already recorded (if anything). Recorded as-is in sample.csv's
+    /// `comment` column - unlike `PromptRejectReason`, doesn't touch `status`, and an empty
+    /// submission is valid (clears the comment). If a comment is present when the sample is later
+    /// promoted (`s`), it's also written as a leading doc comment in the generated
+    /// optimal_solutions test stub - see `action_promote`/`ensure_stub_test`. Re-raised with
+    /// `error` set (input preserved) if the sample.csv row can't be found - same posture as
+    /// `PromptPromoteName`.
+    PromptComment {
         input: String,
         error: Option<String>,
     },
@@ -3643,6 +3666,19 @@ fn render_modal(
                     .unwrap_or_default(),
             ),
         ),
+        Modal::PromptComment { input, error } => render_text_modal(
+            frame,
+            area,
+            "Sample comment",
+            &format!(
+                "Enter or edit a comment for this sample (recorded as-is in sample.csv;\nempty clears it; written into the generated test stub if present at promote time)\n\n> {}\n{}\n[Enter] confirm   [Esc] cancel",
+                input,
+                error
+                    .as_deref()
+                    .map(|e| format!("\n{}\n", e))
+                    .unwrap_or_default(),
+            ),
+        ),
         Modal::PromptSearch { input } => render_text_modal(
             frame,
             area,
@@ -4279,18 +4315,19 @@ fn is_navigation_or_display_key(code: KeyCode) -> bool {
 ///
 /// With no modal open, this is `is_navigation_or_display_key` (`handle_key`'s own pure-navigation
 /// keys). With a modal open, only typing into (or backspacing out of) `PromptSearch`'s,
-/// `PromptPromoteName`'s, or `PromptRejectReason`'s own `input` string qualifies: those modals only
-/// ever mutate that string in response to these keys, everything else about the case is untouched.
-/// Every other key while a modal is open -- including Enter/Esc on these same three modals, which
-/// can search-and-move-the-cursor, promote/reject/save, or close the modal -- is treated
-/// conservatively as "might have changed something", so the cache is thrown away and rebuilt
-/// fresh, exactly as if this function didn't exist.
+/// `PromptPromoteName`'s, `PromptRejectReason`'s, or `PromptComment`'s own `input` string
+/// qualifies: those modals only ever mutate that string in response to these keys, everything else
+/// about the case is untouched. Every other key while a modal is open -- including Enter/Esc on
+/// these same four modals, which can search-and-move-the-cursor, promote/reject/comment/save, or
+/// close the modal -- is treated conservatively as "might have changed something", so the cache is
+/// thrown away and rebuilt fresh, exactly as if this function didn't exist.
 fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
     match modal {
         None => is_navigation_or_display_key(code),
         Some(Modal::PromptSearch { .. })
         | Some(Modal::PromptPromoteName { .. })
-        | Some(Modal::PromptRejectReason { .. }) => {
+        | Some(Modal::PromptRejectReason { .. })
+        | Some(Modal::PromptComment { .. }) => {
             matches!(code, KeyCode::Char(_) | KeyCode::Backspace)
         }
         Some(_) => false,
@@ -4785,7 +4822,7 @@ fn handle_key(
         }
         KeyCode::Char('s') => match &app.origin {
             CaseOrigin::Diffs => {
-                let result = action_save(&mut app.mapping, &mut app.dirty, &app.name);
+                let result = action_save(&mut app.mapping, &mut app.dirty, &app.name, None);
                 if result.is_ok() {
                     refresh_diff_completeness(app, &app.name.clone());
                 }
@@ -4814,6 +4851,23 @@ fn handle_key(
                 });
             } else {
                 app.status = Some("Only an open sample (O) can be rejected".to_string());
+            }
+            None
+        }
+        KeyCode::Char('e') => {
+            if let CaseOrigin::Sample(source) = &app.origin {
+                // Pre-fill with whatever's already recorded, so this is an edit, not a blind
+                // overwrite - same idea as `PromptPromoteName`'s pre-filled default name.
+                let existing = read_sample_csv_rows(&sample_csv_path())
+                    .ok()
+                    .and_then(|rows| find_sample_row(&rows, source).map(|row| row.comment.clone()))
+                    .unwrap_or_default();
+                app.modal = Some(Modal::PromptComment {
+                    input: existing,
+                    error: None,
+                });
+            } else {
+                app.status = Some("Only an open sample (O) can have a comment".to_string());
             }
             None
         }
@@ -5304,7 +5358,7 @@ fn handle_modal_key(
         },
         Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
-                match action_save(&mut app.mapping, &mut app.dirty, &app.name) {
+                match action_save(&mut app.mapping, &mut app.dirty, &app.name, None) {
                     Ok(_) => {
                         refresh_diff_completeness(app, &app.name.clone());
                         return Some(target);
@@ -5388,6 +5442,37 @@ fn handle_modal_key(
             }
             _ => {
                 app.modal = Some(Modal::PromptRejectReason { input, error: None });
+            }
+        },
+        Modal::PromptComment {
+            mut input,
+            error: _,
+        } => match code {
+            KeyCode::Enter => {
+                let comment = input.trim().to_string();
+                match action_comment(app, &comment) {
+                    Ok(msg) => app.status = Some(msg),
+                    Err(err) => {
+                        app.modal = Some(Modal::PromptComment {
+                            input,
+                            error: Some(format!("{:#}", err)),
+                        });
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                app.status = Some("Cancelled".to_string());
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                app.modal = Some(Modal::PromptComment { input, error: None });
+            }
+            KeyCode::Char(c) => {
+                input.push(c);
+                app.modal = Some(Modal::PromptComment { input, error: None });
+            }
+            _ => {
+                app.modal = Some(Modal::PromptComment { input, error: None });
             }
         },
         Modal::PromptSearch { mut input } => match code {
@@ -5519,9 +5604,19 @@ fn handle_modal_key(
     None
 }
 
-fn action_save(mapping: &mut HumanMapping, dirty: &mut bool, name: &str) -> Result<String> {
+/// `comment` is only ever `Some` from `action_promote` (a sample's recorded `Modal::PromptComment`
+/// text, if any) - the plain save path (`s` on an already-real `CaseOrigin::Diffs` case) always
+/// passes `None`, since only samples have a comment to carry forward. Only takes effect when
+/// `ensure_stub_test` is *creating* the stub file for the first time; a comment added or edited
+/// after promotion has no generated file left to write into.
+fn action_save(
+    mapping: &mut HumanMapping,
+    dirty: &mut bool,
+    name: &str,
+    comment: Option<&str>,
+) -> Result<String> {
     human_mapping::save(name, mapping)?;
-    let created = ensure_stub_test(name)?;
+    let created = ensure_stub_test(name, comment)?;
     *dirty = false;
     Ok(if created {
         format!(
@@ -5652,7 +5747,13 @@ fn action_promote(
         String::new()
     };
 
-    let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name)?;
+    // A sample's recorded comment (if any) rides along into the generated stub test - see
+    // `action_save`'s doc comment for why this is fetched here rather than threaded further down.
+    let comment = match &sample_source {
+        Some(source) => sample_comment(source)?,
+        None => None,
+    };
+    let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name, comment.as_deref())?;
     refresh_diff_completeness(app, new_name);
 
     let csv_note = match &sample_source {
@@ -5674,9 +5775,9 @@ fn action_promote(
 }
 
 /// Rejects the currently open sample instead of promoting it: records `reason` verbatim in its
-/// sample.csv row (`rejection_reason`, with `status` set to `REJECTED`) and leaves everything else
-/// -- the sample directory, `promoted_to` -- untouched. Only a sample has a sample.csv row to
-/// update; a git-commit-sourced case (`CaseOrigin::GitCommitFile`) has nothing to reject.
+/// sample.csv row (`comment`, with `status` set to `REJECTED`) and leaves everything else -- the
+/// sample directory, `promoted_to` -- untouched. Only a sample has a sample.csv row to update; a
+/// git-commit-sourced case (`CaseOrigin::GitCommitFile`) has nothing to reject.
 fn action_reject(app: &App, reason: &str) -> Result<String> {
     let CaseOrigin::Sample(source) = &app.origin else {
         bail!("Only a sample (opened via O) can be rejected");
@@ -5689,6 +5790,25 @@ fn action_reject(app: &App, reason: &str) -> Result<String> {
 
     match reject_sample(source, reason)? {
         true => Ok(format!("Rejected '{}': {}", app.name, reason)),
+        false => bail!("source row not found in sample.csv; not updated"),
+    }
+}
+
+/// Records or clears the currently open sample's sample.csv `comment` column, without touching
+/// `status`/`promoted_to` -- unlike `R`'s reject flow (`action_reject`), this works regardless of
+/// whether the sample is still unreviewed, already promoted, or already rejected, and an empty
+/// `comment` is valid (clears any previously-recorded one, unlike a rejection reason, which can't
+/// be empty). Only a sample has a sample.csv row to update; a git-commit-sourced case
+/// (`CaseOrigin::GitCommitFile`) has nothing to comment on.
+fn action_comment(app: &App, comment: &str) -> Result<String> {
+    let CaseOrigin::Sample(source) = &app.origin else {
+        bail!("Only a sample (opened via O) can have a comment");
+    };
+
+    let comment = comment.trim();
+    match set_sample_comment(source, comment)? {
+        true if comment.is_empty() => Ok(format!("Cleared comment for '{}'", app.name)),
+        true => Ok(format!("Set comment for '{}': {}", app.name, comment)),
         false => bail!("source row not found in sample.csv; not updated"),
     }
 }
@@ -5710,9 +5830,11 @@ struct SampleCsvRow {
     dataset: String,
     /// One of `SAMPLED`/`PROMOTED`/`REJECTED` - see `sample_test_diffs::Row::status`.
     status: String,
-    /// Why this row was rejected instead of promoted, verbatim from `Modal::PromptRejectReason`.
-    /// Empty unless `status` is `REJECTED`.
-    rejection_reason: String,
+    /// Free-form note about this sample, verbatim from `Modal::PromptComment`'s input - independent
+    /// of `status`: settable (and editable) whether the row is still SAMPLED, already PROMOTED, or
+    /// REJECTED. `action_reject` also writes here (the rejection reason *is* the comment, not a
+    /// separate column) - see that function and `Modal::PromptRejectReason`. Empty if never set.
+    comment: String,
 }
 
 /// Same backfill `sample_test_diffs::default_status` uses for a sample.csv row written before
@@ -5745,7 +5867,7 @@ fn read_sample_csv_rows(path: &Path) -> Result<Vec<SampleCsvRow>> {
             // Same historical fallback as `legacy_dataset()`/`sample_test_diffs::LEGACY_DATASET`.
             dataset: record.get(5).unwrap_or("small").to_string(),
             status,
-            rejection_reason: record.get(7).unwrap_or("").to_string(),
+            comment: record.get(7).unwrap_or("").to_string(),
         });
     }
     Ok(rows)
@@ -5761,7 +5883,7 @@ fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
         "promoted_to",
         "dataset",
         "status",
-        "rejection_reason",
+        "comment",
     ])?;
     for row in rows {
         writer.write_record([
@@ -5772,11 +5894,39 @@ fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
             &row.promoted_to,
             &row.dataset,
             &row.status,
-            &row.rejection_reason,
+            &row.comment,
         ])?;
     }
     writer.flush()?;
     Ok(())
+}
+
+/// Finds the sample.csv row matching `source`'s identity (language/repository/commit/path) -
+/// shared by every write path that needs to locate exactly one row to update
+/// (`update_sample_csv_at`, `reject_sample_csv_at`, `set_sample_comment_at`), plus the read-only
+/// `sample_comment_at`/the `e` keybinding's prefill lookup. `source` uniquely identifies a row by
+/// construction (`sample_test_diffs` never writes two rows for the same commit+path), so "first
+/// match" is never ambiguous in practice.
+fn find_sample_row<'a>(rows: &'a [SampleCsvRow], source: &SampleSource) -> Option<&'a SampleCsvRow> {
+    rows.iter().find(|row| {
+        row.language == source.language
+            && row.repository == source.repository
+            && row.commit == source.commit
+            && row.path == source.path
+    })
+}
+
+/// Mutable counterpart of `find_sample_row`, for the write paths.
+fn find_sample_row_mut<'a>(
+    rows: &'a mut [SampleCsvRow],
+    source: &SampleSource,
+) -> Option<&'a mut SampleCsvRow> {
+    rows.iter_mut().find(|row| {
+        row.language == source.language
+            && row.repository == source.repository
+            && row.commit == source.commit
+            && row.path == source.path
+    })
 }
 
 fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result<bool> {
@@ -5784,32 +5934,21 @@ fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result<bool> {
 }
 
 /// Marks the sample.csv row matching `source` as promoted to `new_name`, preserving every other
-/// row and column untouched. Returns `Ok(false)` (not an error) if no row matches -- e.g. the
-/// sample was placed under samples/ by hand rather than by `sample_test_diffs` -- since that
-/// shouldn't undo a promotion that has already otherwise succeeded.
+/// row and column (including `comment`) untouched. Returns `Ok(false)` (not an error) if no row
+/// matches -- e.g. the sample was placed under samples/ by hand rather than by
+/// `sample_test_diffs` -- since that shouldn't undo a promotion that has already otherwise
+/// succeeded.
 fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
     }
 
     let mut rows = read_sample_csv_rows(path)?;
-
-    let mut found = false;
-    for row in &mut rows {
-        if row.language == source.language
-            && row.repository == source.repository
-            && row.commit == source.commit
-            && row.path == source.path
-        {
-            row.promoted_to = new_name.to_string();
-            row.status = "PROMOTED".to_string();
-            found = true;
-        }
-    }
-
-    if !found {
+    let Some(row) = find_sample_row_mut(&mut rows, source) else {
         return Ok(false);
-    }
+    };
+    row.promoted_to = new_name.to_string();
+    row.status = "PROMOTED".to_string();
 
     write_sample_csv_rows(path, &rows)?;
     Ok(true)
@@ -5819,38 +5958,68 @@ fn reject_sample(source: &SampleSource, reason: &str) -> Result<bool> {
     reject_sample_csv_at(&sample_csv_path(), source, reason)
 }
 
-/// Marks the sample.csv row matching `source` as rejected with `reason`, preserving every other
-/// row and column untouched -- the reject counterpart of `update_sample_csv_at`. `promoted_to` is
-/// deliberately left as-is (empty, in practice: `action_reject` only ever runs against a case
-/// that's still `CaseOrigin::Sample`, which a promotion would have already moved past) since a
-/// rejected sample was never promoted. Returns `Ok(false)` (not an error) if no row matches, same
-/// reasoning as `update_sample_csv_at`.
+/// Marks the sample.csv row matching `source` as rejected, recording `reason` in its `comment`
+/// column -- the reject counterpart of `update_sample_csv_at`. `promoted_to` is deliberately left
+/// as-is (empty, in practice: `action_reject` only ever runs against a case that's still
+/// `CaseOrigin::Sample`, which a promotion would have already moved past) since a rejected sample
+/// was never promoted. Returns `Ok(false)` (not an error) if no row matches, same reasoning as
+/// `update_sample_csv_at`.
 fn reject_sample_csv_at(path: &Path, source: &SampleSource, reason: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
     }
 
     let mut rows = read_sample_csv_rows(path)?;
-
-    let mut found = false;
-    for row in &mut rows {
-        if row.language == source.language
-            && row.repository == source.repository
-            && row.commit == source.commit
-            && row.path == source.path
-        {
-            row.rejection_reason = reason.to_string();
-            row.status = "REJECTED".to_string();
-            found = true;
-        }
-    }
-
-    if !found {
+    let Some(row) = find_sample_row_mut(&mut rows, source) else {
         return Ok(false);
-    }
+    };
+    row.comment = reason.to_string();
+    row.status = "REJECTED".to_string();
 
     write_sample_csv_rows(path, &rows)?;
     Ok(true)
+}
+
+fn set_sample_comment(source: &SampleSource, comment: &str) -> Result<bool> {
+    set_sample_comment_at(&sample_csv_path(), source, comment)
+}
+
+/// Records `comment` verbatim in the sample.csv row matching `source`'s `comment` column,
+/// preserving every other column -- including `status`/`promoted_to` -- untouched. Unlike
+/// `reject_sample_csv_at`, this never changes `status`, so it works the same whether the row is
+/// still SAMPLED, already PROMOTED, or REJECTED; an empty `comment` is valid and clears any
+/// previously-recorded one. Returns `Ok(false)` (not an error) if no row matches, same reasoning
+/// as `update_sample_csv_at`.
+fn set_sample_comment_at(path: &Path, source: &SampleSource, comment: &str) -> Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let mut rows = read_sample_csv_rows(path)?;
+    let Some(row) = find_sample_row_mut(&mut rows, source) else {
+        return Ok(false);
+    };
+    row.comment = comment.to_string();
+
+    write_sample_csv_rows(path, &rows)?;
+    Ok(true)
+}
+
+fn sample_comment(source: &SampleSource) -> Result<Option<String>> {
+    sample_comment_at(&sample_csv_path(), source)
+}
+
+/// The `comment` column value for `source`'s row in sample.csv, if the row exists and its comment
+/// is non-empty (after trimming) - `None` either way otherwise. `action_promote`'s own way of
+/// asking "should the generated stub test get a leading explanatory comment".
+fn sample_comment_at(path: &Path, source: &SampleSource) -> Result<Option<String>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let rows = read_sample_csv_rows(path)?;
+    Ok(find_sample_row(&rows, source)
+        .map(|row| row.comment.trim().to_string())
+        .filter(|c| !c.is_empty()))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -5905,7 +6074,12 @@ fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
 /// (`case_dataset`) - every caller (an already-open existing case, or `action_promote`, which
 /// creates the diffs/ directory before calling this) runs after that directory already exists, so
 /// there's always a real dataset to resolve, no separate parameter needed.
-fn ensure_stub_test(name: &str) -> Result<bool> {
+///
+/// `comment`, if non-empty once trimmed, is word-wrapped (`wrap_comment_lines`) into a leading `//`
+/// block right before the `assert_matches_human_mapping` call - only when the file is actually
+/// being created here for the first time; an already-existing stub is never rewritten, so a
+/// comment added or edited after promotion has no effect.
+fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
     let stub_path = optimal_solutions_dir(&dataset).join(format!("{module}.rs"));
@@ -5913,10 +6087,7 @@ fn ensure_stub_test(name: &str) -> Result<bool> {
     let created = if stub_path.exists() {
         false
     } else {
-        let contents = format!(
-            "{LICENSE_HEADER}use anyhow::Result;\n\nuse crate::test;\n\n#[test]\nfn optimal_solution() -> Result<()> {{\n    test::helper::human_mapping::assert_matches_human_mapping(\"{name}\")\n}}\n"
-        );
-        fs::write(&stub_path, contents)
+        fs::write(&stub_path, stub_test_contents(name, comment))
             .with_context(|| format!("writing stub test to {:?}", stub_path))?;
         true
     };
@@ -5924,6 +6095,55 @@ fn ensure_stub_test(name: &str) -> Result<bool> {
     insert_mod_declaration(&dataset, &module)?;
 
     Ok(created)
+}
+
+/// Builds the full contents of a freshly-created `optimal_solutions/<dataset>/<name>.rs` stub -
+/// split out from `ensure_stub_test` as a pure string-building function (no filesystem access) so
+/// it's directly unit-testable without writing into the real repo's `src/test/optimal_solutions/`.
+fn stub_test_contents(name: &str, comment: Option<&str>) -> String {
+    let comment_block = match comment.map(str::trim) {
+        Some(c) if !c.is_empty() => wrap_comment_lines(c),
+        _ => String::new(),
+    };
+    format!(
+        "{LICENSE_HEADER}use anyhow::Result;\n\nuse crate::test;\n\n#[test]\nfn optimal_solution() -> Result<()> {{\n{comment_block}    test::helper::human_mapping::assert_matches_human_mapping(\"{name}\")\n}}\n"
+    )
+}
+
+/// Word-wraps `comment` into `    // <text>\n` lines - 4-space indent matching the generated
+/// stub's function body, `//` since this precedes a `#[test]` fn's own statement, not documenting
+/// an item (a `///` doc comment there would attach to nothing). Wraps at a width matching this
+/// codebase's own prose-comment convention (~96 columns including the prefix). `comment` is
+/// assumed already trimmed and non-empty - see `ensure_stub_test`'s only caller.
+fn wrap_comment_lines(comment: &str) -> String {
+    const WIDTH: usize = 96;
+    const PREFIX: &str = "    // ";
+    let max_content = WIDTH.saturating_sub(PREFIX.len());
+
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in comment.split_whitespace() {
+        let candidate_len = if current.is_empty() {
+            word.len()
+        } else {
+            current.len() + 1 + word.len()
+        };
+        if candidate_len > max_content && !current.is_empty() {
+            lines.push(std::mem::take(&mut current));
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+
+    lines
+        .into_iter()
+        .map(|line| format!("{PREFIX}{line}\n"))
+        .collect()
 }
 
 /// Adds `#[cfg(test)]\nmod <module>;` to `optimal_solutions/<dataset>.rs`, keeping the list
@@ -6020,6 +6240,78 @@ mod tests {
         // A keyword as a substring of a longer name is fine -- only an exact module-name
         // collision matters.
         assert!(validate_new_case_name("matches-guard").is_ok());
+    }
+
+    #[test]
+    fn stub_test_contents_has_no_comment_block_when_none_given() {
+        let contents = stub_test_contents("rust-add-if", None);
+        assert!(!contents.contains("//\n") && !contents.contains("    // "));
+        assert!(contents.contains(
+            "fn optimal_solution() -> Result<()> {\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
+        ));
+    }
+
+    #[test]
+    fn stub_test_contents_has_no_comment_block_when_comment_is_empty_or_whitespace() {
+        assert_eq!(
+            stub_test_contents("rust-add-if", Some("")),
+            stub_test_contents("rust-add-if", None)
+        );
+        assert_eq!(
+            stub_test_contents("rust-add-if", Some("   \n  ")),
+            stub_test_contents("rust-add-if", None)
+        );
+    }
+
+    #[test]
+    fn stub_test_contents_includes_a_wrapped_comment_block_right_before_the_assert() {
+        let contents = stub_test_contents("rust-add-if", Some("A short note."));
+        assert!(contents.contains(
+            "fn optimal_solution() -> Result<()> {\n    // A short note.\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
+        ));
+    }
+
+    #[test]
+    fn wrap_comment_lines_keeps_a_short_comment_on_one_line() {
+        assert_eq!(
+            wrap_comment_lines("A short note."),
+            "    // A short note.\n"
+        );
+    }
+
+    #[test]
+    fn wrap_comment_lines_wraps_long_comments_at_word_boundaries() {
+        let long = "one two three four five six seven eight nine ten eleven twelve thirteen \
+                     fourteen fifteen sixteen seventeen eighteen nineteen twenty";
+        let wrapped = wrap_comment_lines(long);
+        assert!(
+            wrapped.lines().count() > 1,
+            "expected a comment this long to wrap onto multiple lines"
+        );
+        for line in wrapped.lines() {
+            assert!(
+                line.len() <= 96,
+                "line exceeds the 96-column wrap width: {:?} ({} chars)",
+                line,
+                line.len()
+            );
+            assert!(line.starts_with("    // "), "line missing the expected prefix: {:?}", line);
+        }
+        // Every word survives the wrap, in order, none dropped or duplicated - strip each line's
+        // "    // " prefix first so it doesn't get counted as a word of its own.
+        let rejoined: Vec<&str> = wrapped
+            .lines()
+            .flat_map(|line| line.strip_prefix("    // ").unwrap_or(line).split_whitespace())
+            .collect();
+        let original: Vec<&str> = long.split_whitespace().collect();
+        assert_eq!(rejoined, original);
+    }
+
+    #[test]
+    fn wrap_comment_lines_never_splits_a_single_word_even_if_it_exceeds_the_width() {
+        let word = "x".repeat(200);
+        let wrapped = wrap_comment_lines(&word);
+        assert_eq!(wrapped, format!("    // {word}\n"));
     }
 
     #[test]
@@ -8902,8 +9194,8 @@ mod tests {
         assert!(statuses.is_empty());
     }
 
-    /// (path, promoted_to, dataset, status, rejection_reason) per row - like `read_csv`, but for
-    /// tests that also care about the two newest columns.
+    /// (path, promoted_to, dataset, status, comment) per row - like `read_csv`, but for tests that
+    /// also care about the two newest columns.
     fn read_csv_with_status(path: &Path) -> Vec<(String, String, String, String, String)> {
         let mut reader = csv::Reader::from_path(path).unwrap();
         reader
@@ -9015,7 +9307,7 @@ mod tests {
         assert!(!found);
 
         // Untouched: no row matched, so the file is never rewritten -- still the original
-        // (pre-`status`/`rejection_reason`) 6-column shape, not a backfilled 8-column one.
+        // (pre-`status`/`comment`) 6-column shape, not a backfilled 8-column one.
         let rows = read_csv_with_status(file.path());
         assert_eq!(
             rows,
@@ -9027,6 +9319,136 @@ mod tests {
                 "".to_string(),
             )]
         );
+    }
+
+    #[test]
+    fn set_sample_comment_at_sets_comment_without_touching_status_or_promoted_to() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[
+                ("Rust", "repo", "abc123", "src/a.rs", "rust-already-promoted", "small"),
+                ("Rust", "repo", "def456", "src/b.rs", "", "full"),
+            ],
+        );
+
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        let found = set_sample_comment_at(file.path(), &source, "worth a second look").unwrap();
+        assert!(found);
+
+        let rows = read_csv_with_status(file.path());
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    "src/a.rs".to_string(),
+                    // A comment must never touch promoted_to or status - unlike reject, this can
+                    // be set on an already-PROMOTED row without disturbing either.
+                    "rust-already-promoted".to_string(),
+                    "small".to_string(),
+                    "PROMOTED".to_string(),
+                    "worth a second look".to_string(),
+                ),
+                (
+                    "src/b.rs".to_string(),
+                    "".to_string(),
+                    "full".to_string(),
+                    "SAMPLED".to_string(),
+                    "".to_string(),
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn set_sample_comment_at_with_an_empty_comment_clears_a_previous_one() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        assert!(set_sample_comment_at(file.path(), &source, "first note").unwrap());
+        assert!(set_sample_comment_at(file.path(), &source, "").unwrap());
+
+        let rows = read_csv_with_status(file.path());
+        assert_eq!(rows[0].4, "");
+    }
+
+    #[test]
+    fn set_sample_comment_at_returns_false_when_no_row_matches() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "other-repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        assert!(!set_sample_comment_at(file.path(), &source, "note").unwrap());
+    }
+
+    #[test]
+    fn sample_comment_at_returns_the_trimmed_comment_when_present() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        set_sample_comment_at(file.path(), &source, "  needs a closer look  ").unwrap();
+
+        assert_eq!(
+            sample_comment_at(file.path(), &source).unwrap(),
+            Some("needs a closer look".to_string())
+        );
+    }
+
+    #[test]
+    fn sample_comment_at_is_none_when_comment_is_empty_or_row_is_missing() {
+        let file = NamedTempFile::new().unwrap();
+        write_csv(
+            file.path(),
+            &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+        );
+        let source = SampleSource {
+            language: "Rust".to_string(),
+            repository: "repo".to_string(),
+            commit: "abc123".to_string(),
+            path: "src/a.rs".to_string(),
+            dataset: "small".to_string(),
+        };
+        // Present row, never-set comment.
+        assert_eq!(sample_comment_at(file.path(), &source).unwrap(), None);
+
+        // No matching row at all.
+        let missing_source = SampleSource {
+            repository: "other-repo".to_string(),
+            ..source
+        };
+        assert_eq!(sample_comment_at(file.path(), &missing_source).unwrap(), None);
     }
 
     #[test]

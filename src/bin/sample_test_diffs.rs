@@ -111,9 +111,10 @@ struct Row {
     /// whichever of the other two applies when the sample is triaged (`s` to promote, `R` to
     /// reject); this tool never sets anything but `SAMPLED` on a freshly-sampled row.
     status: String,
-    /// Why this row was rejected instead of promoted, verbatim from `human_solver`'s reject
-    /// prompt. Empty unless `status` is `REJECTED`.
-    rejection_reason: String,
+    /// Free-form note about this sample, set (and editable) via `human_solver`'s `e`/`R` prompts -
+    /// independent of `status`, though `R` (reject) always sets it to the rejection reason. Empty
+    /// if never set; this tool never writes anything but an empty value on a freshly-sampled row.
+    comment: String,
 }
 
 type SampleKey = (String, String, String);
@@ -178,7 +179,7 @@ fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
             promoted_to,
             dataset: record.get(5).unwrap_or(LEGACY_DATASET).to_string(),
             status,
-            rejection_reason: record.get(7).unwrap_or("").to_string(),
+            comment: record.get(7).unwrap_or("").to_string(),
         });
     }
     Ok(rows)
@@ -317,7 +318,7 @@ fn sample_repository(
             promoted_to: String::new(),
             dataset: dataset.to_string(),
             status: "SAMPLED".to_string(),
-            rejection_reason: String::new(),
+            comment: String::new(),
         };
         reservoirs
             .entry(language)
@@ -358,7 +359,7 @@ fn write_csv(
         "promoted_to",
         "dataset",
         "status",
-        "rejection_reason",
+        "comment",
     ])?;
     for row in &rows {
         writer.write_record([
@@ -369,7 +370,7 @@ fn write_csv(
             &row.promoted_to,
             &row.dataset,
             &row.status,
-            &row.rejection_reason,
+            &row.comment,
         ])?;
     }
     writer.flush()?;
