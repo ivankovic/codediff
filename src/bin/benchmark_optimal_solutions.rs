@@ -164,6 +164,21 @@ fn algorithm_cost_for(
     diff_cost(&diff_ast, &before_metadata, &after_metadata)
 }
 
+/// Wall-clock time for one `diff_code_with_config` call, in milliseconds - a single-shot
+/// measurement (no repeats/averaging, unlike `benchmark_other.rs`'s `--repeats`), kept as its own
+/// isolated call rather than reusing `reason_counts_for`/`algorithm_cost_for`'s own separate
+/// `diff_code_with_config` runs, matching this file's existing "each computation gets its own
+/// independent diff_code call" convention (see `algorithm_cost_for`'s doc comment) - a shared-run
+/// refactor would also need to reach into `compute_mismatches_for_with_config` (a third independent
+/// call, in `human_mapping.rs`), more complexity than this benchmark tool's interactive,
+/// not-hot-loop use case warrants. Independent of `human_mapping.json`, so this works for
+/// "unsolved" fixtures too, same as `reason_counts_for`/`algorithm_cost_for`.
+fn elapsed_ms_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> f64 {
+    let started = std::time::Instant::now();
+    let _diff = codediff::diff::diff_code_with_config(before, after, config);
+    started.elapsed().as_secs_f64() * 1000.0
+}
+
 #[derive(Parser)]
 struct Args {
     /// Print every individual mismatch for this one fixture (including the operation and
@@ -250,6 +265,11 @@ struct Row {
     /// `None` for "unsolved" fixtures (no `human_mapping.json` yet), same convention as
     /// `mismatches`.
     human_cost: Option<u64>,
+    /// Wall-clock time for one `diff_code_with_config` call (see `elapsed_ms_for`), in
+    /// milliseconds. Computed unconditionally, same as `reason_counts`/`algorithm_cost` - this is
+    /// "how long codediff took on this fixture", independent of whether there's a human mapping to
+    /// compare it against.
+    elapsed_ms: f64,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -341,6 +361,7 @@ fn main() -> Result<()> {
             .expect("name came from test_diffs.keys()");
         let reason_counts = reason_counts_for(before, after, &config);
         let algorithm_cost = algorithm_cost_for(before, after, &config);
+        let elapsed_ms = elapsed_ms_for(before, after, &config);
 
         if !human_mapping::mapping_path(name).exists() {
             rows.push(Row {
@@ -349,6 +370,7 @@ fn main() -> Result<()> {
                 reason_counts,
                 algorithm_cost,
                 human_cost: None,
+                elapsed_ms,
             });
             continue;
         }
@@ -362,6 +384,7 @@ fn main() -> Result<()> {
             reason_counts,
             algorithm_cost,
             human_cost: Some(human_cost),
+            elapsed_ms,
         });
     }
 
@@ -403,7 +426,7 @@ fn print_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!(
-        "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}",
+        "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12}",
         "Solution",
         "Mismatches",
         "Mism %",
@@ -411,11 +434,12 @@ fn print_table(rows: &[Row]) {
         "Alg Cost",
         "Hum Cost",
         "Cost Diff",
+        "Elapsed(ms)",
         name_width = name_width
     );
     println!(
         "{}",
-        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9)
+        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12)
     );
 
     let mut total_mismatches = 0usize;
@@ -427,8 +451,10 @@ fn print_table(rows: &[Row]) {
     // algorithm side against nothing on the human side.
     let mut total_algorithm_cost_where_solved = 0u64;
     let mut total_human_cost = 0u64;
+    let mut total_elapsed_ms = 0.0f64;
     for row in rows {
         total_algorithm_cost += row.algorithm_cost;
+        total_elapsed_ms += row.elapsed_ms;
         match (row.mismatches, row.human_cost) {
             (Some((count, nodes)), Some(human_cost)) => {
                 total_mismatches += count;
@@ -442,7 +468,7 @@ fn print_table(rows: &[Row]) {
                 };
                 let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}",
+                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
                     row.name,
                     count,
                     pct,
@@ -450,13 +476,14 @@ fn print_table(rows: &[Row]) {
                     row.algorithm_cost,
                     human_cost,
                     cost_diff,
+                    row.elapsed_ms,
                     name_width = name_width
                 );
             }
             _ => {
                 total_unsolved += 1;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}",
+                    "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12.1}",
                     row.name,
                     "-",
                     "-",
@@ -464,6 +491,7 @@ fn print_table(rows: &[Row]) {
                     row.algorithm_cost,
                     "-",
                     "-",
+                    row.elapsed_ms,
                     name_width = name_width
                 );
             }
@@ -472,7 +500,7 @@ fn print_table(rows: &[Row]) {
 
     println!(
         "{}",
-        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9)
+        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12)
     );
     let total_pct = if total_nodes > 0 {
         100.0 * total_mismatches as f64 / total_nodes as f64
@@ -481,7 +509,7 @@ fn print_table(rows: &[Row]) {
     };
     let total_cost_diff = total_algorithm_cost_where_solved as i64 - total_human_cost as i64;
     println!(
-        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}",
+        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
         "TOTAL",
         total_mismatches,
         total_pct,
@@ -489,6 +517,7 @@ fn print_table(rows: &[Row]) {
         total_algorithm_cost,
         total_human_cost,
         total_cost_diff,
+        total_elapsed_ms,
         name_width = name_width
     );
 }
@@ -563,6 +592,7 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "algorithm_cost",
         "human_cost",
         "cost_diff",
+        "elapsed_ms",
     ];
     header.extend(columns.iter().map(String::as_str));
     wtr.write_record(&header)?;
@@ -595,6 +625,7 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     row.algorithm_cost.to_string(),
                     human_cost.to_string(),
                     cost_diff.to_string(),
+                    format!("{:.3}", row.elapsed_ms),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
@@ -609,6 +640,7 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     row.algorithm_cost.to_string(),
                     "-".to_string(),
                     "-".to_string(),
+                    format!("{:.3}", row.elapsed_ms),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
