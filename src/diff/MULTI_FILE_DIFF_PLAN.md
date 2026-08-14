@@ -174,7 +174,7 @@ pub fn solve(before_metadata: &ASTMetadata, after_metadata: &ASTMetadata, node_c
 Lowest risk - migrate first.
 
 **Group B** (`solve_comment_nodes.rs`, `solve_identical_diagnostic_statements.rs`,
-`solve_similar_flow_control.rs`, `solve_syntax_aware_matching.rs`, `solve_large_flat_subtrees.rs`)
+`solve_syntax_aware_matching.rs`, `solve_large_flat_subtrees.rs`)
 - these read raw source bytes (`.contents.as_bytes()`) and/or call `.id()` on nodes freshly derived
   via `.parent()`/`.children()` (not already in `node_info`), so they need `FileOrigins` threaded
   through:
@@ -324,8 +324,7 @@ identity property means they need no changes.
 - `src/diff/solve_moved_subtrees.rs`, `solve_hash_descent.rs`, `solve_bottom_up_expansion.rs`,
   `solve_greedy_anchor_blocks.rs` (Group A)
 - `src/diff/solve_comment_nodes.rs`, `solve_identical_diagnostic_statements.rs`,
-  `solve_similar_flow_control.rs`, `solve_syntax_aware_matching.rs`, `solve_large_flat_subtrees.rs`
-  (Group B)
+  `solve_syntax_aware_matching.rs`, `solve_large_flat_subtrees.rs` (Group B)
 
 ## Verification
 

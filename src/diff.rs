@@ -27,7 +27,6 @@ pub mod solve_identical_diagnostic_statements;
 pub mod solve_large_flat_subtrees;
 pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
-pub mod solve_similar_flow_control;
 pub mod solve_syntax_aware_matching;
 pub mod text;
 pub mod text_range;
@@ -245,16 +244,11 @@ impl Diff {
         }
 
         // Phase 4: syntax-aware subtree matching (fully-resolved-name N:M matching, absorbing
-        // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally, and
-        // solve_similar_flow_control gated on `solver_similar_flow_control` - net-negative
-        // individually (-82) in the same ablation study).
-        solve_syntax_aware_matching::solve(
-            before,
-            after,
-            &node_cache,
-            &mut ast_diff,
-            config.solver_similar_flow_control,
-        );
+        // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally). Used to also
+        // absorb solve_similar_flow_control (arm-overlap matching), gated on
+        // `solver_similar_flow_control` - deleted 2026-08-14, net-negative in the 2026-07-15
+        // ablation study (-82) and never re-enabled; see `TODO.md`.
+        solve_syntax_aware_matching::solve(before, after, &node_cache, &mut ast_diff);
 
         // Phase 5: second bottom-up expansion, now that phase 4 has produced more matched
         // descendants for it to vote on. Same gate as phase 3.
@@ -459,13 +453,15 @@ impl<'code> PendingDiff<'code> {
 *
 * Defaults were tuned by a 2026-07-15 leave-one-out ablation study over the `optimal_solutions`
 * benchmark corpus (see `ablation_study.sh`, `research/ablation/`), run against the pipeline that
-* existed at the time: all 4 fields here default to `false` because each was found net-negative
-* when disabled individually (i.e. removing it *improved* the benchmark) - `solver_import_nodes`
-* (-89), `solver_similar_flow_control` (-82), `solver_bottom_up_expansion` (-69, gates both of
-* phases 3 and 5). The seven-phase pipeline rework (`TODO.md`, 2026-07-17/18) that replaced the
-* original ~15-pass pipeline these were tuned against kept exactly these 4 knobs, on the same
-* passes, at the same defaults - nothing about the rework changes any of these 4 signals' own
-* accuracy contribution.
+* existed at the time: `solver_import_nodes` and `solver_bottom_up_expansion` (gates both of
+* phases 3 and 5) default to `false` because each was found net-negative when disabled
+* individually (i.e. removing it *improved* the benchmark) - `-89` and `-69` respectively. A third
+* knob, `solver_similar_flow_control` (`-82`, same study), gated `solve_similar_flow_control`
+* (arm-overlap matching); that pass was deleted outright 2026-08-14 (net-negative, disabled by
+* default since the study and never re-enabled - nothing left to gate), so only 3 fields remain.
+* The seven-phase pipeline rework (`TODO.md`, 2026-07-17/18) that replaced the original ~15-pass
+* pipeline these were tuned against kept these knobs, on the same passes, at the same defaults -
+* nothing about the rework changes any of these signals' own accuracy contribution.
 *
 * Exists for the ablation study in `ablation_study.sh` (via `benchmark_optimal_solutions
 * --no-solver-X`/`--solver-X`): disabling or enabling exactly one pass and comparing accuracy
@@ -476,7 +472,6 @@ impl<'code> PendingDiff<'code> {
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
     pub solver_import_nodes: bool,
-    pub solver_similar_flow_control: bool,
     pub solver_bottom_up_expansion: bool,
     pub solver_moved_subtrees: bool,
 }
@@ -487,7 +482,6 @@ impl Default for HeuristicConfig {
             // Net-negative when disabled individually (i.e. removing it *improved* the
             // benchmark) - ablation 2026-07-15.
             solver_import_nodes: false,
-            solver_similar_flow_control: false,
             solver_bottom_up_expansion: false,
             solver_moved_subtrees: true,
         }

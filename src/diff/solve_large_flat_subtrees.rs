@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
-use crate::diff::solve_syntax_aware_matching::solve_named_reference_groups_within;
+use crate::diff::solve_syntax_aware_matching::solve_qualified_name_groups_within;
 use crate::diff::{ASTDiff, NodeCache, nodes};
 
 /// Minimum direct-child count for a node to be treated as a "flat" sequence worth Myers-diffing
@@ -137,14 +137,14 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         // pays full, unconstrained tree-edit-distance for content that `solve_named_reference_
         // groups` would otherwise have matched cheaply by name, since that pass runs *after* this
         // one (deliberately - see this function's doc comment) and so never gets the chance. See
-        // `solve_named_reference_groups_within`'s doc comment for the confirmed live cases this
+        // `solve_qualified_name_groups_within`'s doc comment for the confirmed live cases this
         // fixes.
         //
         // Tried moving both pre-match calls here to *before* the Myers call above (2026-08-08),
         // hoping they'd rescue reusable substructure inside a flat-descendant entry that changed
         // internally (see TODO.md's vimscript entry) before Myers atomically deletes+inserts it.
         // Zero effect - identical mismatch count and content. Neither helper fires on a
-        // `dictionnary_entry`: `solve_named_reference_groups_within` only matches named
+        // `dictionnary_entry`: `solve_qualified_name_groups_within` only matches named
         // declarations, `prematch_identical_statement_siblings` only matches statement sequences,
         // and a dictionary entry is neither. Reverted; left as a doc note so this isn't
         // re-attempted without a reason to expect a different result.
@@ -152,7 +152,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             node_cache.before.get(&before_id),
             node_cache.after.get(&after_id),
         ) {
-            solve_named_reference_groups_within(
+            solve_qualified_name_groups_within(
                 before_node,
                 before_id,
                 after_node,
@@ -556,9 +556,9 @@ mod tests {
         );
     }
 
-    /// Regression guard for the 2026-07-23 fix (`solve_named_reference_groups_within`): a Go test
+    /// Regression guard for the 2026-07-23 fix (`solve_qualified_name_groups_within`): a Go test
     /// function containing *both* a large data-literal table and an independent, literal-named
-    /// `t.Run(...)` subtest call should get the subtest call pre-matched by name (`syntax_named`)
+    /// `t.Run(...)` subtest call should get the subtest call pre-matched by name (`qualified_name`)
     /// before the container-wide `large_flat_subtree_container` call, rather than paying full
     /// tree-edit-distance for it - confirmed against live cases (cockroachdb's
     /// `api_v2_grants_test.go`, jesseduffield/lazygit's `graph_test.go`) that this was previously
@@ -593,14 +593,14 @@ mod tests {
 
         solve(&before, &after, &node_cache, &mut diff);
 
-        let has_syntax_named_reason = diff.mapping.values().any(|m| {
+        let has_qualified_name_reason = diff.mapping.values().any(|m| {
             matches!(
                 &m.reason,
-                crate::diff::ASTMappingReason::APTED("syntax_named")
+                crate::diff::ASTMappingReason::APTED("qualified_name")
             )
         });
         assert!(
-            has_syntax_named_reason,
+            has_qualified_name_reason,
             "expected the independent t.Run(\"independent case\", ...) call to be pre-matched by name"
         );
     }

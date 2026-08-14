@@ -204,14 +204,6 @@ struct Args {
     #[arg(long = "no-solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_import_nodes")]
     no_solver_import_nodes: bool,
 
-    /// Enable MatchSimilarFlowControl. Off by default: net-negative in the 2026-07-15 ablation
-    /// study (disabling it individually *improved* the benchmark by 82 mismatches).
-    #[arg(long = "solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_similar_flow_control")]
-    solver_similar_flow_control: bool,
-    /// Disable `solve_similar_flow_control` (if/switch/match arm-overlap matching).
-    #[arg(long = "no-solver-similar-flow-control", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_similar_flow_control")]
-    no_solver_similar_flow_control: bool,
-
     /// Enable BottomUpExpansion. Off by default: net-negative in the 2026-07-15 ablation study
     /// (disabling it individually *improved* the benchmark by 69 mismatches). Gates both phase 3
     /// and phase 5 (bottom-up expansion runs twice in the pipeline).
@@ -229,14 +221,12 @@ struct Args {
     no_solver_moved_subtrees: bool,
 }
 
-/// Resolves `Args`' 4 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
+/// Resolves `Args`' 3 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
 /// wins whenever the two disagree at the end of parsing (see the flag pair's `overrides_with`,
 /// verified against clap's actual last-flag-wins behavior).
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
     codediff::diff::HeuristicConfig {
         solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
-        solver_similar_flow_control: args.solver_similar_flow_control
-            && !args.no_solver_similar_flow_control,
         solver_bottom_up_expansion: args.solver_bottom_up_expansion
             && !args.no_solver_bottom_up_expansion,
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,

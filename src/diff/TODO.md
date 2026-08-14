@@ -66,6 +66,43 @@ here so nobody re-discovers the same false positives.
   the residual tie between "whitespace before" vs. "whitespace after" a single deletion is real and
   unavoidable, this just stops it from propagating past its own local segment.
 
+- **`solve_similar_flow_control` (MatchSimilarFlowControl) deleted (2026-08-14)**: phase 4's
+  arm-overlap matcher for still-unmatched `if`/`switch`/`match` constructs. Net-negative in the
+  2026-07-15 ablation study (disabling it individually *improved* the benchmark by 82 mismatches),
+  disabled by default ever since, and never re-enabled - so removing it changes nothing about
+  default-config diff output. Confirmed: full corpus benchmark identical before/after (21090
+  mismatches both times, zero fixtures changed). Removed the module
+  (`solve_similar_flow_control.rs`),
+  its `HeuristicConfig::solver_similar_flow_control` gate and CLI flags
+  (`--solver-similar-flow-control`/`--no-solver-similar-flow-control` on
+  `benchmark_optimal_solutions`), and its now-solely-owned helpers in `nodes.rs`
+  (`FlowControlArm`, `flow_control_arms`/`match_arms`/`switch_arms`/`if_chain_arms`,
+  `signature_text`, `trimmed_text`, `flow_control_signature_set`). Kept: `FlowControlFamily`/
+  `flow_control_family` (still used by `is_block_container` for `solve_greedy_anchor_blocks`),
+  `flow_control_similarity_of_sets` (still used by `solve_import_list_overlap`'s Jaccard scoring),
+  `nodes::collect_unmatched` (still used by `solve_identical_diagnostic_statements`). Phase 4 is now
+  three mechanisms sharing `grouped_greedy_matcher`'s generic engine (named-group matching, import-
+  list overlap, positional anchoring) plus the one that doesn't fit that shape
+  (`solve_large_flat_subtrees`), not four.
+
+- **Phase 4 naming cleanup (2026-08-14)**: `solve_named_reference_groups`/`_within` (and its
+  helpers `match_named_groups`, `collect_fully_resolved_groups`/`_excluding_root`/`_rec`) renamed
+  to `solve_qualified_name_groups`/`_within`/`match_qualified_name_groups`/
+  `collect_qualified_name_groups`/`_excluding_root`/`_rec` - "reference" collided with the
+  unrelated `nodes::is_reference` (phase 1's own-identity predicate for XML elements, imports,
+  etc.), and the old name didn't foreground the actual mechanism (fully-resolved, scope-qualified
+  names, e.g. `"Bar::new"` not bare `"new"`). Its `ASTMappingReason::APTED` source strings renamed
+  to match: `"syntax_named"` -> `"qualified_name"`, `"syntax_import_list"` ->
+  `"import_list_overlap"` (dropping the `syntax_`-prefix-by-parent-module convention in favor of
+  direct names, consistent with sibling reasons `"large_flat_subtree"`/`"greedy_anchor_block"`
+  which never had that prefix). `apted/common.rs`'s `PREMATCH_SIBLING_ORDER_SOURCES` array (which
+  matches against these exact source strings at runtime to gate a real behavior, not just cosmetic)
+  updated in lockstep - a pure string-literal rename there would have silently disabled that check
+  for this source. Pure rename, no logic changed: full corpus benchmark identical before/after
+  (21090 mismatches both times, zero fixtures changed), only the reason-column names in the CSV
+  changed (`APTED:syntax_named` -> `APTED:qualified_name`, `APTED:syntax_import_list` ->
+  `APTED:import_list_overlap`).
+
 ## Not actual bugs (re-verified 2026-07-08)
 
 - **`from_treesitter_range`'s `end_row < columns_per_row.len()` guard**: the original report
@@ -82,8 +119,8 @@ here so nobody re-discovers the same false positives.
   `for_nodes` call. This looks like double work but isn't: `PostorderIndexer` prunes any node
   already present in `diff`'s node maps (plus its subtree) before building the forest, so the
   class-level call skips every already-matched method. This is the same intentional
-  pre-match-then-diff-container idiom `solve_similar_flow_control::anchor_matching_arms` uses and
-  documents.
+  pre-match-then-diff-container idiom every phase-4 heuristic uses (e.g.
+  `solve_greedy_anchor_blocks::anchor_pair_via_apted`).
 - **Cost model treats `Move` as free (`COST_MOVE = 0`)**: deliberate, not an oversight.
 - **`DeltaTable::get`'s "no bounds checking"**: it indexes a `Vec`, which panics on out-of-bounds
   access like any other Rust indexing - there's no silent corruption to guard against. Returning

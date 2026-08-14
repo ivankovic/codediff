@@ -59,8 +59,9 @@ fn optimal_solution() -> Result<()> {
     //  This is quite a "deep" change, and heuristics that prevent changes across too many levels
     //  might not allow "contents" to match. However, for humans it is obviously correct to match
     //  them. Confirmed this is APTED's own tree-edit-distance ordering constraint, not a heuristic
-    //  cutoff: both nodes reach APTED (reason `APTED("syntax_named")` on both the before-side
-    //  Delete and the after-side Insert) and matching them is textually free (identical
+    //  cutoff: both nodes reach APTED (reason `APTED("qualified_name")`, formerly `"syntax_named"`
+    //  - renamed 2026-08-14 - on both the before-side Delete and the after-side Insert) and
+    //  matching them is textually free (identical
     //  identifiers), but APTED's optimal solution still doesn't include the pair - matching them
     //  would violate the LCA-consistent ordering APTED's mapping model requires relative to the
     //  other already-fixed matches in the block. This is the same class of "objective wall" as

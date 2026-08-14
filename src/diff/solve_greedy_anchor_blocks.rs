@@ -21,18 +21,18 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
 * GreedyAnchorBlock: the pipeline's only *greedy, cost-estimate-driven* matcher. Every other
-* container-pairing heuristic (`solve_syntax_aware_matching`, `solve_similar_flow_control`,
-* `solve_bottom_up_expansion`) decides "is this pair the same thing" from some form of identity
-* signal - a shared name, a shared set of arm/case signatures, a Dice coefficient over already-
-* matched descendants. This pass instead estimates the actual edit cost of matching each candidate
-* pair (see `sequence_edit_cost`) and accepts whichever pairs are cheap enough, cheapest first,
+* container-pairing heuristic (`solve_syntax_aware_matching`, `solve_bottom_up_expansion`) decides
+* "is this pair the same thing" from some form of identity signal - a shared name, a Dice
+* coefficient over already-matched descendants. This pass instead estimates the actual edit cost of
+* matching each candidate pair (see `sequence_edit_cost`) and accepts whichever pairs are cheap
+* enough, cheapest first,
 * exactly like a greedy weighted-matching algorithm - useful for containers (e.g. an `if` block, a
 * loop body, a function body) that have no name, no arm structure, and no already-matched children
 * for a Dice coefficient to count, but whose *content* is still obviously the same block with a few
 * edits.
 *
 * An earlier version of this pass scored *every* candidate pair against every other (an all-pairs
-* B*A search, same shape as `solve_similar_flow_control`'s arm-overlap scoring) and regressed 9
+* B*A search) and regressed 9
 * `optimal_solutions` fixtures: `sequence_edit_cost` only looks at a pair's own direct children, so
 * nothing stopped it scoring two structurally *unrelated* nodes as "cheap to match" whenever their
 * children happened to hash-coincide (e.g. two different `call_expression`s - one in a `for` loop

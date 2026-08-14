@@ -70,9 +70,10 @@ pub fn map_identical_descendants<'a>(
 /// `mapped`. Doesn't descend into already-mapped nodes - their contents are presumed already
 /// resolved by an earlier pass - but does keep descending past a collected node itself, in case a
 /// second match is nested inside the first (e.g. one diagnostic call nested in another's
-/// arguments). Shared shape behind `solve_similar_flow_control`'s
-/// `collect_unmatched_containers` and `solve_identical_diagnostic_statements`'s
-/// `collect_unmatched_diagnostic_statements`, which differed only in their predicate.
+/// arguments). Originally factored out of two near-duplicate walks, one of which
+/// (`solve_similar_flow_control`'s `collect_unmatched_containers`) was deleted 2026-08-14;
+/// `solve_identical_diagnostic_statements`'s `collect_unmatched_diagnostic_statements` remains the
+/// current caller.
 pub fn collect_unmatched<'a>(
     root: Node<'a>,
     mapped: &rustc_hash::FxHashMap<usize, usize>,
@@ -294,7 +295,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
 /// A *scope-local* identity name for nodes like parameters, local variable declarations, and
 /// shell variable assignments - the same kind of stable identity signal `is_semantically_
 /// structural` provides for top-level declarations, but deliberately **not** layered onto that
-/// function or the global name-resolution pipeline it feeds (`solve_named_reference_groups`):
+/// function or the global name-resolution pipeline it feeds (`solve_qualified_name_groups`):
 /// that walks the *entire* file, so adding parameters/local variables there would make every one
 /// of them in the whole codebase a top-level-matchable candidate - a much bigger, riskier change
 /// than the narrow, per-container mechanism this is for (`apted::prematch_unique_named_locals`)
@@ -458,7 +459,7 @@ pub fn is_semantically_structural<'a>(
             // first name only (a simplification, not a correctness issue - the group is still
             // matched as one unit across before/after as long as that first name is unchanged).
             // `var_spec`/`const_spec` are *also* matched independently below, for
-            // `solve_named_reference_groups`'s fully-recursive, finer-grained walk - the two
+            // `solve_qualified_name_groups`'s fully-recursive, finer-grained walk - the two
             // consumers have different needs (direct-children-only vs. any depth), so both arms
             // are useful rather than redundant.
             "var_declaration" | "const_declaration" => {
@@ -553,7 +554,7 @@ pub fn is_semantically_structural<'a>(
         // Previously entirely unhandled here (confirmed empirically 2026-07-25, chasing a
         // 30s-on-235-lines pathology in `csharp-radarr-add-object-instance`): `is_reference`
         // above already lists these C# kinds for hash-candidate selection, but nothing extracted
-        // a *name* from them, so `solve_named_reference_groups`/`solve_large_flat_subtrees` (both
+        // a *name* from them, so `solve_qualified_name_groups`/`solve_large_flat_subtrees` (both
         // keyed on `is_semantically_structural`) silently treated every C# file as having zero
         // named declarations - no class, method, or field ever got the cheap identity-based match
         // every other supported language gets. The 49-vs-50-entry `new IsoLanguage(...)` list in
@@ -849,7 +850,7 @@ pub fn is_semantically_structural<'a>(
         // Safe against repeated keys (`one`/`other`/`name`, ubiquitous across sibling objects in a
         // locale file) the same way Ruby's `Bar::new` vs `Foo::new` is safe: every enclosing
         // `block_mapping_pair` that's itself a candidate contributes its own key to the fully-
-        // resolved scope chain (`solve_named_reference_groups`'s doc comment), so two pairs only
+        // resolved scope chain (`solve_qualified_name_groups`'s doc comment), so two pairs only
         // ever share an identity if their *entire* ancestor key path matches, not just the leaf key.
         Language::YAML if node_kind == "block_mapping_pair" => node
             .child_by_field_name("key")
@@ -875,7 +876,7 @@ pub fn is_semantically_structural<'a>(
 /// diffs. Only a mismatched (wrong-position, wrong-content) false positive elsewhere could make
 /// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
 /// quality (a coincidental non-test `.Run("...")` call getting grouped as if it had an identity),
-/// never correctness - `solve_named_reference_groups` still runs real APTED on whatever it groups.
+/// never correctness - `solve_qualified_name_groups` still runs real APTED on whatever it groups.
 /// The `identifier` name of a Go `var_spec`/`const_spec` (or, for a grouped `var (...)`/`const
 /// (...)` declaration, the same lookup applied to its first spec child).
 fn go_spec_identifier_name<'a>(spec: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
@@ -923,7 +924,7 @@ fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a s
 /// Without this, every `TEST(...)`/`TEST_F(...)`/`TEST_P(...)` block in a file resolves to the
 /// *identical* literal name "TEST"/"TEST_F"/"TEST_P" via the ordinary `c_family_declarator_name`
 /// path below, collapsing potentially dozens of genuinely distinct, uniquely-named test functions
-/// into one shared-name candidate group - `solve_named_reference_groups`'s N:M support then has to
+/// into one shared-name candidate group - `solve_qualified_name_groups`'s N:M support then has to
 /// pairwise cost-compare all of them to decide which pairs with which, instead of matching 1:1 by
 /// name for free. Measured live (`cpp-opencv-add-test-case`): adding one new, uniquely-named
 /// `TEST(...)` block among ~15 pre-existing ones cost 691ms in phase 4 alone, almost entirely this
@@ -1336,27 +1337,18 @@ pub fn matching_allowed(
     parents_matched()
 }
 
-/// A flow-control construct family, used to keep `MatchSimilarFlowControl` from ever pairing a
-/// `match` against a `switch`, etc. `Hash` (alongside `Eq`) so it can serve directly as
-/// `grouped_greedy_matcher`'s compatibility key.
+/// A flow-control construct family. Originally existed to keep the since-deleted
+/// `solve_similar_flow_control` (`MatchSimilarFlowControl`) from ever pairing a `match` against a
+/// `switch`, etc.; its only remaining consumer is [`flow_control_family`], used by
+/// [`is_block_container`] to recognize `if`/`match`/`switch` constructs as anonymous-container
+/// candidates for `solve_greedy_anchor_blocks`. `Hash` (alongside `Eq`) is a holdover from once
+/// serving as `grouped_greedy_matcher`'s compatibility key - harmless to keep, not required by the
+/// current use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlowControlFamily {
     Match,
     Switch,
     If,
-}
-
-/// One arm/case of a flow-control container, together with its normalized discriminant text (the
-/// match pattern or case label), used by `MatchSimilarFlowControl` to score how similar two
-/// containers are.
-///
-/// `signature` is `None` for a wildcard/default arm (Rust/Python `_`, a bare `default:`): matching
-/// those across two constructs is trivial and would inflate the similarity score without telling
-/// us anything real, so they're excluded from scoring (see `flow_control_similarity`).
-#[derive(Debug, Clone)]
-pub struct FlowControlArm {
-    pub node_id: usize,
-    pub signature: Option<String>,
 }
 
 /// Returns which [`FlowControlFamily`] `node_kind` belongs to for `language`, if any.
@@ -1426,227 +1418,13 @@ pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
     )
 }
 
-/// Extracts the byte range of `container`'s discriminant, excluding a trailing guard/`when`
-/// clause if the grammar attaches one directly to the pattern node under a `condition` field
-/// (Rust's `match_pattern` does this for `pattern if guard`; Python's `case_pattern` doesn't need
-/// it since the guard is a sibling field on `case_clause` instead, so this is a no-op there).
-fn signature_text(container: Node, source: &[u8]) -> Option<String> {
-    let start = container.start_byte();
-    let guard = container.child_by_field_name("condition");
-    let end = guard
-        .map(|g| g.start_byte())
-        .unwrap_or_else(|| container.end_byte());
-    if end <= start {
-        return None;
-    }
-    let text = std::str::from_utf8(&source[start..end]).ok()?.trim();
-    // When a guard is present, the slice still includes the `if`/`when` keyword introducing it
-    // (the keyword itself isn't part of the `condition` field) - strip it back off.
-    let text = if guard.is_some() {
-        text.strip_suffix("if")
-            .or_else(|| text.strip_suffix("when"))
-            .map(str::trim_end)
-            .unwrap_or(text)
-    } else {
-        text
-    };
-    if text.is_empty() || text == "_" {
-        None
-    } else {
-        Some(text.to_string())
-    }
-}
-
-/// Extracts the arm/case list for a recognized flow-control container node (see
-/// [`flow_control_family`]). Returns `None` if `node`'s kind isn't a recognized container.
-pub fn flow_control_arms(
-    node: Node,
-    language: &Language,
-    source: &[u8],
-) -> Option<Vec<FlowControlArm>> {
-    match flow_control_family(node.kind(), language)? {
-        FlowControlFamily::Match => match_arms(node, language, source),
-        FlowControlFamily::Switch => switch_arms(node, language, source),
-        FlowControlFamily::If => if_chain_arms(node, language, source),
-    }
-}
-
-fn match_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
-    match language {
-        Language::Rust => {
-            let body = node.child_by_field_name("body")?; // match_block
-            let mut cursor = body.walk();
-            Some(
-                body.children(&mut cursor)
-                    .filter(|c| c.kind() == "match_arm")
-                    .map(|arm| FlowControlArm {
-                        node_id: arm.id(),
-                        signature: arm
-                            .child_by_field_name("pattern")
-                            .and_then(|pattern| signature_text(pattern, source)),
-                    })
-                    .collect(),
-            )
-        }
-        Language::Python => {
-            let body = node.child_by_field_name("body")?; // block
-            let mut cursor = body.walk();
-            Some(
-                body.children(&mut cursor)
-                    .filter(|c| c.kind() == "case_clause")
-                    .map(|arm| FlowControlArm {
-                        node_id: arm.id(),
-                        // `case_pattern` is `case_clause`'s sole unnamed child, always the first
-                        // one (the optional `guard`/`consequence` fields always follow it).
-                        signature: arm
-                            .named_child(0)
-                            .and_then(|pattern| signature_text(pattern, source)),
-                    })
-                    .collect(),
-            )
-        }
-        _ => None,
-    }
-}
-
-fn switch_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
-    let arm = |n: Node, value_field: &str| FlowControlArm {
-        node_id: n.id(),
-        signature: n
-            .child_by_field_name(value_field)
-            .and_then(|v| signature_text(v, source)),
-    };
-    match language {
-        Language::C | Language::CPP => {
-            let body = node.child_by_field_name("body")?; // compound_statement
-            let mut cursor = body.walk();
-            Some(
-                body.children(&mut cursor)
-                    .filter(|c| c.kind() == "case_statement")
-                    .map(|n| arm(n, "value"))
-                    .collect(),
-            )
-        }
-        Language::JavaScript | Language::TypeScript | Language::TSX => {
-            let body = node.child_by_field_name("body")?; // switch_body
-            let mut cursor = body.walk();
-            Some(
-                body.children(&mut cursor)
-                    .filter(|c| c.kind() == "switch_case" || c.kind() == "switch_default")
-                    .map(|n| arm(n, "value"))
-                    .collect(),
-            )
-        }
-        Language::CSharp => {
-            let body = node.child_by_field_name("body")?; // switch_body
-            let mut cursor = body.walk();
-            Some(
-                body.children(&mut cursor)
-                    .filter(|c| c.kind() == "switch_section")
-                    .map(|n| FlowControlArm {
-                        node_id: n.id(),
-                        signature: n
-                            .child_by_field_name("expression")
-                            .or_else(|| n.child_by_field_name("pattern"))
-                            .and_then(|v| signature_text(v, source)),
-                    })
-                    .collect(),
-            )
-        }
-        Language::Go => {
-            // No `body` field: `expression_case`/`default_case` are direct children.
-            let mut cursor = node.walk();
-            Some(
-                node.children(&mut cursor)
-                    .filter(|c| c.kind() == "expression_case" || c.kind() == "default_case")
-                    .map(|n| arm(n, "value"))
-                    .collect(),
-            )
-        }
-        _ => None,
-    }
-}
-
-/// Walks an `if`/`else if`/`else` chain starting at `node` (which must already be the outermost
-/// unmatched `if` for this comparison), producing one arm per branch: the condition text for each
-/// `if`/`else if`, and a final wildcard (`signature: None`) arm for a trailing bare `else`, if any.
+/// Jaccard similarity (shared entries / all distinct entries across both sides) of two precomputed
+/// string sets - generic set-overlap scoring, originally written for comparing flow-control arm
+/// signatures (the name and doc comment predate that caller's 2026-08-14 deletion; the name stuck
+/// since `solve_import_list_overlap` reuses it unchanged for import-symbol-set overlap).
 ///
-/// `else_clause`-wrapping grammars (Rust, C, C++, JS/TS/TSX) always give that wrapper exactly one
-/// child - either a block or a nested `if` - so unwrapping it is a single `named_child(0)`. Grammars
-/// that put `alternative` directly on the next branch (Java, Go, C#) need no unwrapping at all.
-fn if_chain_arms(node: Node, language: &Language, source: &[u8]) -> Option<Vec<FlowControlArm>> {
-    let wraps_else_clause = matches!(
-        language,
-        Language::Rust
-            | Language::C
-            | Language::CPP
-            | Language::JavaScript
-            | Language::TypeScript
-            | Language::TSX
-    );
-
-    let mut arms = Vec::new();
-    let mut current = node;
-    // A chain this long would be a code smell in the source itself; the cap is just to keep a
-    // malformed/unexpected tree from looping forever.
-    for _ in 0..64 {
-        let signature = current
-            .child_by_field_name("condition")
-            .and_then(|condition| trimmed_text(condition, source));
-        arms.push(FlowControlArm {
-            node_id: current.id(),
-            signature,
-        });
-
-        let Some(alternative) = current.child_by_field_name("alternative") else {
-            break;
-        };
-        let next = if wraps_else_clause {
-            match alternative.named_child(0) {
-                Some(inner) => inner,
-                None => break,
-            }
-        } else {
-            alternative
-        };
-
-        if flow_control_family(next.kind(), language) == Some(FlowControlFamily::If) {
-            current = next;
-        } else {
-            // A bare `else { ... }`: terminal, no condition of its own.
-            arms.push(FlowControlArm {
-                node_id: next.id(),
-                signature: None,
-            });
-            break;
-        }
-    }
-    Some(arms)
-}
-
-fn trimmed_text(node: Node, source: &[u8]) -> Option<String> {
-    let text = node.utf8_text(source).ok()?.trim();
-    if text.is_empty() {
-        None
-    } else {
-        Some(text.to_string())
-    }
-}
-
-/// The set of non-wildcard arm signatures for a flow-control container, as used by
-/// `flow_control_similarity_of_sets`. Callers comparing one candidate against many others (e.g.
-/// `solve_similar_flow_control`'s all-pairs scoring) should build this once per candidate and
-/// reuse it, rather than re-deriving it from `arms` on every pairwise comparison.
-pub fn flow_control_signature_set(arms: &[FlowControlArm]) -> std::collections::HashSet<&str> {
-    arms.iter().filter_map(|a| a.signature.as_deref()).collect()
-}
-
-/// Fraction of non-wildcard arm signatures shared between two flow-control containers (Jaccard
-/// similarity: shared signatures / all distinct signatures across both sides), given their
-/// precomputed signature sets (see `flow_control_signature_set`).
-///
-/// Returns 0.0 if either side has no non-wildcard signatures at all (nothing meaningful to
-/// compare), so an empty/all-wildcard construct never spuriously "matches" another one.
+/// Returns 0.0 if either side is empty (nothing meaningful to compare), so two empty sets never
+/// spuriously "match" each other.
 pub fn flow_control_similarity_of_sets(
     before_set: &std::collections::HashSet<&str>,
     after_set: &std::collections::HashSet<&str>,
@@ -1831,91 +1609,20 @@ mod tests {
         ));
     }
 
-    fn rust_match_container(src: &str) -> Code {
-        Code::from_string(src, &Language::Rust)
-    }
-
     #[test]
-    fn rust_match_arms_extracts_string_literal_patterns() {
-        let code = rust_match_container(
-            r#"
-fn f(s: &str) {
-    match s {
-        "a" => 1,
-        "b" => 2,
-        _ => 0,
-    };
-}
-"#,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let match_expr = helper::find_first_of_kind(ast.root_node(), "match_expression").unwrap();
-        let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
-        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
-        assert_eq!(signatures, vec![Some("\"a\""), Some("\"b\""), None]);
-    }
+    fn flow_control_similarity_of_sets_ignores_wildcards_and_scores_jaccard() {
+        // Regression guard for `flow_control_similarity_of_sets` after the arm-extraction helpers
+        // that used to be its only caller (`solve_similar_flow_control`) were deleted 2026-08-14 -
+        // `solve_import_list_overlap` is the sole remaining caller now, building its sets directly
+        // from import symbols rather than flow-control arm signatures, but the Jaccard scoring
+        // itself is generic and still worth its own direct test.
+        let before: std::collections::HashSet<&str> =
+            ["asset", "ecmascript", "wasm"].into_iter().collect();
+        let after: std::collections::HashSet<&str> =
+            ["asset", "ecmascript", "json"].into_iter().collect();
 
-    #[test]
-    fn rust_match_arm_guard_is_excluded_from_signature() {
-        let code = rust_match_container(
-            r#"
-fn f(s: i32) {
-    match s {
-        n if n > 0 => 1,
-        _ => 0,
-    };
-}
-"#,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let match_expr = helper::find_first_of_kind(ast.root_node(), "match_expression").unwrap();
-        let arms = match_arms(match_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
-        assert_eq!(arms[0].signature.as_deref(), Some("n"));
-    }
-
-    #[test]
-    fn flow_control_similarity_ignores_wildcard_and_scores_jaccard() {
-        let before = rust_match_container(
-            r#"
-fn f(s: &str) {
-    match s {
-        "asset" => 1,
-        "ecmascript" => 2,
-        "wasm" => 3,
-        _ => 0,
-    };
-}
-"#,
-        );
-        let after = rust_match_container(
-            r#"
-fn f(s: &str) {
-    match s {
-        "asset" => 1,
-        "ecmascript" => 2,
-        "json" => 4,
-        _ => 0,
-    };
-}
-"#,
-        );
-        let before_ast = before.ast.as_ref().unwrap();
-        let after_ast = after.ast.as_ref().unwrap();
-        let before_expr =
-            helper::find_first_of_kind(before_ast.root_node(), "match_expression").unwrap();
-        let after_expr =
-            helper::find_first_of_kind(after_ast.root_node(), "match_expression").unwrap();
-        let before_arms =
-            match_arms(before_expr, &Language::Rust, before.contents.as_bytes()).unwrap();
-        let after_arms =
-            match_arms(after_expr, &Language::Rust, after.contents.as_bytes()).unwrap();
-
-        // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4). Wildcards
-        // excluded from both sets entirely, so a trivial `_`<->`_` match can't inflate the score.
-        let score = flow_control_similarity_of_sets(
-            &flow_control_signature_set(&before_arms),
-            &flow_control_signature_set(&after_arms),
-        );
+        // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4).
+        let score = flow_control_similarity_of_sets(&before, &after);
         assert!(
             (score - 0.5).abs() < 1e-9,
             "expected 2/4 = 0.5, got {score}"
@@ -1923,87 +1630,11 @@ fn f(s: &str) {
     }
 
     #[test]
-    fn c_switch_arms_extracts_case_values_and_default() {
-        let code = Code::from_string(
-            r#"
-void f(int x) {
-    switch (x) {
-        case 1: break;
-        case 2: break;
-        default: break;
-    }
-}
-"#,
-            &Language::C,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let switch_stmt = helper::find_first_of_kind(ast.root_node(), "switch_statement").unwrap();
-        let arms = switch_arms(switch_stmt, &Language::C, code.contents.as_bytes()).unwrap();
-        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
-        assert_eq!(signatures, vec![Some("1"), Some("2"), None]);
-    }
-
-    #[test]
-    fn rust_if_chain_extracts_conditions_and_trailing_else() {
-        let code = rust_match_container(
-            r#"
-fn f(x: i32) -> i32 {
-    if x > 0 {
-        1
-    } else if x < 0 {
-        2
-    } else {
-        0
-    }
-}
-"#,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let if_expr = helper::find_first_of_kind(ast.root_node(), "if_expression").unwrap();
-        let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
-        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
-        assert_eq!(signatures, vec![Some("x > 0"), Some("x < 0"), None]);
-    }
-
-    #[test]
-    fn rust_if_chain_without_else_has_no_trailing_wildcard_arm() {
-        let code = rust_match_container(
-            r#"
-fn f(x: i32) {
-    if x > 0 {
-        1;
-    }
-}
-"#,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let if_expr = helper::find_first_of_kind(ast.root_node(), "if_expression").unwrap();
-        let arms = if_chain_arms(if_expr, &Language::Rust, code.contents.as_bytes()).unwrap();
-        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
-        assert_eq!(signatures, vec![Some("x > 0")]);
-    }
-
-    #[test]
-    fn c_if_chain_extracts_conditions() {
-        let code = Code::from_string(
-            r#"
-int f(int x) {
-    if (x > 0) {
-        return 1;
-    } else if (x < 0) {
-        return 2;
-    } else {
-        return 0;
-    }
-}
-"#,
-            &Language::C,
-        );
-        let ast = code.ast.as_ref().unwrap();
-        let if_stmt = helper::find_first_of_kind(ast.root_node(), "if_statement").unwrap();
-        let arms = if_chain_arms(if_stmt, &Language::C, code.contents.as_bytes()).unwrap();
-        let signatures: Vec<Option<&str>> = arms.iter().map(|a| a.signature.as_deref()).collect();
-        assert_eq!(signatures, vec![Some("(x > 0)"), Some("(x < 0)"), None]);
+    fn flow_control_similarity_of_sets_is_zero_when_either_side_is_empty() {
+        let empty: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let non_empty: std::collections::HashSet<&str> = ["a"].into_iter().collect();
+        assert_eq!(flow_control_similarity_of_sets(&empty, &non_empty), 0.0);
+        assert_eq!(flow_control_similarity_of_sets(&non_empty, &empty), 0.0);
     }
 
     #[test]
@@ -2443,7 +2074,7 @@ class Calculator:
         let after = Code::from_string(after_src, &Language::Python);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();
@@ -2614,7 +2245,7 @@ class Calculator {
         let after = Code::from_string(after_src, &Language::Kotlin);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();

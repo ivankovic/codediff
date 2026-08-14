@@ -24,8 +24,8 @@ use anyhow::{Ok, Result};
 #[test]
 fn matches_human_solution() -> Result<()> {
     // Lowered from 175 to 52: the 2026-07-15 default-heuristic change (see TODO.md) disabled
-    // solver_import_nodes/solver_similar_flow_control/solver_bottom_up_expansion by default, which
-    // measurably improved this fixture's match quality.
+    // solver_import_nodes/solver_bottom_up_expansion by default (plus solver_similar_flow_control,
+    // deleted outright 2026-08-14), which measurably improved this fixture's match quality.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-turbopack-module-rule",
         52,

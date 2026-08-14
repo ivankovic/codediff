@@ -25,24 +25,26 @@ use crate::diff::apted::{self, Algorithm};
 use crate::diff::nodes::flow_control_similarity_of_sets;
 use crate::diff::{
     ASTDiff, NodeCache, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks,
-    solve_large_flat_subtrees, solve_similar_flow_control,
+    solve_large_flat_subtrees,
 };
 
 /**
 * Phase 4 of the seven-phase pipeline (`TODO.md`, 2026-07-17/18): "syntax-aware subtree matching".
-* Named-group matching (below), positional anchoring (`solve_greedy_anchor_blocks`), and
-* flow-control arm-overlap (`solve_similar_flow_control`) turned out, on inspection (`TODO.md`'s
-* "generalization of phase 4" analysis, 2026-07-18), to be the same algorithm with three different
-* (candidate predicate, compatibility key, cost function) tuples plugged in - all three now share
-* one engine, `grouped_greedy_matcher::solve`: partition candidates into buckets by an exact key,
-* score same-key pairs with a cheap cost function, greedily accept the cheapest first (optionally
-* above a threshold), hand accepted pairs to real APTED. This module's own contribution to that
-* shared shape is [`solve_named_reference_groups`] - **fully-resolved names** (scope-qualified,
-* e.g. `"Bar::new"` rather than bare `"new"`) as the compatibility key, supporting real N:M
-* (overloads, trait-impl duplicates) and no rejection threshold at all (the shared name already
-* *is* the identity signal - see that function's doc comment for why).
+* Named-group matching (below) and positional anchoring (`solve_greedy_anchor_blocks`) turned out,
+* on inspection (`TODO.md`'s "generalization of phase 4" analysis, 2026-07-18), to be the same
+* algorithm with different (candidate predicate, compatibility key, cost function) tuples plugged
+* in - both now share one engine, `grouped_greedy_matcher::solve`: partition candidates into
+* buckets by an exact key, score same-key pairs with a cheap cost function, greedily accept the
+* cheapest first (optionally above a threshold), hand accepted pairs to real APTED. This module's
+* own contribution to that shared shape is [`solve_qualified_name_groups`] - **fully-resolved
+* names** (scope-qualified, e.g. `"Bar::new"` rather than bare `"new"`) as the compatibility key,
+* supporting real N:M (overloads, trait-impl duplicates) and no rejection threshold at all (the
+* shared name already *is* the identity signal - see that function's doc comment for why). A third
+* mechanism sharing this shape, flow-control arm-overlap matching (`solve_similar_flow_control`),
+* was deleted 2026-08-14 - net-negative in the 2026-07-15 ablation study, disabled by default since
+* and never re-enabled.
 *
-* `solve_large_flat_subtrees` is the fourth pass this phase absorbs, but it doesn't fit the
+* `solve_large_flat_subtrees` is the other pass this phase absorbs, but it doesn't fit the
 * grouped-matching shape (no competing candidates, no scoring) - it's a deterministic lookup
 * executed *inside* an already-identity-matched pair purely to pre-empt part of that pair's own
 * APTED call. It runs first, same ordering the old pipeline used: `TODO.md`'s original plan bet
@@ -53,20 +55,11 @@ use crate::diff::{
 * the flat descendant specifically). Pre-empting it explicitly here fixed a 141-mismatch regression
 * on that fixture - see `TODO.md`.
 */
-pub fn solve(
-    before: &Code,
-    after: &Code,
-    node_cache: &NodeCache,
-    diff: &mut ASTDiff,
-    solve_similar_flow_control_enabled: bool,
-) {
+pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     solve_large_flat_subtrees::solve(before, after, node_cache, diff);
-    solve_named_reference_groups(before, after, diff);
+    solve_qualified_name_groups(before, after, diff);
     solve_import_list_overlap(before, after, diff);
     solve_greedy_anchor_blocks::solve(before, after, node_cache, diff);
-    if solve_similar_flow_control_enabled {
-        solve_similar_flow_control::solve(before, after, node_cache, diff);
-    }
 }
 
 /**
@@ -81,21 +74,21 @@ pub fn solve(
 * support real N:M: overloads, duplicate trait impls, or any other case where more than one
 * candidate shares the same key on one or both sides.
 *
-* Unlike the positional/arm-overlap signals this phase also uses (via `solve_greedy_anchor_blocks`/
-* `solve_similar_flow_control`), matching here is **not** gated by a cost-ratio rejection
-* threshold: the shared fully-resolved name already *is* the identity signal (this declaration
-* exists on both sides, however much its content changed - even a 100%-rewritten function body is
-* still "the same function" if the name didn't change), so cost is only used to break ties *within*
-* a multi-candidate group (deciding *which* overload pairs with which), never to reject a pair
-* outright. `solve_greedy_anchor_blocks::cost_ratio` (the same `sequence_edit_cost`-based estimate)
-* is reused for that tie-break, cheapest first, one-to-one within the group.
+* Unlike the positional signal this phase also uses (via `solve_greedy_anchor_blocks`), matching
+* here is **not** gated by a cost-ratio rejection threshold: the shared fully-resolved name already
+* *is* the identity signal (this declaration exists on both sides, however much its content
+* changed, even a 100%-rewritten function body is still "the same function" if the name didn't
+* change), so cost is only used to break ties *within* a multi-candidate group (deciding *which*
+* overload pairs with which), never to reject a pair outright. `solve_greedy_anchor_blocks::
+* cost_ratio` (the same `sequence_edit_cost`-based estimate) is reused for that tie-break, cheapest
+* first, one-to-one within the group.
 *
-* Runs before the positional/arm-overlap signals in [`solve`] so a container that could be matched
-* by *either* an outer named declaration or an inner anonymous block gets the stronger, name-based
-* signal first - same "identity beats position, position beats coincidence" ordering the old
-* pipeline's Pass 1-3 already encoded.
+* Runs before the positional signal in [`solve`] so a container that could be matched by *either*
+* an outer named declaration or an inner anonymous block gets the stronger, name-based signal
+* first, same "identity beats position, position beats coincidence" ordering the old pipeline's
+* Pass 1-3 already encoded.
 */
-fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff) {
+fn solve_qualified_name_groups(before: &Code, after: &Code, diff: &mut ASTDiff) {
     let before_metadata = metadata_of(before);
     let after_metadata = metadata_of(after);
     let language = before_metadata.language;
@@ -107,10 +100,10 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
         return;
     };
 
-    let before_groups = collect_fully_resolved_groups(before_root, &language, before);
-    let after_groups = collect_fully_resolved_groups(after_root, &language, after);
+    let before_groups = collect_qualified_name_groups(before_root, &language, before);
+    let after_groups = collect_qualified_name_groups(after_root, &language, after);
 
-    match_named_groups(
+    match_qualified_name_groups(
         before_groups,
         after_groups,
         &before_metadata,
@@ -119,7 +112,7 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
     );
 }
 
-/// Same matching as [`solve_named_reference_groups`], but scoped to an arbitrary `(before_root,
+/// Same matching as [`solve_qualified_name_groups`], but scoped to an arbitrary `(before_root,
 /// after_root)` pair instead of always the whole file, and excluding the roots' *own* identity
 /// from the search (only nested content is matched - the caller already knows `before_root`/
 /// `after_root` correspond, that's not what this is for).
@@ -130,13 +123,13 @@ fn solve_named_reference_groups(before: &Code, after: &Code, diff: &mut ASTDiff)
 /// confirmed against live cases (cockroachdb's `api_v2_grants_test.go`, jesseduffield/lazygit's
 /// `graph_test.go`/`commit_loader_test.go`) that without this, such content pays full,
 /// unconstrained tree-edit-distance instead of the cheap name-based match it would otherwise get
-/// from `solve_named_reference_groups` - which runs *after* `solve_large_flat_subtrees` and so
+/// from `solve_qualified_name_groups` - which runs *after* `solve_large_flat_subtrees` and so
 /// never gets the chance (see `solve_large_flat_subtrees`'s own doc comment for why that ordering
 /// can't simply be reversed).
 // Each parameter is genuinely distinct context (both roots and their ids, both metadata sets, the
 // source, the diff) - a params struct here would just relocate the same fields, not reduce them.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn solve_named_reference_groups_within(
+pub(crate) fn solve_qualified_name_groups_within(
     before_root: Node,
     before_root_id: usize,
     after_root: Node,
@@ -149,20 +142,20 @@ pub(crate) fn solve_named_reference_groups_within(
 ) {
     let language = before_metadata.language;
 
-    let before_groups = collect_fully_resolved_groups_excluding_root(
+    let before_groups = collect_qualified_name_groups_excluding_root(
         before_root,
         before_root_id,
         &language,
         before_code,
     );
-    let after_groups = collect_fully_resolved_groups_excluding_root(
+    let after_groups = collect_qualified_name_groups_excluding_root(
         after_root,
         after_root_id,
         &language,
         after_code,
     );
 
-    match_named_groups(
+    match_qualified_name_groups(
         before_groups,
         after_groups,
         before_metadata,
@@ -172,7 +165,7 @@ pub(crate) fn solve_named_reference_groups_within(
 }
 
 /// Flattens one side's `(kind, fully_resolved_name) -> [node_id]` groups into a single candidate
-/// list, sorted by `preorder_index` - shared by both sides of [`match_named_groups`].
+/// list, sorted by `preorder_index` - shared by both sides of [`match_qualified_name_groups`].
 fn flatten_and_sort_candidates(
     groups: HashMap<(String, String), Vec<usize>>,
     metadata: &crate::code::ASTMetadata,
@@ -191,12 +184,12 @@ fn flatten_and_sort_candidates(
     candidates
 }
 
-/// Shared by [`solve_named_reference_groups`] and [`solve_named_reference_groups_within`]: flatten
+/// Shared by [`solve_qualified_name_groups`] and [`solve_qualified_name_groups_within`]: flatten
 /// both sides' `(kind, fully_resolved_name) -> [node_id]` groups into candidate lists and run
-/// `grouped_greedy_matcher` over them - see `solve_named_reference_groups`'s doc comment for the
+/// `grouped_greedy_matcher` over them - see `solve_qualified_name_groups`'s doc comment for the
 /// matching rules (fully-resolved name is the identity signal, cost only tie-breaks within a
 /// multi-candidate group).
-fn match_named_groups(
+fn match_qualified_name_groups(
     before_groups: HashMap<(String, String), Vec<usize>>,
     after_groups: HashMap<(String, String), Vec<usize>>,
     before_metadata: &crate::code::ASTMetadata,
@@ -204,7 +197,7 @@ fn match_named_groups(
     diff: &mut ASTDiff,
 ) {
     // Flatten into (id, key) candidate lists for `grouped_greedy_matcher`, sorted by
-    // `preorder_index` to satisfy its determinism contract - `collect_fully_resolved_groups`'
+    // `preorder_index` to satisfy its determinism contract - `collect_qualified_name_groups`'
     // per-key `Vec`s are already in document order, but the flattened union across keys needs
     // its own global sort (`HashMap` key iteration order is not deterministic).
     let before_candidates = flatten_and_sort_candidates(before_groups, before_metadata);
@@ -235,7 +228,7 @@ fn match_named_groups(
                 after_id,
                 before_metadata,
                 after_metadata,
-                "syntax_named",
+                "qualified_name",
                 diff,
             );
             // Pre-match parameters/local variables whose name is unique within this candidate
@@ -255,7 +248,7 @@ fn match_named_groups(
                 vec![before_id],
                 vec![after_id],
                 Algorithm::Apted,
-                "syntax_named",
+                "qualified_name",
                 diff,
             );
         },
@@ -263,36 +256,36 @@ fn match_named_groups(
 }
 
 /// Recursive top-down walk building `HashMap<(kind, fully_resolved_name), Vec<node_id>>` - see
-/// `solve_named_reference_groups`'s doc comment for what "fully resolved" means. `scope` is the
+/// `solve_qualified_name_groups`'s doc comment for what "fully resolved" means. `scope` is the
 /// stack of enclosing named nodes' own (unqualified) names, outermost first; only nodes for which
 /// `nodes::is_semantically_structural` returns a name push onto it, so intermediate structural
 /// wrappers with no name of their own (Rust's `declaration_list`, Python's class `block`, ...)
 /// don't break scope inheritance - a method two wrapper-levels under `impl Bar` still resolves to
 /// `"Bar::method"`, not `"Bar::declaration_list::method"`.
-fn collect_fully_resolved_groups(
+fn collect_qualified_name_groups(
     root: Node,
     language: &Language,
     code: &Code,
 ) -> HashMap<(String, String), Vec<usize>> {
     let mut out = HashMap::new();
     let mut scope: Vec<String> = Vec::new();
-    collect_fully_resolved_groups_rec(root, language, code, &mut scope, &mut out);
+    collect_qualified_name_groups_rec(root, language, code, &mut scope, &mut out);
     out
 }
 
-/// Same as [`collect_fully_resolved_groups`], but drops `root_id` itself from the result - for
-/// [`solve_named_reference_groups_within`], where `root` is an already-established match (not
+/// Same as [`collect_qualified_name_groups`], but drops `root_id` itself from the result - for
+/// [`solve_qualified_name_groups_within`], where `root` is an already-established match (not
 /// something being searched for) and only its *nested* content is of interest. `root`'s own
 /// `is_semantically_structural` match (if any) still contributes to scope-qualifying its
 /// children's names (e.g. a subtest call inside `func TestThings` still resolves to
 /// `"TestThings::<subtest name>"`), it's just excluded from the returned groups afterward.
-fn collect_fully_resolved_groups_excluding_root(
+fn collect_qualified_name_groups_excluding_root(
     root: Node,
     root_id: usize,
     language: &Language,
     code: &Code,
 ) -> HashMap<(String, String), Vec<usize>> {
-    let mut groups = collect_fully_resolved_groups(root, language, code);
+    let mut groups = collect_qualified_name_groups(root, language, code);
     for ids in groups.values_mut() {
         ids.retain(|&id| id != root_id);
     }
@@ -300,7 +293,7 @@ fn collect_fully_resolved_groups_excluding_root(
     groups
 }
 
-fn collect_fully_resolved_groups_rec(
+fn collect_qualified_name_groups_rec(
     node: Node,
     language: &Language,
     code: &Code,
@@ -321,7 +314,7 @@ fn collect_fully_resolved_groups_rec(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_fully_resolved_groups_rec(child, language, code, scope, out);
+        collect_qualified_name_groups_rec(child, language, code, scope, out);
     }
 
     if pushed_scope {
@@ -340,9 +333,9 @@ const IMPORT_LIST_SIMILARITY_THRESHOLD: f64 = 0.5;
 * hashes, which changes with membership, not just order - and have no other identity signal to key
 * on. This groups candidate `use_declaration`s with a multi-symbol `use_list` by their base import
 * path (`std::collections` in `use std::collections::{HashMap, HashSet}`), scores same-path pairs
-* by Jaccard similarity of their imported symbol sets (same shape as `solve_similar_flow_control`'s
-* arm-overlap scoring, reusing its generic `flow_control_similarity_of_sets` helper), and hands
-* accepted pairs to real APTED.
+* by Jaccard similarity of their imported symbol sets (via `nodes::flow_control_similarity_of_sets`,
+* a generic set-overlap helper originally written for the since-deleted `solve_similar_flow_control`
+* arm-overlap matcher), and hands accepted pairs to real APTED.
 *
 * Deliberately matches the *whole* `use_declaration` in one `apted::for_nodes` call, never an
 * individual imported symbol - expansion candidate #1 (field/variant-level named matching, tried
@@ -410,7 +403,7 @@ fn solve_import_list_overlap(before: &Code, after: &Code, diff: &mut ASTDiff) {
                 vec![before_id],
                 vec![after_id],
                 Algorithm::Apted,
-                "syntax_import_list",
+                "import_list_overlap",
                 diff,
             );
         },
@@ -489,7 +482,7 @@ impl Bar { fn new() -> Bar { Bar::default() } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();
@@ -529,7 +522,7 @@ impl Bar { fn new() -> Bar { Bar::default() } }
     /// having no identity signal at all and falling through to whatever handles the surrounding
     /// test function as one undifferentiated blob.
     #[test]
-    fn go_subtests_named_by_literal_are_individually_matched_via_syntax_named() {
+    fn go_subtests_named_by_literal_are_individually_matched_via_qualified_name() {
         let before_src = "
 package main
 
@@ -550,21 +543,21 @@ func TestThings(t *testing.T) {
         let after = Code::from_string(after_src, &Language::Go);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
-        let syntax_named_count = diff
+        let qualified_name_count = diff
             .mapping
             .values()
             .filter(|m| {
                 matches!(
                     &m.reason,
-                    crate::diff::ASTMappingReason::APTED("syntax_named")
+                    crate::diff::ASTMappingReason::APTED("qualified_name")
                 )
             })
             .count();
         assert!(
-            syntax_named_count >= 2,
-            "expected each named subtest call to be independently matched via syntax_named, got {syntax_named_count}"
+            qualified_name_count >= 2,
+            "expected each named subtest call to be independently matched via qualified_name, got {qualified_name_count}"
         );
     }
 
@@ -588,7 +581,7 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         // Both `fn a` and `fn b` should end up mapped somewhere (not left as orphans) regardless
         // of which of the two same-keyed `impl Foo` blocks they were grouped under.
@@ -629,7 +622,7 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         let before_use =
             find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")
@@ -651,7 +644,7 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff, true);
+        solve(&before, &after, &node_cache, &mut diff);
 
         let before_use =
             find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")

@@ -45,12 +45,13 @@ if ! cargo build --release --features test-fixtures --bin benchmark_optimal_solu
 fi
 
 # Keep this list in sync with the --no-solver-X flags in src/bin/benchmark_optimal_solutions.rs
-# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Only 4 passes have their own
+# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Only 3 passes have their own
 # on/off knob post-rework (TODO.md, 2026-07-17/18) - the seven-phase pipeline's other steps run
-# unconditionally, so there's nothing left to ablate for them.
+# unconditionally, so there's nothing left to ablate for them. A 4th, solver-similar-flow-control,
+# was removed 2026-08-14: it gated solve_similar_flow_control, deleted outright after being
+# disabled by default (net-negative here) since this same 2026-07-15 study and never re-enabled.
 FLAGS=(
   solver-import-nodes
-  solver-similar-flow-control
   solver-bottom-up-expansion
   solver-moved-subtrees
 )

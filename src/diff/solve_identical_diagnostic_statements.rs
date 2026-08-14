@@ -36,21 +36,23 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 * function wholesale) into a smaller one anchored on some incidental identical `log::debug!(...)`
 * call inside it. Running it before the later phases means it can still find a diagnostic
 * statement buried inside a function/impl that has no same-named counterpart on the other side -
-* exactly the same reasoning `solve_similar_flow_control` documents for its own placement inside
-* phase 4.
+* the same reasoning the since-deleted (2026-08-14) `solve_similar_flow_control` used to document
+* for its own placement inside phase 4.
 *
 * Note this pass has no effect on the `rust-turbopack-module-rule` fixture that motivated
-* `solve_similar_flow_control`: its one `bail!(...)` isn't byte-identical between before/after (the
-* message text changed to list an added "json" module type), so it wouldn't match here regardless.
-* And even if it were identical, `solve_similar_flow_control` already resolves the entire enclosing
-* `match_expression` - `bail!` arm included - via a full `apted::for_nodes` call on the container
-* before this pass ever runs, since `for_nodes` computes a complete edit script over the whole
-* subtree, not just the root pair. So this pass is currently validated only by its own unit tests
-* (including non-Rust ones covering C/Python/Go callee extraction) and has no real-fixture coverage
-* yet - worth keeping in mind if it ever needs revisiting.
+* `solve_similar_flow_control` (deleted 2026-08-14): its one `bail!(...)` isn't byte-identical
+* between before/after (the message text changed to list an added "json" module type), so it
+* wouldn't match here regardless. And even if it were identical, the enclosing `match_expression` -
+* `bail!` arm included - gets fully resolved via a real `apted::for_nodes` call on the container
+* regardless (through phase 4's named-group matching on the enclosing declaration, or, when
+* `solve_similar_flow_control` still existed and was enabled, through its own container-wide call),
+* since `for_nodes` computes a complete edit script over the whole subtree, not just the root pair.
+* So this pass is currently validated only by its own unit tests (including non-Rust ones covering
+* C/Python/Go callee extraction) and has no real-fixture coverage yet - worth keeping in mind if it
+* ever needs revisiting.
 *
 * Matching requires an *exact* full-content hash match (see `ASTMetadata::node_to_full_hash`) - no
-* similarity threshold, unlike `solve_similar_flow_control`. A `log::error!("failed: {e}")` that
+* similarity threshold. A `log::error!("failed: {e}")` that
 * only *changed* on one side is deliberately left for the final APTED pass to size up as an Update,
 * since this pass has no basis for deciding two non-identical diagnostic statements are "the same"
 * one.
@@ -202,8 +204,9 @@ fn parse(s: &str) -> Result<i32> {
 
     #[test]
     fn changed_diagnostic_statement_is_not_matched() {
-        // Same macro, different message: not byte-identical, so this pass (unlike
-        // `solve_similar_flow_control`) must leave it alone for the final APTED pass to size up.
+        // Same macro, different message: not byte-identical, so this pass - which requires an
+        // exact hash match, no similarity threshold - must leave it alone for the final APTED
+        // pass to size up.
         let before_src = r#"
 fn a() {
     log::error!("first message");
