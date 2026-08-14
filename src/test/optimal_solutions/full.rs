@@ -110,6 +110,8 @@ mod ruby_moneta_rb_moneta_change_one_identifier;
 #[cfg(test)]
 mod ruby_moneta_rb_moneta_trivial_version_update;
 #[cfg(test)]
+mod rust_skim_rs_skim_format_string;
+#[cfg(test)]
 mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
@@ -118,8 +120,20 @@ mod scala_com_lihaoyi_mill_small_change;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_version_string_change;
 #[cfg(test)]
+mod scala_sirthias_parboiled_value_change;
+#[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
 #[cfg(test)]
+mod shellscript_hgst_libzbc_add_variable;
+#[cfg(test)]
+mod shellscript_maxsatula_ocp_small_change;
+#[cfg(test)]
+mod tsx_keybase_client_emoji_to_native;
+#[cfg(test)]
+mod tsx_rektdeckard_departure_mono_import_path;
+#[cfg(test)]
 mod vimscript_chikamichi_mediawiki_add_one_autocmd;
+#[cfg(test)]
+mod vimscript_fedorenchik_qt_support_add_two_lines;
 #[cfg(test)]
 mod vimscript_idanarye_vim_merginal_add_one_call;
