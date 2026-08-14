@@ -5753,7 +5753,12 @@ fn action_promote(
         Some(source) => sample_comment(source)?,
         None => None,
     };
-    let save_msg = action_save(&mut app.mapping, &mut app.dirty, new_name, comment.as_deref())?;
+    let save_msg = action_save(
+        &mut app.mapping,
+        &mut app.dirty,
+        new_name,
+        comment.as_deref(),
+    )?;
     refresh_diff_completeness(app, new_name);
 
     let csv_note = match &sample_source {
@@ -5907,7 +5912,10 @@ fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
 /// `sample_comment_at`/the `e` keybinding's prefill lookup. `source` uniquely identifies a row by
 /// construction (`sample_test_diffs` never writes two rows for the same commit+path), so "first
 /// match" is never ambiguous in practice.
-fn find_sample_row<'a>(rows: &'a [SampleCsvRow], source: &SampleSource) -> Option<&'a SampleCsvRow> {
+fn find_sample_row<'a>(
+    rows: &'a [SampleCsvRow],
+    source: &SampleSource,
+) -> Option<&'a SampleCsvRow> {
     rows.iter().find(|row| {
         row.language == source.language
             && row.repository == source.repository
@@ -6295,13 +6303,21 @@ mod tests {
                 line,
                 line.len()
             );
-            assert!(line.starts_with("    // "), "line missing the expected prefix: {:?}", line);
+            assert!(
+                line.starts_with("    // "),
+                "line missing the expected prefix: {:?}",
+                line
+            );
         }
         // Every word survives the wrap, in order, none dropped or duplicated - strip each line's
         // "    // " prefix first so it doesn't get counted as a word of its own.
         let rejoined: Vec<&str> = wrapped
             .lines()
-            .flat_map(|line| line.strip_prefix("    // ").unwrap_or(line).split_whitespace())
+            .flat_map(|line| {
+                line.strip_prefix("    // ")
+                    .unwrap_or(line)
+                    .split_whitespace()
+            })
             .collect();
         let original: Vec<&str> = long.split_whitespace().collect();
         assert_eq!(rejoined, original);
@@ -9327,7 +9343,14 @@ mod tests {
         write_csv(
             file.path(),
             &[
-                ("Rust", "repo", "abc123", "src/a.rs", "rust-already-promoted", "small"),
+                (
+                    "Rust",
+                    "repo",
+                    "abc123",
+                    "src/a.rs",
+                    "rust-already-promoted",
+                    "small",
+                ),
                 ("Rust", "repo", "def456", "src/b.rs", "", "full"),
             ],
         );
@@ -9448,7 +9471,10 @@ mod tests {
             repository: "other-repo".to_string(),
             ..source
         };
-        assert_eq!(sample_comment_at(file.path(), &missing_source).unwrap(), None);
+        assert_eq!(
+            sample_comment_at(file.path(), &missing_source).unwrap(),
+            None
+        );
     }
 
     #[test]

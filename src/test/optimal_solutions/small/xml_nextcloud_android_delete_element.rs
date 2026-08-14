@@ -40,5 +40,7 @@ fn optimal_solution() -> Result<()> {
     // (`split_into_anchored_segments`) and running Myers per segment, so a shift on one side of an
     // anchor can no longer misalign anything on the other side of it. Purely a mismatch-count fix:
     // `algorithm_cost == human_cost` was already true here, so rendered diff output is unchanged.
-    test::helper::human_mapping::assert_matches_human_mapping("xml-nextcloud-android-delete-element")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "xml-nextcloud-android-delete-element",
+    )
 }
