@@ -28,7 +28,7 @@ mod cpp_bolero_murakami_sprout_copyright_update;
 #[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_update_3;
 #[cfg(test)]
-mod csharp_waf_csharprepl_update_string_URL;
+mod csharp_waf_csharprepl_update_string_url;
 #[cfg(test)]
 mod css_fortawesome_font_awesome_update_version_comment_2;
 #[cfg(test)]
@@ -110,7 +110,7 @@ mod ruby_moneta_rb_moneta_change_one_identifier;
 #[cfg(test)]
 mod ruby_moneta_rb_moneta_trivial_version_update;
 #[cfg(test)]
-mod rust_xou816_spot_add_Some_around_existing_code;
+mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
 #[cfg(test)]

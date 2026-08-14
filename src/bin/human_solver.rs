@@ -179,9 +179,13 @@ use codediff::code::{Code, Language};
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, MultiMapGroup,
-    NodeStatus, is_inherited_removed, path_refs, rebuild_caches, rebuild_caches_for_mapping,
-    status_after, status_before,
+    NodeStatus, is_inherited_removed, path_refs, rebuild_caches_for_mapping, status_after,
+    status_before,
 };
+// Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
+// one the non-test code path uses).
+#[cfg(test)]
+use codediff::test::helper::human_mapping::rebuild_caches;
 use codediff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, diffs_case_dir, node_for_path, path_for_node,
     precompute_paths,

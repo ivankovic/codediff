@@ -39,9 +39,13 @@ use codediff::code::{Code, Language};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanOperation, MarkKind, NodeStatus, is_identical_after, is_identical_before,
-    is_moved_after, is_moved_before, match_operation_after, match_operation_before, rebuild_caches,
+    is_moved_after, is_moved_before, match_operation_after, match_operation_before,
     rebuild_caches_for_mapping, status_after, status_before,
 };
+// Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
+// one the non-test code path uses).
+#[cfg(test)]
+use codediff::test::helper::human_mapping::rebuild_caches;
 
 /// `owner/repo`, used both for the "file an issue" link (rewritten client-side in viewer.js) and
 /// the "view source" link below (baked in at generation time, since it's static per fixture).
