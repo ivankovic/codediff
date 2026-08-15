@@ -252,13 +252,11 @@ mod tests {
     /// A whole function moving across another (unchanged) function must come out as matched
     /// content, not a delete+insert pair.
     ///
-    /// Ignored as of the `phases-4-7-rearchitecture` branch's Phase 1 (see `TODO.md`,
-    /// `~/.claude/plans/iterative-herding-panda.md`): now finds 1 delete/1 insert instead of 0/0
-    /// - a known, measured, temporarily-accepted regression from replacing whole-residual full
-    /// APTED with the cheaper Myers-LCS fallback (`for_roots_fallback`) in `PendingDiff::finish`.
-    /// Un-ignore once Phase 2/3 land and this passes again.
+    /// Was `#[ignore]`d during the `phases-4-7-rearchitecture` branch's Phase 1 (see `TODO.md`):
+    /// briefly found 1 delete/1 insert instead of 0/0, from replacing whole-residual full APTED
+    /// with the cheaper Myers-LCS fallback (`for_roots_fallback`). Passes again as of the
+    /// `maximal_unmatched_roots` traversal fix (`TODO.md`'s "Bug fix" entry) - un-ignored.
     #[test]
-    #[ignore = "known Phase 1 regression - see TODO.md's phases-4-7 rearchitecture section"]
     fn moved_function_is_matched_not_deleted() {
         let before = Code::from_string(
             "fn moved_one(x: i64, y: i64) -> i64 { let q = x * y; q + x }\nfn stay() {}\n",
