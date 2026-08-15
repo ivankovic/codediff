@@ -702,16 +702,87 @@ fn plain_text_line_diff_with_max_edit(
     after: &str,
     max_edit: usize,
 ) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    match line_diff_core(before, after, max_edit) {
+        Some(core) => build_line_ranges(core.before_line_count, core.after_line_count, &core.pairs),
+        None => {
+            let before_line_count = before.lines().count();
+            let after_line_count = after.lines().count();
+            whole_file_replaced(before_line_count, after_line_count)
+        }
+    }
+}
+
+/// The parser-independent line-diff core, shared between `plain_text_line_diff`'s visualization
+/// path (via `plain_text_line_diff_with_max_edit`) and the matching pipeline's phases-4-7
+/// rearchitecture (`TODO.md`, `~/.claude/plans/iterative-herding-panda.md`, Phase 3a). `None` means
+/// `myers_lcs` gave up past `max_edit` - callers fall back to treating the whole file as replaced
+/// (`whole_file_replaced`) rather than trusting a partial/nonexistent match set.
+pub struct LineDiffCore {
+    /// Matched `(before_row, after_row)` pairs, ascending in both (an LCS matching preserves
+    /// relative order on both sides).
+    pub pairs: Vec<(usize, usize)>,
+    pub before_line_count: usize,
+    pub after_line_count: usize,
+}
+
+/// Classification of a whole-file line diff, used to license (or refuse to license) a
+/// constrained, delete-free/insert-free resolver downstream - see the phases-4-7 rearchitecture
+/// plan's "Step 2 - text-diff-first classification" section. Corpus-census-validated at whole-file
+/// granularity (72/338 fixtures `InsertOnly`/`DeleteOnly`, zero ground-truth counterexamples); not
+/// yet validated at hunk granularity within `Mixed` files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WholeFileClass {
+    /// No lines changed at all.
+    Identical,
+    /// Every before-line is matched (nothing deleted); at least one after-line is new.
+    InsertOnly,
+    /// Every after-line is matched (nothing inserted); at least one before-line is gone.
+    DeleteOnly,
+    /// Both insertions and deletions present, or `myers_lcs` gave up past `max_edit` (treated as
+    /// `Mixed` since no license can be safely granted without knowing what actually changed).
+    Mixed,
+}
+
+impl LineDiffCore {
+    /// See `WholeFileClass`'s doc comment. `pairs.len() < before_line_count` means some
+    /// before-line has no match (a delete happened somewhere); symmetric for inserts.
+    pub fn whole_file_class(&self) -> WholeFileClass {
+        let has_delete = self.pairs.len() < self.before_line_count;
+        let has_insert = self.pairs.len() < self.after_line_count;
+        match (has_delete, has_insert) {
+            (false, false) => WholeFileClass::Identical,
+            (true, false) => WholeFileClass::DeleteOnly,
+            (false, true) => WholeFileClass::InsertOnly,
+            (true, true) => WholeFileClass::Mixed,
+        }
+    }
+}
+
+/// Whole-file classification at the pipeline's default edit-distance cap (`PLAIN_TEXT_MAX_EDIT`) -
+/// the entry point Phase 3a's dispatcher uses. A `myers_lcs` give-up is treated as `Mixed`: no
+/// license should ever be granted from an edit distance too large to have actually been measured.
+pub fn whole_file_text_class(before: &str, after: &str) -> WholeFileClass {
+    match line_diff_core(before, after, PLAIN_TEXT_MAX_EDIT) {
+        Some(core) => core.whole_file_class(),
+        None => WholeFileClass::Mixed,
+    }
+}
+
+/// Runs `myers_lcs` over hashed lines. Returns `None` if it gave up past `max_edit` (see
+/// `PLAIN_TEXT_MAX_EDIT`'s doc comment) - callers must not treat a `None` as "no changes."
+pub fn line_diff_core(before: &str, after: &str, max_edit: usize) -> Option<LineDiffCore> {
     let before_lines: Vec<&str> = before.lines().collect();
     let after_lines: Vec<&str> = after.lines().collect();
 
     let before_hashes = hash_lines(&before_lines);
     let after_hashes = hash_lines(&after_lines);
 
-    match crate::diff::apted::myers_lcs(&before_hashes, &after_hashes, max_edit) {
-        Some(pairs) => build_line_ranges(before_lines.len(), after_lines.len(), &pairs),
-        None => whole_file_replaced(before_lines.len(), after_lines.len()),
-    }
+    let pairs = crate::diff::apted::myers_lcs(&before_hashes, &after_hashes, max_edit)?;
+    Some(LineDiffCore {
+        pairs,
+        before_line_count: before_lines.len(),
+        after_line_count: after_lines.len(),
+    })
 }
 
 fn hash_lines(lines: &[&str]) -> Vec<u64> {
@@ -1530,6 +1601,115 @@ mod tests {
              replaced-whole-file range: got {} before ranges",
             before_ranges.len()
         );
+    }
+
+    #[test]
+    fn whole_file_class_identical_when_no_lines_changed() {
+        assert_eq!(
+            whole_file_text_class("a\nb\nc\n", "a\nb\nc\n"),
+            WholeFileClass::Identical
+        );
+    }
+
+    #[test]
+    fn whole_file_class_insert_only_when_nothing_deleted() {
+        assert_eq!(
+            whole_file_text_class("a\nc\n", "a\nb\nc\n"),
+            WholeFileClass::InsertOnly
+        );
+    }
+
+    #[test]
+    fn whole_file_class_delete_only_when_nothing_inserted() {
+        assert_eq!(
+            whole_file_text_class("a\nb\nc\n", "a\nc\n"),
+            WholeFileClass::DeleteOnly
+        );
+    }
+
+    #[test]
+    fn whole_file_class_mixed_when_both_inserted_and_deleted() {
+        assert_eq!(
+            whole_file_text_class("a\nb\nc\n", "a\nx\nc\n"),
+            WholeFileClass::Mixed,
+            "a changed line is a delete+insert pair, not an Update - so it's Mixed, not licensed"
+        );
+    }
+
+    #[test]
+    fn whole_file_class_mixed_when_myers_lcs_gives_up() {
+        const SMALL_CAP: usize = 20;
+        let before: String = (0..SMALL_CAP + 10)
+            .map(|i| format!("before-unique-line-{i}\n"))
+            .collect();
+        let after: String = (0..SMALL_CAP + 10)
+            .map(|i| format!("after-unique-line-{i}\n"))
+            .collect();
+        let class = line_diff_core(&before, &after, SMALL_CAP)
+            .map(|core| core.whole_file_class())
+            .unwrap_or(WholeFileClass::Mixed);
+        assert_eq!(
+            class,
+            WholeFileClass::Mixed,
+            "a give-up must never be reported as a licensable class - no license should be \
+             granted from an edit distance too large to have actually been measured"
+        );
+    }
+
+    /// Cross-checks `whole_file_text_class` (Myers LCS, this module's own algorithm) against an
+    /// independently computed classification (Python `difflib.SequenceMatcher`, `autojunk=False`)
+    /// over the same 338-fixture corpus used for Phase 0's hunk-level census (`TODO.md`'s
+    /// "Phase 0 findings" section) - `src/test/data/whole_file_text_classification_census.csv`.
+    /// This is the load-bearing primitive Phase 3a's dispatcher licenses a delete-free/insert-free
+    /// resolver from, so a wiring bug here (not just a logic bug within this module) needs an
+    /// external ground truth to catch, per the phases-4-7 rearchitecture plan's Phase 3a doc
+    /// comment ("give this newly load-bearing primitive focused test coverage beyond its existing
+    /// viz-oriented tests").
+    #[test]
+    #[ignore = "slow"]
+    fn whole_file_text_class_matches_independent_census() -> Result<()> {
+        let census_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("test")
+            .join("data")
+            .join("whole_file_text_classification_census.csv");
+        let census_csv = std::fs::read_to_string(&census_path)?;
+
+        let pairs = test::helper::handmade_test_code_pairs()?;
+        let mut mismatches = Vec::new();
+        let mut checked = 0;
+        for line in census_csv.lines().skip(1) {
+            let (fixture, expected_str) = line
+                .split_once(',')
+                .expect("census CSV row must be `fixture,classification`");
+            let expected = match expected_str {
+                "Identical" => WholeFileClass::Identical,
+                "InsertOnly" => WholeFileClass::InsertOnly,
+                "DeleteOnly" => WholeFileClass::DeleteOnly,
+                "Mixed" => WholeFileClass::Mixed,
+                other => panic!("unknown census classification `{other}` for `{fixture}`"),
+            };
+            let Some((before, after)) = pairs.get(fixture) else {
+                continue;
+            };
+            checked += 1;
+            let actual = whole_file_text_class(&before.contents, &after.contents);
+            if actual != expected {
+                mismatches.push(format!("{fixture}: census={expected:?} rust={actual:?}"));
+            }
+        }
+
+        assert!(
+            checked > 300,
+            "expected to check the vast majority of the 338-fixture corpus, only checked {checked}"
+        );
+        assert!(
+            mismatches.is_empty(),
+            "{} whole-file classification mismatches vs the independent census:\n{}",
+            mismatches.len(),
+            mismatches.join("\n")
+        );
+        Ok(())
     }
 
     /// Regression guard: a real one-token change (e.g. renaming a call inside an otherwise

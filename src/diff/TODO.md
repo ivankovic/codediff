@@ -404,6 +404,43 @@ Zero-mismatch fixtures are still well below the pre-Phase-1 baseline (252/339, 7
 90% target - expected, this is only phase 2 of the rearchitecture; Phase 3 (text-diff-guided
 per-region dispatch) is where the bulk of the remaining gap is designed to close.
 
+### Phase 3a result: line-diff core extraction + whole-file classification (branch commit follows)
+
+Pure plumbing, zero behavior change, deliberately scoped that way per the advisor's review before
+starting: extracted `plain_text_line_diff`'s hunk-producing core into `line_diff_core`
+(`src/diff/text.rs`), added `WholeFileClass` (`Identical`/`InsertOnly`/`DeleteOnly`/`Mixed`) and
+`whole_file_text_class`, the entry point Phase 3b's dispatcher will license a constrained-LCS
+resolver from. `plain_text_line_diff` itself now calls through the extracted core - refactor, not
+reimplementation.
+
+Before building the resolver on top of this, checked whether it's even worth building yet: joined
+Phase 0's 72 whole-file-licensed fixtures against the Phase 2 baseline CSV. **22/72 are already at
+zero mismatches**; the other 50 have real residual (`c-microsoft-terminal-add-function` 201,
+`typescript-excalidraw-excalidraw-add-function` 115, down to several at 1-10) - confirms the
+premise, Phase 3b/resolver work is not chasing an empty set.
+
+Validated the new primitive against an *independently computed* ground truth, not just its own
+logic: `src/test/data/whole_file_text_classification_census.csv`, 338 fixtures classified via
+Python `difflib.SequenceMatcher(autojunk=False)` over `str.splitlines()` (no `keepends` - matching
+Rust's `.lines()` semantics, which normalize away trailing-newline-presence differences; the first
+census attempt used `keepends=True` and flagged one false mismatch, `cpp-whitespace-only-change`,
+whose *only* byte difference is a trailing `\n` at EOF - a real methodology bug in the census
+script, not a Rust bug, fixed by regenerating without `keepends`). Cross-check test:
+`diff::text::tests::whole_file_text_class_matches_independent_census` (`#[ignore = "slow"]`, full
+corpus) - **0 mismatches across 338 fixtures**. Five additional focused unit tests cover
+`Identical`/`InsertOnly`/`DeleteOnly`/`Mixed`/give-up-treated-as-`Mixed` directly, per the plan's
+own note that this primitive's risk profile changes once it's load-bearing for matching, not just
+visualization.
+
+Advisor guidance followed: split what the plan labeled "Phase 3a" into (1) this commit - extraction
++ classification, threaded through with no behavior change, validated against ground truth - and
+(2) a separate follow-up commit for the constrained-LCS resolver itself and its wiring into
+`PendingDiff::finish`, so a future regression can be attributed to the resolver, not conflated with
+the extraction (the same bundling mistake that cost an isolation re-run in Phase 1). Also flagged:
+propagation (Phase 2) currently runs only once, before the terminal fallback - a leaf-level match
+the Phase 3b resolver creates *inside or after* the terminal step won't bubble up to its ancestors
+without a second propagation call after it. Not yet added; tracked for the resolver commit.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
