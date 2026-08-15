@@ -1774,6 +1774,27 @@ fn leaf(id: usize, hash: u64, meta: &mut ASTMetadata) {
     meta.node_to_full_hash.insert(id, hash);
 }
 
+/// Same as `leaf`, but with a real `kind`/`text` (not the blank `text: String::new()` every other
+/// `leaf` call shares) - needed for tests that exercise real APTED's cost model (`UnitCostModel::
+/// ren`) directly, which compares `kind`/`text`, not `node_to_full_hash` (only `myers_lcs`-based
+/// exact-hash matching ever looks at the hash map). Every other `leaf`-built node is
+/// text-indistinguishable from every other by design (`ren` would treat any two same-kind `leaf`
+/// helper nodes as identical on text alone) - fine for tests that only exercise the exact-hash
+/// path, wrong for ones that need `ren` to see genuinely different content.
+fn leaf_with_kind(id: usize, hash: u64, kind: &str, text: &str, meta: &mut ASTMetadata) {
+    meta.node_info.insert(
+        id,
+        ASTNodeMetadata {
+            kind: kind.to_string(),
+            text: text.to_string(),
+            children: vec![],
+            start_byte: id,
+            preorder_index: id,
+        },
+    );
+    meta.node_to_full_hash.insert(id, hash);
+}
+
 fn interior(id: usize, children: Vec<usize>, meta: &mut ASTMetadata) {
     meta.node_info.insert(
         id,
@@ -1816,18 +1837,31 @@ fn maximal_unmatched_roots_stops_at_first_unmatched_node_each_branch() {
 }
 
 #[test]
-fn resolve_residual_forest_via_myers_lcs_matches_identical_and_replaces_the_rest() {
+fn resolve_residual_forest_via_myers_lcs_matches_identical_and_recurses_the_rest() {
     // Before/after each have a matched root with two unmatched leaf children; one pair of
-    // children shares a hash (should match), the other pair doesn't (should delete/insert).
+    // children shares a hash (should match via the exact-hash pass), the other pair is left as
+    // the sole entry on each side of the one gap between that anchor and the sequence end.
+    //
+    // Historically (pre Phase 3b, `TODO.md` 2026-08-15) this function only ever did exact-hash
+    // matching, so the "unique" pair always fell through to delete+insert. Phase 3b added a
+    // real-APTED recursion for exactly this shape - a single leftover entry on each side of a gap
+    // - specifically so a genuinely-edited node (not a coincidence) gets a real match instead of
+    // a lossy atomic replace. That recursion goes through the real cost model
+    // (`UnitCostModel::ren`), which - by design, same as every other APTED call site in this
+    // codebase - prefers relabeling two *same-kind* leaves (`COST_UPDATE = 1`) over deleting one
+    // and inserting the other (`COST_DELETE + COST_INSERT = 2`), regardless of whether they're
+    // "really" related. `leaf`'s helper nodes are both `kind: "leaf"`, so that's what happens
+    // here now - an accepted trade-off, not a bug (see `resolve_residual_forest_via_myers_lcs_
+    // does_not_relabel_across_different_kinds` below for the safety net that's still enforced).
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
     interior(1, vec![2, 3], &mut before_meta);
     leaf(2, 999, &mut before_meta); // shared with after's node 12
-    leaf(3, 111, &mut before_meta); // unique to before
+    leaf(3, 111, &mut before_meta); // same kind as 13, no shared hash
 
     interior(11, vec![12, 13], &mut after_meta);
     leaf(12, 999, &mut after_meta); // shared with before's node 2
-    leaf(13, 222, &mut after_meta); // unique to after
+    leaf(13, 222, &mut after_meta); // same kind as 3, no shared hash
 
     let mut diff = ASTDiff::default();
     diff.before_node_map.insert(1, 11); // roots pre-matched by an earlier phase
@@ -1849,13 +1883,52 @@ fn resolve_residual_forest_via_myers_lcs_matches_identical_and_replaces_the_rest
     assert_eq!(matched.operation, ASTMappingOperation::Identical);
     assert_eq!(matched.reason, ASTMappingReason::APTED("test_source"));
 
+    assert_eq!(
+        diff.before_node_map.get(&3).copied(),
+        Some(13),
+        "the single leftover entry on each side of the gap should be matched to each other via \
+         real APTED, not atomically deleted/inserted"
+    );
+}
+
+#[test]
+fn resolve_residual_forest_via_myers_lcs_does_not_relabel_across_different_kinds() {
+    // Same shape as the test above, but the two leftover leaves have *different* kinds
+    // (`kinds_update_allowed` has no entry for this made-up pair, so they're not on the
+    // hand-picked cross-kind allow-list either). `UnitCostModel::ren` makes a cross-kind relabel
+    // strictly more expensive than delete+insert specifically to prevent this - real APTED still
+    // has to fall back to delete+insert here, confirming Phase 3b's single-entry-gap recursion
+    // didn't weaken *that* guarantee, only the same-kind one demonstrated above.
+    let mut before_meta = ASTMetadata::default();
+    let mut after_meta = ASTMetadata::default();
+    interior(1, vec![2, 3], &mut before_meta);
+    leaf(2, 999, &mut before_meta); // shared with after's node 12
+    leaf_with_kind(3, 111, "kind_a", "x", &mut before_meta);
+
+    interior(11, vec![12, 13], &mut after_meta);
+    leaf(12, 999, &mut after_meta); // shared with before's node 2
+    leaf_with_kind(13, 222, "kind_b", "y", &mut after_meta);
+
+    let mut diff = ASTDiff::default();
+    diff.before_node_map.insert(1, 11);
+    diff.after_node_map.insert(11, 1);
+
+    resolve_residual_forest_via_myers_lcs(
+        &before_meta,
+        &after_meta,
+        1,
+        11,
+        "test_source",
+        &mut diff,
+    );
+
     assert!(
         diff.mapping.contains_key(&(3, 0)),
-        "before's unique child should be deleted"
+        "different-kind leftover entries must still delete, never relabel across kinds"
     );
     assert!(
         diff.mapping.contains_key(&(0, 13)),
-        "after's unique child should be inserted"
+        "different-kind leftover entries must still insert, never relabel across kinds"
     );
 }
 
