@@ -501,6 +501,50 @@ Zero-mismatch fixtures (64.0%) are now close to the pre-Phase-1 baseline (74.3%)
 closer to the 90% target - most of the remaining gap is concentrated in fixtures needing real
 per-region dispatch (Phase 3b/3c), not this fallback-traversal class of bug.
 
+Verified with a worktree-based before/after full test-suite comparison (this fix's parent commit vs
+after it): 187 -> 58 failing tests, **129 fixed, zero newly broken** - resolves the apparent
+discrepancy between "760/58 both times" seen in-session (both runs were already post-fix; no
+pre-fix baseline had actually been captured via the test suite until this comparison). The two
+previously-`#[ignore]`d Phase 1 regression tests (`moved_function_is_matched_not_deleted`,
+`python_leetcode_1_added_if_block_all_ranges`) pass again - un-ignored in a follow-up commit.
+
+### Re-scoping Phase 3a's second half / Phase 3b-3c against the post-fix corpus (2026-08-15)
+
+Per advisor guidance: before building Phase 3a's planned constrained-LCS resolver, re-checked
+whether it's still needed. **Don't build it as originally scoped**: of the 72 whole-file-licensed
+fixtures, only 7 have residual left (`css-add-property` 4, `go-kubernetes-...-add-unit-test-cases`
+5, `shellscript-ansible-...-simple-deletion` 2, `typescript-...-add-target-comment-2` 2, `vimscript-
+chikamichi-mediawiki-add-one-autocmd` 31, `vimscript-fedorenchik-qt-support-add-two-lines` 19,
+`vimscript-neovim-...-add-a-few-lines-one-after-the-other` 2) - spot-checked `css-add-property`:
+an empty `{ }` `rule_set` left unmatched, the same duplicate/near-identical-small-content Myers-
+ordering-ambiguity shape as this fix's own 2 regressions, not a delete-forbidden-license gap the
+planned resolver would have addressed anyway.
+
+`css-shadcn-ui-ui-completely-broken-treesitter-parsing` (Phase 3c's pinned kill-criterion fixture,
+77% of the corpus's original mismatch total): **16277 -> 124 mismatches**, confirming the
+architecture-level fix (parser-independent handling, now indirectly via the traversal fix rather
+than Phase 3c's planned ERROR-density gate) already does most of what Phase 3c targeted. Phase 3c's
+kill criterion needs restating against 124, not 16277, once that phase is actually scoped.
+
+Corpus-wide: 121 fixtures (down from ~210) still have nonzero mismatches. Sampled beyond the 72 to
+see what they actually need (not assumed from the original plan): `kotlin-remove-function` (68
+mismatches) is a different failure *class* entirely - not missing matches but **over-eager**
+matching (`solve_qualified_name_groups`/APTED("qualified_name") partially matching pieces of an
+import path that should have been deleted wholesale with its now-unused function) - a false-positive
+problem the planned delete-forbidden/insert-forbidden licensing wouldn't touch either way.
+`rust_add_to_existing_use` (a failing test, not yet re-measured standalone) is the class Phase 3b's
+per-region dispatch actually targets: `scoped_identifier` (before) vs. `scoped_use_list`/`use_list`
+(after) - a real grammar-level shape change from a single import becoming a multi-import list, kept
+as a named exemplar for scoping that phase.
+
+**Conclusion**: Phase 3b/3c's remaining scope is real but smaller and differently-shaped than the
+original plan assumed (that plan was written against a fallback that was destroying quality
+wholesale - a world that no longer exists after this fix). Before writing more code, the next step
+is classifying a wider sample of the 121 remaining fixtures into "duplicate-content ambiguity"
+(may need a MatchSimilarFlowControl-style disambiguation, not a resolver) vs. "over-eager matching"
+(may need tightening an existing pass, not adding one) vs. "genuine shape change" (the only category
+the original Phase 3b/3c design actually addresses) before committing to that phase's shape.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
