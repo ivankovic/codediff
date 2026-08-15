@@ -375,6 +375,20 @@ instances** - consistent with (and superseding) the earlier stale-CSV-derived fi
 "Architecture rethink: target goals" above (74.1%/123.9ms/1.35s/61.8s/169.3s/21090 on the 332-row
 stale CSV).
 
+### Phase 1 result (on `phases-4-7-rearchitecture` branch, not main - see commit `bf79bfe`)
+
+Latency win confirmed on the two shape-pathology fixtures that motivated this whole rearchitecture:
+`vimscript-neovim-neovim-add-two-functions-and-modify-a-few-lines` 87s -> 0.12s (>700x),
+`vimscript-neovim-neovim-add-test-case-plus-edit-existing-one` 61.8s -> 0.96s (64x). The two
+genuinely-huge fixtures improved but aren't at target yet:
+`rust-real-logic-change-in-a-huge-75k-node-file` 169s -> 24.4s,
+`tsx-excalidraw-excalidraw-huge-file-with-real-logic-change` 138s -> 16.3s - remaining cost is now
+in phases 1-5 (parsing/hashing/candidate-matching at 75k-150k node scale) or the fallback's own
+O(residual) Myers pass, not phase 6 - worth profiling once Phase 2/3 land, not blocking right now.
+Quality cost is the measured regression documented in the Phase 1 commit message (175/257 fixtures
+that relied on real APTED dropped from 0 to nonzero mismatches) - expected to be won back by
+Phases 2-3, which is why this stays off `main` until then.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
