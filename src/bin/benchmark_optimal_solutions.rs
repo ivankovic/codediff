@@ -219,9 +219,17 @@ struct Args {
     /// Disable `solve_moved_subtrees` (deleted+inserted identical-subtree move pairing).
     #[arg(long = "no-solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_moved_subtrees")]
     no_solver_moved_subtrees: bool,
+
+    /// Enable `solve_bottom_up_propagation` (phases-4-7 rearchitecture, `TODO.md`). Off by
+    /// default pending its own isolated corpus measurement.
+    #[arg(long = "solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_bottom_up_propagation")]
+    solver_bottom_up_propagation: bool,
+    /// Disable `solve_bottom_up_propagation`.
+    #[arg(long = "no-solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_propagation")]
+    no_solver_bottom_up_propagation: bool,
 }
 
-/// Resolves `Args`' 3 `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
+/// Resolves `Args`' `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
 /// wins whenever the two disagree at the end of parsing (see the flag pair's `overrides_with`,
 /// verified against clap's actual last-flag-wins behavior).
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
@@ -230,6 +238,8 @@ fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
         solver_bottom_up_expansion: args.solver_bottom_up_expansion
             && !args.no_solver_bottom_up_expansion,
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
+        solver_bottom_up_propagation: args.solver_bottom_up_propagation
+            && !args.no_solver_bottom_up_propagation,
     }
 }
 

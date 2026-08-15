@@ -389,6 +389,21 @@ Quality cost is the measured regression documented in the Phase 1 commit message
 that relied on real APTED dropped from 0 to nonzero mismatches) - expected to be won back by
 Phases 2-3, which is why this stays off `main` until then.
 
+### Phase 2 result: `solve_bottom_up_propagation` (branch commit follows)
+
+Started winning back the quality Phase 1 gave up, as intended. Full 339-fixture corpus, measured
+in isolation (`--solver-bottom-up-propagation` on vs. off) against the Phase 1 baseline: **0
+regressions, 69 improvements**, total mismatches 25980 -> 25883, **zero-mismatch fixtures 75 -> 129
+(22.1% -> 38.1%)**, latency delta within noise (+1.5% aggregate `elapsed_ms` across 339 fixtures x
+4 repeated runs each - and it's O(n) per sweep by construction, so a real regression would mean a
+bug, not a legitimate cost). Clean enough result to flip `HeuristicConfig::solver_bottom_up_
+propagation`'s default straight to `true` rather than leaving it as an opt-in ablation knob like
+`solver_import_nodes`/`solver_bottom_up_expansion`.
+
+Zero-mismatch fixtures are still well below the pre-Phase-1 baseline (252/339, 74.3%) and the
+90% target - expected, this is only phase 2 of the rearchitecture; Phase 3 (text-diff-guided
+per-region dispatch) is where the bulk of the remaining gap is designed to close.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching

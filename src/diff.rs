@@ -21,6 +21,7 @@ pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
 pub mod solve_bottom_up_expansion;
+pub mod solve_bottom_up_propagation;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_hash_descent;
 pub mod solve_identical_diagnostic_statements;
@@ -437,6 +438,16 @@ impl<'code> PendingDiff<'code> {
                 &mut ast_diff,
             );
         }
+
+        // Phase 2 of the rearchitecture: strict bottom-up propagation (`solve_bottom_up_
+        // propagation`), gated on `solver_bottom_up_propagation` (default `true` - see
+        // `HeuristicConfig`'s doc comment for the measurement that earned it). Runs here, right
+        // before the terminal fallback, specifically to shrink that fallback's residual before it
+        // ever sees it: a parent this resolves is one less "maximal unmatched root" the fallback
+        // would otherwise have to guess at via lossy whole-subtree hashing.
+        if config.solver_bottom_up_propagation {
+            solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
+        }
         apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
@@ -493,6 +504,14 @@ pub struct HeuristicConfig {
     pub solver_import_nodes: bool,
     pub solver_bottom_up_expansion: bool,
     pub solver_moved_subtrees: bool,
+    /// Gates `solve_bottom_up_propagation` (phases-4-7 rearchitecture, `TODO.md`). Measured
+    /// net-positive in isolation against the Phase 1 baseline (2026-08-15, full 339-fixture
+    /// corpus, `phases-4-7-rearchitecture` branch): 0 regressions, 69 improvements, total
+    /// mismatches 25980 -> 25883, zero-mismatch fixtures 75 -> 129 (22.1% -> 38.1%), latency
+    /// delta within noise (+1.5% aggregate `elapsed_ms`, and it's O(n) by construction) - default
+    /// flipped to `true` on that basis, unlike `solver_import_nodes`/`solver_bottom_up_expansion`
+    /// below.
+    pub solver_bottom_up_propagation: bool,
 }
 
 impl Default for HeuristicConfig {
@@ -503,6 +522,7 @@ impl Default for HeuristicConfig {
             solver_import_nodes: false,
             solver_bottom_up_expansion: false,
             solver_moved_subtrees: true,
+            solver_bottom_up_propagation: true,
         }
     }
 }
@@ -791,6 +811,13 @@ pub enum ASTMappingReason {
     /// Import statements matched by normalized path (quotes stripped, separators normalized,
     /// relative import prefixes handled) - a `KindAndValueHash` variant, see `solve_hash_descent`.
     NormalizedImportPath,
+    /// Neither node was matched directly, but *every* direct child of the before-node already had
+    /// a decision (matched or deleted), and - if matched - every one of them agreed on the exact
+    /// same after-side parent, so the parent itself was matched (or, if every child was deleted,
+    /// marked deleted too). Unlike `BottomUpExpansion`, this is a strict, unconditional rule - no
+    /// Dice-coefficient threshold, no partial-consensus vote - so it never has an invented
+    /// decision to fight a later, more precise pass over. See `solve_bottom_up_propagation`.
+    BottomUpPropagation,
 }
 
 impl ASTMappingReason {
@@ -816,6 +843,7 @@ impl ASTMappingReason {
             ASTMappingReason::BottomUpExpansion => "BottomUp",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
             ASTMappingReason::NormalizedImportPath => "NormImport",
+            ASTMappingReason::BottomUpPropagation => "BottomUpProp",
         }
     }
 }
