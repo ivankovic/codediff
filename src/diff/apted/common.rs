@@ -1799,13 +1799,49 @@ fn subtree_has_any_match(
 /// no single shared parent to anchor a trailing mapping to.
 ///
 /// On an LCS hit, emits `emit_identical_subtree` (tagged `ASTMappingReason::APTED(source)`, same
-/// convention as `for_nodes`/`for_roots`); everything left unpaired - including everything, if the
-/// edit distance exceeds `FALLBACK_MAX_EDIT` - is marked delete/insert via `add_delete_mappings`/
-/// `add_insert_mappings`, exactly as `resolve_flat_tree_pair`'s own bail-out does.
+/// convention as `for_nodes`/`for_roots`) for exact-hash pairs. Everything left unpaired between
+/// two such anchors (or the sequence ends) then gets one more chance - see `RESIDUAL_SEGMENT_MAX_
+/// ENTRIES`/`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` below - before falling back to `add_delete_mappings`/
+/// `add_insert_mappings`.
 ///
-/// Only ever matches subtrees whose full content is byte-identical (via `myers_lcs`'s exact-hash
-/// comparison) - there is no tree-edit-distance-quality partial matching here, by design: this
-/// path only runs once the residual is judged too large for full APTED to be affordable.
+/// Phase 3b finding (`TODO.md`, 2026-08-15): a maximal-unmatched-root's *whole-subtree* hash can
+/// fail to match even when almost everything inside it is real, reusable structure - a long chain
+/// of the same repeated node kind (a left-associative `binary_expression` chain from string
+/// concatenation; nested `element`s from nested `<li>`s) has every ancestor's hash change the
+/// instant one link is removed, so this function used to see N differing entries where the truth
+/// is one deletion plus N-1 relabels through the nesting - and, being a coarse exact-hash-only
+/// pass by original design, atomically deleted+inserted every one of them. Confirmed directly (not
+/// just inferred) that real bounded APTED already resolves this class correctly when given just
+/// the affected region: isolated `apted::for_nodes` on one such fixture's affected `expression_
+/// statement` (206/200 nodes) produced 187 Identical/13 MatchButNotIdentical/6 Delete - essentially
+/// the correct alignment - rather than a wholesale replace.
+///
+/// Split entries left unpaired after the exact-hash pass into anchored segments (reusing `split_
+/// into_anchored_segments`, keyed off the mappings the exact-hash pass above just wrote - the same
+/// "diff each gap between confirmed anchors independently" idiom `resolve_flat_tree_pair` already
+/// uses for one parent's flat children, generalized here to the whole-file residual's scattered,
+/// unrelated maximal-unmatched-root sequence instead of one parent's ordered siblings). A segment
+/// with *exactly one* entry on each side, light enough in total node count
+/// (`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`), is recursed through real bounded APTED (`resolve_forest`,
+/// `Algorithm::Apted`) instead of atomic delete/insert - unlike `resolve_flat_tree_pair`'s pooled
+/// recursion of up to `FLAT_UNMATCHED_RECURSE_LIMIT` entries, this deliberately does **not** pool
+/// multiple entries per side: `resolve_flat_tree_pair`'s entries are genuine ordered siblings under
+/// one shared parent, while this residual's maximal-unmatched-roots are scattered, semantically
+/// *unrelated* fragments from anywhere in the file. Confirmed empirically that pooling here is
+/// unsafe, not just theoretically risky (`kotlin-refactor-function`, 2026-08-15): with a multi-entry
+/// pool, APTED found a plausible-looking but wrong cross-match between an unrelated deleted
+/// function's descendants and merely-similar nodes elsewhere in the same gap, flipping a fixture
+/// from 0 to 32 mismatches. Restricting to exactly one entry per side is a true, unambiguous 1:1
+/// "this replaced that" correspondence between two confirmed anchors, with no room for APTED to
+/// invent a relationship - and still covers the validated exemplar (a single edited node between
+/// two untouched ones). A segment that doesn't qualify falls back to the original atomic
+/// delete/insert - this can only find *more* reuse than the purely exact-hash version, never less.
+///
+/// If the top-level `myers_lcs` itself gives up (edit distance exceeds `FALLBACK_MAX_EDIT`), there
+/// are no exact-hash anchors to split around - `split_into_anchored_segments` degrades to a single
+/// segment spanning everything, which will only qualify for recursion in the degenerate case of
+/// exactly one root per side, falling back to the original atomic behavior otherwise, same as
+/// before this function recursed at all.
 pub(crate) fn resolve_residual_forest_via_myers_lcs(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -1826,43 +1862,82 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
         .map(|&id| after_meta.node_to_full_hash.get(&id).copied().unwrap_or(0))
         .collect();
 
-    match myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT) {
-        Some(pairs) => {
-            let mut before_matched = vec![false; before_roots.len()];
-            let mut after_matched = vec![false; after_roots.len()];
-            for (bi, ai) in pairs {
-                before_matched[bi] = true;
-                after_matched[ai] = true;
-                emit_identical_subtree(
-                    before_roots[bi],
-                    after_roots[ai],
-                    before_meta,
-                    after_meta,
-                    source,
-                    diff,
-                );
-            }
-            for (i, &id) in before_roots.iter().enumerate() {
-                if !before_matched[i] {
-                    add_delete_mappings(id, before_meta, source, diff);
-                }
-            }
-            for (i, &id) in after_roots.iter().enumerate() {
-                if !after_matched[i] {
-                    add_insert_mappings(id, after_meta, source, diff);
-                }
-            }
+    if let Some(pairs) = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT) {
+        for (bi, ai) in pairs {
+            emit_identical_subtree(
+                before_roots[bi],
+                after_roots[ai],
+                before_meta,
+                after_meta,
+                source,
+                diff,
+            );
         }
-        None => {
-            // Edit distance exceeds FALLBACK_MAX_EDIT: mark everything still unmatched replaced.
-            for &id in &before_roots {
+    }
+
+    let segments = split_into_anchored_segments(&before_roots, &after_roots, diff);
+    for (before_seg, after_seg) in segments {
+        if before_seg.is_empty() && after_seg.is_empty() {
+            continue;
+        }
+        // Deliberately `== 1`, not `<= RESIDUAL_SEGMENT_MAX_ENTRIES` (unlike `resolve_flat_tree_
+        // pair`'s own leftover recursion, which pools up to `FLAT_UNMATCHED_RECURSE_LIMIT` entries
+        // because its entries are genuine ordered siblings under one shared parent). Confirmed
+        // empirically that pooling multiple entries here is unsafe: this residual's
+        // maximal-unmatched-roots are scattered, semantically *unrelated* fragments from anywhere
+        // in the file, so handing APTED a pool of several candidates per side lets it invent a
+        // plausible-looking but wrong cross-match between two merely-similar, unrelated fragments
+        // instead of correctly deleting one and inserting the other - caught on
+        // `kotlin-refactor-function` (2026-08-15): an unrelated deleted function's parameter/
+        // return-expression nodes got matched, via reason `fast_fallback`, to look-alike nodes
+        // elsewhere in the same gap, flipping a fixture from 0 to 32 mismatches. Restricting to
+        // exactly one entry per side removes the ambiguity entirely - a true 1:1 "this replaced
+        // that" correspondence between two confirmed anchors - while still covering the validated
+        // exemplar (a single edited node between two untouched ones).
+        let recursable = before_seg.len() == 1
+            && after_seg.len() == 1
+            && subtree_size_sum(&before_seg, before_meta) <= RESIDUAL_SEGMENT_MAX_TOTAL_SIZE
+            && subtree_size_sum(&after_seg, after_meta) <= RESIDUAL_SEGMENT_MAX_TOTAL_SIZE;
+        if recursable {
+            let cost_model = UnitCostModel {
+                language: before_meta.language,
+            };
+            resolve_forest(
+                before_seg,
+                after_seg,
+                before_meta,
+                after_meta,
+                &cost_model,
+                Algorithm::Apted,
+                source,
+                diff,
+            );
+        } else {
+            for &id in &before_seg {
                 add_delete_mappings(id, before_meta, source, diff);
             }
-            for &id in &after_roots {
+            for &id in &after_seg {
                 add_insert_mappings(id, after_meta, source, diff);
             }
         }
     }
+}
+
+/// Total-node-count cap for `resolve_residual_forest_via_myers_lcs`'s single-entry-per-side
+/// real-APTED recursion - the entry (each side has exactly one, by that recursion's own gate) can
+/// still be a large subtree (the confirming case for this mechanism was a single 206-node chain),
+/// so entry count alone doesn't bound APTED's O(n×m)-worst-case cost. Chosen as an
+/// order-of-magnitude-conservative fraction of the old `EXPENSIVE_RESIDUAL_THRESHOLD` (5000
+/// unmatched nodes, whole-file) - this cap applies per *segment*, not per file, and Phase 1 already
+/// removed the whole-file case this was guarding; tune upward if measurement shows headroom.
+const RESIDUAL_SEGMENT_MAX_TOTAL_SIZE: usize = 2000;
+
+/// Sums `node_to_subtree_size` over `ids` - the total node count a segment's real-APTED recursion
+/// would actually have to compare, used by `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`'s gate.
+fn subtree_size_sum(ids: &[usize], meta: &ASTMetadata) -> usize {
+    ids.iter()
+        .map(|id| meta.node_to_subtree_size.get(id).copied().unwrap_or(0))
+        .sum()
 }
 
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/

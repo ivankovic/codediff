@@ -576,6 +576,46 @@ original plan named is still the right place. The `qualified_name` over-matching
 `none_mapped`/`css-add-property`-shaped empty-block cases are separate, smaller follow-ups, not
 part of this phase.
 
+### Phase 3b result: single-entry-gap real-APTED dispatch (branch commit follows)
+
+Implemented directly in `resolve_residual_forest_via_myers_lcs` (`apted/common.rs`) rather than a
+new dispatcher module: after its existing exact-hash `myers_lcs` pass over `maximal_unmatched_
+roots`, split the leftover unpaired roots into anchored segments (reusing `split_into_anchored_
+segments`, the same "diff each gap between confirmed anchors independently" idiom `resolve_flat_
+tree_pair` already uses for one parent's flat children). A segment gets a real, bounded
+`apted::for_nodes` call instead of atomic delete/insert.
+
+**First attempt regressed 10 fixtures** (one 0->32, `kotlin-refactor-function`) by pooling up to
+`FLAT_UNMATCHED_RECURSE_LIMIT` (20) entries per side into one `resolve_forest` call, mirroring
+`resolve_flat_tree_pair`'s own leftover recursion. Root cause: unlike that function's entries (real
+ordered siblings under one shared parent), this residual's maximal-unmatched-roots are scattered,
+*unrelated* fragments from anywhere in the file - given a multi-candidate pool, APTED confidently
+invented a plausible-but-wrong cross-match between an unrelated deleted function's descendants and
+merely-similar nodes elsewhere in the same gap. **Fixed by restricting to exactly one entry per
+side** - a true, unambiguous 1:1 "this replaced that" correspondence between two confirmed anchors,
+with no room for APTED to invent a relationship. Still bounded by a 2000-node-per-side total-size
+cap (`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`) on top of the 1-entry restriction, since a lone entry can
+still be an arbitrarily large subtree.
+
+Full 339-fixture corpus, isolated to this fix: **zero-mismatch 217 -> 243 (64.0% -> 71.7%)**, total
+mismatches 5052 -> 4131, only **1 minor regression** (`vimscript-neovim-neovim-add-two-functions-
+and-modify-a-few-lines`, 53 -> 58 - the same small residual cross-matching risk the 1-entry
+restriction reduces but can't eliminate entirely, since even a "true" 1:1 gap pairing isn't
+*guaranteed* correct, just far more constrained than an open pool), 52 improvements. Latency flat
+(p50 119.7 -> 114.7ms, p99 9741 -> 9575ms, both noise). Confirms the exemplar fixture directly:
+`javascript-microsoft-typescript-broken-js-remove-string-fragment` 602 -> 464 (not fully zero - a
+602-mismatch fixture has more than one affected chain, and only single-entry gaps qualify; some of
+its chains apparently sit in multi-entry gaps). Bonus: `css-add-property`'s empty-`{}`-block
+residual (previously assumed to be a different, unexplained shape) also resolved to 0 - it turned
+out to be the same single-entry-gap case, not a distinct category.
+
+Test suite: 58 -> 18 failing (`cargo test --release --features test-fixtures --lib`). 71.7% is now
+within reach of the pre-Phase-1 baseline (74.3%) and closing in on the 90% target - remaining gap is
+concentrated in the `qualified_name` over-matching bucket (separate, not yet investigated) and
+fixtures whose affected chains span multi-entry gaps (need real disambiguation to recurse safely,
+not just a size increase on the entry cap - the exact risk this phase's first attempt hit).
+`research/optimal_solutions_benchmark.csv` refreshed to this result.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
