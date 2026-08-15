@@ -357,9 +357,15 @@ pub struct PendingDiff<'code> {
 }
 
 impl<'code> PendingDiff<'code> {
-    /// `max(unmatched_before, unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD`. Both this method
-    /// and `finish(DiffMode::Fast)`'s own guard check consult the same stored counts (computed
-    /// once, in `Diff::pending_with_config`), so they can never disagree.
+    /// `max(unmatched_before, unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD`.
+    ///
+    /// As of the phases-4-7 rearchitecture's Phase 1 (`TODO.md`,
+    /// `~/.claude/plans/iterative-herding-panda.md`), `finish` no longer branches on this - it
+    /// always runs the cheap fallback, regardless of residual size - so this is now a diagnostic
+    /// signal only ("this diff had a large residual"), not something that changes `finish`'s
+    /// behavior. Kept for callers (the TUI's `SelectDiffMode` prompt, `fallback_used` in JSON
+    /// output) pending a follow-up commit that decides `DiffMode`'s fate once Phase 1's quality
+    /// delta is measured.
     pub fn looks_expensive(&self) -> bool {
         self.unmatched_before.max(self.unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD
     }
@@ -370,11 +376,10 @@ impl<'code> PendingDiff<'code> {
         (self.unmatched_before, self.unmatched_after)
     }
 
-    /// Runs phase 6 (full APTED under [`DiffMode::Exact`], or under [`DiffMode::Fast`] - full
-    /// APTED unless [`Self::looks_expensive`], in which case [`apted::for_roots_fallback`]) and
-    /// phase 7, and assembles the final [`Diff`].
-    pub fn finish(self, mode: DiffMode) -> Diff {
-        let use_fallback = mode == DiffMode::Fast && self.looks_expensive();
+    /// Runs phase 6 and phase 7, and assembles the final [`Diff`].
+    ///
+    /// `_mode` is intentionally unused - see the phase-6 comment below.
+    pub fn finish(self, _mode: DiffMode) -> Diff {
         let PendingDiff {
             before,
             after,
@@ -384,41 +389,55 @@ impl<'code> PendingDiff<'code> {
             ..
         } = self;
 
-        // Phase 6: final APTED on the whole-file residual, or - under DiffMode::Fast, once the
-        // residual is too large for that to be affordable - the cheaper Myers-LCS-based fallback.
-        // Apted is asymptotically better than Zhang-Shasha and (as of 2026-07-10) is
-        // containment-aware, so the exact path runs it unconditionally instead of demoting itself
-        // back to Zhang-Shasha on forests with real containment constraints - see
-        // src/diff/TODO.md.
-        if use_fallback {
-            apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
-        } else {
-            // Pre-match top-level scope-locally-named entities (e.g. shell variable assignments
-            // with no enclosing named container at all, so `solve_syntax_aware_matching`'s own
-            // call to this never fires for them) whose name is unique and survives a position
-            // shift caused by an unrelated insertion elsewhere in the file - see
-            // `apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion").
-            if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
-                let before_metadata = crate::code::metadata::metadata_of(before);
-                let after_metadata = crate::code::metadata::metadata_of(after);
-                apted::prematch_unique_named_locals(
-                    before_ast.root_node().id(),
-                    after_ast.root_node().id(),
-                    &before_metadata,
-                    &after_metadata,
-                    "unique_named_local",
-                    &mut ast_diff,
-                );
-            }
-            apted::for_roots(
-                before,
-                after,
-                &node_cache,
-                apted::Algorithm::Apted,
-                "final_pass",
+        // Phase 6: pre-match top-level scope-locally-named entities (e.g. shell variable
+        // assignments with no enclosing named container at all, so `solve_syntax_aware_matching`'s
+        // own call to this never fires for them) whose name is unique and survives a position
+        // shift caused by an unrelated insertion elsewhere in the file - see
+        // `apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion") - then
+        // resolve the whole-file residual via the cheap Myers-LCS-based fallback
+        // (`apted::for_roots_fallback`), unconditionally, regardless of `_mode`.
+        //
+        // Until the phases-4-7 rearchitecture (`TODO.md`, `~/.claude/plans/iterative-herding-
+        // panda.md`), this branched: `DiffMode::Exact` (or `Fast` below `EXPENSIVE_RESIDUAL_
+        // THRESHOLD`) ran unconditional whole-residual full APTED (`apted::for_roots(...,
+        // Algorithm::Apted, "final_pass", ...)`) instead. That call is deleted as of this commit
+        // (Phase 1 of the rearchitecture): its Θ(n1×n2) dense-matrix cost is driven by residual
+        // shape, not size, and cannot meet the project's p99<400ms target no matter how it's
+        // gated - see the measured pathology (`vimscript-neovim-...add-two-functions`: 87s at
+        // 11,647 nodes, vs. `json-iwalton3-jellyfin-web-...`: 9.4s at 258,504 nodes) recorded in
+        // `TODO.md`'s "Architecture rethink: target goals" section.
+        //
+        // MEASURED QUALITY COST (2026-08-15, see TODO.md): this alone regresses 249/257 fixtures
+        // that currently rely on real APTED (175 drop from 0 mismatches to nonzero, net +4880
+        // mismatches on that subset) - `resolve_residual_forest_via_myers_lcs` only recovers
+        // whole-subtree byte-identical matches, so any residual with even one genuinely-changed
+        // node loses partial credit for everything around it. This is why this change lives on
+        // the `phases-4-7-rearchitecture` branch, not `main`: Phases 2-3 (still to come) have to
+        // land alongside it, replacing what real tree-edit-distance-quality matching this call
+        // provided with bounded, per-region matching, before this is safe to merge.
+        //
+        // `prematch_unique_named_locals` now runs unconditionally too (previously only in the
+        // deleted `else` arm) - measured in isolation and found NOT to be a meaningful
+        // contributor to the regression above (nearly identical delta with/without it: +4880 vs
+        // +4860) - the fallback's own lossiness dominates.
+        //
+        // `DiffMode`/`_mode` no longer changes behavior - kept on the signature for API
+        // compatibility (the TUI's `SelectDiffMode` prompt and `--exact` CLI flag both still
+        // construct one) pending a follow-up commit that decides its fate once this branch's
+        // quality is back at or above baseline.
+        if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
+            let before_metadata = crate::code::metadata::metadata_of(before);
+            let after_metadata = crate::code::metadata::metadata_of(after);
+            apted::prematch_unique_named_locals(
+                before_ast.root_node().id(),
+                after_ast.root_node().id(),
+                &before_metadata,
+                &after_metadata,
+                "unique_named_local",
                 &mut ast_diff,
             );
         }
+        apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
         // APTED, by necessity - not a stylistic choice. Every phase above (1-6) requires *some*
