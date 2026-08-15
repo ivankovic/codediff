@@ -220,9 +220,9 @@ struct Args {
     #[arg(long = "no-solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_moved_subtrees")]
     no_solver_moved_subtrees: bool,
 
-    /// Enable `solve_bottom_up_propagation` (phases-4-7 rearchitecture, `TODO.md`). Off by
-    /// default pending its own isolated corpus measurement.
-    #[arg(long = "solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_bottom_up_propagation")]
+    /// Enable `solve_bottom_up_propagation` (phases-4-7 rearchitecture, `TODO.md`; default, since
+    /// its own isolated corpus measurement came back clean - see `HeuristicConfig`'s doc comment).
+    #[arg(long = "solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_bottom_up_propagation")]
     solver_bottom_up_propagation: bool,
     /// Disable `solve_bottom_up_propagation`.
     #[arg(long = "no-solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_propagation")]

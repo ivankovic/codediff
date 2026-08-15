@@ -1715,21 +1715,41 @@ pub(crate) fn prematch_unique_named_locals(
 const FALLBACK_MAX_EDIT: usize = 1000;
 
 /// Collects the root id of every *maximal* still-unmatched subtree under `root_id`: a preorder
-/// walk that stops descending the instant it finds an unmatched node, so one whole deleted/
-/// inserted block contributes exactly one sequence entry, not one per descendant (generalizes
-/// `flat_children`'s "one entry per unmatched child" from one parent's direct children to the
-/// whole tree). `node_map` is `diff.before_node_map`/`diff.after_node_map` for the respective
-/// side. Nodes are pushed onto an explicit stack in reverse child order so the result comes out in
-/// document order (matters for Myers alignment quality, not correctness) without recursion.
+/// walk that stops descending the instant it finds a node whose *entire* subtree is unmatched, so
+/// one whole deleted/inserted block contributes exactly one sequence entry, not one per descendant
+/// (generalizes `flat_children`'s "one entry per unmatched child" from one parent's direct
+/// children to the whole tree). `node_map` is `diff.before_node_map`/`diff.after_node_map` for the
+/// respective side.
+///
+/// Bug fixed 2026-08-15 (phases-4-7 rearchitecture, `TODO.md`): the original version stopped
+/// descending the instant it found *any* unmatched node, `root_id` included - so whenever the
+/// root itself was unmatched (true for almost every real edit, since the root's own content hash
+/// changes with any edit anywhere in the file), the *entire file* collapsed into one sequence
+/// entry, and any smaller genuinely-recoverable pocket nested inside it (e.g. a sibling
+/// `attribute_item` or an unrelated, byte-identical enum variant, neither individually a
+/// "reference node" or "big enough" for `solve_hash_descent`'s own selector) was silently marked
+/// delete/insert instead of matched. Invisible before Phase 1 of this rearchitecture, which
+/// promoted this function's caller (`resolve_residual_forest_via_myers_lcs`) from a rare
+/// `DiffMode::Fast` safety-valve substitute to the unconditional terminal step - now each node's
+/// "does descending still have a chance of finding something" question is answered by a single
+/// postorder pass (`subtree_has_any_match`) computed once per call, so the fix stays O(n) like the
+/// walk it replaces.
 fn maximal_unmatched_roots(
     root_id: usize,
     meta: &ASTMetadata,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) -> Vec<usize> {
+    let mut has_matched_descendant = rustc_hash::FxHashMap::default();
+    subtree_has_any_match(root_id, meta, node_map, &mut has_matched_descendant);
+
     let mut result = Vec::new();
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {
-        if !node_map.contains_key(&id) {
+        let matched_here = node_map.contains_key(&id);
+        let matched_below = has_matched_descendant.get(&id).copied().unwrap_or(false);
+        if !matched_here && !matched_below {
+            // This node and everything under it is unmatched: nothing to gain by descending
+            // further, so it's emitted as one atomic block (same intent as the original check).
             result.push(id);
             continue;
         }
@@ -1740,6 +1760,31 @@ fn maximal_unmatched_roots(
         }
     }
     result
+}
+
+/// Postorder fills `out[id] = true` iff some node strictly under `id` (not `id` itself) is present
+/// in `node_map` - the precondition `maximal_unmatched_roots` needs to tell "genuinely nothing
+/// recoverable in this subtree" apart from "unmatched itself, but has a matched descendant worth
+/// digging for."
+fn subtree_has_any_match(
+    id: usize,
+    meta: &ASTMetadata,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+    out: &mut rustc_hash::FxHashMap<usize, bool>,
+) -> bool {
+    let Some(info) = meta.node_info.get(&id) else {
+        return node_map.contains_key(&id);
+    };
+    let mut any_matched = false;
+    for &child in &info.children {
+        let child_matched = node_map.contains_key(&child);
+        let child_has_matched_descendant = subtree_has_any_match(child, meta, node_map, out);
+        if child_matched || child_has_matched_descendant {
+            any_matched = true;
+        }
+    }
+    out.insert(id, any_matched);
+    any_matched
 }
 
 /// `DiffMode::Fast`'s substitute for full whole-tree APTED (phase 6) when

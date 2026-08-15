@@ -450,6 +450,18 @@ impl<'code> PendingDiff<'code> {
         }
         apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
 
+        // Run propagation again, now that the fallback (and the `maximal_unmatched_roots` fix
+        // alongside it - see that function's doc comment) may have just matched small pockets
+        // (e.g. a byte-identical sibling attribute or enum variant) nested inside a parent that
+        // was itself still unmatched when the first propagation pass ran above. Without this
+        // second pass, those matches never bubble up to their now-fully-resolved ancestors - see
+        // TODO.md's Phase 3a section, which flagged this gap before the fallback fix that makes it
+        // matter landed. Cheap: O(n) by construction, and a no-op whenever the fallback found
+        // nothing new to propagate.
+        if config.solver_bottom_up_propagation {
+            solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
+        }
+
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
         // APTED, by necessity - not a stylistic choice. Every phase above (1-6) requires *some*
         // anchor before it will consider a pair: a hash, a name, a shared matched ancestor, an

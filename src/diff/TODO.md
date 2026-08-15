@@ -441,6 +441,66 @@ propagation (Phase 2) currently runs only once, before the terminal fallback - a
 the Phase 3b resolver creates *inside or after* the terminal step won't bubble up to its ancestors
 without a second propagation call after it. Not yet added; tracked for the resolver commit.
 
+### Bug fix: `maximal_unmatched_roots` collapsed the whole file to one atomic block (2026-08-15)
+
+Before starting the Phase 3a resolver itself, checked one small residual fixture
+(`rust-add-value-to-enum`, 1 mismatch) with a throwaway debug test to see what it actually needed -
+per the advisor's standing guidance to verify a concrete failure before designing around it. Found
+something bigger than a missing resolver: `source_file` itself was being marked `Delete` via
+`fast_fallback`, even though 89/90-ish of its descendants were already correctly matched.
+
+Root cause, in `apted::common::maximal_unmatched_roots` (the walk `resolve_residual_forest_via_
+myers_lcs`/`for_roots_fallback` use to find "maximal still-unmatched subtrees" to align): it
+**stopped descending the instant it found an unmatched node - including the root itself.** Any real
+edit changes the root's own content hash, so the root is unmatched for nearly every fixture; the
+walk then treated the *entire file* as one atomic block and never looked inside it for the smaller,
+genuinely-recoverable pockets nested there (e.g. two `attribute_item`s and a byte-identical enum
+variant in the `rust-add-value-to-enum` case - none of them "reference nodes" or "big enough" for
+`solve_hash_descent`'s own selector, so nothing upstream of the fallback ever touches them either).
+This bug predates this session, but was invisible until Phase 1 promoted this function's caller
+from a rare `DiffMode::Fast` substitute (gated behind `EXPENSIVE_RESIDUAL_THRESHOLD`, 5000+
+unmatched nodes) to the unconditional terminal step - now it fires on every fixture whose root
+doesn't hash-match, which is nearly all of them. This is almost certainly the dominant cause of
+Phase 1's 175-fixture quality collapse, not an inherent cost of removing whole-residual APTED.
+
+Fix: `maximal_unmatched_roots` now computes (one extra `O(n)` postorder pass, `subtree_has_any_
+match`) whether a node's subtree contains *any* matched descendant before deciding to stop there -
+only a subtree with *zero* matched nodes anywhere in it is emitted as one atomic block (preserving
+the original intent: a genuinely-deleted function still comes out as a single sequence entry, not
+one per statement). Verified `add_prune_mappings` (the delete/insert writer both branches of the
+fallback use) skips anything already present with a real mapping before assuming this was safe to
+change without also auditing every call site - it does, so the fix is confined to *finding* more of
+the genuinely-unmatched pockets, not at risk of clobbering an already-correct match.
+
+Also added a second `solve_bottom_up_propagation` call, right after `for_roots_fallback`, gated the
+same as the first: newly-fallback-matched small pockets (the attribute_items, the enum variant)
+need a chance to bubble up to their now-fully-resolved ancestors, which the first (pre-fallback)
+propagation call can't do since those matches didn't exist yet when it ran. Cheap - O(n), no-op
+whenever the fallback found nothing new.
+
+Also fixed a stale default while in the area: `benchmark_optimal_solutions`'s `--solver-bottom-up-
+propagation` flag defaulted to `false` (`default_value_t = false`), silently diverging from
+`HeuristicConfig::default()`'s `true` - meaning every *default* invocation of the benchmark tool
+(no explicit flags) was running the corpus *without* Phase 2's propagation. Flipped to match; this
+means any earlier single-fixture `--details`/`--dump` diagnostic run without an explicit
+`--solver-bottom-up-propagation` flag understated what production code actually does.
+
+**Full 339-fixture corpus result, isolated to just this fix (Phase 2's propagation already on both
+sides)**: **zero-mismatch fixtures 129 -> 217 (38.1% -> 64.0%)**, total mismatches 25883 -> 5052 (a
+~5x reduction), only **2 regressions** (`html-mozilla-firefox-firefox-remove-li-around-button` 20 ->
+24, `kotlin-nextcloud-android-move-from-one-mocking-library-to-other` 48 -> 49 - both duplicate-
+content Myers-ordering-ambiguity cases, a known hard category, not a new failure mode), 183
+improvements. Latency unaffected (p50 105.7 -> 119.7ms, p99 9036 -> 9741ms, both within noise) -
+expected, the fix is `O(n)` by construction like the walk it replaces. Of the 72 whole-file
+`InsertOnly`/`DeleteOnly`-licensed fixtures Phase 3a's resolver was about to target: **65/72 (90.3%)
+are now already at zero mismatches**, up from 22/72 - this single bug fix did more for that target
+set than the planned resolver would have, and substantially shrinks what Phase 3b/3c still need to
+do. `research/optimal_solutions_benchmark.csv` refreshed to this result.
+
+Zero-mismatch fixtures (64.0%) are now close to the pre-Phase-1 baseline (74.3%) and meaningfully
+closer to the 90% target - most of the remaining gap is concentrated in fixtures needing real
+per-region dispatch (Phase 3b/3c), not this fallback-traversal class of bug.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
