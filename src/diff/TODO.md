@@ -268,6 +268,113 @@ here so nobody re-discovers the same false positives.
 This section tracks novel algorithmic and heuristic improvements to the diff algorithm, beyond implementation
 optimizations. Organized by priority phase.
 
+## Architecture rethink: target goals (set 2026-08-15)
+
+The current 7-phase pipeline (hash descent -> leading-sibling/diagnostic matching -> bottom-up
+expansion -> syntax-aware matching -> second bottom-up expansion -> final APTED/fast fallback ->
+moved-subtree recovery) is judged to have hit its practical ceiling, particularly phases 4/5/6/7.
+A full architectural rethink is planned. These are the concrete targets it must hit - not
+aspirational, the bar for "done":
+
+- **Latency: p99 < 400ms, p50 < 100ms (ideally).** Corrected baseline, full-corpus
+  `benchmark_optimal_solutions --csv` run (332 fixtures, release binary, 2026-08-15): p50 123.9ms,
+  p90 1.35s, **p99 61.8s**, max 169.3s. (An earlier note in this section said p99 9.4s - that was
+  measured on a narrower scope and is wrong; this is the full-corpus figure. p99 needs a ~150x
+  reduction, not 23x.) The tail is bimodal: a few deliberately-gigantic stress fixtures (max case
+  is 153129 nodes) where high cost is at least defensible, versus mid-size shape-driven pathology
+  where it isn't - e.g. `vimscript-neovim-neovim-add-two-functions-and-modify-a-few-lines` takes
+  87s at only 11647 nodes, while `json-iwalton3-jellyfin-web-...` does 258504 nodes in 9.4s. A 22x
+  smaller file taking 9x longer is the existence proof that the tail is APTED/flat-residual shape
+  pathology in phase 6, not raw scale - that's the real target for a redesign, not the huge-file
+  cases. Whether the p99 SLO is meant to cover the deliberately-gigantic fixtures at all is an open
+  question.
+- **Quality: 90% of corpus datasets with zero mismatches; the remaining 10% capped at <=0.5%
+  of nodes mismatched.** Baseline (same run): 246/332 fixtures (74.1%) at exactly zero mismatches -
+  52 fixtures short of the 298 (90%) needed. 85 fixtures are nonzero and must shrink to <=33 (10%)
+  to fit the allowance, each individually <=0.5%; 34 of the 85 currently exceed that cap. Total
+  mismatch instances corpus-wide: 21090, but this figure is dominated by one fixture,
+  `css-shadcn-ui-ui-completely-broken-treesitter-parsing` (16277 mismatches, 49.8% of its own
+  32682 nodes) - a parse failure, not a matching failure; no pipeline redesign fixes a broken
+  parse.
+  Whether that fixture (and 2-3 similarly-named `broken`/`awful-string-matching` fixtures) should
+  count against the quality target is an open question.
+  Cost-model breakdown across the 85 nonzero fixtures (`algorithm_cost` vs `human_cost`): 10 are
+  true ties (cost function under-discriminates, see the correction below), 57 have
+  `algorithm_cost > human_cost` (search failure - the optimum exists but wasn't found; median gap
+  is only 10, so mostly near-misses not catastrophes), and 18 have `algorithm_cost < human_cost`
+  (the human's mapping isn't actually cost-minimal under the current model - a second, distinct
+  cost-function defect). So ~28 fixtures point at the objective function being wrong and ~57 point
+  at the search not reaching the objective's optimum - a redesign needs to fix both, and they are
+  different problems.
+
+**Correction to prior framing:** it was previously assumed that cases where
+`algorithm_cost == human_cost` but the mapping still differs from the human ground truth represent
+an unreachable floor (indistinguishable ties, no cost function could pick the human's answer over
+the algorithm's). **This is wrong and should not be used to write off any remaining mismatch
+bucket.** Human solutions are defined as optimal ground truth; if the algorithm's mapping ties the
+human's mapping on cost but differs from it, that proves the cost function itself is
+under-discriminating - it is failing to capture some signal the human is implicitly using to
+prefer their mapping over the algorithm's. The fix in that case is a better cost function, not
+acceptance of the tie. Every `algorithm_cost == human_cost` mismatch is a cost-function bug report,
+not evidence of a floor.
+
+## Phases 4-7 replacement: text-diff-first matching (in progress, started 2026-08-15)
+
+Superseding architectural work - see `~/.claude/plans/iterative-herding-panda.md` for the full
+design and phased build plan. Phases 1-3 (hash descent, leading-sibling/diagnostic matching, bottom-
+up expansion) stay; phases 4-7 (syntax-aware bundle, second bottom-up expansion, whole-residual
+final APTED, moved-subtree recovery) are being replaced by a pipeline built around a
+parser-independent textual diff computed first, which bounds what the tree diff can contain per
+region and lets each region pick the cheapest sufficient algorithm.
+
+### Phase 0 findings (2026-08-15)
+
+**332 vs. 338/339 fixture-count discrepancy, resolved**: the checked-in
+`research/optimal_solutions_benchmark.csv` (332 rows) is simply stale - it predates 7 fixtures added
+by an earlier commit this session (`rust-skim-rs-skim-format-string`,
+`scala-sirthias-parboiled-value-change`, `shellscript-hgst-libzbc-add-variable`,
+`shellscript-maxsatula-ocp-small-change`, `tsx-keybase-client-emoji-to-native`,
+`tsx-rektdeckard-departure-mono-import-path`, `vimscript-fedorenchik-qt-support-add-two-lines`), and
+includes 2 fixtures (`rust-completely-unrelated-main-files`, `rust-hash-optimization`) that exist as
+fixture directories but aren't wired into any `.rs` test via `assert_matches_human_mapping`. The
+authoritative fixture population is whatever `test::helper::handmade_test_code_pairs()` finds on
+disk (currently 339 fixture directories under `src/test/data/diffs/*/*/`, 338 with
+`human_mapping.json`, 1 "unsolved") - this is what `benchmark_optimal_solutions` (no args) actually
+iterates, and is the correct denominator for every phase's quality gate going forward, not 332.
+
+**Hunk-level insert/delete-only licensing invariant, validated (not just whole-file)**: built a
+temporary diagnostic (`src/bin/hunk_census.rs`, deleted after use - dumps every human-mapping
+operation's before/after byte range per fixture) and cross-checked it against a line-level text
+diff. Refined the test from the original naive "any delete inside an insert-classified hunk's byte
+range" (which produces false positives from ordinary ancestor `MatchButNotIdentical` entries that
+legitimately span a real change happening elsewhere in their subtree) to the precise signal: **a
+mapping entry whose before-byte-range and after-byte-range contain byte-for-byte identical content,
+but whose operation isn't `Identical`** - this is the unambiguous signature of the wrap/reparent
+counterexample (content unchanged, but still needed real tree work because its structural context
+changed).
+
+Result: 4452 non-`Identical` mapping entries checked corpus-wide, only 19 exhibit this signal,
+concentrated in 6 fixtures - **all 6 in the whole-file "mixed" text-diff class, zero in the 72
+whole-file `insert-only`/`delete-only`-classified fixtures.** Confirms: (1) the mandatory escape
+hatch in the plan is validated as necessary, not paranoia - e.g. `rust-turbopack-module-rule` (9
+instances) is exactly the already-known moved-code gap (byte-identical string-literal match arms
+relocated to a different position, so `MatchButNotIdentical` rather than `Identical` despite
+identical bytes); (2) it's rare (6/338 fixtures, ~1.8%) and entirely confined to `mixed`-classified
+files - the 72 whole-file-licensed fixtures Phase 3a targets have zero occurrences, so the
+constrained-LCS-only path for those fixtures is not expected to need its escape hatch in practice,
+even though the hatch must still exist for correctness.
+
+**Full-corpus fresh baseline run**: initially blocked by severe pre-existing memory pressure on the
+dev machine (other running applications, not codediff, had already exhausted free RAM and swap
+before any benchmark run started) - two attempts (tracked background, detached `setsid`) were
+killed. A third, also detached, eventually completed (~19 minutes wall clock) once memory pressure
+eased; installed as `research/optimal_solutions_benchmark.csv` (339 fixtures - see the count
+resolution above). Final pinned pre-rearchitecture baseline: **252/339 (74.3%) at exactly zero
+mismatches, p50 120.2ms, p90 1347.9ms, p99 63576.8ms, max 192233.3ms, 21109 total mismatch
+instances** - consistent with (and superseding) the earlier stale-CSV-derived figures quoted in
+"Architecture rethink: target goals" above (74.1%/123.9ms/1.35s/61.8s/169.3s/21090 on the 332-row
+stale CSV).
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
