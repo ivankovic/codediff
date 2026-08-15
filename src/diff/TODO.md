@@ -526,24 +526,55 @@ architecture-level fix (parser-independent handling, now indirectly via the trav
 than Phase 3c's planned ERROR-density gate) already does most of what Phase 3c targeted. Phase 3c's
 kill criterion needs restating against 124, not 16277, once that phase is actually scoped.
 
-Corpus-wide: 121 fixtures (down from ~210) still have nonzero mismatches. Sampled beyond the 72 to
-see what they actually need (not assumed from the original plan): `kotlin-remove-function` (68
-mismatches) is a different failure *class* entirely - not missing matches but **over-eager**
-matching (`solve_qualified_name_groups`/APTED("qualified_name") partially matching pieces of an
-import path that should have been deleted wholesale with its now-unused function) - a false-positive
-problem the planned delete-forbidden/insert-forbidden licensing wouldn't touch either way.
-`rust_add_to_existing_use` (a failing test, not yet re-measured standalone) is the class Phase 3b's
-per-region dispatch actually targets: `scoped_identifier` (before) vs. `scoped_use_list`/`use_list`
-(after) - a real grammar-level shape change from a single import becoming a multi-import list, kept
-as a named exemplar for scoping that phase.
+Corpus-wide: 121 fixtures (down from ~210) still have nonzero mismatches. Ran every one through
+`--details` and auto-bucketed by the "reason" tag on the wrong mapping (`fast_fallback` on 62
+fixtures/2087 mismatches, `qualified_name` on 40/2572 - mostly one outlier -, ~10 fixtures/306
+mismatches where the mismatch-checker reports `None` rather than a real decision, and only 4/15
+with an explicit before/after *kind* mismatch). Initially mischaracterized the `fast_fallback`
+bucket as "duplicate-content Myers-ordering-ambiguity", generalizing too far from this fix's own 2
+regressions (which genuinely are that shape). Spot-checking the two largest fixtures in that
+bucket - `javascript-microsoft-typescript-broken-js-remove-string-fragment` (602 mismatches) and
+`html-mozilla-firefox-firefox-remove-li-around-button` (24) - found a different, more specific, and
+more actionable pattern: **long chains of the same repeated node kind** (a left-associative
+`binary_expression` chain from string concatenation; deeply nested `element` chains from nested
+`<li>`s). Removing one item from such a chain changes every ancestor's subtree hash, so `myers_lcs`
+over whole-subtree hashes sees N differing entries where the truth is one deletion plus N-1 relabels
+through the nesting - textbook tree-edit-distance territory, not duplicate-content confusion (an
+empty `{}` block, like `css-add-property`'s residual, has no nesting to shift and is a different,
+still-unexplained case - don't lump them together).
 
-**Conclusion**: Phase 3b/3c's remaining scope is real but smaller and differently-shaped than the
-original plan assumed (that plan was written against a fallback that was destroying quality
-wholesale - a world that no longer exists after this fix). Before writing more code, the next step
-is classifying a wider sample of the 121 remaining fixtures into "duplicate-content ambiguity"
-(may need a MatchSimilarFlowControl-style disambiguation, not a resolver) vs. "over-eager matching"
-(may need tightening an existing pass, not adding one) vs. "genuine shape change" (the only category
-the original Phase 3b/3c design actually addresses) before committing to that phase's shape.
+**Confirmed directly**, not just inferred: isolated `apted::for_nodes(Algorithm::Apted, ...)` on
+just the smallest enclosing pair for `javascript-microsoft-typescript-broken-js-remove-string-
+fragment`'s affected chain (`expression_statement:28`, 206/200 nodes) - bypassing the fallback
+entirely - produces **187 Identical, 13 MatchButNotIdentical, 6 Delete**, i.e. essentially the
+correct human-like alignment, not a wholesale delete+insert. **Real bounded APTED already solves
+this class correctly when given the right region.** Phase 3b's actual remaining job is *finding*
+that region and routing to APTED - the resolver doesn't need to be built, only dispatched to. This
+is a materially smaller phase than the original plan's "1-2 weeks, largest phase" estimate, which
+was sized for a world where APTED itself needed building/bounding, not just invoking.
+
+`kotlin-remove-function` (68 mismatches) is a separate failure *class*: not missing matches but
+**over-eager** matching (`solve_qualified_name_groups`/APTED("qualified_name") partially matching
+pieces of an import path that should have been deleted wholesale with its now-unused function) - a
+false-positive problem neither the chain-dispatch fix nor a delete-forbidden/insert-forbidden
+license would touch. The `qualified_name`-tagged bucket (40 fixtures) is the one worth a second,
+separate look later, since that tag means an earlier pass *actively chose* a mapping contradicting
+ground truth, unlike `fast_fallback`'s "nothing upstream claimed this" default. `rust_add_to_
+existing_use`: `scoped_identifier` (before) vs. `scoped_use_list`/`use_list` (after) - a genuine
+grammar-level shape change (single import becoming a multi-import list) - kept as the named exemplar
+for the *smallest* target category, now confirmed to be a minority of the remaining gap (4/121
+fixtures show an explicit kind mismatch).
+
+**Conclusion**: Phase 3b is now scoped as a *region-finding dispatcher* over already-working
+machinery (bounded APTED confirmed above; the constrained-LCS resolver Phase 3a's second half would
+have built has no demonstrated customer - 65/72 licensed fixtures are already zero, and the 7
+residual ones are a different shape), not a "build a new resolver" phase. Concretely: find maximal
+same-kind repeat-chains and same-shaped mixed regions still unmatched after the propagation/
+fallback pipeline, size-gate them, and route to `apted::for_nodes` instead of the fallback's
+whole-subtree-hash Myers LCS for those regions specifically - the `resolve_forest` chokepoint the
+original plan named is still the right place. The `qualified_name` over-matching bucket and the
+`none_mapped`/`css-add-property`-shaped empty-block cases are separate, smaller follow-ups, not
+part of this phase.
 
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
