@@ -838,6 +838,50 @@ Verified byte-identical, not just "should be fine": full 339-fixture corpus, zer
 mismatch count changed. Expected, since both removed paths were already unreachable in every
 production/default configuration - this was pure surface-area reduction, not a behavior change.
 
+### `fast_fallback` unequal-count residual gaps: kind-only sub-anchoring (2026-08-16)
+
+The "one final push" quality work's last target: `resolve_residual_forest_via_myers_lcs`'s
+unequal-count segments (`src/diff/apted/common.rs`) fell through unconditionally to atomic
+delete-all/insert-all, even when a segment plainly contained real reuse (e.g. a 3-before/2-after
+gap where two of the three genuinely correspond to two of the after-side entries). Sampled via a
+temporary `CODEDIFF_DEBUG_LEFTOVER` instrumentation against the `fast_fallback`-flagged fixture
+bucket: confirmed this bucket's shape is real and reasonably uniform (small, unequal-count leftover
+gaps), and 9 of the 35 flagged fixtures sat at ≤3 mismatches - real headroom toward the 245→252
+zero-mismatch gap vs. `main`.
+
+**Shipped**: `resolve_unequal_segment_via_kind_only_anchors` - a second, finer `myers_lcs` pass over
+the segment's `node_to_kind_only_hash` values, with matched pairs recursed per-position (one
+candidate per side, same no-pooling guarantee as the equal-count branch). Landed with two safety
+filters found necessary only after real regressions, not designed in up front:
+- `KIND_ONLY_ANCHOR_MIN_SIZE` (50): `KindOnlyHash` never hashes leaf values, so small/shallow
+  subtrees collide on shape alone regardless of actual content. Two regressions surfaced this at
+  different scales - a same-kind `comment` **leaf** collision (`swift-swiftlang-swift-enable-
+  checks-remove-todo-comment`, 2→4) and, more surprisingly, a size-11 **non-leaf** `element`
+  collision in repeated HTML markup (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-
+  tbody`, 9→27; `css-mozilla-firefox-firefox-actual-style-changes` regressed the same way at size
+  14). The one confirmed genuine win (`vimscript-neovim-neovim-improved-asserts`, 53→0) anchored at
+  size 186, over 10x either false positive - a size floor at 50 cleanly separates them.
+- Segment-local hash-value uniqueness (only trust a pair if neither side's hash repeats elsewhere in
+  the same segment) - a second, independent safety net for the ambiguous-candidate case, though it
+  did **not** catch the HTML regression above (that pairing was already unique within its segment;
+  the true correspondent simply wasn't present in the segment at all - see below).
+
+**Key negative result, worth not re-deriving**: `KindOnlyHash`'s safety in phase 1
+(`solve_hash_descent.rs`) doesn't come from the hash being inherently safe - it comes from phase 1's
+node selector (`reference_nodes_ordered`, large declaration-level nodes only, evaluated across the
+*whole file*) restricting what's eligible to hash in the first place. Reusing the same hash locally,
+inside one small residual segment, loses that guarantee: repeated/templated structures (HTML rows,
+similarly-shaped statements) can share a `KindOnlyHash` while being genuinely different content, and
+no purely local filter (leaf exclusion, segment uniqueness) catches the case where the wrong
+same-shape candidate is unique *within the segment* but wrong anyway. A size floor is a heuristic
+that happened to separate the one real win from the two known false positives on this corpus - it is
+not a structural guarantee, and a future session extending this bucket further should treat any new
+low-size win with suspicion rather than assuming the mechanism generalizes safely downward.
+
+**Verified**: full 339-fixture corpus, zero regressions, one fixture flipped to zero
+(`vimscript-neovim-neovim-improved-asserts`, 53→0). 245/339 (72.3%) → 246/339 (72.6%) zero-mismatch,
+still short of `main`'s 252/339 (74.3%) baseline this branch must clear before merging.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching

@@ -1782,6 +1782,20 @@ pub(crate) fn prematch_unique_named_locals(
 /// is marked delete/insert instead of aligned.
 const FALLBACK_MAX_EDIT: usize = 1000;
 
+/// Minimum `node_to_subtree_size` a `resolve_unequal_segment_via_kind_only_anchors` candidate must
+/// have on *both* sides before its `KindOnlyHash` match is trusted. `KindOnlyHash` never hashes
+/// leaf values (`compute_kind_only_hash`, `code/hash.rs`), so small subtrees collide on shape alone
+/// far more than their size suggests is safe - not just true leaves, but shallow, commonly-repeated
+/// containers too (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody`, 2026-08-16: two
+/// *different* size-11 `element` nodes, both structurally unique within their segment - i.e. not an
+/// ambiguous-hash case either - shared a `KindOnlyHash` purely from having the same tag/attribute
+/// shape, and the wrong one got matched, regressing 9 mismatches to 27; `css-mozilla-firefox-
+/// firefox-actual-style-changes` regressed the same way at size 14). The one confirmed genuine win
+/// found this session (`vimscript-neovim-neovim-improved-asserts`, 53 mismatches to 0) anchored at
+/// size 186 - over 10x either false positive - so 50 cleanly separates the known good case from the
+/// known bad ones without being reverse-engineered to fit only one fixture.
+const KIND_ONLY_ANCHOR_MIN_SIZE: usize = 50;
+
 /// Collects the root id of every *maximal* still-unmatched subtree under `root_id`: a preorder
 /// walk that stops descending the instant it finds a node whose *entire* subtree is unmatched, so
 /// one whole deleted/inserted block contributes exactly one sequence entry, not one per descendant
@@ -1993,6 +2007,15 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
                     diff,
                 );
             }
+        } else if !before_seg.is_empty() && !after_seg.is_empty() {
+            resolve_unequal_segment_via_kind_only_anchors(
+                &before_seg,
+                &after_seg,
+                before_meta,
+                after_meta,
+                source,
+                diff,
+            );
         } else {
             for &id in &before_seg {
                 add_delete_mappings(id, before_meta, source, diff);
@@ -2002,6 +2025,146 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
             }
         }
     }
+}
+
+/// Unequal-count fallback for a `resolve_residual_forest_via_myers_lcs` gap (2026-08-16): rather
+/// than atomically deleting every `before_seg` entry and inserting every `after_seg` entry, run a
+/// second, finer `myers_lcs` pass over the segment's `node_to_kind_only_hash` values (the same
+/// coarse-but-order-preserving discriminator phase 1's second hash pass already trusts globally,
+/// here further constrained to entries already known to fall inside one shared gap between two
+/// exact-hash anchors). A matched pair is still recursed per-position, one candidate per side,
+/// exactly like the equal-count branch above - APTED never gets a pool to invent a cross-match
+/// from, so the correctness argument that makes that branch safe (`kotlin-refactor-function`,
+/// 2026-08-15) carries over verbatim. Entries `myers_lcs` leaves unpaired (a real insert/delete,
+/// not just a same-shaped reparent) fall back to atomic delete/insert, same as before this
+/// function existed - so this can only find *more* reuse than the plain unequal-count fallback,
+/// never less, and degrades to today's behavior whenever no kind-only anchors are found.
+///
+/// Two extra safety filters beyond plain LCS matching, both found empirically necessary
+/// (2026-08-16), not assumed up front - `KindOnlyHash`'s safety in phase 1 turned out to come from
+/// its node selector (`reference_nodes_ordered`, large declaration-level nodes only), not from the
+/// hash itself, which this local segment doesn't get for free:
+/// - **`KIND_ONLY_ANCHOR_MIN_SIZE` floor**: `KindOnlyHash` hashes kind + child hashes but never leaf
+///   values (`compute_kind_only_hash`, `code/hash.rs`), so shape alone drives the hash. At the
+///   extreme (a leaf, `subtree_size == 1`) this reduces to a pure function of kind, colliding every
+///   same-kind leaf in the segment - caught on `swift-swiftlang-swift-enable-checks-remove-todo-
+///   comment`: two unrelated `comment` leaves got sub-anchored to each other, regressing 2
+///   mismatches to 4. But it isn't only leaves: `html-gohugoio-hugo-enclose-table-with-div-and-add-
+///   thead-tbody` regressed 9 mismatches to 27 from two *different*, size-11 `element` nodes (same
+///   tag/attribute shape, unrelated content) sharing a hash with no ambiguity to catch (see below) -
+///   `css-mozilla-firefox-firefox-actual-style-changes` regressed the same way at size 14. The one
+///   confirmed genuine win found this session (`vimscript-neovim-neovim-improved-asserts`, 53 to 0)
+///   anchored at size 186 - see `KIND_ONLY_ANCHOR_MIN_SIZE`'s own doc comment for why 50 was picked.
+/// - **Segment-local uniqueness**: even above the size floor, a hash can still repeat within one
+///   segment if two different candidates are genuinely the same shape - LCS will happily pick *some*
+///   pairing among same-hash candidates, but nothing constrains it to the *true* correspondent
+///   (unlike the equal-count branch's fixed positional pairing, which has only one candidate per
+///   side by construction). A pair is only trusted if its hash value is unique within both
+///   `before_seg` and `after_seg` - i.e. there was truly only one candidate per side.
+///
+/// Both filters only ever *withhold* a match, never invent one that plain LCS didn't already
+/// propose - so an excluded entry just falls through to the atomic delete/insert loops below, same
+/// as before this function existed.
+fn resolve_unequal_segment_via_kind_only_anchors(
+    before_seg: &[usize],
+    after_seg: &[usize],
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let before_hashes: Vec<u64> = before_seg
+        .iter()
+        .map(|id| {
+            before_meta
+                .node_to_kind_only_hash
+                .get(id)
+                .copied()
+                .unwrap_or(0)
+        })
+        .collect();
+    let after_hashes: Vec<u64> = after_seg
+        .iter()
+        .map(|id| {
+            after_meta
+                .node_to_kind_only_hash
+                .get(id)
+                .copied()
+                .unwrap_or(0)
+        })
+        .collect();
+
+    let before_hash_counts = count_occurrences(&before_hashes);
+    let after_hash_counts = count_occurrences(&after_hashes);
+
+    let pairs = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT).unwrap_or_default();
+
+    let mut matched_before = vec![false; before_seg.len()];
+    let mut matched_after = vec![false; after_seg.len()];
+    let cost_model = UnitCostModel {
+        language: before_meta.language,
+    };
+    for (bi, ai) in &pairs {
+        let before_size = before_meta
+            .node_to_subtree_size
+            .get(&before_seg[*bi])
+            .copied()
+            .unwrap_or(0);
+        let after_size = after_meta
+            .node_to_subtree_size
+            .get(&after_seg[*ai])
+            .copied()
+            .unwrap_or(0);
+        if before_size < KIND_ONLY_ANCHOR_MIN_SIZE || after_size < KIND_ONLY_ANCHOR_MIN_SIZE {
+            continue;
+        }
+        let ambiguous = before_hash_counts
+            .get(&before_hashes[*bi])
+            .copied()
+            .unwrap_or(0)
+            > 1
+            || after_hash_counts
+                .get(&after_hashes[*ai])
+                .copied()
+                .unwrap_or(0)
+                > 1;
+        if ambiguous {
+            continue;
+        }
+        matched_before[*bi] = true;
+        matched_after[*ai] = true;
+        resolve_forest(
+            vec![before_seg[*bi]],
+            vec![after_seg[*ai]],
+            before_meta,
+            after_meta,
+            &cost_model,
+            Algorithm::Apted,
+            source,
+            diff,
+        );
+    }
+    for (i, &id) in before_seg.iter().enumerate() {
+        if !matched_before[i] {
+            add_delete_mappings(id, before_meta, source, diff);
+        }
+    }
+    for (i, &id) in after_seg.iter().enumerate() {
+        if !matched_after[i] {
+            add_insert_mappings(id, after_meta, source, diff);
+        }
+    }
+}
+
+/// Counts how many times each value occurs in `values` - used by
+/// `resolve_unequal_segment_via_kind_only_anchors` to detect a segment-local hash collision (more
+/// than one same-hash candidate on a side, i.e. a genuinely ambiguous match) before trusting it.
+fn count_occurrences(values: &[u64]) -> rustc_hash::FxHashMap<u64, usize> {
+    let mut counts = rustc_hash::FxHashMap::default();
+    for &v in values {
+        *counts.entry(v).or_insert(0) += 1;
+    }
+    counts
 }
 
 /// Sums `node_to_subtree_size` over `ids` - the total node count a pooled `resolve_forest` call
