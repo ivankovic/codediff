@@ -1,0 +1,1975 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1"
+      ],
+      "after_path": [
+        "document:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:3",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:4",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:1",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:5",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:2",
+        "flow_node:2",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1",
+        "plain_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1",
+        "plain_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:1",
+        "plain_scalar:1",
+        "string_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "::1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "[:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:1",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:2",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:3",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:3"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:4",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:4"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:5",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:5"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        ",:5"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1",
+        "\":1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1",
+        "\":2"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "flow_node:6",
+        "double_quote_scalar:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "]:1"
+      ],
+      "after_path": [
+        "document:1",
+        "block_node:1",
+        "block_mapping:1",
+        "block_mapping_pair:6",
+        "flow_node:2",
+        "flow_sequence:1",
+        "]:1"
+      ]
+    }
+  ]
+}

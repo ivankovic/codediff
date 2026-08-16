@@ -1,0 +1,4920 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1"
+      ],
+      "after_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1",
+        "?:1"
+      ],
+      "after_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:1",
+        "flow_maybe_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:1"
+      ],
+      "after_path": [
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "=:1"
+      ],
+      "after_path": [
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:2"
+      ],
+      "after_path": [
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "=:2"
+      ],
+      "after_path": [
+        "=:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "?:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "!:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "!:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "=:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "ERROR:2",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "regex_pattern:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "regex_pattern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ">:1"
+      ],
+      "after_path": [
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "identifier:3"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:3"
+      ],
+      "after_path": [
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:1"
+      ],
+      "after_path": [
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:1"
+      ],
+      "after_path": [
+        "regex:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:1",
+        "/:1"
+      ],
+      "after_path": [
+        "regex:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:1",
+        "regex_pattern:1"
+      ],
+      "after_path": [
+        "regex:1",
+        "regex_pattern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:1",
+        "/:2"
+      ],
+      "after_path": [
+        "regex:1",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:2"
+      ],
+      "after_path": [
+        "<:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:4"
+      ],
+      "after_path": [
+        "identifier:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3"
+      ],
+      "after_path": [
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:3",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:3",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "=:3"
+      ],
+      "after_path": [
+        "=:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1"
+      ],
+      "after_path": [
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ">:2"
+      ],
+      "after_path": [
+        ">:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2"
+      ],
+      "after_path": [
+        "type_arguments:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:2",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_arguments:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_arguments:2",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:2",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:2",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3"
+      ],
+      "after_path": [
+        "type_arguments:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:3",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_arguments:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_arguments:3",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:3",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:3",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:3",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:4"
+      ],
+      "after_path": [
+        "type_arguments:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:4",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:4",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:4",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:4",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:4",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:4",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4"
+      ],
+      "after_path": [
+        "ERROR:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "=:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "type_parameter:1",
+        "default_type:1",
+        "literal_type:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:2",
+        "/:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        "ERROR:2",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "type_assertion:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "identifier:3"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:4",
+        "identifier:4"
+      ],
+      "after_path": [
+        "ERROR:4",
+        "identifier:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:5"
+      ],
+      "after_path": [
+        "identifier:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:5"
+      ],
+      "after_path": [
+        "ERROR:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:5",
+        "::1"
+      ],
+      "after_path": [
+        "ERROR:5",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:3"
+      ],
+      "after_path": [
+        "<:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:2"
+      ],
+      "after_path": [
+        "regex:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:2",
+        "/:1"
+      ],
+      "after_path": [
+        "regex:2",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:2",
+        "regex_pattern:1"
+      ],
+      "after_path": [
+        "regex:2",
+        "regex_pattern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:2",
+        "/:2"
+      ],
+      "after_path": [
+        "regex:2",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:4"
+      ],
+      "after_path": [
+        "<:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:6"
+      ],
+      "after_path": [
+        "identifier:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:6"
+      ],
+      "after_path": [
+        "ERROR:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:6",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:6",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "=:4"
+      ],
+      "after_path": [
+        "=:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2"
+      ],
+      "after_path": [
+        "binary_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "regex_pattern:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "regex_pattern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "regex:1",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "=:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "instantiation_expression:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_expression:2",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "type_assertion:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ">:3"
+      ],
+      "after_path": [
+        ">:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:7"
+      ],
+      "after_path": [
+        "identifier:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:7"
+      ],
+      "after_path": [
+        "ERROR:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:7",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:7",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:5"
+      ],
+      "after_path": [
+        "<:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:3"
+      ],
+      "after_path": [
+        "regex:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:3",
+        "/:1"
+      ],
+      "after_path": [
+        "regex:3",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:3",
+        "regex_pattern:1"
+      ],
+      "after_path": [
+        "regex:3",
+        "regex_pattern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "regex:3",
+        "/:2"
+      ],
+      "after_path": [
+        "regex:3",
+        "/:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "<:6"
+      ],
+      "after_path": [
+        "<:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "identifier:8"
+      ],
+      "after_path": [
+        "identifier:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:8"
+      ],
+      "after_path": [
+        "ERROR:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:8",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:8",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "=:5"
+      ],
+      "after_path": [
+        "=:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:2"
+      ],
+      "after_path": [
+        "string:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:2",
+        "\":1"
+      ],
+      "after_path": [
+        "string:2",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:2",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "string:2",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "string:2",
+        "\":2"
+      ],
+      "after_path": [
+        "string:2",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ">:4"
+      ],
+      "after_path": [
+        ">:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5"
+      ],
+      "after_path": [
+        "type_arguments:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:5",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_arguments:5",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_arguments:5",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:5",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:5",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:5",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6"
+      ],
+      "after_path": [
+        "type_arguments:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:6",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_arguments:6",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_arguments:6",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:6",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:6",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:6",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7"
+      ],
+      "after_path": [
+        "type_arguments:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7",
+        "<:1"
+      ],
+      "after_path": [
+        "type_arguments:7",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_arguments:7",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_arguments:7",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_arguments:7",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_arguments:7",
+        ">:1"
+      ],
+      "after_path": [
+        "type_arguments:7",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        "ERROR:1",
+        "/:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        "ERROR:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "type_parameters:1",
+        ">:1"
+      ]
+    }
+  ]
+}
