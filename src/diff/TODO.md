@@ -740,6 +740,45 @@ Still short of main's 74.3% zero-mismatch bar (71.1% now, was 70.8%) - the remai
 over-matching bucket (still not investigated), and whatever's behind the other ~19 remaining
 regressions vs. main not yet individually diagnosed.
 
+### Quality push, continued: `resolve_flat_tree_pair`'s pooling had the same risk (2026-08-16)
+
+Extended the equal-count-vs-pooled distinction to `resolve_flat_tree_pair`'s own leftover
+recursion (the flat-container path, not the residual-forest path above) - it previously pooled
+*any* leftover up to `FLAT_UNMATCHED_RECURSE_LIMIT` (20) entries unconditionally, on the assumption
+(stated in its own doc comment) that its entries are "genuine ordered siblings under one shared
+parent" and therefore safe to pool. **That assumption was wrong, confirmed directly, not just
+theoretically**: `java-nextcloud-android-add-if-branch-with-reused-return` (54 -> 343 vs. main) has
+a leftover of just **2 entries each side** - nowhere near the old cap - and pooling still let APTED
+invent a plausible-but-wrong cross-match between two unrelated methods, deleting one wholesale. The
+same risk the residual-forest fix (above) demonstrated at larger scale exists here too, even at
+N=2.
+
+Rewrote the dispatch: equal-count gaps now always recurse per position (`before_unmatched[i]`
+against only `after_unmatched[i]`, one independent call per pair, no entry-count cap needed since
+each call is bounded on its own) instead of pooling; unequal-count gaps keep the original pooled
+`resolve_forest` call (bounded by both the entry-count and total-size caps) as a deliberate,
+validated risk/reward trade with no safer alternative. First attempt at this dropped the
+single-pair-exempt-from-size-cap carve-out from the earlier fix along the way, regressing
+`xml-odoo-odoo-add-two-attributes` right back to 160 - caught by the same full-corpus measurement
+discipline, restored (`N == 1` is exempt from the size cap regardless of magnitude; `N > 1`
+equal-count is still size-capped, since per-pair cost still needs *some* latency bound even without
+a correctness risk).
+
+Full 339-fixture corpus, isolated to this fix: **zero regressions, 3 improvements**
+(`java-nextcloud-android-add-if-branch-with-reused-return` 343->54, back to exactly main's value;
+`java-protobuf-add-two-annotations` 5->0; `c-ffmpeg-added-typedef-to-enum` 2->0). Zero-mismatch
+241 -> 243 (71.1% -> 71.7%), total mismatches 3140 -> 2844. `research/optimal_solutions_benchmark.
+csv` refreshed to this result.
+
+Running tally this session, `main` (74.3%) vs. branch: 74.3% -> ~21% (Phase 1) -> 64.0% (Phase 2/3a
+bug fix) -> 71.7% (Phase 3b) -> 70.8% (flat_children speed fix, deliberate trade) -> 71.1% (equal-
+count residual-forest generalization) -> **71.7% (equal-count flat-tree-pair generalization,
+matching Phase 3b's post-fix level, still 2.6 points short of main)**. Remaining known gap: `vimscript-
+neovim-neovim-improved-asserts` (unequal-count shape), the `qualified_name` over-matching bucket,
+and an unknown number of the original ~19-21 regressions vs. main not yet individually diagnosed -
+worth re-running the full main-vs-branch diff before continuing, since several may already be fixed
+as a side effect of these two generalizations.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching

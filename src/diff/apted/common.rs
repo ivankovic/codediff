@@ -1418,36 +1418,67 @@ fn resolve_flat_tree_pair(
 
     // A Myers-unmatched entry only failed *exact-hash* equality - it can still share real
     // structure with an entry on the other side (a small edit inside an otherwise-
-    // unchanged dictionary/list entry, say). Recurse the leftover through real APTED
-    // (bounded by `FLAT_UNMATCHED_RECURSE_LIMIT` *and* `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE` -
-    // see their doc comments) instead of unconditionally treating every one of them as fully
-    // replaced - `resolve_forest` still has delete/insert available for genuinely unrelated pairs,
-    // so this can only find *more* reuse than the atomic version, never less. Confirmed against a
-    // live case (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: one dictionary
-    // entry out of ~185 had an internal edit; the atomic version deleted+inserted all ~40 of its
-    // descendant nodes instead of recognizing the ~38 that were untouched - see TODO.md's
-    // 2026-08-08 entry). Pooled across every segment rather than recursed per segment, to match
-    // the pre-split cap and avoid many tiny APTED calls where one pooled call used to suffice.
+    // unchanged dictionary/list entry, say). Recurse the leftover through real APTED instead of
+    // unconditionally treating every one of them as fully replaced - `resolve_forest` still has
+    // delete/insert available for genuinely unrelated pairs, so this can only find *more* reuse
+    // than the atomic version, never less. Confirmed against a live case (`vimscript-neovim-
+    // neovim-i-have-no-idea-what-this-diff-does`: one dictionary entry out of ~185 had an internal
+    // edit; the atomic version deleted+inserted all ~40 of its descendant nodes instead of
+    // recognizing the ~38 that were untouched - see TODO.md's 2026-08-08 entry).
     //
-    // The size cap is waived for the *exactly-one-entry-per-side* case specifically (2026-08-16,
-    // phases-4-7 rearchitecture `TODO.md`) - a true 1:1 "this replaced that" correspondence between
-    // two confirmed anchors has no other candidate for APTED to cross-match against, so the
-    // pooling risk the cap otherwise guards against (see `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`'s
-    // doc comment) cannot occur here regardless of size - the same reasoning Phase 3b already
-    // applied to `resolve_residual_forest_via_myers_lcs`'s own leftover recursion. Confirmed this
-    // is the right split, not a guess: `xml-odoo-odoo-add-two-attributes`'s regression was exactly
-    // this shape (1 entry each side, 17,670 combined nodes - blocked by the old size-only cap, no
-    // ambiguity risk at all) while `tsx-excalidraw-...-huge-file-with-real-logic-change`'s (6
-    // before / 12 after, mismatched counts) is exactly the pooling-risk shape the cap must keep
-    // blocking.
+    // Equal counts on both sides are recursed *per position*, never pooled (2026-08-16, phases-4-7
+    // rearchitecture `TODO.md`): `before_unmatched[i]` against only `after_unmatched[i]`, one
+    // independent `resolve_forest` call per pair - a true, unambiguous 1:1 "this replaced that"
+    // correspondence for every pair, with no room for APTED to invent a relationship across pairs.
+    // This module's own doc comment previously called this function's entries "genuine ordered
+    // siblings under one shared parent" and assumed pooling them (up to `FLAT_UNMATCHED_RECURSE_
+    // LIMIT`) was therefore safe - **it isn't, even at small scale**: confirmed on `java-nextcloud-
+    // android-add-if-branch-with-reused-return` (2026-08-16), a mere 2-before/2-after pool (well
+    // under the old cap) still let APTED invent a plausible-but-wrong cross-match between the two
+    // unrelated methods, deleting one wholesale (54 -> 343 mismatches) - the same risk `kotlin-
+    // refactor-function` (Phase 3b) and `tsx-excalidraw-...-huge-file` (the `flat_children` fix)
+    // already demonstrated for larger pools. Per-position recursion has no entry-count cap (each
+    // call is independent and bounded on its own) - see the total-size cap and its single-pair
+    // exemption below.
+    //
+    // Unequal counts (a real insert/delete happened inside the segment too, so there's no fixed
+    // positional correspondence) still use the original pooled `resolve_forest` call, bounded by
+    // both `FLAT_UNMATCHED_RECURSE_LIMIT` (entry count) and `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`
+    // (total node count) - pooling is a genuine, deliberate risk/reward trade for this case (no
+    // safer alternative exists short of atomic delete/insert), not an oversight.
+    // The size cap itself is waived for the single-pair case (`N == 1`): with only one candidate
+    // per side there's nothing to bound the *choice* of match against (that risk is what the cap
+    // guards against for `N > 1`), only compute time for one APTED call - and one call, however
+    // large, was never what the cap was sized against. Confirmed empirically, not assumed:
+    // `xml-odoo-odoo-add-two-attributes` (1 entry each side, 17,670 combined nodes) regressed the
+    // instant this exemption was dropped during the `N == 1` -> `N >= 1` generalization above.
     let single_entry_pair = before_unmatched.len() == 1 && after_unmatched.len() == 1;
     let unmatched_total_size = subtree_size_sum(&before_unmatched, before_meta)
         + subtree_size_sum(&after_unmatched, after_meta);
     if !before_unmatched.is_empty()
+        && before_unmatched.len() == after_unmatched.len()
+        && (single_entry_pair || unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE)
+    {
+        let cost_model = UnitCostModel {
+            language: before_meta.language,
+        };
+        for (b, a) in before_unmatched.into_iter().zip(after_unmatched) {
+            resolve_forest(
+                vec![b],
+                vec![a],
+                before_meta,
+                after_meta,
+                &cost_model,
+                Algorithm::Apted,
+                source,
+                diff,
+            );
+        }
+    } else if !before_unmatched.is_empty()
         && !after_unmatched.is_empty()
         && before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
         && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
-        && (single_entry_pair || unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE)
+        && unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE
     {
         let cost_model = UnitCostModel {
             language: before_meta.language,
