@@ -616,6 +616,84 @@ fixtures whose affected chains span multi-entry gaps (need real disambiguation t
 not just a size increase on the entry cap - the exact risk this phase's first attempt hit).
 `research/optimal_solutions_benchmark.csv` refreshed to this result.
 
+### Speed investigation: `flat_children`'s gate, revisited (2026-08-16)
+
+User asked "what is our speed" - checked against the p50<100ms/p99<400ms goal. Answer at the time:
+p50 114.7ms (close), p90 1.3s, **p99 9.6s (24x over target), max 177s** - two fixtures
+(`rust-real-logic-change-in-a-huge-75k-node-file` 177s, `tsx-excalidraw-...-huge-file` 150s)
+dominated the tail; nothing speed-related had been touched since Phase 1.
+
+Profiled both directly (temporary phase-by-phase timing, reverted after use - see this section's
+methodology note below): **~95% of both fixtures' time was in `solve_large_flat_subtrees`**
+(23.2/24.2s and 16.6/17.4s respectively). One level deeper: one single top-level item each time (a
+`mod tests { ... }` with a ~30K-node flat body; similar for excalidraw) accounted for nearly all of
+it. Root cause, precisely identified: `flat_children`'s gate (deciding whether a container gets the
+cheap Myers path or falls through to general Zhang-Shasha/APTED) checked *unmatched* child count
+against `FLAT_MIN_CHILDREN` (50), not total child count - a container with 30K total children but
+only ~20 still-unmatched (the rest already hash-matched by Phase 1) falls *below* 50 unmatched and
+gets routed to general tree-edit-distance over the whole container instead of Myers.
+
+**This is not a new bug - it's a known one, previously investigated and reverted.** Memory record
+`flat_children-gate-widening-attempt-2026-08-14` (and this file's own history) documents an
+identical diagnosis and fix attempt on 2026-08-14: widening the gate to total count fixed the exact
+pathology (confirmed then too: "18.5s of one fixture's 28s total") but broke 9 corpus fixtures,
+because `resolve_flat_tree_pair`'s own leftover-recursion (`FLAT_UNMATCHED_RECURSE_LIMIT`, an
+*entry count* cap, no size cap) was too weak for containers whose newly-exposed residual needed
+general APTED - and was reverted for lack of a fix that didn't weaken that path. That gap is
+exactly what Phase 3b's `resolve_residual_forest_via_myers_lcs` work (this same session, above)
+had just built and validated: a total-*size* cap alongside the entry-count cap, since tree-edit-
+distance cost is driven by node count, not entry count.
+
+**Re-attempted with that fix in hand**: (1) widened `flat_children`'s gate to total child count
+(removing its now-unused `node_map` parameter); (2) added `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`
+(2000, same value/reasoning as Phase 3b's `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`) to `resolve_flat_tree_
+pair`'s leftover recursion. First measurement: fixed both target fixtures (23.9s -> 3.4s and
+17.4s -> ~2s of `solve_large_flat_subtrees` time) and net-improved the corpus (4131 -> 3255 total
+mismatches after the full fix lands - see below), but introduced 5 new regressions, one of them a
+full 0 -> 343 flip.
+
+**Diagnosed rather than accepted**: added temporary per-call instrumentation (reverted after use)
+to `resolve_flat_tree_pair`'s leftover recursion, capturing entry counts and total size for the two
+worst-behaved fixtures. `xml-odoo-odoo-add-two-attributes` (0 -> 160 regression): exactly **1
+before-entry, 1 after-entry, 17,670 combined nodes** - a true, unambiguous 1:1 correspondence,
+blocked purely by the size cap, no cross-matching risk possible (nothing else to choose between).
+`tsx-excalidraw-...-huge-file` (the fixture that motivated the cap in the first place): **6
+before-entries, 12 after-entries, 21,056 combined nodes** - a genuine multi-candidate pool with
+mismatched counts, exactly the shape where an unbounded pooled real-APTED call can invent a
+plausible-but-wrong cross-match (confirmed separately: removing the cap entirely made this fixture
+*worse* on both quality and speed, 1458 mismatches/19.3s vs. 231/2.4s capped - not just slower).
+
+**Fix**: exempt the size cap specifically for the exactly-one-entry-per-side case (mirroring Phase
+3b's own single-entry-gap reasoning exactly) while keeping it for genuine multi-entry pools. This
+resolved `xml-odoo-odoo-add-two-attributes` (0 mismatches) without reopening the excalidraw risk
+(stayed at 231). Final result, full 339-fixture corpus: **zero-mismatch 243 -> 240 (71.7% ->
+70.8%)**, total mismatches 4131 -> 3255, **4 remaining regressions** (all confirmed or
+strongly-suspected multi-entry-pool cases the cap is deliberately still blocking - `java-nextcloud-
+android-add-if-branch-with-reused-return` 54->343, `java-nextcloud-android-add-two-function-calls`
+0->30, `json-excalidraw-...-change-translations-mostly-add` 0->27, `java-protobuf-add-two-
+annotations` 0->5) vs. 1 huge improvement (`tsx-excalidraw-...-huge-file` 1458->231, the fixture
+this whole investigation started from). Test suite: 18 -> 21 failing, consistent with the 3-fixture
+net zero-mismatch delta.
+
+**Latency, the actual point of this investigation**: **max 177,105ms -> 11,386ms (15.6x)**, p99
+9575ms -> 7621ms, p50/p90 unchanged (114.7->115.3ms, 1288->1265ms, both noise). Corpus-wide
+benchmark wall time (339 fixtures x 3 diff computations each) 1997s -> 756s (2.6x). Neither
+originally-targeted fixture is in the top 5 slowest anymore except `rust-real-logic-change-in-a-
+huge-75k-node-file` (177s -> 10.6s - still the second-slowest fixture in the corpus, now bounded by
+something other than `solve_large_flat_subtrees`, not yet investigated). p99/max are still well
+over the 400ms target - this investigation closed the two worst outliers, not the whole tail; the
+next-slowest fixtures (`json-iwalton3-jellyfin-web-...` 11.4s, two more `rust-rustdesk-rustdesk-...`
+fixtures at 8-9s) are now the frontier and haven't been profiled.
+
+**Methodology note**: every diagnostic in this section (phase-by-phase timing in `PendingDiff::
+finish`/`pending_with_config`, per-item timing in `solve_large_flat_subtrees`, per-call
+entry-count/size logging in `resolve_flat_tree_pair`) was added as temporary instrumentation
+(`eprintln!` gated behind a `CODEDIFF_DEBUG_*` env var, or a throwaway `#[ignore]`d test) and
+reverted immediately after use via `git checkout --` once it had answered its question - none of it
+shipped. Same discipline as the debug tests used earlier in this session (Phase 0's `hunk_census.
+rs`, the propagation investigation) - confirmed clean via `git status`/`git diff` before every
+commit in this section.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
