@@ -236,9 +236,8 @@ hermetic-benchmark-update-baseline:
 
 # Benchmark against existing sampled pairs for the four primary languages (Rust, Python, Go,
 # Kotlin) and run analysis afterwards. Uses benchmark_all_extended.sh restricted to these four via
-# --language - the only difference from benchmark-sampled-extended below was ever which languages
-# ran by default, not the underlying script.
-benchmark-sampled:
+# --language.
+benchmark-sampled-main-languages-only:
 	@echo "Running benchmarks for Rust, Python, Go, Kotlin..."
 	@echo "Results will be written to research/results/"
 	cd research && ./measure/benchmark_all_extended.sh --language "Rust Python Go Kotlin" --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
@@ -247,8 +246,8 @@ benchmark-sampled:
 	cd research && uv run ./analysis/benchmark_report.py
 
 # Benchmark with extended language set (every language with a tree-sitter grammar - see
-# ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit
-benchmark-sampled-extended:
+# ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit.
+benchmark-sampled-all-languages:
 	@echo "Running extended benchmarks for all supported languages..."
 	@echo "Results will be written to research/results/"
 	@echo "Using 20000 node limit, max 100 commits per repo"
