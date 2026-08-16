@@ -30,6 +30,10 @@ mod cpp_bolero_murakami_sprout_copyright_update;
 #[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_update_3;
 #[cfg(test)]
+mod cpp_lancos_ponyprog_remove_a_few_lines;
+#[cfg(test)]
+mod cpp_llnl_sundials_comment_change;
+#[cfg(test)]
 mod csharp_cyanfish_naps2_add_condition_to_if;
 #[cfg(test)]
 mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
@@ -41,6 +45,8 @@ mod css_fortawesome_font_awesome_update_version_comment_2;
 mod css_fortawesome_font_awesome_update_version_comment_3;
 #[cfg(test)]
 mod css_fortawesome_font_awesome_upgrade_version_comment;
+#[cfg(test)]
+mod css_heroic_games_launcher_heroicgameslauncher_add_6_lines;
 #[cfg(test)]
 mod css_horst3180_vertex_theme_remove_single_rule;
 #[cfg(test)]
@@ -62,6 +68,10 @@ mod go_prometheus_node_exporter_remove_one_comment;
 #[cfg(test)]
 mod go_stackexchange_blackbox_add_comment;
 #[cfg(test)]
+mod html_chennes_med_only_text_value_change;
+#[cfg(test)]
+mod html_chennes_med_only_text_value_change_2;
+#[cfg(test)]
 mod html_milkytracker_milkytracker_text_update;
 #[cfg(test)]
 mod html_oauth_xx_oauth_ruby_version_and_timestamp_update;
@@ -76,6 +86,8 @@ mod java_jflex_de_jflex_javadoc_update;
 #[cfg(test)]
 mod java_jopt_simple_jopt_simple_remove_import;
 #[cfg(test)]
+mod java_junit_pioneer_junit_pioneer_add_block_comment;
+#[cfg(test)]
 mod java_zeroc_ice_ice_comment_only_update;
 #[cfg(test)]
 mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;
@@ -88,6 +100,8 @@ mod javascript_usebruno_bruno_add_class_to_classname_attribute;
 #[cfg(test)]
 mod javascript_usebruno_bruno_style_change;
 #[cfg(test)]
+mod javascript_xpra_org_xpra_html5_small_change;
+#[cfg(test)]
 mod json_fedoraqt_qgnomeplatform_remove_from_list;
 #[cfg(test)]
 mod json_fortawesome_font_awesome_string_change;
@@ -98,11 +112,17 @@ mod json_iwalton3_jellyfin_web_jmp_gigantic_file_trivial_string_version_change;
 #[cfg(test)]
 mod json_kellyjonbrazil_jc_add_maxhops_to_traceroute;
 #[cfg(test)]
+mod json_kiwix_kiwix_desktop_add_a_few_change_a_few;
+#[cfg(test)]
 mod json_main_branch_track_open_instances_remove_item_from_list;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_add_single_const;
 #[cfg(test)]
+mod kotlin_jetbrains_kotlin_remove_one_comment_line;
+#[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_typealias_with_annotations;
+#[cfg(test)]
+mod kotlin_yairm210_unciv_small_change;
 #[cfg(test)]
 mod lua_corsixth_corsixth_refactor_if_expressions;
 #[cfg(test)]
@@ -114,13 +134,23 @@ mod lua_luals_lua_language_server_add_two_translations;
 #[cfg(test)]
 mod lua_luaposix_luaposix_copyright_year_change;
 #[cfg(test)]
+mod lua_return_to_the_roots_s25client_add_two_items_to_list;
+#[cfg(test)]
+mod lua_return_to_the_roots_s25client_few_added_lines;
+#[cfg(test)]
 mod lua_teeworlds_teeworlds_add_or_expression_to_existing_if;
 #[cfg(test)]
+mod php_doctrine_orm_delete_3_comments_and_update_1;
+#[cfg(test)]
 mod php_smarty_php_smarty_change_version_string;
+#[cfg(test)]
+mod php_symfony_finder_move_elseif_block_to_else;
 #[cfg(test)]
 mod php_zetacomponents_base_whitespace_only_change;
 #[cfg(test)]
 mod php_zetacomponents_consoletools_file_with_parse_errors_and_a_few_deletions;
+#[cfg(test)]
+mod python_aajanki_yle_dl_tiny_change;
 #[cfg(test)]
 mod python_bolero_murakami_sprout_change_copyright_year;
 #[cfg(test)]
@@ -148,13 +178,21 @@ mod ruby_moneta_rb_moneta_trivial_version_update;
 #[cfg(test)]
 mod ruby_rapid7_ruby_smb_add_import_and_one_expression;
 #[cfg(test)]
+mod rust_fornwall_rust_script_add_lifecycle_management;
+#[cfg(test)]
 mod rust_refirmlabs_binwalk_whitespace_only;
 #[cfg(test)]
 mod rust_skim_rs_skim_format_string;
 #[cfg(test)]
+mod rust_tursodatabase_turso_unwrap_to_expect;
+#[cfg(test)]
 mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
+mod scala_com_lihaoyi_mill_add_a_function_call;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_add_one_argument;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_assert_format_string_change;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
 #[cfg(test)]
@@ -170,7 +208,11 @@ mod scala_com_lihaoyi_mill_version_string_change;
 #[cfg(test)]
 mod scala_sirthias_parboiled_value_change;
 #[cfg(test)]
+mod scala_ymnk_jzlib_interesting_probably_has_no_optimal_solution;
+#[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
+#[cfg(test)]
+mod shellscript_go_delve_delve_add_if;
 #[cfg(test)]
 mod shellscript_hgst_libzbc_add_variable;
 #[cfg(test)]
@@ -189,6 +231,8 @@ mod tsx_kong_insomnia_classname_strings_changed;
 mod tsx_mitmproxy_mitmproxy_array_to_object;
 #[cfg(test)]
 mod tsx_rektdeckard_departure_mono_import_path;
+#[cfg(test)]
+mod typescript_apache_echarts_envelop_2_lines_with_an_if_block;
 #[cfg(test)]
 mod typescript_lxqt_lxqt_openssh_askpass_change_url;
 #[cfg(test)]
@@ -209,6 +253,10 @@ mod xml_adoptopenjdk_icedtea_web_update_version_string;
 mod xml_antlr_antlr3_comment_out_part_of_code_interesting_case;
 #[cfg(test)]
 mod xml_eclipse_ee4j_jaxb_istack_commons_update_version_string;
+#[cfg(test)]
+mod xml_gap_packages_toric_remove_two_attributes;
+#[cfg(test)]
+mod xml_javacc_javacc_version_update;
 #[cfg(test)]
 mod xml_lincity_ng_lincity_ng_whitespace_only_change;
 #[cfg(test)]

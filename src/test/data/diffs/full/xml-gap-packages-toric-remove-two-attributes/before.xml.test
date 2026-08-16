@@ -1,0 +1,941 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Book SYSTEM "gapdoc.dtd">
+
+<Book Name="toric">
+
+<#Include SYSTEM "title.xml">
+
+<TableOfContents/>
+
+<Body>
+
+
+<Chapter><Heading>Introduction</Heading>
+
+<Section>
+  <Heading>Introduction to the <Package>toric</Package> package</Heading>
+
+<P/>
+This manual describes the <Package>toric</Package> package for working with
+toric varieties in &GAP;. Toric varieties can be dealt
+with more easily than general varieties since often
+times questions about a toric variety can be reformulated in terms
+of combinatorial geometry. 
+
+Some coding theory commands related to toric varieties
+are contained in the error-correcting codes 
+<Package>GUAVA</Package> package
+(for example, the command <C>ToricCode</C>). 
+We refer to the <Package>GUAVA</Package> manual
+<Cite Key="Gua05"/> and the expository 
+paper <Cite Key="JV02"/> for more details.
+
+<P/>
+The <Package>toric</Package> package also contains
+several commands unrelated to toric varieties
+(mostly for list manipulations). 
+These will not be described in this documention but 
+they are briefly documented in the <C>lib/util.gd</C>
+file.
+ 
+<P/>
+<Package>toric</Package> is implemented in the &GAP; language, 
+and runs on any system supporting &GAP;4.3 and above. 
+The <Package>toric</Package> package is loaded with the command
+<Verb> gap> LoadPackage( "toric" ); </Verb>
+
+<P/>
+Please send bug reports, suggestions and other comments about
+<Package>toric</Package> to 
+<Email>support@gap-system.org</Email>.
+
+</Section>
+  
+<Section>
+  <Heading>Introduction to constructing toric varieties</Heading>
+
+Rather than sketch the theory of 
+toric varieties, we refer to
+<Cite Key="JV02"/> and <Cite Key="F93"/> for details.
+However, we briefly describe some terminology and notation.
+
+<Subsection>
+<Heading>Generalities</Heading>
+
+Let <M>F</M> denote a field and
+<M>R=F [x_1,...,x_n]</M> be a ring in <M>n</M> variables.
+A <B>binomial equation</B>
+in <M>R</M> is one of the form
+
+<Display>
+x_1^{k_1}...x_n^{k_n}=x_1^{\ell_1}...x_n^{\ell_n},
+</Display>
+where <M>k_i \geq 0,\ \ell_j \geq 0</M> are integers.
+A binomial variety
+is a subvariety of affine <M>n</M>-space
+<M>A_F^n</M> defined by a finite set of binomial 
+equations (such a variety need not be normal).
+A typical ``toric variety'' is binomial, though they 
+will be introduced via an <E>a priori</E>
+independent construction.
+The basic idea of the construction is to
+replace each such binomial equation as above by a relation in a 
+semigroup contained in a lattice
+and replace <M>R</M> by the ``group algebra'' of this 
+semigroup. By the way, a toric variety is 
+always normal (see for example, <Cite Key="F93"/>, 
+page 29).
+
+</Subsection>
+
+<Subsection>
+<Heading>Basic combinatorial geometry constructions</Heading>
+
+Let <M>Q</M> denote the field of rational numbers and <M>Z</M> denote the
+set of integers. Let <M>n>1</M> denote an integer.
+
+<P/>
+Let <Math>V=Q^n</Math> having basis
+<M>f_1=(1,0,...,0)</M>, ..., <M>f_n=(0,...,0,1)</M>.
+Let <M>L_0=Z^n\subset V</M> be the standard lattice in <M>V</M>.
+We identify <M>V</M> and <M>L_0\otimes_{Z} Q</M>.
+We use <M>\langle\ ,\ \rangle</M> to denote
+the (standard) inner product on <M>V</M>. Let
+
+<Display>
+L_0^*={\rm Hom}(L_0,Z)=\{ v\in V\ |\ \langle v,w \rangle \in Z,
+\ \forall w\in L_0\}
+</Display>
+denote the <B>dual lattice</B>, so (fixing the standard basis
+<M>e_1^*</M>,...,<M>e_n^*</M> dual to the <M>f_1</M>,...,<M>f_n</M>)
+<M>L_0^*</M> may be identified with <M>Z^n</M>.
+
+<P/>
+A <B>cone</B> in <M>V</M> is a set <M>\sigma</M> of the form
+
+<Display>
+\sigma=\{a_1v_1+...+a_mv_m\ |\ a_i\geq 0\}\subset V,
+</Display>
+where <M>v_1,...,v_m \in V</M> is a given collection of 
+vectors, called (semigroup) <B>generators</B> of <M>\sigma</M>. 
+A <B>rational cone</B> is one where <M>v_1,...,v_m \in L_0</M>.
+A <B>strongly convex</B> cone is one which contains
+no lines through the origin.
+
+<P/>
+<E>
+By abuse of terminology, from now on
+a <B>cone</B> of <M>L_0</M> is a strongly convex rational cone.
+</E>
+<Index>cone</Index>
+<P/>
+A <B>face</B> of a cone <M>\sigma</M> is either <M>\sigma</M> 
+itself or a subset of the form <M>H\cap \sigma</M>, 
+where <M>H</M> is a codimension one subspace of <M>V</M>
+which intersects the cone non-trivially and such that the cone
+is contained in exactly one of the two half-spaces determined by 
+<M>H</M>. A <B>ray</B> (or edge) of a cone is a one-dimensional face.
+<Index>ray</Index>
+Typically, cones are represented in <Package>toric</Package>
+by the list of vectors defining their rays.
+The <B>dimension</B> of a cone is the dimension of the
+vector space it spans.
+The <Package>toric</Package> package can test if a 
+given vector is in a given cone (see <C>InsideCone</C>).
+
+<P/>
+If <M>\sigma</M> is a cone then the <B>dual cone</B> is defined by
+
+<Display>
+\sigma^* =\{w \in L_0^*\otimes Q
+\ |\ \langle v,w \rangle \geq 0,\ \forall v\in \sigma\}.
+</Display>
+The <Package>toric</Package> package can test if a 
+vector is in the dual of a given cone (see <C>InDualCone</C>).
+<Index>dual cone</Index>
+
+<P/>
+Associate to the dual cone <M>\sigma^*</M> is the semigroup 
+
+<Display>
+S_\sigma =\sigma^*\cap L_0^*
+=\{w\in L_0^*
+\ |\ \langle v,w\rangle \geq 0,\ 
+\forall v\in \sigma\}.
+</Display>
+Though <M>L_0^*</M> has $n$ generators <E>as a lattice</E>,
+typically <M>S_\sigma</M> will have more than <M>n</M>
+generators <E>as a semigroup</E>. 
+The <Package>toric</Package> package can compute a 
+minimal list of semigroup generators of <M>S_\sigma</M>
+(see <C>DualSemigroupGenerators</C>).
+<Index>semigroup associated to cone</Index>
+
+<P/>
+A fan is a collection of cones which ``fit together'' well.
+
+A <B>fan</B> in <M>L_0</M> is a set 
+<M>\Delta=\{\sigma \}</M> of rational strongly convex
+cones in <M>V= L_0 \otimes Q</M>
+such that
+
+<List>
+
+<Item>
+if <M>\sigma \in \Delta</M> and <M>\tau \subset \sigma</M> is a face
+of <M>\sigma</M> then <M>\tau \in \Delta</M>,
+</Item>
+
+<Item>
+if <M>\sigma_1, \sigma_2 \in \Delta</M> then 
+the intersection <M>\sigma_1 \cap \sigma_2</M> is a face of 
+both <M>\sigma_1</M> and <M>\sigma_2</M> (and hence
+belongs to <M>\Delta</M>).
+</Item>
+</List>
+In particular, the face of a cone in a fan is a cone is the fan.
+<P/>
+If <M>V</M> is the (set-theoretic) union of the
+cones in <M>\Delta</M> then we call the fan <B>complete</B>.
+We shall assume that all fans are finite.
+A fan is determined by its list of maximal cones.
+<Index>fan</Index>
+
+<P/>
+<E>Notation</E>:   A fan <M>\Delta</M> is represented in
+<Package>toric</Package> as a set of maximal cones.
+For example, if <M>\Delta</M> is the fan with maximal cones
+<M>\sigma_1=Q_+\cdot f_1+Q_+\cdot (-f_1+f_2)</M>,
+<M>\sigma_2=Q_+\cdot (-f_1+f_2)+Q_+\cdot (-f_1-f_2)</M>,
+<M>\sigma_3=Q_+\cdot (-f_1-f_2)+Q_+\cdot f_1</M>,
+then <M>\Delta</M> is represented by
+<M>[[[1,0],[-1,1]],[[-1,1],[-1,-1]],[[-1,-1],[1,0]]]</M>.
+
+<P/>
+The <Package>toric</Package> package can compute all cones
+in a fan of a given dimension (see <C>ConesOfFan</C>).
+Moreover, <Package>toric</Package> can compute
+the set of all normal vectors to the faces (i.e., hyperplanes)
+of a cone (see <C>Faces</C>).
+
+<P/>
+The <B>star</B> of a cone <M>\sigma</M> in a 
+fan <M>\Delta</M> is the set <M>\Delta_\sigma</M>
+of cones in <M>\Delta</M> containing <M>\sigma</M> as a face.
+The <Package>toric</Package> package can compute stars 
+(see <C>ToricStar</C>).
+<Index>star</Index>
+
+<P/>
+
+</Subsection>
+
+<Subsection>
+<Heading>Basic affine toric variety constructions</Heading>
+
+Let
+<Display>
+R_\sigma = F [S_\sigma]
+</Display>
+denote the ``group algebra'' of this semigroup. It is a
+finitely generated commutative F-algebra.
+It is in fact integrally closed (<Cite Key="F93"/>, page 29).
+We may interprete <M>R_\sigma</M> as a subring of 
+<M>R=F [x_1,...,x_n]</M> as follows: First, 
+identify each <M>e_i^*</M> with the variable <M>x_i</M>.
+If <M>S_\sigma</M> is generated as a semigroup by 
+vectors of the form <M>\ell_1 e_1^*+...+\ell_n e_n^*</M>,
+where <M>\ell_i</M> is an integer, then its image in 
+<M>R</M> is generated by monomials of the 
+form <M>x_1^{\ell_1}\dots x_n^{\ell_n}</M>.
+The <Package>toric</Package> package can compute these
+generating monomials (see <C>EmbeddingAffineToricVariety</C>).
+See Lemma 2.14 in <Cite Key="JV02"/> for more details.
+This embedding can also be used to resolve singularities -
+see section 5 of <Cite Key="JV02"/> for more details.
+
+<P/>
+Let
+<Display>
+U_\sigma={\rm Spec}\ R_\sigma.
+</Display>
+This defines an <B>affine toric variety</B> (associated 
+to <M>\sigma</M>). It is known that the coordinate ring
+<M>R_\sigma</M> of the affine toric variety <M>U_\sigma</M>
+has the form <M>R_\sigma = F[x_1,...,x_n]/J</M>, where <M>J</M>
+is an ideal. The <Package>toric</Package> package can compute 
+generators of this ideal by using the <C>DualSemigroupGenerators</C>
+and the <C>EmbeddingAffineToricVariety</C>
+commands.
+<Index>affine toric variety</Index>
+
+<P/>
+Roughly speaking, the toric variety <M>X(\Delta)</M> associated to
+the fan <M>\Delta</M> is given by a collection of affine
+pieces $U_{\sigma_1},U_{\sigma_2},\dots,U_{\sigma_d}$
+which ``glue'' together (where <M>\Delta = \{\sigma_i\}</M>).  
+The affine pieces are given by the zero
+sets of polynomial equations in some affine spaces
+and the gluings are given by maps 
+<M>\phi_{i,j} : U_{\sigma_i} \rightarrow U_{\sigma_j}</M>
+which are defined by ratios of polynomials on open subsets of the 
+$U_{\sigma_i}$.
+The <Package>toric</Package> package does <E>not</E> 
+compute these gluings or work directly with these 
+(non-affine) varieties <M>X(\Delta)</M>.
+
+<P/>
+A cone <M>\sigma \subset V</M> is said to be <B>nonsingular</B> if
+it is generated by part of a basis for the lattice <M>L_0</M>.
+A fan <M>\Delta</M> of cones is said to be <B>nonsingular</B> if
+all its cones are nonsingular. It is known that <M>U_\sigma</M>
+is nonsingular if and only if <M>\sigma</M> is nonsingular
+(Proposition 2.1 in <Cite Key="F93"/>).
+<Index>cone, nonsingular</Index>
+
+<P/>
+<B>Example:</B>
+In three dimensions, consider the cones
+<M>\sigma_{\epsilon_1,\epsilon_2,\epsilon_3,i,j}</M>
+generated by <M>(\epsilon_1\cdot 1,\epsilon_2\cdot 1,\epsilon_3\cdot 1)</M>
+and the standard basis vectors <M>f_i,f_j</M>,
+where <M>\epsilon_i=\pm 1</M> and
+<M>1\leq i\not= j\leq 3</M>. There are 8 cones per octant,
+for a total of 64 cones. Let <M>\Delta</M> denote the
+fan in <M>V=Q^3</M> determined by these maximal cones.
+The toric variety <M>X(\Delta)</M> is nonsingular.
+<P/>
+
+</Subsection>
+
+<Subsection>
+<Heading>Riemann-Roch spaces and related constructions</Heading>
+
+Although the <Package>toric</Package> package does not 
+work directly with the toric varieties <M>X(\Delta)</M>,
+it can compute objects associated with it.
+For example, it can compute the 
+Euler characteristic (see <C>EulerCharacteristic</C>), Betti numbers 
+(see <C>BettiNumberToric</C>), and the
+number of GF(q)-rational points 
+(see <C>CardinalityOfToricVariety</C>) of <M>X(\Delta)</M>,
+<E> provided <M>\Delta</M> is nonsingular.</E>
+
+<P/>
+For an algebraic variety <M>X</M> the group of <B>Weil divisors</B> 
+on <M>X</M> is
+the abelian group <M>Div(X)</M> generated (additively) by the
+irreducible subvarieties of X of codimension <M>1</M>.
+For a toric variety <M>X(\Delta)</M> with dense open torus <M>T</M>, a Weil divisor
+D is <B>T-invariant</B> if <M>D=T\cdot D</M>.
+The group of <M>T</M>-invariant Weil divisors is denoted 
+<M>TDiv(X)</M>. This is finitely generated by an explicitly
+given finite set of divisors 
+<M>\{D_1,...,D_r\}</M> which correspond naturally to certain
+cones in <M>\Delta</M> (see <Cite Key="F93"/> for details).
+In particular, we may represent such a divisor <M>D</M> in <M>TDiv(X)</M>
+by an <M>k</M>-tuple <M>(d_1,...,d_k)</M> of integers.
+<Index>Weil divisors</Index>
+
+<P/>
+Let <M>\Delta</M> denote a fan in <M>V=Q^n</M> with rays (or edges)
+<M>\tau_i</M>, <M>1\leq i\leq k</M>, and let 
+<M>v_i</M> denote the first lattice point on <M>\tau_i</M>.
+Associated to the T-invariant Weil divisor <M>D=d_1D_1+...+d_kD_k</M>,
+is the <B>polytope</B>
+<Display>
+P_D = \{ x=(x_1,...,x_n)\ |\ \langle x,v_i \rangle \geq -d_i, 
+\ \forall 1 \leq i \leq k\}.
+</Display>
+The <Package>toric</Package> package can compute 
+<M>P_D</M> (see <C>DivisorPolytope</C>), as well as the set of all 
+lattice points contained in this polytope
+(see <C>DivisorPolytopeLatticePoints</C>).
+Also associated to the <M>T</M>-invariant Weil divisor 
+<M>D=d_1D_1+...+d_kD_k</M>, is the Riemann-Roch space,
+<M>L(D)</M>. This is a space of functions on 
+<M>X(\Delta)</M> whose zeros and poles are 
+``controlled'' by <M>D</M> (for a more precise definition, see
+<Cite Key="F93"/>). The <Package>toric</Package> package can compute 
+a basis for <M>L(D)</M> (see <C>RiemannRochBasis</C>),
+<E> provided <M>\Delta</M> is complete and nonsingular.</E>
+<Index>polytope associated to divisor</Index>
+
+</Subsection>
+</Section>
+
+</Chapter>
+
+<Chapter>
+<Heading>Cones and semigroups</Heading>
+
+
+  <Section>
+  <Heading>Cones</Heading>
+  
+   This section introduces the <Package>toric</Package>
+commands which deal with cones and related
+combinatorial-geometric objects.
+
+Recall, a <B>cone</B> is a strongly convex polyhedral
+cone (<Cite Key="F93"/>, page 4).
+
+<ManSection Label="InsideCone">
+   <Func Name="InsideCone" Arg=" v, L "/>
+		   
+        <Description>
+This command returns `true` if the vector <A>v</A> belongs to the interior 
+of the (strongly convex polyhedral)
+cone generated by the vectors in <A>L</A>.
+        </Description>
+      </ManSection>			  
+
+This procedure does not check if <A>L</A> generates a 
+strongly convex polyhedral cone.
+
+ <Example>
+gap> L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];; v:=[0,0,1];;
+gap> InsideCone(v,L);
+false
+gap> L:=[[1,0],[3,4]];;
+gap> v:=[1,-7]; InsideCone(v,L);
+[ 1, -7 ]
+false
+gap> v:=[4,-3]; InsideCone(v,L);
+[ 4, -3 ]
+false
+gap> v:=[4,-4]; InsideCone(v,L);
+[ 4, -4 ]
+false
+gap> v:=[4,1]; InsideCone(v,L);
+[ 4, 1 ]
+true
+</Example>
+<!--
+L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];; 
+v:=[0,0,1];;
+InsideCone(v,L);
+false
+L:=[[1,0],[3,4]];;
+v:=[1,-7]; InsideCone(v,L);
+v:=[4,-3]; InsideCone(v,L);
+v:=[4,-4]; InsideCone(v,L);
+v:=[4,1];  InsideCone(v,L);
+-->
+
+<ManSection Label="InDualCone">
+   <Func Name="InDualCone" Arg=" v, L "/>
+		   
+        <Description>
+This command
+returns `true` if <A>v</A> belongs to the dual of the cone generated by
+the vectors in <A>L</A>.
+        </Description>
+      </ManSection>			  
+
+ <Example>
+gap> L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];; v:=[0,0,1];;
+gap> InDualCone(v,L);
+true
+gap> L:=[[1,0],[3,4]];
+[ [ 1, 0 ], [ 3, 4 ] ]
+gap> v:=[1,-7]; InDualCone(v,L);
+[ 1, -7 ]
+false
+gap> v:=[4,-3]; InDualCone(v,L);
+[ 4, -3 ]
+true
+gap> v:=[4,-4]; InDualCone(v,L);
+[ 4, -4 ]
+false
+gap> v:=[4,1]; InDualCone(v,L);
+[ 4, 1 ]
+true
+</Example>
+<!--
+L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];; v:=[0,0,1];;
+InDualCone(v,L);
+L:=[[1,0],[3,4]];
+v:=[1,-7]; InDualCone(v,L);
+v:=[4,-3]; InDualCone(v,L);
+v:=[4,-4]; InDualCone(v,L);
+v:=[4,1]; InDualCone(v,L);
+--> 
+
+<ManSection>
+   <Func Name="PolytopeLatticePoints" Arg=" A, Perps "/>
+		   
+        <Description>
+<E>Input</E>: <A>Perps</A><M>=[v_1,...,v_k]</M> is the list of ``inward normal" 
+vectors perpendicular to the walls of a polytope <M>P</M> in the
+vector space <M>L_0^*\otimes Q</M>,
+<Br></Br>
+<A>A</A><M>=[a_1,...,a_k]</M> is a k-tuple of integers, where
+<M>a_i</M> denotes the amount the i-th ``wall" (defined by the normal <M>v_i</M>)
+is shifted from the origin (each <M>a_i</M> is assumed non-negative).
+<Br></Br>
+For example, the polytope <M>P</M> with faces
+<C>[x=0, x=a, y=0, y=b]</C>
+has <A>Perps</A><M>=[[1,0],[-1,0],[0,1],[0,-1]]</M> and <A>A</A><M>=[0,a,0,b]</M>.
+<Br></Br>
+<E>Output</E>: the list of points in <M>P \cap L_0^*</M>.
+        </Description>
+</ManSection>			  
+
+<Example>
+gap> Perps:=[[1,0],[-1,0],[0,1],[0,-1]];
+[ [ 1, 0 ], [ -1, 0 ], [ 0, 1 ], [ 0, -1 ] ]
+gap> A:=[0,4,0,3];
+[ 0, 4, 0, 3 ]
+gap> PolytopeLatticePoints(A,Perps);
+[ [ 0, 0 ], [ 0, 1 ], [ 0, 2 ], [ 0, 3 ], [ 1, 0 ], [ 1, 1 ], [ 1, 2 ],
+  [ 1, 3 ], [ 2, 0 ], [ 2, 1 ], [ 2, 2 ], [ 2, 3 ], [ 3, 0 ], [ 3, 1 ],
+  [ 3, 2 ], [ 3, 3 ], [ 4, 0 ], [ 4, 1 ], [ 4, 2 ], [ 4, 3 ] ]
+gap> Length(last);
+20
+</Example>
+<!--
+Perps:=[[1,0],[-1,0],[0,1],[0,-1]];
+A:=[0,4,0,3];
+PolytopeLatticePoints(A,Perps);
+Length(last);
+-->
+
+<ManSection>
+   <Func Name="Faces" Arg=" Rays "/>
+		   
+        <Description>
+<E>Input</E>: <A>Rays</A> is a list of rays for the fan <M>\Delta</M>
+<Br></Br>
+<E>Output</E>: All the normals to the faces (hyperplanes of the cone).
+        </Description>
+
+</ManSection>			  
+
+<Example>
+gap> Cones1:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> Faces(Cones1[1]);
+[ [ 1/2, 1 ], [ 2, 1 ] ]
+gap> Faces(Cones1[2]);
+[ [ -2, -1 ], [ -1, 1 ] ]
+gap> Cones2:=[[[ 2,0,0],[0,2,0],[0,0,2]], [[2,0,0], [0,2,0], [2,-2,1],[1,2,-2]]];;
+gap> Faces(Cones2[1]);
+[ [ 0, 0, 1 ], [ 0, 1, 0 ], [ 1, 0, 0 ] ]
+gap> Faces(Cones2[2]);
+[ [ 1/3, 5/6, 1 ], [ 1/2, 0, -1 ], [ 2, 0, 1 ] ]
+</Example>
+<!--
+Cones1:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+Faces(Cones1[1]);
+Faces(Cones1[2]);
+Cones2:=[[[ 2,0,0],[0,2,0],[0,0,2]], [[2,0,0], [0,2,0], [2,-2,1],[1,2,-2]]];;
+Faces(Cones2[1]);
+Faces(Cones2[2]);
+-->
+
+
+
+<ManSection>
+   <Func Name="ConesOfFan" Arg=" Delta k "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> is the fan of cones,
+<Br></Br>
+<A>k</A> is the dimension of the cones desired.
+<Br></Br>
+<E>Output</E>: The <A>k</A>-dimensional cones in the fan.
+        </Description>
+
+</ManSection>			  
+
+
+
+<ManSection>
+<Func Name="NumberOfConesOfFan" Arg=" Delta k "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> is the fan of cones in <M>V=Q^n</M>,
+<Br></Br>
+ <A>k</A> is the dimension of the cones counted.
+<Br></Br>
+<E>Output</E>: The number of <A>k</A>-dimensional cones in the fan.
+        </Description>
+</ManSection>			  
+
+Idea:   The fan <A>Delta</A> is represented as a set of maximal cones.
+For each maximal cone, look at the <A>k</A>-dimensional faces
+obtained by taking <M>n</M> choose <A>k</A> subsets of the
+rays describing the cone. Certain of these <A>k</A>-subsets 
+yield the desired cones.
+
+<Example>
+gap> Delta0:=[ [ [2,0,0],[0,2,0],[0,0,2] ], [ [2,0,0],[0,2,0],[2,-2,1],[1,2,-2] ] ];;
+gap> NumberOfConesOfFan(Delta0,2);
+6
+gap> ConesOfFan(Delta0,2);
+[ [ [ 0, 0, 2 ], [ 0, 2, 0 ] ], [ [ 0, 0, 2 ], [ 2, 0, 0 ] ], 
+  [ [ 0, 2, 0 ], [ 1, 2, -2 ] ], [ [ 0, 2, 0 ], [ 2, -2, 1 ] ],
+  [ [ 0, 2, 0 ], [ 2, 0, 0 ] ], [ [ 1, 2, -2 ], [ 2, -2, 1 ] ] ]
+gap> ConesOfFan(Delta0,1);
+[ [ [ 0, 0, 2 ] ], [ [ 0, 2, 0 ] ], [ [ 1, 2, -2 ] ], 
+  [ [ 2, -2, 1 ] ], [ [ 2, 0, 0 ] ] ]
+gap> NumberOfConesOfFan(Delta0,1);
+5
+</Example>
+<!--
+Delta0:=[ [ [2,0,0],[0,2,0],[0,0,2] ], [ [2,0,0],[0,2,0],[2,-2,1],[1,2,-2] ] ];;
+NumberOfConesOfFan(Delta0,2);
+ConesOfFan(Delta0,2);
+ConesOfFan(Delta0,1);
+NumberOfConesOfFan(Delta0,1);
+
+-->
+
+
+<ManSection>
+   <Func Name="ToricStar" Arg=" sigma, Delta "/>
+		   
+        <Description>
+<E>Input</E>:  <A>sigma</A> is a cone in the fan,
+represented by its set of maximal (i.e., highest dimensional) cones.
+<Br></Br>
+<A>Delta</A> is the fan of cones in <M>V=Q^n</M>.
+<Br></Br>
+<E>Output</E>: The star of the cone <A>sigma</A> in <A>Delta</A>,
+i.e., the cones <M>\tau</M> which have <A>sigma</A> as a face. 
+
+        </Description>
+
+</ManSection>			  
+
+<Example>
+gap> MaxCones:=[ [ [2,0,0],[0,2,0],[0,0,2] ], 
+>                 [ [2,0,0],[0,2,0],[2,-2,1],[1,2,-2] ] ];;
+gap> #this is the set of maximal cones in the fan Delta
+gap> ToricStar([[1,0]],MaxCones);
+[  ]
+gap> ToricStar([[2,0,0],[0,2,0]],MaxCones);
+[ [ [ 0, 2, 0 ], [ 2, 0, 0 ] ], [ [ 2, 0, 0 ], [ 0, 2, 0 ], [ 0, 0, 2 ] ],
+  [ [ 2, 0, 0 ], [ 0, 2, 0 ], [ 2, -2, 1 ], [ 1, 2, -2 ] ] ]
+gap> MaxCones:=[ [ [2,0,0],[0,2,0],[0,0,2] ], [ [2,0,0],[0,2,0],[1,1,-2] ] ];;
+gap> ToricStar([[2,0,0],[0,2,0]],MaxCones);
+[ [ [ 0, 2, 0 ], [ 2, 0, 0 ] ], [ [ 2, 0, 0 ], [ 0, 2, 0 ], [ 0, 0, 2 ] ],
+  [ [ 2, 0, 0 ], [ 0, 2, 0 ], [ 1, 1, -2 ] ] ]
+gap> ToricStar([[1,0]],MaxCones);
+[  ]
+</Example>
+<!--
+MaxCones:=[ [ [2,0,0],[0,2,0],[0,0,2] ], [ [2,0,0],[0,2,0],[2,-2,1],[1,2,-2] ] ];;
+ToricStar([[1,0]],MaxCones);
+ToricStar([[2,0,0],[0,2,0]],MaxCones);
+MaxCones:=[ [ [2,0,0],[0,2,0],[0,0,2] ], [ [2,0,0],[0,2,0],[1,1,-2] ] ];;
+ToricStar([[2,0,0],[0,2,0]],MaxCones);
+ToricStar([[1,0]],MaxCones);
+-->
+
+</Section>
+
+<Section>
+  <Heading>Semigroups</Heading>
+
+<ManSection>
+   <Func Name="DualSemigroupGenerators" Arg=" L "/>
+		   
+        <Description>
+<E>Input</E>: <A>L</A> is a list of integral <M>n</M>-vectors generating a 
+cone <M>\sigma</M>. 
+<Br></Br>
+<E>Output</E>: the generators of <M>S_\sigma</M>,  
+<P/>
+Idea:  let <M>M</M> be the maximum of the absolute values of the 
+coordinates of the <A>L</A>[i]'s, for each vector <M>v</M> in 
+<M>[1..M]^n</M>, test if <M>v</M> is in the dual cone 
+<M>\sigma^*</M>. If so, 
+add <M>v</M> to list of possible generators. 
+Once this for loop is finished, one can check 
+this list for redundant generators. The  
+trick is to simply omit those elements 
+which are of the form <M>d_1+d_2</M>, where <M>d_1</M> and <M>d_2</M> 
+are ``small" elements in the integral dual cone. 
+<P/>
+This program is not very efficient and should not be used 
+in ``large examples'' involving semigroups with ``many'' generators. 
+For example, if you take
+<A>L:=[[1,2,3,4],[0,1,0,7],[3,1,0,2],[0,0,1,0]];</A> then
+<C>DualSemigroupGenerators(L);</C> can exhaust GAP's memory
+allocation.
+</Description>
+</ManSection>			  
+
+<Example>
+gap> L:=[[1,0],[3,4]];; DualSemigroupGenerators([[1,0],[3,4]]);
+[ [ 0, 0 ], [ 0, 1 ], [ 1, 0 ], [ 2, -1 ], [ 3, -2 ], [ 4, -3 ] ]
+gap> L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];;
+gap> DualSemigroupGenerators(L);
+[ [ 0, 0, 0 ], [ 0, 0, 1 ], [ 0, 1, 0 ], [ 1, -1, 0 ], [ 1, 0, -1 ] ]
+</Example>
+<!--
+L:=[[1,0],[3,4]];; DualSemigroupGenerators([[1,0],[3,4]]);
+L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];;
+DualSemigroupGenerators(L);
+-->
+
+</Section>
+
+</Chapter>
+
+<Chapter>
+<Heading>Affine toric varieties</Heading>
+
+This chapter concerns <Package>toric</Package>
+commands which deal with the coordinate rings of
+affine toric varieties <M>U_\sigma</M>.
+
+<Section>
+  <Heading>Ideals defining affine toric varieties</Heading>
+  
+<ManSection>
+           <Func Name="EmbeddingAffineToricVariety" Arg=" L "/>
+		   
+        <Description>
+<E>Input</E>: <A>L</A> is a list generating a cone 
+(as in <C>DualSemigroupGenerators</C>).
+<Br></Br>
+<E>Output</E>: the toroidal embedding of <M>X=Spec(I)</M>, where I is the
+ideal of the affine toric variety (given as a list of multinomials).
+        </Description>
+</ManSection>			  
+
+<Example>
+gap> phi:=EmbeddingAffineToricVariety([[1,0],[3,4]]);
+[ x_2, x_1, x_1^2/x_4, x_1^3/x_4^2, x_1^4/x_4^3 ]
+gap> L:=[[1,0,0],[1,1,0],[1,1,1],[1,0,1]];;
+gap> phi:=EmbeddingAffineToricVariety(L);
+[ x_3, x_2, x_1/x_5, x_1/x_6 ]
+</Example>
+
+
+  </Section>
+</Chapter>
+
+ <Chapter>
+<Heading>Toric varieties <M>X(\Delta)</M> </Heading>
+
+This chapter concerns <Package>toric</Package>
+commands which deal with certain objects associated to the
+(non-affine) toric varieties <M>X(\Delta)</M>.
+
+<Section>
+  <Heading>Riemann-Roch spaces</Heading>
+
+Let <M>\Delta</M> denote a complete nonsingular fan.
+
+<ManSection>
+           <Func Name="DivisorPolytope" Arg=" D, Rays "/>
+		   
+        <Description>
+<E>Input</E>: <A>Rays</A> is the list of smallest integer
+vectors in the rays for the fan <M>\Delta</M>
+which determine the Weil divisors of <M>X(\Delta)</M>.
+<Br></Br>
+<A>D</A> is the list of coefficients for the a Weil divisor.
+<Br></Br>
+<E>Output</E>: the linear expressions in the affine coordinates of the
+space of the cone which must be positive for a point to be in the
+desired polytope.
+        </Description>
+</ManSection>			  
+
+<Example>
+gap> DivisorPolytope([6,6,0],[[2,-1],[-1,2],[-1,-1]]);
+[ 2*x_1-x_2+6, -x_1+2*x_2+6, -x_1-x_2 ]
+</Example>
+
+See also Example 6.13 in <Cite Key="JV02"/>.
+
+<ManSection>
+           <Func Name="DivisorPolytopeLatticePoints" Arg=" D, Delta, Rays "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> is the fan <Br></Br>
+       <A>Rays</A> is the <E>ordered</E> list of rays for <A>Delta</A> <Br></Br>
+   <A>D</A> is the list of coefficients for a Weil divisor.
+<Br></Br>
+<E>Output</E>: the list of points in <M>P_D \cap L_0^*</M>
+which parameterize the elements in the Riemann-Roch space
+<M>L(D)</M>, where <M>P_D</M>
+is the polytope associated to the divisor <M>D</M>
+(see <C>DivisorPolytope</C>).
+        </Description>
+</ManSection>			  
+
+<Example>
+gap> Div:=[6,6,0];; Rays:=[[2,-1],[-1,2],[-1,-1]];;
+gap> Delta0:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> P_Div:=DivisorPolytopeLatticePoints(Div,Delta0,Rays);
+[ [ -6, -6 ], [ -5, -5 ], [ -5, -4 ], [ -4, -5 ], [ -4, -4 ], [ -4, -3 ],
+  [ -4, -2 ], [ -3, -4 ], [ -3, -3 ], [ -3, -2 ], [ -3, -1 ], [ -3, 0 ],
+  [ -2, -4 ], [ -2, -3 ], [ -2, -2 ], [ -2, -1 ], [ -2, 0 ], [ -2, 1 ],
+  [ -2, 2 ], [ -1, -3 ], [ -1, -2 ], [ -1, -1 ], [ -1, 0 ], [ -1, 1 ],
+  [ 0, -3 ], [ 0, -2 ], [ 0, -1 ], [ 0, 0 ], [ 1, -2 ], [ 1, -1 ], [ 2, -2 ] ]
+</Example>
+<!--
+Div:=[6,6,0];; Rays:=[[2,-1],[-1,2],[-1,-1]];;
+Delta0:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+P_Div:=DivisorPolytopeLatticePoints(Div,Delta0,Rays);
+-->
+
+<ManSection>
+           <Func Name="RiemannRochBasis" Arg=" D, Delta, Rays "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> is a complete and nonsingular fan <Br></Br>
+<A>D</A> is the list of coefficients for the Weil divisor<Br></Br>
+<A>Rays</A> is a list of rays for the fan used to describe 
+the Weil divisors.
+<Br></Br>
+<E>Output</E>: A basis (a list of monomials)
+for the Riemann-Roch space of the divisor represented by <A>D</A>.
+        </Description>
+</ManSection>			  
+
+For details on how the Weil divisors can be expressed in terms of
+the rays of the fan, please see section 3.3 in
+<Cite Key="F93"/>.
+
+This procedure does not check if the fan is complete and nonsingular.
+
+<Example>
+gap> Div:=[6,6,0];; Rays:=[[2,-1],[-1,2],[-1,-1]];;
+gap> Delta0:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> RiemannRochBasis(Div,Delta0,Rays);
+[ 1/(x_1^6*x_2^6), 1/(x_1^5*x_2^5), 1/(x_1^5*x_2^4), 1/(x_1^4*x_2^5),
+  1/(x_1^4*x_2^4), 1/(x_1^4*x_2^3), 1/(x_1^4*x_2^2), 1/(x_1^3*x_2^4),
+  1/(x_1^3*x_2^3), 1/(x_1^3*x_2^2), 1/(x_1^3*x_2), 1/x_1^3, 1/(x_1^2*x_2^4),
+  1/(x_1^2*x_2^3), 1/(x_1^2*x_2^2), 1/(x_1^2*x_2), 1/x_1^2, x_2/x_1^2,
+  x_2^2/x_1^2, 1/(x_1*x_2^3), 1/(x_1*x_2^2), 1/(x_1*x_2), 1/x_1, x_2/x_1,
+  1/x_2^3, 1/x_2^2, 1/x_2, 1, x_1/x_2^2, x_1/x_2, x_1^2/x_2^2 ]
+</Example>
+<!--
+Div:=[6,6,0];; Rays:=[[2,-1],[-1,2],[-1,-1]];;
+Delta:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+RiemannRochBasis(Div,Delta,Rays);
+-->
+
+ </Section>
+
+<Section>
+  <Heading>Topological invariants</Heading>
+
+Throughout this section, <M>X(\Delta)</M> <E>must be non-singular</E>.
+
+<ManSection>
+           <Func Name="EulerCharacteristic" Arg=" Delta "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> is a nonsingular fan of cones,
+represented by its list of maximal cones.
+<Br></Br>
+<E>Output</E>: the Euler characteristic of the toric variety 
+<M>X(\Delta)</M>, where <M>\Delta</M> is a fan determined by 
+<A>Delta</A>.
+        </Description>
+</ManSection>			  
+
+<Example>
+gap> Cones:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> EulerCharacteristic(Cones);
+3
+</Example>
+
+Note: <M>X(\Delta)</M> <E>must be non-singular</E>
+here.
+
+<ManSection>
+           <Func Name="BettiNumberToric" Arg=" Delta, k "/>
+		   
+        <Description>
+<E>Input</E>: <A>Delta</A> represents a nonsingular 
+fan <M>\Delta</M> (represented by maximal cones),
+<Br></Br>
+     <A>k</A> is an integer.
+<Br></Br>
+<E>Output</E>: the <A>k</A>-th Betti number of the toric variety 
+<M>X(\Delta)</M>.
+
+</Description>
+</ManSection>			  
+
+The <C>BettiNumberToric</C> procedure does not check if 
+<A>Delta</A> is nonsingular. It is possible that this procedure outputs
+nonsense when <A>Delta</A> is not represented by maximal cones or 
+is nonsingular.
+
+<Example>
+gap> Cones:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> BettiNumberToric(Cones,1);
+0
+gap> BettiNumberToric(Cones,2);
+1
+gap> Cones:=[[[2,-1],[-1,1]],[[-1,1],[-1,0]],[[-1,0],[2,-1]]];;
+gap> BettiNumberToric(Cones,1);
+0
+gap> BettiNumberToric(Cones,2);
+1
+</Example>
+<!--
+The first example is singular, second is nonsingular.
+
+-->
+
+Not to be confused with the Betti number of a polycyclically 
+presented torsion free group, already available in &GAP;.
+
+ </Section>
+
+<Section>
+  <Heading>Points over a finite field</Heading>
+
+
+<ManSection>
+           <Func Name="CardinalityOfToricVariety" Arg=" Cones q "/>
+		   
+        <Description>
+<E>Input</E>: <A>Cones</A> is the list of maximal cones of a 
+fan <M>\Delta</M>, <A>q</A> is a prime power.
+<Br></Br>
+<E>Output</E>: The size of the set of <M>GF(q)</M>-rational 
+points of the toric variety <M>X(\Delta)</M>.
+        </Description>
+</ManSection>			  
+
+Note: <M>X(\Delta)</M> <E>must be non-singular</E>
+here.
+
+<Example>
+gap> Cones:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+gap> CardinalityOfToricVariety(Cones,3);
+13
+gap> CardinalityOfToricVariety(Cones,4);
+21
+gap> CardinalityOfToricVariety(Cones,5);
+31
+gap> CardinalityOfToricVariety(Cones,7);
+57
+</Example>
+<!--
+Cones:=[[[2,-1],[-1,2]],[[-1,2],[-1,-1]],[[-1,-1],[2,-1]]];;
+CardinalityOfToricVariety(Cones,3);
+CardinalityOfToricVariety(Cones,4);
+CardinalityOfToricVariety(Cones,5);
+CardinalityOfToricVariety(Cones,7);
+-->
+
+ </Section>
+
+</Chapter>
+
+</Body>
+<Bibliography Databases="toric"/>
+<TheIndex/>                                               
+</Book>
