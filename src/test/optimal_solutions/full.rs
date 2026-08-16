@@ -184,6 +184,10 @@ mod tsx_keybase_client_change_from_one_import_and_call_to_another;
 #[cfg(test)]
 mod tsx_keybase_client_emoji_to_native;
 #[cfg(test)]
+mod tsx_kong_insomnia_classname_strings_changed;
+#[cfg(test)]
+mod tsx_mitmproxy_mitmproxy_array_to_object;
+#[cfg(test)]
 mod tsx_rektdeckard_departure_mono_import_path;
 #[cfg(test)]
 mod typescript_lxqt_lxqt_openssh_askpass_change_url;

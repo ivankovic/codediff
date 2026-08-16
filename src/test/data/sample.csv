@@ -374,7 +374,7 @@ Swift,swiftlang-swift.git,cd7ca397e3a3386e571a4974ec7e58398e0908b8,validation-te
 Swift,swiftlang-swift.git,f2798f8ff420ed83454fed70586be86ba088eef1,test/Constraints/issue-85942.swift,swift-swiftlang-swift-comment-change-2,small,PROMOTED,
 Swift,tree-sitter-tree-sitter-haskell,d0bdf18a667c58f339d599807616bab4c9f2b927,Package.swift,,full,SAMPLED,
 Swift,zeroc-ice-ice,14bc2f79c269266297cd5ff431806b22f858f5d5,swift/src/Ice/Initialize.swift,,full,SAMPLED,
-TSX,Kong-insomnia,2f4e3a8e65560efae270d2637ac9d978ce8d7c7b,packages/insomnia/src/ui/components/encoding-picker.tsx,,full,SAMPLED,
+TSX,Kong-insomnia,2f4e3a8e65560efae270d2637ac9d978ce8d7c7b,packages/insomnia/src/ui/components/encoding-picker.tsx,tsx-kong-insomnia-classname-strings-changed,full,PROMOTED,
 TSX,Kong-insomnia,c62a114d28a064c303d0c7114ced1cf68b2a8bc3,packages/insomnia/src/ui/components/modals/workspace-environments-edit-modal.tsx,,full,SAMPLED,
 TSX,Kong-insomnia,c62a114d28a064c303d0c7114ced1cf68b2a8bc3,packages/insomnia/src/ui/components/templating/tag-editor.tsx,,full,SAMPLED,
 TSX,apache-superset.git,a6a66ca483287783729fa80757395b4282d74987,superset-frontend/src/components/Datasource/DatasourceModal/index.tsx,tsx-apache-superset-error-handling-change,small,PROMOTED,
@@ -386,7 +386,7 @@ TSX,greenbone-gsa,3a03e36b0240139712eaa3a5aeead436c57c2f4c,src/web/pages/scanner
 TSX,keybase-client,909d7312381693c3630229a720ac76b5dad8e5cc,shared/chat/conversation/messages/emoji-row.tsx,tsx-keybase-client-change-from-one-import-and-call-to-another,full,PROMOTED,
 TSX,keybase-client,d9c0c4974d26d38a48b1fb8bd0c9cc07fa80184f,shared/chat/conversation/messages/special-top-message.tsx,tsx-keybase-client-emoji-to-native,full,PROMOTED,
 TSX,langflow-ai-langflow.git,87f5721d7cec5abffb938e49e959b3a52dd42450,src/frontend/src/components/core/parameterRenderComponent/components/modelInputComponent/index.tsx,tsx-langflow-ai-langflow-move-function-around-update-string-constant,small,PROMOTED,
-TSX,mitmproxy-mitmproxy,26074879818ed547d3ca44b02880fb78ee62bbb3,web/src/js/components/Modal/ModalList.tsx,,full,SAMPLED,
+TSX,mitmproxy-mitmproxy,26074879818ed547d3ca44b02880fb78ee62bbb3,web/src/js/components/Modal/ModalList.tsx,tsx-mitmproxy-mitmproxy-array-to-object,full,PROMOTED,
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,packages/mui-joy/src/styles/variantColorInheritance.test.tsx,tsx-material-remove-import,small,PROMOTED,
 TSX,mui-material-ui.git,8663368c5472de8076993763fa0a52f9ce55fa5d,docs/src/pages/premium-themes/onepirate/modules/views/ProductCategories.tsx,tsx-mui-material-ui-move-colour-to-a-new-attribute,small,PROMOTED,
 TSX,popcorn-official-popcorn-desktop,108e30a11c47fb6bbf3f392349dd37fc3d1dc8dd,apps/desktop/src/routes/splash.test.tsx,,full,SAMPLED,
@@ -409,10 +409,10 @@ TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tes
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/expressions/arrayLiterals/arrayLiterals3.ts,typescript-microsoft-typescript-add-target-comment,small,PROMOTED,
 TypeScript,microsoft-playwright.git,71e9e8e102b92e10c3edfc48185c791af3a4d6f1,tests/library/agent-expect.spec.ts,typescript-microsoft-playwright-add-two-test-cases,small,PROMOTED,
 TypeScript,n8n-io-n8n.git,d00a55f869c3dd3f20a438b8f65573467701528c,packages/@n8n/nodes-langchain/nodes/llms/LMLemonade/LmLemonade.node.ts,typescript-n8n-io-n8n-remove-and-add-imports,small,PROMOTED,
-TypeScript,nextcloud-desktop,60a9dcc5697c2fd03d7521046dabd6b128ae7247,translations/client_sk.ts,,full,SAMPLED,
-TypeScript,pawelsalawa-sqlitestudio,a44584e523a2890ed53a96078c304a9f21212ef5,SQLiteStudio3/guiSQLiteStudio/translations/guiSQLiteStudio_nl_NL.ts,,full,SAMPLED,
-TypeScript,radioacoustick-Coil64,362b627b7e301572608de346ae7b7549d0b53da8,lang/Coil64_tw.ts,,full,SAMPLED,
-TypeScript,radioacoustick-Coil64,4cd06a16bafe66e4925cfd40dfa7e6218f6e31cf,lang/Coil64_bg.ts,,full,SAMPLED,
+TypeScript,nextcloud-desktop,60a9dcc5697c2fd03d7521046dabd6b128ae7247,translations/client_sk.ts,,full,REJECTED,"This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests."
+TypeScript,pawelsalawa-sqlitestudio,a44584e523a2890ed53a96078c304a9f21212ef5,SQLiteStudio3/guiSQLiteStudio/translations/guiSQLiteStudio_nl_NL.ts,,full,REJECTED,"This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests."
+TypeScript,radioacoustick-Coil64,362b627b7e301572608de346ae7b7549d0b53da8,lang/Coil64_tw.ts,,full,REJECETD,"This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests."
+TypeScript,radioacoustick-Coil64,4cd06a16bafe66e4925cfd40dfa7e6218f6e31cf,lang/Coil64_bg.ts,,full,REJECTED,"This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests."
 TypeScript,th-ch-youtube-music,4fba3ffd92ca4d12962d4bdac22b8d497aefed39,src/plugins/downloader/main/index.ts,,full,SAMPLED,
 Vimscript,chikamichi-mediawiki.vim,03ed9538a8a623c3fe626d07d5085d040a2cfc65,ftdetect/mediawiki.vim,vimscript-chikamichi-mediawiki-add-one-autocmd,full,PROMOTED,
 Vimscript,chikamichi-mediawiki.vim,cd89be566e89e2d32444660a261af8e877323a2c,autoload/mediawiki.vim,vimscript-chikamichi-mediawiki-remove-3-lines,full,PROMOTED,
