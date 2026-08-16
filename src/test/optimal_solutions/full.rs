@@ -142,6 +142,10 @@ mod lua_teeworlds_teeworlds_add_or_expression_to_existing_if;
 #[cfg(test)]
 mod php_doctrine_orm_delete_3_comments_and_update_1;
 #[cfg(test)]
+mod php_icinga_icingaweb2_module_graphite_add_a_few_nodes;
+#[cfg(test)]
+mod php_php_fig_log_deleted_a_class;
+#[cfg(test)]
 mod php_smarty_php_smarty_change_version_string;
 #[cfg(test)]
 mod php_symfony_finder_move_elseif_block_to_else;
@@ -222,6 +226,8 @@ mod shellscript_nicolargo_glances_add_shebang;
 #[cfg(test)]
 mod shellscript_ropery_ffcast_comment_only_change;
 #[cfg(test)]
+mod swift_apple_swift_argument_parser_small_change;
+#[cfg(test)]
 mod tsx_keybase_client_change_from_one_import_and_call_to_another;
 #[cfg(test)]
 mod tsx_keybase_client_emoji_to_native;
@@ -245,6 +251,8 @@ mod vimscript_fedorenchik_qt_support_add_two_lines;
 mod vimscript_idanarye_vim_merginal_add_one_call;
 #[cfg(test)]
 mod vimscript_jreybert_vimagit_move_one_line;
+#[cfg(test)]
+mod vimscript_m_pilia_vim_mediawiki_add_a_new_functon;
 #[cfg(test)]
 mod vimscript_protesilaos_tempus_themes_vim_change_two_values;
 #[cfg(test)]
