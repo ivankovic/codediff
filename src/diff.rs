@@ -20,7 +20,6 @@ pub mod cost;
 pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
-pub mod solve_bottom_up_expansion;
 pub mod solve_bottom_up_propagation;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_hash_descent;
@@ -212,18 +211,8 @@ impl Diff {
         // had to be closed first. Phases 1-5 live here, in `pending_with_config`; phases 6-7 live
         // in `PendingDiff::finish` - see that struct's doc comment for why they're split.
 
-        // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash,
-        // normalized-import-path hash). The import-path hash variant is gated on
-        // `solver_import_nodes`: the 2026-07-15 ablation study found it net-negative (-89
-        // disabling it individually), and nothing about folding it into a hash variant changes
-        // that signal's own accuracy.
-        solve_hash_descent::solve(
-            before,
-            after,
-            &node_cache,
-            &mut ast_diff,
-            config.solver_import_nodes,
-        );
+        // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash).
+        solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff);
 
         // Phase 2: contextual exact matching - houses solve_leading_siblings (a comment or
         // attribute/decorator modifier that immediately precedes a matched node, walking a whole
@@ -238,11 +227,12 @@ impl Diff {
         solve_leading_siblings::solve(before, after, &node_cache, &mut ast_diff);
         solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
 
-        // Phase 3: bottom-up expansion. Gated on `solver_bottom_up_expansion`, same net-negative
-        // finding as above (-69 individually).
-        if config.solver_bottom_up_expansion {
-            solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
-        }
+        // Phase 3 (bottom-up expansion, Dice-coefficient threshold) and phase 5 (a second pass of
+        // the same, after phase 4 below produced more matched descendants to vote on) were removed
+        // 2026-08-16 - both were net-negative in the 2026-07-15 ablation study (disabling each
+        // individually *improved* the benchmark, -69) and had been permanently off by default ever
+        // since. See `solve_bottom_up_propagation` (runs later, in `PendingDiff::finish`) for the
+        // strict, non-heuristic mechanism that occupies the same conceptual slot today.
 
         // Phase 4: syntax-aware subtree matching (fully-resolved-name N:M matching, absorbing
         // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally). Used to also
@@ -250,12 +240,6 @@ impl Diff {
         // `solver_similar_flow_control` - deleted 2026-08-14, net-negative in the 2026-07-15
         // ablation study (-82) and never re-enabled; see `TODO.md`.
         solve_syntax_aware_matching::solve(before, after, &node_cache, &mut ast_diff);
-
-        // Phase 5: second bottom-up expansion, now that phase 4 has produced more matched
-        // descendants for it to vote on. Same gate as phase 3.
-        if config.solver_bottom_up_expansion {
-            solve_bottom_up_expansion::solve(before, after, &node_cache, &mut ast_diff);
-        }
 
         // Guard metric for `DiffMode::Fast` (see `PendingDiff::looks_expensive`): how many nodes
         // on each side are still unmatched heading into phase 6. Safe to compute from
@@ -493,17 +477,14 @@ impl<'code> PendingDiff<'code> {
 * [`HeuristicConfig::default`] is what plain [`Diff::from_code`]/[`diff_code`] use, and is the
 * only configuration any production caller should need.
 *
-* Defaults were tuned by a 2026-07-15 leave-one-out ablation study over the `optimal_solutions`
-* benchmark corpus (see `ablation_study.sh`, `research/ablation/`), run against the pipeline that
-* existed at the time: `solver_import_nodes` and `solver_bottom_up_expansion` (gates both of
-* phases 3 and 5) default to `false` because each was found net-negative when disabled
-* individually (i.e. removing it *improved* the benchmark) - `-89` and `-69` respectively. A third
-* knob, `solver_similar_flow_control` (`-82`, same study), gated `solve_similar_flow_control`
-* (arm-overlap matching); that pass was deleted outright 2026-08-14 (net-negative, disabled by
-* default since the study and never re-enabled - nothing left to gate), so only 3 fields remain.
-* The seven-phase pipeline rework (`TODO.md`, 2026-07-17/18) that replaced the original ~15-pass
-* pipeline these were tuned against kept these knobs, on the same passes, at the same defaults -
-* nothing about the rework changes any of these signals' own accuracy contribution.
+* A 2026-07-15 leave-one-out ablation study over the `optimal_solutions` benchmark corpus (see
+* `ablation_study.sh`, `research/ablation/`) found two other knobs net-negative when disabled
+* individually (i.e. removing them *improved* the benchmark): the normalized-import-path hash
+* variant in `solve_hash_descent` (`-89`) and the Dice-threshold `solve_bottom_up_expansion` pass
+* (`-69`, gated both of the old phases 3 and 5). Both had been permanently off by default ever
+* since; removed outright 2026-08-16 rather than kept as always-off dead code. A third knob from
+* the same study, `solver_similar_flow_control` (`-82`), gated `solve_similar_flow_control`
+* (arm-overlap matching); that pass was deleted outright 2026-08-14, the same way.
 *
 * Exists for the ablation study in `ablation_study.sh` (via `benchmark_optimal_solutions
 * --no-solver-X`/`--solver-X`): disabling or enabling exactly one pass and comparing accuracy
@@ -513,26 +494,19 @@ impl<'code> PendingDiff<'code> {
 */
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
-    pub solver_import_nodes: bool,
-    pub solver_bottom_up_expansion: bool,
     pub solver_moved_subtrees: bool,
     /// Gates `solve_bottom_up_propagation` (phases-4-7 rearchitecture, `TODO.md`). Measured
     /// net-positive in isolation against the Phase 1 baseline (2026-08-15, full 339-fixture
     /// corpus, `phases-4-7-rearchitecture` branch): 0 regressions, 69 improvements, total
     /// mismatches 25980 -> 25883, zero-mismatch fixtures 75 -> 129 (22.1% -> 38.1%), latency
     /// delta within noise (+1.5% aggregate `elapsed_ms`, and it's O(n) by construction) - default
-    /// flipped to `true` on that basis, unlike `solver_import_nodes`/`solver_bottom_up_expansion`
-    /// below.
+    /// flipped to `true` on that basis.
     pub solver_bottom_up_propagation: bool,
 }
 
 impl Default for HeuristicConfig {
     fn default() -> Self {
         Self {
-            // Net-negative when disabled individually (i.e. removing it *improved* the
-            // benchmark) - ablation 2026-07-15.
-            solver_import_nodes: false,
-            solver_bottom_up_expansion: false,
             solver_moved_subtrees: true,
             solver_bottom_up_propagation: true,
         }
@@ -811,24 +785,17 @@ pub enum ASTMappingReason {
     /// run of unmatched, textually-identical leading siblings immediately preceding an
     /// already-matched node on both before and after sides. See `solve_leading_siblings`.
     LeadingSibling,
-    /// Neither node was matched directly, but enough of its descendants were already matched to
-    /// the other's descendants (see `DICE_THRESHOLD`) that the two nodes were matched too. See
-    /// `solve_bottom_up_expansion`.
-    BottomUpExpansion,
     /// Neither node was matched by name, arm structure, or already-matched descendants - instead
     /// a fast sequence-alignment cost estimate over the two nodes' direct children, gated on a
     /// shared positional anchor (see `MAX_COST_RATIO`), found them cheap enough to anchor
     /// together, greedily. See `solve_greedy_anchor_blocks`.
     GreedyAnchorBlock,
-    /// Import statements matched by normalized path (quotes stripped, separators normalized,
-    /// relative import prefixes handled) - a `KindAndValueHash` variant, see `solve_hash_descent`.
-    NormalizedImportPath,
     /// Neither node was matched directly, but *every* direct child of the before-node already had
     /// a decision (matched or deleted), and - if matched - every one of them agreed on the exact
     /// same after-side parent, so the parent itself was matched (or, if every child was deleted,
-    /// marked deleted too). Unlike `BottomUpExpansion`, this is a strict, unconditional rule - no
-    /// Dice-coefficient threshold, no partial-consensus vote - so it never has an invented
-    /// decision to fight a later, more precise pass over. See `solve_bottom_up_propagation`.
+    /// marked deleted too). A strict, unconditional rule - no threshold, no partial-consensus vote,
+    /// so it never has an invented decision to fight a later, more precise pass over. See
+    /// `solve_bottom_up_propagation`.
     BottomUpPropagation,
 }
 
@@ -852,9 +819,7 @@ impl ASTMappingReason {
             ASTMappingReason::FlatSequenceDiff => "FlatSeq",
             ASTMappingReason::MovedSubtree => "Moved",
             ASTMappingReason::LeadingSibling => "LeadSib",
-            ASTMappingReason::BottomUpExpansion => "BottomUp",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
-            ASTMappingReason::NormalizedImportPath => "NormImport",
             ASTMappingReason::BottomUpPropagation => "BottomUpProp",
         }
     }

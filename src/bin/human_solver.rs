@@ -9540,12 +9540,12 @@ mod tests {
         assert_eq!(reason_label(ASTMappingReason::MovedSubtree), "Moved");
         assert_eq!(reason_label(ASTMappingReason::LeadingSibling), "LeadSib");
         assert_eq!(
-            reason_label(ASTMappingReason::BottomUpExpansion),
-            "BottomUp"
-        );
-        assert_eq!(
             reason_label(ASTMappingReason::GreedyAnchorBlock),
             "GreedyAnchor"
+        );
+        assert_eq!(
+            reason_label(ASTMappingReason::BottomUpPropagation),
+            "BottomUpProp"
         );
     }
 
@@ -9557,8 +9557,8 @@ mod tests {
         // Every other variant has no payload to show, so `reason_detail` just falls back to the
         // same short label as `reason_label`.
         assert_eq!(
-            reason_detail(ASTMappingReason::BottomUpExpansion),
-            "BottomUp"
+            reason_detail(ASTMappingReason::BottomUpPropagation),
+            "BottomUpProp"
         );
     }
 

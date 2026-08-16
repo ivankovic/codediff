@@ -230,7 +230,7 @@ mod tests {
     fn solve_only(before: &Code, after: &Code) -> ASTDiff {
         let node_cache = NodeCache::build(before, after);
         let mut diff = ASTDiff::default();
-        crate::diff::solve_hash_descent::solve(before, after, &node_cache, &mut diff, false);
+        crate::diff::solve_hash_descent::solve(before, after, &node_cache, &mut diff);
         solve(before, after, &node_cache, &mut diff);
         diff
     }

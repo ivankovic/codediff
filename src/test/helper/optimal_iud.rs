@@ -1621,7 +1621,7 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
 
         // This should match all nodes with IdenticalHash
-        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff, true);
+        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff);
 
         // Verify that all nodes are already mapped
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();

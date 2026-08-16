@@ -195,24 +195,6 @@ struct Args {
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
 
-    /// Enable the import-path-normalization hash variant. Off by default: net-negative in the
-    /// 2026-07-15 ablation study (disabling it individually *improved* the benchmark by 89
-    /// mismatches).
-    #[arg(long = "solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_import_nodes")]
-    solver_import_nodes: bool,
-    /// Disable the import-path-normalization hash variant (`solve_hash_descent`'s phase 1 step).
-    #[arg(long = "no-solver-import-nodes", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_import_nodes")]
-    no_solver_import_nodes: bool,
-
-    /// Enable BottomUpExpansion. Off by default: net-negative in the 2026-07-15 ablation study
-    /// (disabling it individually *improved* the benchmark by 69 mismatches). Gates both phase 3
-    /// and phase 5 (bottom-up expansion runs twice in the pipeline).
-    #[arg(long = "solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "no_solver_bottom_up_expansion")]
-    solver_bottom_up_expansion: bool,
-    /// Disable `solve_bottom_up_expansion` (Dice-coefficient descendant-driven matching).
-    #[arg(long = "no-solver-bottom-up-expansion", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_expansion")]
-    no_solver_bottom_up_expansion: bool,
-
     /// Enable MoveDetectionRecovery / phase 7 (default; see the `--no-solver-...` form).
     #[arg(long = "solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_moved_subtrees")]
     solver_moved_subtrees: bool,
@@ -234,9 +216,6 @@ struct Args {
 /// verified against clap's actual last-flag-wins behavior).
 fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
     codediff::diff::HeuristicConfig {
-        solver_import_nodes: args.solver_import_nodes && !args.no_solver_import_nodes,
-        solver_bottom_up_expansion: args.solver_bottom_up_expansion
-            && !args.no_solver_bottom_up_expansion,
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
         solver_bottom_up_propagation: args.solver_bottom_up_propagation
             && !args.no_solver_bottom_up_propagation,

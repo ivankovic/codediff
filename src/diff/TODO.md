@@ -819,6 +819,25 @@ sense for a *pooled* multi-candidate call doesn't automatically transfer to a *p
 call built to replace it - re-derive whether a cap is still protecting against a real risk before
 carrying it over, rather than assuming.
 
+### Dead-code removal: the two permanently-disabled solver knobs (2026-08-16)
+
+Part of the planned "Phase 5: cleanup" work, pulled forward on request rather than deferred: both
+`solver_import_nodes` (the normalized-import-path hash variant in `solve_hash_descent`) and
+`solver_bottom_up_expansion` (the Dice-threshold pass, gating what used to be phases 3 and 5) had
+been `false` by default since the 2026-07-15 ablation study found each net-negative in isolation,
+with no re-measurement since. Removed outright rather than left as always-off toggles: deleted
+`solve_bottom_up_expansion.rs` entirely, removed `solve_import_path_hash` and its helpers from
+`solve_hash_descent.rs`, dropped both `HeuristicConfig` fields and their `benchmark_optimal_
+solutions` CLI ablation flags, and removed the now-unreachable `ASTMappingReason::BottomUpExpansion`
+/`NormalizedImportPath` variants. `solve_bottom_up_propagation` (the *different*, currently-enabled
+mechanism that replaced `solve_bottom_up_expansion`'s conceptual slot - similar name, unrelated
+code, see the session's own end-to-end pipeline explanation for the distinction that prompted this)
+is untouched.
+
+Verified byte-identical, not just "should be fine": full 339-fixture corpus, zero fixtures'
+mismatch count changed. Expected, since both removed paths were already unreachable in every
+production/default configuration - this was pure surface-area reduction, not a behavior change.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
