@@ -1945,11 +1945,27 @@ fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap()
     let after_children: Vec<usize> = (0..N).map(|i| N + i + 1).collect();
     interior(9999, before_children.clone(), &mut before_meta);
     interior(19999, after_children.clone(), &mut after_meta);
-    for &id in &before_children {
-        leaf(id, id as u64, &mut before_meta); // hashes 1..=600
+    for (i, &id) in before_children.iter().enumerate() {
+        // Distinct kind *and* text per leaf (not the blank-text `leaf()` helper - see
+        // `leaf_with_kind`'s doc comment): real APTED's cost model compares kind/text, so this
+        // must give it genuinely different content per position, not just a different hash (which
+        // only the exact-hash myers_lcs path above ever consults).
+        leaf_with_kind(
+            id,
+            id as u64,
+            &format!("before_kind_{i}"),
+            &format!("before_text_{i}"),
+            &mut before_meta,
+        );
     }
-    for &id in &after_children {
-        leaf(id, id as u64, &mut after_meta); // hashes 601..=1200, no overlap with before
+    for (i, &id) in after_children.iter().enumerate() {
+        leaf_with_kind(
+            id,
+            id as u64,
+            &format!("after_kind_{i}"),
+            &format!("after_text_{i}"),
+            &mut after_meta,
+        );
     }
 
     let mut diff = ASTDiff::default();
