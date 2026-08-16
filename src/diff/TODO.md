@@ -799,6 +799,26 @@ unknown number of the remaining ~17-19 regressions vs. main not yet individually
 re-running the full main-vs-branch diff before continuing, since several may already be fixed as a
 side effect of these fixes (this has been true at every step so far).
 
+### Quality push, continued: same size-cap-removal applied to the residual-forest sibling (2026-08-16)
+
+Applied the just-validated finding (removing the size cap from a per-position branch is safe,
+since a per-position pair has nothing to cross-match against regardless of size) to `resolve_
+residual_forest_via_myers_lcs`'s own equal-count branch too - it had carried the same `RESIDUAL_
+SEGMENT_MAX_TOTAL_SIZE` cap since Phase 3b, for the same now-outdated reason. Removed
+`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` entirely (dead once its only caller's cap was lifted).
+
+Full 339-fixture corpus: **zero regressions, 2 improvements**
+(`vimscript-fedorenchik-qt-support-add-two-lines` 19 -> 0, `vimscript-neovim-neovim-awful-test-
+case-bunch-of-hex-colours-more-data-than-code` 22 -> 11). Zero-mismatch 244 -> 245 (72.0% -> 72.3%),
+total mismatches 2814 -> 2784, latency flat (p99 8010 -> 7906ms, max 11554 -> 11699ms, both noise).
+
+Running tally: **72.3%**, 2.0 points short of main's 74.3%. The two size-capped branches
+(`resolve_flat_tree_pair`'s and `resolve_residual_forest_via_myers_lcs`'s equal-count recursions)
+are now both uncapped and share one lesson worth remembering going forward: a size cap that made
+sense for a *pooled* multi-candidate call doesn't automatically transfer to a *per-position*
+call built to replace it - re-derive whether a cap is still protecting against a real risk before
+carrying it over, rather than assuming.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching

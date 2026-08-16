@@ -1868,9 +1868,8 @@ fn subtree_has_any_match(
 ///
 /// On an LCS hit, emits `emit_identical_subtree` (tagged `ASTMappingReason::APTED(source)`, same
 /// convention as `for_nodes`/`for_roots`) for exact-hash pairs. Everything left unpaired between
-/// two such anchors (or the sequence ends) then gets one more chance - see `RESIDUAL_SEGMENT_MAX_
-/// ENTRIES`/`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` below - before falling back to `add_delete_mappings`/
-/// `add_insert_mappings`.
+/// two such anchors (or the sequence ends) then gets one more chance - equal-count segments recurse
+/// per position (see below) - before falling back to `add_delete_mappings`/`add_insert_mappings`.
 ///
 /// Phase 3b finding (`TODO.md`, 2026-08-15): a maximal-unmatched-root's *whole-subtree* hash can
 /// fail to match even when almost everything inside it is real, reusable structure - a long chain
@@ -1889,8 +1888,7 @@ fn subtree_has_any_match(
 /// "diff each gap between confirmed anchors independently" idiom `resolve_flat_tree_pair` already
 /// uses for one parent's flat children, generalized here to the whole-file residual's scattered,
 /// unrelated maximal-unmatched-root sequence instead of one parent's ordered siblings). A segment
-/// with *equal counts* on each side, light enough in total node count
-/// (`RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`), is recursed through real bounded APTED (`resolve_forest`,
+/// with *equal counts* on each side is recursed through real bounded APTED (`resolve_forest`,
 /// `Algorithm::Apted`) instead of atomic delete/insert - one call per position, `before_seg[i]`
 /// paired only with `after_seg[i]`, never pooled (unlike `resolve_flat_tree_pair`'s pooled
 /// recursion of up to `FLAT_UNMATCHED_RECURSE_LIMIT` entries): `resolve_flat_tree_pair`'s entries
@@ -1972,11 +1970,13 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
         // happened inside the gap too) fall through unchanged to atomic delete/insert - resolving
         // *which* subset corresponds needs real alignment info this gap doesn't have without
         // re-introducing exactly the pooling risk above.
-        let unmatched_total_size =
-            subtree_size_sum(&before_seg, before_meta) + subtree_size_sum(&after_seg, after_meta);
-        let recursable = !before_seg.is_empty()
-            && before_seg.len() == after_seg.len()
-            && unmatched_total_size <= RESIDUAL_SEGMENT_MAX_TOTAL_SIZE;
+        //
+        // Uncapped in size, same as `resolve_flat_tree_pair`'s own equal-count branch (2026-08-16):
+        // `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` bounded a *pool's* cost, but a per-position pair has
+        // nothing to cross-match against regardless of size, so it was never protecting against a
+        // correctness risk here either - only an unconfirmed latency one, and measurement (on the
+        // sibling function) found no fixture worse and no latency movement once removed.
+        let recursable = !before_seg.is_empty() && before_seg.len() == after_seg.len();
         if recursable {
             let cost_model = UnitCostModel {
                 language: before_meta.language,
@@ -2004,17 +2004,10 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
     }
 }
 
-/// Total-node-count cap for `resolve_residual_forest_via_myers_lcs`'s single-entry-per-side
-/// real-APTED recursion - the entry (each side has exactly one, by that recursion's own gate) can
-/// still be a large subtree (the confirming case for this mechanism was a single 206-node chain),
-/// so entry count alone doesn't bound APTED's O(n×m)-worst-case cost. Chosen as an
-/// order-of-magnitude-conservative fraction of the old `EXPENSIVE_RESIDUAL_THRESHOLD` (5000
-/// unmatched nodes, whole-file) - this cap applies per *segment*, not per file, and Phase 1 already
-/// removed the whole-file case this was guarding; tune upward if measurement shows headroom.
-const RESIDUAL_SEGMENT_MAX_TOTAL_SIZE: usize = 2000;
-
-/// Sums `node_to_subtree_size` over `ids` - the total node count a segment's real-APTED recursion
-/// would actually have to compare, used by `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE`'s gate.
+/// Sums `node_to_subtree_size` over `ids` - the total node count a pooled `resolve_forest` call
+/// would actually have to compare, used by `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`'s gate
+/// (`resolve_flat_tree_pair`'s pooled unequal-count branch - the only remaining size-capped path;
+/// both functions' equal-count/per-position branches are uncapped, see their own doc comments).
 fn subtree_size_sum(ids: &[usize], meta: &ASTMetadata) -> usize {
     ids.iter()
         .map(|id| meta.node_to_subtree_size.get(id).copied().unwrap_or(0))
