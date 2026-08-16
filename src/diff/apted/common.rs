@@ -1426,39 +1426,35 @@ fn resolve_flat_tree_pair(
     // edit; the atomic version deleted+inserted all ~40 of its descendant nodes instead of
     // recognizing the ~38 that were untouched - see TODO.md's 2026-08-08 entry).
     //
-    // Equal counts on both sides are recursed *per position*, never pooled (2026-08-16, phases-4-7
-    // rearchitecture `TODO.md`): `before_unmatched[i]` against only `after_unmatched[i]`, one
-    // independent `resolve_forest` call per pair - a true, unambiguous 1:1 "this replaced that"
-    // correspondence for every pair, with no room for APTED to invent a relationship across pairs.
-    // This module's own doc comment previously called this function's entries "genuine ordered
-    // siblings under one shared parent" and assumed pooling them (up to `FLAT_UNMATCHED_RECURSE_
-    // LIMIT`) was therefore safe - **it isn't, even at small scale**: confirmed on `java-nextcloud-
-    // android-add-if-branch-with-reused-return` (2026-08-16), a mere 2-before/2-after pool (well
-    // under the old cap) still let APTED invent a plausible-but-wrong cross-match between the two
-    // unrelated methods, deleting one wholesale (54 -> 343 mismatches) - the same risk `kotlin-
-    // refactor-function` (Phase 3b) and `tsx-excalidraw-...-huge-file` (the `flat_children` fix)
-    // already demonstrated for larger pools. Per-position recursion has no entry-count cap (each
-    // call is independent and bounded on its own) - see the total-size cap and its single-pair
-    // exemption below.
+    // Equal counts on both sides are recursed *per position*, never pooled, and **uncapped in
+    // size** (2026-08-16, phases-4-7 rearchitecture `TODO.md`): `before_unmatched[i]` against only
+    // `after_unmatched[i]`, one independent `resolve_forest` call per pair - a true, unambiguous
+    // 1:1 "this replaced that" correspondence for every pair, with no room for APTED to invent a
+    // relationship across pairs. This module's own doc comment previously called this function's
+    // entries "genuine ordered siblings under one shared parent" and assumed pooling them (up to
+    // `FLAT_UNMATCHED_RECURSE_LIMIT`) was therefore safe - **it isn't, even at small scale**:
+    // confirmed on `java-nextcloud-android-add-if-branch-with-reused-return`, a mere 2-before/
+    //2-after pool (well under the old entry-count cap) still let APTED invent a plausible-but-
+    // wrong cross-match between two unrelated methods, deleting one wholesale (54 -> 343
+    // mismatches) - the same risk `kotlin-refactor-function` (Phase 3b) and `tsx-excalidraw-...-
+    // huge-file` (the `flat_children` fix) already demonstrated for larger pools. A size cap was
+    // tried here too (matching `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`, below) and found to cost
+    // real fixtures for no benefit: `java-nextcloud-android-add-two-function-calls` (2 entries
+    // each side, 5,454 combined nodes) regressed until the cap was removed, and removing it
+    // entirely made no fixture in the corpus worse and didn't move latency (p99/max both within
+    // noise) - unlike the pooled multi-candidate case below, a per-position pair has nothing to
+    // cross-match against regardless of its size, so there was never a correctness reason to cap
+    // it, only an unconfirmed latency worry that measurement didn't bear out.
     //
     // Unequal counts (a real insert/delete happened inside the segment too, so there's no fixed
     // positional correspondence) still use the original pooled `resolve_forest` call, bounded by
     // both `FLAT_UNMATCHED_RECURSE_LIMIT` (entry count) and `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`
     // (total node count) - pooling is a genuine, deliberate risk/reward trade for this case (no
-    // safer alternative exists short of atomic delete/insert), not an oversight.
-    // The size cap itself is waived for the single-pair case (`N == 1`): with only one candidate
-    // per side there's nothing to bound the *choice* of match against (that risk is what the cap
-    // guards against for `N > 1`), only compute time for one APTED call - and one call, however
-    // large, was never what the cap was sized against. Confirmed empirically, not assumed:
-    // `xml-odoo-odoo-add-two-attributes` (1 entry each side, 17,670 combined nodes) regressed the
-    // instant this exemption was dropped during the `N == 1` -> `N >= 1` generalization above.
-    let single_entry_pair = before_unmatched.len() == 1 && after_unmatched.len() == 1;
+    // safer alternative exists short of atomic delete/insert), not an oversight, and *does* still
+    // need the size cap since a pool's cost genuinely depends on its combined size.
     let unmatched_total_size = subtree_size_sum(&before_unmatched, before_meta)
         + subtree_size_sum(&after_unmatched, after_meta);
-    if !before_unmatched.is_empty()
-        && before_unmatched.len() == after_unmatched.len()
-        && (single_entry_pair || unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE)
-    {
+    if !before_unmatched.is_empty() && before_unmatched.len() == after_unmatched.len() {
         let cost_model = UnitCostModel {
             language: before_meta.language,
         };

@@ -772,12 +772,32 @@ csv` refreshed to this result.
 
 Running tally this session, `main` (74.3%) vs. branch: 74.3% -> ~21% (Phase 1) -> 64.0% (Phase 2/3a
 bug fix) -> 71.7% (Phase 3b) -> 70.8% (flat_children speed fix, deliberate trade) -> 71.1% (equal-
-count residual-forest generalization) -> **71.7% (equal-count flat-tree-pair generalization,
-matching Phase 3b's post-fix level, still 2.6 points short of main)**. Remaining known gap: `vimscript-
-neovim-neovim-improved-asserts` (unequal-count shape), the `qualified_name` over-matching bucket,
-and an unknown number of the original ~19-21 regressions vs. main not yet individually diagnosed -
-worth re-running the full main-vs-branch diff before continuing, since several may already be fixed
-as a side effect of these two generalizations.
+count residual-forest generalization) -> 71.7% (equal-count flat-tree-pair generalization,
+matching Phase 3b's post-fix level).
+
+### Quality push, continued: the total-size cap on per-position pairs was pure overhead (2026-08-16)
+
+Re-diagnosed the next regression by the same recipe: `java-nextcloud-android-add-two-function-
+calls` (0 -> 30 vs. main) turned out to be an equal-count gap too (2 entries each side), just over
+`FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE` (5,454 combined nodes) - blocked by the size cap that
+carried over from the pooled design into the new per-position one. Re-examined whether that cap
+still made sense there: it exists to bound a *pool's* cost (which genuinely scales with combined
+size, since it's one dense computation over every candidate at once), but a per-position pair's
+cost is independent of every other pair - nothing to cross-match against regardless of size, so
+capping it was never protecting against a correctness risk the way it does for the pooled/unequal-
+count branch, only an unconfirmed latency one. Tested directly rather than assumed: removed the cap
+for the equal-count branch entirely. Result - **zero regressions, 1 improvement**
+(`java-nextcloud-android-add-two-function-calls` 30 -> 0), zero-mismatch 243 -> 244 (71.7% ->
+72.0%), latency unmoved (p99 7797 -> 8011ms, max 11880 -> 11554ms, both noise). Kept uncapped;
+the size cap now applies only to the pooled unequal-count branch, where it's still load-bearing.
+
+Running tally: **72.0%**, 2.3 points short of main's 74.3%. Remaining known gap: `vimscript-neovim-
+neovim-improved-asserts` (unequal-count shape, not yet re-diagnosed against this session's fixes),
+the `qualified_name` over-matching bucket, `cpp-add-templates`/`rust-turbopack-module-rule`-class
+wrap/reparent cases (a structural-shift shape none of this session's mechanisms address), and an
+unknown number of the remaining ~17-19 regressions vs. main not yet individually diagnosed - worth
+re-running the full main-vs-branch diff before continuing, since several may already be fixed as a
+side effect of these fixes (this has been true at every step so far).
 
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
