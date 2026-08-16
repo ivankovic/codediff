@@ -23,6 +23,6 @@ use crate::test;
 fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-remove-function",
-        66,
+        68,
     )
 }

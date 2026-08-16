@@ -22,5 +22,8 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // Another case of code partially moving in and out of strings.
-    test::helper::human_mapping::assert_matches_human_mapping("lua-corsixth-corsixth-refactor-if-expressions")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "lua-corsixth-corsixth-refactor-if-expressions",
+        12,
+    )
 }

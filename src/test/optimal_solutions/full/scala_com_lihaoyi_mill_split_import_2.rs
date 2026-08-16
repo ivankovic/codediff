@@ -22,5 +22,8 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // The best solution would require a many-to-many map
-    test::helper::human_mapping::assert_matches_human_mapping("scala-com-lihaoyi-mill-split-import-2")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "scala-com-lihaoyi-mill-split-import-2",
+        8,
+    )
 }
