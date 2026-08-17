@@ -29,6 +29,7 @@ pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
 pub mod solve_syntax_aware_matching;
 pub mod solve_unique_type_matching;
+pub mod solve_unresolved_nodes;
 pub mod text;
 pub mod text_range;
 
@@ -481,6 +482,12 @@ impl<'code> PendingDiff<'code> {
             solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
         }
 
+        // Terminal completeness sweep: everything above is free to leave a node undecided, so this
+        // records the delete/insert implied by whatever absence is left. Must be last - it pairs
+        // nothing, and any pass running after it would find every node already claimed. See
+        // `solve_unresolved_nodes`.
+        solve_unresolved_nodes::solve(before, after, &node_cache, &mut ast_diff);
+
         Diff {
             ast: Some(ast_diff),
             language: before.metadata.language.unwrap_or(Language::Unknown),
@@ -840,6 +847,11 @@ pub enum ASTMappingReason {
     /// inspired by XYDiff - see `TODO.md`'s 2026-08-17 literature survey). See
     /// `solve_unique_type_matching`.
     UniqueTypeMatching,
+    /// No pass in the pipeline reached a decision about this node at all, so the terminal
+    /// completeness sweep recorded the delete/insert its absence already implied. Not a matching
+    /// verdict - it pairs nothing - just the guarantee that the finished mapping covers every node
+    /// of both trees. See `solve_unresolved_nodes`.
+    UnresolvedNode,
 }
 
 impl ASTMappingReason {
@@ -865,6 +877,7 @@ impl ASTMappingReason {
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
             ASTMappingReason::BottomUpPropagation => "BottomUpProp",
             ASTMappingReason::UniqueTypeMatching => "UniqueType",
+            ASTMappingReason::UnresolvedNode => "Unresolved",
         }
     }
 }
