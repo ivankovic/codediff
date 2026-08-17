@@ -1252,6 +1252,79 @@ groups` and the scoped-APTED path), so start with runtime #1's diagnosis step - 
 double as the evidence base for the quality work, and the budget it introduces must be in place
 first so quality fixes aren't measured against a pipeline that later changes under them.
 
+### Quality work: undecided nodes, and the wrap shape behind them (2026-08-17)
+
+Started from the near-misses rather than the ranked list above, on the theory that the 90% bar is
+reached by converting fixtures that are already close (the 66 easiest nonzero fixtures have <=13
+mismatches each). Two false starts worth recording before the real finding:
+
+- The 1-mismatch fixtures are dominated by a single leaf the human matched *across kinds*
+  (`public` -> `protected`, `integer_value` -> `float_value`, `string_content` -> `regex`, `none` ->
+  `identifier`), which `UnitCostModel::ren` forbids at cost 3 vs. delete+insert at 2. That looked
+  like a systematic cost-model gap worth a new `kinds_update_allowed` family. **Checked before
+  building: cross-kind is only 26 of 904 such mismatches corpus-wide**, and every one of the 13
+  distinct kind pairs appears in exactly one fixture. It is a real gap but a long tail of
+  one-offs, not a mechanism - the tiny fixtures just make it look representative. Not pursued.
+- The near-miss reason breakdown pointed at `fast_fallback` and `qualified_name`, which is where
+  everything ends up and says nothing actionable on its own.
+
+**The real finding: codediff's mapping was not total.** Nodes present in neither `before_node_map`
+nor `after_node_map` carried no decision at all - a consumer walking the after tree found nothing
+for a genuinely new node and could not distinguish "inserted" from "never considered". 10 fixtures,
+81 nodes. The cause is the ordinary shape of a *wrap*: in `typescript-add-error-handling` two
+statements move inside a new `try`/`catch`, and the new `try_statement`, its `statement_block`, and
+the `program` root above them all came out with no entry. The terminal Myers fallback only assigns
+decisions to *maximal* unmatched roots, and neither a new wrapper (its subtree contains matched
+descendants, so it is not maximal) nor an unmatched ancestor of matched children is one;
+`solve_bottom_up_propagation` cannot help either, because its rule 3 requires all children to have
+matched into the *same direct* after-parent and a wrap is exactly when they did not.
+
+Three passes shipped, each measured independently against the full corpus, **none with a single
+regression**:
+
+| step | mismatches | zero-mismatch fixtures |
+|---|---|---|
+| after the runtime pass | 2835 | 310 |
+| `solve_unresolved_nodes` (completeness sweep) | 2817 | 310 |
+| + root pairing | 2807 | 311 |
+| + `solve_mutual_ancestors` | **2785** | **312** |
+
+1. **`solve_unresolved_nodes`** - terminal sweep giving every remaining undecided node the
+   `Delete`/`Insert` its absence already implied. Pairs nothing, so it cannot guess wrong or take a
+   partner from a later pass (there is none). `Delete`/`Insert`, never the `WithChildren` variants,
+   since such a node usually *has* matched descendants. `algorithm_cost` rises 39235 -> 39380,
+   which is the point: those nodes were always being dropped, they just were not being counted.
+2. **Root pairing** (inside the same module) - the two trees' roots always correspond, so when a
+   top-level wrap leaves both unclaimed they are paired directly rather than reported as the whole
+   file being deleted and a new one inserted. Cost 0 / `MatchButNotIdentical`: `ren` already prices
+   a same-kind internal pairing at 0, and running APTED over two whole files to rediscover that
+   would cost more than the rest of the pipeline.
+3. **`solve_mutual_ancestors`** - the general form of the same shape. For a before-node `B`, let
+   `lca_after(B)` be the lowest common ancestor of every after-node that `B`'s matched descendants
+   map to, and symmetrically `lca_before(A)`. Pair `B` and `A` only when **each is the other's
+   LCA**. One direction alone would match a small container to a huge unrelated one that merely
+   happens to contain the same content somewhere; requiring both means the two hold *the same*
+   content and nothing else spoken for. Mutuality also makes the pairing unique by construction -
+   two `B`s can share an `lca_after`, but only one can be that node's own `lca_before` - so there
+   is no claiming order to get right, and no threshold or vote anywhere. Biggest single win:
+   `html-mozilla-firefox-firefox-remove-li-around-button` 17 -> 2 (a `<li>` removed from deep
+   inside had left every `element` ancestor above it, with *identical* paths on both sides, marked
+   deleted). Gated by `HeuristicConfig::solver_mutual_ancestors`; ablation confirms 2785/312 with
+   it on vs. 2807/311 off.
+
+**Note for anyone extending this**: the rule needs **two or more matched descendants** in different
+branches to say anything - with a single one, a container's LCA is that descendant itself and the
+mutual test correctly fails. An early draft of the unit tests missed this and also went through the
+full pipeline, where APTED had already claimed the containers before this pass ran; the tests now
+pre-match statements and call `solve` directly (same isolation lesson as
+`solve_unique_type_matching`'s tests, recorded above).
+
+**Still open in this area**: ~38 of the original 81 undecided nodes remain mismatched, mostly
+`element`/`content` chains in `xml-odoo-odoo-add-button-roles` (109) and the HTML fixtures, where
+the human matched an ancestor that this rule still declines - typically because the container's
+content is genuinely split across several after-parents, so no single LCA is mutual. Worth another
+look before moving to the ranked quality candidates below.
+
 ### Runtime work done: the APTED budget was the wrong fix; the constant factor was (2026-08-17)
 
 Runtime candidate #1 above proposed budgeting `solve_qualified_name_groups`' scoped APTED calls.

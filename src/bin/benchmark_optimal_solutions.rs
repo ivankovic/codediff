@@ -218,6 +218,13 @@ struct Args {
     /// Disable `solve_unique_type_matching`.
     #[arg(long = "no-solver-unique-type-matching", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_unique_type_matching")]
     no_solver_unique_type_matching: bool,
+
+    /// Enable `solve_mutual_ancestors` (mutual lowest-common-ancestor container pairing).
+    #[arg(long = "solver-mutual-ancestors", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_mutual_ancestors")]
+    solver_mutual_ancestors: bool,
+    /// Disable `solve_mutual_ancestors`.
+    #[arg(long = "no-solver-mutual-ancestors", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_mutual_ancestors")]
+    no_solver_mutual_ancestors: bool,
 }
 
 /// Resolves `Args`' `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
@@ -230,6 +237,7 @@ fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
             && !args.no_solver_bottom_up_propagation,
         solver_unique_type_matching: args.solver_unique_type_matching
             && !args.no_solver_unique_type_matching,
+        solver_mutual_ancestors: args.solver_mutual_ancestors && !args.no_solver_mutual_ancestors,
     }
 }
 

@@ -27,6 +27,7 @@ pub mod solve_identical_diagnostic_statements;
 pub mod solve_large_flat_subtrees;
 pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
+pub mod solve_mutual_ancestors;
 pub mod solve_syntax_aware_matching;
 pub mod solve_unique_type_matching;
 pub mod solve_unresolved_nodes;
@@ -482,6 +483,15 @@ impl<'code> PendingDiff<'code> {
             solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
         }
 
+        // Recovery for containers the passes above left unclaimed: an ancestor sitting above an
+        // edit whose descendants all still live inside one corresponding ancestor on the other
+        // side. Runs last among the matching passes, so its lowest-common-ancestor evidence is
+        // computed from the most complete set of matched descendants available, and strictly
+        // before the completeness sweep, which would otherwise spend these nodes on delete/insert.
+        if config.solver_mutual_ancestors {
+            solve_mutual_ancestors::solve(before, after, &node_cache, &mut ast_diff);
+        }
+
         // Terminal completeness sweep: everything above is free to leave a node undecided, so this
         // records the delete/insert implied by whatever absence is left. Must be last - it pairs
         // nothing, and any pass running after it would find every node already claimed. See
@@ -545,6 +555,8 @@ pub struct HeuristicConfig {
     /// customer if the pipeline's mechanism ordering changes later - but this is a real negative
     /// result for the corpus as it exists today, not a proven win, and should be described that way.
     pub solver_unique_type_matching: bool,
+    /// Gates `solve_mutual_ancestors` (mutual lowest-common-ancestor container pairing).
+    pub solver_mutual_ancestors: bool,
 }
 
 impl Default for HeuristicConfig {
@@ -553,6 +565,7 @@ impl Default for HeuristicConfig {
             solver_moved_subtrees: true,
             solver_bottom_up_propagation: true,
             solver_unique_type_matching: true,
+            solver_mutual_ancestors: true,
         }
     }
 }
@@ -852,6 +865,10 @@ pub enum ASTMappingReason {
     /// verdict - it pairs nothing - just the guarantee that the finished mapping covers every node
     /// of both trees. See `solve_unresolved_nodes`.
     UnresolvedNode,
+    /// Neither node matched directly, but each is the lowest common ancestor, in its own tree, of
+    /// everything the other's matched descendants map to - a mutual, vote-free correspondence
+    /// between two containers holding the same content. See `solve_mutual_ancestors`.
+    MutualAncestor,
 }
 
 impl ASTMappingReason {
@@ -878,6 +895,7 @@ impl ASTMappingReason {
             ASTMappingReason::BottomUpPropagation => "BottomUpProp",
             ASTMappingReason::UniqueTypeMatching => "UniqueType",
             ASTMappingReason::UnresolvedNode => "Unresolved",
+            ASTMappingReason::MutualAncestor => "MutualAnc",
         }
     }
 }
