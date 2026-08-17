@@ -1441,6 +1441,82 @@ This likely also covers `xml-odoo-odoo-add-button-roles` (109) - same shape, an 
 `role="button"` attribute shifting the rest, where the human maps `Attribute:2` -> `Attribute:3` -
 and the HTML fixtures. Worth doing; worth doing properly.
 
+### Crossed-sibling repair: works, but net-negative as built (2026-08-18)
+
+Built the post-fallback swap repair the previous entry proposed, as `solve_sibling_swaps` (reverted;
+rebuild from this entry rather than from memory). Shape: group the *nonzero-cost* mappings by their
+matched parent pair - so the pass is proportional to what actually changed, not to the file - and
+inside a group look for two pairs `b1<->a1`, `b2<->a2` where re-pairing crosswise is cheaper.
+Latency was a non-issue at every stage (p50 3.8ms unchanged, p99 764 -> 777ms, total 19.2 -> 19.5s),
+helped by a `MAX_SWAP_SUBTREE` cap and by only ever re-pointing subtrees that are already suspect.
+
+**It does what it was built to do.** `css-wordpress-reformat` **30 -> 2**,
+`rust-add-comments-and-real-new-logic` 84 -> 61, `tsx-mui-material-ui-move-colour-to-a-new-attribute`
+16 -> 7.
+
+**And it is still net-negative**: five previously-*perfect* `yaml-draios-sysdig-*-url-change`
+fixtures went 0 -> 8..24, so zero-mismatch fixtures fell 313 -> 308 and total mismatches rose +12.
+Not shipped.
+
+Two things were tried and did *not* explain the YAML damage, so don't repeat them:
+- Requiring **both** crossings to be byte-identical. Provably safe, but too strict to fire on the
+  real target: in `css-wordpress-reformat` the minified side's last declaration per rule has no
+  trailing `;`, so only one direction of the swap is exact even though the swap is plainly right.
+  This is why the decision was relaxed to a cost comparison in the first place.
+- Excluding `is_commutative_container` parents (on the theory that hash descent already handles
+  those correctly). **Zero effect** - byte-identical corpus numbers. The YAML damage is not under a
+  commutative parent at all: `--details` puts it inside a `flow_sequence`, YAML's inline `[a, b]`
+  list, which is ordered.
+
+**The real defect is the cost estimator, and that is the useful finding.** The decision used
+`solve_greedy_anchor_blocks::sequence_edit_cost`, which by design counts two children as "the same
+token" only when their *full subtree hashes are identical* - it is deliberately blind to a child
+that merely resembles its counterpart. For two near-identical strings differing in one URL, that
+blindness makes a crossing look cheaper than the truth, and in an ordered sequence position *is*
+part of identity, so the human's mapping stays positional. The pass is only ever as good as the
+estimator deciding its swaps, and this estimator cannot see "almost the same".
+
+### Idea: a similarity-preserving hash, for cheap detection of near-identical siblings
+
+Recurring across several of the investigations above, and worth trying on its own merits.
+
+Every hash in `code::hash` today is an *equality* hash: `node_to_full_hash`,
+`node_to_kind_and_value_hash`, `node_to_kind_only_hash` all answer "are these two subtrees exactly
+the same?" and say nothing when the answer is no. That single limitation is behind a surprising
+number of the open items here:
+
+- The crossed-sibling repair above cannot tell "the same declaration, moved" from "a different
+  declaration", so it has to fall back on a coarse estimator and gets ordered sequences wrong.
+- `css-wordpress-reformat`'s blocks cannot hash-match despite being ~90% identical, because one
+  declaration gained a trailing `;` - one differing child changes the whole multiset hash, and the
+  pair drops to APTED.
+- The "search-quality gap" bucket (large rewrites where surviving content hides inside new
+  structure, `rust-zed-workspace-tasks` and friends) needs exactly "find me the most similar
+  candidate", which no current hash can answer.
+- The LSH/MinHash candidate-search idea (literature candidate #3) is the same need, arrived at from
+  the opposite direction.
+
+**Sketch.** Give each node a *similarity signature* alongside its equality hashes - a fixed-width
+sketch of the multiset of its descendants' leaf hashes (MinHash, or a simple k-of-N bottom-k
+sketch), computed bottom-up in the same walk that already computes the other hashes, so it is O(n)
+at metadata time and O(1) to compare. Two signatures then yield an estimated Jaccard similarity of
+two subtrees' contents in constant time, without touching either subtree.
+
+What that buys, concretely: a cheap "is this pair nearly identical?" test usable *inside* hot loops
+where a real comparison is unaffordable - the swap decision above, `solve_moved_subtrees`' ambiguous
+candidate choice, `qualified_name`'s group tie-break, and a pre-filter for candidate search in large
+rewrites. It also gives an honest similarity number for near-miss cases like the trailing-`;`
+block, where equality hashing has to answer "different" and the truth is "95% the same".
+
+**Watch out for**: (1) the 2026-07-11 container-dissimilarity revert - that was a *cost-model*
+change (a text-similarity surcharge on `ren`) and it broke five perfect fixtures; a signature used
+for *candidate selection and tie-breaks* is a different use and should not be assumed to inherit
+that failure, but it must be validated separately rather than assumed safe. (2) Determinism: the
+sketch must be seeded from a constant, never from a per-process hasher, or it re-introduces exactly
+the run-to-run instability documented in `benchmark-determinism-fix`. (3) It is an *estimate* - use
+it to rank and to gate, never as proof two subtrees are equal, which the existing exact hashes
+already answer definitively.
+
 ### Move detection: the ambiguity guard (2026-08-17, shipped)
 
 Followed the lead above. `--dump` on `python-django` showed all 48 mismatches came from three
