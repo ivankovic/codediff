@@ -51,7 +51,7 @@ use crate::diff::{
 /// the whole subtree went away. Cost is this node alone for the same reason - its children carry
 /// their own entries and their own costs.
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let _ = (before, after);
+    match_roots_if_unresolved(before, after, diff);
 
     // Sorted for determinism: `NodeCache`'s maps are `FxHashMap`s, and while the mappings added
     // here are independent of each other (each node's decision depends only on whether that node
@@ -96,6 +96,45 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     }
 }
 
+/// Pair the two trees' root nodes when nothing else has, before the delete/insert sweep above gets
+/// to them.
+///
+/// The roots of two versions of one file always correspond - that is what "two versions of one
+/// file" means - so this is the one pairing that needs no evidence beyond both roots still being
+/// unclaimed. They *usually* are claimed: `solve_hash_descent` matches them outright when the file
+/// is unchanged, and propagation reaches them when the edit is contained. What defeats both is a
+/// wrap at top level (`typescript-add-error-handling`: statements moved inside a new `try`, so the
+/// root's children matched into two *different* after-parents and propagation's same-direct-parent
+/// rule correctly declined). Without this, the sweep below would then declare the file's own root
+/// deleted and a new one inserted, which is never what happened.
+///
+/// Cost 0 and `MatchButNotIdentical` rather than a real edit-distance computation: `UnitCostModel::
+/// ren` already prices a same-kind internal-node pairing at 0 (children carry their own costs), and
+/// running APTED over two whole files to rediscover that would cost more than the entire rest of
+/// the pipeline. If the roots' subtrees were identical, hash descent would have matched them long
+/// before this point, so "matched but not identical" is the only state left to record.
+fn match_roots_if_unresolved(before: &Code, after: &Code, diff: &mut ASTDiff) {
+    let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+        return;
+    };
+    let before_root = before_ast.root_node().id();
+    let after_root = after_ast.root_node().id();
+    if diff.before_node_map.contains_key(&before_root)
+        || diff.after_node_map.contains_key(&after_root)
+    {
+        return;
+    }
+    diff.add_mapping(
+        before_root,
+        after_root,
+        ASTMapping {
+            cost: 0,
+            operation: ASTMappingOperation::MatchButNotIdentical,
+            reason: ASTMappingReason::UnresolvedNode,
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +172,28 @@ mod tests {
                 .map(|m| m.operation.clone()),
             Some(ASTMappingOperation::Insert),
             "and a plain Insert, not InsertWithChildren - its descendants match the before side"
+        );
+    }
+
+    /// A top-level wrap leaves both roots unclaimed - they must still be paired with each other,
+    /// never reported as the whole file being deleted and a new one inserted.
+    #[test]
+    fn both_roots_are_paired_rather_than_deleted_and_inserted() {
+        let before = Code::from_string("const x = f();\nlog(x);\n", &Language::TypeScript);
+        let after = Code::from_string(
+            "try {\n  const x = f();\n  log(x);\n} catch (e) {\n  report(e);\n}\n",
+            &Language::TypeScript,
+        );
+
+        let diff = Diff::from_code(&before, &after);
+        let ast = diff.ast.as_ref().expect("typescript parses");
+        let before_root = before.ast.as_ref().unwrap().root_node().id();
+        let after_root = after.ast.as_ref().unwrap().root_node().id();
+
+        assert_eq!(
+            ast.before_node_map.get(&before_root).copied(),
+            Some(after_root),
+            "the two files' roots must map to each other"
         );
     }
 
