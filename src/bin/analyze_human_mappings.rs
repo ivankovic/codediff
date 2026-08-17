@@ -42,9 +42,24 @@ use clap::Parser;
 use codediff::code::Language;
 use codediff::diff::NodeCache;
 use codediff::test::helper;
+use codediff::test::helper::PathCache;
 use codediff::test::helper::human_mapping::{self, HumanOperation};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+/// Counts a tree-sitter subtree's size (root inclusive) - a local copy of
+/// `codediff::stats::count_nodes`, not a reuse of it: that function lives behind the `stats`
+/// feature (git2/rusqlite and the rest of that feature's build-time cost), which this binary has
+/// no other reason to pull in - it only needs `test-fixtures`. Keep this in sync if
+/// `stats::count_nodes`'s definition ever changes.
+fn count_nodes(root: tree_sitter::Node) -> usize {
+    let mut count = 1;
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        count += count_nodes(child);
+    }
+    count
+}
 
 #[derive(Parser)]
 #[command(
@@ -77,14 +92,21 @@ struct OpCounts {
 
 impl OpCounts {
     fn add(&mut self, op: HumanOperation) {
+        self.add_n(op, 1);
+    }
+
+    /// Same tally, weighted by `n` instead of always 1 - used for the *node-instance* count
+    /// (see `node_ops` on `FixtureStats`), where a single `DeleteWithChildren`/`InsertWithChildren`
+    /// entry covers an entire subtree, not one node.
+    fn add_n(&mut self, op: HumanOperation, n: usize) {
         match op {
-            HumanOperation::Identical => self.identical += 1,
-            HumanOperation::Update => self.update += 1,
-            HumanOperation::MatchButNotIdentical => self.match_but_not_identical += 1,
-            HumanOperation::Delete => self.delete += 1,
-            HumanOperation::DeleteWithChildren => self.delete_with_children += 1,
-            HumanOperation::Insert => self.insert += 1,
-            HumanOperation::InsertWithChildren => self.insert_with_children += 1,
+            HumanOperation::Identical => self.identical += n,
+            HumanOperation::Update => self.update += n,
+            HumanOperation::MatchButNotIdentical => self.match_but_not_identical += n,
+            HumanOperation::Delete => self.delete += n,
+            HumanOperation::DeleteWithChildren => self.delete_with_children += n,
+            HumanOperation::Insert => self.insert += n,
+            HumanOperation::InsertWithChildren => self.insert_with_children += n,
         }
     }
 
@@ -253,6 +275,25 @@ struct FixtureStats {
     after_nodes: usize,
     has_mapping: bool,
     ops: OpCounts,
+    /// Same seven-way breakdown as `ops`, but counting AST *node instances*, not mapping
+    /// *entries*: a plain `Identical`/`Update`/`MatchButNotIdentical` entry still contributes 2
+    /// (one before-tree node, one after-tree node), a plain `Delete`/`Insert` contributes 1 (the
+    /// single node on its one side), but a `DeleteWithChildren`/`InsertWithChildren` entry
+    /// contributes its whole subtree's size, resolved via `PathCache` + `count_nodes` - see
+    /// `analyze_fixture`. `node_ops.total()` equals `before_nodes + after_nodes` exactly, by
+    /// construction: `human_mapping.rs` documents "a node with no entry at all defaults to
+    /// identical" (its own `is_identical_before`/`is_identical_after` test), so ground truth for a
+    /// large file is often sparse - only changed/relevant nodes get an explicit entry, not every
+    /// untouched one - and `analyze_fixture` folds that implicit remainder into `node_ops.identical`
+    /// after processing the explicit entries. See `implicit_identical_nodes` for how much of a
+    /// given fixture's Identical count is implicit rather than explicit.
+    node_ops: OpCounts,
+    /// How many of `node_ops.identical`'s node instances came from the implicit-identical rule
+    /// (see `node_ops`'s doc comment) rather than an explicit `Identical` entry in
+    /// `human_mapping.json`. Zero for a fully-annotated fixture; large for a sparsely-annotated one
+    /// (e.g. a huge file where only a localized real change was explicitly marked) - see `main`'s
+    /// node-instance section for the corpus-wide prevalence this reveals.
+    implicit_identical_nodes: usize,
     depth_delta: DepthDeltaCounts,
     reorder_signals: usize,
     paired_entries: usize,
@@ -294,6 +335,35 @@ fn load_current_mismatches(path: &std::path::Path) -> HashMap<String, usize> {
     out
 }
 
+/// Resolves `path` against `root` via `cache` and returns the resulting node's subtree size
+/// (root inclusive), for a `*WithChildren` entry's node-instance count. Falls back to 1 (as if it
+/// were a plain, non-subtree entry) when `root`/`cache` are unavailable (no AST on that side - see
+/// `analyze_fixture`'s fail-safe elsewhere) or when the path fails to resolve, logging a warning in
+/// the latter case since that should not happen against a valid ground-truth mapping. A standalone
+/// `fn`, not a closure: a closure's captured/parameter lifetimes get unified at its definition
+/// site, which conflicts here since `analyze_fixture` calls this once per side with independently-
+/// lived `Node`/`PathCache` values - a plain `fn` stays generic over the lifetime per call site.
+fn subtree_size<'a>(
+    root: Option<tree_sitter::Node<'a>>,
+    cache: &mut Option<PathCache<'a>>,
+    path: &[String],
+    fixture_name: &str,
+) -> usize {
+    let (Some(root), Some(cache)) = (root, cache.as_mut()) else {
+        return 1;
+    };
+    let path_refs: Vec<&str> = path.iter().map(String::as_str).collect();
+    match cache.resolve(root, &path_refs) {
+        Ok(node) => count_nodes(node),
+        Err(e) => {
+            eprintln!(
+                "warning: {fixture_name}: could not resolve path {path:?} for subtree size: {e}"
+            );
+            1
+        }
+    }
+}
+
 fn analyze_fixture(
     name: &str,
     category: &str,
@@ -320,6 +390,8 @@ fn analyze_fixture(
         after_nodes: node_cache.after.len(),
         has_mapping: false,
         ops: OpCounts::default(),
+        node_ops: OpCounts::default(),
+        implicit_identical_nodes: 0,
         depth_delta: DepthDeltaCounts::default(),
         reorder_signals: 0,
         paired_entries: 0,
@@ -338,23 +410,46 @@ fn analyze_fixture(
     let mapping = human_mapping::load(name)?;
     let mut sibling_candidates: Vec<SiblingCandidate> = Vec::new();
 
+    // Node-instance counting needs to resolve a mapping-entry path down to the real tree-sitter
+    // node it names, only for the two `*WithChildren` variants (everything else's contribution is
+    // a fixed 1 or 2, no tree lookup needed - see `node_ops`'s doc comment). `PathCache` amortizes
+    // repeated lookups through the same high-fanout parent across a fixture's many entries; built
+    // lazily (`Option`, not unconditionally) since plenty of fixtures have zero `*WithChildren`
+    // entries and would pay index-building cost for nothing.
+    let before_root = before.ast.as_ref().map(|a| a.root_node());
+    let after_root = after.ast.as_ref().map(|a| a.root_node());
+    let mut before_cache = before_root.map(|_| PathCache::new());
+    let mut after_cache = after_root.map(|_| PathCache::new());
+
     for entry in &mapping.entries {
         stats.ops.add(entry.operation);
         match entry.operation {
             HumanOperation::Delete | HumanOperation::DeleteWithChildren => {
-                if let Some(path) = &entry.before_path
-                    && let Some(last) = path.last()
-                {
-                    let (kind, _) = split_kind_index(last);
-                    *stats.delete_kinds.entry(kind.to_string()).or_insert(0) += 1;
+                if let Some(path) = &entry.before_path {
+                    let n = if entry.operation == HumanOperation::DeleteWithChildren {
+                        subtree_size(before_root, &mut before_cache, path, name)
+                    } else {
+                        1
+                    };
+                    stats.node_ops.add_n(entry.operation, n);
+                    if let Some(last) = path.last() {
+                        let (kind, _) = split_kind_index(last);
+                        *stats.delete_kinds.entry(kind.to_string()).or_insert(0) += 1;
+                    }
                 }
             }
             HumanOperation::Insert | HumanOperation::InsertWithChildren => {
-                if let Some(path) = &entry.after_path
-                    && let Some(last) = path.last()
-                {
-                    let (kind, _) = split_kind_index(last);
-                    *stats.insert_kinds.entry(kind.to_string()).or_insert(0) += 1;
+                if let Some(path) = &entry.after_path {
+                    let n = if entry.operation == HumanOperation::InsertWithChildren {
+                        subtree_size(after_root, &mut after_cache, path, name)
+                    } else {
+                        1
+                    };
+                    stats.node_ops.add_n(entry.operation, n);
+                    if let Some(last) = path.last() {
+                        let (kind, _) = split_kind_index(last);
+                        *stats.insert_kinds.entry(kind.to_string()).or_insert(0) += 1;
+                    }
                 }
             }
             HumanOperation::Identical
@@ -364,6 +459,9 @@ fn analyze_fixture(
                     (&entry.before_path, &entry.after_path)
                 {
                     stats.paired_entries += 1;
+                    // One node in the before tree, one in the after tree - both carry this entry's
+                    // operation label, unlike Delete/Insert's single-sided node.
+                    stats.node_ops.add_n(entry.operation, 2);
                     let delta = before_path.len().abs_diff(after_path.len());
                     stats.depth_delta.add(delta);
                     if let Some(candidate) = sibling_candidate(before_path, after_path) {
@@ -374,6 +472,20 @@ fn analyze_fixture(
         }
     }
     stats.reorder_signals = count_reorder_inversions(sibling_candidates);
+
+    // Fold the implicit-identical remainder into node_ops.identical (see that field's doc
+    // comment): whatever `entries` didn't explicitly account for, out of this fixture's true
+    // `before_nodes + after_nodes` total, is either a node the ground truth left implicit (the
+    // common case) or one covered only by a `mapping.groups` entry (not tallied above - groups are
+    // rare, 130 across 33/417 fixtures corpus-wide, and small, p50 size 2, so lumping their few
+    // node instances in here rather than tallying them separately by operation isn't worth the
+    // extra complexity). `saturating_sub` rather than a bare subtraction: entries could in
+    // principle overcount (e.g. a stale/inconsistent mapping) and this section must not panic on
+    // a fixture that turns out to violate the invariant, only report it accurately via `main`'s
+    // corpus-wide section.
+    let total_physical_nodes = stats.before_nodes + stats.after_nodes;
+    stats.implicit_identical_nodes = total_physical_nodes.saturating_sub(stats.node_ops.total());
+    stats.node_ops.identical += stats.implicit_identical_nodes;
 
     for group in &mapping.groups {
         stats.group_count += 1;
@@ -457,6 +569,14 @@ fn write_csv(stats: &[FixtureStats], path: &std::path::Path) -> Result<()> {
         "op_delete_with_children",
         "op_insert",
         "op_insert_with_children",
+        "node_op_identical",
+        "node_op_update",
+        "node_op_match_but_not_identical",
+        "node_op_delete",
+        "node_op_delete_with_children",
+        "node_op_insert",
+        "node_op_insert_with_children",
+        "implicit_identical_nodes",
         "paired_entries",
         "depth_delta_0",
         "depth_delta_1",
@@ -486,6 +606,14 @@ fn write_csv(stats: &[FixtureStats], path: &std::path::Path) -> Result<()> {
             s.ops.delete_with_children.to_string(),
             s.ops.insert.to_string(),
             s.ops.insert_with_children.to_string(),
+            s.node_ops.identical.to_string(),
+            s.node_ops.update.to_string(),
+            s.node_ops.match_but_not_identical.to_string(),
+            s.node_ops.delete.to_string(),
+            s.node_ops.delete_with_children.to_string(),
+            s.node_ops.insert.to_string(),
+            s.node_ops.insert_with_children.to_string(),
+            s.implicit_identical_nodes.to_string(),
             s.paired_entries.to_string(),
             s.depth_delta.zero.to_string(),
             s.depth_delta.one.to_string(),
@@ -591,21 +719,25 @@ fn main() -> Result<()> {
 
     // ---- 3. Human operation mix (solved fixtures only) ----
     let mut corpus_ops = OpCounts::default();
+    let mut corpus_node_ops = OpCounts::default();
     let mut corpus_depth_delta = DepthDeltaCounts::default();
     let mut total_reorder_signals = 0usize;
     let mut total_paired_entries = 0usize;
     let mut total_groups = 0usize;
     let mut total_group_with_children = 0usize;
+    let mut total_implicit_identical = 0usize;
     let mut all_group_sizes: Vec<(usize, usize)> = Vec::new();
     let mut delete_kinds: HashMap<String, usize> = HashMap::new();
     let mut insert_kinds: HashMap<String, usize> = HashMap::new();
     for s in all_stats.iter().filter(|s| s.has_mapping) {
         corpus_ops.merge(&s.ops);
+        corpus_node_ops.merge(&s.node_ops);
         corpus_depth_delta.merge(&s.depth_delta);
         total_reorder_signals += s.reorder_signals;
         total_paired_entries += s.paired_entries;
         total_groups += s.group_count;
         total_group_with_children += s.group_with_children;
+        total_implicit_identical += s.implicit_identical_nodes;
         all_group_sizes.extend(&s.group_sizes);
         for (kind, count) in &s.delete_kinds {
             *delete_kinds.entry(kind.clone()).or_insert(0) += count;
@@ -643,6 +775,80 @@ fn main() -> Result<()> {
         100.0 * corpus_ops.identical as f64 / total_ops.max(1) as f64,
         100.0 * corpus_depth_delta.one as f64 / total_paired_entries.max(1) as f64
     );
+
+    // ---- 3b. Same mix, in AST node instances rather than mapping entries ----
+    // A `*WithChildren` entry is one line in human_mapping.json but can cover an entire subtree,
+    // so the entry-count mix above (§3) understates how many actual nodes each operation touches.
+    // This section re-tallies in node instances (see `node_ops`'s doc comment on `FixtureStats`),
+    // which is what research/analysis/human_mapping_shapes_report.py's per-fixture chart plots.
+    println!("\n=== Same mix, in AST node instances rather than mapping entries ===");
+    println!(
+        "(a DeleteWithChildren/InsertWithChildren entry counts its whole subtree here, not 1 - \
+         see node_op_* columns in the --csv export)"
+    );
+    let total_node_ops = corpus_node_ops.total();
+    for (label, count) in [
+        ("Identical", corpus_node_ops.identical),
+        ("Update", corpus_node_ops.update),
+        (
+            "MatchButNotIdentical",
+            corpus_node_ops.match_but_not_identical,
+        ),
+        ("Delete", corpus_node_ops.delete),
+        ("DeleteWithChildren", corpus_node_ops.delete_with_children),
+        ("Insert", corpus_node_ops.insert),
+        ("InsertWithChildren", corpus_node_ops.insert_with_children),
+    ] {
+        let pct = if total_node_ops > 0 {
+            100.0 * count as f64 / total_node_ops as f64
+        } else {
+            0.0
+        };
+        println!("  {label:<22} {count:>10}  ({pct:>5.1}%)");
+    }
+    println!("  {:<22} {total_node_ops:>10}", "Total");
+    // Scoped to `has_mapping` fixtures only, matching `corpus_node_ops`'s own scope - the corpus's
+    // one unsolved fixture (no human_mapping.json at all) contributes to `total_before_nodes`/
+    // `total_after_nodes` above but never enters the entries loop, so including it here would
+    // introduce a spurious gap unrelated to the implicit-identical mechanism this checks for.
+    let expected_node_total: usize = all_stats
+        .iter()
+        .filter(|s| s.has_mapping)
+        .map(|s| s.before_nodes + s.after_nodes)
+        .sum();
+    println!(
+        "Sanity check: node-instance total ({total_node_ops}) equals before_nodes + after_nodes \
+         summed over solved fixtures ({expected_node_total}) by construction - see below for how \
+         much of Identical is implicit."
+    );
+    debug_assert_eq!(
+        total_node_ops, expected_node_total,
+        "node_ops.total() must equal before_nodes + after_nodes after the implicit-identical fold"
+    );
+
+    let fixtures_with_implicit = all_stats
+        .iter()
+        .filter(|s| s.has_mapping && s.implicit_identical_nodes > 0)
+        .count();
+    println!(
+        "\nOf {} total Identical node instances, {} ({:.1}%) are implicit (no explicit entry in \
+         human_mapping.json - see `node_ops`'s doc comment), across {fixtures_with_implicit}/{solved} \
+         fixtures ({:.1}%). Ground truth is sparse for a large file: only changed/relevant nodes \
+         get an explicit entry, so a fixture's own `paired_entries`/`ops.total()` alone \
+         understates how much of it was actually reviewed as Identical.",
+        corpus_node_ops.identical,
+        total_implicit_identical,
+        100.0 * total_implicit_identical as f64 / corpus_node_ops.identical.max(1) as f64,
+        100.0 * fixtures_with_implicit as f64 / solved.max(1) as f64
+    );
+    let mut top_implicit: Vec<&FixtureStats> = all_stats
+        .iter()
+        .filter(|s| s.implicit_identical_nodes > 0)
+        .collect();
+    top_implicit.sort_by_key(|s| std::cmp::Reverse(s.implicit_identical_nodes));
+    for s in top_implicit.iter().take(5) {
+        println!("  {:<55} {}", s.name, s.implicit_identical_nodes);
+    }
 
     // ---- 4. Depth-delta distribution (wrap/reparent prevalence) ----
     println!(
