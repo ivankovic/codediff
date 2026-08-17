@@ -882,6 +882,93 @@ low-size win with suspicion rather than assuming the mechanism generalizes safel
 (`vimscript-neovim-neovim-improved-asserts`, 53→0). 245/339 (72.3%) → 246/339 (72.6%) zero-mismatch,
 still short of `main`'s 252/339 (74.3%) baseline this branch must clear before merging.
 
+**This branch has since been fast-forward merged to `main`** and the corpus has grown to 417/418
+fixtures (many new human solutions added). Current baseline as of 2026-08-17: 310/418 (74.3%)
+zero-mismatch, p50 66ms/p90 781ms/p99 4.69s/max 6.9s - still well short of the 90%-zero-mismatch and
+p99<400ms targets. Re-scoping below picks up from here, not from the 246/339 figure above.
+
+### Task #7 ("Phase 3c") re-scoped, then re-scoped again (2026-08-17)
+
+The plan's original Phase 3c (ERROR-density gate + leaf-hash refinement, kill criterion pinned to
+`css-shadcn-ui-ui-completely-broken-treesitter-parsing` dropping from 16277) turned out to already be
+solved - that fixture was down to 124 as a side effect of the `maximal_unmatched_roots` traversal fix
+above, not anything Phase 3c would add. Re-scoped toward "multi-entry-gap chain dispatch" based on a
+stale reading of this file's own Phase 3b writeup (which flagged multi-entry gaps as an open tail) -
+but a fresh read of the code (`resolve_residual_forest_via_myers_lcs`, `apted/common.rs`) showed
+equal-count multi-entry gaps are already handled (per-position recursion, uncapped, 2026-08-16), and
+the 464-mismatch fixture originally cited as the target (`javascript-microsoft-typescript-broken-js-
+remove-string-fragment`) turned out to be 464/464 `IdenticalHash`/`IdenticalHashOfAncestor` - a
+phase-1 hash-collision problem, unrelated to residual dispatch. Both corrections surfaced to the user
+before continuing, rather than silently substituting a different mechanism under the same task label.
+
+A full bucket breakdown across all 107 then-nonzero fixtures (dominant `reason` tag per fixture, via
+`--details`) found the `fast_fallback` bucket (37 fixtures, 466 mismatches) is itself at least three
+unrelated failure shapes, not one: (1) duplicate-hash Myers tie-break drift in `css-shadcn` (124
+mismatches, confirmed via temporary `CODEDIFF_DEBUG_RESIDUAL` instrumentation - only ~244 entries are
+left in leftover segments after the top-level pass, so the 124 mismatches are wrong matches picked
+*inside* the ~16,283-entry top-level `myers_lcs` call itself, where thousands of near-identical
+`ERROR`/leaf tokens collide on hash; same class as two known regressions this session, high risk to
+touch further, not pursued), (2) wrap/reparent (`cpp-add-templates`, fixed below), (3) moved/
+reparented chains (`html-apache-echarts-actual-structure-change`, `rust-turbopack-module-rule` - the
+already-documented moved-code gap). User chose (2) after this breakdown.
+
+### Fix: trivial-entry filtering unlocks wrap/reparent matches (2026-08-17)
+
+Root cause, found via the same `CODEDIFF_DEBUG_RESIDUAL` instrumentation: `cpp-add-templates`'s
+residual gap was `before_seg=[class_specifier(49), ;(1)]` vs `after_seg=[template_declaration(58)]` -
+a genuine wrap (`class_specifier` gets a new `template_declaration` parent) sitting in an
+unequal-count (2 vs 1) segment purely because of an unrelated size-1 `;` in the same gap. Unequal
+counts fall to `resolve_unequal_segment_via_kind_only_anchors`, which compares whole-subtree
+`KindOnlyHash` values - `class_specifier` and `template_declaration` have different kinds, so they
+never hash-match there regardless of the size floor, and the whole segment fell through to atomic
+delete/insert.
+
+Fix: before the unequal-count branch, filter entries with `node_to_subtree_size <=
+TRIVIAL_ENTRY_MAX_SIZE` (started at 1 - matches true leaves and entries missing size data, nothing
+larger) from both sides and re-check for equal counts among what's left. If they match, recurse the
+substantial entries per-position through real APTED (same safety argument as the existing
+equal-count branch - each is still the only candidate at its document-order position, so there's no
+room for APTED to invent a cross-match) and resolve the filtered-out trivial entries independently
+via plain delete/insert, same as an unmatched leaf would get anyway. `cpp-add-templates`: 25 → 2
+mismatches (the residual 2 are the root's own `MatchButNotIdentical`, needing one more propagation
+pass, and the `;` itself, which is one of the filtered trivial entries and so wasn't matched to its
+new nested position).
+
+**Verified**: full 418-fixture corpus, **zero regressions**, 3 improvements: `cpp-add-templates`
+(25→2), `css-mozilla-firefox-firefox-actual-style-changes` (20→8), `typescript-async-await` (9→6) -
+the latter two turned out to share the same trivial-leaf-alongside-a-real-wrap shape, not solely
+their previously-documented explanations. This branch runs *before*
+`resolve_unequal_segment_via_kind_only_anchors`, so it changes which mechanism handles any segment
+where trivial-filtering makes counts equal - `css-mozilla-firefox-firefox-actual-style-changes` was
+specifically named in `KIND_ONLY_ANCHOR_MIN_SIZE`'s own doc comment as a regression case from that
+other mechanism, so its improvement here was double-checked, not just trusted from the aggregate
+count: diffed its full `--details` output line-by-line against a pre-fix build (`git stash` +
+rebuild, the same isolation technique used earlier this session) - the remaining 8 mismatches are a
+byte-for-byte **subset** of the original 20 (the fixed 12 are three whole `declaration` groups; the
+untouched 8 are an unrelated `media_statement` deletion and an `integer_value`/`plain_value`
+ambiguity, unchanged from before), confirming this is a clean improvement, not a masked new wrong
+match. Zero-mismatch count unchanged (310/418, none of the three hit exactly zero) but total
+mismatches dropped. Latency deltas were all under 2x on already-largest fixtures (this project's own
+established threshold for "don't trust a single unrepeated `elapsed_ms` run as signal" - see the
+Phase 0 findings above) - not treated as a regression signal. `research/optimal_solutions_benchmark
+.csv` refreshed to this result.
+
+`TRIVIAL_ENTRY_MAX_SIZE` started at 1 deliberately, matching only the observed case - per
+`KIND_ONLY_ANCHOR_MIN_SIZE`'s own history (see the kind-only sub-anchoring section above), widening a
+size-based trust threshold without new corpus evidence has caused real regressions before in this
+exact area of code. A future session chasing more of this bucket should re-verify on the full corpus
+before raising it, not assume it generalizes.
+
+**`css-shadcn-ui-ui-completely-broken-treesitter-parsing`'s 124 mismatches are an explicit accepted
+residual, not an unexamined gap**: diagnosed above (in the re-scoping note) as duplicate-hash Myers
+tie-break drift across ~16,283 near-identical `ERROR`/leaf tokens in the top-level
+`resolve_residual_forest_via_myers_lcs` pass itself, not a dispatcher gap. It is currently the single
+largest nonzero fixture in the corpus. Deliberately not pursued this session: fixing it safely would
+need a genuinely new disambiguation signal (positional or content-aware tie-breaking), and this exact
+class of fix has caused two real regressions elsewhere in this file already
+(`KIND_ONLY_ANCHOR_MIN_SIZE`'s doc comment). A future session should re-derive this from the code, not
+assume the mechanism is safe to extend, before attempting it.
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching

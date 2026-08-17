@@ -1796,6 +1796,17 @@ const FALLBACK_MAX_EDIT: usize = 1000;
 /// known bad ones without being reverse-engineered to fit only one fixture.
 const KIND_ONLY_ANCHOR_MIN_SIZE: usize = 50;
 
+/// Max `node_to_subtree_size` for a `resolve_residual_forest_via_myers_lcs` segment entry to be
+/// treated as a trivial leaf/punctuation node (a stray `;`, `,`, etc.) rather than real structural
+/// content, when checking whether an unequal-count segment is actually a wrap/reparent case in
+/// disguise. Started at 1 - matches true leaves (`subtree_size == 1`) and entries missing size data
+/// entirely (`unwrap_or(0)`, `subtree_size == 0`), nothing larger - the one confirmed case
+/// (`cpp-add-templates`, `class_specifier` size 49 wrapped by a new `template_declaration` size 58,
+/// with an unrelated size-1 `;` in the same gap) only needs this much; widen only with corpus
+/// evidence, per this file's established pattern of starting conservative on size-based trust
+/// thresholds (`KIND_ONLY_ANCHOR_MIN_SIZE`'s own history is the cautionary example).
+const TRIVIAL_ENTRY_MAX_SIZE: usize = 1;
+
 /// Collects the root id of every *maximal* still-unmatched subtree under `root_id`: a preorder
 /// walk that stops descending the instant it finds a node whose *entire* subtree is unmatched, so
 /// one whole deleted/inserted block contributes exactly one sequence entry, not one per descendant
@@ -2008,14 +2019,90 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
                 );
             }
         } else if !before_seg.is_empty() && !after_seg.is_empty() {
-            resolve_unequal_segment_via_kind_only_anchors(
-                &before_seg,
-                &after_seg,
-                before_meta,
-                after_meta,
-                source,
-                diff,
-            );
+            // Wrap/reparent case (2026-08-17): a raw count mismatch can be entirely explained by a
+            // trivial leaf entry (punctuation - a stray `;`, `,`, etc.) appearing alongside a real
+            // structural change, e.g. `class_specifier` (before) becoming `template_declaration`'s
+            // child (after) while an unrelated `;` in the same gap is a genuine, unrelated
+            // delete/insert. Filtering out leaf entries (`subtree_size <= TRIVIAL_ENTRY_MAX_SIZE`)
+            // from both sides first and re-checking for equal counts among what's left generalizes
+            // the equal-count branch's safety argument unchanged: each substantial entry is still
+            // the only candidate at its document-order position among substantial entries, so there
+            // is still no room for APTED to invent a cross-match - the leaf entries it no longer has
+            // to explain are resolved independently (delete/insert, never matched to anything),
+            // exactly as an unmatched leaf would be resolved on its own anyway.
+            let before_substantial: Vec<usize> = before_seg
+                .iter()
+                .copied()
+                .filter(|id| {
+                    before_meta
+                        .node_to_subtree_size
+                        .get(id)
+                        .copied()
+                        .unwrap_or(0)
+                        > TRIVIAL_ENTRY_MAX_SIZE
+                })
+                .collect();
+            let after_substantial: Vec<usize> = after_seg
+                .iter()
+                .copied()
+                .filter(|id| {
+                    after_meta
+                        .node_to_subtree_size
+                        .get(id)
+                        .copied()
+                        .unwrap_or(0)
+                        > TRIVIAL_ENTRY_MAX_SIZE
+                })
+                .collect();
+            if !before_substantial.is_empty() && before_substantial.len() == after_substantial.len()
+            {
+                let cost_model = UnitCostModel {
+                    language: before_meta.language,
+                };
+                for (&b, &a) in before_substantial.iter().zip(after_substantial.iter()) {
+                    resolve_forest(
+                        vec![b],
+                        vec![a],
+                        before_meta,
+                        after_meta,
+                        &cost_model,
+                        Algorithm::Apted,
+                        source,
+                        diff,
+                    );
+                }
+                for &id in &before_seg {
+                    if before_meta
+                        .node_to_subtree_size
+                        .get(&id)
+                        .copied()
+                        .unwrap_or(0)
+                        <= TRIVIAL_ENTRY_MAX_SIZE
+                    {
+                        add_delete_mappings(id, before_meta, source, diff);
+                    }
+                }
+                for &id in &after_seg {
+                    if after_meta
+                        .node_to_subtree_size
+                        .get(&id)
+                        .copied()
+                        .unwrap_or(0)
+                        <= TRIVIAL_ENTRY_MAX_SIZE
+                    {
+                        add_insert_mappings(id, after_meta, source, diff);
+                    }
+                }
+            } else {
+                resolve_unequal_segment_via_kind_only_anchors(
+                    &before_seg,
+                    &after_seg,
+                    before_meta,
+                    after_meta,
+                    source,
+                    diff,
+                );
+            }
         } else {
             for &id in &before_seg {
                 add_delete_mappings(id, before_meta, source, diff);

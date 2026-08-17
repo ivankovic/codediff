@@ -24,10 +24,12 @@ fn optimal_solution() -> Result<()> {
     // A callback-to-async/await rewrite: the top-level `fetchData(...)` call's identifier/arguments
     // would need to match their counterparts now nested inside an async IIFE's `await` expression -
     // a "bridge across added nesting" gap in the same family as `rust-algorithm-change`'s documented
-    // case 2 (see that fixture's doc comment), not attempted here. Limit re-clamped to the
-    // benchmark-measured count.
+    // case 2 (see that fixture's doc comment), not attempted here. Dropped 9 -> 6
+    // (`TRIVIAL_ENTRY_MAX_SIZE` wrap/reparent fix, 2026-08-17) - some of this gap turned out to be
+    // the same trivial-leaf-alongside-a-real-wrap shape as `cpp-add-templates`, not solely the
+    // bridge-across-nesting gap described above.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-async-await",
-        9,
+        6,
     )
 }
