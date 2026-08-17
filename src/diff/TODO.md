@@ -1392,6 +1392,53 @@ one non-leaf child), which excludes a bare literal-with-delimiters regardless of
 unlike a size bump does not penalise legitimately small structured moves - the 11 fixtures that
 regressed at threshold 5 suggest those exist and matter.
 
+### Move detection: the ambiguity guard (2026-08-17, shipped)
+
+Followed the lead above. `--dump` on `python-django` showed all 48 mismatches came from three
+shapes paired across unrelated classes: a bare `string` (`string_start`/`string_content`/
+`string_end`), an `attribute` (`identifier`/`.`/`identifier`), and a `parameters` list
+(`(`/`identifier`/`)`) - each exactly four nodes.
+
+**The structural hypothesis recorded above was tested and is wrong.** "Require a non-leaf child"
+does exclude all three shapes, and does take `python-django` to zero - but it regressed **12**
+fixtures, because in CSS, JSON and vimscript colour tables the content that legitimately moves *is*
+flat by nature. Structure is not the discriminator; net +24 mismatches, same wash as the threshold
+bump. Don't retry it.
+
+**What actually separates them is ambiguity, not shape.** A `self.foo` occurs dozens of times per
+file, so when several available targets spell the same thing, "which one did this move to" has no
+answer and the document-position tiebreak is a guess dressed as a decision. Refusing to pair in
+that case fixes `python-django` outright. Unbounded, though, it costs the data-heavy files real
+matches (their repeated rows genuinely do move), so it is gated by `AMBIGUOUS_MOVE_MIN_SIZE`:
+ambiguity is only disqualifying below ~8 nodes, above which a repeated subtree is distinctive
+enough to trust. Swept:
+
+| variant | mismatches | zero-mismatch fixtures |
+|---|---|---|
+| baseline | 2785 | 312 |
+| structure guard (non-leaf child) | 2809 | 313 |
+| ambiguity, no size gate | 2790 | 313 |
+| ambiguity below 6 | 2753 | 313 |
+| **ambiguity below 8 (shipped)** | **2747** | **313** |
+
+Shipped at 8: **-38 mismatches, `python-django` 48 -> 0, `rust-rustdesk` 95 -> 79,
+`java-genymobile-scrcpy` 52 -> 46**, fixtures over the 0.5% tail cap unchanged at 33. Note this is
+a *different question* from `MIN_MOVE_SUBTREE_SIZE`, which gates whether a subtree is worth
+considering at all; this gates whether a choice *between several equals* can be made honestly.
+
+**Honest cost, not hidden**: four fixtures regress - `vimscript-...-hex-colours` 11 -> 23,
+`vimscript-...-debian-package-parsing` 8 -> 16, `html-apache-echarts` 82 -> 90, `tsx-excalidraw`
+231 -> 235. All are repeated-content files where the position tiebreak had been guessing correctly.
+The first pushed a pinned ceiling over its limit; it was raised 22 -> 24 **deliberately**, with the
+reasoning written into that test, rather than silently. Net effect is positive on every target
+metric, which is why it shipped, but a future session looking at those four fixtures should know
+this guard is why.
+
+**Still unfixed**: `cpp-laydbird-change-function-signature` (60, would be 8 without move detection),
+`kotlin-nextcloud-...-mocking-library` (46 -> 22) and `c-postgres-real-logic-change` (27 -> 14) are
+untouched by this - their damage comes from *large* false moves, where neither size nor ambiguity
+applies. That is a separate mechanism and the next thing to characterise here.
+
 ### Runtime work done: the APTED budget was the wrong fix; the constant factor was (2026-08-17)
 
 Runtime candidate #1 above proposed budgeting `solve_qualified_name_groups`' scoped APTED calls.

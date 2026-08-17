@@ -40,6 +40,9 @@
 //!   common that pairing them across unrelated regions is noise, not signal.
 //! - Largest-first with claiming: a moved function claims its whole subtree in one piece, rather
 //!   than its statements each finding their own (possibly different) partners.
+//! - Ambiguity refusal below `AMBIGUOUS_MOVE_MIN_SIZE`: when several available targets spell
+//!   exactly the same thing, a small subtree's "move" is a coin flip between commodity tokens, so
+//!   no pairing is made at all. Above that size the repetition is distinctive enough to trust.
 //! - Container-identity agreement: the outermost deleted reference-node ancestor of the source
 //!   and the outermost inserted reference-node ancestor of the target must have the same kind.
 //!   Humans read a move relative to the construct it left and the construct it entered: content
@@ -59,6 +62,17 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 /// move. Below this, identical subtrees are commodity code (single tokens, trivial statements)
 /// whose pairing is coincidence more often than intent.
 const MIN_MOVE_SUBTREE_SIZE: usize = 4;
+
+/// Size at or above which an *ambiguous* move (several available targets spelling exactly the same
+/// thing) is trusted anyway - see the guard's own comment at the use site.
+///
+/// Swept 6/8/unbounded against the full corpus: 8 is the best of the three (-38 mismatches, vs.
+/// -32 at 6 and +5 with no size gate at all - an unbounded ambiguity guard also loses
+/// `java-genymobile-scrcpy-refactor-for-loop-in-a-function` and doubles `tsx-excalidraw`'s
+/// regression). The shape it separates is real rather than fitted: below ~8 nodes an identical
+/// subtree is a `self.foo`, a `(self)`, a bare string; at 8 and up it is a distinct enough
+/// construct that several copies of it moving is more likely a genuine reorder than a coincidence.
+const AMBIGUOUS_MOVE_MIN_SIZE: usize = 8;
 
 pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
     let language = before.metadata.language.unwrap_or_default();
@@ -122,6 +136,33 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
                 .map(|n| n.start_byte())
                 .unwrap_or(usize::MAX)
         });
+        // Ambiguity guard: with more than one available target spelling exactly the same thing,
+        // "which one did this move to" has no answer, and the document-position sort above is a
+        // guess dressed as a decision. Commodity code is precisely where this bites - a Python
+        // `self.foo` or `(self)` occurs dozens of times per file, so an identical hash carries no
+        // information about relocation at all. All 48 of `python-django-django-update-unit-tests-
+        // actual-logic-change`'s mismatches were this: `string`, `attribute` and `parameters`
+        // subtrees paired across unrelated classes. It is **zero** with this guard.
+        //
+        // Only below `AMBIGUOUS_MOVE_MIN_SIZE`, because ambiguity stops meaning coincidence once a
+        // subtree is big enough to be distinctive - a data file's repeated rows really do move, and
+        // refusing to pick among them costs more than guessing (measured; see that constant).
+        //
+        // Note this is *not* the same question `MIN_MOVE_SUBTREE_SIZE` asks. That one gates whether
+        // a subtree is worth considering at all; this one gates whether a *choice between several
+        // equals* can be made honestly. Raising `MIN_MOVE_SUBTREE_SIZE` instead was tried and
+        // rejected (see its own doc comment): it discards unambiguous small moves too, regressing
+        // 11 fixtures to fix one.
+        if candidates.len() > 1
+            && before_metadata
+                .node_to_subtree_size
+                .get(&b)
+                .copied()
+                .unwrap_or(0)
+                < AMBIGUOUS_MOVE_MIN_SIZE
+        {
+            continue;
+        }
         let source_container = outermost_unmapped_reference_kind(
             b,
             &before_metadata,
@@ -311,6 +352,34 @@ mod tests {
         assert!(
             !has_move,
             "tiny identical statements must not be paired as moves"
+        );
+    }
+
+    /// A small subtree with *several* identical candidates on the other side has no honest answer
+    /// to "which one did it move to", so no move may be recorded - see the ambiguity guard in
+    /// `solve`. Here the deleted function's `self.log(x)` call could equally have "moved" into
+    /// either of the two inserted functions that contain the very same call.
+    #[test]
+    fn ambiguous_small_moves_are_refused_rather_than_guessed() {
+        let before = Code::from_string(
+            "class A:\n    def gone(self, x):\n        self.log(x)\n",
+            &Language::Python,
+        );
+        let after = Code::from_string(
+            "class A:\n    def one(self, x):\n        self.log(x)\n\n    def two(self, x):\n        self.log(x)\n",
+            &Language::Python,
+        );
+
+        let diff = diff_code(&before, &after);
+        let ast = diff.ast.unwrap();
+
+        let has_move = ast
+            .mapping
+            .values()
+            .any(|m| m.reason == crate::diff::ASTMappingReason::MovedSubtree);
+        assert!(
+            !has_move,
+            "with two equally good targets, no move should be invented"
         );
     }
 }

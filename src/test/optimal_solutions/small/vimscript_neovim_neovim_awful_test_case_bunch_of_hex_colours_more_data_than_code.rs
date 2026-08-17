@@ -21,8 +21,16 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // Raised 22 -> 24 (2026-08-17), a deliberate and measured regression on *this* fixture, not a
+    // drifting ceiling. `solve_moved_subtrees`' new ambiguity guard refuses to pick between several
+    // identical move targets below `AMBIGUOUS_MOVE_MIN_SIZE` nodes, which costs this file (a hex
+    // colour table - "more data than code", so its content is short, repetitive and genuinely
+    // relocated) 11 -> 23 mismatches. The same guard takes
+    // `python-django-...-update-unit-tests-actual-logic-change` from 48 to **zero** and is worth
+    // -38 mismatches corpus-wide, so the trade is net positive on every target metric; see
+    // `TODO.md`'s 2026-08-17 move-detection section for the full before/after table.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
-        22,
+        24,
     )
 }
