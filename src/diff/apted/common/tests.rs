@@ -46,13 +46,13 @@ fn synthetic_meta(nodes: &[(usize, &str, &str, &[usize])]) -> ASTMetadata {
     for &(id, kind, text, children) in nodes {
         node_info.insert(
             id,
-            ASTNodeMetadata {
-                kind: kind.to_string(),
-                text: text.to_string(),
-                children: children.to_vec(),
-                start_byte: id,
-                preorder_index: id,
-            },
+            ASTNodeMetadata::new(
+                kind.to_string(),
+                text.to_string(),
+                children.to_vec(),
+                id,
+                id,
+            ),
         );
     }
     let node_to_parent = node_to_parent_from(&node_info);
@@ -107,9 +107,7 @@ fn assert_distance_matches_oracle_pruned(
     before_node_map: &rustc_hash::FxHashMap<usize, usize>,
     after_node_map: &rustc_hash::FxHashMap<usize, usize>,
 ) {
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
 
     let before_idx = PostorderIndexer::build(before_meta, before_root_ids, before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, after_root_ids, after_node_map);
@@ -189,9 +187,7 @@ fn assert_distance_matches_oracle_forced_right(
     before_root_ids: &[usize],
     after_root_ids: &[usize],
 ) {
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
     let empty_map = rustc_hash::FxHashMap::default();
 
     let before_idx = PostorderIndexer::build(before_meta, before_root_ids, &empty_map);
@@ -418,13 +414,7 @@ fn meta_from_owned(nodes: &[(usize, String, String, Vec<usize>)]) -> ASTMetadata
     for (id, kind, text, children) in nodes {
         node_info.insert(
             *id,
-            ASTNodeMetadata {
-                kind: kind.clone(),
-                text: text.clone(),
-                children: children.clone(),
-                start_byte: *id,
-                preorder_index: *id,
-            },
+            ASTNodeMetadata::new(kind.clone(), text.clone(), children.clone(), *id, *id),
         );
     }
     let node_to_parent = node_to_parent_from(&node_info);
@@ -463,9 +453,7 @@ fn gen_balanced_binary_tree(
 fn bench_compute_delta_large_balanced_trees() {
     let kinds = ["a", "b", "c"];
     let texts = ["x", "y", "z"];
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
     let empty_map = rustc_hash::FxHashMap::default();
 
     for depth in [9usize, 10, 11, 12, 14] {
@@ -540,9 +528,7 @@ fn bench_compute_delta_large_balanced_trees() {
 fn bench_compute_delta_typical_random_trees() {
     let kinds = ["a", "b", "c"];
     let texts = ["x", "y", "z"];
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
     let empty_map = rustc_hash::FxHashMap::default();
 
     for depth in [8usize, 9, 10] {
@@ -669,9 +655,7 @@ fn debug_dump_case(
     before_root: usize,
     after_root: usize,
 ) {
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
     let empty_map = rustc_hash::FxHashMap::default();
     let before_idx = PostorderIndexer::build(before, &[before_root], &empty_map);
     let after_idx = PostorderIndexer::build(after, &[after_root], &empty_map);
@@ -840,9 +824,7 @@ fn debug_dump_minimal_repro() {
         (13, "b".into(), "".into(), vec![14]),
         (7, "b".into(), "".into(), vec![8, 10, 13]),
     ]);
-    let cost_model = UnitCostModel {
-        language: Language::Unknown,
-    };
+    let cost_model = UnitCostModel::new(Language::Unknown);
     let empty_map = rustc_hash::FxHashMap::default();
     let before_idx = PostorderIndexer::build(&before, &[0], &empty_map);
     let after_idx = PostorderIndexer::build(&after, &[7], &empty_map);
@@ -1650,13 +1632,7 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
             let id = i + 1;
             meta.node_info.insert(
                 id,
-                ASTNodeMetadata {
-                    kind: "token".to_string(),
-                    text: tok.to_string(),
-                    children: vec![],
-                    start_byte: id,
-                    preorder_index: id,
-                },
+                ASTNodeMetadata::new("token".to_string(), tok.to_string(), vec![], id, id),
             );
             // Use the token text as hash so identical tokens match.
             use std::hash::{Hash, Hasher};
@@ -1666,13 +1642,13 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         }
         meta.node_info.insert(
             root_id,
-            ASTNodeMetadata {
-                kind: "token_tree".to_string(),
-                text: String::new(),
-                children: child_ids.clone(),
-                start_byte: root_id,
-                preorder_index: root_id,
-            },
+            ASTNodeMetadata::new(
+                "token_tree".to_string(),
+                String::new(),
+                child_ids.clone(),
+                root_id,
+                root_id,
+            ),
         );
         meta.node_to_full_hash.insert(root_id, 0); // different hashes → will not short-circuit
         (root_id, child_ids)
@@ -1763,13 +1739,7 @@ fn myers_lcs_exceeds_limit() {
 fn leaf(id: usize, hash: u64, meta: &mut ASTMetadata) {
     meta.node_info.insert(
         id,
-        ASTNodeMetadata {
-            kind: "leaf".to_string(),
-            text: String::new(),
-            children: vec![],
-            start_byte: id,
-            preorder_index: id,
-        },
+        ASTNodeMetadata::new("leaf".to_string(), String::new(), vec![], id, id),
     );
     meta.node_to_full_hash.insert(id, hash);
 }
@@ -1784,13 +1754,7 @@ fn leaf(id: usize, hash: u64, meta: &mut ASTMetadata) {
 fn leaf_with_kind(id: usize, hash: u64, kind: &str, text: &str, meta: &mut ASTMetadata) {
     meta.node_info.insert(
         id,
-        ASTNodeMetadata {
-            kind: kind.to_string(),
-            text: text.to_string(),
-            children: vec![],
-            start_byte: id,
-            preorder_index: id,
-        },
+        ASTNodeMetadata::new(kind.to_string(), text.to_string(), vec![], id, id),
     );
     meta.node_to_full_hash.insert(id, hash);
 }
@@ -1798,13 +1762,7 @@ fn leaf_with_kind(id: usize, hash: u64, kind: &str, text: &str, meta: &mut ASTMe
 fn interior(id: usize, children: Vec<usize>, meta: &mut ASTMetadata) {
     meta.node_info.insert(
         id,
-        ASTNodeMetadata {
-            kind: "interior".to_string(),
-            text: String::new(),
-            children,
-            start_byte: id,
-            preorder_index: id,
-        },
+        ASTNodeMetadata::new("interior".to_string(), String::new(), children, id, id),
     );
 }
 

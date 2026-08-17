@@ -1065,11 +1065,89 @@ const IDENTIFIER_KINDS: &[&str] = &[
     "shorthand_property_identifier",
 ];
 
+/// True if `kind` is one of the name-like leaf kinds in [`IDENTIFIER_KINDS`] - the membership test
+/// [`kinds_update_allowed`] runs to decide whether two differently-kinded names may still match.
+pub fn is_identifier_kind(kind: &str) -> bool {
+    IDENTIFIER_KINDS.contains(&kind)
+}
+
 /// True if `kind_a` and `kind_b` both appear in the same family in `families`.
 fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
     families
         .iter()
         .any(|family| family.contains(&kind_a) && family.contains(&kind_b))
+}
+
+/// Every operator family above, in one fixed order, so a kind's membership across all of them can
+/// be packed into the bits of a single `u8` ([`operator_family_mask`]) and a language's applicable
+/// subset into another ([`language_operator_family_mask`]). Order is arbitrary but must stay
+/// consistent between those two functions - which is exactly why both derive from *this* list
+/// rather than hardcoding bit positions of their own.
+///
+/// Deliberately built from the same `const` arrays [`kinds_update_allowed`] itself uses, not a
+/// hand-transcribed copy: the arrays stay the single source of truth, and the bitmask form is a
+/// pure derivation of them, so the two cannot drift apart as families are edited.
+const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
+    COMPARISON_OPS,
+    ARITHMETIC_OPS,
+    PHP_ARITHMETIC_OPS,
+    BITWISE_OPS,
+    LOGICAL_OPS,
+    ASSIGNMENT_OPS,
+    INCREMENT_OPS,
+    RUST_RANGE_OPS,
+];
+
+/// Bit `i` set iff `kind` belongs to `ALL_OPERATOR_FAMILIES[i]`. A kind may belong to several
+/// (e.g. `+` is in both `ARITHMETIC_OPS` and `PHP_ARITHMETIC_OPS`), which is why this is a mask
+/// rather than a single family id.
+///
+/// Computed once per node at metadata-build time (see `ASTNodeMetadata::kind_cost_class`), turning
+/// what used to be a linear scan over every family on every comparison into a bitwise AND - see
+/// [`update_allowed_from_masks`].
+pub fn operator_family_mask(kind: &str) -> u8 {
+    let mut mask = 0u8;
+    for (i, family) in ALL_OPERATOR_FAMILIES.iter().enumerate() {
+        if family.contains(&kind) {
+            mask |= 1 << i;
+        }
+    }
+    mask
+}
+
+/// Bit `i` set iff `ALL_OPERATOR_FAMILIES[i]` is one of the families `language` recognizes - the
+/// bitmask form of [`kinds_update_allowed`]'s own `match language` arm, derived from it by
+/// identity comparison on the array pointers so the two can't disagree about which families a
+/// language has.
+pub fn language_operator_family_mask(language: &Language) -> u8 {
+    let mut mask = 0u8;
+    for family in families_for_language(language) {
+        for (i, known) in ALL_OPERATOR_FAMILIES.iter().enumerate() {
+            if std::ptr::eq(*family as *const [&str], *known as *const [&str]) {
+                mask |= 1 << i;
+            }
+        }
+    }
+    mask
+}
+
+/// True if two nodes' precomputed kind classes permit a cross-kind update under `language_mask`,
+/// i.e. the mask-based equivalent of [`kinds_update_allowed`]'s identifier-family and
+/// shared-operator-family checks. Assumes the callers have already handled the same-kind case
+/// (which [`kinds_update_allowed`] short-circuits first).
+///
+/// `(a & b & language) != 0` is exactly `families.iter().any(|f| f.contains(a) && f.contains(b))`
+/// restricted to `language`'s families: bit `i` survives the AND iff both kinds are in family `i`
+/// *and* `language` recognizes it - no assumption that a kind belongs to at most one family.
+pub fn update_allowed_from_masks(
+    a: &crate::code::KindCostClass,
+    b: &crate::code::KindCostClass,
+    language_mask: u8,
+) -> bool {
+    if a.identifier_like && b.identifier_like {
+        return true;
+    }
+    (a.operator_families & b.operator_families & language_mask) != 0
 }
 
 /**
@@ -1095,11 +1173,19 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
     // This enables matching e.g. identifier "pwd" to field_identifier "pwd" in
     // expressions like `pwd++` -> `cb_data.pwd++`, which is a common pattern
     // in real code changes (see c-nginx-add-typedef optimal solution).
-    if IDENTIFIER_KINDS.contains(&kind_a) && IDENTIFIER_KINDS.contains(&kind_b) {
+    if is_identifier_kind(kind_a) && is_identifier_kind(kind_b) {
         return true;
     }
 
-    let families: &[&[&str]] = match language {
+    in_shared_family(kind_a, kind_b, families_for_language(language))
+}
+
+/// Which operator families [`kinds_update_allowed`] recognizes for `language` - empty for any
+/// language with no hand-picked cross-kind exceptions. Extracted so
+/// [`language_operator_family_mask`] derives its bitmask from this same list rather than
+/// duplicating the language-to-families mapping.
+fn families_for_language(language: &Language) -> &'static [&'static [&'static str]] {
+    match language {
         Language::C | Language::Java | Language::Go | Language::CSharp => &[
             COMPARISON_OPS,
             ARITHMETIC_OPS,
@@ -1148,10 +1234,8 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
         ],
-        _ => return false,
-    };
-
-    in_shared_family(kind_a, kind_b, families)
+        _ => &[],
+    }
 }
 
 /// Generic structural punctuation: bracket/separator tokens that exist purely as grammar glue and
@@ -1531,6 +1615,60 @@ mod tests {
     use crate::test::helper;
 
     use super::*;
+
+    /// The bitmask form `UnitCostModel::ren` uses on the hot path must agree with the string-
+    /// scanning `kinds_update_allowed` it replaced, for *every* pair of kinds either of them knows
+    /// about, in every language. Exhaustive rather than sampled: the whole point of the mask is
+    /// that it is a pure derivation of the same `const` arrays, so a disagreement anywhere is a
+    /// bug in the derivation, and the cross product is small enough to just check outright.
+    #[test]
+    fn operator_family_masks_agree_with_string_scanning_kinds_update_allowed() {
+        let mut kinds: Vec<&str> = ALL_OPERATOR_FAMILIES.concat();
+        kinds.extend_from_slice(IDENTIFIER_KINDS);
+        // A kind in no family at all, to pin the negative case too.
+        kinds.push("if_statement");
+        kinds.sort_unstable();
+        kinds.dedup();
+
+        let languages = [
+            Language::C,
+            Language::CPP,
+            Language::Java,
+            Language::Go,
+            Language::CSharp,
+            Language::Rust,
+            Language::JavaScript,
+            Language::TypeScript,
+            Language::TSX,
+            Language::Python,
+            Language::Kotlin,
+            Language::PHP,
+            Language::Ruby,
+            // No families at all - the `_ => &[]` arm.
+            Language::Unknown,
+        ];
+
+        for language in &languages {
+            let language_mask = language_operator_family_mask(language);
+            for &a in &kinds {
+                for &b in &kinds {
+                    if a == b {
+                        continue; // Handled by `ren`'s own same-kind branch, before the masks.
+                    }
+                    let class_of = |kind: &str| crate::code::KindCostClass {
+                        identifier_like: is_identifier_kind(kind),
+                        literal_like: is_literal_kind(kind),
+                        operator_families: operator_family_mask(kind),
+                    };
+                    assert_eq!(
+                        update_allowed_from_masks(&class_of(a), &class_of(b), language_mask),
+                        kinds_update_allowed(a, b, language),
+                        "mask and string forms disagree on ({a:?}, {b:?}) in {language:?}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn kinds_update_allowed_same_kind_is_always_allowed() {

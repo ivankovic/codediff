@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Language};
-use crate::diff::nodes::{self, is_literal_kind, kinds_update_allowed};
+use crate::diff::nodes::{self, kinds_update_allowed};
 use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
     COST_UPDATE, NodeCache,
@@ -34,13 +34,26 @@ const COST_LITERAL_UPDATE: u64 = 2;
 
 /// Cost model for APTED - unit cost model
 pub(crate) struct UnitCostModel {
-    /// The language both sides of the diff are parsed as, consulted by `ren` to allow a small,
-    /// hand-picked set of cross-kind operator swaps (see `kinds_update_allowed`) that would
-    /// otherwise always be forbidden.
-    pub(crate) language: Language,
+    /// Which operator families the language both sides are parsed as recognizes, in bitmask form
+    /// (`nodes::language_operator_family_mask`) - the only thing `ren` needs the language *for*:
+    /// permitting a small, hand-picked set of cross-kind operator swaps (see
+    /// `kinds_update_allowed`) that would otherwise always be forbidden.
+    ///
+    /// Stored pre-reduced rather than as a `Language`, because `ren` runs once per tree-edit-
+    /// distance DP cell and re-deriving the family list per call is exactly the O(n^2) string
+    /// scanning `KindCostClass` exists to remove.
+    language_family_mask: u8,
 }
 
 impl UnitCostModel {
+    /// Derives [`UnitCostModel::language_family_mask`] from `language` - the only constructor, so
+    /// the two can't fall out of step.
+    pub(crate) fn new(language: Language) -> Self {
+        UnitCostModel {
+            language_family_mask: nodes::language_operator_family_mask(&language),
+        }
+    }
+
     pub(crate) fn del(&self, _node: &ASTNodeMetadata) -> u64 {
         COST_DELETE
     }
@@ -71,7 +84,7 @@ impl UnitCostModel {
                 // Both are leaves
                 if node1.text == node2.text {
                     0 // Identical
-                } else if is_literal_kind(&node1.kind) {
+                } else if node1.kind_cost_class.literal_like {
                     // Literals (strings, numbers, etc.) - medium cost
                     COST_LITERAL_UPDATE
                 } else {
@@ -84,7 +97,11 @@ impl UnitCostModel {
                 // accounted for separately via `delta`/recursion).
                 0
             }
-        } else if kinds_update_allowed(&node1.kind, &node2.kind, &self.language) {
+        } else if nodes::update_allowed_from_masks(
+            &node1.kind_cost_class,
+            &node2.kind_cost_class,
+            self.language_family_mask,
+        ) {
             // A hand-picked exception (e.g. `<` -> `<=`): different kinds, but the same
             // conceptual operator slot. These are always leaves with differing text, so this is
             // exactly the same-kind/different-text case above.
@@ -793,9 +810,7 @@ pub(crate) fn emit_match(
         after_id,
         ctx.before_meta,
         ctx.after_meta,
-        &UnitCostModel {
-            language: ctx.before_meta.language,
-        },
+        &UnitCostModel::new(ctx.before_meta.language),
     );
     let mut total = root_cost;
 
@@ -841,9 +856,7 @@ pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut
         return subtree_del_cost(
             before_id,
             ctx.before_meta,
-            &UnitCostModel {
-                language: ctx.before_meta.language,
-            },
+            &UnitCostModel::new(ctx.before_meta.language),
         );
     }
 
@@ -882,9 +895,7 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
         return subtree_ins_cost(
             after_id,
             ctx.after_meta,
-            &UnitCostModel {
-                language: ctx.after_meta.language,
-            },
+            &UnitCostModel::new(ctx.after_meta.language),
         );
     }
 
@@ -963,13 +974,7 @@ fn add_prune_mappings(
     }
     let (before_id, after_id) = mapping_key(node_id);
     if !diff.mapping.contains_key(&(before_id, after_id)) {
-        let cost = subtree_cost(
-            node_id,
-            meta,
-            &UnitCostModel {
-                language: meta.language,
-            },
-        );
+        let cost = subtree_cost(node_id, meta, &UnitCostModel::new(meta.language));
         diff.add_mapping(
             before_id,
             after_id,
@@ -1455,9 +1460,7 @@ fn resolve_flat_tree_pair(
     let unmatched_total_size = subtree_size_sum(&before_unmatched, before_meta)
         + subtree_size_sum(&after_unmatched, after_meta);
     if !before_unmatched.is_empty() && before_unmatched.len() == after_unmatched.len() {
-        let cost_model = UnitCostModel {
-            language: before_meta.language,
-        };
+        let cost_model = UnitCostModel::new(before_meta.language);
         for (b, a) in before_unmatched.into_iter().zip(after_unmatched) {
             resolve_forest(
                 vec![b],
@@ -1476,9 +1479,7 @@ fn resolve_flat_tree_pair(
         && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
         && unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE
     {
-        let cost_model = UnitCostModel {
-            language: before_meta.language,
-        };
+        let cost_model = UnitCostModel::new(before_meta.language);
         resolve_forest(
             before_unmatched,
             after_unmatched,
@@ -2003,9 +2004,7 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
         // sibling function) found no fixture worse and no latency movement once removed.
         let recursable = !before_seg.is_empty() && before_seg.len() == after_seg.len();
         if recursable {
-            let cost_model = UnitCostModel {
-                language: before_meta.language,
-            };
+            let cost_model = UnitCostModel::new(before_meta.language);
             for (&b, &a) in before_seg.iter().zip(after_seg.iter()) {
                 resolve_forest(
                     vec![b],
@@ -2056,9 +2055,7 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
                 .collect();
             if !before_substantial.is_empty() && before_substantial.len() == after_substantial.len()
             {
-                let cost_model = UnitCostModel {
-                    language: before_meta.language,
-                };
+                let cost_model = UnitCostModel::new(before_meta.language);
                 for (&b, &a) in before_substantial.iter().zip(after_substantial.iter()) {
                     resolve_forest(
                         vec![b],
@@ -2188,9 +2185,7 @@ fn resolve_unequal_segment_via_kind_only_anchors(
 
     let mut matched_before = vec![false; before_seg.len()];
     let mut matched_after = vec![false; after_seg.len()];
-    let cost_model = UnitCostModel {
-        language: before_meta.language,
-    };
+    let cost_model = UnitCostModel::new(before_meta.language);
     for (bi, ai) in &pairs {
         let before_size = before_meta
             .node_to_subtree_size
@@ -3661,9 +3656,7 @@ pub fn for_nodes(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
-    let cost_model = UnitCostModel {
-        language: before_metadata.language,
-    };
+    let cost_model = UnitCostModel::new(before_metadata.language);
     resolve_forest(
         before_node_ids,
         after_node_ids,

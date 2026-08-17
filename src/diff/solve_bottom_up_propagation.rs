@@ -67,7 +67,31 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     // ordering convention as `solve_bottom_up_expansion` - by the time an ancestor is considered,
     // every descendant already had its chance to resolve in this same call, so one call can
     // propagate a resolution several levels up the tree.
-    let mut before_candidates: Vec<usize> = before_metadata.node_to_depth.keys().copied().collect();
+    //
+    // Filtered to the nodes that could possibly resolve *before* sorting, not just skipped inside
+    // the loop: on a large, mostly-unchanged file the overwhelming majority of nodes are already
+    // matched or are childless leaves, and sorting all of them was the pass's dominant cost (this
+    // pass runs twice per diff - see `PendingDiff::finish` - and was measured 2026-08-17 at ~260ms
+    // of a 907ms diff on a 258k-node fixture). Filtering first makes the sort proportional to the
+    // unresolved residual instead of the whole file.
+    //
+    // Behaviour-preserving: both conditions are exactly the two `continue` guards that opened the
+    // loop body. A node already matched here can never become unmatched later (matching only adds
+    // entries), and `children` is immutable, so no node dropped here could have become eligible
+    // mid-loop. Nodes that become matched *during* the loop are still caught by the in-loop check
+    // below, which stays.
+    let mut before_candidates: Vec<usize> = before_metadata
+        .node_to_depth
+        .keys()
+        .copied()
+        .filter(|id| {
+            !diff.before_node_map.contains_key(id)
+                && before_metadata
+                    .node_info
+                    .get(id)
+                    .is_some_and(|info| !info.children.is_empty())
+        })
+        .collect();
     sort_deepest_first(&mut before_candidates, &before_metadata);
 
     for before_id in before_candidates {

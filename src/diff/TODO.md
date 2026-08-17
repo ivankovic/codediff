@@ -1252,6 +1252,106 @@ groups` and the scoped-APTED path), so start with runtime #1's diagnosis step - 
 double as the evidence base for the quality work, and the budget it introduces must be in place
 first so quality fixes aren't measured against a pipeline that later changes under them.
 
+### Runtime work done: the APTED budget was the wrong fix; the constant factor was (2026-08-17)
+
+Runtime candidate #1 above proposed budgeting `solve_qualified_name_groups`' scoped APTED calls.
+Its mandatory diagnosis step killed the plan and replaced it with a strictly better one - **no
+budget was implemented, and none should be until the numbers below stop improving.**
+
+**What the diagnosis found.** Per-pair instrumentation (temporary, fully reverted) at the
+`resolve_forest` chokepoint, logging each call's *pruned residual* sizes (`PostorderIndexer::size`,
+i.e. what survives after already-matched subtrees are pruned - not raw subtree size) against
+elapsed time:
+
+- Raw subtree size is a *useless* predictor: a pair with `product = 26.9M` finished in 5.5ms while
+  one with `product = 391k` took 1154ms. Pruned residual predicts far better but still only
+  loosely. This independently re-derives the 2026-07-25 "size/dissimilarity-capped fallback"
+  revert - **any budget keyed on size would fire mostly on the wrong calls**, which is exactly why
+  the planned budget was not built.
+- Corpus-wide, 131.5s of APTED time, 87% of it under `qualified_name`, concentrated in 118 calls.
+- The damning number: **~2.7µs per unit of residual product**, i.e. per DP cell - a hundred times
+  what a tree-edit-distance inner loop should cost. That pointed at the constant factor, not the
+  algorithm or its inputs.
+
+**Root cause.** `UnitCostModel::ren` is evaluated once per DP cell (O(n1*n2) and more). It called
+`kinds_update_allowed`, which linearly scanned `IDENTIFIER_KINDS` twice plus up to six operator-
+family arrays comparing `&str`s - **tens of string comparisons per cell**. Every input to those
+scans depends only on a node's *kind*, never on the pair being compared. A stub experiment
+(replacing `ren` and the containment adjustment with constants) bounded the recoverable share at
+~50% of all APTED time before any real work started.
+
+**Fix 1: `code::KindCostClass`, precomputed per node** (`identifier_like`, `literal_like`,
+`operator_families: u8`), plus `UnitCostModel::language_family_mask: u8` computed once per cost
+model. The cross-kind test becomes `(a.operator_families & b.operator_families & language_mask) !=
+0` - exactly equivalent to `families.any(|f| f.contains(a) && f.contains(b))` restricted to the
+language's families, with no assumption that a kind belongs to at most one family (several do:
+`+` is in both `ARITHMETIC_OPS` and `PHP_ARITHMETIC_OPS`). The masks are *derived from the same
+`const` arrays* `kinds_update_allowed` still uses (`ALL_OPERATOR_FAMILIES` +
+`families_for_language`, the latter extracted from that function's own `match`), so the fast and
+slow forms cannot drift; `operator_family_masks_agree_with_string_scanning_kinds_update_allowed`
+pins that exhaustively over every known kind pair x every language. `UnitCostModel::new` is now the
+only constructor, so `language_family_mask` can't fall out of step - and `language` itself turned
+out to be dead afterwards and was removed.
+
+Measured on the APTED calls themselves: rustdesk 4188ms -> 1492ms (2.8x), kotlin-nextcloud 1758 ->
+906 (1.9x), excalidraw-ts 1260 -> 790 (1.6x). Corpus effect of this fix alone: p99 1132ms -> 990ms,
+max 4886 -> 3582, fixtures over 400ms 23 -> 17, total corpus diff time 38.8s -> 32.3s. After this,
+stubbing `ren` entirely changes nothing measurable - it is off the critical path.
+
+**Fix 2: three whole-file sweeps made residual-proportional.** Each cost O(file) even when the edit
+was one token, which is what made a 258k-node fixture with a one-string-literal change take ~900ms:
+- `solve_leading_siblings` iterated *every* matched pair (~every node on a near-identical file),
+  paying two `node_cache` lookups, two tree-sitter `prev_sibling` calls and two `node_map` probes
+  each, just to discover there was no leading comment to match (~400ms). Now pre-computes the set
+  of anchors whose immediately-preceding sibling is an unmatched comment/modifier - the necessary
+  condition for the walk to do anything - in one O(n) pass, and skips everything else.
+- `solve_bottom_up_propagation` collected and *sorted* every node in the file (~260ms across its
+  two calls); now filters to unmatched non-leaf nodes before sorting.
+- `solve_unique_type_matching` sorted every matched pair (~60ms) for a pass that fires zero times
+  corpus-wide; now filters to pairs that actually have an unmatched child.
+
+All three filters are behaviour-preserving for the same structural reason, worth stating once
+because it is what makes them safe: **matching only ever adds entries to the node maps, never
+removes them**, and `children` is immutable, so a node excluded by these filters could not have
+become eligible later in the same pass - while a node that becomes matched *during* a pass is still
+caught by the in-loop guards, which were all left in place.
+
+**Combined result, full corpus (417 fixtures, idle machine,
+`research/results/benchmark_2026-08-17_after_runtime_pass.csv`)**, against the honest baseline in
+the previous section:
+
+| | p50 | p90 | p99 | max | >400ms | total | mismatches | zero-mismatch |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 6.8ms | 172ms | 1132ms | 4886ms | 23 | 38.8s | 2835 | 310 |
+| + fix 1 | 6.6ms | 125ms | 990ms | 3582ms | 17 | 32.3s | 2835 | 310 |
+| + fix 2 | **3.8ms** | **81ms** | **833ms** | **3086ms** | **11** | **20.7s** | 2835 | 310 |
+
+**Zero fixtures changed mismatch count at any step** - both fixes are pure constant-factor work,
+verified fixture-by-fixture, not just on the total. Roughly 1.9x end-to-end (38.8s -> 20.7s), p90
+2.1x, and the count of fixtures breaching the 400ms target is down from 23 to 11. p50 (3.8ms)
+clears its <100ms goal by ~26x; **p99 833ms remains ~2x over the 400ms goal**, so this pass narrows
+but does not close the latency gap.
+
+Caveat on precision, since these are the numbers the next session will measure against:
+`elapsed_ms` is a single unrepeated timing per fixture, and repeated runs of the *same* binary
+moved the tail figures by ~5% (an earlier run of the identical code read p99 787ms / max 2626ms /
+8 over-budget). Treat sub-10% deltas in p99, max and the over-400ms count as noise; the totals and
+the p50/p90 columns are far steadier, and the fixture-by-fixture mismatch comparison is exact.
+
+**What did NOT work, measured and reverted**: an `is_trivial()` early-out on `ContainmentCtx::
+adjust` (skip the hash probes when nothing is pruned and there are no sibling-order anchors).
+Zero measured effect - real contexts on the hot fixtures have non-empty pruned-target maps, so the
+fast path never fired. Removed rather than kept as speculative code.
+
+**Where the remaining APTED time is**: after fix 1, stubbing `ContainmentCtx::adjust` is worth
+~15% on the hot fixtures - it still does 2-4 hash probes per DP cell (two `pruned_targets` maps,
+plus two `node_info` probes for the anchor-rank check). The principled fix is to index those by the
+engine's dense preorder (`vren_adjusted` already has `before_pre`/`after_pre` in hand) instead of by
+node id, turning every probe into an array index. That is the next runtime item, ahead of any
+budget. Beyond it, the honest remaining gap is algorithmic: ~2.7µs per residual-product unit means
+APTED is evaluating far more subproblems than `n1*n2`, so the next question is how many DP cells are
+actually evaluated per call, not how to make each one cheaper.
+
 ### #1 implemented: `solve_unique_type_matching` - zero firings, a real negative result (2026-08-17)
 
 Shipped as `src/diff/solve_unique_type_matching.rs`, gated by `HeuristicConfig::solver_unique_type_

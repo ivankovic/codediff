@@ -279,6 +279,71 @@ pub struct ASTNodeMetadata {
     /// Unique per node and, like `start_byte`, a pure function of the tree's shape - not the
     /// arena that happened to produce it - so it's safe to use across separate parses.
     pub preorder_index: usize,
+    /// Precomputed answers to the kind-membership questions
+    /// [`crate::diff::nodes::kinds_update_allowed`] and [`crate::diff::nodes::is_literal_kind`]
+    /// would otherwise re-derive by string scanning - see [`KindCostClass`] for why this is
+    /// precomputed rather than computed on demand.
+    pub kind_cost_class: KindCostClass,
+}
+
+impl ASTNodeMetadata {
+    /// Builds a node's metadata with [`kind_cost_class`](ASTNodeMetadata::kind_cost_class) derived
+    /// from `kind`, so no caller has to know how that derivation works (or can get it wrong by
+    /// hand). The production builder (`code::metadata::compute_node_info`) fills the struct
+    /// literally, field by field, because it already computes each field from the tree-sitter node
+    /// - this is for everything else, principally test fixtures.
+    pub fn new(
+        kind: String,
+        text: String,
+        children: Vec<usize>,
+        start_byte: usize,
+        preorder_index: usize,
+    ) -> Self {
+        let kind_cost_class = KindCostClass {
+            identifier_like: crate::diff::nodes::is_identifier_kind(&kind),
+            literal_like: crate::diff::nodes::is_literal_kind(&kind),
+            operator_families: crate::diff::nodes::operator_family_mask(&kind),
+        };
+        ASTNodeMetadata {
+            kind,
+            text,
+            children,
+            start_byte,
+            preorder_index,
+            kind_cost_class,
+        }
+    }
+}
+
+/// The parts of a node's *kind* that [`crate::diff::apted`]'s rename-cost model needs, reduced to
+/// integer/boolean form once per node at metadata-build time.
+///
+/// Purely a performance representation - it answers exactly the questions
+/// [`crate::diff::nodes::kinds_update_allowed`] and [`crate::diff::nodes::is_literal_kind`]
+/// already answer from the kind string, and is derived from the very same `const` family arrays
+/// (see [`crate::diff::nodes::operator_family_mask`]), so the two can't disagree.
+///
+/// Why it exists: `UnitCostModel::ren` is evaluated once per tree-edit-distance DP cell - O(n1*n2)
+/// times and more - and each evaluation used to walk `IDENTIFIER_KINDS` and up to six operator
+/// family arrays comparing `&str`s, tens of string comparisons per cell. Every input to those
+/// scans depends only on the node's kind, never on the pair, so the whole cost moves from the
+/// O(n^2) inner loop to an O(n) precompute (measured 2026-08-17: roughly half of all APTED time
+/// was in `ren` plus the containment adjustment it feeds).
+///
+/// Language-independent by construction: `operator_families` records membership in *every* family,
+/// and which subset applies is decided at comparison time from the cost model's own language (see
+/// [`crate::diff::nodes::language_operator_family_mask`]). That keeps this correct even when a
+/// node's own tree was parsed as a different language than the comparison is being run under.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct KindCostClass {
+    /// `IDENTIFIER_KINDS.contains(kind)` - name-like leaves that may match each other across
+    /// differing kinds in every language.
+    pub identifier_like: bool,
+    /// `is_literal_kind(kind)` - drives the higher `COST_LITERAL_UPDATE` for a changed value.
+    pub literal_like: bool,
+    /// Bit `i` set iff this kind is in `ALL_OPERATOR_FAMILIES[i]` (see
+    /// [`crate::diff::nodes::operator_family_mask`]). A kind can be in several families at once.
+    pub operator_families: u8,
 }
 
 /**

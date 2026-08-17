@@ -56,9 +56,37 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     let current_mappings: Vec<(usize, usize)> =
         diff.before_node_map.iter().map(|(&k, &v)| (k, v)).collect();
 
+    // Anchors worth walking back from: exactly those whose immediately-preceding sibling is an
+    // unmatched comment/modifier, which is the necessary condition for the loop below to match
+    // anything at all. Everything else is a provable no-op that would still pay two `node_cache`
+    // lookups, two tree-sitter `prev_sibling` calls and two `node_map` probes to discover that.
+    //
+    // Worth building because this pass runs on *every* matched pair, and on a large,
+    // mostly-unchanged file nearly all of them are matched - the pass was measured (2026-08-17) at
+    // ~400ms of a 907ms diff on a 258k-node fixture whose actual edit was one string literal.
+    // Building the set is a single O(n) walk whose per-node work is a kind check (a cheap `match`
+    // on `&str`) and, only for the few nodes that pass it, one hash probe.
+    //
+    // Safe as a *superset* filter under this loop's live-mutation contract: matching only ever
+    // adds entries to `before_node_map`, never removes them, so a node unmatched when this set is
+    // built can only become matched later - which the in-loop checks still catch. It can never go
+    // the other way and make a skipped anchor become useful mid-loop.
+    let candidate_anchors: rustc_hash::FxHashSet<usize> = node_cache
+        .before
+        .values()
+        .filter(|node| {
+            (is_comment(node.kind()) || is_leading_modifier(node.kind(), &language))
+                && !diff.before_node_map.contains_key(&node.id())
+        })
+        .filter_map(|node| node.next_sibling().map(|next| next.id()))
+        .collect();
+
     for (before_id, after_id) in current_mappings {
         // Skip if either node is 0 (delete/insert)
         if before_id == 0 || after_id == 0 {
+            continue;
+        }
+        if !candidate_anchors.contains(&before_id) {
             continue;
         }
 

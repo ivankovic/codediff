@@ -205,6 +205,11 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         metadata.node_info.insert(
             node_id,
             ASTNodeMetadata {
+                kind_cost_class: crate::code::KindCostClass {
+                    identifier_like: nodes::is_identifier_kind(&kind),
+                    literal_like: nodes::is_literal_kind(&kind),
+                    operator_families: nodes::operator_family_mask(&kind),
+                },
                 kind,
                 text,
                 children,

@@ -58,10 +58,27 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
     // Snapshot of currently-matched pairs, sorted by the before node's preorder index for
     // deterministic iteration order regardless of `FxHashMap`'s own iteration order - see
     // `ASTNodeMetadata::start_byte`'s doc comment on why node ids themselves aren't a safe sort key.
+    // Only pairs that actually have an unmatched child on the before side can produce anything
+    // here, and on a large, mostly-unchanged file almost none do - filtering before the sort keeps
+    // this proportional to the residual rather than to the whole file (measured 2026-08-17: ~60ms
+    // of a 907ms diff on a 258k-node fixture, for a pass that fires zero times corpus-wide, see
+    // this module's `TODO.md` entry). The filter is a necessary condition for the per-kind loop
+    // below, which re-checks everything properly; matching only ever adds map entries, so a child
+    // unmatched now can only become matched later, never the reverse.
     let mut matched_pairs: Vec<(usize, usize)> = diff
         .before_node_map
         .iter()
         .filter_map(|(&before_id, &after_id)| (after_id != 0).then_some((before_id, after_id)))
+        .filter(|(before_id, _)| {
+            before_metadata
+                .node_info
+                .get(before_id)
+                .is_some_and(|info| {
+                    info.children
+                        .iter()
+                        .any(|child| !diff.before_node_map.contains_key(child))
+                })
+        })
         .collect();
     matched_pairs.sort_unstable_by_key(|&(before_id, _)| {
         before_metadata
