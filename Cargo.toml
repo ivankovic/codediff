@@ -187,6 +187,21 @@ path = "src/bin/analyze_human_mappings.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
+name = "apted_only_worker"
+path = "src/bin/apted_only_worker.rs"
+# Single-pair worker, spawned as a subprocess by apted_only_benchmark (stats-gated, below) -
+# doesn't itself need git2/csv, but gated the same way as ascii_visualizer's own bin entry: reuse
+# test-fixtures as the general "checkout-only dev tool" gate rather than inventing a feature for
+# one binary with no fixture/stats dependency of its own.
+required-features = ["test-fixtures"]
+
+[[bin]]
+name = "apted_only_benchmark"
+path = "src/bin/apted_only_benchmark.rs"
+# Needs git2 (repo/blob access, same as benchmark_diff_pairs) and csv - both gated by `stats`.
+required-features = ["stats"]
+
+[[bin]]
 name = "commit_stats"
 path = "src/bin/commit_stats.rs"
 required-features = ["stats"]

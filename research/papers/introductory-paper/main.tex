@@ -162,9 +162,9 @@ documentation states that it targets research use, not production deployment at 
 reasonable scope for its own goals, but one that leaves open a question every production diff
 tool must answer:
 
-\textbf{RQ1 (Scale).} Does the scale of real-world source files, ASTs, and commits match the
-assumptions existing diff-tooling designs are built on - how large is $n$ in real code, and how
-often does it reach that size?
+\textbf{RQ1 (Scale).} What percentage of real-world source-code changes can a single, whole-tree
+tree-edit-distance computation - the algorithmic core every exact, syntax-aware diff tool is built
+on - complete within a one-second budget?
 
 A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
 for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
