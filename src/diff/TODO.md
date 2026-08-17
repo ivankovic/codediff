@@ -276,7 +276,10 @@ moved-subtree recovery) is judged to have hit its practical ceiling, particularl
 A full architectural rethink is planned. These are the concrete targets it must hit - not
 aspirational, the bar for "done":
 
-- **Latency: p99 < 400ms, p50 < 100ms (ideally).** Corrected baseline, full-corpus
+- **Latency: p99 < 400ms, p50 < 100ms (ideally).** **STALE (2026-08-17): every latency figure in
+  this bullet is ~5-6x inflated by a benchmark-harness artifact (metadata recomputed ~26x per timed
+  diff) - see "Latency baseline was ~5-6x harness artifact" below for the honest baseline: p50
+  6.8ms, p99 1.13s, max 4.9s.** Original text kept for history: corrected baseline, full-corpus
   `benchmark_optimal_solutions --csv` run (332 fixtures, release binary, 2026-08-15): p50 123.9ms,
   p90 1.35s, **p99 61.8s**, max 169.3s. (An earlier note in this section said p99 9.4s - that was
   measured on a narrower scope and is wrong; this is the full-corpus figure. p99 needs a ~150x
@@ -1022,9 +1025,276 @@ picked up again. A future session should not assume the remaining 37 fixtures ar
 between these two shapes without checking a few more source diffs directly (path-string inference
 alone was actively misleading on both examples checked here).
 
+### Literature + external-implementation survey, cross-checked against corpus stats (2026-08-17)
+
+Two new corpus-wide analyses landed this session, independent of everything above: `analyze_human_
+mappings`'s node-instance operation mix (`node_op_*` columns, `research/human_mapping_analysis.csv`)
+and a "shape of human solutions" chart (`research/analysis/human_mapping_shapes_report.py`) showing
+each fixture's change composition, normalized to its own non-Identical mass. Cross-referencing
+fixture *typology* (which operation dominates a fixture's changed nodes) against `current_mismatches`
+found a real, non-uniform pattern: fixtures dominated by `InsertWithChildren` have by far the worst
+mean mismatch count (15.5, vs. 4.6 for `MatchButNotIdentical`-dominant and 5.8 for `Mixed`), driven by
+a handful of severe outliers -
+`tsx-excalidraw-excalidraw-huge-file-with-real-logic-change` (231), `rust-zed-workspace-tasks` (117),
+`cpp-ladybird-refactor-variables-if-changes` (109). `MatchButNotIdentical`-dominant fixtures (172/417,
+the largest single group) have the *best* zero-mismatch rate (86.0%) despite being the most common
+shape - matching succeeded, only content differs. `Mixed`-typology fixtures fare worse (57.8%
+zero-mismatch) than either dominant-single-operation group. This independently re-derives several
+fixtures already named above (`rust-zed-workspace-tasks`, `lua-neovim-neovim-if-flips-two-branches`)
+from a completely different signal (corpus-wide typology vs. individual mismatch-path reading),
+which is a useful cross-check that both methods are finding the same real problems, not noise.
+
+Prompted by this, a literature/external-implementation search (not previously done for this specific
+purpose - `related-works.md` surveys *tools*, not their internal heuristics) turned up three
+candidates, cross-checked against both the corpus stats above and this file's own history so nothing
+below re-suggests something already tried (see "Tried and rejected" entries throughout this file) or
+re-describes something already shipped:
+
+**1. GumTree Simple's bounded recovery phase** (Falleri & Martinez, ICSE 2024, "Fine-grained, accurate
+and scalable source differencing") - replaces GumTree Greedy's O(n^3) TED-based recovery phase with a
+three-step O(n^2) heuristic run recursively the instant a bottom-up mapping is found: (a) exact
+subtree isomorphism among a newly-matched parent's unmatched children, (b) structural isomorphism
+ignoring leaf *values* (so a renamed identifier still matches), (c) last-resort **unique-type
+matching**: if a child node *kind* occurs exactly once among both sides' still-unmatched children of
+the same matched parent, pair them - inspired by XYDiff. Measured ~99% fewer CPU-cycles than Greedy on
+both benchmark datasets (GitHub Java, Defects4J); interestingly, it found *fewer* total mappings than
+Greedy on GitHub Java's arbitrary large changes but *more* on Defects4J's small localized bug patches
+- exactly this corpus's own shape (median fixture is 1.8% changed, per the density stats above).
+**Status check against current `main`, not the stale assumption I started this investigation with**:
+step (a) is `solve_hash_descent`, step (b) is already codediff's own `KindOnlyHash` sub-anchoring
+(2026-08-16) - both shipped. The uncapped whole-residual real-APTED `final_pass` this paper's
+complexity argument would also indict is *already gone* on `main` (`git merge-base --is-ancestor
+phases-4-7-rearchitecture main` confirms that branch, including "Phase 1: remove whole-residual full
+APTED, always use the cheap fallback" `bf79bfe`, is merged - the comment in `diff.rs` claiming this
+"lives on the branch, not main" is stale documentation, not current behavior, and should be fixed).
+**The one genuinely new, unimplemented piece is step (c), unique-type matching** - never attempted in
+any form here. Low risk by construction (fires only when a kind is unique among both sides' unmatched
+siblings under an already-matched parent - a narrow, precise trigger, not a broad heuristic).
+
+**2. Scoped unordered/commutative sibling matching - correction after checking current `main`, not
+just this file's old backlog text.** Full unordered tree-edit-distance is MAX-SNP-hard (Zhang et
+al.), which is why no real tool solves it globally, but literature treats it as tractable when scoped
+to one parent's children as a local minimum-cost assignment (permuting sibling order permutes the
+assignment cost matrix without changing the optimal cost) or a per-parent Longest Increasing
+Subsequence instead of positional Myers-LCS when order isn't semantically meaningful. **This file's
+own "Commutative Sibling Matching" Phase-1 backlog entry just below, proposed as "sort children by a
+canonical key before hashing," turns out to already be substantially shipped**: `nodes::is_
+commutative_container` + `code::hash`'s `compute_kind_and_value_hash`/`compute_kind_only_hash` already
+give order-independent hashing to every language construct that is *language-guaranteed* to be
+order-independent - Rust `enum_variant_list`/`use_list`/`field_declaration_list`, Go/C#/Java/C/C++
+enum and struct-field lists, JSON/YAML object keys, Python dicts, JS/TS objects, and more (see that
+function's full match arm, `nodes.rs`). The backlog entry below is stale and should be updated or
+removed, not re-implemented from scratch.
+
+The fixture that actually motivates this section, `lua-neovim-neovim-if-flips-two-branches`, is a
+**different, harder problem that `is_commutative_container` correctly does not attempt**: an
+`if`/`elseif` chain is not language-guaranteed order-independent (reordering branches can change
+program behavior for overlapping conditions) - a human made an order-changing edit to an
+order-*sensitive* construct, and codediff cannot safely generalize "this kind is commutative" the way
+it can for enum variants or struct fields. This is closer in spirit to `solve_moved_subtrees` (move
+detection for content that relocated) than to `is_commutative_container` (blanket structural
+order-independence) - what's actually needed is branch-level move detection scoped to a single
+if-chain's clauses, tolerant of the bare-if-vs-wrapped-elseif grammar inconsistency (Lua's grammar
+only wraps the *second-and-later* clause of an if-chain in `elseif_statement`; the first clause's
+condition+body sit bare under `if_statement`, so even a same-kind-only comparison has nothing to
+compare against for the first clause). **Not implemented this session** - needs its own short design
+pass (what counts as "a clause" across the bare/wrapped grammar quirk, and how to bound the risk of a
+move-detection-style heuristic firing on a genuinely order-changing edit that was NOT a simple swap)
+before writing it.
+
+**3. MinHash/LSH-based approximate candidate search** for the large-rewrite "search-quality gap"
+(`rust-zed-workspace-tasks` and the `qualified_name` bucket's second failure shape above) - already
+listed in this file's old Priority Reference table ("LSH for approximate matching") but never
+elaborated or attempted. Important distinction from the *already-tried-and-reverted* "container
+dissimilarity cost" experiment (2026-07-11, text-similarity surcharge on `UnitCostModel::ren`, broke 5
+perfect fixtures): that was a *cost-model* change, scoring an already-committed match. LSH-based
+candidate search is a *search/candidate-generation* technique - cheaply proposing plausible partners
+before matching commits to anything - a different failure mode, so the prior revert doesn't
+straightforwardly indict it, but this is the least-evidenced of the three candidates and would need
+its own validation that the distinction actually holds up in this pipeline before trusting it.
+
+**Decision**: implementing #1's unique-type-matching sub-phase next - lowest risk (narrow, precise
+trigger condition), most clearly scoped, and a genuinely new mechanism rather than a variant of
+something already tried. #2 needs a short design pass on the bare/wrapped-clause question first. #3
+needs its own smaller validation before being trusted as different-in-kind from the reverted attempt.
+
+### Latency baseline was ~5-6x harness artifact; honest numbers + the two real hotspots (2026-08-17)
+
+Every `elapsed_ms` figure this file has ever recorded - including the "Architecture rethink" section's
+corrected baseline (p50 123.9ms / p99 61.8s / max 169.3s) and every per-session A/B CSV - was
+measuring a benchmark-harness artifact on top of true pipeline cost. Root cause:
+`helper::handmade_test_code_pairs()` memoizes `Code` pairs and hands out **clones**, and `Code`'s
+hand-written `Clone` deliberately drops `ast_metadata` to `None` (node ids are parse-specific, see
+its doc comment). Every `metadata_of()` call in the pipeline then hits the silent
+`Cow::Owned(compute_ast_metadata(...))` fallback and recomputes whole-tree metadata from scratch.
+Measured directly (temporary env-gated instrumentation, added and fully reverted): **956
+`compute_ast_metadata` calls totaling 32.2s for ONE benchmark row** on the largest fixture
+(`json-iwalton3-jellyfin-web-...`, 258k nodes; ~26 full-file recomputes at ~245ms inside the single
+timed `diff_code_with_config` call alone). The production path (`Code::from_string`/`from_file`)
+precomputes metadata at construction and never pays this - the benchmark was overstating real diff
+latency ~5-6x on any large fixture. This is the same hazard `handmade_test_code()`'s own 2026-07-26
+doc comment describes ("20 separate compute_ast_metadata calls for one diff_code call") - fixed
+there with `ensure_parsed()`, but `handmade_test_code_pairs()`'s clone-on-return path reintroduced
+it for every benchmark consumer.
+
+**Fix shipped** (`benchmark_optimal_solutions.rs`): clone + `ensure_parsed()` both sides per row
+before any timed call, mirroring production. Verified: jellyfin 7.3s -> 1.0s; a residue of ~12
+full-file + ~800 tiny recomputes per row remains inside the *untimed* mismatch/cost helpers
+(`human_mapping` internals) - slows the benchmark run, doesn't touch `elapsed_ms`. A deeper
+library-side fix (make `metadata_of` cache-on-first-use, e.g. interior-mutability `OnceCell`) is
+open - any future caller that clones a `Code` and diffs it still silently pays ~26x.
+
+**Honest baseline (fresh full-corpus run, idle machine, warm metadata, 2026-08-17)**: p50 **6.8ms**
+(goal <100ms met ~15x over), p90 172ms, **p99 1.13s** (goal <400ms, ~2.8x over), max 4.9s, 23/417
+fixtures over 400ms. Quality unchanged (2835 mismatches, 310/417 zero) - mismatch counts were never
+affected. The p50/latency-architecture goals are in far better shape than believed; the whole
+remaining p99 problem concentrates in **one pass**: phase-level timing on every fixture still over
+~700ms shows `solve_syntax_aware_matching` at 95-99% of total diff time, split between exactly two
+sub-passes:
+- `solve_qualified_name_groups`: 1.4s on `kotlin-nextcloud-a-few-small-removals` (6.9k nodes!),
+  1.3s on `typescript-excalidraw-...-add-values-to-lists` (6.2k), 727ms on
+  `java-genymobile-scrcpy-refactor-for-loop` (3.0k), 2.7s on `rust-...-huge-75k-node-file`. Small
+  files being slow means shape-driven blowup inside the per-name-pair bounded `apted::for_nodes`
+  calls (or the group tie-break's cost estimation), not scale.
+- `solve_large_flat_subtrees`: 5.0s on `rust-rustdesk-...-io-loop-medium-sized-file` (46.7k nodes).
+
+Neither had ever shown up as a suspect because the metadata artifact drowned them: the old slowest-
+fixture list was just "biggest files first." Fixing p99 now means profiling *inside* these two
+passes (which pair, what shape, which APTED path), not re-architecting the pipeline's phase
+structure - see the honest slowest-15 list in
+`research/results/benchmark_2026-08-17_warm_metadata.csv`.
+
+### Roadmap to the goals, re-ranked against the honest baseline (2026-08-17)
+
+Where things stand against each goal after the harness fix above (all numbers from
+`research/results/benchmark_2026-08-17_warm_metadata.csv`, 417 solved fixtures, idle machine):
+
+- p50 < 100ms: **met**, 6.8ms (~15x headroom).
+- p99 < 400ms: 1.13s, ~2.8x over; only 23/417 fixtures exceed 400ms, max 4.9s.
+- 90% zero-mismatch: 310/417 (74.3%); need 66 more perfect fixtures to reach 376 (90%).
+- Nonzero tail <= 0.5% of nodes: 37/107 nonzero fixtures currently violate the cap.
+
+The 66 *easiest* nonzero fixtures each have <= 13 mismatches (327 total between them), so the 90%
+bar does not require solving the big outliers - it requires converting near-misses. By cost class
+(`algorithm_cost` vs `human_cost`) those 66 split: **48 search gaps** (`algorithm_cost >
+human_cost`: a cheaper mapping exists and wasn't found), **12 cost ties** (cost function
+under-discriminates - each one a cost-function bug report, see the correction in "Architecture
+rethink" above), **6 cost-model-wrong** (`algorithm_cost < human_cost`: the model actively prefers
+a non-human mapping). Corpus-wide, mismatches stay concentrated: top-10 fixtures hold 52% of all
+2835, top-30 hold 82%.
+
+**Runtime candidates, ranked** (the whole p99 problem is `solve_syntax_aware_matching`, per the
+previous section):
+
+1. **Budget the per-pair scoped APTED inside `solve_qualified_name_groups`.** First step is
+   diagnosis, not code: temporarily log `(name, before_size, after_size, elapsed)` per
+   `anchor_pair_via_apted`/`apted::for_nodes` call on the four known-slow fixtures and find which
+   pair blows up and why (candidate suspects: one huge function body pair with flat children -
+   Zhang-Shasha shape pathology, the known failure mode from the 2026-07-09 perf pass; or the
+   group tie-break's `cost_ratio`/`sequence_edit_cost` estimate running O(pairs^2) inside a big
+   N:M group). Then enforce a `before_size * after_size` budget **inside `resolve_forest`'s
+   `Algorithm::Apted` branch itself** (the chokepoint principle from the rearchitecture plan: no
+   caller, present or future, should be able to reintroduce an unbounded call), falling back to
+   the bounded flat/leaf Myers path over that one pair. Expect quality interaction: these calls do
+   real matching work, so A/B the full corpus and track the `qualified_name`-bucket fixtures
+   individually, not just the total.
+2. **Same treatment for `solve_large_flat_subtrees`** (5.0s on rustdesk at 46.7k nodes). Prior art
+   to reuse, not rediscover: the 2026-08-16 "flat_children gate, revisited" entry (total-count
+   gate + size cap), and the 2026-07-18 lesson "check the FLAT_MIN_CHILDREN fast-path first"
+   before attributing cost to the main path.
+3. **Make the O(n)-sweep passes residual-proportional** - matters for the giant-file tail
+   (jellyfin, 258k nodes, 907ms with a trivial edit): `solve_leading_siblings` iterates *every*
+   matched pair (~all nodes on a 99%-identical file) just to check `prev_sibling`; inverting it to
+   iterate only unmatched comment/modifier nodes (via a maintained unmatched-set, or by walking
+   `node_cache` filtered by kind) makes it proportional to the residual. Same shape applies to
+   `solve_identical_diagnostic_statements`, the *second* `solve_bottom_up_propagation` sweep (seed
+   a worklist from nodes newly matched since the first sweep instead of re-sweeping the whole
+   tree), and `solve_unique_type_matching` (~60ms on jellyfin for a pass with zero corpus-wide
+   firings - iterate only matched pairs that still have unmatched children, or flip its default
+   off given the negative result above).
+4. **Library-side hardening: make `metadata_of` cache-on-first-use** (e.g. `ast_metadata:
+   OnceCell<ASTMetadata>` populated through `&Code`) so *any* future caller that clones a `Code`
+   and diffs it stops silently paying ~26x metadata recomputes - the benchmark harness fix above
+   only cures this binary. `Clone` should still reset the cell (node ids are parse-specific).
+   Check the `Cow<'_, ASTMetadata>` return type's callers when converting - with a cell this can
+   become a plain `&ASTMetadata`.
+
+**Quality candidates, ranked** (target: +66 zero-mismatch fixtures):
+
+1. **Branch/clause-level move detection for reordered if/elseif chains** - literature candidate #2
+   above, design questions already scoped there (clause abstraction over Lua's bare-if vs.
+   wrapped-elseif grammar quirk; guardrail against firing on non-swap order changes). Directly
+   targets `lua-neovim-neovim-if-flips-two-branches` (68) and the commutative-reorder half of the
+   `qualified_name` bucket (2026-08-17 survey above).
+2. **A secondary tie-break objective for cost-tied mappings.** `javascript-microsoft-typescript-
+   broken-js-remove-string-fragment` alone is 464 mismatches at an *exact* cost tie - the model
+   cannot express whatever signal the human used. Most defensible candidate signal: locality/
+   contiguity (prefer the mapping that minimizes crossings / preorder-index displacement between
+   matched pairs, i.e. keep matches monotone and near their original neighborhood). Implementation
+   hint: implement as a deterministic *tie-break* in candidate ordering (only consulted when unit
+   costs are exactly equal), not as a new cost term - the 2026-07-11 container-dissimilarity
+   revert showed how easily a new cost *term* breaks currently-perfect fixtures, while a pure
+   tie-break provably cannot change any outcome that isn't already a tie.
+3. **Per-fixture audit of the ~19 `algorithm_cost < human_cost` fixtures** (kotlin-remove-function
+   -58, cpp-ladybird-refactor -53, cpp-laydbird-change-function-signature -48, kotlin-nextcloud
+   -46, python-django -48, ...): each is a concrete proof the cost model prefers a wrong mapping.
+   Diagnose individually with `--details`/`--dump` and classify *which* cost term is too cheap
+   (likely `UnitCostModel::ren` on dissimilar containers - but the fix must be term-targeted and
+   corpus-A/B'd, not a blanket similarity surcharge, which is exactly what was tried and reverted
+   2026-07-11).
+4. **LSH/MinHash candidate search for large rewrites** (literature candidate #3) - targets the
+   `InsertWithChildren`-dominant outliers (`tsx-excalidraw` 231, `rust-zed-workspace-tasks` 117)
+   where surviving content hides deep inside new structure. Highest effort, least evidence,
+   explicitly deferred until 1-3 land.
+
+**Sequencing note**: runtime #1 and quality #1/#3 touch the same code (`solve_qualified_name_
+groups` and the scoped-APTED path), so start with runtime #1's diagnosis step - its per-pair logs
+double as the evidence base for the quality work, and the budget it introduces must be in place
+first so quality fixes aren't measured against a pipeline that later changes under them.
+
+### #1 implemented: `solve_unique_type_matching` - zero firings, a real negative result (2026-08-17)
+
+Shipped as `src/diff/solve_unique_type_matching.rs`, gated by `HeuristicConfig::solver_unique_type_
+matching` (default `true`), wired in right after the first `solve_bottom_up_propagation` call and
+before the terminal `apted::for_roots_fallback`. Unit-tested in isolation (two tests that pre-match a
+node directly via `diff.add_mapping`, not via an earlier real pass, so a passing assertion can only
+be this pass's own doing - an earlier draft's tests pre-matched the *outer* function instead of the
+block its children live under, which let real APTED resolve the target node as a side effect of a
+different match and made both tests pass without the mechanism under test ever running; caught by
+checking `ASTMappingReason` on the resulting mapping, not just checking a match exists).
+
+**Full-corpus measurement (417 fixtures, `--solver-unique-type-matching` vs. `--no-solver-unique-
+type-matching`): byte-for-byte identical output, 2835/2835 total mismatches, 310/417 (74.3%)
+zero-mismatch either way.** Confirmed via temporary `CODEDIFF_DEBUG_UNIQUE_TYPE`-gated
+instrumentation (added, used, fully reverted - `git diff` clean beyond the intended change) that the
+pass fires **zero times** across the entire real corpus, even though the isolated unit tests prove
+the mechanism itself is correct. Root cause: by the point in the pipeline where this pass runs, `Kind
+OnlyHash` sub-anchoring (`solve_hash_descent`, shipped well before this session) has already resolved
+essentially every "same shape, different leaf value" case GumTree Simple's own earlier recovery
+sub-phases (exact isomorphism, structural isomorphism ignoring leaf values) target - and codediff's
+other passes are comprehensive enough that a matched parent's leftover unmatched children essentially
+never land on the exact "one of this kind on each side" shape this pass needs: either every child is
+already resolved by something else, or several share a kind and the ambiguity guard correctly blocks
+it. This is the same shape of negative result as Task #8 ("reposition move-detection twice") above -
+a literature-backed, plausible-sounding idea that is safe and correctly implemented but has no
+customer in *this* corpus, given everything upstream of it in *this* pipeline. Kept shipped
+(zero measured risk, since it never fires) rather than reverted, in case a future pipeline reordering
+or corpus addition gives it a customer - but this is not a case to cite as "implemented and helping."
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
+
+**STATUS (2026-08-17): substantially shipped, this entry is stale.** `nodes::is_commutative_container`
++ `code::hash`'s `compute_kind_and_value_hash`/`compute_kind_only_hash` already give order-independent
+hashing to every language-guaranteed-order-independent container (struct/field lists, enum variants,
+import lists, JSON/YAML object keys, Python dicts, JS/TS objects - see `nodes.rs`'s full match arm).
+The originally-proposed "sort by canonical key before hashing" design was superseded by folding
+order-independence directly into the hash functions instead. What's left is a genuinely different,
+harder problem - order-*sensitive* constructs (if/elseif chains) that a human reordered anyway - see
+this file's "Literature + external-implementation survey" section above (2026-08-17) for why that
+needs branch-level move detection, not a blanket commutativity rule, and is not yet attempted.
+
 - **Problem:** Order-independent blocks (struct fields, enum variants, import statements) cause spurious
   mismatches when reordered, even though the content is semantically identical.
 - **Solution:** For node kinds marked as commutative (e.g., `struct_pattern`, `field_declaration_list`,
@@ -1227,7 +1497,7 @@ alone was actively misleading on both examples checked here).
 
 | Phase | Item | Impact | Complexity | ROI |
 |-------|------|--------|------------|-----|
-| 1 | Commutative sibling matching | ⭐⭐⭐⭐ | Medium | High |
+| 1 | Commutative sibling matching | ⭐⭐⭐⭐ | Medium | High | **DONE for language-guaranteed-commutative kinds (`is_commutative_container`); if/elseif branch-move case still open, see 2026-08-17** |
 | 1 | Multi-level normalized hashing | ⭐⭐⭐⭐ | Medium | High |
 | 1 | Adaptive cost model | ⭐⭐⭐ | Low | High |
 | 1 | Import path normalization | ⭐⭐⭐ | Low | High | **DONE** |

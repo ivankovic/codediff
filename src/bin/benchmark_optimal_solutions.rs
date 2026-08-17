@@ -209,6 +209,15 @@ struct Args {
     /// Disable `solve_bottom_up_propagation`.
     #[arg(long = "no-solver-bottom-up-propagation", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_bottom_up_propagation")]
     no_solver_bottom_up_propagation: bool,
+
+    /// Enable `solve_unique_type_matching` (GumTree Simple's "unique type matching" recovery
+    /// sub-phase - see `TODO.md`'s 2026-08-17 literature survey). Newly added, default `true`
+    /// pending full-corpus measurement.
+    #[arg(long = "solver-unique-type-matching", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_unique_type_matching")]
+    solver_unique_type_matching: bool,
+    /// Disable `solve_unique_type_matching`.
+    #[arg(long = "no-solver-unique-type-matching", action = clap::ArgAction::SetTrue, default_value_t = false, overrides_with = "solver_unique_type_matching")]
+    no_solver_unique_type_matching: bool,
 }
 
 /// Resolves `Args`' `--solver-X`/`--no-solver-X` pairs into a `HeuristicConfig` - `--no-solver-X`
@@ -219,6 +228,8 @@ fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
         solver_bottom_up_propagation: args.solver_bottom_up_propagation
             && !args.no_solver_bottom_up_propagation,
+        solver_unique_type_matching: args.solver_unique_type_matching
+            && !args.no_solver_unique_type_matching,
     }
 }
 
@@ -338,6 +349,21 @@ fn main() -> Result<()> {
         let (before, after) = test_diffs
             .get(name)
             .expect("name came from test_diffs.keys()");
+        // `handmade_test_code_pairs` hands out clones, and `Code`'s hand-written `Clone` drops
+        // `ast_metadata` to `None` (see its doc comment) - without re-caching it here, every
+        // `metadata_of` call across the pipeline silently recomputes whole-tree metadata from
+        // scratch (measured 2026-08-17: ~26 full recomputes per `diff_code_with_config` call,
+        // ~6s of pure recompute overhead on the largest fixture - inflating `elapsed_ms` ~6x
+        // over what the production path, which precomputes metadata in `Code::from_string`/
+        // `from_file`, actually costs). Mutate local clones so the timed diff below measures the
+        // pipeline, not the harness artifact.
+        let (mut before, mut after) = (before.clone(), after.clone());
+        for code in [&mut before, &mut after] {
+            if code.metadata.language.is_some() {
+                code.ensure_parsed()?;
+            }
+        }
+        let (before, after) = (&before, &after);
         let reason_counts = reason_counts_for(before, after, &config);
         let algorithm_cost = algorithm_cost_for(before, after, &config);
         let elapsed_ms = elapsed_ms_for(before, after, &config);

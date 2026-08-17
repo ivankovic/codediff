@@ -28,6 +28,7 @@ pub mod solve_large_flat_subtrees;
 pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
 pub mod solve_syntax_aware_matching;
+pub mod solve_unique_type_matching;
 pub mod text;
 pub mod text_range;
 
@@ -392,14 +393,23 @@ impl<'code> PendingDiff<'code> {
         // 11,647 nodes, vs. `json-iwalton3-jellyfin-web-...`: 9.4s at 258,504 nodes) recorded in
         // `TODO.md`'s "Architecture rethink: target goals" section.
         //
-        // MEASURED QUALITY COST (2026-08-15, see TODO.md): this alone regresses 249/257 fixtures
-        // that currently rely on real APTED (175 drop from 0 mismatches to nonzero, net +4880
-        // mismatches on that subset) - `resolve_residual_forest_via_myers_lcs` only recovers
-        // whole-subtree byte-identical matches, so any residual with even one genuinely-changed
-        // node loses partial credit for everything around it. This is why this change lives on
-        // the `phases-4-7-rearchitecture` branch, not `main`: Phases 2-3 (still to come) have to
-        // land alongside it, replacing what real tree-edit-distance-quality matching this call
-        // provided with bounded, per-region matching, before this is safe to merge.
+        // MEASURED QUALITY COST AT THE TIME (2026-08-15, see TODO.md): this alone regressed
+        // 249/257 fixtures that then relied on real APTED (175 dropped from 0 mismatches to
+        // nonzero, net +4880 mismatches on that subset) - `resolve_residual_forest_via_myers_lcs`
+        // only recovers whole-subtree byte-identical matches, so any residual with even one
+        // genuinely-changed node lost partial credit for everything around it. This is why the
+        // change first landed on the `phases-4-7-rearchitecture` branch rather than `main`
+        // directly: Phases 2-3 (bottom-up propagation, region-scoped real APTED dispatch) had to
+        // land alongside it first, replacing what real tree-edit-distance-quality matching this
+        // call provided with bounded, per-region matching.
+        //
+        // STATUS (2026-08-17): that branch is merged into `main` (`git merge-base --is-ancestor
+        // phases-4-7-rearchitecture main` confirms it) - this is not branch-only behavior, it is
+        // what `main` does today. Quality is back at or above the pre-Phase-1 baseline (see
+        // `research/optimal_solutions_benchmark.csv` and TODO.md's later 2026-08-16/17 entries:
+        // kind-only sub-anchoring, trivial-entry filtering) - the regression described above was
+        // real but transient, measured mid-migration before Phases 2-3 shipped, not a standing
+        // cost of this design.
         //
         // `prematch_unique_named_locals` now runs unconditionally too (previously only in the
         // deleted `else` arm) - measured in isolation and found NOT to be a meaningful
@@ -408,8 +418,8 @@ impl<'code> PendingDiff<'code> {
         //
         // `DiffMode`/`_mode` no longer changes behavior - kept on the signature for API
         // compatibility (the TUI's `SelectDiffMode` prompt and `--exact` CLI flag both still
-        // construct one) pending a follow-up commit that decides its fate once this branch's
-        // quality is back at or above baseline.
+        // construct one) pending a follow-up commit that decides whether to remove it now that
+        // quality has recovered.
         if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
             let before_metadata = crate::code::metadata::metadata_of(before);
             let after_metadata = crate::code::metadata::metadata_of(after);
@@ -431,6 +441,14 @@ impl<'code> PendingDiff<'code> {
         // would otherwise have to guess at via lossy whole-subtree hashing.
         if config.solver_bottom_up_propagation {
             solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
+        }
+
+        // GumTree Simple's "unique type matching" recovery sub-phase (see `TODO.md`'s 2026-08-17
+        // literature survey and `solve_unique_type_matching`'s own doc comment) - runs after
+        // bottom-up propagation so it has the most already-matched parent pairs to work from, and
+        // before the terminal fallback so its precise, cheap pairs are locked in first.
+        if config.solver_unique_type_matching {
+            solve_unique_type_matching::solve(before, after, &node_cache, &mut ast_diff);
         }
         apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
 
@@ -502,6 +520,24 @@ pub struct HeuristicConfig {
     /// delta within noise (+1.5% aggregate `elapsed_ms`, and it's O(n) by construction) - default
     /// flipped to `true` on that basis.
     pub solver_bottom_up_propagation: bool,
+    /// Gates `solve_unique_type_matching` (GumTree Simple's "unique type matching" recovery
+    /// sub-phase - see `TODO.md`'s 2026-08-17 literature survey and that module's own doc comment).
+    /// MEASURED (2026-08-17, full 417-fixture corpus, `--nocapture`-instrumented run then reverted):
+    /// **zero firings corpus-wide** - `research/optimal_solutions_benchmark.csv` is byte-for-byte
+    /// identical with this on vs. off (2835/2835 total mismatches, 310/417 zero-mismatch either
+    /// way). Unit-tested and confirmed correct in isolation (`solve_unique_type_matching`'s own
+    /// tests, which pre-match a node directly rather than relying on an earlier pass, so a pass
+    /// couldn't silently do nothing and still pass) - the mechanism works, it just has no customer
+    /// in this corpus: by the time it runs (after hash-descent, syntax-aware matching, and bottom-up
+    /// propagation), `KindOnlyHash` sub-anchoring already resolves the "same shape, different leaf
+    /// values" cases GumTree Simple's own earlier recovery sub-phases target, and codediff's
+    /// existing passes are comprehensive enough that a matched parent's leftover unmatched children
+    /// essentially never land on "exactly one of this kind on each side" - either every child is
+    /// already resolved, or several share a kind and the count-ambiguity guard correctly blocks it.
+    /// Kept default `true`: zero measured risk (it never fires), unit-tested, and may find a
+    /// customer if the pipeline's mechanism ordering changes later - but this is a real negative
+    /// result for the corpus as it exists today, not a proven win, and should be described that way.
+    pub solver_unique_type_matching: bool,
 }
 
 impl Default for HeuristicConfig {
@@ -509,6 +545,7 @@ impl Default for HeuristicConfig {
         Self {
             solver_moved_subtrees: true,
             solver_bottom_up_propagation: true,
+            solver_unique_type_matching: true,
         }
     }
 }
@@ -797,6 +834,12 @@ pub enum ASTMappingReason {
     /// so it never has an invented decision to fight a later, more precise pass over. See
     /// `solve_bottom_up_propagation`.
     BottomUpPropagation,
+    /// Neither node matched directly, but under an already-matched parent pair, exactly one
+    /// still-unmatched child on each side shares the same node kind - an unambiguous-by-
+    /// construction pairing (GumTree Simple's "unique type matching" recovery sub-phase, itself
+    /// inspired by XYDiff - see `TODO.md`'s 2026-08-17 literature survey). See
+    /// `solve_unique_type_matching`.
+    UniqueTypeMatching,
 }
 
 impl ASTMappingReason {
@@ -821,6 +864,7 @@ impl ASTMappingReason {
             ASTMappingReason::LeadingSibling => "LeadSib",
             ASTMappingReason::GreedyAnchorBlock => "GreedyAnchor",
             ASTMappingReason::BottomUpPropagation => "BottomUpProp",
+            ASTMappingReason::UniqueTypeMatching => "UniqueType",
         }
     }
 }
