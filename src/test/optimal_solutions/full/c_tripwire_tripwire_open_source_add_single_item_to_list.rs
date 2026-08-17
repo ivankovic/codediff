@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-tripwire-tripwire-open-source-add-single-item-to-list")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-tripwire-tripwire-open-source-add-single-item-to-list",
+    )
 }

@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("css-heroic-games-launcher-heroicgameslauncher-add-6-lines")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "css-heroic-games-launcher-heroicgameslauncher-add-6-lines",
+    )
 }

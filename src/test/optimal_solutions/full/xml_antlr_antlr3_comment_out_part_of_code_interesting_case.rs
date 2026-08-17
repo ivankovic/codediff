@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("xml-antlr-antlr3-comment-out-part-of-code-interesting-case")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "xml-antlr-antlr3-comment-out-part-of-code-interesting-case",
+    )
 }

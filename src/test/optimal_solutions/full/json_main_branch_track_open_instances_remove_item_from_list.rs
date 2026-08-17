@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("json-main-branch-track_open_instances-remove-item-from-list")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "json-main-branch-track_open_instances-remove-item-from-list",
+    )
 }

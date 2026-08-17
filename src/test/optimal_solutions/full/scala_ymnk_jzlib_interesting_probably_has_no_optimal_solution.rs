@@ -22,5 +22,7 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // It's not clear if the test string should or should not reuse the junit string.
-    test::helper::human_mapping::assert_matches_human_mapping("scala-ymnk-jzlib-interesting-probably-has-no-optimal-solution")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "scala-ymnk-jzlib-interesting-probably-has-no-optimal-solution",
+    )
 }

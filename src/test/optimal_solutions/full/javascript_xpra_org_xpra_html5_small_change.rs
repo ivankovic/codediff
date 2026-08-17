@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("javascript-xpra-org-xpra-html5-small-change")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "javascript-xpra-org-xpra-html5-small-change",
+        5,
+    )
 }

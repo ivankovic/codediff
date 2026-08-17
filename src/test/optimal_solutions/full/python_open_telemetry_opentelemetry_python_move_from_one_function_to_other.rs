@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("python-open-telemetry-opentelemetry-python-move-from-one-function-to-other")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "python-open-telemetry-opentelemetry-python-move-from-one-function-to-other",
+    )
 }

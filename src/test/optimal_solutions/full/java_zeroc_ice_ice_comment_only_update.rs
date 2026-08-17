@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-zeroc-ice-ice-comment-only-update")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "java-zeroc-ice-ice-comment-only-update",
+    )
 }

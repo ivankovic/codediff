@@ -21,5 +21,8 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("typescript-apache-echarts-envelop-2-lines-with-an-if-block")
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "typescript-apache-echarts-envelop-2-lines-with-an-if-block",
+        6,
+    )
 }

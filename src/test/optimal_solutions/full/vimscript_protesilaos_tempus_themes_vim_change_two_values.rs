@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("vimscript-protesilaos-tempus-themes-vim-change-two-values")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "vimscript-protesilaos-tempus-themes-vim-change-two-values",
+    )
 }

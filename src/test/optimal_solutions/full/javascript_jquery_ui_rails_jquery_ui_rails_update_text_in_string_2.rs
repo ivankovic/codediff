@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("javascript-jquery-ui-rails-jquery-ui-rails-update-text-in-string-2")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "javascript-jquery-ui-rails-jquery-ui-rails-update-text-in-string-2",
+    )
 }

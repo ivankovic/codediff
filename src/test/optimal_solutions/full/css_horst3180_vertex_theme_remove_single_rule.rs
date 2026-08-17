@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("css-horst3180-vertex-theme-remove-single-rule")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "css-horst3180-vertex-theme-remove-single-rule",
+    )
 }
