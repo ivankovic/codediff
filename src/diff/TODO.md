@@ -969,6 +969,59 @@ class of fix has caused two real regressions elsewhere in this file already
 (`KIND_ONLY_ANCHOR_MIN_SIZE`'s doc comment). A future session should re-derive this from the code, not
 assume the mechanism is safe to extend, before attempting it.
 
+### Task #8 ("reposition move-detection") investigated, no customer found (2026-08-17)
+
+Checked whether calling `solve_moved_subtrees::solve` a second time, before `apted::for_roots_fallback`
+(not just its current dead-last position), would rescue moves the fallback fragments before move
+detection's strict `subtree_fully_unmapped` guardrail ever sees them. Tested directly on
+`rust-turbopack-module-rule` - `solve_moved_subtrees.rs`'s own named "moved code" example, currently
+misdiagnosed with 49 `fast_fallback` mismatches - via temporary instrumentation inside `solve_moved_
+subtrees` (added, used, fully reverted - `git status` clean afterward). **Result: negative.** The
+candidate `match_arm` subtrees have zero full-hash candidates anywhere in the after-tree - they were
+never fragmented by the fallback, they're genuinely different text (old `Display::fmt`'s match arms
+vs. new `ConfiguredModuleType::parse`'s, same patterns, different bodies). This needs pattern/
+similarity-based alignment, not hash-based move detection, regardless of pipeline position. Broader
+sweep: of 107 nonzero fixtures, only 6 have any `MovedSubtree` mapping at all, and only one of those
+(`xml-odoo-odoo-add-button-roles`) also has `fast_fallback` mismatches in the same fixture - and its
+shape (`StructurallyIdenticalAncestor`-dominated, ambiguous duplicate XML content) doesn't match the
+fragmentation pattern either. **Conclusion**: calling move detection twice is safe by construction
+(same idempotent-append reasoning that already justifies the double `solve_bottom_up_propagation`
+call - it only ever converts `target==0` pairs, never steals from a real mapping) but has no
+demonstrated customer in the current corpus. Not implemented. A future session should look for direct
+evidence (a fixture with `MovedSubtree` mappings *and* `fast_fallback` deletes concentrated in the
+same subtree) before building this on spec.
+
+### `qualified_name` bucket surveyed, two different hard problems found, neither fixed (2026-08-17)
+
+39 fixtures (the corpus's largest bucket by fixture count, ~600 total mismatches, top 4 alone =
+279) have `APTED("qualified_name")` as their dominant mismatch reason - `solve_qualified_name_groups`
+(`solve_syntax_aware_matching.rs`) matches whole functions/methods/etc. by fully-resolved name, then
+runs a real, bounded `apted::for_nodes` call scoped to that one pair; the reason tag marks everything
+decided *inside* that real APTED call, not a coarse dispatch mechanism like `fast_fallback`.
+
+Initial surface read of the top 2 fixtures' mismatch paths looked like the same wrap/reparent shape
+`TRIVIAL_ENTRY_MAX_SIZE` just fixed (a `let_condition`/`elseif_statement` appearing on only one
+side's path). **Directly checking the fixtures' actual source diffs disproved this** for both:
+- `lua-neovim-neovim-if-flips-two-branches` (68 mismatches): the real edit is two `elseif` branches
+  **swapping position** (`if A ... elseif B` → `if B ... elseif A`, each branch's own content
+  unchanged) - a commutative/order-independent sibling matching problem, not a reparent. This is
+  literally item #1 on this file's own "Phase 1: Quick Wins" list below ("Commutative Sibling
+  Matching"), never implemented.
+- `rust-zed-workspace-tasks` (91 mismatches): not a clean unwrap either - `--dump` showed the
+  mismatched `let`/`.` tokens matched to unrelated positions deep inside a large genuinely-new
+  block (a `SaveStrategy` match, relocated spawn logic), not the reparented condition. The real
+  source diff confirms a substantial rewrite where some old content survives deep inside new
+  structure - a search-quality/cost-model gap (the "search failure" bucket already characterized in
+  "Architecture rethink: target goals" above), not a single fixable mechanism.
+
+**Conclusion**: unlike `fast_fallback`, this bucket is not one mechanism with one fix - it's at least
+two different hard problems (commutative sibling reordering: scoped, real, but a nontrivial feature,
+not a quick filter; general search-quality gaps in large rewrites: no clean fix available, needs the
+broader cost-model/search work). Not attempted this session - flagged for scoping, not fixing, if
+picked up again. A future session should not assume the remaining 37 fixtures are evenly split
+between these two shapes without checking a few more source diffs directly (path-string inference
+alone was actively misleading on both examples checked here).
+
 ## Phase 1: Quick Wins (1-2 weeks, production-ready)
 
 ### Commutative Sibling Matching
