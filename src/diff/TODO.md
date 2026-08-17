@@ -1343,14 +1343,45 @@ adjust` (skip the hash probes when nothing is pruned and there are no sibling-or
 Zero measured effect - real contexts on the hot fixtures have non-empty pruned-target maps, so the
 fast path never fired. Removed rather than kept as speculative code.
 
-**Where the remaining APTED time is**: after fix 1, stubbing `ContainmentCtx::adjust` is worth
-~15% on the hot fixtures - it still does 2-4 hash probes per DP cell (two `pruned_targets` maps,
-plus two `node_info` probes for the anchor-rank check). The principled fix is to index those by the
-engine's dense preorder (`vren_adjusted` already has `before_pre`/`after_pre` in hand) instead of by
-node id, turning every probe into an array index. That is the next runtime item, ahead of any
-budget. Beyond it, the honest remaining gap is algorithmic: ~2.7µs per residual-product unit means
-APTED is evaluating far more subproblems than `n1*n2`, so the next question is how many DP cells are
-actually evaluated per call, not how to make each one cheaper.
+**Where the remaining APTED time is - measured, and it is NOT a constant factor.** Three follow-up
+experiments (all instrumented, measured, and fully reverted; nothing below is shipped code):
+
+1. **Subproblem count.** Counting `vren` calls per `resolve_forest` call: the two hottest pairs run
+   **24.8M and 12.5M** cell evaluations for residual products of 629k and 461k - i.e. **12-40x
+   `n1*n2`**, confirming the suspicion recorded above. This is APTED doing its normal
+   super-quadratic path-decomposition work, not a bug.
+2. **`ContainmentCtx::adjust` is a dead end, contradicting the ~15% estimate above.** With the
+   cell counter in place, stubbing `adjust` entirely moved per-cell cost only 64ns -> 59ns
+   (rustdesk) and 145 -> 138 (kotlin) - **~5%, not 15%**. The earlier 15% figure was measured
+   before fix 1 landed and did not survive it. The planned "index containment by dense preorder"
+   rewrite is therefore **not worth doing** - it is real work for at most a 5% return.
+3. **Per-`spf_a` allocation is not the problem either.** `spf_a` allocates two matrices plus three
+   whole-tree-sized vectors on every call, which looked like a classic O(n^3)-allocation pitfall.
+   Counted: 2053 calls and 6.3M allocated elements against 24.8M cells - **0.3-0.8 elements per
+   cell**. Ruled out. Do not re-litigate this by reading the code; the counter already answered it.
+
+**So the last ~2x on p99 cannot come from micro-optimization** - at ~60-150ns per cell with tens of
+millions of cells, the only lever left is handing APTED *less work*, which means changing what gets
+matched and therefore has a quality cost. Two candidate shapes, neither implemented, both needing a
+full corpus A/B before being trusted:
+- **Decompose an over-budget pair into anchor-separated segments** and resolve each independently
+  (the `split_into_anchored_segments` machinery `resolve_residual_forest_via_myers_lcs` already
+  uses). Cost is the sum of several small super-quadratics instead of one large one. **Known
+  catch, and the reason this is not a free win:** that splitter only recurses into real APTED for
+  *equal-count* segments; unequal-count segments fall through to atomic delete/insert. On a large
+  residual - which is exactly when the budget would trip - segments are likely to be
+  unequal-count, so this degrades toward the lossy fallback precisely where it is needed most.
+- **A size-keyed budget**, as originally proposed - but note the diagnosis at the top of this
+  section: residual size predicts APTED cost only loosely (26.9M-product call: 5.5ms;
+  391k-product call: 1154ms), so such a budget fires on the wrong calls. This is the third
+  independent time this project has found a size proxy unreliable (see also 2026-07-25).
+
+Given all of the above, the honest recommendation is to **stop pushing p99 through APTED tuning**
+and revisit whether the p99<400ms target should cover the deliberately-gigantic stress fixtures at
+all (an open question flagged in "Architecture rethink" above and never resolved). 11 fixtures now
+exceed 400ms; several are 75k-258k-node files where a few hundred ms is arguably correct behaviour,
+not a defect. Quality work (the 66 near-miss fixtures) has a far better return per unit of risk
+from here.
 
 ### #1 implemented: `solve_unique_type_matching` - zero firings, a real negative result (2026-08-17)
 
