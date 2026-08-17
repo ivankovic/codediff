@@ -1392,6 +1392,55 @@ one non-leaf child), which excludes a bare literal-with-delimiters regardless of
 unlike a size bump does not penalise legitimately small structured moves - the 11 fixtures that
 regressed at threshold 5 suggest those exist and matter.
 
+### `is_commutative_container` cannot fix reordered siblings - wrong layer (2026-08-18)
+
+`css-wordpress-reformat` (30 mismatches, 15.6% of its nodes - the corpus's second-worst by
+percentage) looked like the perfect customer for the long-standing "commutative sibling matching"
+idea. It isn't, and neither is anything else: **adding container kinds to
+`nodes::is_commutative_container` is measurably incapable of fixing this class of fixture.** Tried,
+measured, reverted; do not retry without first reading the mechanism below.
+
+**What the fixture actually is** (the name misleads - it is not merely a reformat): a minified
+WordPress CSS file pretty-printed, *and* `margin-top`/`margin-bottom` swapped inside all four rules.
+The human maps each declaration across the swap (`declaration:3` <-> `declaration:2`); codediff pairs
+them positionally and must then explain the swap as an `Update` of `property_name` plus updates to
+every node beneath, so four swaps cascade into 30 mismatched nodes.
+
+**Node kinds, verified against the real grammars** (2026-08-18, by dumping parse trees - never
+guessed, given this function's own history of dead strings): CSS `rule_set > block > declaration*`;
+XML `STag`/`EmptyElemTag > Attribute*`; HTML `start_tag`/`self_closing_tag > attribute*`; Java
+`modifiers > public|static|final`. XML and HTML attributes are order-independent *by
+specification*, Java modifier order is free per the JLS, so all four are legitimate entries on the
+merits.
+
+**All four measured at exactly zero corpus effect** - not one fixture changed, individually (CSS
+alone) or together. The reason is structural, and it is the useful part of this entry:
+
+- `is_commutative_container` only influences two things: order-independent *hashing*
+  (`code::hash`), and child pairing inside `pair_children_for_descent` during *hash descent*.
+- These fixtures never reach either. `--dump` shows `css-wordpress-reformat`'s block pair resolved
+  by `APTED("fast_fallback")`. The blocks cannot hash-match even with order-independent hashing,
+  because the minified file's final declaration in each rule has no trailing `;` while the
+  pretty-printed one does - one genuinely different child is enough to change the whole multiset
+  hash. So the pair falls through to tree edit distance.
+- **Ordered tree edit distance structurally cannot express a sibling swap.** It is order-preserving
+  by construction, so the human's crossing mapping is not merely unfound, it is unreachable in that
+  layer. APTED never consults `is_commutative_container` and could not act on it if it did.
+
+**What would actually fix it**, for whoever picks this up: a pre-match that pairs hash-identical
+children of a commutative container *before* the DP sees them, so the crossing is already committed
+and the DP only resolves what is left. The awkward part is anchoring - the block pair here is only
+known *after* the fallback matches it, so a pre-pass has nothing to hang off. The viable shape is
+probably a post-fallback repair restricted to provably cost-reducing swaps (a child currently
+carrying a nonzero-cost `Update` when a zero-cost hash-identical partner exists under the same
+matched container), which strictly lowers total cost and so cannot be a regression under the cost
+model - unlike a general re-pairing, which would be stealing from an existing mapping and is
+something every other pass here is careful never to do.
+
+This likely also covers `xml-odoo-odoo-add-button-roles` (109) - same shape, an inserted
+`role="button"` attribute shifting the rest, where the human maps `Attribute:2` -> `Attribute:3` -
+and the HTML fixtures. Worth doing; worth doing properly.
+
 ### Move detection: the ambiguity guard (2026-08-17, shipped)
 
 Followed the lead above. `--dump` on `python-django` showed all 48 mismatches came from three
