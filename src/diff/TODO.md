@@ -1325,6 +1325,73 @@ the human matched an ancestor that this rule still declines - typically because 
 content is genuinely split across several after-parents, so no single LCA is mutual. Worth another
 look before moving to the ranked quality candidates below.
 
+### Quality, continued: four experiments, all negative, one strong lead (2026-08-17)
+
+Follow-up to the section above, chasing the remaining wrap-family mismatches. Nothing here shipped
+- recorded so the next session doesn't pay for it twice.
+
+**Tried and reverted (no benefit):**
+1. **Parent-correspondence tiebreak in `hash_tree_matching::solve_with_hash_map`.** Among
+   equally-hashed candidates it prefers the one nearest by *byte offset*, which is the wrong signal
+   when an edit shifts every later offset. Added a preceding key: prefer a candidate sitting under
+   the after-parent this node's own parent was matched to (refining, not replacing, proximity).
+   **Corpus effect: exactly zero - not one fixture changed.** Either the parent is rarely settled at
+   that point, or the byte-nearest candidate already is the one under the right parent. Reverted
+   rather than left as inert code in a hot path.
+2. **LCS-anchored child alignment in `pair_children_for_descent`.** For non-commutative parents,
+   children are paired by a naive positional `zip` + kind filter, so inserting one child shifts
+   every later pair - which is *exactly* the shape of `xml-odoo-odoo-add-button-roles` (adding one
+   `role="button"` attribute; the human maps `Attribute:2` -> `Attribute:3`, which a `zip`
+   structurally cannot express). Replaced the zip with `myers_lcs` over `node_to_kind_and_value_
+   hash` to anchor still-identical children, filling the gaps between anchors with the old
+   positional zip. **Result: the target fixture did not move (still 109) and 5 previously-perfect
+   YAML fixtures broke.** Reverted. Two lessons: the mispairing in that fixture is *not* happening
+   in this function (worth finding out where before trying again), and monotone anchoring is not
+   automatically safer than positional zipping - the YAML fixtures depend on the current behaviour.
+
+**Ablation sweep of the two gated matching passes** (the 2026-07-15 study predates most of the
+current pipeline, so it was worth redoing). Both are strongly net-positive - disabling
+`solve_moved_subtrees` costs 2317 mismatches, disabling `solve_bottom_up_propagation` costs 311 -
+so neither should be turned off. But the per-fixture breakdown is where the value is:
+
+**`solve_moved_subtrees` actively harms 7 fixtures**, several severely:
+
+| fixture | now | with move detection off |
+|---|---|---|
+| `cpp-laydbird-change-function-signature` | 60 | **8** |
+| `python-django-...-update-unit-tests-actual-logic-change` | 48 | **0** |
+| `kotlin-nextcloud-android-move-from-one-mocking-library-to-other` | 46 | 22 |
+| `rust-rustdesk-...-io-loop-medium-sized-file` | 95 | 79 |
+| `c-postgres-real-logic-change` | 27 | 14 |
+| `java-genymobile-scrcpy-refactor-for-loop-in-a-function` | 52 | 46 |
+| `c-nginx-add-typedef` | 50 | 44 |
+
+That is ~180 mismatches of self-inflicted damage from a pass that is otherwise worth 2317. **This is
+the strongest quality lead currently on the table**: the pass is right in general and wrong in a
+characterisable minority, so a guard - not a threshold - is what's needed.
+
+3. **`MIN_MOVE_SUBTREE_SIZE` sweep (4 -> 5/6/8/10/12), tried and reverted.** Diagnosis: a Python
+   `string` is exactly 4 nodes (`string` + `string_start`/`string_content`/`string_end`), so at 4
+   the pass pairs identical string literals in unrelated places as "moves" - all 48 of
+   `python-django`'s mismatches. At 5 that fixture is **zero** and `rust-rustdesk` drops 95 -> 79.
+   Against the project's real targets 5 even looks like a win (zero-mismatch fixtures 312 -> 313,
+   fixtures breaching the 0.5% tail cap 33 -> 32, raw total 2785 -> 2803 - and raw total is not a
+   stated goal). **Reverted anyway: it breaks 6 pinned `optimal_solutions` regression tests.**
+   Buying one perfect fixture by loosening six regression guards is a bad trade, and a global size
+   threshold is the wrong instrument regardless - it cannot help the three fixtures above
+   (`cpp-laydbird`, `kotlin-nextcloud`, `c-postgres`) that only improve with the pass fully off,
+   whose damage therefore comes from *large* false moves. Sweep table for the record: 4 -> 312
+   fixtures/2785, 5 -> 313/2803, 6 -> 313/2923, 8 -> 312/3041, 10 -> 311/3128, 12 -> 308/3386.
+   Past 6 it degrades on every metric, so 5 is a narrow optimum, not a plateau.
+
+**Recommended next step**: characterise *why* move detection fires wrongly on `cpp-laydbird`
+(60 -> 8) and `python-django`, then add a targeted guard. The size threshold and the existing
+container-identity agreement rule are both too blunt. Concrete hypothesis worth testing first, from
+the `python-django` diagnosis: require a move candidate to contain real nested structure (at least
+one non-leaf child), which excludes a bare literal-with-delimiters regardless of node count, and
+unlike a size bump does not penalise legitimately small structured moves - the 11 fixtures that
+regressed at threshold 5 suggest those exist and matter.
+
 ### Runtime work done: the APTED budget was the wrong fix; the constant factor was (2026-08-17)
 
 Runtime candidate #1 above proposed budgeting `solve_qualified_name_groups`' scoped APTED calls.
