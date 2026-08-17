@@ -182,6 +182,11 @@ path = "src/bin/generate_mapping_site.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
+name = "analyze_human_mappings"
+path = "src/bin/analyze_human_mappings.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
 name = "commit_stats"
 path = "src/bin/commit_stats.rs"
 required-features = ["stats"]
