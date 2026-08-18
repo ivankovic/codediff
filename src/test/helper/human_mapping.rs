@@ -701,6 +701,14 @@ pub fn human_mapping_cost(
     // Groups contribute too, via one concrete (if arbitrary) representative pairing - see
     // `representative_entries`'s own doc comment for why an arbitrary example is fine here even
     // though it would never be for validation.
+    //
+    // That "arbitrary is fine" became *conditional* when `MatchButNotIdentical` stopped always
+    // costing 0 (2026-08-18): for a group over nodes that own text directly, which representative
+    // gets paired with which now decides how many pairs are charged `COST_UPDATE`, so the total
+    // would depend on a pairing that means nothing. Checked at the time and it does not arise -
+    // of the corpus's 55 `match_but_not_identical` groups, zero resolve to a gap-owning kind. If a
+    // group over XML `AttValue`s (or CSS values, or comments - see `ASTNodeMetadata::owned_text_
+    // hash`) ever appears, revisit this rather than assuming the cost is still well-defined.
     let entries = representative_entries(mapping, before_root, after_root)?;
 
     let mut total = 0u64;

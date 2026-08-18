@@ -1483,20 +1483,25 @@ yaml-draios-sysdig-string-url-change, human_mapping.json
   ... all six, positional, though every one is byte-identical to a flow_node elsewhere
 ```
 
-**The ground truth is positional. The objective was wrong, not the estimator.** And the reason is
-visible in the benchmark's own cost columns rather than in anyone's taste:
+**The ground truth is positional. The objective was wrong, not the estimator.** The benchmark's own
+cost columns then looked like they explained *why*, and that reading was itself a bug - the numbers
+below are kept only because the argument built on them is referred to later:
 
-| fixture | algorithm_cost | human_cost |
-|---|---|---|
-| `yaml-draios-sysdig-string-url-change` | 0 | 0 |
-| `css-wordpress-reformat` | 8 | 4 |
+| fixture | algorithm_cost | human_cost | |
+|---|---|---|---|
+| `yaml-draios-sysdig-string-url-change` | ~~0~~ **6** | ~~0~~ **6** | corrected by the cost fix, same day |
+| `css-wordpress-reformat` | 8 | 4 | unchanged |
 
-In the YAML file the differing URL text lives in *gap text* between the two quote leaves, and
-`UnitCostModel::ren` prices a same-kind pairing at 0 because its children carry the cost - so the
-change is invisible to the cost model and **both mappings cost 0**. Chasing the permutation buys
-literally nothing and only churns the diff, which is exactly why the human left it positional. In
-CSS the crossing genuinely halves the cost, 8 -> 4, and the human traces it (`declaration:3 ->
-declaration:2` alongside `declaration:2 -> declaration:3`).
+The original reasoning ran: the differing URL text lives in *gap text* between the two quote leaves,
+which no cost path charged for, so both mappings cost 0, so chasing the permutation buys nothing -
+which is why the human left it positional. **Two things in that are wrong.** The zero came from
+`cost::operation_cost` pricing `MatchButNotIdentical` at 0, *not* from `UnitCostModel::ren` (fixing
+`ren` alone left these columns untouched - the two are separate paths, DP search vs. reported
+score). And with the zero fixed the fixture reads 6/6, so the permutation - every pair
+byte-identical, `COST_MOVE` 0 - is *cheaper* than the positional ground truth, not equal to it. The
+human chose the dearer mapping. In CSS the crossing genuinely halves the cost, 8 -> 4, and the human
+traces it (`declaration:3 -> declaration:2` alongside `declaration:2 -> declaration:3`) - so the two
+fixtures disagree about whether ground truth minimises cost at all. See the gap-text section below.
 
 ~~**So the discriminator a rebuilt swap pass needs is "does crossing strictly reduce *real* cost".**~~
 **Also retracted, same day, by the cost fix in the gap-text section below** - once gap-owned text is
