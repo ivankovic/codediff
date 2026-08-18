@@ -18,6 +18,9 @@
 pub mod hash;
 pub mod language;
 pub mod metadata;
+pub mod similarity;
+#[cfg(test)]
+mod similarity_corpus_tests;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
 
 use anyhow::{Result, anyhow};
@@ -408,6 +411,17 @@ pub struct ASTMetadata {
     pub node_to_kind_only_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map for `node_to_kind_only_hash`.
     pub kind_only_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
+    /// node.id() -> a bottom-k MinHash sketch of the *leaf* hashes in that node's subtree.
+    ///
+    /// The one map here that does not answer "identical?". All four hashes above are Merkle
+    /// hashes: one changed token makes them differ, and they then say nothing about *how much*
+    /// differs. This answers "how nearly the same?" in O(k) for any two nodes, without touching
+    /// either subtree - see [`crate::code::similarity`] for why that question keeps coming up and
+    /// why the sketch covers leaves rather than all descendants. There is deliberately no reverse
+    /// map: a sketch is for comparing two known nodes, not for looking a node up by content
+    /// (which is what `full_hash_to_node` and friends are for).
+    pub node_to_similarity_sketch:
+        rustc_hash::FxHashMap<usize, crate::code::similarity::SimilaritySketch>,
     /// node.id() -> subtree size
     pub node_to_subtree_size: rustc_hash::FxHashMap<usize, usize>,
     /// node.id() -> `(count, node_id)` of the node with the most *direct* children found

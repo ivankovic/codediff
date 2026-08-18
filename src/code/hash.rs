@@ -17,6 +17,8 @@
  */
 use anyhow::{Context, Result};
 use metrohash::MetroHash64;
+
+use crate::code::similarity::SimilaritySketch;
 use std::hash::Hasher;
 
 use crate::code::{ASTMetadata, Code, Language};
@@ -78,6 +80,7 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     metadata.kind_and_value_hash_to_node.clear();
     metadata.node_to_kind_only_hash.clear();
     metadata.kind_only_hash_to_node.clear();
+    metadata.node_to_similarity_sketch.clear();
 
     let ast = code
         .ast
@@ -183,6 +186,36 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
             node_id,
             kind_only_hash,
         );
+
+        // The similarity sketch rides along on the same post-order guarantee as the four hashes
+        // above: a leaf seeds a one-element sketch from its own full hash, an internal node merges
+        // its children's already-computed sketches. `SimilaritySketch` has no reverse map, so it
+        // isn't `record`ed. Children are merged in document order for determinism's sake, though
+        // `merge` sorts and dedups and so is order-independent by construction anyway.
+        //
+        // The extra element for owned gap text is not an embellishment - without it the sketch is
+        // blind on whole languages. In tree-sitter-yaml a double-quoted scalar's *leaves* are the
+        // two quote characters and the string body sits in the gap between them, so six completely
+        // different URLs in a `flow_sequence` all sketch to the identical one-element set (measured
+        // 2026-08-18; every pairing scored 1.00). Any node owning non-whitespace text contributes
+        // it, exactly like a leaf does, which is what makes "the set of content tokens in this
+        // subtree" a faithful description of it rather than a description of its tokenization.
+        let mut elements = Vec::with_capacity(children.len() + 1);
+        if children.is_empty() {
+            elements.push(SimilaritySketch::leaf(full_hash));
+        } else {
+            for child in &children {
+                if let Some(sketch) = metadata.node_to_similarity_sketch.get(&child.id()) {
+                    elements.push(sketch.clone());
+                }
+            }
+            if let Some(own_text_hash) = compute_owned_text_hash(&node, source, &children) {
+                elements.push(SimilaritySketch::leaf(own_text_hash));
+            }
+        }
+        metadata
+            .node_to_similarity_sketch
+            .insert(node_id, SimilaritySketch::merge(elements));
     }
 
     Ok(())
@@ -224,6 +257,43 @@ fn compute_full_hash(
     hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
 
     hasher.finish()
+}
+
+/// A hash of the text an internal node owns directly - the gaps before, between and after its
+/// children - or `None` when every one of those gaps is empty or pure formatting.
+///
+/// `compute_full_hash` folds the same gaps into a Merkle hash over the whole subtree; this pulls
+/// them out on their own so [`crate::code::similarity`]'s leaf-set sketch can count them as content
+/// tokens. Grammars differ on whether a scalar's body is a child node or gap text (tree-sitter-yaml
+/// chooses the latter for quoted strings), and a similarity measure must not depend on which choice
+/// a grammar made.
+fn compute_owned_text_hash(
+    node: &tree_sitter::Node,
+    source_code: &[u8],
+    children: &[tree_sitter::Node],
+) -> Option<u64> {
+    let mut hasher = MetroHash64::new();
+    hasher.write(node.kind_id().to_le_bytes().as_slice());
+
+    let mut any_content = false;
+    let mut hash_if_content = |hasher: &mut MetroHash64, start: usize, end: usize| {
+        if start < end
+            && let Ok(text) = std::str::from_utf8(&source_code[start..end])
+            && !text.trim().is_empty()
+        {
+            hasher.write(text.as_bytes());
+            any_content = true;
+        }
+    };
+
+    let mut gap_start = node.start_byte();
+    for child in children {
+        hash_if_content(&mut hasher, gap_start, child.start_byte());
+        gap_start = child.end_byte();
+    }
+    hash_if_content(&mut hasher, gap_start, node.end_byte());
+
+    any_content.then(|| hasher.finish())
 }
 
 /// Hashes `source[start..end]` into `hasher`, unless that span is empty or entirely whitespace
