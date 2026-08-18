@@ -305,21 +305,46 @@ rq1:
 paper-variables:
 	uv run ./analysis/paper_variables.py
 
-# Regenerates the benchmark_other charts/table the paper embeds from whatever
-# data/comparison/benchmark_other.csv already has on disk, then rebuilds that paper's PDF. Deliberately
-# depends on benchmark-other-report, not benchmark-other: rebuilding a paper should not pay for a
-# fresh benchmark run (minutes, dominated by GumTree's JVM cold-start per fixture) every time - run
-# `make benchmark-other` yourself first to refresh the underlying data, then this target to
-# re-render from it. Also does not regenerate plots/tips.png, which needs the full repository-fetch
-# pipeline (`make full`). Needs a LaTeX toolchain with the acmart class and cm-super (see
+# Rebuilds the paper PDF from the figures and macros already in plots/.
+#
+# Deliberately does NOT depend on benchmark-other-report: that step regenerates the comparison
+# charts and variance table from whatever data/comparison/benchmark_other.csv currently holds,
+# and that CSV (156 fixtures) has grown past the corpus every AUTHORED number in the paper was
+# measured on (98 fixtures - see paper_variables.py's COMPARISON block and the TODO in main.tex).
+# A routine PDF rebuild must not silently swap 156-fixture charts into a paper whose prose says
+# 98 - exactly that happened live on 2026-08-19, caught only because the regenerated variance
+# table's n column changed. When the evaluation is deliberately refreshed, run
+# `make benchmark-other` (or benchmark-other-report), update the authored blocks in
+# paper_variables.py to match, and re-render - together, never piecemeal.
+#
+# Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
+# (`make full`). Needs a LaTeX toolchain with the acmart class and cm-super (see
 # papers/introductory-paper/README.md). `-g` forces a full latexmk run regardless of its own
 # up-to-date check: without it, latexmk can decide main.pdf is already current from main.tex's own
 # timestamp alone and skip the rebuild even though an \input-ed generated table just changed
 # underneath it (confirmed live, 2026-07-31 - main.pdf was silently one run stale until this flag
 # was added).
-introductory-paper: benchmark-other-report
+#
+# `build-pdf` falls back to a manual pdflatex+bibtex sequence when latexmk is not installed
+# (discovered live, 2026-08-19: latexmk absent on the primary dev machine while pdflatex worked
+# fine, silently breaking both paper targets). Three pdflatex passes is the standard fixed point
+# for cross-references + bibliography; byproducts are removed afterward, matching what
+# `latexmk -c` would leave.
+define build-pdf
+	cd papers/introductory-paper && \
+	if command -v latexmk >/dev/null 2>&1; then \
+		latexmk -pdf -g -interaction=nonstopmode main.tex; \
+	else \
+		pdflatex -interaction=nonstopmode main.tex && bibtex main && \
+		pdflatex -interaction=nonstopmode main.tex && \
+		pdflatex -interaction=nonstopmode main.tex && \
+		rm -f main.aux main.log main.out main.blg main.fls main.fdb_latexmk; \
+	fi
+endef
+
+introductory-paper:
 	$(MAKE) paper-variables
-	cd papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
+	$(build-pdf)
 
 # Regenerates papers/introductory-paper's empirical-study numbers (Table 1, repository/file/language
 # counts, bytes-AST correlation - all \input from figures/variables.tex, a generated LaTeX-macro
@@ -332,4 +357,4 @@ introductory-paper: benchmark-other-report
 # step. Run `make file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
 introductory-paper-empirical: file-stats-report
 	$(MAKE) paper-variables
-	cd papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
+	$(build-pdf)

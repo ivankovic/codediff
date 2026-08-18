@@ -186,12 +186,13 @@ same sentence or the immediately following one.
 
 ## What this means for `introductory-paper/main.tex`
 
-The current draft does not follow several of these conventions, worth knowing before revising it
-further: it uses a spaced hyphen as a dash 12 times (never done in the real corpus), has no
-bulleted contributions list in the introduction, has no RQ/RA structure in the evaluation section,
-and merges Background and Related Work into one early section instead of splitting them. This is a
-factual comparison, not an instruction to rewrite the draft — apply these rules going forward, and
-raise the mismatch with Marko before restructuring anything already-written.
+As of 2026-08-19 the draft follows these conventions: prose dashes are unspaced em-dashes (the
+spaced-hyphen substitutes were converted in one pass; a few remain in `%%` comments, which are not
+prose), the introduction ends with a parallel "It reports/It details" contributions list, the
+evaluation uses explicit RQ/RA numbering (RQ1-RQ3, with \textsc{CodeDiff} itself framed as the
+system contribution rather than an RQ), Background (Section 2) and Related Work (second-to-last
+section) are separate, and the conclusion closes with a prescriptive recommendations list. Keep
+new text consistent with all of the above rather than re-diverging.
 
 ## Evidence
 

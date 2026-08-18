@@ -74,7 +74,7 @@ heuristic pass ships only if an ablation study shows a measurable accuracy gain 
 real-world diffs with human-verified ground truth, so that a technique's published benefit is
 confirmed in \textsc{CodeDiff}'s own pipeline rather than assumed to transfer unchanged. On that
 same ground-truth corpus, \textsc{CodeDiff} maps \NodeAccuracyPct{}\% of AST nodes correctly, and reaches that
-accuracy at a speed and reliability suited to everyday, interactive use - read alongside GumTree,
+accuracy at a speed and reliability suited to everyday, interactive use—read alongside GumTree,
 difftastic, and diffsitter not as a replacement for any of them, but as one way of combining what
 each already does well.
 \end{abstract}
@@ -84,31 +84,61 @@ each already does well.
 \section{Introduction}
 \label{sec:intro}
 
-Code diffing reffers to the process of comparing two pieces of computer code. Code diff is the set of acions required to transform one piece of code into another. Modern version control systems, and especially modern code review tools critically depend on code diffing. During a modern code review, the developers view the diff to see what in the code has changed and what has stayed the same. The quality of the diff has a big impact on the user experience during the code reivew.
+Code diffing, the process of comparing two pieces of source code and computing the set of
+operations that transforms one into the other, underlies modern version control and, especially,
+modern code review. During a review, developers read the diff to see what changed and what stayed
+the same, so the quality of the diff directly shapes the quality of the review.
 
-The current standard diff used by almost all developers and platforms is text, more specifically line, based. The file is treated as a sequence of lines of text and the tools find the smallest edit distance script between the two sequences. The tree common operations are: insert, delete and update. This approach requires very little compute power and is very fast even on previous generation hardware. However, in most implementations it doesn't include a move operation at all, and tools that do support a move operation only support it in limited ways. This impacts the quality of the diff, because moving code is a very frequent code change: re-factoring and extracting code into reusable functions, wrapping code in a codition, renaming variables and many more changes are all ultimately move operations that need to be represented as full deletions and full insertions if a move is not available. This leaves the developers the task of creating the diff ``by eye''. This is error prone; developers are human and can get tired and make mistakes.
+The standard diff used by almost all developers and platforms today is line-based: the file is
+treated as a sequence of text lines, and the tool computes a shortest edit script between the two
+sequences using three operations, insert, delete, and update. This approach is computationally
+cheap and fast even on modest hardware. However, most implementations offer no move operation at
+all, and the tools that do support one support it only in limited ways. A whole class of common
+changes—extracting code into a reusable function, wrapping a block in a condition, reordering
+declarations—is ultimately a relocation of existing code, and without a move operation every such
+change must be rendered as a full deletion plus a full insertion. Reconstructing the
+correspondence between the deleted and inserted halves is then left to the reviewer, by eye,
+which is exactly the kind of mechanical, attention-taxing work humans do least reliably.
 
-One way of automatically computing high quality diffs with move operations is to use the abstract syntax tree (AST) of the code, instead of the raw text. The AST consists of nodes that represent the syntax of the code. A diff of two ASTs maps nodes from one tree to the other. A move is a mapping of nodes whose common ancestor node changed. Tree diffing is a relatively well-studied field. We provide an overview of the most important research literature in section~\ref{sec:background}. However, it lacks significant adoption in practice. We believe this is because tree diffing is markedly slower than text based diffing. The best pure tree diffing algorithms are asymptotically at best $O(nodes^3)$ and hybrid implementations that use heuristics to reduce the tree size are 10 to 100 times slower than Unix \texttt{diff}, or are fast but produce incomplete diffs.
+One way to compute diffs with a genuine move operation is to compare the code's abstract syntax
+tree (AST) instead of its raw text. An AST diff maps nodes of one tree onto nodes of the other; a
+move is a mapping whose nodes match but whose ancestry changed. Tree diffing is a well-studied
+field, and Section~\ref{sec:background} surveys the work this paper builds on. In practice,
+however, tree diffing has seen little adoption, and we argue the central reason is cost: the best
+exact tree-diffing algorithms are $O(n^3)$ in tree size, and Section~\ref{sec:problem-space}
+measures directly how often a whole-tree computation at real-world file sizes exceeds an
+interactive time budget.
 
-This paper presents \textsc{CodeDiff}, a syntax-aware code-diffing tool that combines all current state of the art research with rigorous engineering practices to meet very specific performance and robustness targets. These targets are based on a large analysis of thousands of real open source projects and the shape and size of their files and actual code changes that developers do in practice.
+This paper presents \textsc{CodeDiff}, a syntax-aware code-diffing tool that combines
+established algorithms with rigorous engineering practice to meet explicit performance and
+robustness targets. The targets come from an empirical study of real open-source projects—the
+sizes and shapes of their files and of the changes developers actually make—rather than from
+worst-case analysis alone.
 
 This paper makes the following contributions:
 \begin{itemize}
   \item It reports an empirical study of \NumRepos{} real-world open-source repositories, showing
-  that existing diff tooling's worst-case assumptions are rarely reached in the common case, but
-  that the tail is real and large enough that a production tool must be able to handle cases that push the limits of what current state of the art tree diffing algorithms are able to process.
-  \item It details \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline that combines APTED's exact
-  tree edit distance, GumTree's source-code-specific heuristics, and Myers' sequence diff into one
-  production-engineered tool.
-  \item It reports a head-to-head accuracy, speed, and robustness comparison against GumTree, Unix
-  \texttt{diff}, difftastic, and diffsitter on a human-verified ground-truth corpus,
-  showing that combining established techniques reaches superior accuracy and speed.
+  that the worst-case inputs tree-diffing algorithms are analyzed against are rare in practice,
+  but that the tail is real and large enough that a production tool must handle inputs beyond
+  what a whole-tree tree-edit-distance computation can process within an interactive budget.
+  \item It reports a quantified comparison of four established diffing
+  tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against human-authored
+  ground-truth mappings of \NumFixtures{} real-world code changes.
+  \item It reports a leave-one-out ablation study identifying which shapes of change require a
+  dedicated matching heuristic, and showing that a heuristic's published benefit does not
+  automatically transfer into a different pipeline evaluated against a different corpus.
+  \item It details \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline that combines
+  APTED's exact tree edit distance, GumTree's source-code-specific heuristics, and Myers'
+  sequence diff into one production-engineered tool meeting the targets the empirical study sets.
 \end{itemize}
 
-\section{Existing State of the Art}
+\section{Background}
 \label{sec:background}
 
-We examine two areas of the current state of the art: algorithms and implemented tools.
+This section introduces the algorithms and tools the rest of the paper depends on: the
+algorithms \textsc{CodeDiff} builds its pipeline from, and the tools it is evaluated alongside.
+Section~\ref{sec:related} returns to the closest prior work in more depth once the paper's own
+results are in hand.
 
 \subsection{Algorithms}
 
@@ -150,15 +180,9 @@ exact node-to-node mapping: difftastic reduces the parse tree to an s-expression
 with its own structural algorithm, and diffsitter applies a related tree-sitter-based alignment
 over a smaller, hand-picked set of compiled-in grammars. Neither computes a full tree-edit-distance
 mapping the way APTED or GumTree do, so neither directly targets the ground-truth-accuracy metric
-this paper measures against in Section~\ref{sec:evaluation} - a difference in design goal, not a
+this paper measures against in Section~\ref{sec:evaluation}—a difference in design goal, not a
 shortcoming, and the reason we include both as companions in the same problem space rather than as
 head-to-head competitors on identical terms.
-
-Two further empirical studies inform the size distributions in
-Section~\ref{sec:problem-space}: Dyer et al.~\cite{ast-api-1} and L\"{a}mmel et
-al.~\cite{ast-api-2} mine AST nodes at scale to study API usage in Java, and
-Arafat and Riehle~\cite{commit-size-distribution-paper} measure the commit-size distribution of
-open-source software.
 
 \section{Problem Space}
 \label{sec:problem-space}
@@ -166,13 +190,13 @@ open-source software.
 Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
 complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
 This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
-documentation states that it targets research use, not production deployment at scale - a
+documentation states that it targets research use, not production deployment at scale—a
 reasonable scope for its own goals, but one that leaves open a question every production diff
 tool must answer:
 
 \textbf{RQ1 (Scale).} What percentage of real-world source-code changes can a single, whole-tree
-tree-edit-distance computation - the algorithmic core every exact, syntax-aware diff tool is built
-on - complete within a one-second budget?
+tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff tool is built
+on—complete within a one-second budget?
 
 A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
 for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
@@ -181,8 +205,9 @@ analysis never quantified. Answering RQ1 needs measurement, not further asymptot
 We measure this directly. We built a corpus of \NumRepos{} open-source repositories, drawn from
 the Gentoo Linux distribution's package list and popular repositories on GitHub. We cloned every
 repository in full and parsed every file with Tree-sitter, recording byte size, line count,
-language, and AST node count per file. Full methodology and per-language results appear in our
-companion empirical study. Here, we summarize the numbers that shape \textsc{CodeDiff}'s design.
+language, and AST node count per file. The full methodology, and every per-language number, is
+reproducible from the project's research repository; here, we summarize the numbers that shape
+\textsc{CodeDiff}'s design.
 
 %% TODO: \NumRepos{} etc. currently reflect the 100-repository `small` sample (fast, already
 %% computed), not the target 7,423-repository full corpus (slow - see README.md). Re-run
@@ -228,11 +253,44 @@ $|\text{AST}| \approx \text{bytes} / 5$ for quick estimates. Arafat and Riehle r
 of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
 over 10{,}000 lines still occur.
 
-\textbf{RA1.} Existing tools' worst-case assumptions are rarely reached in the common case - most
-files and most commits are small - but the tail is real and large enough to matter: files up to
-\AstMax{} AST nodes and commits over 10{,}000 lines both occur in this corpus. A production diff
-tool must be engineered for both regimes, not only the common case. Section~\ref{sec:pipeline}
-turns this answer into \textsc{CodeDiff}'s own concrete design targets.
+\textbf{Measurement.} To answer RQ1's percentage directly, we sampled \RqOnePairsAttempted{} real
+(before, after) file pairs from single-parent commits in these repositories, stratified per
+language and per size bucket so that large files are represented rather than drowned out by the
+far more common small ones. We ran a single whole-tree tree-edit-distance computation on every
+pair—\textsc{CodeDiff}'s own APTED implementation, applied to the full before and after trees
+with none of \textsc{CodeDiff}'s pipeline heuristics—under a hard one-second budget enforced by
+terminating the computation's process. This implementation includes an optimization that makes it
+faster than a textbook APTED, so the failure rates below are a lower bound on how often a
+whole-tree computation misses the budget, not an upper bound.
+
+Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket,
+split by what kind of artifact the file is: code (\RqOneCodePairs{} pairs across general-purpose
+programming languages), and configuration, data, and markup formats (\RqOneConfigDataPairs{}
+pairs). The split matters because the two populations behave differently—blended, the headline
+number would move with how many configuration files a sample happens to contain, independently of
+anything the algorithm does to source code.
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/apted_only_rq1_by_category.png}
+  \caption{Fraction of sampled file pairs a whole-tree tree-edit-distance computation completes
+  within a one-second budget, per size bucket and artifact category.}
+  \label{fig:rq1}
+\end{figure*}
+
+\textbf{RA1.} For source code, a whole-tree computation is dependable only for small files: it
+completes within one second for \RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but
+for only \RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines—well inside the
+range of ordinary source files (Table~\ref{tab:file-size-percentiles})—and never recovers above
+one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in
+time; this sample-weighted aggregate deliberately over-represents large files and therefore
+understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
+the answer regardless of weighting. The common case is genuinely cheap—most files and most
+commits are small—but the tail is real: files up to \AstMax{} AST nodes occur in this corpus, and
+Arafat and Riehle's data shows commits of over 10{,}000 lines occur in practice. A production
+diff tool must be engineered for both regimes, and cannot rely on a whole-tree computation alone
+for either. Section~\ref{sec:pipeline} turns this answer into \textsc{CodeDiff}'s concrete
+design targets.
 
 \section{CodeDiff}
 \label{sec:pipeline}
@@ -270,7 +328,7 @@ though nothing matched their own labels directly. \textsc{CodeDiff} runs this pa
 before phase 4 and once after, since phase 4 produces more matched descendants for the second pass
 to vote on. Section~\ref{sec:evaluation} reports that, once combined with the rest of this specific
 pipeline, this heuristic does not carry over the accuracy gain GumTree's own evaluation found for
-it, so \textsc{CodeDiff} ships it disabled by default - a property of this pipeline's measured
+it, so \textsc{CodeDiff} ships it disabled by default—a property of this pipeline's measured
 results, not of the heuristic's origin.
 
 \textbf{Phase 4, syntax-aware subtree matching.} This phase generalizes three matching strategies
@@ -279,7 +337,7 @@ scopes), a greedy cost-estimate matcher for containers with no name or arm struc
 \texttt{if} block or a loop body, and a Jaccard-similarity matcher for flow-control constructs
 whose case arms mostly agree. Before any of these run, large flat subtrees, such as a macro's
 token list or a big flat argument list, are pre-matched directly with Myers'
-algorithm~\cite{myers-1986}, since a flat sequence has no tree structure worth exploiting - exactly
+algorithm~\cite{myers-1986}, since a flat sequence has no tree structure worth exploiting—exactly
 the structures that drive Section~\ref{sec:problem-space}'s measured AST-size tail. Each accepted
 pair is then handed to APTED (below) to compute its exact internal edit script.
 
@@ -309,9 +367,15 @@ against a second, independently-implemented ground truth, not only against itsel
 \section{Evaluation}
 \label{sec:evaluation}
 
+%% TODO: when the evaluation numbers are refreshed to the current corpus (see the TODO at the
+%% top of this section's macros), also add a change-shape distribution table from
+%% data/quality/human_mapping_analysis.csv (analysis/human_mapping_shapes_report.py) - RQ3's
+%% "which shapes occur" half currently rests on the ablation alone, and the shape census must be
+%% measured on the SAME corpus version as the rest of this section, which is why it is not added
+%% now (the analysis file on disk covers 417 fixtures against this section's 98).
 \textbf{Dataset.} \textsc{CodeDiff}'s accuracy claims rest on a corpus of \NumFixtures{} fixtures. Each fixture
-pairs a before and after version of a source file, representing a realistic code change - a bug
-fix, a refactor, an added feature, or a performance-motivated rewrite - across many languages. Some
+pairs a before and after version of a source file, representing a realistic code change—a bug
+fix, a refactor, an added feature, or a performance-motivated rewrite—across many languages. Some
 fixtures are captured directly from a specific commit in a real open-source repository. Others are
 curated examples of a common, realistic change pattern. For every fixture, a human annotator used a
 purpose-built tool, \texttt{human\_solver}, to walk the before and after syntax trees side by side
@@ -321,63 +385,19 @@ kind and sibling position, not by parser-internal node identity, since that iden
 across separate parses of the same file. This human-authored mapping is the ground truth every
 number in this section is measured against.
 
-This section answers three further research questions, building on RQ1's finding that a real,
-non-negligible tail of large files and commits exists alongside a small common case.
+This section answers two further research questions, building on RQ1's finding that a real,
+non-negligible tail of large files and commits exists alongside a small common case, and then
+evaluates \textsc{CodeDiff} itself—the paper's system contribution—against the design targets
+stated in Section~\ref{sec:pipeline}.
 
-\textbf{RQ2 (Shape).} When applied to real-world code changes, does existing diff tooling recover
-the actual shape of the change - a rename, a move, a restructure - rather than defaulting to
-delete-plus-insert?
+\textbf{RQ2 (Tool accuracy).} How accurately do current state-of-the-art code-diffing tools
+recover real-world code changes, measured against human-authored ground-truth mappings of those
+changes?
 
-\textbf{RQ3 (Heuristic transfer).} Do diffing heuristics shown effective in one pipeline and
-corpus retain that effectiveness when reused in a different pipeline and evaluated against a
-different corpus?
-
-\textbf{RQ4 (Production viability).} Can a production-grade syntax-aware diffing tool be built by
-combining established techniques, rather than new matching algorithms, and still reach accuracy,
-speed, and robustness competitive with specialized tools?
-
-\textbf{Ablation study.} \textsc{CodeDiff} has four optional heuristic passes, each behind its own
-flag: import-node normalization, flow-control arm matching, bottom-up expansion (phases 3 and 5),
-and move-detection recovery (phase 7). A 2026 leave-one-out ablation study measured each pass's
-real contribution on the \NumFixtures{}-fixture corpus above, by disabling one pass at a time and comparing the
-resulting mismatch count against a baseline with all four enabled.
-
-Table~\ref{tab:ablation} reports the result. Import-node normalization and flow-control arm
-matching, two of \textsc{CodeDiff}'s own heuristics, both turned out net-negative for accuracy on
-this corpus once combined with the rest of the pipeline. Bottom-up expansion, adapted from
-GumTree, shows the same pattern here - not because the technique is unsound (GumTree's own
-evaluation, on GumTree's own pipeline and corpus, found it valuable), but because a heuristic's
-net effect depends on what the rest of the pipeline already resolves before that heuristic gets
-its turn, and \textsc{CodeDiff}'s earlier phases leave GumTree's bottom-up phase less new ground
-to help with. Move-detection recovery, GumTree's other contribution to this pipeline, is the one
-of the four that does carry over: it measurably helps here too, and ships enabled by default. The
-other three ship disabled.
-
-\begin{table}
-  \caption{Ablation study: accuracy change from disabling each optional pass, against a baseline
-  with all four enabled. A negative number means disabling the pass improved accuracy, fewer
-  mismatches. A positive number means disabling it hurt accuracy. The two passes GumTree
-  contributes are marked (G).}
-  \label{tab:ablation}
-  \begin{tabular}{lrl}
-    \toprule
-    Pass & $\Delta$ if disabled & Ships \\
-    \midrule
-    Import-node normalization & $\AblationImportNodes{}$ & disabled \\
-    Flow-control arm matching & $\AblationFlowControl{}$ & disabled \\
-    Bottom-up expansion (G)   & $\AblationBottomUp{}$ & disabled \\
-    Move-detection recovery (G) & $\AblationMovedSubtrees{}$ & enabled \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\textbf{RA3.} No, not uniformly: of the two heuristics adapted from GumTree, only move-detection
-recovery transfers its measured benefit into this pipeline; bottom-up expansion, GumTree's other
-contribution, is net-negative here despite being validated as helpful in GumTree's own evaluation,
-on GumTree's own pipeline and corpus. A technique documented as helpful in its original paper is
-not guaranteed to help inside a different pipeline evaluated against a different corpus.
-\textsc{CodeDiff} measures this directly for every optional pass, rather than assuming a result
-from the literature transfers unchanged.
+\textbf{RQ3 (Shapes and heuristics).} Which shapes of real-world
+change—renames, moves, restructurings—require a dedicated matching heuristic, and do heuristics
+shown effective in one pipeline and corpus retain that value when reused in a different pipeline
+and evaluated against a different corpus?
 
 \textbf{Comparison tools.} We place \textsc{CodeDiff} alongside four established tools, on the same
 \NumFixtures{}-fixture corpus: GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014}, Unix \texttt{diff}, and the two
@@ -402,14 +422,18 @@ node-level accuracy.
 compare all five on a common ground: which source lines each tool marks as touched, against the
 same human mapping (Table~\ref{tab:accuracy-vs-others}, Figure~\ref{fig:accuracy}). Coverage
 varies: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the \NumFixtures{} fixtures' languages, GumTree's
-generator set matches \GumTreeFixtures{}, and the rest match all \NumFixtures{} - each tool's own row is scored only on its own
+generator set matches \GumTreeFixtures{}, and the rest match all \NumFixtures{}—each tool's own row is scored only on its own
 applicable subset, not padded with unscored fixtures.
 
-\textbf{RA2.} Not entirely: among the four pre-existing tools alone (Table~\ref{tab:accuracy-vs-others},
-excluding \textsc{CodeDiff}'s own row), mismatch rates range from \UnixDiffLineRate{}\% (Unix \texttt{diff}) to
-\DiffsitterLineRate{}\% (diffsitter) of lines against the human mapping, and no AST-aware tool among them beats
-plain line-based \texttt{diff} on this measure. Syntax-awareness alone does not guarantee a tool
-recovers the shape of a change more faithfully than a line-based one does.
+\textbf{RA2.} Among the four pre-existing tools (Table~\ref{tab:accuracy-vs-others}, excluding
+\textsc{CodeDiff}'s own row), line-level mismatch rates against the human mapping range from
+\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \DiffsitterLineRate{}\% (diffsitter). Two results
+stand out. First, every tool already agrees with the human mapping on the overwhelming majority
+of lines: even the highest mismatch rate leaves more than 98\% of lines in agreement, so the
+question that separates tools is how they handle the small, structurally interesting remainder.
+Second, no AST-aware tool among the four beats plain line-based \texttt{diff} on this measure.
+Syntax-awareness alone does not guarantee that a tool recovers a change the way a human reads
+it—the gap is in which heuristics act on the syntax tree, which RQ3 turns to next.
 
 \begin{table}
   \caption{Line-level mismatches against human ground truth, each tool scored on its own
@@ -436,6 +460,59 @@ recovers the shape of a change more faithfully than a line-based one does.
   \label{fig:accuracy}
 \end{figure*}
 
+\textbf{Ablation study.} RQ3 asks which shapes of change earn a dedicated heuristic.
+\textsc{CodeDiff} has four optional heuristic passes, each targeting a specific shape and each
+behind its own flag: import-node normalization (renamed or reordered import paths), flow-control
+arm matching (restructured \texttt{if}/\texttt{switch} arms), bottom-up expansion (containers
+whose children already match, phases 3 and 5), and move-detection recovery (whole subtrees
+relocated across a matched boundary, phase 7). A leave-one-out ablation study measured each
+pass's real contribution on the \NumFixtures{}-fixture corpus above, by disabling one pass at a
+time and comparing the resulting mismatch count against a baseline with all four enabled.
+
+Table~\ref{tab:ablation} reports the result. Import-node normalization and flow-control arm
+matching, two of \textsc{CodeDiff}'s own heuristics, both turned out net-negative for accuracy on
+this corpus once combined with the rest of the pipeline. Bottom-up expansion, adapted from
+GumTree, shows the same pattern here—not because the technique is unsound (GumTree's own
+evaluation, on GumTree's own pipeline and corpus, found it valuable), but because a heuristic's
+net effect depends on what the rest of the pipeline already resolves before that heuristic gets
+its turn, and \textsc{CodeDiff}'s earlier phases leave GumTree's bottom-up phase less new ground
+to help with. Move-detection recovery, GumTree's other contribution to this pipeline, is the one
+of the four that does carry over: it measurably helps here too, and ships enabled by default. The
+other three ship disabled.
+
+\begin{table}
+  \caption{Ablation study: accuracy change from disabling each optional pass, against a baseline
+  with all four enabled. A negative number means disabling the pass improved accuracy, fewer
+  mismatches. A positive number means disabling it hurt accuracy. The two passes GumTree
+  contributes are marked (G).}
+  \label{tab:ablation}
+  \begin{tabular}{lrl}
+    \toprule
+    Pass & $\Delta$ if disabled & Ships \\
+    \midrule
+    Import-node normalization & $\AblationImportNodes{}$ & disabled \\
+    Flow-control arm matching & $\AblationFlowControl{}$ & disabled \\
+    Bottom-up expansion (G)   & $\AblationBottomUp{}$ & disabled \\
+    Move-detection recovery (G) & $\AblationMovedSubtrees{}$ & enabled \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{RA3.} On this corpus, the move is the one shape whose dedicated heuristic pays for
+itself: move-detection recovery is the only optional pass whose removal hurts accuracy, which
+matches the structural argument of Section~\ref{sec:pipeline}—a relocated subtree is the one
+shape ordered tree edit distance cannot express except as a delete plus an insert, so no
+downstream computation can recover it without a dedicated pass. The heuristics targeting the
+other shapes are net-negative here, including bottom-up expansion, which GumTree's own
+evaluation, on GumTree's own pipeline and corpus, validated as helpful. A technique documented as
+effective in its original paper is therefore not guaranteed to help inside a different pipeline
+evaluated against a different corpus. \textsc{CodeDiff} measures this directly for every optional
+pass, rather than assuming a result from the literature transfers unchanged.
+
+\textbf{Production viability.} The remaining measurements evaluate \textsc{CodeDiff}
+itself—speed, then robustness—against the Fast and Robust targets stated in
+Section~\ref{sec:pipeline}.
+
 \textbf{Speed.} Table~\ref{tab:speed-vs-others} and Figure~\ref{fig:runtime} report wall-clock
 percentiles over the same fixtures, sorted fastest to slowest by median. We report GumTree twice:
 once invoked as a fresh process per fixture, the realistic cost of a single CLI invocation, and
@@ -446,6 +523,18 @@ measured, a direct result of its narrower, hand-picked grammar set. difftastic s
 percentile, difftastic is the slowest AST-aware tool here after GumTree invoked as a fresh process.
 Unix \texttt{diff} remains fastest overall at every percentile, since it never parses or compares
 tree structure.
+
+These percentiles must be read against the right population. The Fast target of
+Section~\ref{sec:pipeline}—\SpeedTargetMs{}\,ms for \SpeedTargetPct{}\% of real-world
+commits—is a claim about the real distribution of commits, in which 47.5\% touch 10 lines or
+fewer~\cite{commit-size-distribution-paper}. The fixture corpus is not that distribution: it
+deliberately concentrates hard, structurally interesting changes, because easy changes exercise
+nothing worth measuring. \textsc{CodeDiff}'s 99th percentile on this corpus
+(\SpeedCodeDiffPNinetyNine{}\,ms) is therefore a stress figure on an adversarially weighted
+sample, not the target metric; its median (\SpeedCodeDiffPFifty{}\,ms) and 90th percentile
+(\SpeedCodeDiffPNinety{}\,ms) on the same hard sample sit well inside the budget. Validating the
+\SpeedTargetPct{}\% claim on a uniformly drawn commit sample remains future work, and we state it
+here as a design target rather than a measured result.
 
 \begin{table}
   \caption{Wall-clock time percentiles, milliseconds, sorted fastest to slowest by median.}
@@ -487,14 +576,38 @@ because the repository's history had since been rewritten, not a \textsc{CodeDif
 \RobustnessSkipped{} exceeded the node cap and were skipped before \textsc{CodeDiff} ever ran. \textsc{CodeDiff}
 completed all \RobustnessCompleted{} remaining pairs with zero panics and zero timeouts. This is a sampled,
 bounded-scale result, not a claim over the full \NumRepos{}-repository corpus, but it is
-consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:problem-space}.
+consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:pipeline}.
 
-\textbf{RA4.} Yes: combining established techniques rather than inventing new ones,
+\textbf{Summary.} Combining established techniques rather than inventing new ones,
 \textsc{CodeDiff} reaches \NodeAccuracyPct{}\% AST-node accuracy against human-verified ground truth, the lowest
 line-level mismatch rate of the five tools compared, wall-clock latency faster than GumTree and
 difftastic at the median, and zero panics or timeouts across the sampled robustness evaluation.
 Building a production-grade syntax-aware diffing tool did not require a new matching algorithm,
 only careful combination and measurement of existing ones.
+
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Tree-diffing tools.} GumTree~\cite{gumtreediff-2014} remains the reference point for
+source-code tree diffing, and two of \textsc{CodeDiff}'s pipeline phases adapt its heuristics
+directly (Section~\ref{sec:pipeline}). The difference is one of goal: GumTree targets research
+use, with broad language and backend flexibility, while \textsc{CodeDiff} narrows to a
+tree-sitter-only frontend and spends the saved generality on production targets—and, as the
+ablation in Section~\ref{sec:evaluation} shows, on validating each adopted heuristic inside its
+own pipeline rather than assuming the published benefit transfers. difftastic~\cite{difftastic}
+and diffsitter~\cite{diffsitter} share \textsc{CodeDiff}'s parsing layer but optimize for a diff
+a human reads comfortably rather than for fidelity of the underlying node mapping; RA2 reflects
+that difference in design goal, not a defect in either tool. Unix \texttt{diff}, built on Myers'
+algorithm~\cite{myers-1986}, remains the baseline every one of these tools must justify itself
+against—on our corpus it is both the fastest tool measured and, at the line level, more accurate
+than every pre-existing AST-aware tool compared.
+
+\textbf{Empirical studies.} Dyer et al.~\cite{ast-api-1} and L\"{a}mmel et al.~\cite{ast-api-2}
+mine AST nodes at scale to study API usage; Arafat and
+Riehle~\cite{commit-size-distribution-paper} measure the commit-size distribution of open-source
+software, the distribution \textsc{CodeDiff}'s Fast target is stated against. This paper's
+empirical study differs from these in purpose rather than method: it measures file- and AST-size
+distributions specifically to set, and then evaluate, the engineering targets of a diffing tool.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
@@ -512,9 +625,25 @@ point: a heuristic's value is a property of the pipeline and corpus it runs in, 
 paper that introduced it. A production tool must measure that value directly, rather than assume
 it carries over.
 
+Based on the lessons reported in this paper, we recommend the following to builders of
+syntax-aware developer tooling:
+\begin{itemize}
+  \item Measure every adopted heuristic inside your own pipeline, against your own corpus: of the
+  two GumTree heuristics adopted here, one helped and one hurt, and only direct measurement told
+  them apart.
+  \item Engineer against the measured distribution of real inputs, not against the worst-case
+  bound alone: the common case and the tail require different machinery, and both occur in
+  practice.
+  \item Keep an exact algorithm as an independent test oracle even when the shipped path is
+  heuristic: \textsc{CodeDiff} fuzz-checks its APTED implementation against an independently
+  implemented Zhang-Shasha on thousands of random trees.
+\end{itemize}
+
 Future work includes widening the ground-truth and robustness corpora beyond Rust and the current
-\NumFixtures{} fixtures, extending the accuracy comparison to more languages GumTree also supports, and
-re-running the ablation study as new heuristic passes are added to the pipeline.
+\NumFixtures{} fixtures, extending the accuracy comparison to more languages GumTree also supports,
+re-running the ablation study as new heuristic passes are added to the pipeline, and quantifying
+the distribution of change shapes in the ground-truth corpus itself, so that RQ3's shape findings
+rest on measured frequencies rather than on the ablation alone.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

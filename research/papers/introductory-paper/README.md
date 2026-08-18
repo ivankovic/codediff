@@ -110,9 +110,12 @@ table, not a chart, `\input` directly rather than copied as a PNG).
 `figures/files_per_project.png` was dropped from an earlier draft after turning out to be a stale,
 empty scratch artifact.
 
-**`main.pdf` as committed is stale** relative to `main.tex`: it still carries a `\subtitle`
-("Building a Diffing Pipeline from APTED, GumTree, and Myers Diff...") that `main.tex` no longer
-defines. Rebuild it before trusting the committed artifact.
+**The RQ1 measurement block is generated, not authored** (`plots/variables_rq1.tex`, written by
+`analysis/apted_only_report.py` via `make rq1-report`), so a full `make rq1` re-measurement flows
+into the paper with no hand-editing. The numbers currently on disk were measured against the
+pre-2026-08-18 sampled corpus (see `data/rq1/PROVENANCE.md`); the prose cites only the code and
+config/data categories, deliberately - the scripting category does not exist in that measurement
+and its macros are not emitted until the re-measurement lands.
 
 ## Building
 
