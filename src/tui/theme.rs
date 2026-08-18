@@ -75,24 +75,24 @@ impl OverlayTheme {
             OverlayTheme::Dark => OverlayPalette {
                 insert_bg: Color::Rgb(20, 60, 20),
                 delete_bg: Color::Rgb(70, 20, 20),
-                move_bg: Color::Rgb(70, 60, 10),
-                update_bg: Color::Rgb(60, 20, 60),
+                move_bg: Color::Rgb(60, 20, 60),
+                update_bg: Color::Rgb(70, 60, 10),
                 overlay_fg: Color::Rgb(225, 225, 225),
                 cross_highlight_bg: Color::Rgb(40, 90, 200),
             },
             OverlayTheme::SolarizedDark => OverlayPalette {
                 insert_bg: Color::Rgb(53, 87, 32),
                 delete_bg: Color::Rgb(88, 46, 51),
-                move_bg: Color::Rgb(72, 81, 32),
-                update_bg: Color::Rgb(84, 47, 84),
+                move_bg: Color::Rgb(84, 47, 84),
+                update_bg: Color::Rgb(72, 81, 32),
                 overlay_fg: Color::Rgb(238, 232, 213),
                 cross_highlight_bg: Color::Rgb(23, 101, 148),
             },
             OverlayTheme::SolarizedLight => OverlayPalette {
                 insert_bg: Color::Rgb(205, 209, 136),
                 delete_bg: Color::Rgb(240, 168, 155),
-                move_bg: Color::Rgb(224, 202, 136),
-                update_bg: Color::Rgb(236, 169, 188),
+                move_bg: Color::Rgb(236, 169, 188),
+                update_bg: Color::Rgb(224, 202, 136),
                 overlay_fg: Color::Rgb(7, 54, 66),
                 cross_highlight_bg: Color::Rgb(124, 182, 217),
             },
@@ -110,8 +110,8 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((80, 250, 123), bg, 0.6), // green
                     delete_bg: blend_toward_base((255, 85, 85), bg, 0.6),  // red
-                    move_bg: blend_toward_base((241, 250, 140), bg, 0.6),  // yellow
-                    update_bg: blend_toward_base((189, 147, 249), bg, 0.6), // purple
+                    move_bg: blend_toward_base((189, 147, 249), bg, 0.6),  // purple
+                    update_bg: blend_toward_base((241, 250, 140), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((139, 233, 253), bg, 0.4), // cyan
                 }
@@ -123,8 +123,8 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((163, 190, 140), bg, 0.6), // nord14, green
                     delete_bg: blend_toward_base((191, 97, 106), bg, 0.6),  // nord11, red
-                    move_bg: blend_toward_base((235, 203, 139), bg, 0.6),   // nord13, yellow
-                    update_bg: blend_toward_base((180, 142, 173), bg, 0.6), // nord15, purple
+                    move_bg: blend_toward_base((180, 142, 173), bg, 0.6),   // nord15, purple
+                    update_bg: blend_toward_base((235, 203, 139), bg, 0.6), // nord13, yellow
                     overlay_fg: Color::Rgb(236, 239, 244),                  // nord6
                     cross_highlight_bg: blend_toward_base((129, 161, 193), bg, 0.4), // nord9
                 }
@@ -135,8 +135,8 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((184, 187, 38), bg, 0.6), // bright green
                     delete_bg: blend_toward_base((251, 73, 52), bg, 0.6),  // bright red
-                    move_bg: blend_toward_base((250, 189, 47), bg, 0.6),   // bright yellow
-                    update_bg: blend_toward_base((211, 134, 155), bg, 0.6), // bright purple
+                    move_bg: blend_toward_base((211, 134, 155), bg, 0.6),  // bright purple
+                    update_bg: blend_toward_base((250, 189, 47), bg, 0.6), // bright yellow
                     overlay_fg: Color::Rgb(235, 219, 178),                 // fg1
                     cross_highlight_bg: blend_toward_base((131, 165, 152), bg, 0.4), // bright blue
                 }
@@ -147,8 +147,8 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((166, 226, 46), bg, 0.6), // green
                     delete_bg: blend_toward_base((249, 38, 114), bg, 0.6), // pink/red
-                    move_bg: blend_toward_base((230, 219, 116), bg, 0.6),  // yellow
-                    update_bg: blend_toward_base((174, 129, 255), bg, 0.6), // purple
+                    move_bg: blend_toward_base((174, 129, 255), bg, 0.6),  // purple
+                    update_bg: blend_toward_base((230, 219, 116), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((102, 217, 239), bg, 0.4), // cyan
                 }
@@ -160,8 +160,8 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((152, 195, 121), bg, 0.6), // green
                     delete_bg: blend_toward_base((224, 108, 117), bg, 0.6), // red
-                    move_bg: blend_toward_base((229, 192, 123), bg, 0.6),   // yellow
-                    update_bg: blend_toward_base((198, 120, 221), bg, 0.6), // purple
+                    move_bg: blend_toward_base((198, 120, 221), bg, 0.6),   // purple
+                    update_bg: blend_toward_base((229, 192, 123), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(171, 178, 191),                  // foreground
                     cross_highlight_bg: blend_toward_base((97, 175, 239), bg, 0.4), // blue
                 }

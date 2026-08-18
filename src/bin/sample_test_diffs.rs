@@ -590,9 +590,9 @@ mod tests {
             .map(|r| r.size_bucket.as_deref().unwrap())
             .collect();
         assert!(
-            buckets.iter().all(|b| LOC_BUCKETS
+            buckets
                 .iter()
-                .any(|(_, label)| label == b)),
+                .all(|b| LOC_BUCKETS.iter().any(|(_, label)| label == b)),
             "unexpected bucket label(s): {:?}",
             buckets
         );

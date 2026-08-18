@@ -177,28 +177,6 @@ fn count_and_index(positions: &[(usize, usize)], cursor: (usize, usize)) -> Opti
     Some((index, positions.len()))
 }
 
-/// Returns the `[start_column, end_column)` portion of `range` that falls on `row`, given the
-/// number of characters on that row, or `None` if `range` doesn't cover any part of `row`.
-fn columns_on_row(range: &TextRange, row: usize, row_len: usize) -> Option<(usize, usize)> {
-    if row < range.start_row || row > range.end_row {
-        return None;
-    }
-    let start_col = if row == range.start_row {
-        range.start_column
-    } else {
-        0
-    };
-    let end_col = if row == range.end_row {
-        range.end_column
-    } else {
-        row_len
-    };
-    if start_col >= end_col {
-        return None;
-    }
-    Some((start_col, end_col))
-}
-
 /// Paint `style` onto the `[start_col, end_col)` character range of `line`, preserving the
 /// existing styling (e.g. syntax-highlight foreground colors) outside of and underneath it.
 fn paint_columns(
@@ -709,8 +687,7 @@ impl CodeViewerWidget {
         );
 
         for (index, range_match) in state.ranges.iter().enumerate() {
-            let Some((start_col, end_col)) = columns_on_row(&range_match.source, row, row_len)
-            else {
+            let Some((start_col, end_col)) = range_match.source.columns_on_row(row, row_len) else {
                 continue;
             };
 
@@ -752,7 +729,7 @@ impl CodeViewerWidget {
         // both mean "this is the thing you're pointing at." Usually empty (no active search), so
         // this loop is a no-op on every other frame.
         for search_match in &state.search_matches {
-            if let Some((start_col, end_col)) = columns_on_row(search_match, row, row_len) {
+            if let Some((start_col, end_col)) = search_match.columns_on_row(row, row_len) {
                 line = paint_columns(
                     &line,
                     start_col,
@@ -773,7 +750,7 @@ impl CodeViewerWidget {
         // does.
         if !state.is_focused
             && let Some(destination) = &state.highlight_destination
-            && let Some((start_col, end_col)) = columns_on_row(destination, row, row_len)
+            && let Some((start_col, end_col)) = destination.columns_on_row(row, row_len)
         {
             line = paint_columns(
                 &line,

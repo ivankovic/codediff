@@ -178,6 +178,31 @@ impl TextRange {
     pub fn can_extend_with_whitespace(&self, other: &TextRange, code: &str) -> bool {
         is_whitespace_between(self, other, code)
     }
+
+    /// Returns the `[start_column, end_column)` portion of this range that falls on `row`, given
+    /// the number of characters on that row, or `None` if this range doesn't cover any part of
+    /// `row`. Shared by `tui::widgets::code_viewer` (column-precise overlay painting) and
+    /// `tui::headless` (column-precise inline ANSI highlighting) - both walk the same per-row
+    /// span math, just onto different rendering targets (a ratatui `Line` vs. a plain string).
+    pub fn columns_on_row(&self, row: usize, row_len: usize) -> Option<(usize, usize)> {
+        if row < self.start_row || row > self.end_row {
+            return None;
+        }
+        let start_col = if row == self.start_row {
+            self.start_column
+        } else {
+            0
+        };
+        let end_col = if row == self.end_row {
+            self.end_column
+        } else {
+            row_len
+        };
+        if start_col >= end_col {
+            return None;
+        }
+        Some((start_col, end_col))
+    }
 }
 
 /// Helper function to check if all characters between the end of range `a` and start of range `b` are whitespace.

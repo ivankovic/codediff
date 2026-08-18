@@ -267,7 +267,10 @@ mod tests {
             .filter(|((language, _), _)| language == "Rust")
             .flat_map(|(_, reservoir)| &reservoir.items)
             .collect();
-        assert!(!rust_items.is_empty(), "expected at least one sampled Rust pair");
+        assert!(
+            !rust_items.is_empty(),
+            "expected at least one sampled Rust pair"
+        );
         assert!(rust_items.iter().any(|c| c.path.ends_with("main.rs")));
         for item in &rust_items {
             assert_eq!(item.repository, "handmade");

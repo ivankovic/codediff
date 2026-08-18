@@ -30,39 +30,229 @@ use crate::code::Code;
 use crate::code::language::language_for_path;
 use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
-use crate::diff::text::{
-    RangeMatch, TextOperation, line_operations, summarize_diff_with_comment_check,
-};
+use crate::diff::text::{RangeMatch, TextOperation, summarize_diff_with_comment_check};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
 
-/// ANSI SGR color for each `TextOperation`, matching the TUI's own convention (see "Diff overlay
-/// and cursor model" in `SPECS.md`): insert green, delete red, move yellow, update magenta.
+/// ANSI SGR color for each `TextOperation`, matching the TUI's own canonical palette
+/// (`tui::theme::OverlayTheme`): insert green, delete red, move magenta, update yellow.
 /// `Identical` (and the `NotYetSet` sentinel, which never survives into a real diff) are left
 /// uncolored, same as the TUI's plain syntax-highlighted text.
 fn ansi_color(operation: &TextOperation) -> Option<&'static str> {
     match operation {
         TextOperation::Insert => Some("32"),
         TextOperation::Delete => Some("31"),
-        TextOperation::Update => Some("35"),
-        TextOperation::Move => Some("33"),
+        TextOperation::Move => Some("35"),
+        TextOperation::Update => Some("33"),
         TextOperation::Identical | TextOperation::NotYetSet => None,
     }
 }
 
-/// The per-line marker for each operation. `-`/`+` deliberately reuse familiar unified-diff
-/// markers for Delete/Insert, and for Update too (from the before side it reads as "old content
-/// being replaced", from the after side as "new content replacing it"); `~` marks a Move, which -
-/// unlike Delete/Insert/Update - has a real counterpart on both sides, just relocated.
-fn marker(operation: &TextOperation, side_is_before: bool) -> &'static str {
-    match operation {
-        TextOperation::Delete => "- ",
-        TextOperation::Insert => "+ ",
-        TextOperation::Update if side_is_before => "- ",
-        TextOperation::Update => "+ ",
-        TextOperation::Move => "~ ",
-        TextOperation::Identical | TextOperation::NotYetSet => "  ",
+/// Which of the four operation categories touch a given line, independently - more than one can
+/// be true at once (e.g. a line that's both part of a moved block and has an updated token
+/// within it).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct RowFlags {
+    moved: bool,
+    inserted: bool,
+    deleted: bool,
+    updated: bool,
+}
+
+impl RowFlags {
+    fn any(&self) -> bool {
+        self.moved || self.inserted || self.deleted || self.updated
     }
+}
+
+/// One row's colored column spans: `(start_col, end_col, operation)`, sorted by `start_col` and
+/// non-overlapping (see `row_overlay`).
+type RowSpans = Vec<(usize, usize, TextOperation)>;
+
+/// Per-row diff overlay: which categories touch each line (`RowFlags`, for the marker columns),
+/// and the exact colored column spans on each line (for inline highlighting) - both computed in
+/// one pass over `ranges`, the same per-range-then-per-row walk `diff::text::line_operations`
+/// uses, just keeping column precision instead of collapsing to one operation per row. Unlike
+/// `line_operations`, this is column-precise: it reuses `TextRange::columns_on_row`, the same
+/// span math the TUI's own `code_viewer::overlay_row` paints with, so headless and interactive
+/// rendering agree on exactly which characters are highlighted, not just which lines.
+///
+/// `Move` only ever sets the flag, never a colored span: a moved line is conveyed by
+/// `render_side`'s box (header/bar/footer, see `moved_chunk_destination`), not by inline color -
+/// coloring the whole moved line's text on top of that box read as too busy in practice. Inline
+/// coloring is reserved for `Insert`/`Delete`/`Update`, which don't have a box of their own.
+///
+/// Ranges are read via `rm.source` regardless of side, same convention as `line_operations`:
+/// `before_ranges`' `.source` is already in before-side coordinates, `after_ranges`' `.source`
+/// is already in after-side coordinates - each side's own `RangeMatch` list is self-referential.
+fn row_overlay(ranges: &[RangeMatch], lines: &[&str]) -> (Vec<RowFlags>, Vec<RowSpans>) {
+    let mut flags = vec![RowFlags::default(); lines.len()];
+    let mut spans: Vec<RowSpans> = vec![Vec::new(); lines.len()];
+
+    for rm in ranges {
+        if rm.operation == TextOperation::Identical || rm.operation == TextOperation::NotYetSet {
+            continue;
+        }
+        let r = &rm.source;
+        if r.is_empty() || r.start_row >= lines.len() {
+            continue;
+        }
+        let last_row = r.end_row.min(lines.len() - 1);
+        for row in r.start_row..=last_row {
+            let row_len = lines[row].chars().count();
+            let Some((start_col, end_col)) = r.columns_on_row(row, row_len) else {
+                continue;
+            };
+            match rm.operation {
+                TextOperation::Move => {
+                    flags[row].moved = true;
+                }
+                TextOperation::Insert => {
+                    flags[row].inserted = true;
+                    spans[row].push((start_col, end_col, rm.operation.clone()));
+                }
+                TextOperation::Delete => {
+                    flags[row].deleted = true;
+                    spans[row].push((start_col, end_col, rm.operation.clone()));
+                }
+                TextOperation::Update => {
+                    flags[row].updated = true;
+                    spans[row].push((start_col, end_col, rm.operation.clone()));
+                }
+                TextOperation::Identical | TextOperation::NotYetSet => unreachable!(),
+            }
+        }
+    }
+
+    for row_spans in &mut spans {
+        row_spans.sort_by_key(|&(start, _, _)| start);
+    }
+
+    (flags, spans)
+}
+
+/// Colors `ch` (or leaves it a plain space) for one marker column: blank when `present` is
+/// false, otherwise `ch` in `op`'s ANSI color (when `use_color`) or plain.
+fn marker_char(present: bool, ch: char, op: TextOperation, use_color: bool) -> String {
+    if !present {
+        return " ".to_string();
+    }
+    match ansi_color(&op).filter(|_| use_color) {
+        Some(code) => format!("\u{1b}[{code}m{ch}\u{1b}[0m"),
+        None => ch.to_string(),
+    }
+}
+
+/// The 2-column line-marker prefix, followed by one separator space before the line text.
+///
+/// Column 1 is `|` when the line is part of a moved chunk - the same box `render_side` draws
+/// around it (header/bar/footer) - blank otherwise. Column 2 reports the line's *other* changes,
+/// in priority order: `~` if the line has any `Update` on it (whether alone or alongside an
+/// `Insert`/`Delete` on the same line), else `-` for a pure delete, `+` for a pure insert, blank
+/// if none of those apply. `Update` wins that priority because a line with an update in it is
+/// never "purely" an insert or delete - flagging it `~` is strictly more informative than picking
+/// one of the other two arbitrarily.
+///
+/// A four-column version of this (one column per category, always in the same position) was
+/// tried first and rejected as too visually busy - two columns plus a moved-chunk box read far
+/// calmer for the common case of a handful of scattered single-category changes.
+///
+/// `-` only ever appears on the before side and `+` only on the after side, by construction (see
+/// `row_overlay`'s doc comment on why ranges are read from each side's own list) - not enforced
+/// here, just a property of which flags can be set at all.
+fn markers(flags: RowFlags, use_color: bool) -> String {
+    let moved_col = marker_char(flags.moved, '|', TextOperation::Move, use_color);
+    let op_col = if flags.updated {
+        marker_char(true, '~', TextOperation::Update, use_color)
+    } else if flags.deleted {
+        marker_char(true, '-', TextOperation::Delete, use_color)
+    } else if flags.inserted {
+        marker_char(true, '+', TextOperation::Insert, use_color)
+    } else {
+        " ".to_string()
+    };
+    format!("{moved_col}{op_col} ")
+}
+
+/// How many dashes make up a moved chunk's closing footer line (see `render_side`) - a fixed
+/// width by deliberate choice, not sized to the terminal or the chunk: it only needs to read as
+/// "the box ends here," not to visually align with anything else.
+const MOVED_CHUNK_FOOTER_WIDTH: usize = 20;
+
+/// The destination-side line range (1-indexed, inclusive) covered by every `Move` range in
+/// `ranges` whose *source* touches any row in `[start_row, end_row]` (inclusive) - the line
+/// numbers `render_side`'s moved-chunk header reports. Merges every such range's destination into
+/// one min/max span rather than tracking them individually: in the overwhelmingly common case a
+/// contiguous moved run comes from one relocated subtree (one `Move` range, or several that all
+/// point at essentially the same destination), so this is a simplification that only matters if
+/// two *unrelated* moves happen to land on adjacent rows, in which case the reported range is
+/// wider than either move alone - accepted rather than tracking sub-runs, since that's a rare
+/// case and this is a display convenience, not a correctness-bearing computation.
+///
+/// `None` only if, somehow, no `Move` range actually touches this run - shouldn't happen, since
+/// this is only ever called for a run of rows `row_overlay` already flagged `moved`.
+fn moved_chunk_destination(
+    ranges: &[RangeMatch],
+    start_row: usize,
+    end_row: usize,
+) -> Option<(usize, usize)> {
+    let last_touched_row = |r: &crate::diff::text_range::TextRange| -> usize {
+        if r.end_column == 0 {
+            r.end_row.saturating_sub(1)
+        } else {
+            r.end_row
+        }
+    };
+
+    let mut span: Option<(usize, usize)> = None;
+    for rm in ranges {
+        if rm.operation != TextOperation::Move || rm.source.is_empty() {
+            continue;
+        }
+        let source_last_row = last_touched_row(&rm.source);
+        if source_last_row < start_row || rm.source.start_row > end_row {
+            continue;
+        }
+        let dest_last_row = last_touched_row(&rm.destination);
+        span = Some(match span {
+            None => (rm.destination.start_row, dest_last_row),
+            Some((lo, hi)) => (lo.min(rm.destination.start_row), hi.max(dest_last_row)),
+        });
+    }
+    span.map(|(lo, hi)| (lo + 1, hi + 1))
+}
+
+/// Wraps each colored span of `line` (as computed by `row_overlay`) in its operation's ANSI
+/// color, leaving the untouched characters between spans as plain text - genuine inline/per-hunk
+/// highlighting rather than coloring the whole line by one dominant operation. `spans` are
+/// non-overlapping and sorted by start column (ranges on one side never overlap by construction),
+/// so a single left-to-right walk suffices.
+fn colorize_line(line: &str, spans: &[(usize, usize, TextOperation)], use_color: bool) -> String {
+    if !use_color || spans.is_empty() {
+        return line.to_string();
+    }
+    let chars: Vec<char> = line.chars().collect();
+    let mut out = String::new();
+    let mut col = 0usize;
+    for (start, end, op) in spans {
+        let start = (*start).min(chars.len());
+        let end = (*end).min(chars.len());
+        if start > col {
+            out.extend(&chars[col..start]);
+        }
+        if end > start {
+            let segment: String = chars[start..end].iter().collect();
+            match ansi_color(op) {
+                Some(code) => out.push_str(&format!("\u{1b}[{code}m{segment}\u{1b}[0m")),
+                None => out.push_str(&segment),
+            }
+        }
+        col = col.max(end);
+    }
+    if col < chars.len() {
+        out.extend(&chars[col..]);
+    }
+    out
 }
 
 /// How many unchanged lines to keep on either side of a change, same convention as `diff -u`'s
@@ -71,16 +261,16 @@ fn marker(operation: &TextOperation, side_is_before: bool) -> &'static str {
 /// elision marker instead of printed in full - see `lines_to_keep`.
 const CONTEXT_LINES: usize = 3;
 
-/// Which line indices `render_side` should actually print: any line that isn't `Identical`, plus
-/// `CONTEXT_LINES` lines on either side of one. Everything else is a candidate to collapse into
-/// an elision marker - this is what fixes headless mode printing entire unchanged files twice
-/// (once per side) for a single-line change.
-fn lines_to_keep(ops: &[TextOperation], context: usize) -> Vec<bool> {
-    let mut keep = vec![false; ops.len()];
-    for (i, op) in ops.iter().enumerate() {
-        if *op != TextOperation::Identical && *op != TextOperation::NotYetSet {
+/// Which line indices `render_side` should actually print: any line touched by at least one
+/// operation category (`RowFlags::any`), plus `CONTEXT_LINES` lines on either side of one.
+/// Everything else is a candidate to collapse into an elision marker - this is what fixes
+/// headless mode printing entire unchanged files twice (once per side) for a single-line change.
+fn lines_to_keep(flags: &[RowFlags], context: usize) -> Vec<bool> {
+    let mut keep = vec![false; flags.len()];
+    for (i, f) in flags.iter().enumerate() {
+        if f.any() {
             let start = i.saturating_sub(context);
-            let end = (i + context + 1).min(ops.len());
+            let end = (i + context + 1).min(flags.len());
             keep[start..end].fill(true);
         }
     }
@@ -127,6 +317,16 @@ pub(crate) fn nearest_reference_line(
 /// still shows you which function that is, even though its `fn foo(...) {` line is out of range
 /// of `CONTEXT_LINES`.
 ///
+/// Column-precise, same as the TUI: each line gets a 2-column marker (see `markers`) plus, for a
+/// moved chunk, a surrounding box - a `Moved from`/`Moved to` header naming the other side's line
+/// range, a `|` bar down every line of the chunk, and a dashed footer closing it. Only the exact
+/// changed sub-spans of `Insert`/`Delete`/`Update` lines are colored inline (see `colorize_line`),
+/// not the whole line by one dominant operation - all of it driven by `row_overlay`, which walks
+/// `ranges` directly instead of the coarser, one-op-per-row `diff::text::line_operations`.
+///
+/// `side_is_before` only affects the moved-chunk header's wording (`Moved to` vs. `Moved from`) -
+/// see `moved_chunk_destination`.
+///
 /// Re-parses `contents` from scratch to get a real tree-sitter tree to walk - `DiffSessionData`
 /// only carries flattened text ranges, not the AST the original diff computation already parsed,
 /// and duplicating that parse here (rather than threading the AST through the diff pipeline just
@@ -140,8 +340,8 @@ fn render_side(
     path: &Path,
 ) -> String {
     let lines: Vec<&str> = contents.split('\n').collect();
-    let ops = line_operations(ranges, lines.len());
-    let keep = lines_to_keep(&ops, CONTEXT_LINES);
+    let (flags, spans) = row_overlay(ranges, &lines);
+    let keep = lines_to_keep(&flags, CONTEXT_LINES);
 
     let language = language_for_path(path);
     let parsed = language.map(|lang| Code::from_string(contents, &lang));
@@ -188,17 +388,43 @@ fn render_side(
             }
         }
 
-        let line = lines[i];
-        let operation = &ops[i];
-        let prefix = marker(operation, side_is_before);
-        match ansi_color(operation).filter(|_| use_color) {
-            Some(code) => out.push_str(&format!("\u{1b}[{code}m{prefix}{line}\u{1b}[0m\n")),
-            None => {
-                out.push_str(prefix);
-                out.push_str(line);
+        let starts_moved_chunk = flags[i].moved && (i == 0 || !flags[i - 1].moved);
+        if starts_moved_chunk {
+            let mut run_end = i;
+            while run_end + 1 < flags.len() && flags[run_end + 1].moved {
+                run_end += 1;
+            }
+            let verb = if side_is_before { "to" } else { "from" };
+            let header = match moved_chunk_destination(ranges, i, run_end) {
+                Some((start, end)) if start == end => format!("Moved {verb} line {start}"),
+                Some((start, end)) => format!("Moved {verb} lines {start}-{end}"),
+                None => format!("Moved {verb} elsewhere"),
+            };
+            if use_color {
+                out.push_str(&format!("\u{1b}[35m{header}\u{1b}[0m\n"));
+            } else {
+                out.push_str(&header);
                 out.push('\n');
             }
         }
+
+        let prefix = markers(flags[i], use_color);
+        let colored_line = colorize_line(lines[i], &spans[i], use_color);
+        out.push_str(&prefix);
+        out.push_str(&colored_line);
+        out.push('\n');
+
+        let ends_moved_chunk = flags[i].moved && (i + 1 == lines.len() || !flags[i + 1].moved);
+        if ends_moved_chunk {
+            let footer = "-".repeat(MOVED_CHUNK_FOOTER_WIDTH);
+            if use_color {
+                out.push_str(&format!("\u{1b}[35m{footer}\u{1b}[0m\n"));
+            } else {
+                out.push_str(&footer);
+                out.push('\n');
+            }
+        }
+
         prev_line_shown = true;
         i += 1;
     }
@@ -232,9 +458,9 @@ fn summary_header(data: &DiffSessionData, use_color: bool) -> Option<String> {
 }
 
 /// Renders a full diff session as plain text: the "before" side (deletions/updates/moves
-/// highlighted), then the "after" side (insertions/updates/moves highlighted). See
-/// `diff::text::line_operations`'s doc comment for why this is row-granular rather than a true
-/// interleaved unified-diff hunk format.
+/// highlighted), then the "after" side (insertions/updates/moves highlighted). Each side's own
+/// `RangeMatch` list already carries which rows/columns changed - see `render_side`'s doc comment
+/// for why this is column-precise, not row-granular.
 pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> String {
     let mut out = String::new();
     if let Some(header) = summary_header(data, use_color) {
@@ -290,10 +516,10 @@ mod tests {
     #[test]
     fn lines_to_keep_keeps_context_lines_around_a_change_and_nothing_else() {
         // 10 lines: only line 5 (index 5) changed. With context=2, indices 3..=7 should be kept.
-        let mut ops = vec![TextOperation::Identical; 10];
-        ops[5] = TextOperation::Insert;
+        let mut flags = vec![RowFlags::default(); 10];
+        flags[5].inserted = true;
 
-        let keep = lines_to_keep(&ops, 2);
+        let keep = lines_to_keep(&flags, 2);
         assert_eq!(
             keep,
             vec![
@@ -306,11 +532,11 @@ mod tests {
     fn lines_to_keep_merges_context_windows_of_nearby_changes() {
         // Changes at indices 2 and 6, context=2: windows [0,5) and [4,9) overlap at 4, so
         // everything from 0 to 8 merges into one kept run with nothing collapsed between.
-        let mut ops = vec![TextOperation::Identical; 10];
-        ops[2] = TextOperation::Delete;
-        ops[6] = TextOperation::Insert;
+        let mut flags = vec![RowFlags::default(); 10];
+        flags[2].deleted = true;
+        flags[6].inserted = true;
 
-        let keep = lines_to_keep(&ops, 2);
+        let keep = lines_to_keep(&flags, 2);
         assert_eq!(
             keep,
             vec![true, true, true, true, true, true, true, true, true, false]
@@ -340,13 +566,71 @@ mod tests {
             "50 lines with 1 change should collapse to well under 15 output lines, got \
              {line_count}:\n{rendered}"
         );
-        assert!(rendered.contains("- changed"));
+        assert!(rendered.contains(" - changed"));
         assert!(rendered.contains("unchanged lines"));
         // Context lines immediately around the change must still be shown in full.
-        assert!(rendered.contains("  line22"));
-        assert!(rendered.contains("  line28"));
+        assert!(rendered.contains("   line22"));
+        assert!(rendered.contains("   line28"));
         // But nothing further out should survive.
         assert!(!rendered.contains("line10\n"));
+    }
+
+    /// No other test exercises `Move` directly - real move-detection heuristics didn't fire in
+    /// manual smoke testing on small synthetic files, so this builds the `RangeMatch` by hand
+    /// (with a `destination` in some other line range) instead of depending on the diff engine's
+    /// move classification.
+    #[test]
+    fn render_side_wraps_a_moved_chunk_in_a_box_with_header_bar_and_footer() {
+        let contents = "fn main() {\n    moved_call();\n    same();\n}";
+        let ranges = vec![RangeMatch {
+            source: crate::diff::text_range::TextRange::new(1, 4, 2, 0),
+            destination: crate::diff::text_range::TextRange::new(9, 0, 10, 0),
+            operation: TextOperation::Move,
+        }];
+        let footer = "-".repeat(MOVED_CHUNK_FOOTER_WIDTH);
+
+        // Rendered as the after side: this line came FROM before-line 10 (1-indexed).
+        let plain = render_side(contents, &ranges, false, false, Path::new("plain.txt"));
+        assert!(
+            plain.contains("Moved from line 10\n"),
+            "should announce where the moved chunk came from: {plain}"
+        );
+        assert!(
+            plain.contains(&format!("\n{footer}\n")),
+            "should close the box with a dashed footer: {plain}"
+        );
+        assert!(
+            plain.contains("|      moved_call();"),
+            "the moved line should start with the box bar: {plain}"
+        );
+
+        // Rendered as the before side, the same range reads as a destination, not an origin.
+        let before_plain = render_side(contents, &ranges, true, false, Path::new("plain.txt"));
+        assert!(
+            before_plain.contains("Moved to line 10\n"),
+            "before-side wording should say where it went, not where it came from: \
+             {before_plain}"
+        );
+
+        let colored = render_side(contents, &ranges, false, true, Path::new("plain.txt"));
+        assert!(
+            colored.contains("\u{1b}[35mMoved from line 10\u{1b}[0m"),
+            "the header should be magenta: {colored}"
+        );
+        assert!(
+            colored.contains(&format!("\u{1b}[35m{footer}\u{1b}[0m")),
+            "the footer should be magenta: {colored}"
+        );
+        assert!(
+            colored.contains("\u{1b}[35m|\u{1b}[0m"),
+            "the box bar should be magenta: {colored}"
+        );
+        // A purely-moved line's own text must NOT be inline-colored - only Insert/Delete/Update
+        // get that treatment; Move is conveyed purely by the box.
+        assert!(
+            !colored.contains("\u{1b}[35mmoved_call();"),
+            "a purely-moved line's text should stay plain, not inline-colored: {colored}"
+        );
     }
 
     /// Builds a Rust file with a change deep inside a function whose own `fn` line is well
@@ -469,29 +753,29 @@ mod tests {
         }
     }
 
+    /// The 2-column marker prefix a plain (uncolored) line with these flags should get - built
+    /// independently of `markers()` itself, from the documented column order, rather than calling
+    /// the function under test. `op` is the column-2 character (`None` for a plain space).
+    fn plain_prefix(moved: bool, op: Option<char>) -> String {
+        format!(
+            "{}{} ",
+            if moved { "|" } else { " " },
+            op.map(String::from).unwrap_or_else(|| " ".to_string()),
+        )
+    }
+
     /// Builds the expected plain-text rendering by concatenating each line's marker with its
     /// original text directly, rather than a hand-typed literal - counting the exact whitespace
-    /// a "- "/"+ "/"  " prefix plus a 4-space-indented line produces by eye is error-prone.
+    /// a marker prefix plus a 4-space-indented line produces by eye is error-prone.
     fn expected_plain_text() -> String {
+        let none = plain_prefix(false, None);
+        let deleted = plain_prefix(false, Some('-'));
+        let inserted = plain_prefix(false, Some('+'));
         format!(
-            "=== before: before.rs ===\n{}{}\n{}{}\n{}{}\n{}{}\n\
-             === after: after.rs ===\n{}{}\n{}{}\n{}{}\n{}{}\n",
-            "  ",
-            "fn main() {",
-            "- ",
-            "    old_call();",
-            "  ",
-            "    same();",
-            "  ",
-            "}",
-            "  ",
-            "fn main() {",
-            "+ ",
-            "    new_call();",
-            "  ",
-            "    same();",
-            "  ",
-            "}",
+            "=== before: before.rs ===\n{none}fn main() {{\n{deleted}    old_call();\n\
+             {none}    same();\n{none}}}\n\
+             === after: after.rs ===\n{none}fn main() {{\n{inserted}    new_call();\n\
+             {none}    same();\n{none}}}\n"
         )
     }
 
@@ -504,25 +788,35 @@ mod tests {
     }
 
     #[test]
-    fn render_text_diff_with_color_wraps_only_changed_lines_in_ansi_codes() {
+    fn render_text_diff_with_color_highlights_only_the_changed_substring_inline() {
         let text = render_text_diff(&sample_data(), true);
-        let deleted = format!("\u{1b}[31m{}{}\u{1b}[0m", "- ", "    old_call();");
-        let inserted = format!("\u{1b}[32m{}{}\u{1b}[0m", "+ ", "    new_call();");
+
+        // The deleted marker column ('-') and the changed substring are both red - but the
+        // leading 4-space indent, part of the same line, is NOT wrapped: this is genuine
+        // inline/per-hunk coloring, not whole-line coloring.
         assert!(
-            text.contains(&deleted),
-            "deleted-side line should be red: {text}"
+            text.contains("\u{1b}[31m-\u{1b}[0m"),
+            "the deleted marker column should be red: {text}"
         );
         assert!(
-            text.contains(&inserted),
-            "inserted-side line should be green: {text}"
+            text.contains("    \u{1b}[31mold_call();\u{1b}[0m"),
+            "only the changed substring, not the leading indent, should be wrapped in red: {text}"
         );
-        assert_eq!(
-            text.matches('\u{1b}').count(),
-            4,
-            "only the two changed lines (one color-start plus one reset each) should carry ANSI codes: {text}"
+
+        // Same shape on the after side, in green for Insert.
+        assert!(
+            text.contains("\u{1b}[32m+\u{1b}[0m"),
+            "the inserted marker column should be green: {text}"
         );
         assert!(
-            text.contains(&format!("\n{}{}\n", "  ", "fn main() {")),
+            text.contains("    \u{1b}[32mnew_call();\u{1b}[0m"),
+            "only the changed substring, not the leading indent, should be wrapped in green: {text}"
+        );
+
+        // Identical lines must stay completely uncolored, markers included.
+        let none = plain_prefix(false, None);
+        assert!(
+            text.contains(&format!("\n{none}fn main() {{\n")),
             "identical lines must stay uncolored: {text}"
         );
     }
