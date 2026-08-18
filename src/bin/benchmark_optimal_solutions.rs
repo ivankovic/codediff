@@ -191,7 +191,7 @@ struct Args {
     #[arg(long)]
     dump: Option<String>,
 
-    /// Output results as a CSV file. Default path: "./research/optimal_solutions_benchmark.csv"
+    /// Output results as a CSV file. Default path: "./research/data/quality/optimal_solutions_benchmark.csv"
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
 
@@ -414,7 +414,7 @@ fn main() -> Result<()> {
 
     if let Some(csv_path) = args.csv {
         let path = csv_path.unwrap_or_else(|| {
-            std::path::PathBuf::from("./research/optimal_solutions_benchmark.csv")
+            std::path::PathBuf::from("./research/data/quality/optimal_solutions_benchmark.csv")
         });
         write_csv(&rows, &path)?;
     }

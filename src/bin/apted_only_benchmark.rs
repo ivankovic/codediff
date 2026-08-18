@@ -55,7 +55,7 @@ use codediff::stats::count_nodes;
 struct Args {
     /// One or more CSVs produced by `sample_code_pairs` (language, size_bucket, repository,
     /// commit, path, old_path). Multiple values, not a merged file, so per-language CSVs (this
-    /// corpus's actual on-disk shape - see research/sampled_code_pairs_*.csv) can be passed
+    /// corpus's actual on-disk shape - see research/data/samples/sampled_code_pairs_*.csv) can be passed
     /// directly without a separate concatenation step.
     #[arg(long, required = true, num_args = 1..)]
     csv: Vec<PathBuf>,

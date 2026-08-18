@@ -19,7 +19,7 @@ AST nodes are Identical vs. one of the six change operations (Update, MatchButNo
 Delete, DeleteWithChildren, Insert, InsertWithChildren), and how do those six break down against
 each other.
 
-Reads research/human_mapping_analysis.csv (produced by `analyze_human_mappings --csv`, see that
+Reads research/data/quality/human_mapping_analysis.csv (produced by `analyze_human_mappings --csv`, see that
 binary's own doc comment), one row per fixture with a `node_op_<operation>` count for each of the
 seven `HumanOperation` variants - true AST *node instances*, not mapping *entries*: a single
 `DeleteWithChildren`/`InsertWithChildren` entry in human_mapping.json can cover an entire subtree,
@@ -96,7 +96,7 @@ def read_rows(csv_path: Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--csv", default="human_mapping_analysis.csv", type=Path)
+    parser.add_argument("--csv", default="data/quality/human_mapping_analysis.csv", type=Path)
     parser.add_argument("--plots-dir", default="plots", type=Path)
     parser.add_argument("--output-png", default="human_mapping_shapes.png")
     args = parser.parse_args()

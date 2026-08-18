@@ -479,7 +479,7 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare codediff against other diff tools from benchmark_other.csv.")
-    parser.add_argument("--csv", default="benchmark_other.csv", help="Path to the benchmark CSV (default: benchmark_other.csv)")
+    parser.add_argument("--csv", default="data/comparison/benchmark_other.csv", help="Path to the benchmark CSV (default: data/comparison/benchmark_other.csv)")
     parser.add_argument("--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)")
     args = parser.parse_args()
 

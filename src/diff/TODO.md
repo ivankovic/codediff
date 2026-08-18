@@ -333,7 +333,7 @@ region and lets each region pick the cheapest sufficient algorithm.
 ### Phase 0 findings (2026-08-15)
 
 **332 vs. 338/339 fixture-count discrepancy, resolved**: the checked-in
-`research/optimal_solutions_benchmark.csv` (332 rows) is simply stale - it predates 7 fixtures added
+`research/data/quality/optimal_solutions_benchmark.csv` (332 rows) is simply stale - it predates 7 fixtures added
 by an earlier commit this session (`rust-skim-rs-skim-format-string`,
 `scala-sirthias-parboiled-value-change`, `shellscript-hgst-libzbc-add-variable`,
 `shellscript-maxsatula-ocp-small-change`, `tsx-keybase-client-emoji-to-native`,
@@ -371,7 +371,7 @@ even though the hatch must still exist for correctness.
 dev machine (other running applications, not codediff, had already exhausted free RAM and swap
 before any benchmark run started) - two attempts (tracked background, detached `setsid`) were
 killed. A third, also detached, eventually completed (~19 minutes wall clock) once memory pressure
-eased; installed as `research/optimal_solutions_benchmark.csv` (339 fixtures - see the count
+eased; installed as `research/data/quality/optimal_solutions_benchmark.csv` (339 fixtures - see the count
 resolution above). Final pinned pre-rearchitecture baseline: **252/339 (74.3%) at exactly zero
 mismatches, p50 120.2ms, p90 1347.9ms, p99 63576.8ms, max 192233.3ms, 21109 total mismatch
 instances** - consistent with (and superseding) the earlier stale-CSV-derived figures quoted in
@@ -498,7 +498,7 @@ expected, the fix is `O(n)` by construction like the walk it replaces. Of the 72
 `InsertOnly`/`DeleteOnly`-licensed fixtures Phase 3a's resolver was about to target: **65/72 (90.3%)
 are now already at zero mismatches**, up from 22/72 - this single bug fix did more for that target
 set than the planned resolver would have, and substantially shrinks what Phase 3b/3c still need to
-do. `research/optimal_solutions_benchmark.csv` refreshed to this result.
+do. `research/data/quality/optimal_solutions_benchmark.csv` refreshed to this result.
 
 Zero-mismatch fixtures (64.0%) are now close to the pre-Phase-1 baseline (74.3%) and meaningfully
 closer to the 90% target - most of the remaining gap is concentrated in fixtures needing real
@@ -617,7 +617,7 @@ within reach of the pre-Phase-1 baseline (74.3%) and closing in on the 90% targe
 concentrated in the `qualified_name` over-matching bucket (separate, not yet investigated) and
 fixtures whose affected chains span multi-entry gaps (need real disambiguation to recurse safely,
 not just a size increase on the entry cap - the exact risk this phase's first attempt hit).
-`research/optimal_solutions_benchmark.csv` refreshed to this result.
+`research/data/quality/optimal_solutions_benchmark.csv` refreshed to this result.
 
 ### Speed investigation: `flat_children`'s gate, revisited (2026-08-16)
 
@@ -1028,7 +1028,7 @@ alone was actively misleading on both examples checked here).
 ### Literature + external-implementation survey, cross-checked against corpus stats (2026-08-17)
 
 Two new corpus-wide analyses landed this session, independent of everything above: `analyze_human_
-mappings`'s node-instance operation mix (`node_op_*` columns, `research/human_mapping_analysis.csv`)
+mappings`'s node-instance operation mix (`node_op_*` columns, `research/data/quality/human_mapping_analysis.csv`)
 and a "shape of human solutions" chart (`research/analysis/human_mapping_shapes_report.py`) showing
 each fixture's change composition, normalized to its own non-Identical mass. Cross-referencing
 fixture *typology* (which operation dominates a fixture's changed nodes) against `current_mismatches`
@@ -1162,12 +1162,12 @@ Neither had ever shown up as a suspect because the metadata artifact drowned the
 fixture list was just "biggest files first." Fixing p99 now means profiling *inside* these two
 passes (which pair, what shape, which APTED path), not re-architecting the pipeline's phase
 structure - see the honest slowest-15 list in
-`research/results/benchmark_2026-08-17_warm_metadata.csv`.
+`research/data/performance/benchmark_2026-08-17_warm_metadata.csv`.
 
 ### Roadmap to the goals, re-ranked against the honest baseline (2026-08-17)
 
 Where things stand against each goal after the harness fix above (all numbers from
-`research/results/benchmark_2026-08-17_warm_metadata.csv`, 417 solved fixtures, idle machine):
+`research/data/performance/benchmark_2026-08-17_warm_metadata.csv`, 417 solved fixtures, idle machine):
 
 - p50 < 100ms: **met**, 6.8ms (~15x headroom).
 - p99 < 400ms: 1.13s, ~2.8x over; only 23/417 fixtures exceed 400ms, max 4.9s.
@@ -1861,7 +1861,7 @@ become eligible later in the same pass - while a node that becomes matched *duri
 caught by the in-loop guards, which were all left in place.
 
 **Combined result, full corpus (417 fixtures, idle machine,
-`research/results/benchmark_2026-08-17_after_runtime_pass.csv`)**, against the honest baseline in
+`research/data/performance/benchmark_2026-08-17_after_runtime_pass.csv`)**, against the honest baseline in
 the previous section:
 
 | | p50 | p90 | p99 | max | >400ms | total | mismatches | zero-mismatch |

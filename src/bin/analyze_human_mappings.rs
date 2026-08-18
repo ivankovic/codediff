@@ -66,7 +66,7 @@ fn count_nodes(root: tree_sitter::Node) -> usize {
     about = "Corpus-wide statistics over src/test/data/diffs/ human_mapping.json fixtures - dataset characterization plus pipeline-design signals (wrap/reparent rate, sibling-reorder rate)"
 )]
 struct Args {
-    /// Per-fixture CSV export path. Default: ./research/human_mapping_analysis.csv
+    /// Per-fixture CSV export path. Default: ./research/data/quality/human_mapping_analysis.csv
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<PathBuf>>,
 
@@ -305,7 +305,7 @@ struct FixtureStats {
     current_mismatches: Option<usize>,
 }
 
-/// Reads `research/optimal_solutions_benchmark.csv` (whatever the most recent `benchmark_optimal_
+/// Reads `research/data/quality/optimal_solutions_benchmark.csv` (whatever the most recent `benchmark_optimal_
 /// solutions --csv` run left there) for the "solution"/"mismatches" columns, if the file exists -
 /// the cross-reference this binary's item #3 (does the wrap/reorder signal actually predict
 /// current failure?) needs. Returns an empty map, not an error, when the file is missing: this
@@ -639,7 +639,7 @@ fn main() -> Result<()> {
     names.sort();
 
     let current_mismatches = load_current_mismatches(std::path::Path::new(
-        "./research/optimal_solutions_benchmark.csv",
+        "./research/data/quality/optimal_solutions_benchmark.csv",
     ));
 
     let mut all_stats = Vec::with_capacity(names.len());
@@ -942,7 +942,7 @@ fn main() -> Result<()> {
     if with_current.is_empty() {
         println!(
             "\n=== Cross-reference against current results ===\n\
-             (skipped: no ./research/optimal_solutions_benchmark.csv found - run \
+             (skipped: no ./research/data/quality/optimal_solutions_benchmark.csv found - run \
              `benchmark_optimal_solutions --csv` first)"
         );
     } else {
@@ -991,8 +991,8 @@ fn main() -> Result<()> {
     }
 
     if let Some(csv_path) = args.csv {
-        let path =
-            csv_path.unwrap_or_else(|| PathBuf::from("./research/human_mapping_analysis.csv"));
+        let path = csv_path
+            .unwrap_or_else(|| PathBuf::from("./research/data/quality/human_mapping_analysis.csv"));
         write_csv(&all_stats, &path)?;
         println!("\nPer-fixture CSV written to {}", path.display());
     }

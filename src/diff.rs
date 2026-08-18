@@ -408,7 +408,7 @@ impl<'code> PendingDiff<'code> {
         // STATUS (2026-08-17): that branch is merged into `main` (`git merge-base --is-ancestor
         // phases-4-7-rearchitecture main` confirms it) - this is not branch-only behavior, it is
         // what `main` does today. Quality is back at or above the pre-Phase-1 baseline (see
-        // `research/optimal_solutions_benchmark.csv` and TODO.md's later 2026-08-16/17 entries:
+        // `research/data/quality/optimal_solutions_benchmark.csv` and TODO.md's later 2026-08-16/17 entries:
         // kind-only sub-anchoring, trivial-entry filtering) - the regression described above was
         // real but transient, measured mid-migration before Phases 2-3 shipped, not a standing
         // cost of this design.
@@ -540,7 +540,7 @@ pub struct HeuristicConfig {
     /// Gates `solve_unique_type_matching` (GumTree Simple's "unique type matching" recovery
     /// sub-phase - see `TODO.md`'s 2026-08-17 literature survey and that module's own doc comment).
     /// MEASURED (2026-08-17, full 417-fixture corpus, `--nocapture`-instrumented run then reverted):
-    /// **zero firings corpus-wide** - `research/optimal_solutions_benchmark.csv` is byte-for-byte
+    /// **zero firings corpus-wide** - `research/data/quality/optimal_solutions_benchmark.csv` is byte-for-byte
     /// identical with this on vs. off (2835/2835 total mismatches, 310/417 zero-mismatch either
     /// way). Unit-tested and confirmed correct in isolation (`solve_unique_type_matching`'s own
     /// tests, which pre-match a node directly rather than relying on an earlier pass, so a pass

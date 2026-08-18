@@ -16,12 +16,12 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Summarise benchmark_diff_pairs results across all languages.
 
-Reads results/benchmark_<language>.csv (or --results-dir), prints a percentile
+Reads data/performance/benchmark_<language>.csv (or --results-dir), prints a percentile
 table, and writes plots/benchmark_timing_distributions.png.
 
 Usage (from research/):
     uv run ./analysis/benchmark_report.py
-    uv run ./analysis/benchmark_report.py --results-dir results/ --plots-dir plots/
+    uv run ./analysis/benchmark_report.py --results-dir data/performance/ --plots-dir plots/
 """
 import argparse
 import csv
@@ -180,8 +180,8 @@ if __name__ == "__main__":
         description="Summarise benchmark_diff_pairs results across languages."
     )
     parser.add_argument(
-        "--results-dir", default="results",
-        help="Directory containing benchmark_<language>.csv files (default: results/)",
+        "--results-dir", default="data/performance",
+        help="Directory containing benchmark_<language>.csv files (default: data/performance/)",
     )
     parser.add_argument(
         "--plots-dir", default="plots",

@@ -144,9 +144,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Compute and visualize size/LOC-changed statistics for sampled code pairs."
     )
-    parser.add_argument("csv", nargs="?", default="sampled_code_pairs_rust.csv")
+    parser.add_argument("csv", nargs="?", default="data/samples/sampled_code_pairs_rust.csv")
     parser.add_argument("--repo-root", default="/var/tmp/research/small/repositories")
-    parser.add_argument("--output-csv", default="code_pair_diff_stats.csv")
+    parser.add_argument("--output-csv", default="data/corpus_stats/code_pair_diff_stats.csv")
     args = parser.parse_args()
 
     rows = collect_pair_stats(Path(args.csv), Path(args.repo_root))

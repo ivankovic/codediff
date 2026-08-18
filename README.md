@@ -133,7 +133,7 @@ CodeDiff must process 100% of all commits in the full test dataset.
 
 The full test dataset holds the git commit history of about 7,400 open-source git repositories,
 as available on the main branch. This list of repositories comes from the Gentoo Linux
-distribution. Find it in `research/list_of_repositories.csv`.
+distribution. Find it in `list_of_repositories.csv`.
 
 A smaller list of 100 repositories, the "small" dataset, is available in the same directory. Use
 it for faster iteration when you debug.

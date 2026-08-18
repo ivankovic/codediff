@@ -27,7 +27,7 @@ ground-truth corpus, both are less accurate than codediff, Unix `diff`, and GumT
 agreement with the human mapping - expected, since neither computes a full tree-edit-distance
 mapping. diffsitter is the fastest AST-aware tool in the whole comparison (median 4.66ms/fixture);
 difftastic sits between codediff and GumTree's warm-JVM number (median 54.40ms). See
-`research/benchmark_other.csv` and `research/plots/benchmark_other_accuracy.png`. Installed with
+`research/data/comparison/benchmark_other.csv` and `research/plots/benchmark_other_accuracy.png`. Installed with
 `cargo install --root /var/tmp/codediff-tools difftastic diffsitter`, pointed at via `DIFFT_BIN`/
 `DIFFSITTER_BIN` - see `CONTRIBUTING.md`'s `benchmark-other` entry.
 

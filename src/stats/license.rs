@@ -178,7 +178,7 @@ fn classify_license(text: &str) -> &'static str {
     }
 }
 
-/// The `origin` remote's URL, if configured - the same URL `research/fetch_data/dataset.sh`
+/// The `origin` remote's URL, if configured - the same URL `research/sampling/dataset.sh`
 /// originally cloned from, so this always points a reader back at the actual upstream project
 /// rather than at this local checkout path.
 pub fn origin_remote_url(repo: &Repository) -> Option<String> {
@@ -190,7 +190,7 @@ pub fn origin_remote_url(repo: &Repository) -> Option<String> {
 /// A direct link to `path` inside `repo_url`'s hosted repository at `commit` - pinned to that
 /// exact commit (not a branch) so the link keeps pointing at the license text as it actually read
 /// when the sample was taken, even if the file is later moved, edited, or removed upstream. Only
-/// handles the three hosts `research/fetch_data/dataset.sh` actually clones from (each uses a
+/// handles the three hosts `research/sampling/dataset.sh` actually clones from (each uses a
 /// different blob-URL scheme); any other host - or a URL that doesn't parse - returns `None`
 /// rather than guessing, since a wrong link is worse than no link (the repository/commit already
 /// recorded above `render_readme`'s license section is still enough to find the file by hand).

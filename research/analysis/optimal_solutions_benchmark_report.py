@@ -212,7 +212,7 @@ if __name__ == "__main__":
         description="CodeDiff's own performance/accuracy characteristics from optimal_solutions_benchmark.csv."
     )
     parser.add_argument(
-        "--csv", default="optimal_solutions_benchmark.csv",
+        "--csv", default="data/quality/optimal_solutions_benchmark.csv",
         help="Path to the benchmark CSV (default: optimal_solutions_benchmark.csv)",
     )
     parser.add_argument("--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)")

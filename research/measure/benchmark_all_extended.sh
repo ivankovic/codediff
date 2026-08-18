@@ -18,7 +18,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 # Run sample_code_pairs + benchmark_diff_pairs for one or more languages and
-# write canonical results to results/benchmark_<language>.csv.
+# write canonical results to data/performance/benchmark_<language>.csv.
 #
 # Extended version with more languages and crash protection.
 #
@@ -40,7 +40,7 @@
 #   --bin-dir DIR         Directory containing binaries
 #                       (default: ../target/release relative to research/)
 #   --resample            Re-run sampling even if CSV exists
-#   --results-dir DIR     Where to write benchmark_<language>.csv (default: results/)
+#   --results-dir DIR     Where to write benchmark_<language>.csv (default: data/performance/)
 #   --timeout-min N       Timeout per language in minutes (default: 60)
 #   --continue-on-error   Continue to next language if one fails (default: off)
 #   --max-commits N      Max commits per repo during sampling (default: 100)
@@ -61,7 +61,7 @@ REPOS_DIR="/var/tmp/research/small/repositories/"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESEARCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BIN_DIR="$RESEARCH_DIR/../target/release"
-RESULTS_DIR="$RESEARCH_DIR/results"
+RESULTS_DIR="$RESEARCH_DIR/data/performance"
 RESAMPLE=0
 TIMEOUT_MIN=60
 CONTINUE_ON_ERROR=0
@@ -93,7 +93,7 @@ done
 # real diff_code timing) for. Language names must match `Language`'s Debug/Display name exactly
 # (sample_code_pairs filters with a plain string comparison against it, case-sensitively) - this
 # previously listed "Lua" instead of "LUA", which silently sampled 0 pairs every run (confirmed via
-# results/benchmark_lua_sample.log: "Sampled 0 pairs" despite ~1700 .lua files across the sampled
+# data/performance/benchmark_lua_sample.log: "Sampled 0 pairs" despite ~1700 .lua files across the sampled
 # repos). CSS, CSharp, HTML, JSON, R, ShellScript, TSX, Vimscript, XML, and YAML were simply never
 # added even though they've had grammars all along - added here for full coverage. Bazel, Dart,
 # MarkDown, ProtoBuf, and SQL are deliberately excluded: `to_treesitter` has no grammar for them
@@ -151,7 +151,7 @@ for LANG in "${LANGUAGES[@]}"; do
   [[ -z "$LANG" ]] && continue
   
   LANG_LOWER="${LANG,,}"
-  SAMPLE_CSV="$RESEARCH_DIR/sampled_code_pairs_${LANG_LOWER}.csv"
+  SAMPLE_CSV="$RESEARCH_DIR/data/samples/sampled_code_pairs_${LANG_LOWER}.csv"
   RESULT_CSV="$RESULTS_DIR/benchmark_${LANG_LOWER}.csv"
 
   echo "═══════════════════════════════════════════════════════════════"

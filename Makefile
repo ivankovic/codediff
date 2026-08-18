@@ -1,28 +1,14 @@
-SCRIPTS_FETCH_DIR := ./research/fetch_data
-
-LIST_FULL := ./research/list_of_repositories.csv
-LIST_SMALL  := ./research/list_of_repositories_100.csv
-LIST_TINY  := ./research/list_of_repositories_tiny.csv
-
-# Default mode is "tiny", can be overridden with "make MODE=small" or "make MODE=full"
-MODE ?= tiny
-
-# Resolve the appropriate list based on mode. Deliberately `=` (recursive/lazy), not `:=`
-# (immediate): `tiny`/`small`/`full` below set MODE as a target-specific variable (`override
-# MODE=...`), which only reaches these via lazy re-expansion at the point each recipe line
-# actually uses them - `:=` would instead bake in whatever MODE was at Makefile-parse time
-# (always the global `tiny` default) and silently ignore the override.
-LIST = $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(LIST_SMALL),$(LIST_FULL)))
-
-# Resolve directories based on mode - see the `LIST` comment above for why `=`, not `:=`.
-REPOSITORIES_DIR = /var/tmp/research/$(MODE)/repositories/
-RESEARCH_DIR = /var/tmp/research/$(MODE)/
-
-clean: clean-db
-	rm -rf $(REPOSITORIES_DIR)
-
-clean-db:
-	rm -rf $(RESEARCH_DIR)/stats.sqlite
+# Product-side targets only: build, test, install, the quality gate, and release.
+#
+# Everything that exists to produce the papers and empirical studies - corpus fetching, sampling,
+# measurement, analysis, paper builds - lives in research/Makefile instead. Run those from there:
+#
+#     cd research && make <target>          # e.g. rq1-report, introductory-paper, file-stats
+#
+# The split is deliberate: this file should stay readable to someone working on codediff itself,
+# who has no reason to care about the research corpus. `benchmark-optimal` and `check-quality`
+# stay here despite reading/writing files under research/data/, because they are this project's
+# own regression gate and release gate, not research artifacts.
 
 test: test-mapping-site-js
 	cargo test --release
@@ -67,71 +53,7 @@ install-hooks:
 benchmark-optimal:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 
-benchmark-optimal-report: benchmark-optimal
-	(cd research && uv run ./analysis/matching_reasons_report.py)
-
-# Runs benchmark_other's own analysis/plotting step over whatever research/benchmark_other.csv
-# already has on disk, without re-running the benchmark itself. Split out from benchmark-other
-# below so a paper rebuild (introductory-paper) can re-render from existing data without paying
-# for a fresh (slow - GumTree's JVM cold-starts per fixture) benchmark run.
-benchmark-other-report:
-	(cd research && uv run ./analysis/benchmark_other_report.py)
-
-# Compares codediff against other diff tools (Unix diff, GumTree, difftastic, diffsitter) on
-# line-level agreement with the human-authored mapping, plus runtime, then runs the analysis step
-# above. --features test-fixtures: benchmark_other, like benchmark_optimal_solutions, needs
-# codediff::test's fixture-loading helpers. Requires GUMTREE_BIN, DIFFT_BIN, and DIFFSITTER_BIN,
-# each pointing at a built binary - unlike everything else in this Makefile, these are external,
-# non-Rust (GumTree) or at least non-workspace (difftastic, diffsitter) tool dependencies this
-# target can't provide on its own (see research/drivers/gumtree-batch/build.sh for GumTree's
-# optional warm-JVM timing variant, and CONTRIBUTING.md's `benchmark-other` entry for how to
-# install difftastic/diffsitter into /var/tmp without touching the system-wide cargo bin
-# directory).
-benchmark-other:
-	cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-	$(MAKE) benchmark-other-report
-
-# Regenerates the benchmark_other charts/table research/papers/introductory-paper/main.tex embeds
-# (accuracy chart, runtime chart, variance table - the last is a generated .tex table, not a
-# chart, \input directly by main.tex rather than copied as a PNG) from whatever
-# research/benchmark_other.csv already has on disk, then rebuilds that paper's PDF. Deliberately
-# depends on benchmark-other-report, not benchmark-other: rebuilding a paper should not pay for a
-# fresh benchmark run (minutes, dominated by GumTree's JVM cold-start per fixture) every time -
-# run `make benchmark-other` yourself first to refresh the underlying data, then this target to
-# re-render from it. Also does not regenerate figures/tips.png, which needs the full
-# repository-fetch pipeline (`make full`) - see main.tex's own TODO comment for that gap. Needs a
-# LaTeX toolchain with the acmart class and cm-super (see
-# research/papers/introductory-paper/README.md). `-g` forces a full latexmk run regardless of its
-# own up-to-date check: without it, latexmk can decide main.pdf is already current from main.tex's
-# own timestamp alone and skip the rebuild even though the \input-ed accuracy/variance table just
-# changed underneath it (confirmed live, 2026-07-31 - main.pdf was silently one run stale until
-# this flag was added).
-introductory-paper: benchmark-other-report
-	cp research/plots/benchmark_other_accuracy.png research/plots/benchmark_other_runtime.png \
-		research/plots/benchmark_other_variance.tex research/papers/introductory-paper/figures/
-	cd research/papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
-
-# Regenerates research/papers/introductory-paper/main.tex's empirical-study numbers (Table 1,
-# repository/file/language counts, bytes-AST correlation - all \input from figures/variables.tex,
-# a generated LaTeX-macro file, not hand-transcribed - see write_paper_variables's own doc comment
-# in research/analysis/file_stats.py for exactly why that matters) and its file-types figure, from
-# whatever $(RESEARCH_DIR)/stats.sqlite already has on disk for the current MODE (default tiny -
-# pass MODE=small or MODE=full to match whatever `make file-stats` run you actually have). Reuses
-# the fast half of that split (file-stats-report), not file-stats itself, for the same reason
-# introductory-paper depends on benchmark-other-report and not benchmark-other: rebuilding a paper
-# should never pay for the slow step. Run `make file-stats MODE=<mode>` yourself first to
-# (re)populate that mode's stats.sqlite.
-introductory-paper-empirical: file-stats-report
-	cp research/plots/variables.tex research/plots/tips.png research/papers/introductory-paper/figures/
-	cd research/papers/introductory-paper && latexmk -pdf -g -interaction=nonstopmode main.tex
-
-# Leave-one-out ablation study over the diff algorithm's optional heuristic passes - see
-# research/measure/ablation_study.sh's own header comment for exactly what it measures.
-# Usage: make ablation-study [OUT_DIR=path]  (default OUT_DIR: research/ablation)
-ablation-study:
-	./research/measure/ablation_study.sh $(OUT_DIR)
-
-QUALITY_BASELINE := research/quality_baseline.txt
+QUALITY_BASELINE := research/data/quality/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
 
 # Runs benchmark_optimal_solutions and gates on it against $(QUALITY_BASELINE) - invoked by
@@ -233,132 +155,3 @@ hermetic-benchmark:
 
 hermetic-benchmark-update-baseline:
 	cargo bench --bench diff_code_benchmark -- --save-baseline baseline
-
-# Benchmark against existing sampled pairs for the four primary languages (Rust, Python, Go,
-# Kotlin) and run analysis afterwards. Uses benchmark_all_extended.sh restricted to these four via
-# --language.
-benchmark-sampled-main-languages-only:
-	@echo "Running benchmarks for Rust, Python, Go, Kotlin..."
-	@echo "Results will be written to research/results/"
-	cd research && ./measure/benchmark_all_extended.sh --language "Rust Python Go Kotlin" --repos-dir /var/tmp/research/small/repositories/ --bin-dir ../target/release
-	@echo ""
-	@echo "Running analysis..."
-	cd research && uv run ./analysis/benchmark_report.py
-
-# Benchmark with extended language set (every language with a tree-sitter grammar - see
-# ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit.
-benchmark-sampled-all-languages:
-	@echo "Running extended benchmarks for all supported languages..."
-	@echo "Results will be written to research/results/"
-	@echo "Using 20000 node limit, max 100 commits per repo"
-	cd research && ./measure/benchmark_all_extended.sh \
-		--language all \
-		--repos-dir /var/tmp/research/small/repositories/ \
-		--bin-dir ../target/release \
-		--limit 20000 \
-		--max-commits 100 \
-		--timeout-min 120 \
-		--continue-on-error
-	@echo ""
-	@echo "Running analysis..."
-	cd research && uv run ./analysis/benchmark_report.py
-
-# Fetch repositories using the current mode
-fetch: $(LIST) $(SCRIPTS_FETCH_DIR)/dataset.sh
-	$(SCRIPTS_FETCH_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)
-
-# Analyze file statistics
-# Just the analysis/plotting/paper-variables step of file-stats, over whatever
-# $(RESEARCH_DIR)/stats.sqlite already has on disk, without re-running file_stats itself. Split
-# out for the same reason as benchmark-other-report above - see introductory-paper-empirical
-# below, which depends on this, not on file-stats.
-file-stats-report:
-	(cd research && uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite)
-
-file-stats: build
-	./target/release/file_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
-	$(MAKE) file-stats-report
-
-# Analyze commit statistics
-commit-stats: build
-	./target/release/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
-	(cd research && uv run ./analysis/commit_stats.py $(RESEARCH_DIR)/stats.sqlite)
-
-# Ad-hoc file_stats/commit_stats run over one specific directory (not the dataset-mode pipeline
-# above) - useful for debugging those binaries without the fetch/mode machinery. No `build`
-# prerequisite: research/measure/debug.sh already does its own `cargo build --release --features
-# stats`, so adding one here would just force a redundant full test+build first.
-# Usage: make debug-stats DIR=/path/to/repos [DEBUG_MODE=dirs|all|repositories]
-DEBUG_MODE ?= dirs
-debug-stats:
-	@if [ -z "$(DIR)" ]; then \
-		echo "usage: make debug-stats DIR=/path/to/repos [DEBUG_MODE=dirs|all|repositories]" >&2; \
-		exit 1; \
-	fi
-	./research/measure/debug.sh --$(DEBUG_MODE) $(DIR)
-
-# Sample real (repository, commit, path) code pairs for benchmark test data, per language.
-sample-pairs: build
-	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs.csv
-
-# Measure diff_code's speed, memory, AST size and mapping operation count across a sampled CSV.
-benchmark-pairs: build
-	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark.csv
-
-# Rust-only variants of the two targets above, fixed at 1000 sampled pairs (sample_code_pairs'
-# default --count and --seed, so re-running against the same checkouts reproduces the same pairs).
-# This is the pipeline used to track diff_code's performance over time on real Rust commits;
-# re-run benchmark-pairs-rust after any change to the diff algorithm to measure its effect.
-sample-pairs-rust: build
-	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_rust.csv --language Rust
-
-benchmark-pairs-rust: build
-	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output research/diff_pairs_benchmark_rust.csv
-
-# Size/LOC-changed statistics and distribution plots for sample-pairs-rust's output. Depends on
-# sample-pairs-rust having already been run (needs the checked-out repositories, not just the CSV).
-code-pair-diff-stats:
-	(cd research && uv run ./analysis/code_pair_diff_stats.py sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output-csv code_pair_diff_stats_rust.csv)
-
-# Compares two benchmark-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
-# charts the difference. Usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
-# (save a copy of research/diff_pairs_benchmark_rust.csv before re-running benchmark-pairs-rust,
-# then pass that copy as BEFORE and the fresh run as AFTER).
-benchmark-pairs-diff:
-	@if [ -z "$(BEFORE)" ] || [ -z "$(AFTER)" ]; then \
-		echo "usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
-		exit 1; \
-	fi
-	(cd research && uv run ./analysis/diff_pairs_benchmark_comparison.py --before $(abspath $(BEFORE)) --after $(abspath $(AFTER)))
-
-# Extended language targets with 20000 node limit
-sample-pairs-java: build
-	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_java.csv --language Java --count 1000 --max-commits-per-repo 100
-
-benchmark-pairs-java: build
-	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_java.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_java.csv --max-combined-nodes 20000
-
-sample-pairs-javascript: build
-	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_javascript.csv --language JavaScript --count 1000 --max-commits-per-repo 100
-
-benchmark-pairs-javascript: build
-	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_javascript.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_javascript.csv --max-combined-nodes 20000
-
-sample-pairs-typescript: build
-	./target/release/sample_code_pairs --path $(REPOSITORIES_DIR) --output research/sampled_code_pairs_typescript.csv --language TypeScript --count 1000 --max-commits-per-repo 100
-
-benchmark-pairs-typescript: build
-	./target/release/benchmark_diff_pairs --csv research/sampled_code_pairs_typescript.csv --repo-root $(REPOSITORIES_DIR) --output research/benchmark_typescript.csv --max-combined-nodes 20000
-
-# Analysis target that respects current mode
-analyze: file-stats
-
-# Mode-specific convenience targets
-tiny: override MODE=tiny
-tiny: analyze
-
-small: override MODE=small
-small: analyze
-
-full: override MODE=full
-full: analyze

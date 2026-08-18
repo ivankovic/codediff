@@ -12,19 +12,25 @@ tmp/
 *.pdb
 
 # ---> Research directory. Part of the project but not part of the product.
-**/research/data/*
-**/research/**/plots/
+#
+# research/data/ (the corpus samples and measurement outputs) and research/plots/ (generated
+# figures) are both deliberately TRACKED, and were both previously ignored here:
+#   * `**/research/data/*` was vestigial - that directory did not exist and nothing referenced it.
+#   * `**/research/**/plots/` made plots/ scratch, which forced every paper figure to be *copied*
+#     into research/papers/*/figures/ to be versioned at all. The paper now symlinks into plots/
+#     instead, so plots/ is the single source of truth and has to be committed for a fresh clone
+#     to build the paper. Net repository size is unchanged - the same PNGs, stored once.
 **/research/drivers/gumtree-batch/out/
 # ablation_study.sh always overwrites the same filenames in place (baseline.csv/log,
 # <flag>.csv/log) - regenerable scratch output, not a versioned record, so it doesn't belong in
-# git (unlike e.g. research/results/*_baseline_*.csv, which are deliberately-named point-in-time
+# git (unlike e.g. research/data/results/*_baseline_*.csv, which are deliberately-named point-in-time
 # snapshots kept for historical comparison).
-**/research/ablation/*
+**/research/data/ablation/*
 
 # pdflatex/bibtex build byproducts for research/papers/* - regenerated on every build, not part of
 # the versioned record (unlike the checked-in main.tex/main.bbl/main.pdf in the same directory).
 # Scoped to research/papers/ rather than a bare *.log so this doesn't shadow the deliberately
-# tracked *.log files under research/results/.
+# tracked *.log files under research/data/results/.
 **/research/papers/**/*.aux
 **/research/papers/**/*.blg
 **/research/papers/**/*.log
@@ -55,3 +61,7 @@ venv.bak/
 
 # codediff TUI's persisted theme choice (written to the cwd it's run from)
 .codediff.toml
+
+# sample-pairs-all writes one combined CSV and then splits it per language. The per-language files
+# are the artifact; the combined one is a regenerable intermediate that duplicates all 3MB of them.
+**/research/data/samples/sampled_code_pairs_all.csv

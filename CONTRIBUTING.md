@@ -116,12 +116,21 @@ specific to that subsystem, for example `src/diff/TODO.md`. `REVIEW.md` stays ro
 
 ## Makefile targets
 
-A reference for `make <target>`. Most dataset and corpus targets accept `MODE=tiny` (default),
-`MODE=small`, or `MODE=full`. This flag picks the fetched repository set to run against (see
-`research/list_of_repositories*.csv`). The targets `tiny`, `small`, and `full` are shorthand for
-"run fetch-stats analysis in that mode".
+There are two Makefiles. The repository-root one holds product concerns only - build, test,
+install, the quality gate, release. Everything that exists to produce the papers and empirical
+studies lives in `research/Makefile` and is run from that directory:
 
-### Build, test, quality
+```
+make test                       # root: product targets
+cd research && make rq1-report  # research: corpus, measurement, analysis, papers
+```
+
+Sections below are marked accordingly. Most dataset and corpus targets accept `MODE=tiny`
+(default), `MODE=small`, or `MODE=full`. This flag picks the fetched repository set to run against
+(see `list_of_repositories*.csv` at the repository root). The targets `tiny`, `small`, and `full`
+are shorthand for "run fetch-stats analysis in that mode".
+
+### Build, test, quality (root Makefile)
 
 * `test` - `cargo test`.
 * `build` - `cargo test` + `cargo build --release --features stats` (needed by every dataset/stats
@@ -135,9 +144,9 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
   side in nvim's diff mode.
 * `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
   gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
-* `benchmark-optimal-report` - same as `benchmark-optimal`, plus `--csv` output and a report on how
+* `benchmark-optimal-report` (research/) - same as `benchmark-optimal`, plus `--csv` output and a report on how
   much of the diff each algorithm pass (`ASTMappingReason`) is responsible for.
-* `benchmark-other` - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
+* `benchmark-other` (research/) - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
   on line-level agreement with the human mapping, plus runtime, then runs `benchmark-other-report`
   below. Each external tool needs its own environment variable pointing at a built binary:
   `GUMTREE_BIN` (a built GumTree distribution - this is the only one with an external, non-Rust
@@ -150,14 +159,14 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
   first fixture in that tool's language scope, rather than silently skipping the tool (see
   `src/bin/benchmark_other.rs`'s own doc comment). This is the slow half of the pair below - a
   fresh GumTree JVM cold-starts once per fixture.
-* `benchmark-other-report` - just the analysis/plotting step of `benchmark-other`, over whatever
-  `research/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
+* `benchmark-other-report` (research/) - just the analysis/plotting step of `benchmark-other`, over whatever
+  `research/data/comparison/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
   variables above, since it never runs the benchmark itself. `introductory-paper` below depends on
   this, not on `benchmark-other`, so rebuilding the paper never pays for a fresh benchmark run.
-* `ablation-study [OUT_DIR=path]` - a leave-one-out study over the diff algorithm's optional
+* `ablation-study [OUT_DIR=path]` (research/) - a leave-one-out study over the diff algorithm's optional
   heuristic passes. It measures each pass's real contribution to accuracy on the fixture corpus.
 * `check-quality` - what `deploy` runs before it tags a release. This target gates on
-  `research/quality_baseline.txt`. It fails hard on an accuracy regression. It only warns, and does
+  `research/data/quality/quality_baseline.txt`. It fails hard on an accuracy regression. It only warns, and does
   not fail, on a runtime jump of more than 2x.
 * `update-quality-baseline` - deliberately lowers that bar, after a reviewed improvement. `deploy`
   never runs this target automatically.
@@ -165,7 +174,7 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
   `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
   first command compares against the saved baseline. The second command saves a new baseline.
 
-### Release
+### Release (root Makefile)
 
 * `deploy` - publishes a release everywhere: `deploy-crates` then `deploy-github`, in that order
   (crates.io first, since a publish there can never be undone - only yanked - while a GitHub tag
@@ -179,13 +188,13 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
   triggers `.github/workflows/release.yml`, which builds and publishes the cross-platform
   `codediff` binaries as a GitHub Release.
 
-### Papers
+### Papers (research/Makefile)
 
 * `introductory-paper` - re-renders the benchmark_other charts and table
   `research/papers/introductory-paper/main.tex` embeds (accuracy chart, runtime chart, and a
   variance table - a generated `.tex` table `\input` directly, not a PNG) from whatever
-  `research/benchmark_other.csv` already has on disk, copies them into that paper's `figures/`,
-  and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-other` - run
+  `research/data/comparison/benchmark_other.csv` already has on disk into `research/plots/` (which that paper's
+  `figures/` symlinks into - there is no copy step), and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-other` - run
   that yourself first to refresh the underlying data, this target only re-renders from it, so a
   paper rebuild stays fast. Needs a LaTeX toolchain with the `acmart` class and `cm-super` (see
   that paper's own `README.md` for the install command).
@@ -193,15 +202,15 @@ A reference for `make <target>`. Most dataset and corpus targets accept `MODE=ti
   repository/file/language counts, bytes-AST correlation) and its file-types figure, from whatever
   `$(RESEARCH_DIR)/stats.sqlite` already exists for the current `MODE` (pass `MODE=small` or
   `MODE=full` to match whichever `file-stats` run you actually have - see "Dataset / corpus
-  analysis" below). These numbers are LaTeX macros in `figures/variables.tex`, generated by
-  `research/analysis/file_stats.py`, not hand-transcribed - see that file's own
+  analysis" below). These numbers are LaTeX macros in `research/plots/variables.tex`, assembled by
+  `research/analysis/paper_variables.py`, not hand-transcribed - see that file's own
   `write_paper_variables` doc comment for why (short version: the paper's original Table 1 numbers
   turned out to be hand-copied from a conference slide deck whose own source computation was never
   saved anywhere, and by the time anyone asked why Bytes' max was blank, there was no way to
   answer it). Depends on `file-stats-report`, not `file-stats` - run that yourself first (slow -
   it re-parses every file in the corpus) to (re)populate the mode's `stats.sqlite`.
 
-### Dataset / corpus analysis (research/)
+### Dataset / corpus analysis (research/Makefile)
 
 * `fetch` - clones/updates the repository set for the current `MODE`.
 * `file-stats` / `commit-stats` - run `file_stats` or `commit_stats` over the fetched repositories,

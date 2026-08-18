@@ -26,7 +26,7 @@ use rand::Rng;
 /// large/xlarge, <1,000/<10,000/<100,000/>=100,000 bytes) is what originally built the RQ1 corpus
 /// underlying the introductory paper's empirical study (see `research/analysis/
 /// apted_only_report.py`'s docstring, which cites it directly) - kept only as history here, not
-/// reproduced: the already-committed `research/sampled_code_pairs_*.csv` files still carry those
+/// reproduced: the already-committed `research/data/samples/sampled_code_pairs_*.csv` files still carry those
 /// old byte-based labels in their own `size_bucket` column (that column name is unchanged - see
 /// this module's `pub fn loc_bucket`'s doc comment - only what gets written into it going
 /// forward), and aren't retroactively relabeled by this change; only a fresh `sample_code_pairs`
