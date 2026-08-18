@@ -15,11 +15,12 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+#[cfg(test)]
+mod gap_survey;
 pub mod hash;
 pub mod language;
 pub mod metadata;
 pub mod similarity;
-#[cfg(test)]
 mod similarity_corpus_tests;
 pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
 

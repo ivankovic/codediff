@@ -1581,6 +1581,64 @@ use and should not be assumed to inherit that failure, but must be validated sep
 an estimate above 16 tokens: rank and gate with it, never conclude equality, which the exact hashes
 already answer definitively.
 
+### Gap-owned text: what tree-sitter puts *between* the children (2026-08-18)
+
+Prompted by an obvious follow-up question after the sketch's YAML surprise - if a node's content can
+live in gap text rather than in a child, is that information *lost*? **No, and establishing that is
+the useful part.** Every node's full span is already in `ASTNodeMetadata::text`, and
+`compute_full_hash` has always hashed the gaps, so equality matching was never blind. What is blind
+is any logic that *enumerates leaves*, and (as measured below) `compute_structural_hash`, which
+ignores gaps by design.
+
+**Corpus census** (`code::gap_survey`, an `#[ignore]`d diagnostic - re-run it if a new language is
+added). Internal nodes owning non-whitespace text, both sides of all 418 fixtures:
+
+| language | such nodes | biggest kinds |
+|---|---|---|
+| XML | 21665 | `AttValue` 21663 nodes / 394KB - i.e. **every attribute value** |
+| CSS | 7128 | `integer_value` 5517, `color_value` 1445 |
+| Rust | 2288 | `line_comment` 2103 / 126KB, `block_comment` 46 / 20KB |
+| YAML | 1878 | `double_quote_scalar` 1095, `single_quote_scalar` 749 |
+| Vimscript | 1723 | `hl_attribute` 384, `list` 284 |
+| Scala | 420 | `interpolated_string` 294 |
+
+Zero in TypeScript, JSON, Go, Kotlin, JavaScript, C++, TSX, Java - which is why this had never
+surfaced.
+
+**Tried and reverted: charging for it in `UnitCostModel::ren`.** `ren` returns 0 for same-kind
+internal nodes because "children cost is accounted for separately", which is false for exactly
+these nodes - `role="button"` -> `role="menu"` costs nothing, and matching an `AttValue` to a
+totally unrelated one is equally free. Adding an `owned_text_hash` to `ASTNodeMetadata` and pricing
+a difference as `COST_LITERAL_UPDATE` was **-1 mismatch across the whole corpus** (2725 -> 2724, two
+fixtures moved) for +4% total latency and p99 801 -> 935ms. Reverted. (Hashing rather than comparing
+`String`s recovered part of the cost - 1039 -> 935ms - so the residue is APTED doing more work once
+these pairs stop being free, not per-cell string scans.)
+
+**Why it was inert, which is the finding worth keeping.** On the fixture that motivated it,
+`xml-odoo-odoo-add-button-roles` (109 mismatches, 81 involving `AttValue`), **not one mismatch is
+decided by `ren`**:
+
+| reason | count |
+|---|---|
+| `StructurallyIdenticalAncestor` | 41 |
+| `APTED("fast_fallback")` | 23 |
+| `UnresolvedNode` | 22 |
+| `MovedSubtree` | 16 |
+
+The cost model was never a party to these decisions. **Check which pass owns a fixture's mismatches
+before improving a pass** - `--details <fixture> | grep -o 'reason ...'` is the whole check, and it
+would have saved this experiment.
+
+**The lead it did produce.** `StructurallyIdenticalAncestor` is the single biggest contributor, and
+it rests on `compute_structural_hash`, which hashes *only* kinds and child counts - gaps are
+deliberately excluded. On a gap-heavy language that is a much stronger claim than intended: two XML
+`AttValue`s with completely different values are "structurally identical", and so is every ancestor
+above them, so the pass pairs their children positionally on evidence that excludes the only bytes
+that actually differ. Note this is not automatically wrong - `yaml-draios-sysdig`'s positional
+pairing is exactly what its ground truth wants - so the fix is not "hash the gaps into the
+structural hash" but "find out where positional-under-a-structural-match is and isn't right", with
+XML's 41 as the worked example.
+
 ### Move detection: the ambiguity guard (2026-08-17, shipped)
 
 Followed the lead above. `--dump` on `python-django` showed all 48 mismatches came from three
