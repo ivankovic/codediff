@@ -22,6 +22,8 @@ mod c_libtom_libtomcrypt_change_function_call;
 #[cfg(test)]
 mod c_ondsel_development_ondselsolver_add_include;
 #[cfg(test)]
+mod c_pocoproject_poco_replace_0_with_nullptr;
+#[cfg(test)]
 mod c_tripwire_tripwire_open_source_add_single_item_to_list;
 #[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_comment_update;
@@ -33,6 +35,8 @@ mod cpp_bolero_murakami_sprout_copyright_update_3;
 mod cpp_lancos_ponyprog_remove_a_few_lines;
 #[cfg(test)]
 mod cpp_llnl_sundials_comment_change;
+#[cfg(test)]
+mod cpp_mikepopoloski_slang_remove_if_condition_and_brackets;
 #[cfg(test)]
 mod csharp_cyanfish_naps2_add_condition_to_if;
 #[cfg(test)]
@@ -67,6 +71,8 @@ mod go_jesseduffield_lazygit_add_function;
 mod go_prometheus_node_exporter_remove_one_comment;
 #[cfg(test)]
 mod go_stackexchange_blackbox_add_comment;
+#[cfg(test)]
+mod html_abs_lang_abs_version_update_in_string;
 #[cfg(test)]
 mod html_chennes_med_only_text_value_change;
 #[cfg(test)]
@@ -121,6 +127,8 @@ mod kotlin_jetbrains_kotlin_add_single_const;
 mod kotlin_jetbrains_kotlin_remove_one_comment_line;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_typealias_with_annotations;
+#[cfg(test)]
+mod kotlin_yairm210_unciv_move_from_vec2_to_hexexpression;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_small_change;
 #[cfg(test)]
@@ -224,9 +232,17 @@ mod shellscript_maxsatula_ocp_small_change;
 #[cfg(test)]
 mod shellscript_nicolargo_glances_add_shebang;
 #[cfg(test)]
+mod shellscript_openlightingproject_ola_real_small_change;
+#[cfg(test)]
 mod shellscript_ropery_ffcast_comment_only_change;
 #[cfg(test)]
+mod swift_apple_swift_argument_parser_simplify_code;
+#[cfg(test)]
 mod swift_apple_swift_argument_parser_small_change;
+#[cfg(test)]
+mod swift_swift_emacs_swift_mode_seems_like_test_code;
+#[cfg(test)]
+mod tsx_greenbone_gsa_add_import_and_use_it;
 #[cfg(test)]
 mod tsx_keybase_client_change_from_one_import_and_call_to_another;
 #[cfg(test)]
@@ -262,7 +278,11 @@ mod xml_antlr_antlr3_comment_out_part_of_code_interesting_case;
 #[cfg(test)]
 mod xml_eclipse_ee4j_jaxb_istack_commons_update_version_string;
 #[cfg(test)]
+mod xml_fasterxml_jackson_dataformat_xml_only_string_value_change;
+#[cfg(test)]
 mod xml_gap_packages_toric_remove_two_attributes;
+#[cfg(test)]
+mod xml_gpuopen_drivers_amdvlk_version_update;
 #[cfg(test)]
 mod xml_javacc_javacc_version_update;
 #[cfg(test)]
