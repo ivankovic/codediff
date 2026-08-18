@@ -674,6 +674,17 @@ fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperati
 * inflate `diff_cost - human_mapping_cost` for a reason that has nothing to do with the algorithm -
 * worth checking with `--details` before trusting a surprising gap on an unfamiliar fixture.
 */
+/// A node's `owned_text_hash`, or 0 when the node has no metadata entry - the same "absent means
+/// owns nothing" convention `ASTNodeMetadata::owned_text_hash` uses, so a missing entry can never
+/// be mistaken for a change.
+fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
+    metadata
+        .node_info
+        .get(&id)
+        .map(|info| info.owned_text_hash)
+        .unwrap_or(0)
+}
+
 pub fn human_mapping_cost(
     mapping: &HumanMapping,
     before_root: Node,
@@ -694,12 +705,35 @@ pub fn human_mapping_cost(
 
     let mut total = 0u64;
     for entry in &entries {
-        let (operation, subtree_size) = match entry.operation {
-            HumanOperation::Identical => (ASTMappingOperation::Identical, 1),
-            HumanOperation::Update => (ASTMappingOperation::Update, 1),
-            HumanOperation::MatchButNotIdentical => (ASTMappingOperation::MatchButNotIdentical, 1),
-            HumanOperation::Delete => (ASTMappingOperation::Delete, 1),
-            HumanOperation::Insert => (ASTMappingOperation::Insert, 1),
+        let (operation, subtree_size, owned_text_changed) = match entry.operation {
+            HumanOperation::Identical => (ASTMappingOperation::Identical, 1, false),
+            HumanOperation::Update => (ASTMappingOperation::Update, 1, false),
+            HumanOperation::MatchButNotIdentical => {
+                // The one operation that has to look at the nodes themselves: a node owning text
+                // directly (an XML attribute value, a YAML quoted scalar - see
+                // `ASTNodeMetadata::owned_text_hash`) carries a difference that no descendant
+                // entry accounts for, so it must be charged here or it is charged nowhere. Both
+                // paths are always present for a match; a missing one can only mean a malformed
+                // mapping, and treating it as "unchanged" keeps this a cost function rather than
+                // a validator (`check_entry` is what rejects malformed entries).
+                let changed = match (entry.before_path.as_ref(), entry.after_path.as_ref()) {
+                    (Some(before_path), Some(after_path)) => {
+                        let before = before_cache.resolve(before_root, &path_refs(before_path));
+                        let after = after_cache.resolve(after_root, &path_refs(after_path));
+                        match (before, after) {
+                            (Ok(before), Ok(after)) => {
+                                owned_text_hash(before_metadata, before.id())
+                                    != owned_text_hash(after_metadata, after.id())
+                            }
+                            _ => false,
+                        }
+                    }
+                    _ => false,
+                };
+                (ASTMappingOperation::MatchButNotIdentical, 1, changed)
+            }
+            HumanOperation::Delete => (ASTMappingOperation::Delete, 1, false),
+            HumanOperation::Insert => (ASTMappingOperation::Insert, 1, false),
             HumanOperation::DeleteWithChildren => {
                 let path = entry
                     .before_path
@@ -713,7 +747,7 @@ pub fn human_mapping_cost(
                     .get(&node.id())
                     .copied()
                     .unwrap_or(1);
-                (ASTMappingOperation::DeleteWithChildren, size)
+                (ASTMappingOperation::DeleteWithChildren, size, false)
             }
             HumanOperation::InsertWithChildren => {
                 let path = entry
@@ -728,10 +762,10 @@ pub fn human_mapping_cost(
                     .get(&node.id())
                     .copied()
                     .unwrap_or(1);
-                (ASTMappingOperation::InsertWithChildren, size)
+                (ASTMappingOperation::InsertWithChildren, size, false)
             }
         };
-        total += operation_cost(&operation, subtree_size);
+        total += operation_cost(&operation, subtree_size, owned_text_changed);
     }
     Ok(total)
 }

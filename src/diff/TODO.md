@@ -1498,10 +1498,14 @@ literally nothing and only churns the diff, which is exactly why the human left 
 CSS the crossing genuinely halves the cost, 8 -> 4, and the human traces it (`declaration:3 ->
 declaration:2` alongside `declaration:2 -> declaration:3`).
 
-**So the discriminator a rebuilt swap pass needs is "does crossing strictly reduce *real* cost",
-using `UnitCostModel`, not a proxy and not a similarity score.** That is what the reverted pass
-claimed to do; it failed because `sequence_edit_cost` is a *different* cost function from the one
-the benchmark scores against, and the two disagree precisely where content sits in gap text. Note
+~~**So the discriminator a rebuilt swap pass needs is "does crossing strictly reduce *real* cost".**~~
+**Also retracted, same day, by the cost fix in the gap-text section below** - once gap-owned text is
+charged, this fixture's positional ground truth costs 6 and the permutation costs 0, so the human
+chose the *dearer* mapping and no cost rule separates it from `css-wordpress-reformat`, where they
+chose the cheaper one. The `0 / 0` reading that suggested "cost-neutral, so the human broke the tie
+on simplicity" was itself a symptom of the bug. What remains true is that `sequence_edit_cost` is a
+*different* cost function from the one the benchmark scores against, and that they disagree
+precisely where content sits in gap text. Note
 also that such a pass must not retract an existing match: every pass in this pipeline is monotone
 (matching only ever adds), which is what makes residual filtering behaviour-preserving, and
 `ASTDiff` deliberately offers no match-removal API. The decision has to be made where the pairing
@@ -1647,18 +1651,34 @@ before improving a pass** - `--details <fixture> | grep -o 'reason ...'` is the 
 not make the cost fix wrong, but it does predict, in seconds and before any code, that the fix
 cannot move *this* fixture.
 
-**A second instance of the same hole, not yet fixed - it needs a decision.** `cost::operation_cost`
-prices `MatchButNotIdentical` at 0 unconditionally, on the same premise ("the differences below are
-charged on the descendant entries") and with the same exception: when the difference is in gap text
-there *are* no descendant entries carrying it. This is why
-`yaml-draios-sysdig-string-url-change` reports `algorithm_cost 0 / human_cost 0` for a file in which
-six URLs changed, and it is unaffected by the `ren` fix, since these are separate code paths -
-`ren` drives APTED's internal DP, `operation_cost` produces the *reported and scored* cost. That
-makes it the more consequential of the two: `algorithm_cost` vs `human_cost` is how this project
-decides whether a better mapping is reachable at all (see the "cost tie is not a floor" note). Left
-alone deliberately - fixing it shifts every fixture's `algorithm_cost` **and** `human_cost`, i.e.
-re-bases every recorded cost comparison in this file, which is a call to make deliberately rather
-than as a side effect.
+**The same hole on the scored path, now also fixed.** `cost::operation_cost` priced
+`MatchButNotIdentical` at 0 unconditionally, on the same premise ("the differences below are charged
+on the descendant entries") and with the same exception: when the difference is in gap text there
+*are* no descendant entries carrying it. It now charges `COST_UPDATE` when the paired nodes'
+`owned_text_hash` differ, on both sides of the comparison (`diff_cost` and
+`human_mapping_cost`, which must stay under one cost model or the two columns stop being
+comparable). `diff_cost` feeds only the benchmark's reporting, so **no mismatch count moved** - 24
+fixtures' cost columns did, and `yaml-draios-sysdig-string-url-change` went from `0 / 0` to
+**`6 / 6`**, i.e. exactly the six changed URLs it had been reporting as free. Sanity checks: the
+count of fixtures where `algorithm_cost < human_cost` is unchanged at 14, and where the algorithm
+reproduces the human's mapping both columns move together (`+6 / +6`), while where they differ only
+the algorithm pays (`xml-odoo` `+4 / +0`, widening 115/30 to 119/30 - the gap it should have been
+showing all along).
+
+**This falsifies the "use real cost as the discriminator" recommendation made above.** With costs
+now honest, the yaml fixture's *positional* ground truth costs **6** while the permutation the
+sketch identifies costs **0** (every pair byte-identical, and `COST_MOVE` is 0). So the human chose
+the strictly more expensive mapping - the earlier reading, "both cost 0, so the human broke the tie
+on simplicity", was an artefact of the very bug this section fixes. A cost-driven crossed-sibling
+repair would therefore *still* break these five fixtures.
+
+Where that leaves the crossed-sibling problem: the human traces the crossing in
+`css-wordpress-reformat` (cheaper: 4 vs 8) and refuses it in `yaml-draios-sysdig` (dearer: 6 vs 0),
+so **ground truth here is not cost-minimising and no cost rule can separate the two**. The remaining
+candidate distinction is semantic rather than numeric - a CSS `declaration` is a named entity
+(`margin-top` is a thing with an identity that can move), a YAML list row is anonymous data whose
+position *is* its identity - which is testable against the corpus but has not been tested. Do not
+build the pass on a cost rule.
 
 **The lead it did produce.** `StructurallyIdenticalAncestor` is the single biggest contributor, and
 it rests on `compute_structural_hash`, which hashes *only* kinds and child counts - gaps are

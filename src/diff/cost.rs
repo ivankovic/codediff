@@ -50,11 +50,17 @@ use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_M
 * Mirrors `apted::common::UnitCostModel`'s per-operation costs, generalized from "match/rename a
 * pair of node labels" (what APTED's DP evaluates candidate by candidate) to "here is the fully
 * resolved operation for this entry" (what a finished mapping already records):
-* - `Identical`, `MatchButNotIdentical`, `Move`, `DoNothing`, `NotYetSet` -> 0. A same-kind
-*   internal-node match costs nothing at the root; `UnitCostModel::ren` already returns 0 for that
-*   case for the same reason - the real cost of any actual difference inside the subtree shows up
-*   as its own, separate entries for the differing descendants, and double-charging the ancestor
-*   for them would count that cost twice.
+* - `Identical`, `Move`, `DoNothing`, `NotYetSet` -> 0, and `MatchButNotIdentical` -> 0 *unless*
+*   `owned_text_changed`. A same-kind internal-node match costs nothing at the root because the
+*   real cost of any difference inside the subtree shows up as its own, separate entries for the
+*   differing descendants, and double-charging the ancestor would count it twice - the same premise
+*   `UnitCostModel::ren` rests on. The exception is a node that owns text *directly*, in the gaps
+*   its children don't cover: there is no descendant entry carrying that difference, so charging 0
+*   loses it outright. That is not hypothetical - it is why
+*   `yaml-draios-sysdig-string-url-change` scored `algorithm_cost 0 / human_cost 0` for a file in
+*   which six URLs changed. See `ASTNodeMetadata::owned_text_hash` for how widespread gap-owned
+*   text is (every XML attribute value, every CSS numeric and colour literal, every Rust comment).
+*   Priced at `COST_UPDATE`, exactly as the equivalent leaf change would be.
 * - `Update` -> `COST_UPDATE`, `Delete` -> `COST_DELETE`, `Insert` -> `COST_INSERT`: single-node
 *   costs, matching `UnitCostModel::del`/`ins`/`ren`'s leaf-rename case exactly.
 * - `DeleteWithChildren`/`InsertWithChildren` -> `COST_DELETE`/`COST_INSERT` times `subtree_size`:
@@ -65,8 +71,13 @@ use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_M
 *   handled correctly for `human_mapping_cost` even though `diff_cost` should never hit this arm in
 *   practice today.
 */
-pub fn operation_cost(operation: &ASTMappingOperation, subtree_size: usize) -> u64 {
+pub fn operation_cost(
+    operation: &ASTMappingOperation,
+    subtree_size: usize,
+    owned_text_changed: bool,
+) -> u64 {
     match operation {
+        ASTMappingOperation::MatchButNotIdentical if owned_text_changed => COST_UPDATE,
         ASTMappingOperation::Identical
         | ASTMappingOperation::MatchButNotIdentical
         | ASTMappingOperation::DoNothing
@@ -109,7 +120,14 @@ pub fn diff_cost(
                     .unwrap_or(1),
                 _ => 1,
             };
-            operation_cost(&m.operation, subtree_size)
+            // Only meaningful for a matched pair; `before_id`/`after_id` is 0 on the missing side
+            // of a lone delete/insert, and a lookup for it simply finds nothing.
+            let owned_text_hash = |metadata: &ASTMetadata, id: usize| {
+                metadata.node_info.get(&id).map(|info| info.owned_text_hash)
+            };
+            let owned_text_changed = owned_text_hash(before_metadata, before_id)
+                != owned_text_hash(after_metadata, after_id);
+            operation_cost(&m.operation, subtree_size, owned_text_changed)
         })
         .sum()
 }
@@ -136,27 +154,33 @@ mod tests {
     }
 
     #[test]
-    fn identical_and_match_but_not_identical_cost_nothing() {
-        assert_eq!(operation_cost(&ASTMappingOperation::Identical, 50), 0);
+    fn identical_and_unchanged_match_but_not_identical_cost_nothing() {
         assert_eq!(
-            operation_cost(&ASTMappingOperation::MatchButNotIdentical, 50),
+            operation_cost(&ASTMappingOperation::Identical, 50, false),
             0
         );
-        assert_eq!(operation_cost(&ASTMappingOperation::Move, 50), COST_MOVE);
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::MatchButNotIdentical, 50, false),
+            0
+        );
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::Move, 50, false),
+            COST_MOVE
+        );
     }
 
     #[test]
     fn single_node_operations_cost_one_regardless_of_subtree_size() {
         assert_eq!(
-            operation_cost(&ASTMappingOperation::Update, 50),
+            operation_cost(&ASTMappingOperation::Update, 50, false),
             COST_UPDATE
         );
         assert_eq!(
-            operation_cost(&ASTMappingOperation::Delete, 50),
+            operation_cost(&ASTMappingOperation::Delete, 50, false),
             COST_DELETE
         );
         assert_eq!(
-            operation_cost(&ASTMappingOperation::Insert, 50),
+            operation_cost(&ASTMappingOperation::Insert, 50, false),
             COST_INSERT
         );
     }
@@ -164,11 +188,11 @@ mod tests {
     #[test]
     fn with_children_operations_scale_by_subtree_size() {
         assert_eq!(
-            operation_cost(&ASTMappingOperation::DeleteWithChildren, 7),
+            operation_cost(&ASTMappingOperation::DeleteWithChildren, 7, false),
             7 * COST_DELETE
         );
         assert_eq!(
-            operation_cost(&ASTMappingOperation::InsertWithChildren, 3),
+            operation_cost(&ASTMappingOperation::InsertWithChildren, 3, false),
             3 * COST_INSERT
         );
     }
@@ -206,5 +230,52 @@ mod tests {
             diff_cost(&diff, &before_meta, &after_meta),
             6 * COST_DELETE + 4 * COST_INSERT
         );
+    }
+
+    /// A matched pair whose *own* text differs must not be free. `MatchButNotIdentical` is priced
+    /// at 0 because a matched internal node's differences show up as separate entries for its
+    /// differing descendants - which is exactly wrong for a node owning text in the gaps its
+    /// children don't cover, since no such descendant entry exists. Concretely: this is why
+    /// `yaml-draios-sysdig-string-url-change` reported a total cost of 0 for a file in which six
+    /// URLs changed.
+    #[test]
+    fn match_but_not_identical_charges_for_a_node_s_own_changed_text() {
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::MatchButNotIdentical, 1, true),
+            COST_UPDATE
+        );
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::MatchButNotIdentical, 1, false),
+            0
+        );
+        // `Identical` cannot have differing owned text (the subtrees are byte-identical), and the
+        // flag must not leak into operations that already price their own difference.
+        assert_eq!(operation_cost(&ASTMappingOperation::Identical, 1, true), 0);
+        assert_eq!(
+            operation_cost(&ASTMappingOperation::Update, 1, true),
+            COST_UPDATE
+        );
+    }
+
+    /// `diff_cost` must derive that flag from the nodes, not be told it - the regression guard for
+    /// the whole-pipeline path, where a gap-owning pair used to contribute nothing at all.
+    #[test]
+    fn diff_cost_charges_a_gap_owning_matched_pair() {
+        let node = |owned_text_hash: u64| crate::code::ASTNodeMetadata {
+            owned_text_hash,
+            ..crate::code::ASTNodeMetadata::new("AttValue".to_string(), String::new(), vec![], 0, 0)
+        };
+        let mut before_meta = ASTMetadata::default();
+        let mut after_meta = ASTMetadata::default();
+        before_meta.node_info.insert(1, node(0xABC));
+        after_meta.node_info.insert(2, node(0xDEF));
+
+        let mut diff = ASTDiff::default();
+        diff.add_mapping(1, 2, mapping(ASTMappingOperation::MatchButNotIdentical));
+        assert_eq!(diff_cost(&diff, &before_meta, &after_meta), COST_UPDATE);
+
+        // Same pair, same owned text: back to free.
+        after_meta.node_info.insert(2, node(0xABC));
+        assert_eq!(diff_cost(&diff, &before_meta, &after_meta), 0);
     }
 }
