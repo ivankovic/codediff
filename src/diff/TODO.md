@@ -1468,53 +1468,110 @@ Two things were tried and did *not* explain the YAML damage, so don't repeat the
   commutative parent at all: `--details` puts it inside a `flow_sequence`, YAML's inline `[a, b]`
   list, which is ordered.
 
-**The real defect is the cost estimator, and that is the useful finding.** The decision used
-`solve_greedy_anchor_blocks::sequence_edit_cost`, which by design counts two children as "the same
-token" only when their *full subtree hashes are identical* - it is deliberately blind to a child
-that merely resembles its counterpart. For two near-identical strings differing in one URL, that
-blindness makes a crossing look cheaper than the truth, and in an ordered sequence position *is*
-part of identity, so the human's mapping stays positional. The pass is only ever as good as the
-estimator deciding its swaps, and this estimator cannot see "almost the same".
+~~**The real defect is the cost estimator, and that is the useful finding.**~~ **Retracted
+2026-08-18 - this diagnosis was wrong, and the correction below is the useful finding.** The claim
+was that `sequence_edit_cost` (blind to a child that merely *resembles* its counterpart) made the
+crossing look cheap, so a similarity-aware estimator would fix the YAML damage. It would not. A
+similarity measure was built (`code::similarity`) and it reads the YAML fixture *perfectly* - each
+`flow_node` scores 1.00 against its true permuted counterpart and 0.33 against every other, so the
+permutation is unambiguous. **That is the wrong answer**, and a better estimator only reaches it
+faster:
 
-### Idea: a similarity-preserving hash, for cheap detection of near-identical siblings
+```
+yaml-draios-sysdig-string-url-change, human_mapping.json
+  match_but_not_identical | flow_node:1 -> flow_node:1
+  ... all six, positional, though every one is byte-identical to a flow_node elsewhere
+```
 
-Recurring across several of the investigations above, and worth trying on its own merits.
+**The ground truth is positional. The objective was wrong, not the estimator.** And the reason is
+visible in the benchmark's own cost columns rather than in anyone's taste:
 
-Every hash in `code::hash` today is an *equality* hash: `node_to_full_hash`,
-`node_to_kind_and_value_hash`, `node_to_kind_only_hash` all answer "are these two subtrees exactly
-the same?" and say nothing when the answer is no. That single limitation is behind a surprising
-number of the open items here:
+| fixture | algorithm_cost | human_cost |
+|---|---|---|
+| `yaml-draios-sysdig-string-url-change` | 0 | 0 |
+| `css-wordpress-reformat` | 8 | 4 |
 
-- The crossed-sibling repair above cannot tell "the same declaration, moved" from "a different
-  declaration", so it has to fall back on a coarse estimator and gets ordered sequences wrong.
-- `css-wordpress-reformat`'s blocks cannot hash-match despite being ~90% identical, because one
-  declaration gained a trailing `;` - one differing child changes the whole multiset hash, and the
-  pair drops to APTED.
-- The "search-quality gap" bucket (large rewrites where surviving content hides inside new
-  structure, `rust-zed-workspace-tasks` and friends) needs exactly "find me the most similar
-  candidate", which no current hash can answer.
-- The LSH/MinHash candidate-search idea (literature candidate #3) is the same need, arrived at from
-  the opposite direction.
+In the YAML file the differing URL text lives in *gap text* between the two quote leaves, and
+`UnitCostModel::ren` prices a same-kind pairing at 0 because its children carry the cost - so the
+change is invisible to the cost model and **both mappings cost 0**. Chasing the permutation buys
+literally nothing and only churns the diff, which is exactly why the human left it positional. In
+CSS the crossing genuinely halves the cost, 8 -> 4, and the human traces it (`declaration:3 ->
+declaration:2` alongside `declaration:2 -> declaration:3`).
 
-**Sketch.** Give each node a *similarity signature* alongside its equality hashes - a fixed-width
-sketch of the multiset of its descendants' leaf hashes (MinHash, or a simple k-of-N bottom-k
-sketch), computed bottom-up in the same walk that already computes the other hashes, so it is O(n)
-at metadata time and O(1) to compare. Two signatures then yield an estimated Jaccard similarity of
-two subtrees' contents in constant time, without touching either subtree.
+**So the discriminator a rebuilt swap pass needs is "does crossing strictly reduce *real* cost",
+using `UnitCostModel`, not a proxy and not a similarity score.** That is what the reverted pass
+claimed to do; it failed because `sequence_edit_cost` is a *different* cost function from the one
+the benchmark scores against, and the two disagree precisely where content sits in gap text. Note
+also that such a pass must not retract an existing match: every pass in this pipeline is monotone
+(matching only ever adds), which is what makes residual filtering behaviour-preserving, and
+`ASTDiff` deliberately offers no match-removal API. The decision has to be made where the pairing
+is *first* made - inside the aligner - not repaired afterwards.
 
-What that buys, concretely: a cheap "is this pair nearly identical?" test usable *inside* hot loops
-where a real comparison is unaffordable - the swap decision above, `solve_moved_subtrees`' ambiguous
-candidate choice, `qualified_name`'s group tie-break, and a pre-filter for candidate search in large
-rewrites. It also gives an honest similarity number for near-miss cases like the trailing-`;`
-block, where equality hashing has to answer "different" and the truth is "95% the same".
+### The similarity sketch (2026-08-18, shipped)
 
-**Watch out for**: (1) the 2026-07-11 container-dissimilarity revert - that was a *cost-model*
-change (a text-similarity surcharge on `ren`) and it broke five perfect fixtures; a signature used
-for *candidate selection and tie-breaks* is a different use and should not be assumed to inherit
-that failure, but it must be validated separately rather than assumed safe. (2) Determinism: the
-sketch must be seeded from a constant, never from a per-process hasher, or it re-introduces exactly
-the run-to-run instability documented in `benchmark-determinism-fix`. (3) It is an *estimate* - use
-it to rank and to gate, never as proof two subtrees are equal, which the existing exact hashes
+The idea recorded here as speculation - "give each node a similarity signature alongside its
+equality hashes" - was built, measured, and kept. `code::similarity::SimilaritySketch` is a
+bottom-k MinHash over the set of content-token hashes in a subtree, computed in the same post-order
+walk as the four existing hashes: O(n) at metadata time, O(k) to compare two arbitrary nodes
+without walking either subtree. It is *exact*, not estimated, whenever both subtrees have <= 16
+distinct tokens, which covers most nodes in a real file, and `jaccard` divides by the union size
+rather than by k so small subtrees are not systematically under-reported.
+
+**Two design points that measurement decided, not taste.**
+
+*Sketch leaves, not every descendant.* All-descendants sounds more discriminative and is strictly
+worse for the near-identical case this exists for: one changed token flips the full hash of every
+ancestor inside the subtree, so a one-token edit costs O(depth) set elements instead of 1.
+
+*A node's own gap text counts as a token.* Found the hard way. tree-sitter-yaml keeps a quoted
+scalar's body in the *gap* between its two quote leaves, so a leaf-only sketch made six completely
+different URLs in a `flow_sequence` identical - every pairing scored 1.00. Grammars disagree about
+whether a scalar's body is a child node or gap text, and a similarity measure must not depend on
+which choice a grammar made. `hash::compute_owned_text_hash` pulls the gaps out for this; note the
+same blindness is worth checking for in any *other* consumer that reasons about leaves.
+
+**What it bought, and what it did not.**
+
+Its intended customer - the crossed-sibling repair - turned out not to need it, and the entry above
+records why at length: that fixture's ground truth is positional and cost-neutral, so no similarity
+measure however good would have prevented the regression. **A negative result that cost one
+afternoon instead of a rebuilt pass, because the sketch was aimed at the failing fixture before any
+consumer was written.** Do that first next time too.
+
+The customer it *did* find was `solve_moved_subtrees`' ambiguity guard. That guard refuses to pick
+between several identical small move targets, on the sound reasoning that the candidates are
+indistinguishable - they share a full hash, which is why they are candidates. But their
+*surroundings* need not be indistinguishable, and comparing two containers is exactly the O(k)
+question the sketch answers. `disambiguate_by_context` compares the parents and accepts the winner
+only when it leads by `CONTEXT_TIEBREAK_MARGIN`:
+
+| | mismatches | zero-mismatch | > 0.5% tail | p50 | p99 | total |
+|---|---|---|---|---|---|---|
+| baseline | 2747 | 313 | 33 | 3.70ms | 802ms | 19.0s |
+| **shipped** | **2725** | 313 | 33 | 3.73ms | 801ms | 19.1s |
+
+-22 mismatches, no regressions, latency unmoved. `html-apache-echarts` 90 -> 76, `tsx-excalidraw`
+235 -> 231, `vimscript-...-hex-colours` 23 -> 19 (below the 22 it sat at *before* the ambiguity
+guard). **`algorithm_cost` falls in all three** (647->619, 1040->1032, 5159->4653), so these are
+better pairings by the project's own objective, not just closer to the labels - the check worth
+making before believing any mismatch-count improvement.
+
+`MAX_AMBIGUOUS_CANDIDATES` is a cost bound found by measurement: uncapped, scoring every candidate
+of a commodity hash (a `,`, a `;`, `self` - hundreds of them) made the whole corpus ~8% slower for
++4 mismatches. At 32 the quality is identical to uncapped and the latency cost vanishes.
+
+**Cost of the primitive itself**: ~1.5% of whole-corpus metadata time (105.9s vs 104.4s total, two
+runs each), and nothing at diff time. Note `benchmark_optimal_solutions` warms metadata *outside*
+its timer, so `elapsed_ms` cannot see metadata-time work at all - a change like this one has to be
+measured on total wall time or it will look free when it is not.
+
+**Consumers not yet tried**, in rough order of promise: `qualified_name`'s group tie-break; a
+pre-filter for candidate search in large rewrites (`rust-zed-workspace-tasks` and friends, the
+"search-quality gap" bucket); and ranking inside `solve_large_flat_subtrees`. Two standing caveats.
+The 2026-07-11 container-dissimilarity revert was a *cost-model* change (a text-similarity surcharge
+on `ren`) and broke five perfect fixtures - a sketch used for *candidate selection* is a different
+use and should not be assumed to inherit that failure, but must be validated separately. And it is
+an estimate above 16 tokens: rank and gate with it, never conclude equality, which the exact hashes
 already answer definitively.
 
 ### Move detection: the ambiguity guard (2026-08-17, shipped)

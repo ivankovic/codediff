@@ -21,16 +21,16 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    // Raised 22 -> 24 (2026-08-17), a deliberate and measured regression on *this* fixture, not a
-    // drifting ceiling. `solve_moved_subtrees`' new ambiguity guard refuses to pick between several
-    // identical move targets below `AMBIGUOUS_MOVE_MIN_SIZE` nodes, which costs this file (a hex
-    // colour table - "more data than code", so its content is short, repetitive and genuinely
-    // relocated) 11 -> 23 mismatches. The same guard takes
-    // `python-django-...-update-unit-tests-actual-logic-change` from 48 to **zero** and is worth
-    // -38 mismatches corpus-wide, so the trade is net positive on every target metric; see
-    // `TODO.md`'s 2026-08-17 move-detection section for the full before/after table.
+    // 22 -> 24 (2026-08-17) -> 19 (2026-08-18), and the round trip is the point. The ambiguity
+    // guard `solve_moved_subtrees` gained in 626045c refuses to pick between several identical
+    // move targets below `AMBIGUOUS_MOVE_MIN_SIZE` nodes, which cost this file (a hex colour table
+    // - "more data than code", so its content is short, repetitive and genuinely relocated) 11 ->
+    // 23 mismatches; the guard was still worth -38 corpus-wide, so the ceiling was raised
+    // deliberately rather than silently. The guard now consults the similarity sketch before
+    // refusing (`disambiguate_by_context`), which recovers most of that here and takes the file
+    // below where it started. See `TODO.md`'s 2026-08-18 similarity-sketch section.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
-        24,
+        19,
     )
 }

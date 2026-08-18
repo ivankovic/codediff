@@ -43,6 +43,9 @@
 //! - Ambiguity refusal below `AMBIGUOUS_MOVE_MIN_SIZE`: when several available targets spell
 //!   exactly the same thing, a small subtree's "move" is a coin flip between commodity tokens, so
 //!   no pairing is made at all. Above that size the repetition is distinctive enough to trust.
+//!   Before refusing, `disambiguate_by_context` gets a chance to decide the question honestly by
+//!   comparing the candidates' *surroundings* - identical subtrees can still sit in tellingly
+//!   different containers.
 //! - Container-identity agreement: the outermost deleted reference-node ancestor of the source
 //!   and the outermost inserted reference-node ancestor of the target must have the same kind.
 //!   Humans read a move relative to the construct it left and the construct it entered: content
@@ -153,6 +156,11 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         // equals* can be made honestly. Raising `MIN_MOVE_SUBTREE_SIZE` instead was tried and
         // rejected (see its own doc comment): it discards unambiguous small moves too, regressing
         // 11 fixtures to fix one.
+        //
+        // Before refusing outright, the sketch gets a chance to make the choice honestly: the
+        // candidates are identical to each other by construction (they share a full hash), but
+        // their *surroundings* need not be, and a small subtree that moved into a container much
+        // like the one it left is a better answer than no answer at all.
         if candidates.len() > 1
             && before_metadata
                 .node_to_subtree_size
@@ -161,7 +169,10 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
                 .unwrap_or(0)
                 < AMBIGUOUS_MOVE_MIN_SIZE
         {
-            continue;
+            match disambiguate_by_context(b, &candidates, &before_metadata, &after_metadata) {
+                Some(best) => candidates = vec![best],
+                None => continue,
+            }
         }
         let source_container = outermost_unmapped_reference_kind(
             b,
@@ -187,6 +198,58 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         claim_subtree(b, &before_metadata, &mut claimed_before);
         claim_subtree(a, &after_metadata, &mut claimed_after);
     }
+}
+
+/// How much more similar the winning candidate's surroundings must be than the runner-up's before
+/// the ambiguity guard will accept its verdict. A margin, not a threshold: the question is never
+/// "is this container similar enough" but "is one of these containers clearly the right one".
+const CONTEXT_TIEBREAK_MARGIN: f32 = 0.15;
+
+/// Candidate count above which the tie-break is not even attempted, and the guard refuses as it
+/// did before. Both a cost and a quality bound. Cost: a commodity hash (a `,`, a `;`, `self`) has
+/// hundreds of candidates, and scoring all of them for every deleted node made the whole corpus
+/// ~8% slower (measured 2026-08-18: `rust-rustdesk-...-io-loop` 2218ms -> 2405ms, and the same
+/// ~10-20% on every large fixture). Quality: a "clearly best of 200 identical commodity tokens"
+/// is not a verdict worth having even when the margin allows one.
+const MAX_AMBIGUOUS_CANDIDATES: usize = 32;
+
+/// Picks the one candidate whose *parent* is clearly the most similar to `source`'s parent, or
+/// `None` when no candidate stands out.
+///
+/// The candidates all share `source`'s full hash, so comparing the candidates themselves is
+/// worthless - they are identical. Their parents are not, and
+/// [`crate::code::similarity::SimilaritySketch`] can compare two of them in O(k) without walking
+/// either subtree, which is what makes this affordable inside the candidate loop.
+fn disambiguate_by_context(
+    source: usize,
+    candidates: &[usize],
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+) -> Option<usize> {
+    if candidates.len() > MAX_AMBIGUOUS_CANDIDATES {
+        return None;
+    }
+    let source_parent = before_metadata.node_to_parent.get(&source)?;
+    let source_sketch = before_metadata
+        .node_to_similarity_sketch
+        .get(source_parent)?;
+
+    let mut scored: Vec<(f32, usize)> = candidates
+        .iter()
+        .filter_map(|&candidate| {
+            let parent = after_metadata.node_to_parent.get(&candidate)?;
+            let sketch = after_metadata.node_to_similarity_sketch.get(parent)?;
+            Some((source_sketch.jaccard(sketch), candidate))
+        })
+        .collect();
+    if scored.len() < 2 {
+        return None;
+    }
+
+    // Descending by score; `candidates` is already in document order, so the `total_cmp` tie-break
+    // below leaves equal scores in that order and the margin check then rejects them anyway.
+    scored.sort_by(|x, y| y.0.total_cmp(&x.0));
+    (scored[0].0 - scored[1].0 >= CONTEXT_TIEBREAK_MARGIN).then_some(scored[0].1)
 }
 
 /// The kind of the outermost reference node (see `is_reference`) on `node`'s still-unmapped
@@ -287,7 +350,9 @@ fn remap_moved_subtree(
 
 #[cfg(test)]
 mod tests {
-    use crate::code::{Code, Language};
+    use super::{MAX_AMBIGUOUS_CANDIDATES, disambiguate_by_context};
+    use crate::code::similarity::SimilaritySketch;
+    use crate::code::{ASTMetadata, Code, Language};
     use crate::diff::diff_code;
 
     /// A whole function moving across another (unchanged) function must come out as matched
@@ -380,6 +445,82 @@ mod tests {
         assert!(
             !has_move,
             "with two equally good targets, no move should be invented"
+        );
+    }
+
+    /// `disambiguate_by_context` is tested directly, on hand-built metadata, rather than through
+    /// the pipeline: driving it from source would mean finding real code where the ambiguity guard
+    /// fires *and* the surroundings differ, and a passing end-to-end assertion would not prove
+    /// which of the pipeline's dozen passes produced the pairing. Only `node_to_parent` and
+    /// `node_to_similarity_sketch` are consulted, so only those are populated.
+    fn metadata_with(parents: &[(usize, usize)], sketches: &[(usize, &[u64])]) -> ASTMetadata {
+        let mut metadata = ASTMetadata::default();
+        for &(child, parent) in parents {
+            metadata.node_to_parent.insert(child, parent);
+        }
+        for &(node, leaves) in sketches {
+            metadata.node_to_similarity_sketch.insert(
+                node,
+                SimilaritySketch::merge(leaves.iter().map(|&h| SimilaritySketch::leaf(h))),
+            );
+        }
+        metadata
+    }
+
+    #[test]
+    fn context_tiebreak_picks_the_candidate_in_the_more_familiar_surroundings() {
+        // Node 1 sits in a container spelling {1,2,3}. Candidate 2's container spells the same;
+        // candidate 3's has nothing in common. The candidates themselves are indistinguishable -
+        // they share a full hash, which is why they are candidates at all - so the surroundings
+        // are the only evidence there is.
+        let before = metadata_with(&[(1, 10)], &[(10, &[1, 2, 3])]);
+        let after = metadata_with(&[(2, 20), (3, 30)], &[(20, &[1, 2, 3]), (30, &[7, 8, 9])]);
+        assert_eq!(
+            disambiguate_by_context(1, &[2, 3], &before, &after),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn context_tiebreak_refuses_when_the_surroundings_are_equally_alike() {
+        // Both containers spell the same thing, so there is no honest answer and the guard must
+        // fall back on refusing - the whole point of `AMBIGUOUS_MOVE_MIN_SIZE` is that a guess
+        // between equals is worse than no pairing.
+        let before = metadata_with(&[(1, 10)], &[(10, &[1, 2, 3])]);
+        let after = metadata_with(&[(2, 20), (3, 30)], &[(20, &[1, 2, 3]), (30, &[1, 2, 3])]);
+        assert_eq!(disambiguate_by_context(1, &[2, 3], &before, &after), None);
+    }
+
+    #[test]
+    fn context_tiebreak_refuses_a_near_tie() {
+        // 10/10 vs 10/11 shared - 1.00 against 0.91. Candidate 3 is genuinely worse, but not by
+        // enough to call. A bare argmax would pair here; `CONTEXT_TIEBREAK_MARGIN` is what stops
+        // it.
+        let ten: Vec<u64> = (1..=10).collect();
+        let eleven: Vec<u64> = (1..=11).collect();
+        let before = metadata_with(&[(1, 10)], &[(10, &ten)]);
+        let after = metadata_with(&[(2, 20), (3, 30)], &[(20, &ten), (30, &eleven)]);
+        assert_eq!(disambiguate_by_context(1, &[2, 3], &before, &after), None);
+    }
+
+    #[test]
+    fn context_tiebreak_declines_to_rank_a_crowd_of_commodity_tokens() {
+        // Above `MAX_AMBIGUOUS_CANDIDATES` the tie-break is not attempted at all, however clear
+        // the winner looks: scoring hundreds of candidates per deleted node cost ~8% of total
+        // corpus runtime, and "the best of 200 identical `,` tokens" is not a verdict worth
+        // having. The winner here would otherwise be unambiguous.
+        let before = metadata_with(&[(1, 10)], &[(10, &[1, 2, 3])]);
+        let candidates: Vec<usize> = (100..100 + MAX_AMBIGUOUS_CANDIDATES + 1).collect();
+        let parents: Vec<(usize, usize)> = candidates.iter().map(|&c| (c, c + 1_000)).collect();
+        let mut sketches: Vec<(usize, &[u64])> = candidates
+            .iter()
+            .map(|&c| (c + 1_000, &[7, 8, 9][..]))
+            .collect();
+        sketches[0] = (candidates[0] + 1_000, &[1, 2, 3][..]);
+        let after = metadata_with(&parents, &sketches);
+        assert_eq!(
+            disambiguate_by_context(1, &candidates, &before, &after),
+            None
         );
     }
 }
