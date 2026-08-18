@@ -962,9 +962,16 @@ mod tests {
     /// used to take 14.5s under the old always-exact pipeline, ~36x this project's 400ms budget,
     /// because phases 1-5 left the bulk of both trees unmatched and full APTED had almost nothing
     /// to prune against. Under the default `DiffMode::Fast`, `PendingDiff::looks_expensive()`
-    /// should trip and substitute the cheap fallback well before that. Run under `--release` (see
-    /// this crate's `[profile.release]`) - the bound here is generous specifically to avoid
-    /// flakiness in an unoptimized debug build, not because the fast path is expected to need it.
+    /// should trip and substitute the cheap fallback well before that.
+    ///
+    /// The timing assertion below only runs in release (`#[cfg(not(debug_assertions))]`), where
+    /// this fixture takes ~1s with wide margin. It used to carry a "generous" 5s bound meant to
+    /// cover debug-build slowness too, but that bound was never actually generous: measured
+    /// 2026-08-18, real elapsed time in an unoptimized debug build is ~4.6-5.1s, unchanged all the
+    /// way back to the v0.0.7 release - under 10% headroom, so ordinary machine jitter flakes it
+    /// on a debug `cargo test` run. `looks_expensive()` (a cheap node-count check, not a timing
+    /// measurement) still runs unconditionally above, so debug builds keep the regression guard
+    /// that doesn't depend on wall-clock time.
     #[test]
     fn rust_completely_unrelated_main_files_resolves_fast_under_default_fast_mode() -> Result<()> {
         let (before, after) =
@@ -982,10 +989,13 @@ mod tests {
         let elapsed = started.elapsed();
 
         assert!(diff.ast.is_some());
+        #[cfg(not(debug_assertions))]
         assert!(
             elapsed < std::time::Duration::from_secs(5),
             "expected DiffMode::Fast's guard to substitute the cheap fallback, took {elapsed:?}"
         );
+        #[cfg(debug_assertions)]
+        let _ = elapsed;
         Ok(())
     }
 
