@@ -92,10 +92,29 @@ impl UnitCostModel {
                     // punctuation/operators are also low cost.
                     COST_UPDATE
                 }
-            } else {
+            } else if node1.owned_text_hash == node2.owned_text_hash {
                 // Same kind, internal nodes - can be matched with 0 cost (children cost is
                 // accounted for separately via `delta`/recursion).
                 0
+            } else {
+                // ...except that "children carry the cost" is false for a node that owns text
+                // *directly*, in the gaps its children don't cover. Nothing else in this model
+                // ever charges for those bytes, so without this arm relabelling `role="button"`
+                // to `role="menu"` costs zero - and matching an `AttValue` to a completely
+                // unrelated one is free, leaving the DP no reason to prefer the right partner.
+                //
+                // Not an edge case: XML keeps *every* attribute value there, as do CSS's numeric
+                // and colour literals, Rust's comments and YAML's quoted scalars (census on
+                // `metadata::owned_text_hash_of`).
+                //
+                // `COST_UPDATE`, not `COST_LITERAL_UPDATE`: the latter is 2, exactly
+                // `COST_DELETE + COST_INSERT`, which leaves the DP indifferent between "this
+                // attribute's value changed" and "this attribute was removed and a different one
+                // added" - and measurably so, it cost
+                // `css-wordpress-...-change-simple-values-to-vars` a mapping. A relabel has to be
+                // strictly cheaper than delete+insert, the same premise the different-kind branch
+                // below states when it goes one *above* that sum to forbid a pairing.
+                COST_UPDATE
             }
         } else if nodes::update_allowed_from_masks(
             &node1.kind_cost_class,

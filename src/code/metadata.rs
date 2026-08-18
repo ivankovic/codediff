@@ -200,7 +200,9 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 
         // Get children IDs
         let mut child_cursor = node.walk();
-        let children: Vec<usize> = node.children(&mut child_cursor).map(|c| c.id()).collect();
+        let child_nodes: Vec<tree_sitter::Node> = node.children(&mut child_cursor).collect();
+        let owned_text_hash = owned_text_hash_of(&node, code.contents.as_bytes(), &child_nodes);
+        let children: Vec<usize> = child_nodes.iter().map(|c| c.id()).collect();
 
         metadata.node_info.insert(
             node_id,
@@ -212,6 +214,7 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
                 },
                 kind,
                 text,
+                owned_text_hash,
                 children,
                 start_byte: node.start_byte(),
                 preorder_index,
@@ -233,6 +236,57 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// A hash of the text a node owns *directly* - the non-whitespace content in the gaps before,
+/// between and after its children - or 0 when every gap is formatting (the overwhelmingly common
+/// case: a well-behaved internal node's bytes are entirely covered by its children).
+///
+/// Not a curiosity. Grammars disagree about whether a construct's payload is a child node or text
+/// the parent owns, and for several it is the latter. Census over the whole corpus (2026-08-18,
+/// `code::gap_survey`): XML `AttValue` 21663 nodes / 394KB - *every* attribute value - CSS
+/// `integer_value`/`color_value` 6962, Rust `line_comment`/`block_comment` 2149 / 146KB, YAML's
+/// quoted scalars 1844. Zero in TypeScript, JSON, Go, Kotlin, JavaScript, C++, TSX and Java, which
+/// is why the gap went unnoticed for so long.
+///
+/// A leaf owns its whole span, but that is already `ASTNodeMetadata::text`, which `ren` compares
+/// directly - so this reports 0 for leaves rather than duplicating it.
+fn owned_text_hash_of(
+    node: &tree_sitter::Node,
+    source: &[u8],
+    children: &[tree_sitter::Node],
+) -> u64 {
+    use std::hash::Hasher;
+    if children.is_empty() {
+        return 0;
+    }
+    let mut hasher = metrohash::MetroHash64::new();
+    let mut any_content = false;
+    let mut hash_gap = |hasher: &mut metrohash::MetroHash64, start: usize, end: usize| {
+        if start >= end {
+            return;
+        }
+        if let Ok(text) = std::str::from_utf8(&source[start..end])
+            && !text.trim().is_empty()
+        {
+            hasher.write(text.as_bytes());
+            any_content = true;
+        }
+    };
+    let mut gap_start = node.start_byte();
+    for child in children {
+        hash_gap(&mut hasher, gap_start, child.start_byte());
+        gap_start = child.end_byte();
+    }
+    hash_gap(&mut hasher, gap_start, node.end_byte());
+    if !any_content {
+        return 0;
+    }
+    // 0 is reserved for "owns no text", so nudge a real hash off it.
+    match hasher.finish() {
+        0 => 1,
+        hash => hash,
+    }
 }
 
 /// Compute `ASTMetadata::node_to_widest_subtree_node` (see its doc comment) via a bottom-up

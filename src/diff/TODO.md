@@ -1605,18 +1605,35 @@ added). Internal nodes owning non-whitespace text, both sides of all 418 fixture
 Zero in TypeScript, JSON, Go, Kotlin, JavaScript, C++, TSX, Java - which is why this had never
 surfaced.
 
-**Tried and reverted: charging for it in `UnitCostModel::ren`.** `ren` returns 0 for same-kind
-internal nodes because "children cost is accounted for separately", which is false for exactly
-these nodes - `role="button"` -> `role="menu"` costs nothing, and matching an `AttValue` to a
-totally unrelated one is equally free. Adding an `owned_text_hash` to `ASTNodeMetadata` and pricing
-a difference as `COST_LITERAL_UPDATE` was **-1 mismatch across the whole corpus** (2725 -> 2724, two
-fixtures moved) for +4% total latency and p99 801 -> 935ms. Reverted. (Hashing rather than comparing
-`String`s recovered part of the cost - 1039 -> 935ms - so the residue is APTED doing more work once
-these pairs stop being free, not per-cell string scans.)
+**Fixed: `UnitCostModel::ren` now charges for it.** `ren` returned 0 for same-kind internal nodes
+because "children cost is accounted for separately", which is exactly false for these - relabelling
+`role="button"` to `role="menu"` cost nothing, and matching an `AttValue` to a completely unrelated
+one was equally free, leaving the DP no reason to prefer the right partner. `ASTNodeMetadata` gained
+an `owned_text_hash` (hashed, not stored as text: the consumer is an equality test in the per-DP-cell
+hot path) and a difference is priced as `COST_UPDATE`.
 
-**Why it was inert, which is the finding worth keeping.** On the fixture that motivated it,
-`xml-odoo-odoo-add-button-roles` (109 mismatches, 81 involving `AttValue`), **not one mismatch is
-decided by `ren`**:
+**`COST_UPDATE`, not `COST_LITERAL_UPDATE`, and the difference is the whole result.**
+`COST_LITERAL_UPDATE` is 2 - *exactly* `COST_DELETE + COST_INSERT` - so pricing the relabel there
+leaves the DP indifferent between "this attribute's value changed" and "this attribute went and an
+unrelated one arrived". That is not theoretical: at 2 the fix was -1 mismatch *with* a regression
+(`css-wordpress-...-change-simple-values-to-vars` 1 -> 2, breaking its pinned ceiling); at 1 it is
+**-2 with no regression at all** (`css-mozilla-firefox-actual-style-changes` 8 -> 6, and nothing
+else in the corpus moves). A relabel must be strictly cheaper than delete+insert - the same premise
+the different-kind branch states when it deliberately goes one *above* that sum to forbid a pairing.
+
+Corpus effect is small - **-2 mismatches** (2725 -> 2723), one fixture moved - and latency is
+unchanged or slightly better: over three runs each, `sum` 18904/18945/18973 with the fix against
+19135/19140/20831 without. **A first single-run measurement said "+4% and p99 801 -> 935ms" and that was pure noise**;
+it was nearly the reason this got reverted rather than shipped. `elapsed_ms` is one unrepeated
+sample per fixture - do not act on a single-run latency delta under ~2x, which this file has said
+before and which is easy to forget when the number happens to confirm a decision you were already
+leaning towards.
+
+It ships on correctness, not on the metric: the model was reporting a cost it knew to be wrong.
+
+**Why the corpus barely moved, which is the other finding worth keeping.** On the fixture that
+motivated it, `xml-odoo-odoo-add-button-roles` (109 mismatches, 81 involving `AttValue`), **not one
+mismatch is decided by `ren`**:
 
 | reason | count |
 |---|---|
@@ -1626,8 +1643,22 @@ decided by `ren`**:
 | `MovedSubtree` | 16 |
 
 The cost model was never a party to these decisions. **Check which pass owns a fixture's mismatches
-before improving a pass** - `--details <fixture> | grep -o 'reason ...'` is the whole check, and it
-would have saved this experiment.
+before improving a pass** - `--details <fixture> | grep -o 'reason ...'` is the whole check. It does
+not make the cost fix wrong, but it does predict, in seconds and before any code, that the fix
+cannot move *this* fixture.
+
+**A second instance of the same hole, not yet fixed - it needs a decision.** `cost::operation_cost`
+prices `MatchButNotIdentical` at 0 unconditionally, on the same premise ("the differences below are
+charged on the descendant entries") and with the same exception: when the difference is in gap text
+there *are* no descendant entries carrying it. This is why
+`yaml-draios-sysdig-string-url-change` reports `algorithm_cost 0 / human_cost 0` for a file in which
+six URLs changed, and it is unaffected by the `ren` fix, since these are separate code paths -
+`ren` drives APTED's internal DP, `operation_cost` produces the *reported and scored* cost. That
+makes it the more consequential of the two: `algorithm_cost` vs `human_cost` is how this project
+decides whether a better mapping is reachable at all (see the "cost tie is not a floor" note). Left
+alone deliberately - fixing it shifts every fixture's `algorithm_cost` **and** `human_cost`, i.e.
+re-bases every recorded cost comparison in this file, which is a call to make deliberately rather
+than as a side effect.
 
 **The lead it did produce.** `StructurallyIdenticalAncestor` is the single biggest contributor, and
 it rests on `compute_structural_hash`, which hashes *only* kinds and child counts - gaps are

@@ -1961,3 +1961,44 @@ fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap()
         "over the edit cap, nothing should be partially aligned"
     );
 }
+
+/// `ren` must not price a *content* change at zero just because the changed bytes live in a gap
+/// rather than in a child node.
+///
+/// The zero for same-kind internal nodes rests on "children carry the cost", which is exactly true
+/// for a well-behaved node and exactly false for the several thousand corpus nodes that own text
+/// directly (XML `AttValue`, CSS numeric/colour literals, Rust comments, YAML quoted scalars - see
+/// `metadata::owned_text_hash_of`). Written against `ren` directly rather than through a diff,
+/// because whether any *fixture* happens to route through this arm is a separate question from
+/// whether the cost model is right: the corpus effect is about -1 mismatch, and the model would
+/// still be wrong without it.
+#[test]
+fn ren_charges_for_text_a_node_owns_directly() {
+    let internal_node = |owned_text_hash: u64| ASTNodeMetadata {
+        owned_text_hash,
+        ..ASTNodeMetadata::new("AttValue".to_string(), String::new(), vec![1, 2], 0, 0)
+    };
+    let cost_model = UnitCostModel::new(Language::XML);
+
+    // `role="button"` vs `role="menu"`: same kind, same (quote) children, different value.
+    let relabel = cost_model.ren(&internal_node(0xBEEF), &internal_node(0xF00D));
+    assert!(
+        relabel > 0,
+        "a differing attribute value must not be free to relabel"
+    );
+    // ...and must stay strictly cheaper than throwing the node away and making a new one, or the
+    // DP is free to read "this value changed" as "this one went and an unrelated one arrived".
+    // Pricing this at `COST_LITERAL_UPDATE` (2, exactly `COST_DELETE + COST_INSERT`) rather than
+    // `COST_UPDATE` did precisely that, and cost a real fixture a mapping.
+    assert!(
+        relabel < COST_DELETE + COST_INSERT,
+        "relabel {relabel} must beat delete+insert"
+    );
+    // Two nodes that genuinely agree stay free - the children still carry their own costs.
+    assert_eq!(
+        cost_model.ren(&internal_node(0xBEEF), &internal_node(0xBEEF)),
+        0
+    );
+    // And an ordinary internal node, owning nothing, is unaffected.
+    assert_eq!(cost_model.ren(&internal_node(0), &internal_node(0)), 0);
+}

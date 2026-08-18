@@ -263,6 +263,20 @@ pub struct ASTNodeMetadata {
     pub kind: String,
     /// Node text content (for leaf nodes)
     pub text: String,
+    /// A hash of the text this node owns *directly*: the non-whitespace content of the gaps
+    /// before, between and after its children. 0 for leaves (whose whole span is already in
+    /// `text`) and for the great majority of internal nodes, whose bytes their children cover
+    /// entirely.
+    ///
+    /// Exists because grammars disagree about whether a construct's payload is a child node or
+    /// text the parent owns, and for several important ones it is the latter - XML's `AttValue`,
+    /// CSS's `integer_value`/`color_value`, Rust's comments, YAML's quoted scalars. Without it
+    /// `UnitCostModel::ren` prices a change to any of those at zero. See
+    /// `metadata::owned_text_hash_of` for the corpus-wide census.
+    ///
+    /// Hashed rather than stored as text because its consumer is an equality test inside APTED's
+    /// per-DP-cell `ren` - the same hot path [`KindCostClass`] exists to keep free of string work.
+    pub owned_text_hash: u64,
     /// Children IDs
     pub children: Vec<usize>,
     /// Byte offset where this node starts in the source.
@@ -311,6 +325,9 @@ impl ASTNodeMetadata {
         ASTNodeMetadata {
             kind,
             text,
+            // Hand-built nodes (test fixtures) have no source to carve gaps out of, so they own
+            // nothing; the production builder computes this from real byte ranges.
+            owned_text_hash: 0,
             children,
             start_byte,
             preorder_index,
