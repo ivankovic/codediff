@@ -27,12 +27,18 @@ pub fn blob_bytes(repo: &Repository, tree: &Tree, path: &Path) -> Result<Vec<u8>
     Ok(blob.content().to_vec())
 }
 
-/// The byte length of the blob at `oid`, or `None` if it's binary or outside `[min_bytes,
-/// max_bytes]`. Shared size/UTF-8-validity check behind `sample_test_diffs`' and
-/// `sample_code_pairs`' blob filtering - both tools exclude near-empty files (trivial fixtures)
-/// and anything above the size `stats::expand_from_code` itself treats as "too large to parse",
-/// since `diff_code` couldn't use it anyway.
-pub fn text_len_if_in_range(
+/// The line count of the blob at `oid`, or `None` if it's binary or its *byte* length falls
+/// outside `[min_bytes, max_bytes]`. Shared size/UTF-8-validity check behind `sample_test_diffs`'
+/// and `sample_code_pairs`' blob filtering - both tools exclude near-empty files (trivial
+/// fixtures) and anything above the size `stats::expand_from_code` itself treats as "too large to
+/// parse", since `diff_code` couldn't use it anyway.
+///
+/// The gate is byte-based but the return value is a line count, not a byte count: both callers
+/// only ever used the byte length to feed `stats::sampling::loc_bucket`, and that function buckets
+/// by LOC (chosen for human-readable bucket labels - "10-30 lines" reads far better than a byte
+/// count), not bytes. The size *gate* stays byte-based regardless, since it's a cheap sanity/perf
+/// filter unrelated to which unit a caller happens to bucket by.
+pub fn text_loc_if_in_range(
     repo: &Repository,
     oid: Oid,
     min_bytes: usize,
@@ -40,14 +46,11 @@ pub fn text_len_if_in_range(
 ) -> Option<usize> {
     let blob = repo.find_blob(oid).ok()?;
     let content = blob.content();
-    if content.len() >= min_bytes
-        && content.len() <= max_bytes
-        && std::str::from_utf8(content).is_ok()
-    {
-        Some(content.len())
-    } else {
-        None
+    if content.len() < min_bytes || content.len() > max_bytes {
+        return None;
     }
+    let text = std::str::from_utf8(content).ok()?;
+    Some(text.lines().count())
 }
 
 /// Walks the most-recent `max_commits` non-merge, non-root commits reachable from `repo_path`'s

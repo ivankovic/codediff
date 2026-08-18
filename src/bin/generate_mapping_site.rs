@@ -195,9 +195,9 @@ fn render_fixture_page(
     );
 
     let language = before.metadata.language.unwrap_or_default();
-    // `diffs_case_dir` resolves which of `handmade`/`small`/`full` this fixture actually lives
-    // under (see `helper::DIFF_DATASETS`) - the URL needs that segment, even though every other
-    // parameter here is already in memory and doesn't otherwise touch disk.
+    // `diffs_case_dir` resolves which `DIFF_DATASETS` folder this fixture actually lives under
+    // (`helper::DIFF_DATASETS`) - the URL needs that segment, even though every other parameter
+    // here is already in memory and doesn't otherwise touch disk.
     let dataset = helper::diffs_case_dir(name)
         .and_then(|dir| {
             dir.parent()

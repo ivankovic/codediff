@@ -15,13 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// Mirrors src/test/data/diffs/'s four-way split (see `test::helper::DIFF_DATASETS`): each of
-// these is its own mod-list file, one `#[cfg(test)] mod <name>;` per fixture in that dataset.
-#[cfg(test)]
-mod full;
-#[cfg(test)]
-mod handmade;
-#[cfg(test)]
-mod small;
-#[cfg(test)]
-mod stratified;
+// Empty until the first `stratified` fixture is promoted (see `test::helper::DIFF_DATASETS` and
+// `sample_test_diffs --stratified`) - `human_solver`'s `insert_mod_declaration` adds entries here
+// the same way it does for `handmade.rs`/`small.rs`/`full.rs`.

@@ -23,8 +23,8 @@
 * These are produced by the `human_solver` binary (src/bin/human_solver.rs), which lets a human
 * walk the before/after ASTs of a test case side by side and mark nodes as matching, deleted or
 * inserted. The result is stored as JSON in
-* `src/test/data/diffs/{handmade,small,full}/<name>/human_mapping.json` - see
-* [`super::DIFF_DATASETS`] for what the three folders mean; [`mapping_path`] is the one place that
+* `src/test/data/diffs/{handmade,small,full,stratified}/<name>/human_mapping.json` - see
+* [`super::DIFF_DATASETS`] for what each folder means; [`mapping_path`] is the one place that
 * resolves which of them holds a given `name`.
 *
 * Nodes are identified by *path* (see [`super::path_for_node`] / [`super::node_for_path`]) rather

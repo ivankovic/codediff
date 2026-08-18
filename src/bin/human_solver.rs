@@ -122,9 +122,10 @@
 *                  a leading comment in the generated optimal_solutions test stub. Has no effect on
 *                  a real test case or a git-commit-sourced case, same as `R`
 *   o              open a different test case: lists every directory under
-*                  src/test/data/diffs/{handmade,small,full}/, j/k to move, Enter to open, Esc to
-*                  cancel. Press `d` inside this picker to cycle which of the three folders it's
-*                  narrowed down to (all -> handmade -> small -> full -> all - see DIFF_DATASETS).
+*                  src/test/data/diffs/{handmade,small,full,stratified}/, j/k to move, Enter to
+*                  open, Esc to cancel. Press `d` inside this picker to cycle which folder it's
+*                  narrowed down to (all -> handmade -> small -> full -> stratified -> all - see
+*                  DIFF_DATASETS).
 *                  If the current mapping has unsaved changes, asks first whether to save (only
 *                  offered for a real test case; see `s` above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
@@ -259,7 +260,7 @@ e              on a sample, enter/edit a free-form comment (recorded in sample.c
                  if present when later promoted)
 o              open a different test case (src/test/data/diffs/); press d inside
                  this picker to cycle which dataset it's narrowed to (all,
-                 handmade, small, full), or H to narrow to cases with at
+                 handmade, small, full, stratified), or H to narrow to cases with at
                  least one unmarked node left (first press scans the whole
                  corpus, so it can take a few seconds) -- both persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
@@ -374,10 +375,10 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
-/// Every case name across all three dataset folders (`handmade`/`small`/`full`) - the `o` picker
-/// doesn't distinguish between them (see the title bar's `[dataset]` tag, via `case_dataset`, for
-/// where a given case actually lives), since names are unique across all three by construction
-/// (`action_promote`'s collision check spans all three too).
+/// Every case name across all `DIFF_DATASETS` folders (`handmade`/`small`/`full`/`stratified`) -
+/// the `o` picker doesn't distinguish between them (see the title bar's `[dataset]` tag, via
+/// `case_dataset`, for where a given case actually lives), since names are unique across all of
+/// them by construction (`action_promote`'s collision check spans all of them too).
 fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     let mut names = Vec::new();
     for dataset in DIFF_DATASETS {
@@ -1329,8 +1330,8 @@ struct App {
     sample_sort_order: SampleSortOrder,
     /// The `o` picker's dataset filter (cycled by `d` - see `DIFF_DATASETS`), persisted here for
     /// the same reason as `sample_hide_solved`/`sample_sort_order` above: so filtering down to
-    /// e.g. just `handmade` sticks across closing and reopening the picker. `None` shows all
-    /// three datasets.
+    /// e.g. just `handmade` sticks across closing and reopening the picker. `None` shows every
+    /// dataset.
     diff_dataset_filter: Option<&'static str>,
     /// The `o` picker's "incomplete only" filter (toggled by `H` inside it), persisted here for
     /// the same reason as `diff_dataset_filter` above.
@@ -5710,9 +5711,9 @@ fn action_promote(
         }
     }
 
-    // Collision check spans all three dataset folders (`diffs_case_dir` searches `DIFF_DATASETS`)
-    // - the flat-name lookup every other case name resolution in this file relies on breaks the
-    // moment two different datasets can hold the same name.
+    // Collision check spans every dataset folder (`diffs_case_dir` searches `DIFF_DATASETS`) - the
+    // flat-name lookup every other case name resolution in this file relies on breaks the moment
+    // two different datasets can hold the same name.
     if diffs_case_dir(new_name).is_some() {
         bail!("'{}' already exists in src/test/data/diffs", new_name);
     }
@@ -6057,7 +6058,7 @@ fn module_name(name: &str) -> String {
     name.replace('-', "_")
 }
 
-/// `optimal_solutions/` mirrors `diffs/`'s three-way split (see `DIFF_DATASETS`): `dataset`'s
+/// `optimal_solutions/` mirrors `diffs/`'s split by dataset (see `DIFF_DATASETS`): `dataset`'s
 /// fixtures get their stub test files here, alongside `optimal_solutions/<dataset>.rs`'s mod-list
 /// (see `optimal_solutions_mod_file`).
 fn optimal_solutions_dir(dataset: &str) -> PathBuf {
@@ -6090,11 +6091,17 @@ fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
 fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
-    let stub_path = optimal_solutions_dir(&dataset).join(format!("{module}.rs"));
+    let dir = optimal_solutions_dir(&dataset);
+    let stub_path = dir.join(format!("{module}.rs"));
 
     let created = if stub_path.exists() {
         false
     } else {
+        // `handmade`/`small`/`full` predate this dataset's `optimal_solutions/<dataset>/`
+        // directory existing at all, so this was never exercised until `stratified` (or any
+        // future dataset) needed it fresh on first promotion - real gap, not defensive
+        // programming against something that can't happen.
+        fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
         fs::write(&stub_path, stub_test_contents(name, comment))
             .with_context(|| format!("writing stub test to {:?}", stub_path))?;
         true
@@ -7928,16 +7935,15 @@ mod tests {
 
     #[test]
     fn next_dataset_filter_cycles_through_diff_datasets_and_back_to_all() {
-        assert_eq!(next_dataset_filter(None), Some(DIFF_DATASETS[0]));
-        assert_eq!(
-            next_dataset_filter(Some(DIFF_DATASETS[0])),
-            Some(DIFF_DATASETS[1])
-        );
-        assert_eq!(
-            next_dataset_filter(Some(DIFF_DATASETS[1])),
-            Some(DIFF_DATASETS[2])
-        );
-        assert_eq!(next_dataset_filter(Some(DIFF_DATASETS[2])), None);
+        // Walks every entry rather than hardcoding `DIFF_DATASETS`' length, so this doesn't need
+        // editing again the next time a dataset is added (it already needed exactly that edit
+        // once, when `stratified` became the fourth).
+        let mut current = None;
+        for &dataset in DIFF_DATASETS {
+            current = next_dataset_filter(current);
+            assert_eq!(current, Some(dataset));
+        }
+        assert_eq!(next_dataset_filter(current), None);
     }
 
     #[test]

@@ -26,8 +26,8 @@ use std::path::{Path, PathBuf};
 use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::metadata;
 use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
-use codediff::stats::git::{text_len_if_in_range, walk_single_parent_commit_diffs};
-use codediff::stats::sampling::Reservoir;
+use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
+use codediff::stats::sampling::{LOC_BUCKETS, Reservoir, loc_bucket};
 
 // Files outside this range are excluded: near-empty files make trivial benchmark cases, and
 // anything above the upper bound is past the size `expand_from_code` itself treats as
@@ -35,23 +35,10 @@ use codediff::stats::sampling::Reservoir;
 const MIN_BYTES: usize = 1;
 const MAX_BYTES: usize = 1024 * 1024;
 
-// Size buckets, keyed by the larger of a pair's before/after byte size. Sampling is stratified
-// across these per language, rather than purely uniform, so that large files (where tree-edit-
-// distance cost grows super-linearly) aren't drowned out by the much more common small ones.
-const SIZE_BUCKETS: &[(usize, &str)] = &[
-    (1_000, "small"),
-    (10_000, "medium"),
-    (100_000, "large"),
-    (usize::MAX, "xlarge"),
-];
-
-fn size_bucket(bytes: usize) -> &'static str {
-    SIZE_BUCKETS
-        .iter()
-        .find(|(upper, _)| bytes < *upper)
-        .map(|(_, name)| *name)
-        .unwrap_or("xlarge")
-}
+// Sampling is stratified across `LOC_BUCKETS` per language, rather than purely uniform, so that
+// large files (where tree-edit-distance cost grows super-linearly) aren't drowned out by the much
+// more common small ones - see that constant's doc comment (`stats::sampling`) for the buckets
+// themselves and why this is the same scheme `sample_test_diffs --stratified` uses.
 
 #[derive(Parser)]
 struct Args {
@@ -108,7 +95,7 @@ fn main() -> Result<()> {
 
     // Capacity is per (language, size bucket), so each language's overall budget stays close to
     // `count` while guaranteeing every size class gets a fair share regardless of how rare it is.
-    let bucket_capacity = (args.count / SIZE_BUCKETS.len()).max(1);
+    let bucket_capacity = (args.count / LOC_BUCKETS.len()).max(1);
 
     let mut rng = StdRng::seed_from_u64(args.seed);
     let mut reservoirs: HashMap<(String, &'static str), Reservoir<Candidate>> = HashMap::new();
@@ -181,17 +168,17 @@ fn sample_repository(
             return Ok(());
         }
 
-        // The larger of the before/after byte sizes decides the size bucket; `None` means either
-        // side is binary or outside the configured size bounds.
-        let size = text_len_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
-            .zip(text_len_if_in_range(
+        // The larger of the before/after line counts decides the size bucket; `None` means either
+        // side is binary or outside the configured byte-size bounds.
+        let loc = text_loc_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
+            .zip(text_loc_if_in_range(
                 repo,
                 delta.new_file().id(),
                 MIN_BYTES,
                 MAX_BYTES,
             ))
-            .map(|(before_len, after_len)| before_len.max(after_len));
-        let Some(size) = size else {
+            .map(|(before_loc, after_loc)| before_loc.max(after_loc));
+        let Some(loc) = loc else {
             return Ok(());
         };
 
@@ -203,7 +190,7 @@ fn sample_repository(
         };
 
         reservoirs
-            .entry((language.to_string(), size_bucket(size)))
+            .entry((language.to_string(), loc_bucket(loc)))
             .or_default()
             .offer(candidate, bucket_capacity, rng);
 
@@ -272,12 +259,17 @@ mod tests {
             &mut rng,
         )?;
 
-        let rust = reservoirs
-            .get(&("Rust".to_string(), "small"))
-            .expect("expected at least one sampled small Rust pair");
-        assert!(!rust.items.is_empty());
-        assert!(rust.items.iter().any(|c| c.path.ends_with("main.rs")));
-        for item in &rust.items {
+        // Whichever LOC bucket(s) the handmade repository's small fixture files land in - not
+        // asserting a specific one, since that's a property of the fixture content's line count,
+        // not of this sampling logic.
+        let rust_items: Vec<_> = reservoirs
+            .iter()
+            .filter(|((language, _), _)| language == "Rust")
+            .flat_map(|(_, reservoir)| &reservoir.items)
+            .collect();
+        assert!(!rust_items.is_empty(), "expected at least one sampled Rust pair");
+        assert!(rust_items.iter().any(|c| c.path.ends_with("main.rs")));
+        for item in &rust_items {
             assert_eq!(item.repository, "handmade");
             assert!(!item.commit.is_empty());
             assert_eq!(item.old_path, item.path);
@@ -286,13 +278,5 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn size_bucket_boundaries() {
-        assert_eq!(size_bucket(1), "small");
-        assert_eq!(size_bucket(999), "small");
-        assert_eq!(size_bucket(1_000), "medium");
-        assert_eq!(size_bucket(10_000), "large");
-        assert_eq!(size_bucket(100_000), "xlarge");
-        assert_eq!(size_bucket(MAX_BYTES), "xlarge");
-    }
+    // `loc_bucket`'s boundaries are tested once, in `stats::sampling` where it now lives.
 }

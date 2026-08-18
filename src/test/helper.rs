@@ -612,14 +612,18 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
     Ok(result)
 }
 
-/// The corpus under `src/test/data/diffs/` is split by provenance into three sibling folders:
+/// The corpus under `src/test/data/diffs/` is split by provenance into four sibling folders:
 /// `handmade` (hand-authored fixtures, never sampled), `small` (promoted from the small research
-/// dataset's `sample.csv`), and `full` (reserved for a future sample from the full dataset, not
-/// available on every machine - empty until then). Fixture names are unique across all three (a
-/// promoted name can't collide with a handmade one - see `human_solver`'s `action_promote`), so
-/// every reader below treats the split as an implementation detail: a name resolves to whichever
-/// of the three actually holds it, and callers never need to know which.
-pub const DIFF_DATASETS: &[&str] = &["handmade", "small", "full"];
+/// dataset's `sample.csv`), `full` (promoted from the full research dataset's `sample.csv`), and
+/// `stratified` (promoted from a `sample_test_diffs --stratified` run - sampled per language *per
+/// size bucket* (`stats::sampling::SIZE_BUCKETS`, gated by the `stats` feature so not linkable
+/// from here under plain `test-fixtures`), rather than per language alone, so large files get
+/// guaranteed representation instead of being drowned out by the much more common small ones; see
+/// that binary's module doc comment). Fixture names are unique across all four (a promoted name
+/// can't collide with a handmade one - see `human_solver`'s `action_promote`), so every reader
+/// below treats the split as an implementation detail: a name resolves to whichever of the four
+/// actually holds it, and callers never need to know which.
+pub const DIFF_DATASETS: &[&str] = &["handmade", "small", "full", "stratified"];
 
 fn diffs_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
