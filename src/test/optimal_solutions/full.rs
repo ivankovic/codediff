@@ -42,6 +42,8 @@ mod csharp_cyanfish_naps2_add_condition_to_if;
 #[cfg(test)]
 mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
 #[cfg(test)]
+mod csharp_glibsharp_gtksharp_whitespace_only_change;
+#[cfg(test)]
 mod csharp_waf_csharprepl_update_string_url;
 #[cfg(test)]
 mod css_fortawesome_font_awesome_update_version_comment_2;
@@ -51,6 +53,8 @@ mod css_fortawesome_font_awesome_update_version_comment_3;
 mod css_fortawesome_font_awesome_upgrade_version_comment;
 #[cfg(test)]
 mod css_heroic_games_launcher_heroicgameslauncher_add_6_lines;
+#[cfg(test)]
+mod css_horst3180_vertex_theme_add_spaces_to_change_class_selector_into_descendant_selectors;
 #[cfg(test)]
 mod css_horst3180_vertex_theme_remove_single_rule;
 #[cfg(test)]
@@ -63,6 +67,8 @@ mod go_cloudflare_cfssl_change_zero_value_to_is_zero;
 mod go_containers_storage_add_two_constants;
 #[cfg(test)]
 mod go_cri_o_cri_o_change_importa;
+#[cfg(test)]
+mod go_darylhjd_mangadesk_remove_a_function_uptade_comments;
 #[cfg(test)]
 mod go_dweymouth_supersonic_remove_two_lines;
 #[cfg(test)]
@@ -198,6 +204,8 @@ mod rust_skim_rs_skim_format_string;
 #[cfg(test)]
 mod rust_tursodatabase_turso_unwrap_to_expect;
 #[cfg(test)]
+mod rust_weggli_rs_weggli_move_import_around_and_formatting_change;
+#[cfg(test)]
 mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_add_a_function_call;
@@ -269,6 +277,8 @@ mod vimscript_idanarye_vim_merginal_add_one_call;
 mod vimscript_jreybert_vimagit_move_one_line;
 #[cfg(test)]
 mod vimscript_m_pilia_vim_mediawiki_add_a_new_functon;
+#[cfg(test)]
+mod vimscript_preservim_tagbar_add_if_statements;
 #[cfg(test)]
 mod vimscript_protesilaos_tempus_themes_vim_change_two_values;
 #[cfg(test)]
