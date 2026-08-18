@@ -206,11 +206,14 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 const CONTEXT_TIEBREAK_MARGIN: f32 = 0.15;
 
 /// Candidate count above which the tie-break is not even attempted, and the guard refuses as it
-/// did before. Both a cost and a quality bound. Cost: a commodity hash (a `,`, a `;`, `self`) has
+/// did before.
+///
+/// A pure cost bound, not a quality/cost tradeoff. A commodity hash (a `,`, a `;`, `self`) has
 /// hundreds of candidates, and scoring all of them for every deleted node made the whole corpus
 /// ~8% slower (measured 2026-08-18: `rust-rustdesk-...-io-loop` 2218ms -> 2405ms, and the same
-/// ~10-20% on every large fixture). Quality: a "clearly best of 200 identical commodity tokens"
-/// is not a verdict worth having even when the margin allows one.
+/// ~10-20% on every large fixture). Swept 8/32/uncapped: 8 costs 4 mismatches, **32 matches
+/// uncapped exactly** - no fixture in the corpus needs more than 32 candidates - so 32 is simply
+/// the smallest cap tried that loses nothing.
 const MAX_AMBIGUOUS_CANDIDATES: usize = 32;
 
 /// Picks the one candidate whose *parent* is clearly the most similar to `source`'s parent, or

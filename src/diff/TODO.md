@@ -1550,15 +1550,22 @@ only when it leads by `CONTEXT_TIEBREAK_MARGIN`:
 | baseline | 2747 | 313 | 33 | 3.70ms | 802ms | 19.0s |
 | **shipped** | **2725** | 313 | 33 | 3.73ms | 801ms | 19.1s |
 
--22 mismatches, no regressions, latency unmoved. `html-apache-echarts` 90 -> 76, `tsx-excalidraw`
+-22 mismatches, no regressions, and latency unmoved *within single-run noise* - `elapsed_ms` is one
+unrepeated measurement per fixture, and a no-op build of this same primitive drifted +1.6% on the
+`total` column, so read those three columns as "no visible cost", not as a tight measurement. The
+mismatch counts are not noisy: verified 20x in separate processes (76/231/19 every time), the
+separate-process form this project's `benchmark-determinism-fix` requires, since a new tiebreak is
+exactly where parse-unstable ordering has bitten before. `html-apache-echarts` 90 -> 76, `tsx-excalidraw`
 235 -> 231, `vimscript-...-hex-colours` 23 -> 19 (below the 22 it sat at *before* the ambiguity
 guard). **`algorithm_cost` falls in all three** (647->619, 1040->1032, 5159->4653), so these are
 better pairings by the project's own objective, not just closer to the labels - the check worth
 making before believing any mismatch-count improvement.
 
-`MAX_AMBIGUOUS_CANDIDATES` is a cost bound found by measurement: uncapped, scoring every candidate
-of a commodity hash (a `,`, a `;`, `self` - hundreds of them) made the whole corpus ~8% slower for
-+4 mismatches. At 32 the quality is identical to uncapped and the latency cost vanishes.
+`MAX_AMBIGUOUS_CANDIDATES` is a pure cost bound, not a quality/cost tradeoff. Uncapped, scoring
+every candidate of a commodity hash (a `,`, a `;`, `self` - hundreds of them) made the whole corpus
+~8% slower; at 8 it cost 4 mismatches; **at 32 the quality is identical to uncapped**, i.e. no
+fixture in the corpus needed more than 32 candidates, so 32 is simply the smallest cap tried that
+loses nothing.
 
 **Cost of the primitive itself**: ~1.5% of whole-corpus metadata time (105.9s vs 104.4s total, two
 runs each), and nothing at diff time. Note `benchmark_optimal_solutions` warms metadata *outside*
