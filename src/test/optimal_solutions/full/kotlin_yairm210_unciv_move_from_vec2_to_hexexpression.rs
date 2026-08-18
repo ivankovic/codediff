@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("kotlin-yairm210-unciv-move-from-vec2-to-hexexpression")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "kotlin-yairm210-unciv-move-from-vec2-to-hexexpression",
+    )
 }
