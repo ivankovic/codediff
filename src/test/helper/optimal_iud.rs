@@ -421,6 +421,18 @@ fn solve_with_slices(
                     solution_if_match.operation = ASTMappingOperation::Identical;
                 } else {
                     solution_if_match.operation = ASTMappingOperation::MatchButNotIdentical;
+                    // Same charge `ren`/`operation_cost` apply: an interior node owning text that
+                    // changed has no child entry carrying the difference, so an oracle that skips
+                    // this under-prices matching and stops agreeing with the model it is meant to
+                    // be the optimum of.
+                    let owned = |meta: &crate::code::ASTMetadata, id: usize| {
+                        meta.node_info.get(&id).map(|info| info.owned_text_hash)
+                    };
+                    if owned(before_metadata, before_first_node.id())
+                        != owned(after_metadata, after_first_node.id())
+                    {
+                        cost += COST_UPDATE;
+                    }
                 }
 
                 // We always need to solve the remaining nodes at the same level as the two first

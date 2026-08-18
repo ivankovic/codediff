@@ -158,6 +158,23 @@ pub(crate) fn solve_with_hash_map(
         // operation-label bug, not a matching/pairing one.
         if before_metadata.is_leaf(before_id) && after_metadata.is_leaf(after_id) {
             (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
+        } else if before_metadata
+            .node_info
+            .get(&before_id)
+            .map(|info| info.owned_text_hash)
+            != after_metadata
+                .node_info
+                .get(&after_id)
+                .map(|info| info.owned_text_hash)
+        {
+            // An interior node whose *own* gap text differs (an XML attribute value, a YAML quoted
+            // scalar - see `ASTNodeMetadata::owned_text_hash`): no descendant entry carries that
+            // difference, so the recorded cost must, mirroring `UnitCostModel::ren` and
+            // `operation_cost`.
+            (
+                ASTMappingOperation::MatchButNotIdentical,
+                crate::diff::COST_UPDATE,
+            )
         } else {
             (ASTMappingOperation::MatchButNotIdentical, 0)
         }

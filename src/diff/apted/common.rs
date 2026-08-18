@@ -28,9 +28,19 @@ use crate::diff::{
 use super::engine::compute_delta;
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
-/// Cost for updating a literal leaf's value (string/number/etc. contents changed) - medium cost,
-/// between `COST_UPDATE` (identifiers/operators, cheap to rename) and a full delete+insert.
-const COST_LITERAL_UPDATE: u64 = 2;
+/// Cost for updating a literal leaf's value (string/number/etc. contents changed).
+///
+/// Equal to `COST_UPDATE` since 2026-08-18, kept as a named tier so the literal case stays an
+/// explicit seam. It was 2 - "medium, between an identifier rename and delete+insert" - but 2 is
+/// *exactly* `COST_DELETE + COST_INSERT`, and a cost equal to delete+insert is not a
+/// discouragement, it is a coin flip; measurement showed APTED resolving that tie toward
+/// delete+insert every time (raising this to 3 changed nothing corpus-wide), turning "discourage"
+/// into a de-facto forbid that `rust-sniffnet-protocol`'s ground truth explicitly contradicts.
+/// At 1: -4 mismatches, +1 zero-mismatch fixture, one deliberate +1 (see
+/// `rust_add_comments_and_real_new_logic.rs`). The rename-vs-replace ordering rule this encodes:
+/// anything cheaper than `COST_DELETE + COST_INSERT` is a preference, anything above it is a
+/// prohibition, and nothing should ever sit exactly on the boundary.
+const COST_LITERAL_UPDATE: u64 = 1;
 
 /// Cost model for APTED - unit cost model
 pub(crate) struct UnitCostModel {
@@ -68,6 +78,7 @@ impl UnitCostModel {
     /// - Identical nodes: 0
     /// - Literal nodes: 2 - medium cost for value changes
     /// - Identifiers and generic punctuation/operators: COST_UPDATE (1) - low cost
+    ///   (literals share the same value today - see COST_LITERAL_UPDATE's doc comment)
     /// - Internal nodes: 0 - cost is accounted for by children
     /// - Different kinds (allowed): COST_UPDATE (1) to COST_DELETE + COST_INSERT + 1
     ///
@@ -85,7 +96,8 @@ impl UnitCostModel {
                 if node1.text == node2.text {
                     0 // Identical
                 } else if node1.kind_cost_class.literal_like {
-                    // Literals (strings, numbers, etc.) - medium cost
+                    // Literals (strings, numbers, etc.) - see the constant's doc comment for why
+                    // this tier currently equals COST_UPDATE rather than sitting above it
                     COST_LITERAL_UPDATE
                 } else {
                     // Identifiers are cheap to update (common in refactorings); generic
@@ -107,13 +119,11 @@ impl UnitCostModel {
                 // and colour literals, Rust's comments and YAML's quoted scalars (census on
                 // `metadata::owned_text_hash_of`).
                 //
-                // `COST_UPDATE`, not `COST_LITERAL_UPDATE`: the latter is 2, exactly
-                // `COST_DELETE + COST_INSERT`, which leaves the DP indifferent between "this
-                // attribute's value changed" and "this attribute was removed and a different one
-                // added" - and measurably so, it cost
-                // `css-wordpress-...-change-simple-values-to-vars` a mapping. A relabel has to be
-                // strictly cheaper than delete+insert, the same premise the different-kind branch
-                // below states when it goes one *above* that sum to forbid a pairing.
+                // Priced `COST_UPDATE`, strictly cheaper than delete+insert. When this was
+                // (accidentally) priced at the then-2 `COST_LITERAL_UPDATE` - exactly
+                // `COST_DELETE + COST_INSERT` - the resulting indifference measurably cost
+                // `css-wordpress-...-change-simple-values-to-vars` a mapping; see
+                // `COST_LITERAL_UPDATE`'s doc comment for the tie rule.
                 COST_UPDATE
             }
         } else if nodes::update_allowed_from_masks(
@@ -693,6 +703,14 @@ pub(crate) fn classify_match(
 
     if hashes_match {
         (ASTMappingOperation::Identical, 0)
+    } else if before_info.owned_text_hash != after_info.owned_text_hash {
+        // This function's contract is "the cost of relabeling just the root pair", and for a node
+        // owning text directly that cost is not zero - `ren` charges `COST_UPDATE` for exactly
+        // this case during the DP search, and `operation_cost` charges it again when scoring, so
+        // recording 0 here would leave `mapping.cost` disagreeing with both. (`mapping.cost`
+        // drives no decisions - this is consistency, not behavior; twice today a recorded zero
+        // that "didn't matter" derailed a diagnosis.)
+        (ASTMappingOperation::MatchButNotIdentical, COST_UPDATE)
     } else {
         (ASTMappingOperation::MatchButNotIdentical, 0)
     }

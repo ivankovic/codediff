@@ -1695,6 +1695,60 @@ pairing is exactly what its ground truth wants - so the fix is not "hash the gap
 structural hash" but "find out where positional-under-a-structural-match is and isn't right", with
 XML's 41 as the worked example.
 
+### Systematic scan for the two 2026-08-18 bug classes (2026-08-18)
+
+After the `ren`/`operation_cost` fixes, a full sweep of the codebase for their two underlying
+classes: (a) **"children carry the cost/content"** stated or assumed somewhere gap-owned text
+falsifies it, and (b) **cost ties** - a relabel priced *exactly* `COST_DELETE + COST_INSERT`,
+which is neither a preference nor a prohibition but a coin flip.
+
+**Found and fixed (class a, consistency - output-neutral, verified 0 fixtures changed either
+mismatches or cost columns):**
+
+- `apted::classify_match`: contract is "cost of relabeling just the root pair", but the
+  same-kind-not-identical branch recorded 0 even when `owned_text_hash` differs - so
+  `mapping.cost` disagreed with what `ren` had just paid in the search *and* with what
+  `operation_cost` scores. `mapping.cost` drives no decisions (verified: no comparisons on it
+  anywhere), but twice today a recorded zero that "didn't matter" derailed a diagnosis.
+- `hash_tree_matching::classify`: same hole in the descent classifier.
+- `test::helper::optimal_iud`: same hole in the oracle tests compare against - an oracle that
+  under-prices matching stops being the optimum of the model it is meant to certify.
+
+**Found and fixed (class b, behavioral):** `COST_LITERAL_UPDATE` was 2 = `COST_DELETE +
+COST_INSERT` exactly, documented in `rust_sniffnet_protocol.rs` as an "accepted cost tie" that
+APTED resolves as delete+insert against the human's obvious Update. Swept both escapes: **raising
+to 3 changed nothing corpus-wide** - i.e. the tie already always resolved toward delete+insert, so
+"2 to discourage" had silently been a forbid all along - and **lowering to 1 is -4 mismatches,
++1 zero-mismatch fixture** (2723 -> 2719, 313 -> 314, tail unchanged at 33): `rust-sniffnet-protocol`
+1 -> 0 (test un-clamped), `vimscript-...-add-two-functions` 22 -> 18 (ceiling lowered), and one
+deliberate +1 on `rust-add-comments-and-real-new-logic` 84 -> 85 whose `algorithm_cost`
+*improved* 273 -> 271 (ceiling raised with rationale in the test). The rule now written on the
+constant: below `COST_DELETE + COST_INSERT` is a preference, above it is a prohibition, and
+nothing sits on the boundary. Latency: single-run sums skewed high (20.6-23.1s vs the 18.9-20.8s
+band of earlier same-day runs) but within this box's demonstrated same-build variance; mismatch
+results are deterministic (3/3 identical runs).
+
+**Scanned and sound (so the next sweep doesn't redo it):**
+
+- `nodes::map_identical_descendants`' positional zip - both callers (`solve_leading_siblings`,
+  `solve_identical_diagnostic_statements`) precondition on byte-equality (full text / full hash).
+- `compute_kind_and_value_hash` - hashes gap text at every level, like `compute_full_hash`.
+- `hash_tree_matching`'s reorder patch-up - downgrades `Identical` ancestors and charges
+  `COST_UPDATE` at the reordered parent.
+- `hash_tree_matching::classify`'s `Identical` arm - keys on the kind+value hash, which includes
+  gaps, so gap-differing pairs can't classify as `Identical`.
+- `solve_moved_subtrees` (full-hash pairing), `solve_greedy_anchor_blocks`' `sequence_edit_cost`
+  (full hash), `solve_unresolved_nodes` root pairing (scored via `operation_cost`, which now
+  checks owned text).
+- `UnitCostModel::del`/`ins`, `subtree_del_cost`/`subtree_ins_cost` - per-node constants; a
+  deleted gap-owning node's text goes down with the node, correctly.
+- `FORBIDDEN_RENAME_COST` = del+ins+1 - correctly *above* the boundary, per the tie rule.
+- `COST_MOVE` = 0 on both the diff and human sides - consistent, a deliberate design choice, not
+  a tie (nothing competes with Move at 0).
+- `compute_structural_hash` excludes gaps *by design* - it answers "same shape?"; the open
+  question about `StructurallyIdenticalAncestor` positional pairing on gap-heavy languages is
+  tracked in the gap-text section above, as a matching-policy question, not a hash bug.
+
 ### Move detection: the ambiguity guard (2026-08-17, shipped)
 
 Followed the lead above. `--dump` on `python-django` showed all 48 mismatches came from three

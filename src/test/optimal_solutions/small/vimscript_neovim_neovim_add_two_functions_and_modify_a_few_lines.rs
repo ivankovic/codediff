@@ -24,9 +24,10 @@ fn optimal_solution() -> Result<()> {
     // Dropped 1542 -> 22 when `solve_leading_siblings` (formerly `solve_comment_nodes`) was
     // extended to walk a whole chain of leading comments/modifiers instead of just one hop - this
     // fixture apparently has runs of several consecutive leading comments that only the multi-hop
-    // walk can fully anchor. Remaining 22 are a different, not yet root-caused gap.
+    // walk can fully anchor. 22 -> 18 (2026-08-18) from the `COST_LITERAL_UPDATE` tie fix (see
+    // `rust_sniffnet_protocol.rs`); the remaining 18 are a different, not yet root-caused gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-neovim-neovim-add-two-functions-and-modify-a-few-lines",
-        22,
+        18,
     )
 }
