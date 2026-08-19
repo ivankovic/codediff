@@ -112,6 +112,8 @@ mod java_zeroc_ice_ice_comment_only_update;
 #[cfg(test)]
 mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;
 #[cfg(test)]
+mod javascript_home_sweet_gnome_dash_to_panel_change_set_style_arguments;
+#[cfg(test)]
 mod javascript_jquery_ui_rails_jquery_ui_rails_add_strict_and_move_function_call_parenthesis;
 #[cfg(test)]
 mod javascript_jquery_ui_rails_jquery_ui_rails_update_text_in_string;
@@ -144,11 +146,15 @@ mod kotlin_jetbrains_kotlin_remove_one_comment_line;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_typealias_with_annotations;
 #[cfg(test)]
+mod kotlin_yairm210_unciv_another_vector2_removal;
+#[cfg(test)]
 mod kotlin_yairm210_unciv_move_from_vec2_to_hexexpression;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_remove_tovector2_from_multiple_callsites;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_small_change;
+#[cfg(test)]
+mod kotlin_yairm210_unciv_yet_another_vector2_removal;
 #[cfg(test)]
 mod lua_corsixth_corsixth_refactor_if_expressions;
 #[cfg(test)]
@@ -205,6 +211,8 @@ mod r_mtytel_helm_dummy_file;
 mod ruby_intridea_multi_json_remove_double_colon;
 #[cfg(test)]
 mod ruby_intridea_multi_json_remove_single_comma;
+#[cfg(test)]
+mod ruby_main_branch_process_executer_actual_small_change;
 #[cfg(test)]
 mod ruby_moneta_rb_moneta_change_one_identifier;
 #[cfg(test)]
@@ -281,6 +289,8 @@ mod tsx_keybase_client_change_from_one_import_and_call_to_another;
 mod tsx_keybase_client_emoji_to_native;
 #[cfg(test)]
 mod tsx_kong_insomnia_classname_strings_changed;
+#[cfg(test)]
+mod tsx_kong_insomnia_rewrite_if_using_ternary_twice;
 #[cfg(test)]
 mod tsx_mitmproxy_mitmproxy_array_to_object;
 #[cfg(test)]
