@@ -25,7 +25,9 @@ use clap::{Parser, Subcommand};
 use codediff::diff::DiffMode;
 use codediff::tui;
 
+mod configure_prompt;
 mod git_configure;
+mod jj_configure;
 
 /// Top-level subcommands. Optional and coexists with `Args::paths` below (clap resolves this
 /// correctly: `codediff a.rs b.rs` still parses as two paths, not an attempt at the `git`
@@ -39,12 +41,24 @@ enum Command {
         #[command(subcommand)]
         action: GitAction,
     },
+    /// Jujutsu (jj) integration helpers.
+    Jj {
+        #[command(subcommand)]
+        action: JjAction,
+    },
 }
 
 #[derive(Subcommand)]
 enum GitAction {
     /// Interactively configure codediff as git's diff tool - the `git config` commands README's
     /// "Git integration" section otherwise asks you to run by hand.
+    Configure,
+}
+
+#[derive(Subcommand)]
+enum JjAction {
+    /// Interactively configure codediff as jj's diff tool - the `jj config set` commands README's
+    /// "Jujutsu (jj) integration" section otherwise asks you to run by hand.
     Configure,
 }
 
@@ -59,11 +73,10 @@ enum ColorChoice {
 
 #[derive(Parser)]
 #[command(
-    after_help = "Exit codes (headless/JSON modes, direct BEFORE AFTER invocation): \
-    0 = no differences, 1 = differences found, 2 = error - same convention as diff(1). \
-    The 7-argument GIT_EXTERNAL_DIFF form always exits 0 on success instead, because git \
-    treats a non-zero exit from an external diff program as a fatal error, not as \"files \
-    differ\". The interactive TUI always exits 0."
+    after_help = "Exit codes: 0 on success, 2 on error. Pass --exit-code to additionally get \
+    1 when the files differ (the diff(1) convention), which is off by default for the same \
+    reason `git diff` defaults to 0: when a VCS drives codediff as a display tool, a non-zero \
+    exit means \"the tool failed\", not \"the files differ\"."
 )]
 struct Args {
     #[command(subcommand)]
@@ -104,6 +117,21 @@ struct Args {
     /// color without needing the variable.
     #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
     color: ColorChoice,
+
+    /// Exit 1 when the files differ (0 when identical, 2 on error) - the `diff(1)` convention,
+    /// for scripts and CI conditionals.
+    ///
+    /// Off by default, deliberately, and for the same reason `git diff` defaults to exiting 0
+    /// even when files differ: codediff's main non-interactive callers are version control
+    /// systems driving it as a *display* tool, and every one of them reads a non-zero exit as
+    /// "the tool failed" rather than "the files differ". Measured consequences of defaulting
+    /// this on (which v0.0.8 briefly did): `jj` prints a `Tool exited with exit status: 1`
+    /// warning on every single file it renders, and `git difftool` with
+    /// `difftool.trustExitCode=true` aborts the whole diff after the first differing file with
+    /// "fatal: external diff died". Both go away when the default is 0; a script that wants the
+    /// `diff(1)` behavior asks for it explicitly.
+    #[arg(long)]
+    exit_code: bool,
 
     /// How many unchanged lines to keep around each change in headless output before collapsing
     /// the rest into an elision marker - same idea as `diff -U N`.
@@ -199,13 +227,18 @@ fn use_color(choice: ColorChoice) -> bool {
     }
 }
 
-/// Turns a completed non-interactive run into a `diff`-style process exit code: 0 = no
-/// differences, 1 = differences found (errors exit 2, handled at the call sites). Only for the
-/// direct `BEFORE AFTER` calling convention: git treats a non-zero exit from a
-/// `GIT_EXTERNAL_DIFF` program as a fatal error ("external diff died"), not as "files differ",
-/// so the 7-argument git form (recognized by `invoked_as_git_external_diff`) always maps to 0.
-fn exit_code_for(differed: bool, invoked_as_git_external_diff: bool) -> i32 {
-    if differed && !invoked_as_git_external_diff {
+/// Turns a completed non-interactive run into a process exit code. 0 unless the caller opted
+/// into the `diff(1)` convention with `--exit-code` (`want_exit_code`) *and* the files differ;
+/// errors exit 2, handled at the call sites. See `Args::exit_code` for why opt-in is the right
+/// default rather than the timid one.
+///
+/// The 7-argument `GIT_EXTERNAL_DIFF` form (recognized by `invoked_as_git_external_diff`) stays
+/// at 0 even under `--exit-code`: git reads a non-zero exit there as "external diff died" and
+/// aborts the *entire* multi-file diff, so honoring the flag in that position would break the
+/// caller rather than inform it. A script wanting per-file differ/same status has the direct
+/// `BEFORE AFTER` form available, which does honor it.
+fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_diff: bool) -> i32 {
+    if differed && want_exit_code && !invoked_as_git_external_diff {
         1
     } else {
         0
@@ -223,6 +256,13 @@ async fn main() -> Result<()> {
         return git_configure::run();
     }
 
+    if let Some(Command::Jj {
+        action: JjAction::Configure,
+    }) = &args.command
+    {
+        return jj_configure::run();
+    }
+
     let before_after = resolve_before_after(&args.paths)?;
     let invoked_as_git_external_diff = args.paths.len() == 7;
 
@@ -235,9 +275,11 @@ async fn main() -> Result<()> {
             DiffMode::Fast
         };
         match tui::json_output::run(&before, &after, mode) {
-            Ok(differed) => {
-                std::process::exit(exit_code_for(differed, invoked_as_git_external_diff))
-            }
+            Ok(differed) => std::process::exit(exit_code_for(
+                differed,
+                args.exit_code,
+                invoked_as_git_external_diff,
+            )),
             Err(e) => {
                 eprintln!("codediff: {e:#}");
                 std::process::exit(2);
@@ -256,9 +298,11 @@ async fn main() -> Result<()> {
             DiffMode::Fast
         };
         match tui::headless::run(&before, &after, use_color(args.color), mode, args.context) {
-            Ok(differed) => {
-                std::process::exit(exit_code_for(differed, invoked_as_git_external_diff))
-            }
+            Ok(differed) => std::process::exit(exit_code_for(
+                differed,
+                args.exit_code,
+                invoked_as_git_external_diff,
+            )),
             Err(e) => {
                 eprintln!("codediff: {e:#}");
                 std::process::exit(2);
@@ -346,6 +390,7 @@ mod tests {
             headless,
             exact: false,
             color: ColorChoice::Auto,
+            exit_code: false,
             context: tui::headless::CONTEXT_LINES,
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
@@ -388,13 +433,36 @@ mod tests {
         assert!(!use_color(ColorChoice::Never));
     }
 
+    /// Without `--exit-code`, a differing pair still exits 0 - the default that keeps `jj` and
+    /// `git difftool --trust-exit-code` from treating a normal diff as a tool failure.
     #[test]
-    fn exit_code_is_diff_style_for_direct_invocations_only() {
-        assert_eq!(exit_code_for(false, false), 0);
-        assert_eq!(exit_code_for(true, false), 1);
-        // The GIT_EXTERNAL_DIFF form must always exit 0 - git treats non-zero as fatal.
-        assert_eq!(exit_code_for(true, true), 0);
-        assert_eq!(exit_code_for(false, true), 0);
+    fn without_the_flag_a_differing_pair_still_exits_zero() {
+        assert_eq!(exit_code_for(true, false, false), 0);
+        assert_eq!(exit_code_for(false, false, false), 0);
+    }
+
+    #[test]
+    fn with_the_flag_exit_codes_follow_the_diff_convention() {
+        assert_eq!(exit_code_for(false, true, false), 0);
+        assert_eq!(exit_code_for(true, true, false), 1);
+    }
+
+    /// Even opted in, the GIT_EXTERNAL_DIFF form stays at 0: git reads non-zero there as
+    /// "external diff died" and aborts the whole multi-file diff.
+    #[test]
+    fn the_git_external_diff_form_never_returns_one_even_with_the_flag() {
+        assert_eq!(exit_code_for(true, true, true), 0);
+        assert_eq!(exit_code_for(false, true, true), 0);
+    }
+
+    #[test]
+    fn exit_code_flag_defaults_to_off_and_parses() {
+        assert!(!Args::try_parse_from(["codediff"]).unwrap().exit_code);
+        assert!(
+            Args::try_parse_from(["codediff", "--exit-code"])
+                .unwrap()
+                .exit_code
+        );
     }
 
     #[test]

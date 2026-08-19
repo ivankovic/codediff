@@ -19,10 +19,12 @@
 //! `codediff git configure`: an interactive wizard for the `git config` commands README's "Git
 //! integration" section otherwise asks the user to run by hand.
 
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::process::Command;
 
 use anyhow::{Context, Result};
+
+use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path};
 
 /// Whether to write `git config` values with `--global` or to the current repository only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,18 +117,6 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-/// The absolute path to the running `codediff` binary, so the git config this writes points at
-/// *this* binary rather than whatever bare `codediff` happens to resolve to on PATH - those can
-/// differ (a checkout build run via `cargo run` vs. a stale `cargo install`), which is exactly
-/// the confusion this command exists to prevent. Falls back to the bare name if the running
-/// executable's path can't be resolved (rare - e.g. it was deleted after this process started).
-fn resolve_codediff_path() -> String {
-    std::env::current_exe()
-        .ok()
-        .and_then(|path| path.to_str().map(str::to_string))
-        .unwrap_or_else(|| "codediff".to_string())
-}
-
 /// One line describing `key`'s current value under `scope`, or an empty string if it isn't set -
 /// shown before a prompt that would overwrite it, so re-running this wizard is safe rather than
 /// silently clobbering an existing setting without saying so.
@@ -214,37 +204,6 @@ fn ask_scope() -> Result<Scope> {
     }
 }
 
-/// Parses a yes/no prompt's input against `default` for an empty line (just pressing Enter) -
-/// `None` for anything else unrecognized, so the caller knows to reprompt.
-fn parse_yes_no(input: &str, default: bool) -> Option<bool> {
-    match input.trim().to_lowercase().as_str() {
-        "" => Some(default),
-        "y" | "yes" => Some(true),
-        "n" | "no" => Some(false),
-        _ => None,
-    }
-}
-
-fn ask_yes_no(prompt: &str, default: bool) -> Result<bool> {
-    loop {
-        let input = read_line(prompt)?;
-        match parse_yes_no(&input, default) {
-            Some(answer) => return Ok(answer),
-            None => println!("'{input}' - please answer 'y' or 'n'."),
-        }
-    }
-}
-
-fn read_line(prompt: &str) -> Result<String> {
-    print!("{prompt}");
-    io::stdout().flush().context("failed to write prompt")?;
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .context("failed to read from stdin")?;
-    Ok(input.trim().to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,14 +212,6 @@ mod tests {
     fn scope_flag_is_always_explicit() {
         assert_eq!(Scope::Global.flag(), "--global");
         assert_eq!(Scope::Local.flag(), "--local");
-    }
-
-    #[test]
-    fn resolve_codediff_path_never_returns_an_empty_string() {
-        // Can't control what current_exe() resolves to under `cargo test`, but it must always
-        // produce *some* non-empty path (or the "codediff" fallback), never silently empty -
-        // an empty difftool.codediff.cmd would be a confusing, hard-to-diagnose config to write.
-        assert!(!resolve_codediff_path().is_empty());
     }
 
     #[test]
@@ -283,26 +234,5 @@ mod tests {
     fn parse_scope_rejects_anything_else() {
         assert_eq!(parse_scope("yes"), None);
         assert_eq!(parse_scope("globalx"), None);
-    }
-
-    #[test]
-    fn parse_yes_no_accepts_y_n_and_their_full_spellings_case_insensitively() {
-        assert_eq!(parse_yes_no("y", false), Some(true));
-        assert_eq!(parse_yes_no("Y", false), Some(true));
-        assert_eq!(parse_yes_no("yes", false), Some(true));
-        assert_eq!(parse_yes_no("n", true), Some(false));
-        assert_eq!(parse_yes_no("no", true), Some(false));
-    }
-
-    #[test]
-    fn parse_yes_no_falls_back_to_the_default_on_an_empty_line() {
-        assert_eq!(parse_yes_no("", true), Some(true));
-        assert_eq!(parse_yes_no("  ", false), Some(false));
-    }
-
-    #[test]
-    fn parse_yes_no_rejects_anything_else() {
-        assert_eq!(parse_yes_no("maybe", true), None);
-        assert_eq!(parse_yes_no("ye", true), None);
     }
 }

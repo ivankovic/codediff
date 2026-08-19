@@ -103,10 +103,13 @@ Colors are on by default (git's pager renders them); pass `--color never`, or se
 (see <https://no-color.org>), to disable ANSI colors, for example when you redirect output to a
 file - `--color always` forces them even under `NO_COLOR`.
 
-For scripting, a direct `codediff BEFORE AFTER` invocation exits with the `diff` convention:
-`0` when the files are identical, `1` when they differ, `2` on error. (The 7-argument
-`GIT_EXTERNAL_DIFF` form always exits `0` on success, because git treats a non-zero exit from an
-external diff program as fatal.)
+codediff exits `0` on success and `2` on error. For scripting, pass `--exit-code` to additionally
+get `1` when the files differ, the `diff(1)` convention. That is opt-in rather than the default
+for the same reason `git diff` exits `0` even when files differ: codediff's usual non-interactive
+callers are version control systems driving it as a display tool, and they read a non-zero exit as
+"the tool failed" - `jj` warns on every file, and `git difftool` with `difftool.trustExitCode=true`
+aborts the whole diff. (The 7-argument `GIT_EXTERNAL_DIFF` form stays at `0` even with
+`--exit-code`, since git treats a non-zero exit there as fatal.)
 
 ## Git integration
 
@@ -146,6 +149,42 @@ GIT_EXTERNAL_DIFF=codediff git diff
 Files with no tree-sitter grammar (an unrecognized extension, or none at all - `Makefile`,
 `Dockerfile`, ...) fall back to a plain line-level diff instead of the syntax-aware one, so a
 change touching one of them never blocks `git diff` from showing the rest.
+
+## Jujutsu (jj) integration
+
+jj does not read git's `difftool`/`diff.external` settings, even in a colocated repo, so it needs
+its own configuration. Run the setup wizard:
+
+```
+codediff jj configure
+```
+
+Or configure it by hand:
+
+```
+jj config set --user merge-tools.codediff.program codediff
+jj config set --user merge-tools.codediff.diff-args '["$left","$right"]'
+jj config set --user merge-tools.codediff.diff-invocation-mode file-by-file
+```
+
+That registers `jj diff --tool codediff`. To make it the default for plain `jj diff` as well:
+
+```
+jj config set --user ui.diff-formatter codediff
+```
+
+Use `--repo` in place of `--user` to configure the current repository only.
+
+**`diff-invocation-mode = "file-by-file"` is required.** jj's default hands a diff tool two
+*directory* trees; codediff diffs two files, so without this setting every invocation fails. With
+it, jj passes one changed file pair at a time, keeping each file's real path and extension, so
+language detection works exactly as it does under git.
+
+`jj diff` runs its formatter under a pager, so codediff renders in its non-interactive text mode
+there - the same output `git diff` gets. jj has no equivalent of `git difftool`'s interactive
+per-file viewer (its terminal-attached hook, `ui.diff-editor`, is for `jj diffedit`/`jj split`,
+which edit the right-hand side and read it back - not something a read-only viewer should claim to
+do), so for the full-screen TUI on a jj repo, run `codediff BEFORE AFTER` directly.
 
 # Guiding principles
 

@@ -159,6 +159,13 @@ are shorthand for "run fetch-stats analysis in that mode".
   first fixture in that tool's language scope, rather than silently skipping the tool (see
   `src/bin/benchmark_other.rs`'s own doc comment). This is the slow half of the pair below - a
   fresh GumTree JVM cold-starts once per fixture.
+
+  `jj` is worth installing into the same scratch prefix (`cargo install --root /var/tmp/tools
+  jj-cli`) if you touch `src/jj_configure.rs`: that module's claims about how jj invokes a diff
+  tool - directory trees by default, file pairs with extensions preserved under
+  `diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0 and should
+  be re-verified the same way rather than assumed, since jj's config surface has been renamed
+  before.
 * `benchmark-other-report` (research/) - just the analysis/plotting step of `benchmark-other`, over whatever
   `research/data/comparison/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
   variables above, since it never runs the benchmark itself. `introductory-paper` below depends on
