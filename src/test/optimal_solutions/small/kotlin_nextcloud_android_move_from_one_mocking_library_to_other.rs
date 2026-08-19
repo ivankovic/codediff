@@ -27,6 +27,7 @@ fn optimal_solution() -> Result<()> {
     // an inherently ambiguous near-duplicate-insert case.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
-        50,
+        46,
+        20,
     )
 }

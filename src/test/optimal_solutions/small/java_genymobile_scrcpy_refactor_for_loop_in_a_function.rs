@@ -28,6 +28,7 @@ fn optimal_solution() -> Result<()> {
     // structural-move objective-wall gap documented elsewhere in this suite.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-genymobile-scrcpy-refactor-for-loop-in-a-function",
-        52,
+        46,
+        32,
     )
 }

@@ -28,5 +28,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-dot-to-question-mark-dot",
         7,
+        7,
     )
 }

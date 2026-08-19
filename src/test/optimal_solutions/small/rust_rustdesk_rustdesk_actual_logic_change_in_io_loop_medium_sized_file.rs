@@ -26,6 +26,7 @@ fn optimal_solution() -> Result<()> {
     // `assert_matches_human_mapping`) once a fix lands.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file",
-        95,
+        79,
+        42,
     )
 }

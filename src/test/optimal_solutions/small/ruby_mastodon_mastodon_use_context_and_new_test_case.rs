@@ -25,6 +25,7 @@ fn optimal_solution() -> Result<()> {
     // Identical classification for the pair it actually picks (do_block and its body_statement).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-use-context-and-new-test-case",
-        16,
+        10,
+        4,
     )
 }

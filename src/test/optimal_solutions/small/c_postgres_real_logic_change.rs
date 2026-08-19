@@ -45,6 +45,7 @@ fn optimal_solution() -> Result<()> {
     //    visually at this time!
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-postgres-real-logic-change",
-        28,
+        27,
+        9,
     )
 }

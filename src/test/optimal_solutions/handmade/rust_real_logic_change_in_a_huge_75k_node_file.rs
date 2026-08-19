@@ -26,6 +26,7 @@ fn optimal_solution() -> Result<()> {
     // `assert_matches_human_mapping`) once a fix lands.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-real-logic-change-in-a-huge-75k-node-file",
-        23,
+        18,
+        15,
     )
 }

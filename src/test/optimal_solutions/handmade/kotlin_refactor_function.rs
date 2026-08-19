@@ -32,6 +32,7 @@ fn optimal_solution() -> Result<()> {
     // attempted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-refactor-function",
-        64,
+        0,
+        0,
     )
 }

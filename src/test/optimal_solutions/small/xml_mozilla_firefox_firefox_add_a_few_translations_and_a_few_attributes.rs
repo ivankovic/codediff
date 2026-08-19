@@ -29,6 +29,7 @@ fn optimal_solution() -> Result<()> {
     // content-identical) sibling than the human's chosen correspondence.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-mozilla-firefox-firefox-add-a-few-translations-and-a-few-attributes",
-        70,
+        69,
+        33,
     )
 }

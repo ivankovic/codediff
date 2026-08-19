@@ -29,5 +29,9 @@ fn optimal_solution() -> Result<()> {
     // are the root's own `MatchButNotIdentical` (needs one more propagation pass to pick up) and
     // that same `;`, which is now nested one level deeper after the wrap and wasn't matched since
     // it was one of the filtered trivial entries.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit("cpp-add-templates", 2)
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "cpp-add-templates",
+        1,
+        1,
+    )
 }

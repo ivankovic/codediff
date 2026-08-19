@@ -29,6 +29,7 @@ fn optimal_solution() -> Result<()> {
     // fix, from a pre-fix baseline of 0 before `solve_large_flat_subtrees` could even reach it).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-ffmpeg-added-typedef-to-enum",
-        4,
+        0,
+        0,
     )
 }

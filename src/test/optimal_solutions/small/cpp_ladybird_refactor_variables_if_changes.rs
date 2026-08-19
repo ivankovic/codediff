@@ -24,5 +24,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-ladybird-refactor-variables-if-changes",
         109,
+        52,
     )
 }

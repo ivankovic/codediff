@@ -24,5 +24,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-scrcpy-public-to-protected",
         1,
+        1,
     )
 }

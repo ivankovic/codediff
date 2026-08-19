@@ -28,6 +28,7 @@ fn optimal_solution() -> Result<()> {
     // syntactic signal to prefer one over the other.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-swiftlang-swift-enable-checks-remove-todo-comment",
-        4,
+        2,
+        2,
     )
 }

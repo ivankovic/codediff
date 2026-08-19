@@ -24,10 +24,13 @@ Reads optimal_solutions_benchmark.csv (produced by
 `total_nodes` (before+after combined AST node count, solved fixtures only - "solved" meaning a
 `human_mapping.json` exists to compare against), `algorithm_cost` (codediff's own edit-script cost,
 `codediff::diff::cost::diff_cost` - a size-of-the-diff proxy, present for every fixture including
-"unsolved" ones), and `mismatches` (disagreement count against the human-authored mapping, solved
-fixtures only).
+"unsolved" ones), `mismatches` (disagreement count against the human-authored mapping, solved
+fixtures only), and `visible_mismatches` (the subset of `mismatches` whose node is actually
+rendered in codediff's own diff output, per `codediff::diff::text::visible_node_ids` - a mismatch
+on a purely structural node like a `block` or `declaration_list` never independently reaches the
+screen, so it's excluded; solved fixtures only, same as `mismatches`).
 
-Writes four plots:
+Writes five plots:
 
   - optimal_solutions_runtime_histogram.png: distribution of elapsed_ms across the whole corpus,
     log-x bins (runtimes span several orders of magnitude, from single-digit ms to multi-second
@@ -42,6 +45,13 @@ Writes four plots:
     (solved fixtures only), log-x/symlog-y (most fixtures have zero mismatches, which a plain log
     y-axis can't show at all) - whether bigger files also tend to have more disagreement with the
     human mapping, or accuracy holds steady regardless of size.
+  - optimal_solutions_mismatches_vs_visible.png: scatter of mismatch count against visible mismatch
+    count (solved fixtures only), linear-linear with a y=x reference line - `visible_mismatches`
+    can never exceed `mismatches` by construction, so every point sits on or below that line; how
+    far below it shows how much of a fixture's disagreement is invisible structural noise rather
+    than something a user would ever see differ. Linear, not log/symlog like the plot above: both
+    axes are dominated by zeros (332 of 445 fixtures match exactly on both), and the range (0-464,
+    0-160) isn't wide enough to need a log axis the way node counts or runtimes are.
 
 Usage (from research/):
     uv run ./analysis/optimal_solutions_benchmark_report.py
@@ -207,6 +217,61 @@ def plot_mismatches_vs_nodes(rows: list[dict], output_path: Path) -> None:
     )
 
 
+def plot_mismatches_vs_visible(rows: list[dict], output_path: Path) -> None:
+    """Total mismatches (x) vs. visible mismatches (y) - see this module's own doc comment for why
+    linear-linear, not log/symlog. Marker area is proportional to how many fixtures share the exact
+    same (mismatches, visible_mismatches) pair, since a plain alpha-blended scatter can't show
+    density at a single overlapping point - and the biggest single point by far is (0, 0)."""
+    scoped = solved_rows(rows)
+    mismatches = np.array([int(r["mismatches"]) for r in scoped], dtype=int)
+    visible = np.array([int(r["visible_mismatches"]) for r in scoped], dtype=int)
+
+    counts: dict[tuple[int, int], int] = {}
+    for m, v in zip(mismatches, visible):
+        counts[(m, v)] = counts.get((m, v), 0) + 1
+    pts_x = np.array([m for (m, v) in counts], dtype=float)
+    pts_y = np.array([v for (m, v) in counts], dtype=float)
+    pts_n = np.array([counts[(m, v)] for (m, v) in counts], dtype=float)
+    # Area (not radius) proportional to count, clamped to a floor so a lone fixture still reads as
+    # a visible dot - matplotlib's `s` is a point^2 area, hence the sqrt.
+    sizes = 18 + 900 * np.sqrt(pts_n / pts_n.max())
+
+    zero_zero = int(counts.get((0, 0), 0))
+    nonzero_mask = mismatches > 0
+    mean_share = float(np.mean(visible[nonzero_mask] / mismatches[nonzero_mask])) if nonzero_mask.any() else float("nan")
+
+    fig, ax = plt.subplots(figsize=(9, 7), facecolor=SURFACE)
+    ax.scatter(pts_x, pts_y, s=sizes, alpha=0.6, color=CODEDIFF_COLOR, edgecolor=SURFACE, linewidth=0.6, zorder=3)
+
+    diag_max = float(max(mismatches.max(), visible.max())) if len(scoped) else 1.0
+    ax.plot([0, diag_max], [0, diag_max], color=INK_MUTED, linestyle="--", linewidth=1.2, zorder=2)
+    ax.text(diag_max, diag_max, "  visible = total", color=INK_MUTED, fontsize=9, va="center")
+
+    if zero_zero:
+        ax.annotate(
+            f"{zero_zero} fixtures match exactly",
+            xy=(0, 0), xytext=(diag_max * 0.12, diag_max * 0.05),
+            fontsize=9, color=INK_SECONDARY,
+            arrowprops={"arrowstyle": "-", "color": INK_MUTED, "linewidth": 0.8},
+        )
+
+    ax.set_xlabel("Total mismatches vs the human-authored mapping", fontsize=11, color=INK_SECONDARY)
+    ax.set_ylabel("Visible mismatches (rendered in codediff's own diff output)", fontsize=11, color=INK_SECONDARY)
+    ax.set_title(
+        f"How much of a mismatch is visible? ({len(scoped)} solved fixtures, "
+        f"mean visible share {mean_share:.0%} among the {int(nonzero_mask.sum())} with any mismatch)",
+        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+    )
+    ax.set_xlim(left=-diag_max * 0.02)
+    ax.set_ylim(bottom=-diag_max * 0.02)
+    style_axes(ax)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
+    plt.close(fig)
+    print(f"Plot saved to {output_path}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="CodeDiff's own performance/accuracy characteristics from optimal_solutions_benchmark.csv."
@@ -240,3 +305,9 @@ if __name__ == "__main__":
     plot_runtime_vs_nodes(rows, plots_dir / "optimal_solutions_runtime_vs_nodes.png")
     plot_runtime_vs_diff_size(rows, plots_dir / "optimal_solutions_runtime_vs_diff_size.png")
     plot_mismatches_vs_nodes(rows, plots_dir / "optimal_solutions_mismatches_vs_nodes.png")
+
+    if "visible_mismatches" not in (rows[0] if rows else {}):
+        print("This CSV has no 'visible_mismatches' column - skipping optimal_solutions_mismatches_vs_visible.png.")
+        print("Regenerate with a build that includes the visible-mismatch measurement (see this script's own doc comment).")
+    else:
+        plot_mismatches_vs_visible(rows, plots_dir / "optimal_solutions_mismatches_vs_visible.png")

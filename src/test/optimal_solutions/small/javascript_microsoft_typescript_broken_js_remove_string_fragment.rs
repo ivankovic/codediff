@@ -29,6 +29,7 @@ fn optimal_solution() -> Result<()> {
     // cascades into a large, but not meaningfully wrong, mapping difference.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-microsoft-typescript-broken-js-remove-string-fragment",
-        1105,
+        464,
+        8,
     )
 }

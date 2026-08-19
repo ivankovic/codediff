@@ -32,6 +32,7 @@ fn optimal_solution() -> Result<()> {
     // in TODO.md, not something this session's changes caused.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-awesomewm-awesome-comment-changes-and-additions",
-        18,
+        0,
+        0,
     )
 }

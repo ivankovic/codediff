@@ -30,6 +30,7 @@ fn optimal_solution() -> Result<()> {
     // further; lower (or drop back to assert_matches_human_mapping) if that's revisited.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-fedorenchik-qt-support-add-two-lines",
-        19,
+        0,
+        0,
     )
 }

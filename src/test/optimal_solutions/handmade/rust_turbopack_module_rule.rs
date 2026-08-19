@@ -28,7 +28,8 @@ fn matches_human_solution() -> Result<()> {
     // deleted outright 2026-08-14), which measurably improved this fixture's match quality.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-turbopack-module-rule",
-        52,
+        49,
+        24,
     )
 }
 

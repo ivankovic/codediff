@@ -36,5 +36,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-pytorch-pytorch-add-param-to-many-places-and-update-one",
         1,
+        1,
     )
 }

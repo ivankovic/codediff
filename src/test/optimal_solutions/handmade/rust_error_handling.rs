@@ -66,5 +66,9 @@ fn optimal_solution() -> Result<()> {
     //  would violate the LCA-consistent ordering APTED's mapping model requires relative to the
     //  other already-fixed matches in the block. This is the same class of "objective wall" as
     //  other cost-tied APTED gaps documented in `TODO.md` - not attempted here.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit("rust-error-handling", 1)
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "rust-error-handling",
+        1,
+        1,
+    )
 }

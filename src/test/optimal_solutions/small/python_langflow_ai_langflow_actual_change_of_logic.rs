@@ -26,6 +26,7 @@ fn optimal_solution() -> Result<()> {
     // multi-map group pairing codediff doesn't realize.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-langflow-ai-langflow-actual-change-of-logic",
-        20,
+        8,
+        5,
     )
 }

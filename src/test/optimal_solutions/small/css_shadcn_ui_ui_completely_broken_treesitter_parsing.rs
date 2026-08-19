@@ -27,6 +27,7 @@ fn optimal_solution() -> Result<()> {
     // following the human's chosen (necessarily somewhat arbitrary) correspondence.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-shadcn-ui-ui-completely-broken-treesitter-parsing",
-        16277,
+        124,
+        0,
     )
 }

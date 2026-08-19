@@ -27,5 +27,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-homebrew-brew-actual-logic-change",
         15,
+        7,
     )
 }

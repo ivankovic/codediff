@@ -462,6 +462,30 @@ pub fn status_after(node: Node, caches: &Caches) -> NodeStatus {
 /// Helper function to find a node by ID in a tree and return its kind.
 /// Returns "None" if the node is not found, "0" if the ID is 0,
 /// or the node kind if found.
+/// Which side of the diff a [`Mismatch`]'s `node_id` belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Before,
+    After,
+}
+
+/// One disagreement between the human mapping and codediff's actual output, tagged with the node
+/// most directly responsible for it. `node_id` is `0` for a mismatch that isn't about any single
+/// node (the nondeterminism check, `ASTDiff::is_valid`, a malformed multi-map group config) - a
+/// real tree-sitter `Node::id()` is never `0`, matching the sentinel `before_node_map`/
+/// `after_node_map` already use for "no counterpart" elsewhere in this codebase.
+///
+/// Exists so a caller can cross-reference `node_id`/`side` against
+/// [`crate::diff::text::visible_node_ids`] and tell a mismatch on a rendered, user-visible node
+/// apart from one on invisible structural scaffolding (a `block`, a `declaration_list`, ...) whose
+/// misclassification has no independent effect on what the diff actually shows.
+#[derive(Debug, Clone)]
+pub struct Mismatch {
+    pub message: String,
+    pub node_id: usize,
+    pub side: Side,
+}
+
 fn node_kind_for_id(root: Node, node_id: usize) -> String {
     if node_id == 0 {
         return "0".to_string();
@@ -484,12 +508,14 @@ fn node_kind_for_id(root: Node, node_id: usize) -> String {
 
 /// Pushes a mismatch for every node in `node`'s subtree (inclusive) that isn't mapped to zero
 /// (i.e. deleted, if `node` is in the before tree, or inserted, if in the after tree) in `node_map`.
+/// `side` is which side `node` (and therefore every descendant tagged here) is on.
 fn check_subtree_maps_to_zero(
     node: Node,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
     context: &str,
-    mismatches: &mut Vec<String>,
+    mismatches: &mut Vec<Mismatch>,
     lookup_root: Node,
+    side: Side,
 ) {
     let mut stack = vec![node];
     while let Some(n) = stack.pop() {
@@ -500,12 +526,16 @@ fn check_subtree_maps_to_zero(
                     Some(&mapped_id) => node_kind_for_id(lookup_root, mapped_id),
                     None => "None".to_string(),
                 };
-                mismatches.push(format!(
-                    "{}: descendant node '{}' was expected to be removed (mapped to 0), but was mapped to {}",
-                    context,
-                    n.kind(),
-                    mapped_kind
-                ))
+                mismatches.push(Mismatch {
+                    message: format!(
+                        "{}: descendant node '{}' was expected to be removed (mapped to 0), but was mapped to {}",
+                        context,
+                        n.kind(),
+                        mapped_kind
+                    ),
+                    node_id: n.id(),
+                    side,
+                })
             }
         }
 
@@ -534,14 +564,15 @@ fn subtree_ids(node: Node) -> std::collections::HashSet<usize> {
 /// counterpart (via `node_map`) doesn't land inside `counterpart_ids` - the one-sided half of
 /// [`check_subtree_maps_within`]'s closure check. `counterpart_lookup_root` is the *other* side's
 /// full tree root, used only to describe what a wrongly-mapped-to node actually is (same role
-/// `check_subtree_maps_to_zero`'s `lookup_root` plays).
+/// `check_subtree_maps_to_zero`'s `lookup_root` plays). `side` is which side `subtree_root` is on.
 fn check_subtree_closed_within(
     subtree_root: Node,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
     counterpart_ids: &std::collections::HashSet<usize>,
     counterpart_lookup_root: Node,
     context: &str,
-    mismatches: &mut Vec<String>,
+    mismatches: &mut Vec<Mismatch>,
+    side: Side,
 ) {
     let mut stack = vec![subtree_root];
     while let Some(n) = stack.pop() {
@@ -552,12 +583,16 @@ fn check_subtree_closed_within(
                     Some(&mapped_id) => node_kind_for_id(counterpart_lookup_root, mapped_id),
                     None => "None".to_string(),
                 };
-                mismatches.push(format!(
-                    "{}: descendant node '{}' was expected to map within the matched pair's counterpart subtree, but was mapped to {}",
-                    context,
-                    n.kind(),
-                    mapped_kind
-                ));
+                mismatches.push(Mismatch {
+                    message: format!(
+                        "{}: descendant node '{}' was expected to map within the matched pair's counterpart subtree, but was mapped to {}",
+                        context,
+                        n.kind(),
+                        mapped_kind
+                    ),
+                    node_id: n.id(),
+                    side,
+                });
             }
         }
 
@@ -585,7 +620,7 @@ fn check_subtree_maps_within(
     before_root: Node,
     after_root: Node,
     context: &str,
-    mismatches: &mut Vec<String>,
+    mismatches: &mut Vec<Mismatch>,
 ) {
     let before_ids = subtree_ids(before_node);
     let after_ids = subtree_ids(after_node);
@@ -596,6 +631,7 @@ fn check_subtree_maps_within(
         after_root,
         context,
         mismatches,
+        Side::Before,
     );
     check_subtree_closed_within(
         after_node,
@@ -604,6 +640,7 @@ fn check_subtree_maps_within(
         before_root,
         context,
         mismatches,
+        Side::After,
     );
 }
 
@@ -982,7 +1019,7 @@ fn check_entry<'b, 'a>(
     before_root: Node<'b>,
     after_root: Node<'a>,
     diff_ast: &ASTDiff,
-    mismatches: &mut Vec<String>,
+    mismatches: &mut Vec<Mismatch>,
     before_cache: &mut PathCache<'b>,
     after_cache: &mut PathCache<'a>,
 ) -> Result<()> {
@@ -1012,16 +1049,20 @@ fn check_entry<'b, 'a>(
                     Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
                     None => "None".to_string(),
                 };
-                mismatches.push(format!(
-                    "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}{}",
-                    entry.operation,
-                    before_path,
-                    after_path,
-                    before_node.kind(),
-                    after_node.kind(),
-                    mapped_kind,
-                    actual_mapping_info(diff_ast, before_node.id(), actual_partner)
-                ));
+                mismatches.push(Mismatch {
+                    message: format!(
+                        "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}{}",
+                        entry.operation,
+                        before_path,
+                        after_path,
+                        before_node.kind(),
+                        after_node.kind(),
+                        mapped_kind,
+                        actual_mapping_info(diff_ast, before_node.id(), actual_partner)
+                    ),
+                    node_id: before_node.id(),
+                    side: Side::Before,
+                });
                 return Ok(());
             }
 
@@ -1030,14 +1071,22 @@ fn check_entry<'b, 'a>(
             );
             match diff_ast.mapping.get(&(before_node.id(), after_node.id())) {
                 Some(actual_mapping) if actual_mapping.operation == expected_op => {}
-                Some(actual_mapping) => mismatches.push(format!(
-                    "{:?} {:?} <-> {:?}: expected codediff operation {:?}, but it chose {:?}",
-                    entry.operation, before_path, after_path, expected_op, actual_mapping.operation
-                )),
-                None => mismatches.push(format!(
-                    "{:?} {:?} <-> {:?}: nodes are mapped to each other but have no ASTMapping entry (unexpected)",
-                    entry.operation, before_path, after_path
-                )),
+                Some(actual_mapping) => mismatches.push(Mismatch {
+                    message: format!(
+                        "{:?} {:?} <-> {:?}: expected codediff operation {:?}, but it chose {:?}",
+                        entry.operation, before_path, after_path, expected_op, actual_mapping.operation
+                    ),
+                    node_id: before_node.id(),
+                    side: Side::Before,
+                }),
+                None => mismatches.push(Mismatch {
+                    message: format!(
+                        "{:?} {:?} <-> {:?}: nodes are mapped to each other but have no ASTMapping entry (unexpected)",
+                        entry.operation, before_path, after_path
+                    ),
+                    node_id: before_node.id(),
+                    side: Side::Before,
+                }),
             }
         }
         HumanOperation::Delete | HumanOperation::DeleteWithChildren => {
@@ -1056,6 +1105,7 @@ fn check_entry<'b, 'a>(
                     &format!("Delete (with children) {:?}", before_path),
                     mismatches,
                     after_root,
+                    Side::Before,
                 );
             } else {
                 let actual = diff_ast.before_node_map.get(&before_node.id()).copied();
@@ -1064,13 +1114,17 @@ fn check_entry<'b, 'a>(
                         Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
                         None => "None".to_string(),
                     };
-                    mismatches.push(format!(
-                        "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {}{}",
-                        before_path,
-                        before_node.kind(),
-                        mapped_kind,
-                        actual_mapping_info(diff_ast, before_node.id(), actual)
-                    ));
+                    mismatches.push(Mismatch {
+                        message: format!(
+                            "Delete {:?}: expected before node '{}' to be removed (mapped to 0), but it mapped to {}{}",
+                            before_path,
+                            before_node.kind(),
+                            mapped_kind,
+                            actual_mapping_info(diff_ast, before_node.id(), actual)
+                        ),
+                        node_id: before_node.id(),
+                        side: Side::Before,
+                    });
                 }
             }
         }
@@ -1090,6 +1144,7 @@ fn check_entry<'b, 'a>(
                     &format!("Insert (with children) {:?}", after_path),
                     mismatches,
                     before_root,
+                    Side::After,
                 );
             } else {
                 let actual = diff_ast.after_node_map.get(&after_node.id()).copied();
@@ -1098,13 +1153,17 @@ fn check_entry<'b, 'a>(
                         Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
                         None => "None".to_string(),
                     };
-                    mismatches.push(format!(
-                        "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {}{}",
-                        after_path,
-                        after_node.kind(),
-                        mapped_kind,
-                        actual_mapping_info_after(diff_ast, after_node.id(), actual)
-                    ));
+                    mismatches.push(Mismatch {
+                        message: format!(
+                            "Insert {:?}: expected after node '{}' to be new (mapped to 0), but it mapped to {}{}",
+                            after_path,
+                            after_node.kind(),
+                            mapped_kind,
+                            actual_mapping_info_after(diff_ast, after_node.id(), actual)
+                        ),
+                        node_id: after_node.id(),
+                        side: Side::After,
+                    });
                 }
             }
         }
@@ -1140,7 +1199,7 @@ fn check_group_entry<'b, 'a>(
     before_root: Node<'b>,
     after_root: Node<'a>,
     diff_ast: &ASTDiff,
-    mismatches: &mut Vec<String>,
+    mismatches: &mut Vec<Mismatch>,
     before_cache: &mut PathCache<'b>,
     after_cache: &mut PathCache<'a>,
 ) -> Result<()> {
@@ -1163,6 +1222,17 @@ fn check_group_entry<'b, 'a>(
         })
         .collect::<Result<_>>()?;
 
+    // A representative node for the group as a whole, used only for mismatches that describe the
+    // group's own aggregate state (a malformed `operation`, a wrong pair count) rather than one
+    // specific node - the first before-group node if there is one, else the first after-group node.
+    // `MultiMapGroup`'s own invariant (at least one of `before_paths`/`after_paths` non-empty) means
+    // the `(0, Side::Before)` fallback is unreachable in practice.
+    let (group_node_id, group_side) = before_nodes
+        .first()
+        .map(|n| (n.id(), Side::Before))
+        .or_else(|| after_nodes.first().map(|n| (n.id(), Side::After)))
+        .unwrap_or((0, Side::Before));
+
     let context = format!(
         "multi-map group ({} before <-> {} after, {:?}{})",
         before_nodes.len(),
@@ -1179,9 +1249,13 @@ fn check_group_entry<'b, 'a>(
         HumanOperation::Identical => ASTMappingOperation::Identical,
         HumanOperation::MatchButNotIdentical => ASTMappingOperation::MatchButNotIdentical,
         other => {
-            mismatches.push(format!(
-                "{context}: operation must be Identical or MatchButNotIdentical, got {other:?}"
-            ));
+            mismatches.push(Mismatch {
+                message: format!(
+                    "{context}: operation must be Identical or MatchButNotIdentical, got {other:?}"
+                ),
+                node_id: group_node_id,
+                side: group_side,
+            });
             return Ok(());
         }
     };
@@ -1206,12 +1280,16 @@ fn check_group_entry<'b, 'a>(
                     Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
                     None => "None".to_string(),
                 };
-                mismatches.push(format!(
-                    "{context}: before node '{}' was expected to match within the group or be deleted, but it mapped to {}{}",
-                    b.kind(),
-                    mapped_kind,
-                    actual_mapping_info(diff_ast, b.id(), other)
-                ));
+                mismatches.push(Mismatch {
+                    message: format!(
+                        "{context}: before node '{}' was expected to match within the group or be deleted, but it mapped to {}{}",
+                        b.kind(),
+                        mapped_kind,
+                        actual_mapping_info(diff_ast, b.id(), other)
+                    ),
+                    node_id: b.id(),
+                    side: Side::Before,
+                });
             }
         }
     }
@@ -1231,38 +1309,54 @@ fn check_group_entry<'b, 'a>(
                     Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
                     None => "None".to_string(),
                 };
-                mismatches.push(format!(
-                    "{context}: after node '{}' was expected to match within the group or be inserted, but it mapped to {}{}",
-                    a.kind(),
-                    mapped_kind,
-                    actual_mapping_info_after(diff_ast, a.id(), other)
-                ));
+                mismatches.push(Mismatch {
+                    message: format!(
+                        "{context}: after node '{}' was expected to match within the group or be inserted, but it mapped to {}{}",
+                        a.kind(),
+                        mapped_kind,
+                        actual_mapping_info_after(diff_ast, a.id(), other)
+                    ),
+                    node_id: a.id(),
+                    side: Side::After,
+                });
             }
         }
     }
 
     let expected_matched = before_nodes.len().min(after_nodes.len());
     if matched_pairs.len() != expected_matched {
-        mismatches.push(format!(
-            "{context}: expected exactly {expected_matched} pair(s) matched within the group, but codediff matched {}",
-            matched_pairs.len()
-        ));
+        mismatches.push(Mismatch {
+            message: format!(
+                "{context}: expected exactly {expected_matched} pair(s) matched within the group, but codediff matched {}",
+                matched_pairs.len()
+            ),
+            node_id: group_node_id,
+            side: group_side,
+        });
     }
 
     for &(b, a) in &matched_pairs {
         match diff_ast.mapping.get(&(b.id(), a.id())) {
             Some(actual_mapping) if actual_mapping.operation == expected_op => {}
-            Some(actual_mapping) => mismatches.push(format!(
-                "{context}: pair '{}' <-> '{}' expected codediff operation {expected_op:?}, but it chose {:?}",
-                b.kind(),
-                a.kind(),
-                actual_mapping.operation
-            )),
-            None => mismatches.push(format!(
-                "{context}: pair '{}' <-> '{}' are mapped to each other but have no ASTMapping entry (unexpected)",
-                b.kind(),
-                a.kind()
-            )),
+            Some(actual_mapping) => mismatches.push(Mismatch {
+                message: format!(
+                    "{context}: pair '{}' <-> '{}' expected codediff operation {expected_op:?}, but it chose {:?}",
+                    b.kind(),
+                    a.kind(),
+                    actual_mapping.operation
+                ),
+                node_id: b.id(),
+                side: Side::Before,
+            }),
+            None => mismatches.push(Mismatch {
+                message: format!(
+                    "{context}: pair '{}' <-> '{}' are mapped to each other but have no ASTMapping entry (unexpected)",
+                    b.kind(),
+                    a.kind()
+                ),
+                node_id: b.id(),
+                side: Side::Before,
+            }),
         }
     }
 
@@ -1286,6 +1380,7 @@ fn check_group_entry<'b, 'a>(
                 &format!("{context} (leftover delete)"),
                 mismatches,
                 after_root,
+                Side::Before,
             );
         }
         for &a in &leftover_after {
@@ -1295,6 +1390,7 @@ fn check_group_entry<'b, 'a>(
                 &format!("{context} (leftover insert)"),
                 mismatches,
                 before_root,
+                Side::After,
             );
         }
     }
@@ -1448,6 +1544,16 @@ pub fn compute_mismatches_with_config(
 ) -> Result<Vec<String>> {
     let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
     compute_mismatches_for_with_config(name, &before, &after, config)
+}
+
+/// Same as [`compute_mismatches_with_config`], but via [`compute_visible_mismatches_for_with_config`]
+/// - loads `name`'s before/after pair itself rather than requiring the caller to already have it.
+pub fn compute_visible_mismatches_with_config(
+    name: &str,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<VisibleMismatches> {
+    let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+    compute_visible_mismatches_for_with_config(name, &before, &after, config)
 }
 
 /**
@@ -1840,12 +1946,47 @@ pub fn compute_mismatches_for_with_config(
     after: &crate::code::Code,
     config: &crate::diff::HeuristicConfig,
 ) -> Result<Vec<String>> {
-    let mapping = load(name)?;
+    Ok(
+        compute_mismatches_detailed_for_with_config(name, before, after, config)?
+            .into_iter()
+            .map(|m| m.message)
+            .collect(),
+    )
+}
 
+/// Same as [`compute_mismatches_for_with_config`], but keeps each mismatch's [`Mismatch::node_id`]/
+/// [`Mismatch::side`] instead of collapsing straight to its message - what
+/// `compute_mismatches_for_with_config` itself is now a thin wrapper around. Exists so a caller
+/// (e.g. `benchmark_optimal_solutions`) can cross-reference each mismatch against
+/// [`crate::diff::text::visible_node_ids`] to separate mismatches on rendered, user-visible nodes
+/// from ones on invisible structural scaffolding - see [`Mismatch`]'s own doc comment.
+pub fn compute_mismatches_detailed_for_with_config(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<Vec<Mismatch>> {
     let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
-
     let node_cache = NodeCache::build(before, after);
+    compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)
+}
+
+/// [`compute_mismatches_detailed_for_with_config`]'s actual body, taking an already-computed
+/// `diff_ast`/`node_cache` instead of running `diff_code_with_config` itself - lets
+/// [`compute_visible_mismatches_for_with_config`] reuse the one diff run for both the mismatch
+/// check and [`crate::diff::text::visible_node_ids`], rather than paying for `diff_code_with_config`
+/// twice. `compute_mismatches_detailed_for_with_config` itself stays the entry point for a caller
+/// that doesn't already have a diff to hand.
+fn compute_mismatches_detailed_with_diff(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    diff_ast: &ASTDiff,
+    node_cache: &NodeCache,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<Vec<Mismatch>> {
+    let mapping = load(name)?;
     let language = before.metadata.language.unwrap_or_default();
     // Sampled, not run for every fixture: the determinism check alone triples the diff pipeline's
     // cost (3 extra full runs on top of the real one above), and a nondeterminism bug (unordered
@@ -1853,16 +1994,30 @@ pub fn compute_mismatches_for_with_config(
     // path*, not a specific fixture - the per-language `UNIT_TEST_FIXTURES` sample exercises every
     // language's pipeline the same way the full corpus would, at a fraction of the cost. See
     // TODO.md's 2026-08-08 entry for the corpus-wide timing that motivated this.
-    let mut mismatches = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name) {
+    //
+    // Neither of these two checks is about any one node, so both get the `(0, Side::Before)`
+    // sentinel - see `Mismatch`'s own doc comment.
+    let mut mismatches: Vec<Mismatch> = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name)
+    {
         describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config)
+            .into_iter()
+            .map(|message| Mismatch {
+                message,
+                node_id: 0,
+                side: Side::Before,
+            })
+            .collect()
     } else {
         Vec::new()
     };
 
     // Check that the produced diff is valid
-    if !diff_ast.is_valid(before, after, &node_cache) {
-        mismatches
-            .push("The produced diff is not valid according to ASTDiff::is_valid".to_string());
+    if !diff_ast.is_valid(before, after, node_cache) {
+        mismatches.push(Mismatch {
+            message: "The produced diff is not valid according to ASTDiff::is_valid".to_string(),
+            node_id: 0,
+            side: Side::Before,
+        });
     }
 
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
@@ -1877,7 +2032,7 @@ pub fn compute_mismatches_for_with_config(
             entry,
             before_root,
             after_root,
-            &diff_ast,
+            diff_ast,
             &mut mismatches,
             &mut before_cache,
             &mut after_cache,
@@ -1888,7 +2043,7 @@ pub fn compute_mismatches_for_with_config(
             group,
             before_root,
             after_root,
-            &diff_ast,
+            diff_ast,
             &mut mismatches,
             &mut before_cache,
             &mut after_cache,
@@ -1896,6 +2051,63 @@ pub fn compute_mismatches_for_with_config(
     }
 
     Ok(mismatches)
+}
+
+/// [`compute_mismatches_detailed_for_with_config`]'s mismatches, split by whether each one's node
+/// is *visible* - i.e. its classification independently reaches the screen in codediff's own
+/// rendered diff, per [`crate::diff::text::visible_node_ids`] - plus the total visible node count
+/// on each side, the denominator a raw visible-mismatch count needs to be read as a rate rather
+/// than an absolute. A mismatch with the `node_id: 0` sentinel (not about any single node - the
+/// nondeterminism check, `ASTDiff::is_valid`, a malformed multi-map group) is never visible.
+pub struct VisibleMismatches {
+    pub visible: Vec<Mismatch>,
+    pub invisible: Vec<Mismatch>,
+    pub before_visible_node_count: usize,
+    pub after_visible_node_count: usize,
+}
+
+/// Runs a single `diff_code_with_config`/`NodeCache::build` and shares it between the mismatch
+/// check and [`crate::diff::text::visible_node_ids`] - unlike `benchmark_optimal_solutions`'s own
+/// "each computation gets its own independent diff_code call" convention (see that binary's
+/// `algorithm_cost_for`/`elapsed_ms_for` doc comments), this function is also the body of every
+/// generated `optimal_solutions/<name>.rs` test (via [`assert_matches_human_mapping_within_limit`]),
+/// so it runs once per fixture on every `cargo test` - doubling the diff cost there isn't a
+/// negotiable "interactive tool" trade-off the way it is in that benchmark binary.
+pub fn compute_visible_mismatches_for_with_config(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    config: &crate::diff::HeuristicConfig,
+) -> Result<VisibleMismatches> {
+    let diff = crate::diff::diff_code_with_config(before, after, config);
+    let diff_ast = diff.ast.context("Diff has no AST")?;
+    let node_cache = NodeCache::build(before, after);
+
+    let mismatches =
+        compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)?;
+    let (before_visible, after_visible) =
+        crate::diff::text::visible_node_ids(before, after, &diff_ast, &node_cache);
+
+    let mut visible = Vec::new();
+    let mut invisible = Vec::new();
+    for mismatch in mismatches {
+        let is_visible = match mismatch.side {
+            Side::Before => before_visible.contains(&mismatch.node_id),
+            Side::After => after_visible.contains(&mismatch.node_id),
+        };
+        if is_visible {
+            visible.push(mismatch);
+        } else {
+            invisible.push(mismatch);
+        }
+    }
+
+    Ok(VisibleMismatches {
+        visible,
+        invisible,
+        before_visible_node_count: before_visible.len(),
+        after_visible_node_count: after_visible.len(),
+    })
 }
 
 /**
@@ -1908,33 +2120,60 @@ pub fn compute_mismatches_for_with_config(
 * the full extent of any disagreement between codediff and the human-authored optimum.
 */
 pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
-    assert_matches_human_mapping_within_limit(name, 0)
+    assert_matches_human_mapping_within_limit(name, 0, 0)
 }
 
 /**
 * Same as [`assert_matches_human_mapping`], but allows up to `upper_limit_of_mismatched_nodes`
-* mismatches instead of requiring an exact match.
+* total mismatches and up to `upper_limit_of_visible_mismatched_nodes` *visible* mismatches
+* (see [`VisibleMismatches`]/[`crate::diff::text::visible_node_ids`]) instead of requiring an exact
+* match. Fails if *either* limit is exceeded - the two are independent bars, not one derived from
+* the other, since a fixture can regress on one without moving the other at all (e.g. a fix that
+* turns invisible mismatches visible without changing the total).
 *
 * For fixtures where codediff's mapping has a known, understood gap against the human-authored
 * mapping (documented in `TODO.md` - an objective-wall gap, a premature-pruning architecture
-* issue, etc. - not a bug that's simply unfixed), pin the limit to today's actual mismatch count.
-* The test still catches *regressions* (an increase past the limit) without blocking the suite on
-* a fix that doesn't exist yet. When a fix does land for one of these gaps, lower the limit (or
-* switch back to [`assert_matches_human_mapping`] if it reaches 0) so the test keeps the new bar.
+* issue, etc. - not a bug that's simply unfixed), pin both limits to today's actual counts. The
+* test still catches *regressions* (either count increasing past its limit) without blocking the
+* suite on a fix that doesn't exist yet. When a fix does land for one of these gaps, lower the
+* limit(s) (or switch back to [`assert_matches_human_mapping`] if both reach 0) so the test keeps
+* the new bar.
 */
 pub fn assert_matches_human_mapping_within_limit(
     name: &str,
     upper_limit_of_mismatched_nodes: usize,
+    upper_limit_of_visible_mismatched_nodes: usize,
 ) -> Result<()> {
-    let mismatches = compute_mismatches(name)?;
+    let visible =
+        compute_visible_mismatches_with_config(name, &crate::diff::HeuristicConfig::default())?;
+    let total = visible.visible.len() + visible.invisible.len();
+    let visible_count = visible.visible.len();
 
-    if mismatches.len() > upper_limit_of_mismatched_nodes {
+    let total_exceeded = total > upper_limit_of_mismatched_nodes;
+    let visible_exceeded = visible_count > upper_limit_of_visible_mismatched_nodes;
+
+    if total_exceeded || visible_exceeded {
+        let messages: Vec<&str> = visible
+            .visible
+            .iter()
+            .map(|m| m.message.as_str())
+            .chain(visible.invisible.iter().map(|m| m.message.as_str()))
+            .collect();
         bail!(
-            "{} mismatch(es) between the human mapping and codediff's diff for '{}' (allowed up to {}):\n{}",
-            mismatches.len(),
+            "{} mismatch(es) ({} visible) between the human mapping and codediff's diff for '{}' \
+             (allowed up to {} total, {} visible){}{}:\n{}",
+            total,
+            visible_count,
             name,
             upper_limit_of_mismatched_nodes,
-            mismatches.join("\n")
+            upper_limit_of_visible_mismatched_nodes,
+            if total_exceeded { " [TOTAL LIMIT EXCEEDED]" } else { "" },
+            if visible_exceeded {
+                " [VISIBLE LIMIT EXCEEDED]"
+            } else {
+                ""
+            },
+            messages.join("\n")
         );
     }
 
@@ -2552,9 +2791,11 @@ mod tests {
 
         assert_eq!(mismatches.len(), 1, "{:?}", mismatches);
         assert!(
-            mismatches[0].contains("expected exactly 2 pair(s) matched"),
-            "{}",
             mismatches[0]
+                .message
+                .contains("expected exactly 2 pair(s) matched"),
+            "{}",
+            mismatches[0].message
         );
         Ok(())
     }
@@ -2619,9 +2860,11 @@ mod tests {
 
         assert_eq!(mismatches.len(), 1, "{:?}", mismatches);
         assert!(
-            mismatches[0].contains("expected to match within the group or be deleted"),
-            "{}",
             mismatches[0]
+                .message
+                .contains("expected to match within the group or be deleted"),
+            "{}",
+            mismatches[0].message
         );
         Ok(())
     }
@@ -2677,7 +2920,9 @@ mod tests {
 
         assert!(!mismatches.is_empty());
         assert!(
-            mismatches.iter().any(|m| m.contains("counterpart subtree")),
+            mismatches
+                .iter()
+                .any(|m| m.message.contains("counterpart subtree")),
             "{:?}",
             mismatches
         );
@@ -2742,7 +2987,7 @@ mod tests {
         assert!(
             mismatches
                 .iter()
-                .any(|m| m.contains("expected to be removed")),
+                .any(|m| m.message.contains("expected to be removed")),
             "{:?}",
             mismatches
         );

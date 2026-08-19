@@ -28,6 +28,7 @@ fn optimal_solution() -> Result<()> {
     // change, not scattered independent issues.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-n8n-io-n8n-remove-and-add-imports",
-        42,
+        13,
+        8,
     )
 }

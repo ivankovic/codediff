@@ -33,6 +33,7 @@ fn optimal_solution() -> Result<()> {
     // and leaf-rename-graduation) - not re-attempted here.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-change-function-fingerprint",
-        11,
+        1,
+        0,
     )
 }

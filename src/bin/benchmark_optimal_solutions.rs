@@ -268,6 +268,14 @@ struct Row {
     /// "how long codediff took on this fixture", independent of whether there's a human mapping to
     /// compare it against.
     elapsed_ms: f64,
+    /// How many of `mismatches`' nodes are *visible* - reach the screen in codediff's own rendered
+    /// diff, per `human_mapping::compute_visible_mismatches_for_with_config` /
+    /// `codediff::diff::text::visible_node_ids` - vs. sitting on invisible structural scaffolding (a
+    /// `block`, a `declaration_list`, ...) whose misclassification has no independent rendering
+    /// consequence. The second element is the total visible-node count (before + after combined),
+    /// the denominator for the visible-mismatch percentage - same `(count, denominator)` shape as
+    /// `mismatches`, and `None` under the same "unsolved" convention.
+    visible_mismatches: Option<(usize, usize)>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -335,10 +343,21 @@ fn main() -> Result<()> {
         if !human_mapping::mapping_path(&name).exists() {
             bail!("fixture '{}' has no human_mapping.json", name);
         }
-        let mismatches = human_mapping::compute_mismatches_with_config(&name, &config)?;
-        println!("{}: {} mismatch(es)", name, mismatches.len());
-        for m in &mismatches {
-            println!("  {}", m);
+        let visible = human_mapping::compute_visible_mismatches_with_config(&name, &config)?;
+        let total = visible.visible.len() + visible.invisible.len();
+        println!(
+            "{}: {} mismatch(es) ({} visible / {} invisible, out of {} visible nodes)",
+            name,
+            total,
+            visible.visible.len(),
+            visible.invisible.len(),
+            visible.before_visible_node_count + visible.after_visible_node_count,
+        );
+        for m in &visible.visible {
+            println!("  [visible]   {}", m.message);
+        }
+        for m in &visible.invisible {
+            println!("  [invisible] {}", m.message);
         }
         return Ok(());
     }
@@ -384,20 +403,27 @@ fn main() -> Result<()> {
                 algorithm_cost,
                 human_cost: None,
                 elapsed_ms,
+                visible_mismatches: None,
             });
             continue;
         }
-        let mismatches =
-            human_mapping::compute_mismatches_for_with_config(name, before, after, &config)?;
+        let visible = human_mapping::compute_visible_mismatches_for_with_config(
+            name, before, after, &config,
+        )?;
+        let mismatch_count = visible.visible.len() + visible.invisible.len();
         let total_nodes = human_mapping::total_node_count_for(before, after);
         let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
         rows.push(Row {
             name: name.clone(),
-            mismatches: Some((mismatches.len(), total_nodes)),
+            mismatches: Some((mismatch_count, total_nodes)),
             reason_counts,
             algorithm_cost,
             human_cost: Some(human_cost),
             elapsed_ms,
+            visible_mismatches: Some((
+                visible.visible.len(),
+                visible.before_visible_node_count + visible.after_visible_node_count,
+            )),
         });
     }
 
@@ -439,10 +465,12 @@ fn print_table(rows: &[Row]) {
         .unwrap_or(0);
 
     println!(
-        "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12}",
+        "{:<name_width$}  {:>10}  {:>7}  {:>9}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12}",
         "Solution",
         "Mismatches",
         "Mism %",
+        "Vis Mism",
+        "Vis %",
         "Human Unsolved",
         "Alg Cost",
         "Hum Cost",
@@ -452,11 +480,15 @@ fn print_table(rows: &[Row]) {
     );
     println!(
         "{}",
-        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12)
+        "-".repeat(
+            name_width + 2 + 10 + 2 + 7 + 2 + 9 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12
+        )
     );
 
     let mut total_mismatches = 0usize;
     let mut total_nodes = 0usize;
+    let mut total_visible_mismatches = 0usize;
+    let mut total_visible_nodes = 0usize;
     let mut total_unsolved = 0usize;
     let mut total_algorithm_cost = 0u64;
     // Only summed over fixtures that also have a human cost, so `total_cost_diff` below compares
@@ -479,12 +511,22 @@ fn print_table(rows: &[Row]) {
                 } else {
                     0.0
                 };
+                let (visible_count, visible_nodes) = row.visible_mismatches.unwrap_or((0, 0));
+                total_visible_mismatches += visible_count;
+                total_visible_nodes += visible_nodes;
+                let visible_pct = if visible_nodes > 0 {
+                    100.0 * visible_count as f64 / visible_nodes as f64
+                } else {
+                    0.0
+                };
                 let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
+                    "{:<name_width$}  {:>10}  {:>6.2}%  {:>9}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
                     row.name,
                     count,
                     pct,
+                    visible_count,
+                    visible_pct,
                     "",
                     row.algorithm_cost,
                     human_cost,
@@ -496,8 +538,10 @@ fn print_table(rows: &[Row]) {
             _ => {
                 total_unsolved += 1;
                 println!(
-                    "{:<name_width$}  {:>10}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12.1}",
+                    "{:<name_width$}  {:>10}  {:>7}  {:>9}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12.1}",
                     row.name,
+                    "-",
+                    "-",
                     "-",
                     "-",
                     "yes",
@@ -513,19 +557,28 @@ fn print_table(rows: &[Row]) {
 
     println!(
         "{}",
-        "-".repeat(name_width + 2 + 10 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12)
+        "-".repeat(
+            name_width + 2 + 10 + 2 + 7 + 2 + 9 + 2 + 7 + 2 + 13 + 2 + 9 + 2 + 9 + 2 + 9 + 2 + 12
+        )
     );
     let total_pct = if total_nodes > 0 {
         100.0 * total_mismatches as f64 / total_nodes as f64
     } else {
         0.0
     };
+    let total_visible_pct = if total_visible_nodes > 0 {
+        100.0 * total_visible_mismatches as f64 / total_visible_nodes as f64
+    } else {
+        0.0
+    };
     let total_cost_diff = total_algorithm_cost_where_solved as i64 - total_human_cost as i64;
     println!(
-        "{:<name_width$}  {:>10}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
+        "{:<name_width$}  {:>10}  {:>6.2}%  {:>9}  {:>6.2}%  {:>13}  {:>9}  {:>9}  {:>+9}  {:>12.1}",
         "TOTAL",
         total_mismatches,
         total_pct,
+        total_visible_mismatches,
+        total_visible_pct,
         total_unsolved,
         total_algorithm_cost,
         total_human_cost,
@@ -601,6 +654,9 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "mismatches",
         "mismatch_pct",
         "total_nodes",
+        "visible_mismatches",
+        "visible_mismatch_pct",
+        "visible_nodes",
         "human_unsolved",
         "algorithm_cost",
         "human_cost",
@@ -628,12 +684,21 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                 } else {
                     0.0
                 };
+                let (visible_count, visible_nodes) = row.visible_mismatches.unwrap_or((0, 0));
+                let visible_pct = if visible_nodes > 0 {
+                    100.0 * visible_count as f64 / visible_nodes as f64
+                } else {
+                    0.0
+                };
                 let cost_diff = row.algorithm_cost as i64 - human_cost as i64;
                 let mut record = vec![
                     row.name.clone(),
                     count.to_string(),
                     format!("{:.2}", pct),
                     nodes.to_string(),
+                    visible_count.to_string(),
+                    format!("{:.2}", visible_pct),
+                    visible_nodes.to_string(),
                     "false".to_string(),
                     row.algorithm_cost.to_string(),
                     human_cost.to_string(),
@@ -646,6 +711,9 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
             _ => {
                 let mut record = vec![
                     row.name.clone(),
+                    "-".to_string(),
+                    "-".to_string(),
+                    "-".to_string(),
                     "-".to_string(),
                     "-".to_string(),
                     "-".to_string(),

@@ -27,6 +27,7 @@ fn optimal_solution() -> Result<()> {
     // one list-content change, not independent issues.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-move-from-one-struct-to-other",
-        33,
+        13,
+        9,
     )
 }

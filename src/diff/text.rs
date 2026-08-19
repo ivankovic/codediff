@@ -590,6 +590,129 @@ fn ranges(
     ranges
 }
 
+/// Whether `node`'s mapping produces its own rendered span in `ranges()`, and whether it stops the
+/// walk from descending into `node`'s children - two independent facts, deliberately not collapsed
+/// into one. Mirrors `ranges()`'s match arms structurally (same guards, same conditions) rather
+/// than being extracted from it - `ranges()` also builds `RangeMatch` output and merges adjacent
+/// same-operation spans, concerns this predicate has no need to share, and `is_comment_only_diff`'s
+/// own `scan` (below in this file) already establishes the precedent of a third parallel walk over
+/// this same match rather than a shared extraction. A change to any one of these three should
+/// prompt review of the other two.
+///
+/// `own_bytes`/`other_bytes` are `node`'s side's source and its mapped counterpart's source - i.e.
+/// (source, destination) when `node` is on the source side, matching `ranges()`'s own parameter
+/// order.
+fn node_span_and_descent(
+    node: Node,
+    operation: ASTMappingOperation,
+    mapped_id: usize,
+    node_cache: &NodeCache,
+    own_bytes: &[u8],
+    other_bytes: &[u8],
+) -> (bool, bool) {
+    match operation {
+        ASTMappingOperation::Identical => (node_cache.get_in_any(&mapped_id).is_some(), true),
+        ASTMappingOperation::DeleteWithChildren | ASTMappingOperation::InsertWithChildren => {
+            (true, true)
+        }
+        ASTMappingOperation::Delete | ASTMappingOperation::Insert => {
+            (node.child_count() == 0, false)
+        }
+        // Always emits (both the `intra_node_update_ranges` branch and its childless-fallback
+        // branch produce a non-empty result) and never stops descent - safe in practice only
+        // because `classify_match`/`hash_tree_matching` assign `Update` exclusively to childless
+        // node pairs, so there's nothing to descend into anyway. See those two call sites.
+        ASTMappingOperation::Update => (true, false),
+        ASTMappingOperation::MatchButNotIdentical => match node_cache.get_in_any(&mapped_id) {
+            Some(&other_node) => {
+                let own = own_content(node, own_bytes);
+                let other = own_content(other_node, other_bytes);
+                let diverges = !whitespace_stripped_equal(&own, &other);
+                (diverges, diverges)
+            }
+            None => (false, false),
+        },
+        _ => (false, false),
+    }
+}
+
+/// The `source`-side node ids whose classification independently reaches the screen when `diff` is
+/// rendered - i.e. `ranges()`'s preorder walk both reaches the node (every ancestor's own operation
+/// let the walk keep descending) and the node itself emits its own span (`node_span_and_descent`).
+/// A `block`, `declaration_list`, or other pure-structure node whose children fully account for
+/// every change is never independently visible: `ranges()` never emits a range for it, so a wrong
+/// classification of it has no rendering consequence on its own.
+///
+/// Judged against `diff`'s own actual mapping, not a hypothetical ground-truth one - i.e. "what
+/// does the user's real, as-rendered diff show right now". One consequence: if `diff` wrongly
+/// recurses into a subtree a human would call one `DeleteWithChildren` span, every descendant that
+/// individually satisfies `node_span_and_descent` becomes its own visible node - the count is not
+/// bounded at one-per-wrong-decision. That's intentional here (more wrong spans really do land on
+/// screen), but it means this set can be considerably larger than the number of underlying mistakes.
+fn visible_ids_for_side(
+    source: &Code,
+    destination: &Code,
+    diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> std::collections::HashSet<usize> {
+    let mut visible = std::collections::HashSet::new();
+
+    let Some(source_tree) = source.ast.as_ref() else {
+        return visible;
+    };
+    let root_node = source_tree.root_node();
+
+    if destination.ast.is_none() {
+        // The whole other side is absent - `ranges()`'s (Some, None)/(None, Some) arms emit one
+        // range for the whole root and never consult `diff` at all, so the root is the only node
+        // that's independently visible.
+        visible.insert(root_node.id());
+        return visible;
+    }
+
+    let mut stack = vec![root_node];
+    while let Some(node) = stack.pop() {
+        let mut stops_descent = false;
+        if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
+            let (emits, stops) = node_span_and_descent(
+                node,
+                mapping.operation,
+                mapped_id,
+                node_cache,
+                source.contents.as_bytes(),
+                destination.contents.as_bytes(),
+            );
+            stops_descent = stops;
+            if emits {
+                visible.insert(node.id());
+            }
+        }
+
+        if !stops_descent {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+    }
+
+    visible
+}
+
+/// The before-side and after-side node ids that are visible in `diff`'s rendered output - see
+/// `visible_ids_for_side`. Computed symmetrically, mirroring `TextDiff::from`'s own two `ranges()`
+/// calls: once with before as the walked side, once with after.
+pub fn visible_node_ids(
+    before: &Code,
+    after: &Code,
+    diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> (std::collections::HashSet<usize>, std::collections::HashSet<usize>) {
+    let before_visible = visible_ids_for_side(before, after, diff, node_cache);
+    let after_visible = visible_ids_for_side(after, before, diff, node_cache);
+    (before_visible, after_visible)
+}
+
 /// Build the `RangeMatch` for a non-Identical, non-Move node: advances `last_non_move_range` to
 /// its own right limit (we're appending after whatever was last placed) and anchors the new
 /// range's destination there, since the node has no real destination-side counterpart to point at.
@@ -2447,6 +2570,73 @@ mod tests {
             .ast
             .expect("diff_code should always produce an AST for valid Rust");
         (before, after, ast, node_cache)
+    }
+
+    /// Whether `outer` fully contains `inner`, by (row, column) - `TextRange` carries no byte
+    /// offsets, but a row/column tuple compares lexicographically the same way a byte offset would
+    /// for text that doesn't wrap, which every fixture here is.
+    fn contains_range(outer: &TextRange, inner: &TextRange) -> bool {
+        (outer.start_row, outer.start_column) <= (inner.start_row, inner.start_column)
+            && (inner.end_row, inner.end_column) <= (outer.end_row, outer.end_column)
+    }
+
+    /// Anti-drift guard for `visible_node_ids`: it's a second, deliberately parallel walk over the
+    /// same match `ranges()` makes (see `node_span_and_descent`'s own doc comment on why it isn't
+    /// extracted), so nothing stops the two from silently drifting apart as either one changes.
+    /// This doesn't assert exact agreement - `merge_ranges` fuses adjacent same-operation ranges
+    /// together, so a visible node's own span is frequently a strict sub-range of one bigger
+    /// `RangeMatch` - but it does assert *containment*: every node `visible_node_ids` calls visible
+    /// must have its own span fall inside some range the real renderer (`TextDiff::from`, exactly
+    /// what the TUI/headless output is built from) actually produced. A node `visible_node_ids`
+    /// wrongly calls visible while the real renderer emitted nothing overlapping it at all would
+    /// fail this - the class of bug that matters.
+    fn assert_visible_ids_contained_in_rendered_ranges(
+        side: &crate::code::Code,
+        visible_ids: &std::collections::HashSet<usize>,
+        rendered: &[RangeMatch],
+    ) {
+        let columns = compute_columns_per_row(&side.contents);
+        let root = side.ast.as_ref().expect("side has an AST").root_node();
+
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if visible_ids.contains(&node.id()) {
+                let node_range = TextRange::from_treesitter_range(node.range(), &columns);
+                assert!(
+                    rendered
+                        .iter()
+                        .any(|r| contains_range(&r.source, &node_range)),
+                    "node '{}' ({:?}) was reported visible, but no rendered range contains its \
+                     span {:?} - rendered ranges: {:?}",
+                    node.kind(),
+                    node.range(),
+                    node_range,
+                    rendered
+                );
+            }
+
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+    }
+
+    #[test]
+    fn visible_node_ids_agrees_with_the_real_renderer() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    let x = 1;\n    foo(x);\n    // stays\n}\n",
+            "fn main() {\n    let y = 2;\n    bar(y);\n    // stays\n}\n",
+        );
+
+        let (before_visible, after_visible) =
+            visible_node_ids(&before, &after, &ast, &node_cache);
+        assert!(!before_visible.is_empty());
+        assert!(!after_visible.is_empty());
+
+        let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
+        assert_visible_ids_contained_in_rendered_ranges(&before, &before_visible, &text_diff.all(0));
+        assert_visible_ids_contained_in_rendered_ranges(&after, &after_visible, &text_diff.all(1));
     }
 
     /// Regression test for the `crossed_backwards` check in `ranges`: before it, a pure reorder

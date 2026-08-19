@@ -28,6 +28,7 @@ fn optimal_solution() -> Result<()> {
     // content-identical) sibling than the human's chosen correspondence.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-odoo-odoo-add-button-roles",
-        133,
+        109,
+        44,
     )
 }

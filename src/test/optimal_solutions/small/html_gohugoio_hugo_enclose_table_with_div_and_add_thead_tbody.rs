@@ -27,6 +27,7 @@ fn optimal_solution() -> Result<()> {
     // fully swept by the delete instead of being followed into the new wrapper.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody",
-        24,
+        4,
+        3,
     )
 }

@@ -31,6 +31,7 @@ fn optimal_solution() -> Result<()> {
     // specifically.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        1882,
+        231,
+        160,
     )
 }

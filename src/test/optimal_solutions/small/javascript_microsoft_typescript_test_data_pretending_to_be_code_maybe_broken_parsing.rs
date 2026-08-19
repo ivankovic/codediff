@@ -27,6 +27,7 @@ fn optimal_solution() -> Result<()> {
     // undefined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing",
-        105,
+        2,
+        2,
     )
 }
