@@ -46,6 +46,8 @@ mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change;
 #[cfg(test)]
+mod csharp_glibsharp_gtksharp_whitespace_only_change_2;
+#[cfg(test)]
 mod csharp_waf_csharprepl_update_string_url;
 #[cfg(test)]
 mod css_fortawesome_font_awesome_update_version_comment_2;
@@ -75,6 +77,8 @@ mod go_darylhjd_mangadesk_remove_a_function_uptade_comments;
 mod go_dweymouth_supersonic_remove_two_lines;
 #[cfg(test)]
 mod go_jesseduffield_lazygit_add_function;
+#[cfg(test)]
+mod go_nwg_piotr_gopsuinfo_shuffle_around_if_blocks;
 #[cfg(test)]
 mod go_prometheus_node_exporter_remove_one_comment;
 #[cfg(test)]
@@ -142,6 +146,8 @@ mod kotlin_jetbrains_kotlin_remove_typealias_with_annotations;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_move_from_vec2_to_hexexpression;
 #[cfg(test)]
+mod kotlin_yairm210_unciv_remove_tovector2_from_multiple_callsites;
+#[cfg(test)]
 mod kotlin_yairm210_unciv_small_change;
 #[cfg(test)]
 mod lua_corsixth_corsixth_refactor_if_expressions;
@@ -159,6 +165,8 @@ mod lua_return_to_the_roots_s25client_add_two_items_to_list;
 mod lua_return_to_the_roots_s25client_few_added_lines;
 #[cfg(test)]
 mod lua_teeworlds_teeworlds_add_or_expression_to_existing_if;
+#[cfg(test)]
+mod php_consol_monitoring_pnp_move_from_one_function_to_other_that_has_more_params;
 #[cfg(test)]
 mod php_doctrine_orm_delete_3_comments_and_update_1;
 #[cfg(test)]
@@ -206,6 +214,8 @@ mod ruby_rapid7_ruby_smb_add_import_and_one_expression;
 #[cfg(test)]
 mod rust_fornwall_rust_script_add_lifecycle_management;
 #[cfg(test)]
+mod rust_quietvoid_dovi_tool_change_to_templated_call;
+#[cfg(test)]
 mod rust_refirmlabs_binwalk_whitespace_only;
 #[cfg(test)]
 mod rust_skim_rs_skim_format_string;
@@ -223,6 +233,8 @@ mod scala_com_lihaoyi_mill_add_one_argument;
 mod scala_com_lihaoyi_mill_assert_format_string_change;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_only_change_failure_strings;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_small_change;
 #[cfg(test)]
@@ -271,6 +283,8 @@ mod tsx_keybase_client_emoji_to_native;
 mod tsx_kong_insomnia_classname_strings_changed;
 #[cfg(test)]
 mod tsx_mitmproxy_mitmproxy_array_to_object;
+#[cfg(test)]
+mod tsx_popcorn_official_popcorn_desktop_simple_property_rename;
 #[cfg(test)]
 mod tsx_rektdeckard_departure_mono_import_path;
 #[cfg(test)]
