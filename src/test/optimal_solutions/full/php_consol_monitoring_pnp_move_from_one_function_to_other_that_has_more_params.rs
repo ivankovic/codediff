@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("php-consol-monitoring-pnp-move-from-one-function-to-other-that-has-more-params")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "php-consol-monitoring-pnp-move-from-one-function-to-other-that-has-more-params",
+    )
 }
