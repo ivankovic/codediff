@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("swift-zeroc-ice-ice-add-an-if-block-and-variable")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "swift-zeroc-ice-ice-add-an-if-block-and-variable",
+    )
 }
