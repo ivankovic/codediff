@@ -1506,6 +1506,111 @@ pub fn line_disagreement_count(a: &[bool], b: &[bool]) -> usize {
     a.iter().zip(b).filter(|(x, y)| x != y).count()
 }
 
+/// One AST node's extent, for the node-granularity counterpart of [`touched_lines`].
+///
+/// `range` is in the same row/column space `TextRange` uses everywhere else in this codebase -
+/// tree-sitter's own rows and *byte* columns, passed through unchanged by
+/// [`TextRange::from_treesitter_range`].
+pub struct NodeExtent {
+    pub range: crate::diff::text_range::TextRange,
+    /// Whether this node has no children. Leaves are the granularity every AST-aware external
+    /// tool in `benchmark_other` actually reports at, and the only nodes whose extents don't
+    /// nest, so they're scored separately from the all-nodes count - see
+    /// [`nodes_touched_by`]'s doc comment.
+    pub is_leaf: bool,
+}
+
+/// Every node of `code`'s AST, in a deterministic preorder walk.
+///
+/// The same node *set* [`crate::diff::NodeCache`] caches (every node, named and anonymous), so
+/// `node_extents(before).len() + node_extents(after).len()` equals
+/// [`total_node_count_for`]`(before, after)` - the two are used as numerator and denominator of
+/// the same ratio, so they must agree on what counts as a node. Deliberately preorder (not
+/// `NodeCache`'s own iteration order, which is an unordered `FxHashMap`): two labelings of the
+/// same file have to be index-comparable, which a hash map can't guarantee.
+///
+/// Empty (no AST parsed) for a `Code` with no tree-sitter grammar.
+pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
+    let Some(ast) = code.ast.as_ref() else {
+        return Vec::new();
+    };
+    let columns = crate::code::metadata::compute_columns_per_row(&code.contents);
+    let mut extents = Vec::new();
+    let mut stack = vec![ast.root_node()];
+    while let Some(node) = stack.pop() {
+        extents.push(NodeExtent {
+            range: crate::diff::text_range::TextRange::from_treesitter_range(
+                node.range(),
+                &columns,
+            ),
+            is_leaf: node.child_count() == 0,
+        });
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor).collect::<Vec<_>>().into_iter().rev() {
+            stack.push(child);
+        }
+    }
+    extents
+}
+
+/// One bool per entry of `extents`: whether any range in `spans` overlaps that node's extent -
+/// the node-granularity counterpart of [`touched_lines`]'s per-line bools.
+///
+/// Deliberately a "touched or not" projection, exactly like [`touched_lines`], **not** the
+/// mapping-fidelity metric `benchmark_optimal_solutions` reports for codediff. An external tool
+/// reports changed *regions* of text, not a node-to-node mapping over this codebase's AST (it
+/// has its own tree, with its own node identities), so "which node did this one become" is not a
+/// question any of them can be asked. What they can all be asked is "did you consider this node's
+/// text changed", and that is what this scores - for codediff and the external tools alike, so
+/// the resulting columns are comparable to each other and *not* to the optimal-solutions number.
+///
+/// Whole-extent overlap, so an interior node counts as touched when a change lands anywhere
+/// inside it. That makes every ancestor of a change touched, up to the root - which is why the
+/// all-nodes count is reported alongside a leaves-only one (`is_leaf`): the leaf count isolates
+/// "which tokens did the tool think changed" from "how deep is this grammar's tree."
+pub fn nodes_touched_by(
+    extents: &[NodeExtent],
+    spans: &[crate::diff::text_range::TextRange],
+) -> Vec<bool> {
+    extents
+        .iter()
+        .map(|extent| spans.iter().any(|span| span.intersects(&extent.range)))
+        .collect()
+}
+
+/// The changed (non-`Identical`) ranges on each side of `ast_diff`, as `(before, after)` -
+/// the representation an external tool's own reported regions are normalized into so both can be
+/// fed to [`nodes_touched_by`] and compared.
+///
+/// Used for both the ground truth (a synthetic `ASTDiff` from [`as_ast_diff`]) and codediff's own
+/// output, so the two go through identical machinery and any asymmetry is in the diff itself, not
+/// in how it was measured.
+pub fn changed_spans(
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    ast_diff: &ASTDiff,
+    node_cache: &NodeCache,
+) -> (
+    Vec<crate::diff::text_range::TextRange>,
+    Vec<crate::diff::text_range::TextRange>,
+) {
+    let text_diff = crate::diff::text::TextDiff::from(before, after, ast_diff, node_cache);
+    let changed = |ranges: Vec<crate::diff::text::RangeMatch>| {
+        ranges
+            .into_iter()
+            .filter(|rm| {
+                !matches!(
+                    rm.operation,
+                    crate::diff::text::TextOperation::Identical
+                        | crate::diff::text::TextOperation::NotYetSet
+                ) && !rm.source.is_empty()
+            })
+            .map(|rm| rm.source)
+            .collect()
+    };
+    (changed(text_diff.all(0)), changed(text_diff.all(1)))
+}
+
 /**
 * Shells out to the real `diff`, not a reimplementation - the whole point of comparing against it
 * is comparing against the actual tool people run. Writes `before`/`after`'s contents to fresh temp
@@ -2912,5 +3017,78 @@ mod tests {
         let report =
             describe_nondeterminism("fn f() { 1 + 1; }", "fn f() { 1 + 1; }", &Language::Rust);
         assert!(report.is_empty(), "{report:?}");
+    }
+
+    /// `node_extents` must enumerate exactly the node set `total_node_count_for` counts - they're
+    /// used as numerator and denominator of the same ratio, so a disagreement would silently
+    /// scale every node-mismatch rate.
+    #[test]
+    fn node_extents_matches_the_total_node_count_denominator() {
+        let before = crate::code::Code::from_string(
+            "fn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n",
+            &crate::code::Language::Rust,
+        );
+        let after = crate::code::Code::from_string(
+            "fn main() {\n    let b = 2;\n    println!(\"{}\", b);\n}\n",
+            &crate::code::Language::Rust,
+        );
+        assert_eq!(
+            node_extents(&before).len() + node_extents(&after).len(),
+            total_node_count_for(&before, &after)
+        );
+    }
+
+    /// Leaves are a strict, non-empty subset of all nodes - the leaves-only denominator would be
+    /// meaningless if `is_leaf` were never (or always) set.
+    #[test]
+    fn node_extents_marks_a_real_subset_as_leaves() {
+        let code = crate::code::Code::from_string(
+            "fn main() { let a = 1; }",
+            &crate::code::Language::Rust,
+        );
+        let extents = node_extents(&code);
+        let leaves = extents.iter().filter(|e| e.is_leaf).count();
+        assert!(leaves > 0, "a parsed file must have leaf nodes");
+        assert!(
+            leaves < extents.len(),
+            "a parsed file must also have interior nodes"
+        );
+    }
+
+    /// A `Code` with no grammar has no AST to walk - empty, not a panic, since the corpus
+    /// contains extension-less fixtures (a `Makefile`, say) that reach this code path.
+    #[test]
+    fn node_extents_is_empty_without_an_ast() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        std::io::Write::write_all(&mut file.as_file(), b"plain text").expect("write");
+        let code = crate::code::Code::from_file(file.path()).expect("read back");
+        assert!(code.ast.is_none(), "an extension-less file has no grammar");
+        assert!(node_extents(&code).is_empty());
+    }
+
+    /// The touched projection's two ends: a span covering a node's text marks it, a span nowhere
+    /// near it does not, and no spans at all marks nothing.
+    #[test]
+    fn nodes_touched_by_marks_only_overlapping_nodes() {
+        let code = crate::code::Code::from_string(
+            "fn main() {\n    let a = 1;\n}\n",
+            &crate::code::Language::Rust,
+        );
+        let extents = node_extents(&code);
+
+        assert_eq!(
+            nodes_touched_by(&extents, &[]).iter().filter(|t| **t).count(),
+            0,
+            "no spans must touch nothing"
+        );
+
+        // Row 1 is `    let a = 1;` - the whole line.
+        let touched = nodes_touched_by(&extents, &[crate::diff::text_range::TextRange::new(1, 0, 1, 14)]);
+        let count = touched.iter().filter(|t| **t).count();
+        assert!(count > 0, "a span over a real line must touch some nodes");
+        assert!(
+            count < extents.len(),
+            "a one-line span must not touch every node in the file"
+        );
     }
 }

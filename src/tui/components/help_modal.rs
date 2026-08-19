@@ -22,40 +22,54 @@ use ratatui::{
     layout::Rect,
     prelude::Stylize,
     style::{Color, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use super::Component;
 use crate::tui::actions::Action;
+use crate::tui::theme::OverlayTheme;
 
 /// Static reference sheet of every keybinding plus an About section (copyright, license,
 /// repository), kept in one place so the keybindings can't drift out of sync with individual
 /// handlers the way a comment scattered across several files could. Mirrors (and should be kept
 /// in sync with) README.md's "Using the TUI" section and `src/bin/human_solver.rs`'s own
-/// `HELP_TEXT`/`?` modal, which this is modeled on. Deliberately has no diff-color legend: the
-/// actual colors are theme-dependent (see `tui::theme::OverlayTheme`), so a fixed "Green means
-/// inserted" description would be wrong for most non-default themes.
+/// `HELP_TEXT`/`?` modal, which this is modeled on. The diff-color legend is *not* part of this
+/// static text: the actual colors are theme-dependent, so `draw` renders it from the live
+/// `OverlayTheme` palette instead (see `legend_lines`) - a fixed "Green means inserted"
+/// description would be wrong for most non-default themes.
 const HELP_TEXT: &str = "\
 Navigation
   Tab              Switch the active panel (Before/After)
   h/j/k/l          Move the cursor left/down/up/right
   Arrow keys       Same as h/j/k/l
-                   The range under the cursor, and its match on the other panel, highlight in
-                   blue when part of a real change; unchanged content is never highlighted
+                   The range under the cursor, and its match on the other panel, highlight
+                   when part of a real change; unchanged content is never highlighted
+  Enter            Jump to the counterpart of the range under the cursor (again: jump back)
   n/p              Jump to the next/previous change, skipping unchanged lines
-  /                Search the focused panel (Enter jumps to nearest, Esc cancels)
-                   An empty query clears the current search's highlights
+  g                Go to a line number
+  /                Search the focused panel (smart-case; Enter jumps to nearest, Esc cancels)
+                   A bare Enter repeats the last search; an empty query clears the highlights
   >/<              Jump to the next/previous search match
+  Ctrl-d/Ctrl-u    Move the cursor half a page down/up
+  Ctrl-e/Ctrl-y    Scroll the view one line without moving the cursor
   Page Up/Down     Scroll by a page
   Home/End         Jump to the top/bottom of the file
 
-Files and appearance
+Files and diffing
   o                Open a file selector for the active panel
-  c                Open the color theme picker
+  r                Reload both files from disk and re-diff (keeps the cursor position)
+  e                Open the focused panel's file in $VISUAL/$EDITOR at the cursor line
+  Esc              While a diff is computing: cancel it and keep the previous result
+
+Appearance
+  c                Open the color theme picker (selection previews live; Enter keeps it)
+  v                Cycle the panel layout: auto / dual / single (persisted)
+  S                Toggle syntax highlighting
 
 Other
   ?                Toggle this help
-  q or Esc         Quit (Esc cancels an open dialog instead, while one is open)
+  q or Esc         Quit (Esc closes an open dialog instead, while one is open)
 
 About
   codediff - fast, syntax-aware code diffing using tree-sitter ASTs
@@ -65,17 +79,49 @@ About
   Repository: https://github.com/ivankovic/codediff
 ";
 
-/// The `?` popup: a static, scrollable keybinding/color-legend reference. Modeled on
-/// `ThemeDialog`/`DiffModeDialog`'s shape, but has no selection state of its own - `HELP_TEXT` is
-/// display-only, so the only state worth keeping is how far it's scrolled.
+/// The `?` popup: a scrollable keybinding reference plus a color legend rendered from the live
+/// theme. Modeled on `ThemeDialog`'s shape, but has no selection state of its own - the only
+/// state worth keeping is how far it's scrolled and which theme to render the legend with.
 #[derive(Default)]
 pub struct HelpModal {
     scroll: u16,
+    theme: OverlayTheme,
 }
 
 impl HelpModal {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(theme: OverlayTheme) -> Self {
+        Self { scroll: 0, theme }
+    }
+
+    /// The color legend, built from the live palette rather than hardcoded color names - each
+    /// entry is a swatch painted in the actual background the viewer uses for that signal, so
+    /// the legend is correct for whichever of the eight themes is active.
+    fn legend_lines(&self) -> Vec<Line<'static>> {
+        let palette = self.theme.palette();
+        let swatch = |label: &str, bg: Color| -> Span<'static> {
+            Span::styled(
+                format!(" {label} "),
+                Style::new().fg(palette.overlay_fg).bg(bg),
+            )
+        };
+        vec![
+            Line::from("Colors (current theme)"),
+            Line::from(vec![
+                Span::raw("  "),
+                swatch("inserted", palette.insert_bg),
+                Span::raw(" "),
+                swatch("deleted", palette.delete_bg),
+                Span::raw(" "),
+                swatch("moved", palette.move_bg),
+                Span::raw(" "),
+                swatch("updated", palette.update_bg),
+                Span::raw(" "),
+                swatch("cursor/counterpart", palette.cross_highlight_bg),
+                Span::raw(" "),
+                swatch("search match", palette.search_bg),
+            ]),
+            Line::from(""),
+        ]
     }
 
     /// The area the popup itself should occupy, centered within `area` - same shape as
@@ -119,8 +165,13 @@ impl Component for HelpModal {
             .borders(Borders::ALL)
             .border_style(Style::new().fg(Color::Cyan));
 
+        // The live color legend first (it's what a first-time user most needs decoded), then
+        // the static keybinding reference.
+        let mut lines = self.legend_lines();
+        lines.extend(HELP_TEXT.lines().map(|l| Line::from(l.to_string())));
+
         frame.render_widget(
-            Paragraph::new(HELP_TEXT)
+            Paragraph::new(lines)
                 .block(block)
                 .wrap(Wrap { trim: false })
                 .scroll((self.scroll, 0)),
@@ -142,7 +193,7 @@ mod tests {
 
     #[test]
     fn question_mark_and_esc_both_close_the_modal() {
-        let mut modal = HelpModal::new();
+        let mut modal = HelpModal::new(OverlayTheme::default());
         assert_eq!(
             modal.handle_key_event(key(KeyCode::Char('?'))).unwrap(),
             Some(Action::DialogCancelled)
@@ -155,7 +206,7 @@ mod tests {
 
     #[test]
     fn j_and_k_scroll_down_and_up() {
-        let mut modal = HelpModal::new();
+        let mut modal = HelpModal::new(OverlayTheme::default());
         modal.handle_key_event(key(KeyCode::Char('j'))).unwrap();
         modal.handle_key_event(key(KeyCode::Char('j'))).unwrap();
         assert_eq!(modal.scroll, 2);
@@ -165,7 +216,7 @@ mod tests {
 
     #[test]
     fn scroll_does_not_go_negative() {
-        let mut modal = HelpModal::new();
+        let mut modal = HelpModal::new(OverlayTheme::default());
         modal.handle_key_event(key(KeyCode::Up)).unwrap();
         assert_eq!(modal.scroll, 0);
     }
@@ -175,9 +226,9 @@ mod tests {
     /// panic and that the keybinding reference text actually ends up on screen somewhere.
     #[test]
     fn help_modal_renders_keybindings() {
-        let backend = TestBackend::new(120, 40);
+        let backend = TestBackend::new(120, 70);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut modal = HelpModal::new();
+        let mut modal = HelpModal::new(OverlayTheme::default());
 
         terminal
             .draw(|f| {
@@ -191,5 +242,42 @@ mod tests {
         assert!(rendered.contains("Navigation"));
         assert!(rendered.contains("About"));
         assert!(rendered.contains("Copyright"));
+    }
+
+    /// The color legend renders from the live palette - swatch cells carry the theme's actual
+    /// diff backgrounds, so "what does this color mean" is answered correctly per theme rather
+    /// than by a hardcoded color-name list.
+    #[test]
+    fn help_modal_renders_a_legend_with_the_current_themes_backgrounds() {
+        let backend = TestBackend::new(120, 70);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut modal = HelpModal::new(OverlayTheme::Nord);
+
+        terminal
+            .draw(|f| {
+                let area = f.size();
+                modal.draw(f, modal.popup_area(area)).unwrap();
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let rendered: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+        assert!(rendered.contains("inserted"));
+        assert!(rendered.contains("search match"));
+
+        let palette = OverlayTheme::Nord.palette();
+        let backgrounds: Vec<_> = buffer
+            .content()
+            .iter()
+            .filter_map(|cell| cell.bg.into())
+            .collect();
+        assert!(
+            backgrounds.contains(&palette.insert_bg),
+            "a legend swatch should be painted in Nord's own insert background"
+        );
+        assert!(
+            backgrounds.contains(&palette.search_bg),
+            "a legend swatch should be painted in Nord's own search background"
+        );
     }
 }

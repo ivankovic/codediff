@@ -225,8 +225,18 @@ fn paint_columns(
 pub struct CodeViewerState {
     /// Scroll position (line number)
     pub scroll: usize,
+    /// Horizontal scroll position (character column into every line). Nonzero only after the
+    /// cursor has been driven past the right edge of the viewport - `CodeViewer::
+    /// scroll_to_show_col` keeps the cursor's column inside `[scroll_col, scroll_col +
+    /// viewport_width)` the same way `scroll_to_show_row` does rows.
+    pub scroll_col: usize,
     /// Viewport height in lines
     pub viewport_height: usize,
+    /// Viewport width in characters, *excluding* the line-number gutter - i.e. how many content
+    /// columns are actually visible. Recorded by the widget's own `render` (the only place the
+    /// real area width is known), consumed by `CodeViewer::scroll_to_show_col`. 0 until the
+    /// first frame has rendered, which callers must treat as "unknown, don't scroll".
+    pub viewport_width: usize,
     /// The diff ranges for this side, as returned by `TextDiff::all`.
     pub ranges: Vec<RangeMatch>,
     /// Indices into `ranges`, sorted by source start position; rebuilt by `load_ranges`. Backs
@@ -543,22 +553,32 @@ impl CodeViewerWidget {
             .unwrap_or_default()
     }
 
-    /// Every case-insensitive occurrence of `query` in the file, in document order, as `TextRange`s
-    /// (always `start_row == end_row`: a search match never spans a line break, unlike diff
-    /// ranges). Empty for an empty query. Columns are character offsets into the *original* line,
+    /// Every occurrence of `query` in the file, in document order, as `TextRange`s (always
+    /// `start_row == end_row`: a search match never spans a line break, unlike diff ranges).
+    /// Empty for an empty query. Columns are character offsets into the *original* line,
     /// matching every other column in this module (`cursor_col`, `columns_on_row`).
     ///
-    /// Matches char-by-char against the original line rather than lowercasing the whole line and
-    /// searching that: `str::to_lowercase` isn't length-preserving for every character (e.g. 'İ'
-    /// becomes two characters), so a byte offset found in a lowercased copy doesn't reliably map
-    /// back to a column in the original - it would shift every match after such a character by
-    /// however many characters the lowercasing added, misaligning the highlight.
+    /// Smart-case, the vim/ripgrep convention: an all-lowercase query matches
+    /// case-insensitively; a query containing any uppercase character matches exactly - typing
+    /// the capital is read as deliberately asking for it.
+    ///
+    /// The insensitive path matches char-by-char against the original line rather than
+    /// lowercasing the whole line and searching that: `str::to_lowercase` isn't
+    /// length-preserving for every character (e.g. 'İ' becomes two characters), so a byte offset
+    /// found in a lowercased copy doesn't reliably map back to a column in the original - it
+    /// would shift every match after such a character by however many characters the lowercasing
+    /// added, misaligning the highlight.
     pub fn find_matches(&self, query: &str) -> Vec<TextRange> {
         if query.is_empty() {
             return Vec::new();
         }
-        let lower_query: Vec<char> = query.chars().flat_map(char::to_lowercase).collect();
-        let query_len = lower_query.len();
+        let case_sensitive = query.chars().any(char::is_uppercase);
+        let query_chars: Vec<char> = if case_sensitive {
+            query.chars().collect()
+        } else {
+            query.chars().flat_map(char::to_lowercase).collect()
+        };
+        let query_len = query_chars.len();
         let mut matches = Vec::new();
         for (row, line) in self.contents.lines().enumerate() {
             let chars: Vec<char> = line.chars().collect();
@@ -566,9 +586,15 @@ impl CodeViewerWidget {
                 continue;
             }
             'starts: for start in 0..=(chars.len() - query_len) {
-                for (offset, &query_char) in lower_query.iter().enumerate() {
-                    let mut lowered = chars[start + offset].to_lowercase();
-                    if lowered.next() != Some(query_char) || lowered.next().is_some() {
+                for (offset, &query_char) in query_chars.iter().enumerate() {
+                    let candidate = chars[start + offset];
+                    let matched = if case_sensitive {
+                        candidate == query_char
+                    } else {
+                        let mut lowered = candidate.to_lowercase();
+                        lowered.next() == Some(query_char) && lowered.next().is_none()
+                    };
+                    if !matched {
                         continue 'starts;
                     }
                 }
@@ -725,18 +751,18 @@ impl CodeViewerWidget {
             }
         }
 
-        // Search matches (from the `/` modal), painted in the same blue as the cross-highlight -
-        // both mean "this is the thing you're pointing at." Usually empty (no active search), so
-        // this loop is a no-op on every other frame.
+        // Search matches (from the `/` modal), painted in the theme's dedicated search color -
+        // previously they shared the cross-highlight blue, which made a search hit and the
+        // cursor's counterpart indistinguishable while a search was active (see
+        // `OverlayPalette::search_bg`). Usually empty (no active search), so this loop is a
+        // no-op on every other frame.
         for search_match in &state.search_matches {
             if let Some((start_col, end_col)) = search_match.columns_on_row(row, row_len) {
                 line = paint_columns(
                     &line,
                     start_col,
                     end_col,
-                    Style::new()
-                        .fg(palette.overlay_fg)
-                        .bg(palette.cross_highlight_bg),
+                    Style::new().fg(palette.overlay_fg).bg(palette.search_bg),
                 );
             }
         }
@@ -763,6 +789,16 @@ impl CodeViewerWidget {
         }
 
         line
+    }
+
+    /// Width of the line-number gutter in characters: the widest 1-indexed line number plus one
+    /// trailing separator space. 0 (no gutter at all) when nothing is loaded, so the empty-panel
+    /// hint state doesn't render a stray "1 " margin.
+    pub fn gutter_width(&self) -> usize {
+        if self.highlighted_lines.is_empty() {
+            return 0;
+        }
+        self.highlighted_lines.len().to_string().len() + 1
     }
 
     /// Whether a file has been loaded into this viewer yet.
@@ -796,6 +832,59 @@ impl CodeViewerWidget {
     }
 }
 
+/// The style for the line-number gutter and the `…` truncation markers - deliberately not part
+/// of `OverlayPalette` (it isn't a diff signal, just chrome), and `DarkGray` reads as "dimmed"
+/// against both light and dark terminal backgrounds.
+const GUTTER_STYLE: Style = Style::new().fg(Color::DarkGray);
+
+/// The horizontal window of `line` from character column `from`, `width` characters wide,
+/// preserving each span's styling. When content is cut off at either edge, the outermost visible
+/// character on that side is replaced with a dimmed `…` so the truncation is visible at all -
+/// previously long lines were silently hard-cut at the panel edge with no indication anything was
+/// missing.
+fn slice_columns(line: &Line<'static>, from: usize, width: usize) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+    let total: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+    let to = from + width;
+    let mut out: Vec<Span<'static>> = Vec::new();
+
+    if from > 0 {
+        out.push(Span::styled("…", GUTTER_STYLE));
+    }
+    let content_from = if from > 0 { from + 1 } else { from };
+    let content_to = if total > to { to - 1 } else { to };
+
+    let mut col = 0usize;
+    for span in &line.spans {
+        let len = span.content.chars().count();
+        let span_start = col;
+        col += len;
+        if col <= content_from {
+            continue;
+        }
+        if span_start >= content_to {
+            break;
+        }
+        let take_from = content_from.saturating_sub(span_start);
+        let take_to = (content_to - span_start).min(len);
+        let content: String = span
+            .content
+            .chars()
+            .skip(take_from)
+            .take(take_to - take_from)
+            .collect();
+        if !content.is_empty() {
+            out.push(Span::styled(content, span.style));
+        }
+    }
+    if total > to {
+        out.push(Span::styled("…", GUTTER_STYLE));
+    }
+    Line::from(out)
+}
+
 impl StatefulWidget for &CodeViewerWidget {
     type State = CodeViewerState;
 
@@ -807,6 +896,13 @@ impl StatefulWidget for &CodeViewerWidget {
         // outer block already showed.
         let inner = area;
 
+        let gutter_width = self.gutter_width();
+        let content_width = (inner.width as usize).saturating_sub(gutter_width);
+        // Recorded here because render is the only place the real area width is known - the
+        // component layer reads it back for cursor-following horizontal scroll
+        // (`CodeViewer::scroll_to_show_col`).
+        state.viewport_width = content_width;
+
         let lines = self.visible_lines(state);
 
         if lines.is_empty() {
@@ -814,9 +910,18 @@ impl StatefulWidget for &CodeViewerWidget {
         } else {
             for (i, line) in lines.iter().enumerate() {
                 let y = inner.y + i as u16;
-                if y < inner.y + inner.height {
-                    buf.set_line(inner.x, y, line, inner.width);
+                if y >= inner.y + inner.height {
+                    continue;
                 }
+                let mut composed: Vec<Span<'static>> = Vec::new();
+                if gutter_width > 0 {
+                    composed.push(Span::styled(
+                        format!("{:>w$} ", state.scroll + i + 1, w = gutter_width - 1),
+                        GUTTER_STYLE,
+                    ));
+                }
+                composed.extend(slice_columns(line, state.scroll_col, content_width).spans);
+                buf.set_line(inner.x, y, &Line::from(composed), inner.width);
             }
         }
     }
@@ -1429,7 +1534,7 @@ mod tests {
     /// `cross_highlight_destination_uses_bright_blue_with_explicit_foreground` below for the
     /// non-search case this mirrors.
     #[test]
-    fn overlay_row_paints_search_matches_in_the_cross_highlight_color() {
+    fn overlay_row_paints_search_matches_in_the_dedicated_search_color() {
         let widget = widget_with_line("hello world");
         let state = CodeViewerState {
             search_matches: vec![TextRange::new(0, 6, 0, 11)],
@@ -1444,7 +1549,11 @@ mod tests {
             .find(|span| span.content == "world")
             .expect("highlighted span");
         let palette = default_palette();
-        assert_eq!(span.style.bg, Some(palette.cross_highlight_bg));
+        assert_eq!(
+            span.style.bg,
+            Some(palette.search_bg),
+            "search matches must use the dedicated search color, not the cursor blue"
+        );
         assert_eq!(span.style.fg, Some(palette.overlay_fg));
     }
 
@@ -1534,10 +1643,71 @@ mod tests {
             !text.contains(&widget.filename()),
             "no title should ever be drawn: {text}"
         );
+        // Flush against the top-left corner - no border row/column to skip. The first cells are
+        // the line-number gutter ("1 " for a 1-line file), then the content itself.
+        assert_eq!(buf.get(0, 0).symbol(), "1", "gutter line number first");
         assert_eq!(
-            buf.get(0, 0).symbol(),
+            buf.get(widget.gutter_width() as u16, 0).symbol(),
             "h",
-            "content should be flush against the top-left corner, no border row/column to skip"
+            "content immediately after the gutter, no border row/column to skip"
         );
+    }
+
+    /// The gutter is exactly wide enough for the file's largest line number plus one separator
+    /// space, and absent entirely (width 0) when nothing is loaded - the empty-panel hint state
+    /// must not show a stray "1 " margin.
+    #[test]
+    fn gutter_width_tracks_line_count_and_disappears_when_empty() {
+        assert_eq!(CodeViewerWidget::default().gutter_width(), 0);
+        assert_eq!(widget_with_line("one line").gutter_width(), 2);
+        let ninety_nine_lines = widget_with_line(&vec!["x"; 99].join("\n"));
+        assert_eq!(ninety_nine_lines.gutter_width(), 3);
+    }
+
+    /// `slice_columns` is the horizontal-scroll window: it must preserve span styling, and mark
+    /// a cut edge with a dimmed `…` so truncation is visible at all.
+    #[test]
+    fn slice_columns_windows_a_line_and_marks_cut_edges() {
+        let line = Line::from(vec![
+            Span::styled("abcde".to_string(), Style::new().fg(Color::Red)),
+            Span::styled("fghij".to_string(), Style::new().fg(Color::Green)),
+        ]);
+
+        // Full width: no markers.
+        let full = slice_columns(&line, 0, 20);
+        let text: String = full.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "abcdefghij");
+
+        // Cut on both sides: a width-5 window is two `…` markers plus three content characters.
+        let window = slice_columns(&line, 2, 5);
+        let text: String = window.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "…def…");
+        assert_eq!(window.spans.first().unwrap().style, GUTTER_STYLE);
+        assert_eq!(window.spans.last().unwrap().style, GUTTER_STYLE);
+        // The styles of the surviving characters are preserved.
+        assert!(
+            window
+                .spans
+                .iter()
+                .any(|s| s.content.contains('d') && s.style.fg == Some(Color::Red)),
+            "red span styling should survive slicing: {window:?}"
+        );
+        assert!(
+            window
+                .spans
+                .iter()
+                .any(|s| s.content.contains('f') && s.style.fg == Some(Color::Green)),
+            "green span styling should survive slicing: {window:?}"
+        );
+
+        // Cut only on the right.
+        let prefix = slice_columns(&line, 0, 4);
+        let text: String = prefix.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "abc…");
+
+        // Zero width renders nothing rather than panicking.
+        let empty = slice_columns(&line, 3, 0);
+        let text: String = empty.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "");
     }
 }

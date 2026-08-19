@@ -351,7 +351,27 @@ fn ranges(
                                 // a Move, not an Identical range, and its destination must not
                                 // become the new `last_non_move_range` anchor since its position
                                 // is out of the normal sequential flow.
-                                if s.start_column == d.start_column {
+                                //
+                                // A second, column-preserving relocation also counts: a node whose
+                                // destination starts *before* the last sequential anchor crossed
+                                // over earlier content - siblings reordered (e.g. two top-level
+                                // functions swapped). Same-column row shifts from unrelated edits
+                                // elsewhere never run backwards, so this can't fire for them.
+                                // Restricted to nodes spanning a row boundary: sub-line tokens
+                                // (a `}`, an operator) can legitimately match an earlier identical
+                                // occurrence when matching is imperfect, and flagging those would
+                                // paint noise, while a multi-row (or full-line) match landing
+                                // backwards is a real reorder. Before this check, a pure sibling
+                                // reorder produced no non-Identical range at all - the diff
+                                // rendered as completely unchanged (the gap `DiffSummary::
+                                // RefactorMovedOnly`'s doc comment used to describe).
+                                let crossed_backwards = s.end_row > s.start_row
+                                    && (d.start_row, d.start_column)
+                                        < (
+                                            last_non_move_range.start_row,
+                                            last_non_move_range.start_column,
+                                        );
+                                if s.start_column == d.start_column && !crossed_backwards {
                                     last_non_move_range = d.clone();
 
                                     new_ranges.push(RangeMatch {
@@ -1037,12 +1057,15 @@ pub struct ChangeCounts {
     pub insertions: usize,
     pub deletions: usize,
     pub updates: usize,
+    pub moves: usize,
 }
 
 /// Counts each side's own [`line_operations`] output independently: `Insert` from the after side
 /// (a line that exists only in after), `Delete` from the before side (a line that exists only in
 /// before). `Update` is counted once, from the after side only - an updated line exists on both
-/// sides at the same row, so counting it from both sides would double it.
+/// sides at the same row, so counting it from both sides would double it. `Move` is counted from
+/// the after side only for the same reason - a moved line exists on both sides (at different
+/// rows), so its destination is the single representative.
 pub fn change_counts(
     before_contents: &str,
     after_contents: &str,
@@ -1064,6 +1087,10 @@ pub fn change_counts(
         updates: after_ops
             .iter()
             .filter(|op| **op == TextOperation::Update)
+            .count(),
+        moves: after_ops
+            .iter()
+            .filter(|op| **op == TextOperation::Move)
             .count(),
     }
 }
@@ -1108,17 +1135,13 @@ pub enum DiffSummary {
     /// reformat (which can also produce only `Move` ranges) is reported as that instead, since
     /// "reformatted" is the more specific and more useful claim of the two.
     ///
-    /// Narrower than "moved code" might suggest: `TextOperation::Move` only fires when a matched
-    /// node's own *column* shifts (a re-indent), not generally whenever a node's position in the
-    /// file changes - reordering two top-level items (same column, different row) produces no
-    /// operations at all today, not `Move` (confirmed empirically: `codediff --headless` on two
-    /// files differing only by a swapped pair of top-level functions shows no diff whatsoever).
-    /// That case currently falls through to `None` if it also fails `WhitespaceOnly` (it usually
-    /// will, since token order really did change) - a real gap, not a bug: catching genuine
-    /// cross-position reordering needs the AST-level `ASTMappingOperation::Move`/
-    /// `ASTMappingReason::MovedSubtree` (`solve_moved_subtrees`), not `TextOperation`, which
-    /// `summarize_diff` doesn't have access to (it only sees `TextDiff`'s already-flattened
-    /// ranges). Worth revisiting if this proves too narrow in practice.
+    /// `TextOperation::Move` fires when a matched node's own *column* shifts (a re-indent), or
+    /// when a multi-row matched node's destination lands *before* the last sequential anchor (a
+    /// sibling reorder - see `ranges`'s `crossed_backwards`). A same-column row shift caused by
+    /// unrelated edits elsewhere in the file is deliberately not a `Move`. Before the
+    /// `crossed_backwards` check existed, a pure reorder of two top-level functions produced no
+    /// operations at all - the diff rendered as completely unchanged and this variant never fired
+    /// for the very case it names.
     RefactorMovedOnly,
 }
 
@@ -1776,6 +1799,31 @@ mod tests {
                 insertions: 1,
                 deletions: 0,
                 updates: 1,
+                moves: 0,
+            }
+        );
+    }
+
+    /// `Move` is counted from the after side only, mirroring `Update`'s single-count rule - a
+    /// moved line exists on both sides at different rows.
+    #[test]
+    fn change_counts_tallies_moves_once_from_the_after_side() {
+        let move_range = |row: usize, dest_row: usize| RangeMatch {
+            source: TextRange::new(row, 0, row, 1),
+            destination: TextRange::new(dest_row, 0, dest_row, 1),
+            operation: TextOperation::Move,
+        };
+        let before_ranges = vec![move_range(0, 2)];
+        let after_ranges = vec![move_range(2, 0)];
+
+        let counts = change_counts("a\nb\nc", "b\nc\na", &before_ranges, &after_ranges);
+        assert_eq!(
+            counts,
+            ChangeCounts {
+                insertions: 0,
+                deletions: 0,
+                updates: 0,
+                moves: 1,
             }
         );
     }
@@ -2399,6 +2447,56 @@ mod tests {
             .ast
             .expect("diff_code should always produce an AST for valid Rust");
         (before, after, ast, node_cache)
+    }
+
+    /// Regression test for the `crossed_backwards` check in `ranges`: before it, a pure reorder
+    /// of two sibling functions (same column, different rows) produced no non-Identical range at
+    /// all - the diff rendered as completely unchanged and `summarize_diff` returned `None`,
+    /// silence for two byte-different files (found via `codediff --headless` smoke test,
+    /// 2026-08-19).
+    #[test]
+    fn sibling_reorder_produces_move_ranges_and_a_refactor_moved_summary() {
+        let before_src = "fn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n\nfn helper(x: i32) -> i32 {\n    x * 2\n}\n";
+        let after_src = "fn helper(x: i32) -> i32 {\n    x * 2\n}\n\nfn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n";
+        let (before, after, ast, node_cache) = diff_ast(before_src, after_src);
+        let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
+        let before_ranges = text_diff.all(0);
+        let after_ranges = text_diff.all(1);
+
+        for (side, ranges) in [("before", &before_ranges), ("after", &after_ranges)] {
+            assert!(
+                ranges.iter().any(|r| r.operation == TextOperation::Move),
+                "{side} side should contain a Move range for a sibling reorder, got {ranges:?}"
+            );
+            assert!(
+                ranges
+                    .iter()
+                    .all(|r| matches!(r.operation, TextOperation::Move | TextOperation::Identical)),
+                "{side} side of a pure reorder should only have Move/Identical ranges, got {ranges:?}"
+            );
+        }
+        assert_eq!(
+            summarize_diff(before_src, after_src, &before_ranges, &after_ranges),
+            Some(DiffSummary::RefactorMovedOnly)
+        );
+    }
+
+    /// The other half of the `crossed_backwards` contract: content shifted *down* by an unrelated
+    /// insertion above it keeps its column and its relative order, so it must stay `Identical` -
+    /// flagging everything below an inserted line as "moved" would be noise.
+    #[test]
+    fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
+        let before_src = "fn main() {\n    foo();\n}\n\nfn helper() {\n    bar();\n}\n";
+        let after_src =
+            "fn added() {}\n\nfn main() {\n    foo();\n}\n\nfn helper() {\n    bar();\n}\n";
+        let (before, after, ast, node_cache) = diff_ast(before_src, after_src);
+        let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
+        for (side, ranges) in [("before", &text_diff.all(0)), ("after", &text_diff.all(1))] {
+            assert!(
+                !ranges.iter().any(|r| r.operation == TextOperation::Move),
+                "{side} side should have no Move ranges when content merely shifted down, got {ranges:?}"
+            );
+        }
     }
 
     /// A comment whose text changed (as opposed to being wholly inserted/deleted) is tagged

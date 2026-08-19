@@ -43,29 +43,45 @@ For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
 If you build from a checkout instead of `cargo install`, use `cargo run --` in place of `codediff`
 in every example below.
 
-* `Tab` — switch the active panel.
-* `o` — open a file selector for the active panel. Once both panels have a file, codediff computes
-  and draws the diff between them automatically, color-coded by change type (inserted, deleted,
-  updated, moved) using the current overlay theme - see `c` below.
+* `Tab` — switch the active panel. `v` cycles the layout between auto, forced dual, and forced
+  single, and codediff remembers the choice across runs.
+* `o` — open a file selector for the active panel. Type to filter the listing; `Backspace` widens
+  the filter, and only with nothing left to widen does it go to the parent directory. `Ctrl-h`
+  toggles dotfiles. Once both panels have a file, codediff computes and draws the diff between
+  them automatically, color-coded by change type (inserted, deleted, updated, moved) using the
+  current overlay theme - see `c` below. On the empty start screen, the digit keys `1`-`9` reopen
+  a recently diffed pair.
+* `r` — reload both files from disk and re-diff, keeping the cursor where it is. `e` opens the
+  focused panel's file in `$VISUAL`/`$EDITOR` at the cursor line and re-diffs on return - together
+  they close the read-diff/fix-code loop without leaving the session. While a diff is computing,
+  `Esc` cancels it and keeps the previous result.
 * `c` — open the color theme picker. Built-in themes: Dark (default), Solarized Dark, Solarized
-  Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. codediff remembers your choice across runs.
-* `?` — show every keybinding, plus copyright/license/repository info. `j`/`k` scrolls it. `?` or
-  `Esc` closes it.
+  Light, Dracula, Nord, Gruvbox Dark, Monokai, One Dark. Moving the selection previews the theme
+  live; `Enter` keeps it, and codediff remembers your choice across runs.
+* `?` — show every keybinding plus a color legend rendered in the active theme's actual colors,
+  and copyright/license/repository info. `j`/`k` scrolls it. `?` or `Esc` closes it.
 * Arrow keys or `h`/`j`/`k`/`l` — move the cursor, one line or column at a time, same as a text
-  editor. The range under the cursor, and the matching range on the other panel, highlight in blue
+  editor. The range under the cursor, and the matching range on the other panel, highlight
   whenever it's part of a real change; unchanged (identical) content is never highlighted. The
-  other panel's cursor always follows the matched node.
+  other panel's cursor always follows the matched node. `Enter` jumps to the matched counterpart
+  on the other panel (and back). Both panels carry a line-number gutter, long lines scroll
+  horizontally with the cursor (`…` marks a cut edge), and a one-column strip at each panel's
+  right edge maps where the changes are in the whole file.
 * `n`/`p` — jump straight to the next or previous change. This skips unchanged lines entirely. It
-  wraps around at the start or end of the file.
-* `/` — search the focused panel for text. `Enter` jumps to the nearest match and highlights every
-  match in blue. `Esc` cancels; an empty query clears the current search's highlights. `>`/`<` step
-  to the next/previous match once a search is active.
-* `Page Up`/`Page Down`/`Home`/`End` — scroll.
-* `q` or `Esc` — quit. If a dialog is open, `Esc` cancels the dialog instead.
-
-If a diff involves two unrelated files, full structural analysis can take several seconds.
-codediff detects this case. It asks whether to wait for the precise, slow result or accept a
-faster, approximate result instead.
+  wraps around at the start or end of the file. `g` jumps to a line number.
+* `/` — search the focused panel for text (smart-case: all-lowercase matches insensitively, any
+  capital matches exactly). The match count updates live while typing, and matches highlight in
+  the theme's search color. `Enter` jumps to the nearest match; a bare `Enter` repeats the last
+  search. `Esc` cancels; an empty query clears the current search's highlights. `>`/`<` step to
+  the next/previous match once a search is active.
+* `Ctrl-d`/`Ctrl-u` — move the cursor half a page. `Ctrl-e`/`Ctrl-y` — scroll the view one line
+  without moving the cursor. `Page Up`/`Page Down`/`Home`/`End` — scroll.
+* `S` — toggle syntax highlighting.
+* Mouse — the wheel scrolls the panel under the pointer; a left click focuses that panel and
+  places the cursor on the clicked character. Terminal-native text selection stays available via
+  your terminal's usual modifier (typically Shift-drag).
+* `q` or `Esc` — quit. If a dialog is open, `Esc` cancels the dialog instead; while a diff is
+  computing, `Esc` cancels the computation.
 
 ## Headless / batch mode
 
@@ -75,16 +91,21 @@ not a real terminal. Headless mode also starts automatically whenever stdout is 
 example when piped into `less` or redirected to a file. Because of this, `codediff BEFORE AFTER |
 less` works without the flag.
 
-codediff collapses long runs of unchanged lines. It keeps 3 lines of context on each side of a
-change, the same convention as `diff -u`. codediff also prefixes each hunk with the nearest
-enclosing function, class, or struct line, when that line is not otherwise visible. This shows the
-location of a change deep inside a large file. The reader does not need to see the whole file
-around it.
+Every printed line is prefixed with its line number, so the moved-chunk headers' "Moved to lines
+40-60" cross-references can actually be followed. codediff collapses long runs of unchanged
+lines. It keeps 3 lines of context on each side of a change (override with `--context N`), the
+same convention as `diff -u`. codediff also prefixes each hunk with the nearest enclosing
+function, class, or struct line, when that line is not otherwise visible. This shows the location
+of a change deep inside a large file. The reader does not need to see the whole file around it.
 
-By default, headless mode uses the same fast, approximate fallback that the TUI offers for
-unrelated-looking files, without asking. Pass `--exact` to force the full, precise analysis
-instead. Pass `NO_COLOR=1` (see <https://no-color.org>) to disable ANSI colors, for example when
-you redirect output to a file.
+Colors are on by default (git's pager renders them); pass `--color never`, or set `NO_COLOR=1`
+(see <https://no-color.org>), to disable ANSI colors, for example when you redirect output to a
+file - `--color always` forces them even under `NO_COLOR`.
+
+For scripting, a direct `codediff BEFORE AFTER` invocation exits with the `diff` convention:
+`0` when the files are identical, `1` when they differ, `2` on error. (The 7-argument
+`GIT_EXTERNAL_DIFF` form always exits `0` on success, because git treats a non-zero exit from an
+external diff program as fatal.)
 
 ## Git integration
 

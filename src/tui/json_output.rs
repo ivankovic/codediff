@@ -251,11 +251,13 @@ fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
 /// the interactive TUI do (same `compute_diff` - same parsing, same `ASTDiff`, same `TextDiff`),
 /// then prints it as one pretty-printed JSON object on stdout. See this module's doc comment for
 /// the schema.
-pub fn run(before: &Path, after: &Path, mode: DiffMode) -> Result<()> {
+/// Returns whether the two files differ at all (raw byte comparison, same convention as
+/// `headless::run`) so `main.rs` can turn it into a `diff`-style exit code.
+pub fn run(before: &Path, after: &Path, mode: DiffMode) -> Result<bool> {
     let (data, fallback_used) = compute_diff(before, after, mode)?;
     let diff = build_diff(&data, fallback_used);
     println!("{}", serde_json::to_string_pretty(&diff)?);
-    Ok(())
+    Ok(std::fs::read(before)? != std::fs::read(after)?)
 }
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
 use crate::tui::actions::{Action, DiffSessionData};
-use crate::tui::theme::OverlayTheme;
+use crate::tui::theme::{OverlayTheme, PanelLayout};
 
 /// Below this terminal width, two side-by-side panels would each be too narrow to read code in,
 /// so callers fall back to showing a single panel at full width. Shared with `human_solver`'s
@@ -41,9 +41,22 @@ pub struct DiffViewer {
     command_tx: Option<UnboundedSender<Action>>,
     /// Current display mode: dual panel or single panel
     display_mode: DisplayMode,
+    /// The user's layout preference (the `v` key, persisted): `Auto` keeps the width-based
+    /// choice, `Dual`/`Single` force one mode regardless of width - see `update_display_mode`.
+    layout_override: PanelLayout,
     /// Which panel is shown in single panel mode, and which panel's cursor drives navigation
     /// (and which panel `o` opens a file selector for) in dual panel mode.
     active_panel: Panel,
+    /// A copy of the active overlay theme (also pushed into both viewers) - kept here for the
+    /// minimap strips, which are drawn by this component, not the viewers.
+    overlay_theme: OverlayTheme,
+    /// The screen rectangles the Before/After content was last drawn into (minimap strip
+    /// excluded), recorded by `draw` for mouse hit-testing - a mouse event only carries screen
+    /// coordinates, and only `draw` knows where each panel actually landed. `None` for a panel
+    /// not currently on screen (the inactive one in single-panel mode, or before the first
+    /// frame).
+    last_before_content: Option<Rect>,
+    last_after_content: Option<Rect>,
 }
 
 /// Display mode for the diff viewer
@@ -126,6 +139,94 @@ impl DiffViewer {
         self.focused_viewer().jump_to_change(forward);
         self.sync_cross_highlight();
         self.sync_scroll_centered();
+    }
+
+    /// Move the focused panel's cursor by half a viewport (`Ctrl-d`/`Ctrl-u`), the vim
+    /// convention for fast-but-not-blind vertical travel - built from single-line moves so the
+    /// sticky column, cross-highlight sync, and scroll-following all behave exactly as a run of
+    /// `j`/`k` presses would.
+    pub fn move_cursor_half_page(&mut self, direction: i32) {
+        let half = (self.focused_viewer().viewport_height() / 2).max(1);
+        for _ in 0..half {
+            self.focused_viewer().move_cursor_vertical(direction);
+        }
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
+    /// Scroll the viewport(s) by one line without moving the cursor (`Ctrl-e`/`Ctrl-y`) - both
+    /// panels in dual mode (same convention as PageUp/PageDown), the focused one in single mode.
+    /// The cursor deliberately stays put; if it scrolls out of view the terminal cursor simply
+    /// isn't drawn until it comes back (see `cursor_screen_position`).
+    pub fn scroll_view(&mut self, direction: i32) {
+        let scroll_one = |viewer: &mut CodeViewer| {
+            if direction < 0 {
+                viewer.scroll_up();
+            } else {
+                viewer.scroll_down();
+            }
+        };
+        if self.display_mode == DisplayMode::Dual {
+            scroll_one(&mut self.left_viewer);
+            scroll_one(&mut self.right_viewer);
+        } else {
+            scroll_one(self.focused_viewer());
+        }
+    }
+
+    /// `Enter`: jump to the counterpart of whatever the cursor is on - switch the active panel
+    /// and place its cursor at the matched destination's start. The cross-highlight already
+    /// *shows* that destination; this makes it reachable in one keypress instead of `Tab` plus
+    /// manual navigation. Pressing `Enter` again jumps back (the counterpart's own destination
+    /// is the original range), giving free round-trip navigation across a long-distance move.
+    /// A no-op when the cursor isn't on any range (e.g. no diff loaded).
+    pub fn jump_to_counterpart(&mut self) {
+        let Some(destination) = self.focused_viewer().cursor_destination() else {
+            return;
+        };
+        self.toggle_active_panel();
+        self.focused_viewer()
+            .set_cursor_position(destination.start_row, destination.start_column);
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
+    /// `S`: toggle syntax highlighting on both panels at once - a per-panel toggle would just
+    /// leave the two sides looking inconsistent for no benefit.
+    pub fn toggle_syntax_highlighting(&mut self) {
+        let enable = !self.left_viewer.is_syntax_highlighting_enabled();
+        self.left_viewer.set_syntax_highlighting(enable);
+        self.right_viewer.set_syntax_highlighting(enable);
+    }
+
+    /// Move the focused panel's cursor to the start of a 1-indexed line (the `g` prompt),
+    /// clamped to the file, centered in the viewport, and synced onto the other panel like any
+    /// other jump.
+    pub fn jump_to_line(&mut self, line: usize) {
+        let row = line.saturating_sub(1);
+        self.focused_viewer().set_cursor_position(row, 0);
+        self.focused_viewer().scroll_to_center_row(row);
+        self.sync_cross_highlight();
+        self.sync_scroll_centered();
+    }
+
+    /// Put the cursor back at a remembered position after a reload/exact re-run (`App::
+    /// restore_after_reload`): re-activate the panel it was on and reposition, clamped - the
+    /// file may have changed underneath a reload.
+    pub fn restore_cursor(&mut self, panel: Panel, row: usize, col: usize) {
+        if self.active_panel != panel {
+            self.toggle_active_panel();
+        }
+        self.focused_viewer().set_cursor_position(row, col);
+        self.sync_cross_highlight();
+        self.sync_scroll();
+    }
+
+    /// Highlight `query`'s matches on the focused panel *without* moving the cursor - the search
+    /// modal's live preview while typing. Returns the match count for the modal's readout.
+    /// An empty query clears the preview (and returns 0).
+    pub fn preview_search(&mut self, query: &str) -> usize {
+        self.focused_viewer().preview_search(query)
     }
 
     /// `n`/`p`'s actual key handler: jumps normally if the focused panel has a change to jump
@@ -232,8 +333,35 @@ impl DiffViewer {
     /// Set the palette used to paint the diff/cursor overlay on both panels, picked via the `c`
     /// theme picker.
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
+        self.overlay_theme = theme;
         self.left_viewer.set_overlay_theme(theme);
         self.right_viewer.set_overlay_theme(theme);
+    }
+
+    /// The viewer backing `panel` (independent of which one is active) - mouse handling resolves
+    /// its target panel by position, not by focus.
+    fn viewer_for(&mut self, panel: Panel) -> &mut CodeViewer {
+        match panel {
+            Panel::Before => &mut self.left_viewer,
+            Panel::After => &mut self.right_viewer,
+        }
+    }
+
+    /// Which panel (and its recorded content rect) the screen position `(column, row)` falls in,
+    /// per the rects `draw` last recorded.
+    fn panel_at(&self, column: u16, row: u16) -> Option<(Panel, Rect)> {
+        let hit = |rect: Option<Rect>| {
+            rect.filter(|r| {
+                column >= r.x && column < r.x + r.width && row >= r.y && row < r.y + r.height
+            })
+        };
+        if let Some(rect) = hit(self.last_before_content) {
+            return Some((Panel::Before, rect));
+        }
+        if let Some(rect) = hit(self.last_after_content) {
+            return Some((Panel::After, rect));
+        }
+        None
     }
 
     /// The panel whose cursor currently drives navigation.
@@ -291,13 +419,38 @@ impl DiffViewer {
         self.right_viewer.load_file(path)
     }
 
-    /// Update display mode based on available width
+    /// Update display mode: the user's explicit `v`-key preference wins; `Auto` falls back to
+    /// the width-based choice.
     pub fn update_display_mode(&mut self, width: u16) {
-        self.display_mode = if width < SINGLE_PANEL_THRESHOLD {
-            DisplayMode::Single
-        } else {
-            DisplayMode::Dual
+        self.display_mode = match self.layout_override {
+            PanelLayout::Dual => DisplayMode::Dual,
+            PanelLayout::Single => DisplayMode::Single,
+            PanelLayout::Auto => {
+                if width < SINGLE_PANEL_THRESHOLD {
+                    DisplayMode::Single
+                } else {
+                    DisplayMode::Dual
+                }
+            }
         };
+    }
+
+    /// Set the layout preference (used at startup to apply the persisted choice) - takes effect
+    /// on the next `update_display_mode` call, i.e. the next frame.
+    pub fn set_layout_override(&mut self, layout: PanelLayout) {
+        self.layout_override = layout;
+    }
+
+    /// The current layout preference - `app.rs` shows it in the footer when it isn't `Auto`.
+    pub fn layout_override(&self) -> PanelLayout {
+        self.layout_override
+    }
+
+    /// The `v` key: advance the layout preference through `Auto -> Dual -> Single` and persist
+    /// it for future runs.
+    fn cycle_layout_override(&mut self) {
+        self.layout_override = self.layout_override.next();
+        crate::tui::theme::save_panel_layout(self.layout_override);
     }
 
     /// Toggle between the "Before" and "After" panel.
@@ -355,8 +508,46 @@ impl Component for DiffViewer {
     }
 
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
+        use crossterm::event::KeyModifiers;
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         // Handle key events
         match key.code {
+            // Vim-convention scrolling: Ctrl-d/Ctrl-u move the cursor half a viewport,
+            // Ctrl-e/Ctrl-y scroll the view one line leaving the cursor in place. Checked before
+            // the plain-letter arms so a Ctrl-modified key can't fall through to an unrelated
+            // binding.
+            crossterm::event::KeyCode::Char('d') if ctrl => {
+                self.move_cursor_half_page(1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('u') if ctrl => {
+                self.move_cursor_half_page(-1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('e') if ctrl => {
+                self.scroll_view(1);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('y') if ctrl => {
+                self.scroll_view(-1);
+                Ok(Some(Action::Render))
+            }
+            // Enter jumps to the counterpart of the range under the cursor on the other panel -
+            // see `jump_to_counterpart`.
+            crossterm::event::KeyCode::Enter => {
+                self.jump_to_counterpart();
+                Ok(Some(Action::Render))
+            }
+            // v cycles the layout preference (auto -> dual -> single), persisted across runs.
+            crossterm::event::KeyCode::Char('v') => {
+                self.cycle_layout_override();
+                Ok(Some(Action::Render))
+            }
+            // S (capital - lowercase s stays free) toggles syntax highlighting on both panels.
+            crossterm::event::KeyCode::Char('S') => {
+                self.toggle_syntax_highlighting();
+                Ok(Some(Action::Render))
+            }
             // Tab switches which panel's cursor drives navigation (and, in single panel mode,
             // which panel is shown).
             crossterm::event::KeyCode::Tab => {
@@ -461,6 +652,50 @@ impl Component for DiffViewer {
         }
     }
 
+    /// Mouse support: the scroll wheel scrolls the panel under the pointer (3 lines a notch,
+    /// the common terminal convention), a left click focuses that panel and places the cursor on
+    /// the clicked character (translated through the gutter and both scroll offsets). Hit-testing
+    /// uses the content rects `draw` last recorded, so this works in both layouts without
+    /// re-deriving the frame's geometry.
+    fn handle_mouse_event(
+        &mut self,
+        mouse: crossterm::event::MouseEvent,
+    ) -> Result<Option<Action>> {
+        use crossterm::event::{MouseButton, MouseEventKind};
+        let Some((panel, rect)) = self.panel_at(mouse.column, mouse.row) else {
+            return Ok(None);
+        };
+        match mouse.kind {
+            MouseEventKind::ScrollDown => {
+                for _ in 0..3 {
+                    self.viewer_for(panel).scroll_down();
+                }
+                Ok(Some(Action::Render))
+            }
+            MouseEventKind::ScrollUp => {
+                for _ in 0..3 {
+                    self.viewer_for(panel).scroll_up();
+                }
+                Ok(Some(Action::Render))
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                if self.active_panel != panel {
+                    self.toggle_active_panel();
+                }
+                let viewer = self.viewer_for(panel);
+                let row = viewer.state().scroll + (mouse.row - rect.y) as usize;
+                let clicked_col = (mouse.column - rect.x) as usize;
+                let col =
+                    viewer.state().scroll_col + clicked_col.saturating_sub(viewer.gutter_width());
+                viewer.set_cursor_position(row, col);
+                self.sync_cross_highlight();
+                self.sync_scroll();
+                Ok(Some(Action::Render))
+            }
+            _ => Ok(None),
+        }
+    }
+
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match &action {
             Action::Resize(w, _h) => {
@@ -495,7 +730,7 @@ impl Component for DiffViewer {
             let (left_area, right_area) = split_panels(area);
 
             let left_filename = self.left_viewer.filename_or_hint();
-            let left_content = panel_title(
+            let left_below_title = panel_title(
                 frame,
                 left_area,
                 " Before ",
@@ -503,10 +738,18 @@ impl Component for DiffViewer {
                 &left_filename,
                 self.active_panel == Panel::Before,
             );
+            let (left_content, left_strip) =
+                carve_minimap(left_below_title, self.left_viewer.line_count());
+            let left_bands = self
+                .left_viewer
+                .change_bands(left_strip.map_or(0, |s| s.height as usize));
             self.left_viewer.draw(frame, left_content)?;
+            if let Some(strip) = left_strip {
+                render_minimap(frame, strip, &left_bands, self.overlay_theme);
+            }
 
             let right_filename = self.right_viewer.filename_or_hint();
-            let right_content = panel_title(
+            let right_below_title = panel_title(
                 frame,
                 right_area,
                 " After ",
@@ -514,7 +757,18 @@ impl Component for DiffViewer {
                 &right_filename,
                 self.active_panel == Panel::After,
             );
+            let (right_content, right_strip) =
+                carve_minimap(right_below_title, self.right_viewer.line_count());
+            let right_bands = self
+                .right_viewer
+                .change_bands(right_strip.map_or(0, |s| s.height as usize));
             self.right_viewer.draw(frame, right_content)?;
+            if let Some(strip) = right_strip {
+                render_minimap(frame, strip, &right_bands, self.overlay_theme);
+            }
+
+            self.last_before_content = Some(left_content);
+            self.last_after_content = Some(right_content);
 
             let focused_content = match self.active_panel {
                 Panel::Before => left_content,
@@ -545,7 +799,7 @@ impl Component for DiffViewer {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Length(1), Constraint::Min(0)])
                 .split(area);
-            let (title_area, content_area) = (layout[0], layout[1]);
+            let (title_area, below_title) = (layout[0], layout[1]);
 
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
@@ -558,7 +812,27 @@ impl Component for DiffViewer {
                 ])),
                 title_area,
             );
+            let line_count = self.focused_viewer().line_count();
+            let (content_area, strip) = carve_minimap(below_title, line_count);
+            let bands = self
+                .focused_viewer()
+                .change_bands(strip.map_or(0, |s| s.height as usize));
             self.focused_viewer().draw(frame, content_area)?;
+            if let Some(strip) = strip {
+                render_minimap(frame, strip, &bands, self.overlay_theme);
+            }
+
+            // Only the visible panel is clickable; the hidden one must not keep a stale rect.
+            match self.active_panel {
+                Panel::Before => {
+                    self.last_before_content = Some(content_area);
+                    self.last_after_content = None;
+                }
+                Panel::After => {
+                    self.last_after_content = Some(content_area);
+                    self.last_before_content = None;
+                }
+            }
 
             if let Some((x, y)) = self.focused_viewer().cursor_screen_position(content_area) {
                 frame.set_cursor(x, y);
@@ -567,6 +841,50 @@ impl Component for DiffViewer {
 
         Ok(())
     }
+}
+
+/// Splits a panel's content area into `(content, Some(strip))` - the rightmost column becomes
+/// the change-overview minimap - or `(area, None)` when there's nothing to show a map *of* (no
+/// file loaded) or no room for one.
+fn carve_minimap(area: Rect, line_count: usize) -> (Rect, Option<Rect>) {
+    if line_count == 0 || area.width < 2 {
+        return (area, None);
+    }
+    let content = Rect::new(area.x, area.y, area.width - 1, area.height);
+    let strip = Rect::new(area.x + area.width - 1, area.y, 1, area.height);
+    (content, Some(strip))
+}
+
+/// Draws the change-overview strip: one cell per band, painted in the band's operation color
+/// from the active theme (the same background hues the diff overlay itself uses, applied to a
+/// solid block glyph), blank where the band holds no change. See `CodeViewer::change_bands`.
+fn render_minimap(
+    frame: &mut Frame,
+    strip: Rect,
+    bands: &[Option<crate::diff::text::TextOperation>],
+    theme: OverlayTheme,
+) {
+    use crate::diff::text::TextOperation;
+    let palette = theme.palette();
+    let lines: Vec<Line> = bands
+        .iter()
+        .map(|band| match band {
+            Some(op) => {
+                let color = match op {
+                    TextOperation::Insert => palette.insert_bg,
+                    TextOperation::Delete => palette.delete_bg,
+                    TextOperation::Move => palette.move_bg,
+                    TextOperation::Update => palette.update_bg,
+                    TextOperation::Identical | TextOperation::NotYetSet => {
+                        return Line::from(" ");
+                    }
+                };
+                Line::from(Span::styled("█", Style::new().fg(color)))
+            }
+            None => Line::from(" "),
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(lines), strip);
 }
 
 /// Splits a dual-panel area into (left, right) halves with a one-column gap for the divider,

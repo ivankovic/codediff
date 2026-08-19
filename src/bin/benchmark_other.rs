@@ -61,6 +61,7 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use codediff::code::{Code, Language};
 use codediff::diff;
+use codediff::diff::text_range::TextRange;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
 use csv::Writer;
@@ -79,6 +80,20 @@ struct Args {
     /// Output results as a CSV file. Default path: "./research/data/comparison/benchmark_other.csv"
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
+
+    /// Accuracy-only run: score every tool's *line* and *node* agreement with the human mapping
+    /// and write one row per fixture to a CSV, skipping all timing. Default path:
+    /// "./research/data/comparison/benchmark_accuracy.csv".
+    ///
+    /// The node columns are a "did you consider this node's text changed" projection, exactly
+    /// like the line columns one granularity down - NOT the node-to-node mapping fidelity
+    /// `benchmark_optimal_solutions` reports for codediff. External tools parse their own trees
+    /// and have no node identities in common with this codebase's, so no mapping-level question
+    /// can be asked of them. codediff is scored through the same projection here, which makes its
+    /// column comparable to the other tools' and deliberately *not* comparable to its own
+    /// optimal-solutions number. See `nodes_touched_by` in `test::helper::human_mapping`.
+    #[arg(long, value_name = "PATH", num_args = 0..=1)]
+    accuracy_csv: Option<Option<std::path::PathBuf>>,
 
     /// How many times to re-run every timing measurement (codediff, each `ExternalTool`,
     /// `treesitter_parse`, and - via `gumtree_warm_batch` - `gumtree_warm`) per fixture. Accuracy/
@@ -963,6 +978,16 @@ fn main() -> Result<()> {
         .collect();
     names.sort();
 
+    // Checked before any timing machinery below: an accuracy run does no timing at all, so it
+    // must not pay for the warm-JVM batch passes (`gumtree_warm_batch`, repeated `--repeats`
+    // times) that only exist to produce runtime numbers.
+    if let Some(path) = args.accuracy_csv {
+        let path = path.unwrap_or_else(|| {
+            std::path::PathBuf::from("./research/data/comparison/benchmark_accuracy.csv")
+        });
+        return run_accuracy(&names, &test_diffs, &path);
+    }
+
     let warm_fixtures: Vec<(&str, &Code, &Code)> = names
         .iter()
         .map(|name| {
@@ -1278,6 +1303,718 @@ fn join_ms(values: &[f64]) -> String {
         .join(";")
 }
 
+/// Maps a whole-file *character* offset onto the `(row, byte column)` space `TextRange` uses
+/// everywhere in this codebase (tree-sitter's own convention, passed through unchanged by
+/// `TextRange::from_treesitter_range`). GumTree reports node positions as character offsets into
+/// the file, so its spans need this before they can be compared against node extents; building
+/// the table once per file keeps the conversion linear rather than rescanning per span.
+fn char_offset_table(contents: &str) -> Vec<(usize, usize)> {
+    let mut table = Vec::with_capacity(contents.chars().count() + 1);
+    let (mut row, mut col) = (0usize, 0usize);
+    for ch in contents.chars() {
+        table.push((row, col));
+        if ch == '\n' {
+            row += 1;
+            col = 0;
+        } else {
+            col += ch.len_utf8();
+        }
+    }
+    table.push((row, col));
+    table
+}
+
+/// A `TextRange` for the half-open character range `[start, end)`, via `char_offset_table`.
+fn span_from_char_offsets(table: &[(usize, usize)], start: usize, end: usize) -> TextRange {
+    let at = |i: usize| -> (usize, usize) {
+        *table
+            .get(i)
+            .or_else(|| table.last())
+            .unwrap_or(&(0usize, 0usize))
+    };
+    let (start_row, start_column) = at(start);
+    let (end_row, end_column) = at(end);
+    TextRange {
+        start_row,
+        start_column,
+        end_row,
+        end_column,
+    }
+}
+
+/// A single-line `TextRange` covering byte columns `[start, end)` on `row` - the shape both
+/// difftastic (`changes[].start`/`.end`) and diffsitter (`start_position`/`end_position`) report
+/// their sub-line spans in.
+fn span_on_row(row: usize, start: usize, end: usize) -> TextRange {
+    TextRange {
+        start_row: row,
+        start_column: start,
+        end_row: row,
+        end_column: end.max(start),
+    }
+}
+
+/// The changed regions each AST-aware external tool reports, as `(before_spans, after_spans)` in
+/// the same space `human_mapping::node_extents` produces node extents in.
+///
+/// `None` for `UnixDiff` by construction, not by omission: a line-based tool reports whole lines
+/// with no sub-line structure at all, so projecting it onto nodes would mark every node on a
+/// changed line as changed. That isn't a worse node score, it's a different (and meaningless)
+/// question - which is why the CSV leaves Unix diff's node columns empty rather than filling in a
+/// number that would read as comparable.
+///
+/// Coordinate conventions, all three verified empirically (2026-08-19) against a fixture with a
+/// multi-byte character before the change, since a char/byte mix-up would silently shift every
+/// span past any non-ASCII text and is invisible on ASCII-only input:
+/// - difftastic's `changes[].start`/`.end` and diffsitter's `*_position.column` are **byte**
+///   columns within the line - the same convention `tree_sitter::Node`'s own positions (and
+///   therefore `node_extents`) use, so those two need no conversion at all.
+/// - GumTree's `[start,end]` are whole-file **character** offsets and do need converting; see
+///   `char_offset_table`.
+fn tool_node_spans(
+    tool: ExternalTool,
+    before: &Code,
+    after: &Code,
+) -> Option<Result<(Vec<TextRange>, Vec<TextRange>)>> {
+    match tool {
+        ExternalTool::UnixDiff => None,
+        ExternalTool::GumTree => Some(gumtree_node_spans(before, after)),
+        ExternalTool::Difftastic => Some(difftastic_node_spans(before, after)),
+        ExternalTool::Diffsitter => Some(diffsitter_node_spans(before, after)),
+    }
+}
+
+/// GumTree's changed spans, from the same `textdiff -f JSON` output `gumtree_line_labels` parses
+/// (see its doc comment for what `matches`/`actions` mean) - but keeping each action's real
+/// character range instead of collapsing it to the lines it touches.
+fn gumtree_node_spans(before: &Code, after: &Code) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let language = before.metadata.language.unwrap_or_default();
+    let (generator, ext) = gumtree_generator(language)
+        .with_context(|| format!("no GumTree generator for {language:?}"))?;
+    let gumtree = gumtree_bin()?;
+    let (before_file, after_file) = write_temp_pair(before, after, Some(&format!(".{ext}")))?;
+
+    let output = Command::new(&gumtree)
+        .args(["textdiff", "-g", generator, "-f", "JSON"])
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {gumtree:?} textdiff -g {generator}"))?;
+    if !output.status.success() {
+        bail!(
+            "gumtree exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing gumtree JSON output")?;
+
+    let matches = json["matches"]
+        .as_array()
+        .context("gumtree JSON has no `matches` array")?;
+    let actions = json["actions"]
+        .as_array()
+        .context("gumtree JSON has no `actions` array")?;
+    let src_to_dest: HashMap<&str, &str> = matches
+        .iter()
+        .filter_map(|m| Some((m["src"].as_str()?, m["dest"].as_str()?)))
+        .collect();
+
+    let before_table = char_offset_table(&before.contents);
+    let after_table = char_offset_table(&after.contents);
+    let mut before_spans = Vec::new();
+    let mut after_spans = Vec::new();
+
+    for action in actions {
+        let Some(action_type) = action["action"].as_str() else {
+            continue;
+        };
+        let Some(tree) = action["tree"].as_str() else {
+            continue;
+        };
+        let (start, end) = gumtree_node_offsets(tree)?;
+        // Same src/dest side rules as `gumtree_line_labels`: insert-* is dest-side, delete-* is
+        // src-side, and update/move name a src-side node whose dest counterpart has to be looked
+        // up in `matches`.
+        match action_type {
+            "insert-tree" | "insert-node" => {
+                after_spans.push(span_from_char_offsets(&after_table, start, end));
+            }
+            "delete-tree" | "delete-node" => {
+                before_spans.push(span_from_char_offsets(&before_table, start, end));
+            }
+            _ => {
+                before_spans.push(span_from_char_offsets(&before_table, start, end));
+                if let Some(dest) = src_to_dest.get(tree) {
+                    let (d_start, d_end) = gumtree_node_offsets(dest)?;
+                    after_spans.push(span_from_char_offsets(&after_table, d_start, d_end));
+                }
+            }
+        }
+    }
+    Ok((before_spans, after_spans))
+}
+
+/// difftastic's changed spans. Its `--display json` chunks carry, per side, a `line_number` plus a
+/// `changes` array of `{start, end}` column offsets into that line - the token-level highlighting
+/// it draws - so each `changes` entry becomes one single-line span. An entry with an empty
+/// `changes` array is a line difftastic reports as part of a chunk without marking any token on it
+/// (context within a changed region), and contributes no span.
+fn difftastic_node_spans(before: &Code, after: &Code) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let language = before.metadata.language.unwrap_or_default();
+    let ext = difftastic_extension(language)
+        .with_context(|| format!("no difftastic extension mapping for {language:?}"))?;
+    let difft = difftastic_bin()?;
+    let (before_file, after_file) = write_temp_pair(before, after, Some(&format!(".{ext}")))?;
+
+    let output = Command::new(&difft)
+        .args(["--display", "json"])
+        .env("DFT_UNSTABLE", "yes")
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {difft:?} --display json"))?;
+    if !output.status.success() {
+        bail!(
+            "difft exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing difft JSON output")?;
+
+    let mut before_spans = Vec::new();
+    let mut after_spans = Vec::new();
+    let Some(chunks) = json["chunks"].as_array() else {
+        return Ok((before_spans, after_spans));
+    };
+    for chunk in chunks {
+        let entries = chunk
+            .as_array()
+            .context("difft JSON chunk is not an array")?;
+        for entry in entries {
+            for (key, spans) in [("lhs", &mut before_spans), ("rhs", &mut after_spans)] {
+                let Some(side) = entry.get(key) else { continue };
+                let Some(line) = side["line_number"].as_u64() else {
+                    continue;
+                };
+                let Some(changes) = side["changes"].as_array() else {
+                    continue;
+                };
+                for change in changes {
+                    let (Some(start), Some(end)) =
+                        (change["start"].as_u64(), change["end"].as_u64())
+                    else {
+                        continue;
+                    };
+                    spans.push(span_on_row(line as usize, start as usize, end as usize));
+                }
+            }
+        }
+    }
+    Ok((before_spans, after_spans))
+}
+
+/// diffsitter's changed spans, from the same `-r json` output `diffsitter_line_labels` parses -
+/// but keeping each entry's `start_position`/`end_position` (row + column) instead of only its
+/// `line_index`. diffsitter emits one entry per *character*, so the spans come out extremely
+/// fine-grained; they're merged by `merge_spans` before scoring rather than tested one at a time.
+fn diffsitter_node_spans(before: &Code, after: &Code) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let language = before.metadata.language.unwrap_or_default();
+    let file_type = diffsitter_file_type(language)
+        .with_context(|| format!("no diffsitter file type mapping for {language:?}"))?;
+    let diffsitter = diffsitter_bin()?;
+    let (before_file, after_file) = write_temp_pair(before, after, None)?;
+
+    let output = Command::new(&diffsitter)
+        .args(["-n", "-r", "json", "-t", file_type])
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {diffsitter:?} -r json -t {file_type}"))?;
+    if !output.status.success() {
+        bail!(
+            "diffsitter exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("parsing diffsitter JSON output")?;
+
+    let mut before_spans = Vec::new();
+    let mut after_spans = Vec::new();
+    let hunks = json["hunks"]
+        .as_array()
+        .context("diffsitter JSON has no `hunks` array")?;
+    for hunk in hunks {
+        let hunk = hunk
+            .as_object()
+            .context("diffsitter JSON hunk is not an object")?;
+        for (side, spans) in [("Old", &mut before_spans), ("New", &mut after_spans)] {
+            let Some(lines) = hunk.get(side).and_then(|v| v.as_array()) else {
+                continue;
+            };
+            for line in lines {
+                let Some(entries) = line["entries"].as_array() else {
+                    continue;
+                };
+                for entry in entries {
+                    let (Some(start_row), Some(start_col), Some(end_row), Some(end_col)) = (
+                        entry["start_position"]["row"].as_u64(),
+                        entry["start_position"]["column"].as_u64(),
+                        entry["end_position"]["row"].as_u64(),
+                        entry["end_position"]["column"].as_u64(),
+                    ) else {
+                        continue;
+                    };
+                    spans.push(TextRange {
+                        start_row: start_row as usize,
+                        start_column: start_col as usize,
+                        end_row: end_row as usize,
+                        end_column: end_col as usize,
+                    });
+                }
+            }
+        }
+    }
+    Ok((merge_spans(before_spans), merge_spans(after_spans)))
+}
+
+/// Sorts and coalesces overlapping/adjacent spans. Purely a cost optimization - `nodes_touched_by`
+/// tests every node against every span, and diffsitter reports one span per character, so a
+/// 2,000-character edit would otherwise mean 2,000 comparisons per node. Merging preserves exactly
+/// which positions are covered, so it cannot change any score.
+fn merge_spans(mut spans: Vec<TextRange>) -> Vec<TextRange> {
+    if spans.is_empty() {
+        return spans;
+    }
+    spans.sort_by_key(|s| (s.start_row, s.start_column, s.end_row, s.end_column));
+    let mut merged: Vec<TextRange> = Vec::with_capacity(spans.len());
+    for span in spans {
+        match merged.last_mut() {
+            Some(last)
+                if (span.start_row, span.start_column) <= (last.end_row, last.end_column) =>
+            {
+                if (span.end_row, span.end_column) > (last.end_row, last.end_column) {
+                    last.end_row = span.end_row;
+                    last.end_column = span.end_column;
+                }
+            }
+            _ => merged.push(span),
+        }
+    }
+    merged
+}
+
+/// One fixture's accuracy row - see `Args::accuracy_csv` for what the node columns do and do not
+/// mean.
+struct AccuracyRow {
+    solution: String,
+    /// Provenance from `src/test/data/sample.csv`, keyed by its `promoted_to` column. Empty for
+    /// the handmade fixtures that were never promoted from a sample (60 of 432 as of 2026-08-19) -
+    /// they're real corpus members, so they get a row with blank provenance rather than being
+    /// dropped.
+    language: String,
+    repository: String,
+    commit: String,
+    path: String,
+    total_lines: usize,
+    total_nodes: usize,
+    total_leaf_nodes: usize,
+    /// Per tool (plus codediff itself), in `ExternalTool::ALL` order with codediff first.
+    scores: Vec<ToolScore>,
+}
+
+/// One tool's agreement with the human mapping on one fixture. `line_mismatches` and the node
+/// counts are `None` for different reasons - see `status`.
+struct ToolScore {
+    name: &'static str,
+    line_mismatches: Option<usize>,
+    node_mismatches: Option<usize>,
+    leaf_node_mismatches: Option<usize>,
+    /// `ok`, `unsupported` (the tool has no parser/generator for this language - not a failure,
+    /// and deliberately not scored as 0, which would read as a perfect result), `error` (the tool
+    /// was supposed to handle this language and didn't), or `line_only` (Unix diff, which has no
+    /// node-level output at all by construction).
+    status: &'static str,
+}
+
+/// Reads `src/test/data/sample.csv` into `promoted_to -> (language, repository, commit, path)`,
+/// the provenance join `AccuracyRow` carries so a row can be traced back to the real-world commit
+/// it was sampled from.
+fn sample_provenance() -> Result<HashMap<String, (String, String, String, String)>> {
+    let path = std::path::Path::new("src/test/data/sample.csv");
+    let mut out = HashMap::new();
+    if !path.exists() {
+        return Ok(out);
+    }
+    let mut reader = csv::Reader::from_path(path)
+        .with_context(|| format!("reading sample provenance from {path:?}"))?;
+    for record in reader.deserialize::<HashMap<String, String>>() {
+        let record = record.context("parsing a sample.csv row")?;
+        let Some(promoted) = record.get("promoted_to") else {
+            continue;
+        };
+        if promoted.is_empty() {
+            continue;
+        }
+        let field = |key: &str| record.get(key).cloned().unwrap_or_default();
+        out.insert(
+            promoted.clone(),
+            (
+                field("language"),
+                field("repository"),
+                field("commit"),
+                field("path"),
+            ),
+        );
+    }
+    Ok(out)
+}
+
+/// Scores every tool's line- and node-level agreement with the human mapping for one fixture.
+///
+/// Ground truth for both granularities comes from the same synthetic `ASTDiff`
+/// (`human_mapping::as_ast_diff`) the line-level benchmark already uses, so the two granularities
+/// are two views of one ground truth rather than two independently-derived ones.
+fn score_accuracy(
+    name: &str,
+    before: &Code,
+    after: &Code,
+    provenance: &HashMap<String, (String, String, String, String)>,
+) -> Result<AccuracyRow> {
+    let node_cache = codediff::diff::NodeCache::build(before, after);
+    let truth_ast = human_mapping::as_ast_diff(name, before, after)?;
+
+    let (truth_before_lines, truth_after_lines) =
+        human_mapping::touched_lines(before, after, &truth_ast, &node_cache);
+    let (truth_before_spans, truth_after_spans) =
+        human_mapping::changed_spans(before, after, &truth_ast, &node_cache);
+
+    let before_extents = human_mapping::node_extents(before);
+    let after_extents = human_mapping::node_extents(after);
+    let truth_before_nodes = human_mapping::nodes_touched_by(&before_extents, &truth_before_spans);
+    let truth_after_nodes = human_mapping::nodes_touched_by(&after_extents, &truth_after_spans);
+
+    // Leaf-only views of the same labelings: the all-nodes count includes every ancestor of a
+    // change (see `nodes_touched_by`), so a leaves-only count is reported alongside it to
+    // separate "which tokens changed" from "how deep is this grammar's tree".
+    let leaf_filter = |labels: &[bool], extents: &[human_mapping::NodeExtent]| -> Vec<bool> {
+        labels
+            .iter()
+            .zip(extents)
+            .filter(|(_, extent)| extent.is_leaf)
+            .map(|(touched, _)| *touched)
+            .collect()
+    };
+    let truth_before_leaves = leaf_filter(&truth_before_nodes, &before_extents);
+    let truth_after_leaves = leaf_filter(&truth_after_nodes, &after_extents);
+
+    let disagreement = human_mapping::line_disagreement_count;
+    let mut scores = Vec::with_capacity(ExternalTool::ALL.len() + 1);
+
+    // codediff itself, scored through the identical projection so its columns sit on the same
+    // scale as the external tools' (and, deliberately, not on the same scale as its own
+    // `benchmark_optimal_solutions` node-mismatch number).
+    {
+        let diff = codediff::diff::diff_code(before, after);
+        let ast = diff.ast.as_ref().context("codediff produced no AST")?;
+        let (cd_before_lines, cd_after_lines) =
+            human_mapping::touched_lines(before, after, ast, &node_cache);
+        let (cd_before_spans, cd_after_spans) =
+            human_mapping::changed_spans(before, after, ast, &node_cache);
+        let cd_before_nodes = human_mapping::nodes_touched_by(&before_extents, &cd_before_spans);
+        let cd_after_nodes = human_mapping::nodes_touched_by(&after_extents, &cd_after_spans);
+        scores.push(ToolScore {
+            name: "codediff",
+            line_mismatches: Some(
+                disagreement(&truth_before_lines, &cd_before_lines)
+                    + disagreement(&truth_after_lines, &cd_after_lines),
+            ),
+            node_mismatches: Some(
+                disagreement(&truth_before_nodes, &cd_before_nodes)
+                    + disagreement(&truth_after_nodes, &cd_after_nodes),
+            ),
+            leaf_node_mismatches: Some(
+                disagreement(
+                    &truth_before_leaves,
+                    &leaf_filter(&cd_before_nodes, &before_extents),
+                ) + disagreement(
+                    &truth_after_leaves,
+                    &leaf_filter(&cd_after_nodes, &after_extents),
+                ),
+            ),
+            status: "ok",
+        });
+    }
+
+    let language = before.metadata.language.unwrap_or_default();
+    for &tool in ExternalTool::ALL {
+        if !tool.supports(language) {
+            scores.push(ToolScore {
+                name: tool.name(),
+                line_mismatches: None,
+                node_mismatches: None,
+                leaf_node_mismatches: None,
+                status: "unsupported",
+            });
+            continue;
+        }
+        let line_mismatches = match tool.line_labels(before, after) {
+            Ok((tool_before, tool_after)) => Some(
+                disagreement(&truth_before_lines, &tool_before)
+                    + disagreement(&truth_after_lines, &tool_after),
+            ),
+            Err(err) => {
+                eprintln!("  {name}: {} line scoring failed: {err:#}", tool.name());
+                None
+            }
+        };
+        let node_result = tool_node_spans(tool, before, after);
+        let (node_mismatches, leaf_node_mismatches, status) = match node_result {
+            // Unix diff: no sub-line output exists to project onto nodes at all.
+            None => (None, None, "line_only"),
+            Some(Ok((tool_before_spans, tool_after_spans))) => {
+                let tb = human_mapping::nodes_touched_by(&before_extents, &tool_before_spans);
+                let ta = human_mapping::nodes_touched_by(&after_extents, &tool_after_spans);
+                (
+                    Some(
+                        disagreement(&truth_before_nodes, &tb)
+                            + disagreement(&truth_after_nodes, &ta),
+                    ),
+                    Some(
+                        disagreement(&truth_before_leaves, &leaf_filter(&tb, &before_extents))
+                            + disagreement(&truth_after_leaves, &leaf_filter(&ta, &after_extents)),
+                    ),
+                    if line_mismatches.is_some() {
+                        "ok"
+                    } else {
+                        "error"
+                    },
+                )
+            }
+            Some(Err(err)) => {
+                eprintln!("  {name}: {} node scoring failed: {err:#}", tool.name());
+                (None, None, "error")
+            }
+        };
+        scores.push(ToolScore {
+            name: tool.name(),
+            line_mismatches,
+            node_mismatches,
+            leaf_node_mismatches,
+            status,
+        });
+    }
+
+    let (language_name, repository, commit, path) = provenance
+        .get(name)
+        .cloned()
+        .unwrap_or_else(|| (String::new(), String::new(), String::new(), String::new()));
+
+    Ok(AccuracyRow {
+        solution: name.to_string(),
+        language: if language_name.is_empty() {
+            format!("{language:?}")
+        } else {
+            language_name
+        },
+        repository,
+        commit,
+        path,
+        total_lines: before.contents.split('\n').count() + after.contents.split('\n').count(),
+        total_nodes: before_extents.len() + after_extents.len(),
+        total_leaf_nodes: before_extents.iter().filter(|e| e.is_leaf).count()
+            + after_extents.iter().filter(|e| e.is_leaf).count(),
+        scores,
+    })
+}
+
+/// Writes the accuracy CSV: one row per fixture, one line/node/leaf-node mismatch column per tool
+/// plus a status column, with `sample.csv` provenance for cross-referencing.
+fn write_accuracy_csv(rows: &[AccuracyRow], path: &std::path::Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {parent:?} for the accuracy CSV"))?;
+    }
+    let mut writer = Writer::from_path(path)
+        .with_context(|| format!("creating accuracy CSV at {path:?}"))?;
+
+    let mut header = vec![
+        "solution".to_string(),
+        "language".to_string(),
+        "repository".to_string(),
+        "commit".to_string(),
+        "path".to_string(),
+        "total_lines".to_string(),
+        "total_nodes".to_string(),
+        "total_leaf_nodes".to_string(),
+    ];
+    let tool_names: Vec<&str> = rows
+        .first()
+        .map(|row| row.scores.iter().map(|s| s.name).collect())
+        .unwrap_or_default();
+    for name in &tool_names {
+        header.push(format!("{name}_line_mismatches"));
+        header.push(format!("{name}_node_mismatches"));
+        header.push(format!("{name}_leaf_node_mismatches"));
+        header.push(format!("{name}_status"));
+    }
+    writer.write_record(&header)?;
+
+    for row in rows {
+        let mut record = vec![
+            row.solution.clone(),
+            row.language.clone(),
+            row.repository.clone(),
+            row.commit.clone(),
+            row.path.clone(),
+            row.total_lines.to_string(),
+            row.total_nodes.to_string(),
+            row.total_leaf_nodes.to_string(),
+        ];
+        let cell = |value: Option<usize>| value.map(|v| v.to_string()).unwrap_or_default();
+        for score in &row.scores {
+            record.push(cell(score.line_mismatches));
+            record.push(cell(score.node_mismatches));
+            record.push(cell(score.leaf_node_mismatches));
+            record.push(score.status.to_string());
+        }
+        writer.write_record(&record)?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// `--accuracy-csv`'s whole run: score every fixture with a human mapping, print a compact
+/// per-tool summary, and write the CSV. No timing at all - accuracy is deterministic, so there is
+/// nothing to repeat.
+fn run_accuracy(
+    names: &[String],
+    test_diffs: &HashMap<String, (Code, Code)>,
+    path: &std::path::Path,
+) -> Result<()> {
+    let provenance = sample_provenance()?;
+    let mut rows = Vec::with_capacity(names.len());
+    for (index, name) in names.iter().enumerate() {
+        if index % 25 == 0 {
+            eprintln!("accuracy: {}/{}...", index, names.len());
+        }
+        let (before, after) = test_diffs
+            .get(name)
+            .expect("name came from test_diffs.keys()");
+        match score_accuracy(name, before, after, &provenance) {
+            Ok(row) => rows.push(row),
+            Err(err) => eprintln!("  {name}: skipped ({err:#})"),
+        }
+    }
+
+    let tool_names: Vec<&str> = rows
+        .first()
+        .map(|row| row.scores.iter().map(|s| s.name).collect())
+        .unwrap_or_default();
+
+    // Coverage first, because it is what makes the raw totals below un-comparable: each tool
+    // scores only the fixtures its own parser supports (GumTree covers well under half the
+    // corpus), so a tool that skipped the hard half would otherwise look best simply for having
+    // attempted less.
+    println!(
+        "\n{:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12}",
+        "tool", "ok", "err", "unsupported", "line mm", "node mm", "leaf mm"
+    );
+    for (i, name) in tool_names.iter().enumerate() {
+        let scores: Vec<&ToolScore> = rows.iter().filter_map(|row| row.scores.get(i)).collect();
+        let count = |status: &str| scores.iter().filter(|s| s.status == status).count();
+        let sum = |f: fn(&ToolScore) -> Option<usize>| -> usize {
+            scores.iter().filter_map(|s| f(s)).sum()
+        };
+        let has_nodes = scores.iter().any(|s| s.node_mismatches.is_some());
+        let cell = |v: usize| {
+            if has_nodes {
+                v.to_string()
+            } else {
+                "-".to_string()
+            }
+        };
+        println!(
+            "{name:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12}",
+            count("ok") + count("line_only"),
+            count("error"),
+            count("unsupported"),
+            sum(|s| s.line_mismatches),
+            cell(sum(|s| s.node_mismatches)),
+            cell(sum(|s| s.leaf_node_mismatches)),
+        );
+    }
+
+    // The only apples-to-apples table: the fixtures every tool actually scored. Rates, not raw
+    // counts, since the subset's own denominators are what make them readable.
+    let common: Vec<&AccuracyRow> = rows
+        .iter()
+        .filter(|row| {
+            row.scores
+                .iter()
+                .all(|s| s.status == "ok" || s.status == "line_only")
+        })
+        .collect();
+    let total_lines: usize = common.iter().map(|r| r.total_lines).sum();
+    let total_nodes: usize = common.iter().map(|r| r.total_nodes).sum();
+    let total_leaves: usize = common.iter().map(|r| r.total_leaf_nodes).sum();
+    println!(
+        "\nCommon subset - the {} of {} fixtures every tool scored ({total_lines} lines, \
+         {total_nodes} nodes, {total_leaves} leaf nodes):",
+        common.len(),
+        rows.len()
+    );
+    println!(
+        "{:<14} {:>10} {:>8} {:>12} {:>8} {:>12} {:>8}",
+        "tool", "line mm", "rate", "node mm", "rate", "leaf mm", "rate"
+    );
+    let rate = |value: usize, total: usize| {
+        if total == 0 {
+            0.0
+        } else {
+            100.0 * value as f64 / total as f64
+        }
+    };
+    for (i, name) in tool_names.iter().enumerate() {
+        let scores: Vec<&ToolScore> = common.iter().filter_map(|row| row.scores.get(i)).collect();
+        let sum = |f: fn(&ToolScore) -> Option<usize>| -> usize {
+            scores.iter().filter_map(|s| f(s)).sum()
+        };
+        let (lines, nodes, leaves) = (
+            sum(|s| s.line_mismatches),
+            sum(|s| s.node_mismatches),
+            sum(|s| s.leaf_node_mismatches),
+        );
+        let has_nodes = scores.iter().any(|s| s.node_mismatches.is_some());
+        if has_nodes {
+            println!(
+                "{name:<14} {lines:>10} {:>7.2}% {nodes:>12} {:>7.2}% {leaves:>12} {:>7.2}%",
+                rate(lines, total_lines),
+                rate(nodes, total_nodes),
+                rate(leaves, total_leaves),
+            );
+        } else {
+            println!(
+                "{name:<14} {lines:>10} {:>7.2}% {:>12} {:>8} {:>12} {:>8}",
+                rate(lines, total_lines),
+                "-",
+                "-",
+                "-",
+                "-",
+            );
+        }
+    }
+
+    write_accuracy_csv(&rows, path)?;
+    println!("\nWrote {}", path.display());
+    Ok(())
+}
+
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let file = File::create(path)?;
     let mut wtr = Writer::from_writer(file);
@@ -1393,5 +2130,60 @@ mod tests {
         // convention) must not panic or index out of bounds.
         let total_chars = contents.chars().count();
         assert_eq!(gumtree_line_range(contents, 6, total_chars), 1..=1);
+    }
+
+    /// GumTree reports character offsets; node extents live in tree-sitter's row/*byte*-column
+    /// space. The table has to bridge exactly that, including past a multi-byte character.
+    #[test]
+    fn char_offset_table_maps_char_offsets_to_rows_and_byte_columns() {
+        let table = char_offset_table("ab\ncd");
+        assert_eq!(table[0], (0, 0));
+        assert_eq!(table[1], (0, 1));
+        assert_eq!(table[2], (0, 2)); // the '\n' itself
+        assert_eq!(table[3], (1, 0));
+        assert_eq!(table[4], (1, 1));
+        assert_eq!(table[5], (1, 2), "one-past-the-end entry");
+
+        // 'é' is one character but two bytes, so the column after it advances by 2.
+        let table = char_offset_table("é x");
+        assert_eq!(table[0], (0, 0));
+        assert_eq!(table[1], (0, 2), "column is a byte offset, not a char index");
+        assert_eq!(table[2], (0, 3));
+    }
+
+    #[test]
+    fn span_from_char_offsets_clamps_past_the_end_instead_of_panicking() {
+        let table = char_offset_table("ab");
+        let span = span_from_char_offsets(&table, 0, 99);
+        assert_eq!((span.start_row, span.start_column), (0, 0));
+        assert_eq!((span.end_row, span.end_column), (0, 2));
+    }
+
+    /// `merge_spans` is a pure cost optimization (diffsitter emits one span per character), so it
+    /// must coalesce overlapping and adjacent spans without ever changing which positions are
+    /// covered - and must leave a genuine gap alone.
+    #[test]
+    fn merge_spans_coalesces_adjacent_and_overlapping_spans_but_keeps_gaps() {
+        let merged = merge_spans(vec![
+            span_on_row(0, 4, 5),
+            span_on_row(0, 0, 2),
+            span_on_row(0, 2, 4), // adjacent to the first, overlaps nothing
+            span_on_row(1, 0, 3),
+            span_on_row(1, 1, 9), // overlaps the previous
+        ]);
+        let as_tuples: Vec<_> = merged
+            .iter()
+            .map(|s| (s.start_row, s.start_column, s.end_row, s.end_column))
+            .collect();
+        assert_eq!(as_tuples, vec![(0, 0, 0, 5), (1, 0, 1, 9)]);
+
+        // A real gap must survive: columns 0-1 and 5-6 are not one span.
+        let merged = merge_spans(vec![span_on_row(0, 0, 1), span_on_row(0, 5, 6)]);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_spans_handles_the_empty_case() {
+        assert!(merge_spans(Vec::new()).is_empty());
     }
 }

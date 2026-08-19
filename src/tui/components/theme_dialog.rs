@@ -53,13 +53,16 @@ impl ThemeDialog {
 impl Component for ThemeDialog {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         match key.code {
+            // Moving the selection previews the highlighted theme on the live viewer behind the
+            // dialog (`Action::ThemePreviewed`) - picking between eight palettes by
+            // Enter/reopen/Enter was the alternative. Esc reverts, Enter persists.
             KeyCode::Up => {
                 move_selection(&mut self.selected, -1, self.themes.len());
-                Ok(Some(Action::Render))
+                Ok(Some(Action::ThemePreviewed(self.themes[self.selected])))
             }
             KeyCode::Down => {
                 move_selection(&mut self.selected, 1, self.themes.len());
-                Ok(Some(Action::Render))
+                Ok(Some(Action::ThemePreviewed(self.themes[self.selected])))
             }
             KeyCode::Enter => Ok(Some(Action::ThemeSelected(self.themes[self.selected]))),
             KeyCode::Esc => Ok(Some(Action::DialogCancelled)),
@@ -127,8 +130,21 @@ mod tests {
     fn up_does_not_run_before_the_first_theme() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dark);
         let action = dialog.handle_key_event(key(KeyCode::Up)).unwrap();
-        assert_eq!(action, Some(Action::Render));
+        assert_eq!(action, Some(Action::ThemePreviewed(OverlayTheme::Dark)));
         assert_eq!(dialog.selected, 0);
+    }
+
+    /// Moving the selection must preview the newly highlighted theme, so the viewer behind the
+    /// dialog updates live instead of requiring Enter/reopen/Enter to compare palettes.
+    #[test]
+    fn moving_the_selection_previews_the_highlighted_theme() {
+        let mut dialog = ThemeDialog::new(OverlayTheme::Dark);
+        let action = dialog.handle_key_event(key(KeyCode::Down)).unwrap();
+        assert_eq!(
+            action,
+            Some(Action::ThemePreviewed(dialog.themes[dialog.selected]))
+        );
+        assert_ne!(dialog.themes[dialog.selected], OverlayTheme::Dark);
     }
 
     #[test]

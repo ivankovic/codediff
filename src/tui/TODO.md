@@ -184,6 +184,10 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   comment, etc.).
 - **Complexity:** Low-Medium.
 
+- **Status:** IMPLEMENTED (2026-08-19). `g` opens `components/line_prompt.rs` (digits-only
+  input, Enter jumps 1-indexed and centers, Esc/empty cancels); `Action::JumpToLineSubmitted`,
+  `DiffViewer::jump_to_line`.
+
 ## Phase 4: Syntax-highlighting toggle keybinding
 
 - **Problem:** The widget layer (`widgets/code_viewer.rs`) already supports toggling syntax
@@ -202,6 +206,10 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   but it's not why a user would see *no* highlighting at all. That turned out to be a different,
   now-fixed bug: see "Syntax highlighting silently missing for several common languages" above.
 
+- **Status:** IMPLEMENTED (2026-08-19). `S` toggles both panels at once
+  (`DiffViewer::toggle_syntax_highlighting`, component-layer wrappers re-added in
+  `components/code_viewer.rs`); documented in `help_modal.rs`.
+
 ## Phase 5: Change overview / minimap
 
 - **Problem:** On a large file, there's no way to see *where* all the changes are at a glance -
@@ -212,6 +220,11 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   colors).
 - **Impact:** Meaningfully faster orientation on large diffs; the most visually involved item here.
 - **Complexity:** Medium-High.
+
+- **Status:** IMPLEMENTED (2026-08-19). One-column strip at each panel's right edge
+  (`carve_minimap`/`render_minimap` in `diff_viewer.rs`, bands from
+  `CodeViewer::change_bands`), painted in the active theme's own operation colors;
+  delete > insert > update > move priority when a band holds several kinds.
 
 ## Phase 6: Mouse scroll support
 
@@ -225,3 +238,300 @@ nothing is shown at all (`app.rs`'s `status_bar_paragraph`/`DiffSummary`).
   nothing at all.
 - **Complexity:** Low-Medium (mostly about picking which panel a mouse event over a given
   column/row belongs to).
+
+- **Status:** IMPLEMENTED (2026-08-19), including the extensions from the 2026-08-19 pass:
+  capture on by default (`ui.mouse = true` in `App::run`), wheel scrolls the panel under the
+  pointer 3 lines a notch, left click focuses that panel and places the cursor on the clicked
+  character (`DiffViewer::handle_mouse_event`, hit-testing via content rects recorded in
+  `draw`).
+
+## 2026-08-19 usability/QoL pass
+
+A second audit, grounded in the current code (`app.rs`, `diff_viewer.rs`, `widgets/code_viewer.rs`,
+`headless.rs`, the dialogs) plus smoke tests against the built binary. Phases 3 (jump-to-line),
+4 (syntax-highlight toggle key), 5 (minimap), and 6 (mouse scroll) above are still open and still
+worth doing; nothing below duplicates them. Ordered by priority.
+
+### Pure sibling-reorder diffs report literally nothing (likely a bug, investigate first)
+- **Problem:** Two files that differ only by reordering two top-level functions render in headless
+  mode as `... 9 unchanged lines ...` on both sides - no moved-chunk box, no `~` markers, and no
+  `DiffSummary` line either. The bytes differ, yet the output is indistinguishable from a
+  whitespace-only formatting pass being absent entirely. `DiffSummary::RefactorMovedOnly` exists
+  precisely for this shape but does not fire - plausibly because the commutative-container work
+  made reorders cost-neutral *matches* rather than `Move` operations, and both the summary
+  classifier and the box renderer key off `TextOperation::Move`. Reproduce: two single-function
+  swaps, `codediff b2.rs a2.rs` (verified 2026-08-19).
+- **Solution:** First decide the intended semantics: if a commutative reorder is deliberately "no
+  semantic change," the summary should still say so explicitly ("Declarations reordered only"),
+  not stay silent; if reorders should render as moves, the range assembly needs to emit `Move` for
+  crossing matches again. Either way, silence is the one wrong answer.
+- **Files:** `diff/text.rs` (`summarize_diff_with_comment_check` / operation assignment),
+  `headless.rs` only if the box path is involved.
+- **Impact:** Trust: a diff tool whose output says "unchanged" for changed files undermines every
+  other number it prints.
+- **Complexity:** Low once the intended semantics are decided; the investigation is the work.
+
+- **Status:** IMPLEMENTED (2026-08-19). Root cause confirmed: `ranges`'s `Identical` arm only
+  produced `Move` on a *column* shift, so row-only relocations rendered as unchanged. Fix: the
+  `crossed_backwards` check - a multi-row matched node whose destination starts before the
+  last sequential anchor is a `Move` (sub-line tokens are exempt, so imperfect leaf matches
+  can't paint noise). A pure reorder now renders the moved-chunk box on both sides and
+  `RefactorMovedOnly` fires. Known remaining quiet case, deliberate: a reorder whose blocks
+  also contain edits decomposes into single-row/sub-line matches that the multi-row guard
+  exempts - the edits themselves still render, only the relocation stays unmarked.
+
+### Line numbers (TUI gutter + headless output)
+- **Problem:** No line numbers anywhere. The TUI panels have no gutter (`widgets/code_viewer.rs`
+  renders content flush; only the footer's `Ln X, Col Y` names the cursor line). Worse, headless
+  output *references* line numbers it never prints: the moved-chunk header says `Moved to lines
+  40-60` and the `@` landmark prefixes a hunk with the enclosing declaration, but a reader has no
+  way to locate line 40 in an output stream with no numbers - the cross-reference is currently
+  unresolvable by eye.
+- **Solution:** A dimmed right-aligned line-number gutter in `CodeViewerWidget::render` (sliced
+  with the viewport; width from total line count) and a matching per-line number prefix on kept
+  lines in `headless.rs`'s `render_side`. Both on by default; elision markers then also become
+  self-locating.
+- **Files:** `widgets/code_viewer.rs` (`render`), `headless.rs` (`render_side`, tests),
+  `json_output.rs` untouched (already carries row indices).
+- **Impact:** Makes the moved-chunk headers actually followable and matches baseline pager/editor
+  expectations; also the prerequisite for jump-to-line (Phase 3) to feel useful.
+- **Complexity:** Medium (marker column layout in headless shifts every existing rendering test).
+
+- **Status:** IMPLEMENTED (2026-08-19). Dimmed right-aligned gutter in
+  `CodeViewerWidget::render` (width from line count, absent on an empty panel); headless
+  prefixes every kept line and the `@` breadcrumb with its 1-indexed number.
+
+### Reload / re-diff key (`r`)
+- **Problem:** The natural workflow - see the diff, fix the code in an editor, check again -
+  requires quitting and relaunching, or re-picking both files through `o`. `App::before_path`/
+  `after_path` already remember everything needed.
+- **Solution:** `r` in `Viewer` re-reads both paths and re-runs `start_diff`, preserving the
+  cursor/scroll position where the row still exists. Document in `help_modal.rs` + footer.
+- **Files:** `app.rs` (key dispatch, `start_diff` re-entry), `help_modal.rs`.
+- **Impact:** Turns the TUI from a one-shot viewer into something usable inside an edit loop;
+  probably the highest value-per-line-of-code item here.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). `r` re-diffs the remembered pair; the cursor is
+  restored (clamped) after `DiffReady` via `App::restore_after_reload`.
+
+### Horizontal scrolling for long lines
+- **Problem:** There is no `scroll_col` anywhere: the viewport never scrolls horizontally, long
+  lines are hard-truncated at the panel width, and `l`/Right happily moves the cursor past the
+  right edge - the cursor (and the range under it) just leaves the visible area with no indicator
+  that content is cut off.
+- **Solution:** Track a horizontal scroll offset in `CodeViewerState`, keep the cursor column in
+  view the same way `sync_scroll` keeps the row in view, and render a truncation indicator (`…`)
+  at a cut edge. Slicing the cached styled lines by column span is the fiddly part (styled spans,
+  not raw chars).
+- **Files:** `widgets/code_viewer.rs` (state + render), `components/diff_viewer.rs` (`sync_scroll`).
+- **Impact:** Long-line files (generated code, minified JS/CSS, long string literals) are currently
+  partially unviewable; this class of file is common in the corpus.
+- **Complexity:** Medium.
+
+- **Status:** IMPLEMENTED (2026-08-19). `CodeViewerState::scroll_col`/`viewport_width`,
+  cursor-following via `scroll_to_show_col`, styled-span slicing with dimmed `…` truncation
+  markers (`slice_columns`).
+
+### Exit-code convention for non-interactive modes
+- **Problem:** `codediff a b` exits 0 whether the files are identical or different (verified
+  2026-08-19). Every scripted caller coming from `diff`/`git diff` expects 0 = same, 1 = differs,
+  2 = trouble; today the only way to detect "no changes" is parsing the output text or JSON.
+- **Solution:** Adopt the `diff` convention in headless and JSON modes (interactive TUI stays 0).
+  Decide explicitly what a semantically-neutral-but-textually-different file pair (reorder,
+  whitespace-only) returns - the `DiffSummary` classification is the natural source; consider `0`
+  only for byte-identical, and document it in `--help`.
+- **Files:** `main.rs`, `headless.rs`/`json_output.rs` (return the classification outward).
+- **Impact:** Makes `codediff` usable in scripts/CI conditionals at all.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). 0 = byte-identical, 1 = differs, 2 = error for
+  headless/JSON `BEFORE AFTER` invocations; the 7-argument `GIT_EXTERNAL_DIFF` form always
+  exits 0 on success (git treats non-zero as fatal, verified against difftastic's documented
+  handling of the same constraint). Documented in `--help`'s after-help.
+
+### Cancel an in-flight diff without quitting
+- **Problem:** During `AppScreen::Diffing`, `Esc` quits the whole app (`esc_should_quit`), and
+  there is no way to abandon a slow diff and return to the viewer - on a pathological pair the
+  only options are waiting or losing the session.
+- **Solution:** `Esc` during `Diffing` returns to `Viewer` and marks the pending computation stale
+  (generation counter checked when `DiffReady` arrives - the `spawn_blocking` task itself can't be
+  killed, but its result can be discarded), keeping whatever diff was previously loaded.
+- **Files:** `app.rs` (`start_diff`, `DiffReady` handling, `esc_should_quit`).
+- **Impact:** Removes the worst-case interaction (losing the session to a slow diff).
+- **Complexity:** Low-Medium.
+
+- **Status:** IMPLEMENTED (2026-08-19). Esc during `Diffing` bumps `App::diff_generation` and
+  returns to the viewer; the stale `DiffComputed` result is dropped on arrival. Esc no longer
+  quits from that screen at all.
+
+### Rethink the blocking Fast/Exact modal
+- **Problem:** When `PendingDiff::looks_expensive()` trips, the user is stopped by a modal choice
+  *before seeing anything*, and must decide fast-vs-exact blind. Post-pipeline-rework, fast mode's
+  quality is far closer to exact and its latency is low; the modal's cost/benefit has shifted since
+  it was designed.
+- **Solution:** Always compute fast immediately and render it (footer already shows `[fast]`);
+  offer a keybinding (e.g. `x`) that re-runs exact in the background and swaps the result in when
+  ready. Removes the modal entirely; `--exact` stays for batch. Fold into the pending pipeline
+  Phase 5 cleanup, which already owns the `DiffMode` surface question.
+- **Files:** `app.rs` (`compute_diff_interactive`, `SelectDiffMode` screen removal),
+  `components/diff_mode_dialog.rs` (deleted), `help_modal.rs`.
+- **Impact:** One less interruption, and the choice becomes informed (you're looking at the fast
+  result while deciding whether exact is worth it).
+- **Complexity:** Medium.
+
+- **Status:** IMPLEMENTED (2026-08-19), with a different second half than planned: the modal,
+  `SelectDiffMode` screen, and `diff_mode_dialog.rs` are gone and every diff computes
+  immediately - but the planned `x` re-run-exact key was *not* added, because investigation
+  showed `PendingDiff::finish` has ignored `DiffMode` entirely since the phases-4-7
+  rearchitecture (see its phase-6 comment): there is no exact path for `x` to select, and
+  shipping a key that recomputes an identical result would be a placebo. The footer's
+  `[fast]`/`[exact]` labels are removed for the same reason (`[plain text]` stays - that
+  distinction is real), `--exact` is documented as a deprecated no-op, and headless mode's
+  large-residual note no longer claims `--exact` would change the result. `DiffMode`'s
+  removal belongs to the pipeline's own pending Phase 5 cleanup.
+
+### Jump to counterpart (`Enter`)
+- **Problem:** The cross-highlight shows where the range under the cursor went on the other panel,
+  but there's no way to *go* there - for a long-distance move you can see the blue block scroll by
+  on the other side but must manually Tab over and navigate to it.
+- **Solution:** `Enter` on a range with a `destination` switches the active panel and places the
+  cursor at the destination's start (the data is already computed for the cross-highlight).
+  Pressing it again jumps back - free round-trip navigation for moves.
+- **Files:** `components/diff_viewer.rs` (new action on the existing `sync_cross_highlight` data),
+  `help_modal.rs`.
+- **Impact:** Makes move-heavy diffs (the tool's differentiating feature) navigable, not just
+  visible.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). `DiffViewer::jump_to_counterpart`; pressing Enter
+  again jumps back.
+
+### Search QoL bundle
+- **Problem:** Search (`/`) works but is bare: no feedback until Enter (the modal shows no live
+  match count), no way to repeat the last search after clearing it, matches share the same blue as
+  the cursor cross-highlight (the deliberate deferral recorded in Phase 2 above - while a search is
+  active, "search hit" and "counterpart of cursor" are visually identical), and matching is always
+  case-insensitive with no smart-case.
+- **Solution, in value order:** (1) live match count in the modal while typing (`12 matches`,
+  reusing `find_matches` incrementally); (2) remember the last query - `/` `Enter` repeats it;
+  (3) a dedicated search highlight color across the 8 `OverlayPalette`s + their distinctness
+  tests; (4) smart-case (case-sensitive iff the query contains an uppercase char).
+- **Files:** `components/search_modal.rs`, `widgets/code_viewer.rs`, `theme.rs` (item 3).
+- **Impact:** Each small; together they make search feel finished rather than minimal.
+- **Complexity:** Low each; item 3 is the widest (all themes + tests).
+
+- **Status:** IMPLEMENTED (2026-08-19), all four: live match count in the modal title (via
+  `Action::SearchQueryChanged` + highlight preview without cursor movement), bare-Enter
+  repeats the last query (hint line advertises it), a dedicated `search_bg` orange across all
+  8 palettes (+ distinctness test), and smart-case matching.
+
+### Scroll-without-cursor keys
+- **Problem:** Every navigation key moves the cursor; the only large motions are PageUp/Down and
+  Home/End. Vim muscle memory expects `Ctrl-d`/`Ctrl-u` (half page, cursor follows) and
+  `Ctrl-e`/`Ctrl-y` (scroll view one line, cursor stays) - none are bound.
+- **Solution:** Bind all four in `diff_viewer.rs`'s key handler; half-page is PageUp/Down's logic
+  with `height/2`, view-scroll needs a small "scroll offset without cursor sync" path.
+- **Files:** `components/diff_viewer.rs`, `widgets/code_viewer.rs`, `help_modal.rs`.
+- **Impact:** Comfort feature for the vim-keyed audience this TUI already targets with `hjkl`.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). Ctrl-d/Ctrl-u half-page cursor moves, Ctrl-e/Ctrl-y
+  view-only scrolling (both panels in dual mode, matching PageUp/PageDown's convention).
+
+### Dynamic color legend + theme-dialog live preview
+- **Problem:** Two sides of one gap. `help_modal.rs` deliberately omits a color legend because the
+  colors are theme-dependent - but that's exactly why a *static* legend was wrong, not why no
+  legend should exist. And `theme_dialog.rs` applies a theme only on Enter: choosing between 8
+  palettes means Enter/reopen/Enter/reopen.
+- **Solution:** Render the legend dynamically from the live `OverlayPalette` (colored swatches:
+  `■ inserted ■ deleted ■ moved ■ updated ■ cursor/counterpart`) in the help modal and as a strip
+  inside the theme dialog; apply the highlighted theme immediately on selection change and revert
+  on Esc.
+- **Files:** `components/help_modal.rs` (needs the palette passed in - it's currently static),
+  `components/theme_dialog.rs`, `app.rs`.
+- **Impact:** New users stop guessing what magenta means; theme choice becomes one keystroke
+  instead of a loop.
+- **Complexity:** Low-Medium.
+
+- **Status:** IMPLEMENTED (2026-08-19). Help modal renders swatches from the live palette
+  (`HelpModal::legend_lines`); the theme dialog previews the highlighted theme on every
+  selection move (`Action::ThemePreviewed`), Esc reverts, Enter persists.
+
+### Move count in the footer summary
+- **Problem:** `format_change_counts` shows `+12 -4 ~2`; moves are invisible in the summary even
+  though move detection is the tool's headline feature. A move-heavy diff summarizes as almost
+  nothing.
+- **Solution:** Count moved ranges (source side once) in `diff::text::change_counts` and append
+  e.g. `M3`, in the Move overlay color. Also surfaces the sibling-reorder silence above if the
+  first item decides reorders count as moves.
+- **Files:** `diff/text.rs` (`ChangeCounts`/`change_counts`), `app.rs` (`format_change_counts`).
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). `ChangeCounts::moves` (counted once, after side),
+  rendered as `M<n>`.
+
+### Manual layout override for the 220-column threshold
+- **Problem:** `SINGLE_PANEL_THRESHOLD = 220` means a 200-column terminal - wide by most standards
+  - is forced into single-panel mode with no recourse, even though two 100-column panels are
+  perfectly readable for most code.
+- **Solution:** A key (e.g. `v`) cycling `auto → dual → single` (persisted next to the theme via
+  the existing `confy` config), with `auto` keeping today's threshold. Possibly lower the
+  threshold's default while at it - 160 gives two 80-column panels.
+- **Files:** `components/diff_viewer.rs` (`display_mode`), `theme.rs`-style config, `help_modal.rs`.
+- **Impact:** Respects the user's judgment about their own terminal.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). `v` cycles auto/dual/single
+  (`theme::PanelLayout`, persisted in `.codediff.toml` alongside the theme via
+  load-modify-save); footer shows `[layout: …]` when overriding. The 220 default is
+  unchanged - the override makes it moot.
+
+### Headless `--color` and `--context` flags
+- **Problem:** Headless colors are on by default with `NO_COLOR` as the only escape - so
+  `codediff a b > out.txt` writes ANSI garbage unless the caller knows the env var; and
+  `CONTEXT_LINES = 3` is hardcoded with no equivalent of `diff -U N`.
+- **Solution:** `--color <always|never>` (flag beats env var; keep `NO_COLOR` honored) and
+  `--context N` threaded into `lines_to_keep`. Both standard CLI furniture.
+- **Files:** `main.rs` (args), `headless.rs`.
+- **Complexity:** Low.
+
+- **Status:** IMPLEMENTED (2026-08-19). `--color <auto|always|never>` (flag beats `NO_COLOR`
+  in both directions), `--context N` threaded into `lines_to_keep`.
+
+### File dialog QoL
+- **Problem:** The picker is scroll-only: no type-ahead filtering, no hidden-file toggle, no way
+  to paste/type a path, and no memory of previously diffed pairs - the empty-start screen always
+  begins from scratch in the cwd.
+- **Solution, in value order:** (1) type-to-filter the current listing (chars narrow, Backspace
+  widens, Esc clears filter before closing); (2) recent file pairs persisted via the existing
+  `confy` config, offered on the empty-start screen ("press 1-9 to reopen a recent pair"); (3) a
+  `.`-key hidden-files toggle.
+- **Files:** `components/file_dialog.rs`, `app.rs`, config module.
+- **Complexity:** Medium (mostly the recent-pairs plumbing).
+
+- **Status:** IMPLEMENTED (2026-08-19). Type-to-filter (Backspace widens the filter before
+  reverting to parent-directory navigation; `..` always survives the filter), `Ctrl-h`
+  dotfile toggle (hidden by default), and recent pairs persisted in `.codediff.toml`
+  (recorded on every successful diff, digit keys 1-9 reopen them from the empty-start
+  screen's overlay).
+
+### Open at cursor in `$EDITOR`
+- **Problem:** The end of most diff-reading sessions is "now go fix it" - which means manually
+  noting the filename and line, quitting, and opening an editor.
+- **Solution:** `e` suspends the TUI (`crossterm` leave/enter alternate screen around a child
+  process), launches `$EDITOR +<line> <path>` for the focused panel's file at the cursor row, and
+  resumes (re-diffing on return, which the `r` reload item above provides for free).
+- **Files:** `app.rs`, `ui.rs` (suspend/resume), `help_modal.rs`.
+- **Impact:** Closes the loop on the tool's main workflow.
+- **Complexity:** Medium (terminal state handoff is the risky part; get `r` in first).
+
+- **Status:** IMPLEMENTED (2026-08-19). `e` releases the terminal (`ui.exit`/`ui.enter`, not
+  `suspend` - that raises SIGTSTP), runs `$VISUAL`/`$EDITOR` (`vi` fallback) with the `+line`
+  convention, then re-diffs with the cursor restored.
+
+### Mouse (Phase 6) extensions, once wheel scroll lands
+Click on a panel to focus it (replacing a Tab press), click on a row/column to place the cursor
+there (the hit-testing needed for wheel-scroll's "which panel is the pointer over" gives both
+nearly for free). Recorded here so Phase 6 isn't scoped to wheel-only when the marginal cost of
+clicks is this low.

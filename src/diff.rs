@@ -351,9 +351,10 @@ impl<'code> PendingDiff<'code> {
     /// `~/.claude/plans/iterative-herding-panda.md`), `finish` no longer branches on this - it
     /// always runs the cheap fallback, regardless of residual size - so this is now a diagnostic
     /// signal only ("this diff had a large residual"), not something that changes `finish`'s
-    /// behavior. Kept for callers (the TUI's `SelectDiffMode` prompt, `fallback_used` in JSON
-    /// output) pending a follow-up commit that decides `DiffMode`'s fate once Phase 1's quality
-    /// delta is measured.
+    /// behavior. Kept for callers (`fallback_used` in JSON output, headless mode's
+    /// large-residual note) pending a follow-up commit that decides `DiffMode`'s fate - the
+    /// TUI's old `SelectDiffMode` prompt, previously the main consumer, was removed in the
+    /// 2026-08-19 usability pass.
     pub fn looks_expensive(&self) -> bool {
         self.unmatched_before.max(self.unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD
     }
@@ -419,9 +420,9 @@ impl<'code> PendingDiff<'code> {
         // +4860) - the fallback's own lossiness dominates.
         //
         // `DiffMode`/`_mode` no longer changes behavior - kept on the signature for API
-        // compatibility (the TUI's `SelectDiffMode` prompt and `--exact` CLI flag both still
-        // construct one) pending a follow-up commit that decides whether to remove it now that
-        // quality has recovered.
+        // compatibility (the `--exact` CLI flag still constructs one; the TUI's old
+        // `SelectDiffMode` prompt was removed in the 2026-08-19 usability pass) pending a
+        // follow-up commit that decides whether to remove it now that quality has recovered.
         if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
             let before_metadata = crate::code::metadata::metadata_of(before);
             let after_metadata = crate::code::metadata::metadata_of(after);

@@ -48,7 +48,23 @@ enum GitAction {
     Configure,
 }
 
+/// When headless output should be ANSI-colored - see `use_color` for how `Auto` resolves.
+#[derive(clap::ValueEnum, Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum ColorChoice {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
 #[derive(Parser)]
+#[command(
+    after_help = "Exit codes (headless/JSON modes, direct BEFORE AFTER invocation): \
+    0 = no differences, 1 = differences found, 2 = error - same convention as diff(1). \
+    The 7-argument GIT_EXTERNAL_DIFF form always exits 0 on success instead, because git \
+    treats a non-zero exit from an external diff program as a fatal error, not as \"files \
+    differ\". The interactive TUI always exits 0."
+)]
 struct Args {
     #[command(subcommand)]
     command: Option<Command>,
@@ -72,13 +88,27 @@ struct Args {
     #[arg(long, alias = "batch")]
     headless: bool,
 
-    /// Always run full (exact) tree-edit-distance analysis, even when the residual after the
-    /// cheap heuristic passes is large enough that the default fast mode would otherwise
-    /// silently substitute a cheaper, less precise fallback for it. Batch/headless only - the
-    /// interactive TUI always offers this choice per-diff instead (see `SelectDiffMode`), rather
-    /// than fixing it for the whole run via a flag.
+    /// Deprecated no-op, kept so existing scripts don't break: since the phases-4-7 pipeline
+    /// rearchitecture, the diff pipeline runs the same bounded, region-scoped analysis
+    /// regardless of mode (`PendingDiff::finish` ignores `DiffMode` - see its phase-6 comment),
+    /// so there is no separate "exact" path for this flag to select anymore. Currently its only
+    /// observable effect is suppressing headless mode's large-residual note. Slated for removal
+    /// together with `DiffMode` itself once the pipeline cleanup that owns that decision lands.
     #[arg(long)]
     exact: bool,
+
+    /// When to ANSI-color headless output: `always`, `never`, or `auto` (the default - color on
+    /// unless the `NO_COLOR` environment variable is set; see `use_color` for why auto is not
+    /// tied to stdout being a terminal). The flag beats the environment variable in both
+    /// directions: `--color always` colors even under `NO_COLOR`, `--color never` suppresses
+    /// color without needing the variable.
+    #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
+    color: ColorChoice,
+
+    /// How many unchanged lines to keep around each change in headless output before collapsing
+    /// the rest into an elision marker - same idea as `diff -U N`.
+    #[arg(long, value_name = "N", default_value_t = tui::headless::CONTEXT_LINES)]
+    context: usize,
 
     /// Tick rate
     #[arg(long, value_name = "FLOAT", default_value_t = 4.0)]
@@ -153,14 +183,33 @@ fn should_run_json(args: &Args) -> bool {
     args.mode.eq_ignore_ascii_case("json")
 }
 
-/// Whether headless output should be ANSI-colored. Deliberately not tied to `stdout_is_terminal`:
-/// the whole point of headless mode's main use case (`GIT_EXTERNAL_DIFF` under git's default
-/// pager) is that stdout is a pipe, not a terminal, yet the pager on the other end is generally
-/// perfectly capable of showing color (git configures `less` with `-R`-equivalent behavior for
-/// exactly this reason). Respects the `NO_COLOR` convention (<https://no-color.org>) as the escape
-/// hatch for callers that don't want that - e.g. redirecting to a file.
-fn use_color() -> bool {
-    std::env::var_os("NO_COLOR").is_none()
+/// Whether headless output should be ANSI-colored. `Auto` is deliberately not tied to
+/// `stdout_is_terminal`: the whole point of headless mode's main use case (`GIT_EXTERNAL_DIFF`
+/// under git's default pager) is that stdout is a pipe, not a terminal, yet the pager on the
+/// other end is generally perfectly capable of showing color (git configures `less` with
+/// `-R`-equivalent behavior for exactly this reason). Under `Auto`, the `NO_COLOR` convention
+/// (<https://no-color.org>) is the escape hatch for callers that don't want that - e.g.
+/// redirecting to a file; `--color always`/`--color never` beat the environment variable in
+/// either direction.
+fn use_color(choice: ColorChoice) -> bool {
+    match choice {
+        ColorChoice::Always => true,
+        ColorChoice::Never => false,
+        ColorChoice::Auto => std::env::var_os("NO_COLOR").is_none(),
+    }
+}
+
+/// Turns a completed non-interactive run into a `diff`-style process exit code: 0 = no
+/// differences, 1 = differences found (errors exit 2, handled at the call sites). Only for the
+/// direct `BEFORE AFTER` calling convention: git treats a non-zero exit from a
+/// `GIT_EXTERNAL_DIFF` program as a fatal error ("external diff died"), not as "files differ",
+/// so the 7-argument git form (recognized by `invoked_as_git_external_diff`) always maps to 0.
+fn exit_code_for(differed: bool, invoked_as_git_external_diff: bool) -> i32 {
+    if differed && !invoked_as_git_external_diff {
+        1
+    } else {
+        0
+    }
 }
 
 #[tokio::main]
@@ -175,6 +224,7 @@ async fn main() -> Result<()> {
     }
 
     let before_after = resolve_before_after(&args.paths)?;
+    let invoked_as_git_external_diff = args.paths.len() == 7;
 
     if should_run_json(&args) {
         let (before, after) = before_after
@@ -184,7 +234,15 @@ async fn main() -> Result<()> {
         } else {
             DiffMode::Fast
         };
-        return tui::json_output::run(&before, &after, mode);
+        match tui::json_output::run(&before, &after, mode) {
+            Ok(differed) => {
+                std::process::exit(exit_code_for(differed, invoked_as_git_external_diff))
+            }
+            Err(e) => {
+                eprintln!("codediff: {e:#}");
+                std::process::exit(2);
+            }
+        }
     }
 
     if should_run_headless(&args, std::io::stdout().is_terminal()) {
@@ -197,7 +255,15 @@ async fn main() -> Result<()> {
         } else {
             DiffMode::Fast
         };
-        return tui::headless::run(&before, &after, use_color(), mode);
+        match tui::headless::run(&before, &after, use_color(args.color), mode, args.context) {
+            Ok(differed) => {
+                std::process::exit(exit_code_for(differed, invoked_as_git_external_diff))
+            }
+            Err(e) => {
+                eprintln!("codediff: {e:#}");
+                std::process::exit(2);
+            }
+        }
     }
 
     if let Err(e) = tui_main(&args, before_after).await {
@@ -279,9 +345,56 @@ mod tests {
             mode: mode.to_string(),
             headless,
             exact: false,
+            color: ColorChoice::Auto,
+            context: tui::headless::CONTEXT_LINES,
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }
+    }
+
+    #[test]
+    fn color_flag_parses_all_three_choices_and_defaults_to_auto() {
+        for (argv, expected) in [
+            (vec!["codediff"], ColorChoice::Auto),
+            (vec!["codediff", "--color", "always"], ColorChoice::Always),
+            (vec!["codediff", "--color", "never"], ColorChoice::Never),
+            (vec!["codediff", "--color", "auto"], ColorChoice::Auto),
+        ] {
+            let args = Args::try_parse_from(argv.clone())
+                .unwrap_or_else(|e| panic!("{argv:?} should parse: {e}"));
+            assert_eq!(args.color, expected, "for {argv:?}");
+        }
+    }
+
+    #[test]
+    fn context_flag_defaults_to_the_headless_default_and_accepts_overrides() {
+        assert_eq!(
+            Args::try_parse_from(["codediff"]).unwrap().context,
+            tui::headless::CONTEXT_LINES
+        );
+        assert_eq!(
+            Args::try_parse_from(["codediff", "--context", "0"])
+                .unwrap()
+                .context,
+            0
+        );
+    }
+
+    #[test]
+    fn always_and_never_beat_the_no_color_environment_variable() {
+        // `use_color` never reads the environment for Always/Never, so this needs no env
+        // manipulation (which would race other tests in the same process).
+        assert!(use_color(ColorChoice::Always));
+        assert!(!use_color(ColorChoice::Never));
+    }
+
+    #[test]
+    fn exit_code_is_diff_style_for_direct_invocations_only() {
+        assert_eq!(exit_code_for(false, false), 0);
+        assert_eq!(exit_code_for(true, false), 1);
+        // The GIT_EXTERNAL_DIFF form must always exit 0 - git treats non-zero as fatal.
+        assert_eq!(exit_code_for(true, true), 0);
+        assert_eq!(exit_code_for(false, true), 0);
     }
 
     #[test]

@@ -22,7 +22,7 @@ use ratatui::{Frame, layout::Rect};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::diff::text::RangeMatch;
+use crate::diff::text::{RangeMatch, TextOperation};
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
@@ -77,6 +77,7 @@ impl CodeViewer {
     /// Reset scroll/diff/cursor state, e.g. after loading a new file.
     fn reset_state(&mut self) {
         self.state.scroll = 0;
+        self.state.scroll_col = 0;
         self.state.load_ranges(Vec::new());
         self.desired_col = None;
     }
@@ -142,6 +143,23 @@ impl CodeViewer {
         self.widget.set_overlay_theme(theme);
     }
 
+    /// Whether syntax highlighting is currently on - see `toggle` counterpart below. A thin
+    /// pass-through to the widget layer; an identical wrapper was removed as dead code in a
+    /// 2026-08-07 health pass because no keybinding ever reached it - the `S` key
+    /// (`DiffViewer::toggle_syntax_highlighting`) is that missing caller.
+    pub fn is_syntax_highlighting_enabled(&self) -> bool {
+        self.widget.is_syntax_highlighting_enabled()
+    }
+
+    /// Turn syntax highlighting on or off (rebuilds the widget's highlight cache).
+    pub fn set_syntax_highlighting(&mut self, enable: bool) {
+        if enable {
+            self.widget.enable_syntax_highlighting();
+        } else {
+            self.widget.disable_syntax_highlighting();
+        }
+    }
+
     /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, keeping it on
     /// the same "sticky" column across a run of vertical moves (see `desired_col`'s doc comment)
     /// rather than the destination row's actual column - except where that column doesn't land
@@ -205,6 +223,7 @@ impl CodeViewer {
             && self.clamp_and_set_cursor(row, col)
         {
             self.scroll_to_center_row(self.state.cursor_row);
+            self.scroll_to_show_col(self.state.cursor_col);
         }
     }
 
@@ -224,6 +243,13 @@ impl CodeViewer {
         if let Some((row, col)) = self.state.nearest_search_match_position() {
             self.set_cursor_position(row, col);
         }
+    }
+
+    /// Highlight `query`'s matches without moving the cursor - the search modal's live preview
+    /// while typing (the cursor only jumps on submit, via `search`). Returns the match count.
+    pub fn preview_search(&mut self, query: &str) -> usize {
+        self.state.search_matches = self.widget.find_matches(query);
+        self.state.search_matches.len()
     }
 
     /// Move the cursor to the next (`forward = true`) or previous (`forward = false`) search
@@ -273,22 +299,42 @@ impl CodeViewer {
 
     /// Where the cursor should be drawn on screen within `area` (the same content area passed to
     /// `draw` - the widget itself draws no border to account for), given the current scroll
-    /// position. `None` if the cursor's row is scrolled out of view, or its column is past the
-    /// (not horizontally scrollable) visible width.
+    /// position - offset past the line-number gutter and by the horizontal scroll. `None` if the
+    /// cursor's row or column is scrolled out of view.
     pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
         let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
-        if row_in_viewport >= area.height as usize || self.state.cursor_col >= area.width as usize {
+        let col_in_viewport = self.state.cursor_col.checked_sub(self.state.scroll_col)?;
+        let gutter = self.widget.gutter_width();
+        if row_in_viewport >= area.height as usize
+            || gutter + col_in_viewport >= area.width as usize
+        {
             return None;
         }
         Some((
-            area.x + self.state.cursor_col as u16,
+            area.x + (gutter + col_in_viewport) as u16,
             area.y + row_in_viewport as u16,
         ))
     }
 
-    /// Scroll the viewport so the cursor's row is visible.
+    /// Scroll the viewport so the cursor's row and column are both visible.
     fn scroll_to_cursor(&mut self) {
         self.scroll_to_show_row(self.state.cursor_row);
+        self.scroll_to_show_col(self.state.cursor_col);
+    }
+
+    /// Scroll the viewport horizontally to keep `col` visible, without moving the cursor - the
+    /// horizontal counterpart of `scroll_to_show_row`. A no-op before the first frame has
+    /// rendered (`viewport_width` still 0, i.e. unknown - see `CodeViewerState::viewport_width`).
+    pub fn scroll_to_show_col(&mut self, col: usize) {
+        let width = self.state.viewport_width;
+        if width == 0 {
+            return;
+        }
+        if col < self.state.scroll_col {
+            self.state.scroll_col = col;
+        } else if col >= self.state.scroll_col + width {
+            self.state.scroll_col = col + 1 - width;
+        }
     }
 
     /// Get the filename for display
@@ -353,6 +399,63 @@ impl CodeViewer {
     /// Get reference to the state
     pub fn state(&self) -> &crate::tui::widgets::code_viewer::CodeViewerState {
         &self.state
+    }
+
+    /// Width of the line-number gutter (see `CodeViewerWidget::gutter_width`) - used by mouse
+    /// hit-testing to translate a clicked screen column into a content column.
+    pub fn gutter_width(&self) -> usize {
+        self.widget.gutter_width()
+    }
+
+    /// The change-overview strip's cells: the file's rows divided into `bands` equal slices, each
+    /// reporting the highest-priority operation (see `band_priority`) of any change touching it,
+    /// or `None` for an untouched slice. This is the minimap next to each panel - "where are the
+    /// changes in this file," at a glance, without `n`-stepping through them one at a time.
+    pub fn change_bands(&self, bands: usize) -> Vec<Option<TextOperation>> {
+        let total = self.line_count();
+        let mut out = vec![None; bands];
+        if bands == 0 || total == 0 {
+            return out;
+        }
+        for rm in &self.state.ranges {
+            if matches!(
+                rm.operation,
+                TextOperation::Identical | TextOperation::NotYetSet
+            ) || rm.source.is_empty()
+            {
+                continue;
+            }
+            let last_row = if rm.source.end_column == 0 {
+                rm.source.end_row.saturating_sub(1)
+            } else {
+                rm.source.end_row
+            }
+            .min(total - 1);
+            for row in rm.source.start_row..=last_row {
+                let band = (row * bands / total).min(bands - 1);
+                let current = &mut out[band];
+                if current
+                    .as_ref()
+                    .is_none_or(|existing| band_priority(&rm.operation) > band_priority(existing))
+                {
+                    *current = Some(rm.operation.clone());
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Which operation "wins" a minimap band touched by several kinds of change - structural
+/// insert/delete over update over move, an arbitrary but stable ordering (a band is one terminal
+/// cell; something has to win).
+fn band_priority(op: &TextOperation) -> u8 {
+    match op {
+        TextOperation::Delete => 4,
+        TextOperation::Insert => 3,
+        TextOperation::Update => 2,
+        TextOperation::Move => 1,
+        TextOperation::Identical | TextOperation::NotYetSet => 0,
     }
 }
 

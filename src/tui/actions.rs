@@ -48,11 +48,10 @@ pub struct DiffSessionData {
     /// itself is gone, so this can't be recomputed later from `before_ranges`/`after_ranges` alone
     /// the way `diff::text::summarize_diff`'s other cases can.
     pub comment_only: bool,
-    /// Which `DiffMode` actually produced this result - `Fast` unless the user picked `Exact` from
-    /// the "this diff is unusually large" prompt, or the file pair never tripped that prompt at
-    /// all (see `compute_diff_interactive`). Meaningless when `plain_text_fallback` is set (no
-    /// AST algorithm ran at all), same as `comment_only` in that case. Shown in `app.rs`'s footer
-    /// so a user can't forget which one they're looking at.
+    /// Which `DiffMode` actually produced this result - `Fast` unless the user re-ran the pair
+    /// through full analysis with the `x` key (or `--exact` in batch mode). Meaningless when
+    /// `plain_text_fallback` is set (no AST algorithm ran at all), same as `comment_only` in that
+    /// case. Shown in `app.rs`'s footer so a user can't forget which one they're looking at.
     pub mode: DiffMode,
     /// Set when either side has no tree-sitter grammar (e.g. an extension-less `Makefile`), so
     /// `before_ranges`/`after_ranges` came from `diff::text::plain_text_line_diff` (a plain
@@ -62,6 +61,19 @@ pub struct DiffSessionData {
     /// where it came from; this field exists purely so `app.rs`'s footer can show `[plain text]`
     /// instead of a `DiffMode` label that would otherwise misleadingly imply a structural diff ran.
     pub plain_text_fallback: bool,
+}
+
+/// The result of one background diff computation - the payload of `Action::DiffComputed`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffOutcome {
+    Ready {
+        data: DiffSessionData,
+        /// Whether `DiffMode::Fast`'s guard silently substituted the cheaper fallback for the
+        /// expensive final pass (see `compute_diff`) - surfaced in the footer as a hint that `x`
+        /// (re-run exact) is worth pressing.
+        fallback_used: bool,
+    },
+    Failed(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,28 +94,40 @@ pub enum Action {
     FileSelected(PathBuf),
     /// The user cancelled the file dialog.
     DialogCancelled,
-    /// Both before/after files are known; kick off the (background) diff computation.
-    StartDiff(PathBuf, PathBuf),
+    /// Both before/after files are known; kick off the (background) diff computation in the given
+    /// mode (`Fast` for every ordinary file pick; `Exact` when the `x` key re-runs the current
+    /// pair through full analysis).
+    StartDiff(PathBuf, PathBuf, DiffMode),
+    /// A background diff computation returned - success or failure - tagged with the generation
+    /// counter `App::start_diff` captured when it launched. `App` compares it against the current
+    /// generation and simply drops a stale result: this is what makes Esc-during-Diffing a real
+    /// cancel (the `spawn_blocking` thread itself can't be killed, but its answer can be
+    /// discarded). A fresh result is re-dispatched as `DiffReady`/`DiffFailed` below, which is
+    /// what components actually consume.
+    DiffComputed {
+        generation: u64,
+        outcome: DiffOutcome,
+    },
     /// The background diff computation finished successfully.
     DiffReady(DiffSessionData),
     /// The background diff computation failed.
     DiffFailed(String),
-    /// The user picked a color theme in the theme dialog.
+    /// The user picked a color theme in the theme dialog (Enter) - apply it and persist it.
     ThemeSelected(OverlayTheme),
-    /// The background diff computation's phase-1-5 residual was too large for `DiffMode::Fast`
-    /// to auto-resolve silently (`PendingDiff::looks_expensive()` was true) - prompts the user to
-    /// pick a `DiffMode`. The counts are just enough context to render "this diff looks big"; the
-    /// actual answer travels back out-of-band via `App::pending_diff_mode_tx`, not on this
-    /// action, since a `oneshot::Sender` isn't `Debug`/`PartialEq`/`Clone`.
-    DiffModeChoiceNeeded {
-        unmatched_before: usize,
-        unmatched_after: usize,
-    },
-    /// The user answered the `SelectDiffMode` prompt.
-    DiffModeSelected(DiffMode),
+    /// The theme dialog's selection moved (Up/Down) - apply the highlighted theme to the live
+    /// viewer behind the dialog as a preview, without persisting anything. Esc reverts to the
+    /// last persisted choice; Enter (`ThemeSelected`) makes it stick.
+    ThemePreviewed(OverlayTheme),
     /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
     /// cursor to the nearest match and highlight every match.
     SearchSubmitted(String),
+    /// The search modal's query changed while typing - `App` recomputes the focused panel's
+    /// match count for the modal's live `N matches` readout and previews the highlights, without
+    /// moving the cursor (that only happens on `SearchSubmitted`).
+    SearchQueryChanged(String),
+    /// The user confirmed a line number in the jump-to-line prompt (the `g` key) - 1-indexed,
+    /// already parsed by the prompt itself.
+    JumpToLineSubmitted(usize),
     /// `n`/`p` was pressed but the focused panel has no navigable changes while the *other*
     /// panel does (e.g. the "before" side of a diff that's pure insertions - there is nothing on
     /// that side to ever jump to). Dispatched by `DiffViewer::handle_key_event` instead of

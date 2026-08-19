@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,12 @@ pub struct OverlayPalette {
     pub update_bg: Color,
     pub overlay_fg: Color,
     pub cross_highlight_bg: Color,
+    /// Search-match highlight (the `/` modal's results). A separate color from
+    /// `cross_highlight_bg`: while a search is active, "search hit" and "counterpart of the
+    /// cursor" used to be visually identical, which made it impossible to tell which blue block
+    /// the `>`/`<` keys would step to next. Every theme uses its own orange accent - the one hue
+    /// none of the four diff bands or the blue/cyan cursor highlight occupy.
+    pub search_bg: Color,
 }
 
 impl OverlayTheme {
@@ -79,6 +85,7 @@ impl OverlayTheme {
                 update_bg: Color::Rgb(70, 60, 10),
                 overlay_fg: Color::Rgb(225, 225, 225),
                 cross_highlight_bg: Color::Rgb(40, 90, 200),
+                search_bg: Color::Rgb(160, 90, 10),
             },
             OverlayTheme::SolarizedDark => OverlayPalette {
                 insert_bg: Color::Rgb(53, 87, 32),
@@ -87,6 +94,8 @@ impl OverlayTheme {
                 update_bg: Color::Rgb(72, 81, 32),
                 overlay_fg: Color::Rgb(238, 232, 213),
                 cross_highlight_bg: Color::Rgb(23, 101, 148),
+                // Solarized orange blended 0.4 toward base03, same vividness as the cursor blue.
+                search_bg: Color::Rgb(122, 62, 35),
             },
             OverlayTheme::SolarizedLight => OverlayPalette {
                 insert_bg: Color::Rgb(205, 209, 136),
@@ -95,6 +104,8 @@ impl OverlayTheme {
                 update_bg: Color::Rgb(224, 202, 136),
                 overlay_fg: Color::Rgb(7, 54, 66),
                 cross_highlight_bg: Color::Rgb(124, 182, 217),
+                // Solarized orange blended 0.4 toward base3, same vividness as the cursor blue.
+                search_bg: Color::Rgb(223, 143, 104),
             },
             // The five palettes below all follow the same recipe, reverse-engineered from the
             // Solarized variants above (whose values were hand-picked before this helper existed):
@@ -114,6 +125,7 @@ impl OverlayTheme {
                     update_bg: blend_toward_base((241, 250, 140), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((139, 233, 253), bg, 0.4), // cyan
+                    search_bg: blend_toward_base((255, 184, 108), bg, 0.4), // orange
                 }
             }
             OverlayTheme::Nord => {
@@ -127,6 +139,7 @@ impl OverlayTheme {
                     update_bg: blend_toward_base((235, 203, 139), bg, 0.6), // nord13, yellow
                     overlay_fg: Color::Rgb(236, 239, 244),                  // nord6
                     cross_highlight_bg: blend_toward_base((129, 161, 193), bg, 0.4), // nord9
+                    search_bg: blend_toward_base((208, 135, 112), bg, 0.4), // nord12, orange
                 }
             }
             OverlayTheme::GruvboxDark => {
@@ -139,6 +152,7 @@ impl OverlayTheme {
                     update_bg: blend_toward_base((250, 189, 47), bg, 0.6), // bright yellow
                     overlay_fg: Color::Rgb(235, 219, 178),                 // fg1
                     cross_highlight_bg: blend_toward_base((131, 165, 152), bg, 0.4), // bright blue
+                    search_bg: blend_toward_base((254, 128, 25), bg, 0.4), // bright orange
                 }
             }
             OverlayTheme::Monokai => {
@@ -151,6 +165,7 @@ impl OverlayTheme {
                     update_bg: blend_toward_base((230, 219, 116), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((102, 217, 239), bg, 0.4), // cyan
+                    search_bg: blend_toward_base((253, 151, 31), bg, 0.4), // orange
                 }
             }
             OverlayTheme::OneDark => {
@@ -164,6 +179,7 @@ impl OverlayTheme {
                     update_bg: blend_toward_base((229, 192, 123), bg, 0.6), // yellow
                     overlay_fg: Color::Rgb(171, 178, 191),                  // foreground
                     cross_highlight_bg: blend_toward_base((97, 175, 239), bg, 0.4), // blue
+                    search_bg: blend_toward_base((209, 154, 102), bg, 0.4), // orange
                 }
             }
         }
@@ -184,11 +200,54 @@ fn blend_toward_base(accent: (u8, u8, u8), base: (u8, u8, u8), base_weight: f32)
     )
 }
 
-/// On-disk representation of the persisted theme choice. A dedicated struct (rather than
-/// persisting `OverlayTheme` directly) so the config file has a named `theme = "..."` field.
+/// How the before/after panels should be laid out - the persisted counterpart of
+/// `DiffViewer`'s width-based auto choice. Lives here (not in `diff_viewer.rs`) because this
+/// module owns the config file both settings persist to; `DiffViewer` consumes it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PanelLayout {
+    /// Pick dual/single from the terminal width (`SINGLE_PANEL_THRESHOLD`) - today's behavior.
+    #[default]
+    Auto,
+    /// Always side-by-side, regardless of width.
+    Dual,
+    /// Always one panel at a time (`Tab` switches), regardless of width.
+    Single,
+}
+
+impl PanelLayout {
+    /// The next mode in the `v` key's `Auto -> Dual -> Single -> Auto` cycle.
+    pub fn next(self) -> Self {
+        match self {
+            PanelLayout::Auto => PanelLayout::Dual,
+            PanelLayout::Dual => PanelLayout::Single,
+            PanelLayout::Single => PanelLayout::Auto,
+        }
+    }
+
+    /// Short label for the footer/title, e.g. `[layout: dual]`.
+    pub fn label(self) -> &'static str {
+        match self {
+            PanelLayout::Auto => "auto",
+            PanelLayout::Dual => "dual",
+            PanelLayout::Single => "single",
+        }
+    }
+}
+
+/// How many recently diffed file pairs to remember (see `record_recent_pair`) - capped at the
+/// nine digit keys the empty-start screen offers for reopening them.
+const MAX_RECENT_PAIRS: usize = 9;
+
+/// On-disk representation of the persisted settings. A dedicated struct (rather than
+/// persisting `OverlayTheme` directly) so the config file has named fields. Every field after
+/// `theme` carries `#[serde(default)]` so a config written by an older build still parses.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ThemeConfig {
     theme: OverlayTheme,
+    #[serde(default)]
+    layout: PanelLayout,
+    #[serde(default)]
+    recent_pairs: Vec<(PathBuf, PathBuf)>,
 }
 
 /// The config file's path: a dotfile in the current working directory, per the exploratory-
@@ -214,9 +273,44 @@ pub fn load_overlay_theme() -> OverlayTheme {
 }
 
 /// Persist the user's theme choice for future runs. Failures (e.g. a read-only working
-/// directory) are non-fatal: the choice simply won't survive a restart.
+/// directory) are non-fatal: the choice simply won't survive a restart. Load-modify-save so the
+/// other persisted settings in the same file survive the write.
 pub fn save_overlay_theme(theme: OverlayTheme) {
-    save_to(config_path(), ThemeConfig { theme });
+    let mut config = load_from(config_path());
+    config.theme = theme;
+    save_to(config_path(), config);
+}
+
+/// Load the persisted panel-layout choice (the `v` key), or `PanelLayout::Auto` if the config
+/// file doesn't exist yet or fails to parse.
+pub fn load_panel_layout() -> PanelLayout {
+    load_from(config_path()).layout
+}
+
+/// Persist the panel-layout choice, preserving the other settings in the same file - same
+/// non-fatal failure semantics as `save_overlay_theme`.
+pub fn save_panel_layout(layout: PanelLayout) {
+    let mut config = load_from(config_path());
+    config.layout = layout;
+    save_to(config_path(), config);
+}
+
+/// The recently diffed file pairs, most recent first - offered on the empty-start screen as
+/// digit shortcuts (`tui::app::draw_viewer`).
+pub fn load_recent_pairs() -> Vec<(PathBuf, PathBuf)> {
+    load_from(config_path()).recent_pairs
+}
+
+/// Record a successfully diffed pair at the front of the recent list (deduplicated, capped at
+/// [`MAX_RECENT_PAIRS`]), preserving the other settings in the same file. Same non-fatal failure
+/// semantics as the other save functions.
+pub fn record_recent_pair(before: &Path, after: &Path) {
+    let mut config = load_from(config_path());
+    let pair = (before.to_path_buf(), after.to_path_buf());
+    config.recent_pairs.retain(|existing| existing != &pair);
+    config.recent_pairs.insert(0, pair);
+    config.recent_pairs.truncate(MAX_RECENT_PAIRS);
+    save_to(config_path(), config);
 }
 
 /// `load_overlay_theme`/`save_overlay_theme`, parameterized by path so tests can exercise the
@@ -241,6 +335,7 @@ mod tests {
             file.path().to_path_buf(),
             ThemeConfig {
                 theme: OverlayTheme::SolarizedLight,
+                ..Default::default()
             },
         );
         assert_eq!(
@@ -306,5 +401,63 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The search highlight exists precisely to be distinguishable from both the four diff bands
+    /// and the cursor cross-highlight (see `OverlayPalette::search_bg`'s doc comment) - a theme
+    /// where it collides with any of them has silently reintroduced the ambiguity it fixes.
+    #[test]
+    fn every_themes_search_color_is_distinct_from_bands_and_cursor_highlight() {
+        for theme in OverlayTheme::iter() {
+            let p = theme.palette();
+            for (name, other) in [
+                ("insert_bg", p.insert_bg),
+                ("delete_bg", p.delete_bg),
+                ("move_bg", p.move_bg),
+                ("update_bg", p.update_bg),
+                ("cross_highlight_bg", p.cross_highlight_bg),
+            ] {
+                assert_ne!(
+                    p.search_bg, other,
+                    "{theme:?}: search_bg collides with {name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn panel_layout_cycle_visits_all_three_modes_and_returns() {
+        assert_eq!(PanelLayout::Auto.next(), PanelLayout::Dual);
+        assert_eq!(PanelLayout::Dual.next(), PanelLayout::Single);
+        assert_eq!(PanelLayout::Single.next(), PanelLayout::Auto);
+    }
+
+    /// `save_overlay_theme`/`save_panel_layout` are load-modify-save specifically so one setting's
+    /// write can't clobber the other back to default - exercised here via the path-parameterized
+    /// helpers they both delegate to.
+    #[test]
+    fn saving_one_setting_preserves_the_other() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        let path = file.path().to_path_buf();
+        save_to(
+            path.clone(),
+            ThemeConfig {
+                theme: OverlayTheme::Nord,
+                layout: PanelLayout::Single,
+                ..Default::default()
+            },
+        );
+
+        let mut config = load_from(path.clone());
+        config.theme = OverlayTheme::Dracula;
+        save_to(path.clone(), config);
+
+        let reloaded = load_from(path);
+        assert_eq!(reloaded.theme, OverlayTheme::Dracula);
+        assert_eq!(
+            reloaded.layout,
+            PanelLayout::Single,
+            "changing the theme must not reset the layout"
+        );
     }
 }

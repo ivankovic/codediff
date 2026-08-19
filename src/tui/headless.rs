@@ -256,10 +256,11 @@ fn colorize_line(line: &str, spans: &[(usize, usize, TextOperation)], use_color:
 }
 
 /// How many unchanged lines to keep on either side of a change, same convention as `diff -u`'s
-/// default `-U3`. A run of unchanged lines longer than `2 * CONTEXT_LINES` (enough for both
-/// changes bordering it to keep their own context) gets its middle collapsed into a single
-/// elision marker instead of printed in full - see `lines_to_keep`.
-const CONTEXT_LINES: usize = 3;
+/// default `-U3`. A run of unchanged lines longer than twice this (enough for both changes
+/// bordering it to keep their own context) gets its middle collapsed into a single elision marker
+/// instead of printed in full - see `lines_to_keep`. This is only the *default*: the `--context N`
+/// CLI flag (`main.rs`) overrides it per invocation, threaded through `run`/`render_text_diff`.
+pub const CONTEXT_LINES: usize = 3;
 
 /// Which line indices `render_side` should actually print: any line touched by at least one
 /// operation category (`RowFlags::any`), plus `CONTEXT_LINES` lines on either side of one.
@@ -338,13 +339,20 @@ fn render_side(
     side_is_before: bool,
     use_color: bool,
     path: &Path,
+    context: usize,
 ) -> String {
     let lines: Vec<&str> = contents.split('\n').collect();
     let (flags, spans) = row_overlay(ranges, &lines);
-    let keep = lines_to_keep(&flags, CONTEXT_LINES);
+    let keep = lines_to_keep(&flags, context);
 
     let language = language_for_path(path);
     let parsed = language.map(|lang| Code::from_string(contents, &lang));
+
+    // Every printed content line (and the `@` breadcrumb) is prefixed with its 1-indexed line
+    // number, right-aligned to the file's widest number and dimmed when colored - without it, the
+    // moved-chunk headers' "Moved to lines 40-60" cross-references were unresolvable by eye in an
+    // output stream that showed no numbers at all.
+    let number_width = lines.len().to_string().len();
 
     let mut out = String::new();
     let mut i = 0;
@@ -376,7 +384,8 @@ fn render_side(
                     // Only worth showing if it isn't already going to be visible in this hunk
                     // (or was already shown, or will be, as part of some other kept line).
                     if !keep[ref_row] {
-                        let breadcrumb = format!("    @ {}", lines[ref_row]);
+                        let breadcrumb =
+                            format!("{:>number_width$} @ {}", ref_row + 1, lines[ref_row]);
                         if use_color {
                             out.push_str(&format!("\u{1b}[90m{breadcrumb}\u{1b}[0m\n"));
                         } else {
@@ -408,6 +417,12 @@ fn render_side(
             }
         }
 
+        let number = format!("{:>number_width$} ", i + 1);
+        if use_color {
+            out.push_str(&format!("\u{1b}[90m{number}\u{1b}[0m"));
+        } else {
+            out.push_str(&number);
+        }
         let prefix = markers(flags[i], use_color);
         let colored_line = colorize_line(lines[i], &spans[i], use_color);
         out.push_str(&prefix);
@@ -461,7 +476,7 @@ fn summary_header(data: &DiffSessionData, use_color: bool) -> Option<String> {
 /// highlighted), then the "after" side (insertions/updates/moves highlighted). Each side's own
 /// `RangeMatch` list already carries which rows/columns changed - see `render_side`'s doc comment
 /// for why this is column-precise, not row-granular.
-pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> String {
+pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool, context: usize) -> String {
     let mut out = String::new();
     if let Some(header) = summary_header(data, use_color) {
         out.push_str(&header);
@@ -473,6 +488,7 @@ pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> Strin
         true,
         use_color,
         &data.before_path,
+        context,
     ));
     out.push_str(&format!("=== after: {} ===\n", data.after_path.display()));
     out.push_str(&render_side(
@@ -481,6 +497,7 @@ pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> Strin
         false,
         use_color,
         &data.after_path,
+        context,
     ));
     out
 }
@@ -489,23 +506,37 @@ pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool) -> Strin
 /// TUI does (`app::compute_diff` - same parsing, same `ASTDiff`, same `TextDiff`), then prints it
 /// as text on stdout instead of drawing an interactive terminal UI.
 ///
-/// Headless mode never prompts (there's no interactive surface to ask on, unlike the TUI's
-/// `SelectDiffMode` dialog) - `mode` is applied unconditionally. Under `DiffMode::Fast` (the
-/// default), if the guard silently substituted the cheaper fallback for phase 6, a one-line note
-/// goes to stderr (plain `eprintln!`, not `tracing` - headless mode never calls
-/// `tui::initialize_logging`, so there's no subscriber installed to receive it) so a script
-/// invoking this isn't left wondering why the diff looks less precise than expected.
-pub fn run(before: &Path, after: &Path, use_color: bool, mode: DiffMode) -> Result<()> {
+/// Under `DiffMode::Fast` (the default), if the diff left an unusually large unmatched residual
+/// (`PendingDiff::looks_expensive`), a one-line note goes to stderr (plain `eprintln!`, not
+/// `tracing` - headless mode never calls `tui::initialize_logging`, so there's no subscriber
+/// installed to receive it) so a script invoking this isn't left wondering why the structural
+/// matching looks coarser than usual for that portion.
+/// Returns whether the two files differ at all (byte comparison) so `main.rs` can turn it into a
+/// `diff`-style exit code - the rendered output itself is unaffected by the return value.
+pub fn run(
+    before: &Path,
+    after: &Path,
+    use_color: bool,
+    mode: DiffMode,
+    context: usize,
+) -> Result<bool> {
     let (data, fallback_used) = compute_diff(before, after, mode)?;
     if fallback_used {
+        // Deliberately no "--exact fixes this" suggestion: since the phases-4-7
+        // rearchitecture, `PendingDiff::finish` runs the same pipeline regardless of mode, so
+        // that flag would not change the result - this is a heads-up about input shape, not a
+        // pointer to a more precise alternative.
         eprintln!(
-            "codediff: the residual after the fast heuristic passes was too large for full \
-             tree-edit-distance analysis; used a faster, less precise fallback instead \
-             (pass --exact to force full analysis)."
+            "codediff: this diff left an unusually large unmatched residual after the \
+             heuristic passes; the structural matching for that portion may be coarser than \
+             usual."
         );
     }
-    print!("{}", render_text_diff(&data, use_color));
-    Ok(())
+    print!("{}", render_text_diff(&data, use_color, context));
+    // Raw on-disk bytes, not `data`'s contents: those have been through `display_safe` (tabs
+    // replaced by spaces for terminal rendering), which would make a tab-vs-space-only difference
+    // compare equal here.
+    Ok(std::fs::read(before)? != std::fs::read(after)?)
 }
 
 #[cfg(test)]
@@ -559,7 +590,14 @@ mod tests {
             operation: TextOperation::Delete,
         }];
 
-        let rendered = render_side(&contents, &ranges, true, false, Path::new("plain.txt"));
+        let rendered = render_side(
+            &contents,
+            &ranges,
+            true,
+            false,
+            Path::new("plain.txt"),
+            CONTEXT_LINES,
+        );
         let line_count = rendered.lines().count();
         assert!(
             line_count < 15,
@@ -568,9 +606,10 @@ mod tests {
         );
         assert!(rendered.contains(" - changed"));
         assert!(rendered.contains("unchanged lines"));
-        // Context lines immediately around the change must still be shown in full.
-        assert!(rendered.contains("   line22"));
-        assert!(rendered.contains("   line28"));
+        // Context lines immediately around the change must still be shown in full, prefixed with
+        // their 1-indexed line numbers (line index 22 is line number 23).
+        assert!(rendered.contains("23    line22"));
+        assert!(rendered.contains("29    line28"));
         // But nothing further out should survive.
         assert!(!rendered.contains("line10\n"));
     }
@@ -590,7 +629,14 @@ mod tests {
         let footer = "-".repeat(MOVED_CHUNK_FOOTER_WIDTH);
 
         // Rendered as the after side: this line came FROM before-line 10 (1-indexed).
-        let plain = render_side(contents, &ranges, false, false, Path::new("plain.txt"));
+        let plain = render_side(
+            contents,
+            &ranges,
+            false,
+            false,
+            Path::new("plain.txt"),
+            CONTEXT_LINES,
+        );
         assert!(
             plain.contains("Moved from line 10\n"),
             "should announce where the moved chunk came from: {plain}"
@@ -605,14 +651,28 @@ mod tests {
         );
 
         // Rendered as the before side, the same range reads as a destination, not an origin.
-        let before_plain = render_side(contents, &ranges, true, false, Path::new("plain.txt"));
+        let before_plain = render_side(
+            contents,
+            &ranges,
+            true,
+            false,
+            Path::new("plain.txt"),
+            CONTEXT_LINES,
+        );
         assert!(
             before_plain.contains("Moved to line 10\n"),
             "before-side wording should say where it went, not where it came from: \
              {before_plain}"
         );
 
-        let colored = render_side(contents, &ranges, false, true, Path::new("plain.txt"));
+        let colored = render_side(
+            contents,
+            &ranges,
+            false,
+            true,
+            Path::new("plain.txt"),
+            CONTEXT_LINES,
+        );
         assert!(
             colored.contains("\u{1b}[35mMoved from line 10\u{1b}[0m"),
             "the header should be magenta: {colored}"
@@ -689,13 +749,25 @@ mod tests {
     #[test]
     fn render_side_shows_the_enclosing_function_as_a_breadcrumb_when_out_of_context() {
         let (contents, ranges) = rust_file_with_a_change_buried_in_a_function();
-        let rendered = render_side(&contents, &ranges, true, false, Path::new("sample.rs"));
+        let rendered = render_side(
+            &contents,
+            &ranges,
+            true,
+            false,
+            Path::new("sample.rs"),
+            CONTEXT_LINES,
+        );
 
         assert!(
             rendered.contains("@ fn parse_args"),
             "should surface the enclosing function as a breadcrumb: {rendered}"
         );
-        let breadcrumb_lines = rendered.lines().filter(|l| l.trim_start().starts_with('@'));
+        // The breadcrumb carries its own line number (`fn parse_args` is row 4, so line 5).
+        assert!(
+            rendered.contains("5 @ fn parse_args"),
+            "the breadcrumb should be prefixed with its 1-indexed line number: {rendered}"
+        );
+        let breadcrumb_lines = rendered.lines().filter(|l| l.contains(" @ "));
         for line in breadcrumb_lines {
             assert!(
                 !line.contains("if arg.starts_with"),
@@ -753,43 +825,51 @@ mod tests {
         }
     }
 
-    /// The 2-column marker prefix a plain (uncolored) line with these flags should get - built
-    /// independently of `markers()` itself, from the documented column order, rather than calling
-    /// the function under test. `op` is the column-2 character (`None` for a plain space).
-    fn plain_prefix(moved: bool, op: Option<char>) -> String {
+    /// The line-number-plus-2-column-marker prefix a plain (uncolored) line with these flags
+    /// should get - built independently of `markers()` itself, from the documented column order,
+    /// rather than calling the function under test. `n` is the 1-indexed line number (the sample
+    /// files are under 10 lines, so the number column is 1 character wide); `op` is the marker's
+    /// column-2 character (`None` for a plain space).
+    fn plain_prefix(n: usize, moved: bool, op: Option<char>) -> String {
         format!(
-            "{}{} ",
+            "{n} {}{} ",
             if moved { "|" } else { " " },
             op.map(String::from).unwrap_or_else(|| " ".to_string()),
         )
     }
 
-    /// Builds the expected plain-text rendering by concatenating each line's marker with its
-    /// original text directly, rather than a hand-typed literal - counting the exact whitespace
-    /// a marker prefix plus a 4-space-indented line produces by eye is error-prone.
+    /// Builds the expected plain-text rendering by concatenating each line's number+marker with
+    /// its original text directly, rather than a hand-typed literal - counting the exact
+    /// whitespace a marker prefix plus a 4-space-indented line produces by eye is error-prone.
     fn expected_plain_text() -> String {
-        let none = plain_prefix(false, None);
-        let deleted = plain_prefix(false, Some('-'));
-        let inserted = plain_prefix(false, Some('+'));
+        let none = |n: usize| plain_prefix(n, false, None);
+        let deleted = plain_prefix(2, false, Some('-'));
+        let inserted = plain_prefix(2, false, Some('+'));
         format!(
-            "=== before: before.rs ===\n{none}fn main() {{\n{deleted}    old_call();\n\
-             {none}    same();\n{none}}}\n\
-             === after: after.rs ===\n{none}fn main() {{\n{inserted}    new_call();\n\
-             {none}    same();\n{none}}}\n"
+            "=== before: before.rs ===\n{}fn main() {{\n{deleted}    old_call();\n\
+             {}    same();\n{}}}\n\
+             === after: after.rs ===\n{}fn main() {{\n{inserted}    new_call();\n\
+             {}    same();\n{}}}\n",
+            none(1),
+            none(3),
+            none(4),
+            none(1),
+            none(3),
+            none(4),
         )
     }
 
     #[test]
     fn render_text_diff_without_color_shows_both_sides_with_markers() {
         assert_eq!(
-            render_text_diff(&sample_data(), false),
+            render_text_diff(&sample_data(), false, CONTEXT_LINES),
             expected_plain_text()
         );
     }
 
     #[test]
     fn render_text_diff_with_color_highlights_only_the_changed_substring_inline() {
-        let text = render_text_diff(&sample_data(), true);
+        let text = render_text_diff(&sample_data(), true, CONTEXT_LINES);
 
         // The deleted marker column ('-') and the changed substring are both red - but the
         // leading 4-space indent, part of the same line, is NOT wrapped: this is genuine
@@ -813,11 +893,11 @@ mod tests {
             "only the changed substring, not the leading indent, should be wrapped in green: {text}"
         );
 
-        // Identical lines must stay completely uncolored, markers included.
-        let none = plain_prefix(false, None);
+        // Identical lines must stay uncolored, markers included - the only escape sequence on
+        // them is the dimmed line-number gutter itself.
         assert!(
-            text.contains(&format!("\n{none}fn main() {{\n")),
-            "identical lines must stay uncolored: {text}"
+            text.contains("\u{1b}[90m1 \u{1b}[0m   fn main() {\n"),
+            "identical lines must stay uncolored apart from the dimmed number gutter: {text}"
         );
     }
 
@@ -830,7 +910,7 @@ mod tests {
         std::fs::write(&after_path, "fn main() {\n    new();\n}\n").unwrap();
 
         let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
-        let text = render_text_diff(&data, false);
+        let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(text.contains("old();"), "before content missing: {text}");
         assert!(text.contains("new();"), "after content missing: {text}");
@@ -842,7 +922,7 @@ mod tests {
         // Same synthetic data headless.rs's other rendering tests use - a real Delete+Insert pair
         // alongside Identical ranges, which shouldn't classify as any of `DiffSummary`'s special
         // cases (see this file's `summary_header`).
-        let text = render_text_diff(&sample_data(), false);
+        let text = render_text_diff(&sample_data(), false, CONTEXT_LINES);
         assert!(
             text.starts_with("=== before:"),
             "an ordinary mixed edit should get no summary header at all: {text}"
@@ -858,7 +938,7 @@ mod tests {
         std::fs::write(&after_path, "fn main() {\n    same();\n}\n").unwrap();
 
         let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
-        let text = render_text_diff(&data, false);
+        let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(
             text.starts_with(crate::diff::text::DiffSummary::NoChanges.label()),
@@ -884,7 +964,7 @@ mod tests {
         std::fs::write(after.path(), "// a comment\nfn main() {}\n").expect("write temp file");
 
         let (data, _fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Exact)?;
-        let text = render_text_diff(&data, false);
+        let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(
             text.starts_with(crate::diff::text::DiffSummary::CommentOnly.label()),
@@ -905,7 +985,7 @@ mod tests {
         }];
         data.after_ranges = data.before_ranges.clone();
 
-        let text = render_text_diff(&data, true);
+        let text = render_text_diff(&data, true, CONTEXT_LINES);
         assert!(
             text.starts_with("\u{1b}[1mNo changes - files are identical\u{1b}[0m\n\n"),
             "the header should be bold, not colored, when use_color is on: {text}"

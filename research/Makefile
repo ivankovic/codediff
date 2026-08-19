@@ -248,6 +248,18 @@ benchmark-other:
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --csv
 	$(MAKE) benchmark-other-report
 
+# Accuracy-only counterpart of benchmark-other: per fixture, every tool's line- AND node-level
+# agreement with the human mapping, written to data/comparison/benchmark_accuracy.csv with
+# sample.csv provenance columns for cross-referencing. No timing at all, so unlike benchmark-other
+# this doesn't need the warm-JVM driver and doesn't care about machine load - accuracy is
+# deterministic. Same GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN requirement.
+#
+# The node columns are a "did the tool consider this node's text changed" projection, NOT the
+# node-mapping fidelity benchmark_optimal_solutions reports - see data/comparison/PROVENANCE.md
+# and `benchmark_other --help`. Unix diff has no node columns by construction.
+benchmark-accuracy:
+	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
+
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
 # Same slow/fast split as benchmark-other above: `rq1-report` re-renders from whatever

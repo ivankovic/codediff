@@ -22,11 +22,10 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Clear, Paragraph},
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use tracing::{debug, error};
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 use crate::code::{Code, Language};
 use crate::diff::{
@@ -36,13 +35,13 @@ use crate::diff::{
         plain_text_line_diff, summarize_diff_with_comment_check,
     },
 };
-use crate::tui::actions::{Action, DiffSessionData};
+use crate::tui::actions::{Action, DiffOutcome, DiffSessionData};
 use crate::tui::components::{
     Component,
-    diff_mode_dialog::DiffModeDialog,
     diff_viewer::{DiffViewer, Panel},
     file_dialog::FileDialog,
     help_modal::HelpModal,
+    line_prompt::LinePrompt,
     no_changes_dialog::NoChangesDialog,
     search_modal::SearchModal,
     theme_dialog::ThemeDialog,
@@ -63,38 +62,39 @@ pub enum AppScreen {
     SelectTheme,
     /// The background diff computation is running.
     Diffing,
-    /// The background diff computation is paused, waiting for the user to answer
-    /// `Action::DiffModeChoiceNeeded` (the phase-1-5 residual was too large for `DiffMode::Fast`
-    /// to auto-resolve silently - see `PendingDiff::looks_expensive`).
-    SelectDiffMode,
     /// The `?` keybinding reference is open, drawn over the (still-visible) viewer.
     Help,
     /// The `/` search modal is open, drawn over the (still-visible) viewer.
     Search,
+    /// The `g` jump-to-line prompt is open, drawn over the (still-visible) viewer.
+    JumpToLine,
     /// `n`/`p` was pressed on a panel with no changes while the other panel has some -
     /// `NoChangesDialog` is open, drawn over the (still-visible) viewer, offering to switch.
     NoChangesPrompt,
 }
 
 /// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
-/// screen's own dialog (via `Action::DialogCancelled`, or - for `SelectDiffMode` - resolving to
-/// its current default selection instead of "cancel," which has no obvious meaning once a diff is
-/// already in flight and the background thread is blocked waiting for *some* answer).
+/// screen's own dialog (via `Action::DialogCancelled`).
+///
+/// `Diffing` is deliberately *not* a quit screen: Esc there cancels the in-flight computation
+/// and returns to the viewer (see the Esc arm in `handle_events`) - previously it quit the whole
+/// app, making a slow diff the one situation where a reflexive Esc lost the entire session.
 ///
 /// Deliberately an exhaustive match, not a list of `!=` exclusions: that list was extended twice
-/// before (for `SelectDiffMode`, then `Help`) and `SelectTheme` was missed *both* times, letting
-/// Esc silently quit the whole app instead of closing the theme picker - the only dialog that
-/// happened to (found in a 2026-07 code-health pass). An exhaustive match means the compiler
-/// itself forces every future `AppScreen` variant to be considered here, instead of relying on
-/// someone remembering to extend a growing exclusion list.
+/// before and `SelectTheme` was missed *both* times, letting Esc silently quit the whole app
+/// instead of closing the theme picker - the only dialog that happened to (found in a 2026-07
+/// code-health pass). An exhaustive match means the compiler itself forces every future
+/// `AppScreen` variant to be considered here, instead of relying on someone remembering to
+/// extend a growing exclusion list.
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
-        AppScreen::Viewer | AppScreen::Diffing => true,
-        AppScreen::SelectFile
+        AppScreen::Viewer => true,
+        AppScreen::Diffing
+        | AppScreen::SelectFile
         | AppScreen::SelectTheme
-        | AppScreen::SelectDiffMode
         | AppScreen::Help
         | AppScreen::Search
+        | AppScreen::JumpToLine
         | AppScreen::NoChangesPrompt => false,
     }
 }
@@ -107,22 +107,34 @@ pub struct App {
     diff_viewer: DiffViewer,
     file_dialog: Option<FileDialog>,
     theme_dialog: Option<ThemeDialog>,
-    diff_mode_dialog: Option<DiffModeDialog>,
     help_modal: Option<HelpModal>,
     no_changes_dialog: Option<NoChangesDialog>,
     search_modal: Option<SearchModal>,
+    line_prompt: Option<LinePrompt>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
-    /// Shared with whichever background diff thread is currently running (if any): once
-    /// `PendingDiff::looks_expensive()` trips, `compute_diff_interactive` stashes the
-    /// `oneshot::Sender` half here, and `Action::DiffModeSelected`'s handler (running on the main
-    /// task - a *different* OS thread than the `spawn_blocking` closure) retrieves it to unblock
-    /// that closure's `blocking_recv()`. There is never more than one diff in flight at a time
-    /// (`AppScreen::Diffing`/`SelectDiffMode` both make `dispatch_event_to_active_screen` ignore
-    /// new `StartDiff`s), so a single-slot cell is sufficient. Needs `Arc<Mutex<_>>`, not a bare
-    /// field, because it's written to from the `spawn_blocking` closure's own OS thread.
-    pending_diff_mode_tx: Arc<Mutex<Option<oneshot::Sender<DiffMode>>>>,
+    /// Incremented for every launched background diff; `start_diff` captures the current value
+    /// and tags its `Action::DiffComputed` with it. A result whose generation no longer matches
+    /// is silently dropped - which is all "cancelling" a `spawn_blocking` computation can mean
+    /// (the thread itself runs to completion; its answer just doesn't land). Bumped by Esc during
+    /// `Diffing` and by every new `StartDiff`, so a slow older diff can never overwrite a newer
+    /// one's result either.
+    diff_generation: u64,
+    /// Where to put the cursor back after the next `DiffReady` - set by the `r` reload and the
+    /// `e` editor round-trip so recomputing the same pair doesn't dump the cursor back at the
+    /// first change. `(panel, row, col)`, applied clamped (the file may have changed under a
+    /// reload).
+    restore_after_reload: Option<(Panel, usize, usize)>,
+    /// The last submitted search query - `/` then a bare Enter repeats it (see `SearchModal`).
+    last_search_query: Option<String>,
+    /// Set by the `e` key: leave the TUI, run `$VISUAL`/`$EDITOR` on this `(path, 1-indexed
+    /// line)`, then re-enter and re-diff - serviced by the `run` loop between event batches,
+    /// since only it holds the `UI` needed to release and re-acquire the terminal.
+    pending_editor: Option<(PathBuf, usize)>,
+    /// Recently diffed pairs (most recent first), loaded from the config in `run` and offered on
+    /// the empty-start screen as digit shortcuts - see `draw_recent_pairs`/the digit-key arm.
+    recent_pairs: Vec<(PathBuf, PathBuf)>,
 
     screen: AppScreen,
     /// Which panel the open file dialog is selecting a file for.
@@ -146,15 +158,10 @@ pub struct App {
     /// shown in the footer. Same lifecycle as `diff_summary` - computed once on `Action::DiffReady`,
     /// cleared on `StartDiff`/`DiffFailed`.
     change_counts: Option<ChangeCounts>,
-    /// Which `DiffMode` produced the currently loaded diff (see `DiffSessionData::mode`), shown in
-    /// the footer so a user can't forget whether they're looking at the fast, approximate result
-    /// or the exact one. Same lifecycle as `diff_summary`/`change_counts`. Ignored in the footer
-    /// when `plain_text_fallback` is set - see that field's own doc comment.
-    diff_mode: Option<DiffMode>,
     /// Whether the currently loaded diff came from `diff::text::plain_text_line_diff` (see
     /// `DiffSessionData::plain_text_fallback`) rather than the AST pipeline - shown in the footer
-    /// as `[plain text]` instead of `diff_mode`'s `[fast]`/`[exact]`, since neither of those
-    /// labels means anything when no AST algorithm ran at all. Same lifecycle as `diff_mode`.
+    /// as `[plain text]`, since no AST algorithm ran at all. Same lifecycle as
+    /// `diff_summary`/`change_counts`.
     plain_text_fallback: bool,
 
     should_exit: bool,
@@ -172,13 +179,17 @@ impl App {
             diff_viewer: DiffViewer::new(),
             file_dialog: None,
             theme_dialog: None,
-            diff_mode_dialog: None,
             help_modal: None,
             no_changes_dialog: None,
             search_modal: None,
+            line_prompt: None,
             action_tx,
             action_rx,
-            pending_diff_mode_tx: Arc::new(Mutex::new(None)),
+            diff_generation: 0,
+            restore_after_reload: None,
+            last_search_query: None,
+            pending_editor: None,
+            recent_pairs: Vec::new(),
             screen: AppScreen::default(),
             dialog_target: None,
             current_theme: OverlayTheme::default(),
@@ -187,7 +198,6 @@ impl App {
             last_error: None,
             diff_summary: None,
             change_counts: None,
-            diff_mode: None,
             plain_text_fallback: false,
             should_exit: false,
             should_suspend: false,
@@ -199,10 +209,17 @@ impl App {
         // touches disk; only actually running the TUI reads (and may create) the config file.
         self.current_theme = theme::load_overlay_theme();
         self.diff_viewer.set_overlay_theme(self.current_theme);
+        self.diff_viewer
+            .set_layout_override(theme::load_panel_layout());
+        self.recent_pairs = theme::load_recent_pairs();
 
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);
+        // Mouse capture on by default: the wheel scrolls the panel under the pointer and a
+        // click focuses/places the cursor (`DiffViewer::handle_mouse_event`). Terminal-native
+        // text selection remains available via the terminal's own modifier (usually Shift-drag).
+        ui.mouse = true;
         ui.enter()?;
 
         self.diff_viewer
@@ -213,6 +230,9 @@ impl App {
         loop {
             self.handle_events(&mut ui).await?;
             self.handle_actions(&mut ui)?;
+            if let Some((path, line)) = self.pending_editor.take() {
+                self.run_editor(&mut ui, &path, line)?;
+            }
             if self.should_suspend {
                 ui.suspend()?;
                 action_tx.send(Action::Resume)?;
@@ -245,6 +265,63 @@ impl App {
                 KeyCode::Esc if esc_should_quit(self.screen) => {
                     action_tx.send(Action::Quit)?;
                 }
+                // Esc during an in-flight diff cancels it instead of quitting: bump the
+                // generation so the eventual `DiffComputed` is recognized as stale and dropped,
+                // and return to the viewer (still showing whatever diff was loaded before).
+                KeyCode::Esc if self.screen == AppScreen::Diffing => {
+                    self.diff_generation += 1;
+                    self.restore_after_reload = None;
+                    self.screen = AppScreen::Viewer;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
+                // Re-diff the current pair from disk - the edit-in-another-terminal loop. Keeps
+                // the cursor where it is (clamped) instead of resetting to the first change.
+                KeyCode::Char('r') if self.screen == AppScreen::Viewer => {
+                    if let (Some(before), Some(after)) =
+                        (self.before_path.clone(), self.after_path.clone())
+                    {
+                        self.remember_cursor_for_restore();
+                        action_tx.send(Action::StartDiff(before, after, DiffMode::Fast))?;
+                    }
+                    globally_handled = true;
+                }
+                KeyCode::Char('g') if self.screen == AppScreen::Viewer => {
+                    self.line_prompt = Some(LinePrompt::new());
+                    self.screen = AppScreen::JumpToLine;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
+                // On the empty-start screen, the digit keys reopen a recent pair (see
+                // `draw_recent_pairs`). Only with no files loaded: once a diff is up, digits
+                // stay free for future use.
+                KeyCode::Char(c @ '1'..='9')
+                    if self.screen == AppScreen::Viewer
+                        && self.before_path.is_none()
+                        && self.after_path.is_none() =>
+                {
+                    let index = (c as usize) - ('1' as usize);
+                    if let Some((before, after)) = self.recent_pairs.get(index).cloned() {
+                        self.open_files(before, after)?;
+                        action_tx.send(Action::Render)?;
+                    }
+                    globally_handled = true;
+                }
+                // Open the focused panel's file in $VISUAL/$EDITOR at the cursor line - serviced
+                // by the run loop (`run_editor`), which is the only place the terminal can be
+                // released and re-acquired.
+                KeyCode::Char('e') if self.screen == AppScreen::Viewer => {
+                    let path = match self.diff_viewer.active_panel() {
+                        Panel::Before => self.before_path.clone(),
+                        Panel::After => self.after_path.clone(),
+                    };
+                    if let (Some(path), Some((row, _col))) =
+                        (path, self.diff_viewer.focused_cursor_position())
+                    {
+                        self.pending_editor = Some((path, row + 1));
+                    }
+                    globally_handled = true;
+                }
                 KeyCode::Char('o') if self.screen == AppScreen::Viewer => {
                     let panel = self.diff_viewer.active_panel();
                     self.dialog_target = Some(panel);
@@ -265,13 +342,13 @@ impl App {
                     globally_handled = true;
                 }
                 KeyCode::Char('?') if self.screen == AppScreen::Viewer => {
-                    self.help_modal = Some(HelpModal::new());
+                    self.help_modal = Some(HelpModal::new(self.current_theme));
                     self.screen = AppScreen::Help;
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
                 KeyCode::Char('/') if self.screen == AppScreen::Viewer => {
-                    self.search_modal = Some(SearchModal::new());
+                    self.search_modal = Some(SearchModal::new(self.last_search_query.clone()));
                     self.screen = AppScreen::Search;
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
@@ -316,8 +393,8 @@ impl App {
                 None => Ok(None),
             },
             AppScreen::Diffing => Ok(None),
-            AppScreen::SelectDiffMode => match self.diff_mode_dialog.as_mut() {
-                Some(dialog) => dialog.handle_events(Some(event)),
+            AppScreen::JumpToLine => match self.line_prompt.as_mut() {
+                Some(prompt) => prompt.handle_events(Some(event)),
                 None => Ok(None),
             },
             AppScreen::Help => match self.help_modal.as_mut() {
@@ -359,18 +436,42 @@ impl App {
                 Action::Render => self.render(ui)?,
                 Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
                 Action::DialogCancelled => self.handle_dialog_cancelled(),
-                Action::StartDiff(before, after) => {
+                Action::StartDiff(before, after, mode) => {
                     self.screen = AppScreen::Diffing;
                     self.diff_summary = None;
                     self.change_counts = None;
-                    self.diff_mode = None;
                     self.plain_text_fallback = false;
-                    self.start_diff(before.clone(), after.clone());
+                    self.start_diff(before.clone(), after.clone(), *mode);
+                }
+                // Every background diff reports back through here; only the result matching the
+                // current generation is re-dispatched as `DiffReady`/`DiffFailed` (which is what
+                // the components consume) - a stale one (cancelled, or superseded by a newer
+                // `StartDiff`) is dropped without a trace.
+                Action::DiffComputed {
+                    generation,
+                    outcome,
+                } => {
+                    if *generation == self.diff_generation {
+                        match outcome {
+                            DiffOutcome::Ready { data, .. } => {
+                                self.action_tx.send(Action::DiffReady(data.clone()))?;
+                            }
+                            DiffOutcome::Failed(message) => {
+                                self.action_tx.send(Action::DiffFailed(message.clone()))?;
+                            }
+                        }
+                    }
                 }
                 Action::DiffReady(data) => {
                     self.screen = AppScreen::Viewer;
                     self.last_error = None;
                     self.file_dialog = None;
+                    // A pair that diffed successfully is worth remembering for the empty-start
+                    // screen's digit shortcuts (deduplicated and capped in `record_recent_pair`).
+                    theme::record_recent_pair(&data.before_path, &data.after_path);
+                    let pair = (data.before_path.clone(), data.after_path.clone());
+                    self.recent_pairs.retain(|existing| existing != &pair);
+                    self.recent_pairs.insert(0, pair);
                     self.diff_summary = summarize_diff_with_comment_check(
                         &data.before_contents,
                         &data.after_contents,
@@ -384,7 +485,6 @@ impl App {
                         &data.before_ranges,
                         &data.after_ranges,
                     ));
-                    self.diff_mode = Some(data.mode);
                     self.plain_text_fallback = data.plain_text_fallback;
                 }
                 Action::DiffFailed(message) => {
@@ -394,7 +494,6 @@ impl App {
                     self.file_dialog = None;
                     self.diff_summary = None;
                     self.change_counts = None;
-                    self.diff_mode = None;
                     self.plain_text_fallback = false;
                 }
                 Action::Error(message) => {
@@ -404,26 +503,18 @@ impl App {
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
-                Action::DiffModeChoiceNeeded {
-                    unmatched_before,
-                    unmatched_after,
-                } => {
-                    self.diff_mode_dialog =
-                        Some(DiffModeDialog::new(*unmatched_before, *unmatched_after));
-                    self.screen = AppScreen::SelectDiffMode;
+                // A live preview while the theme dialog's selection moves - applied to the
+                // viewer behind the dialog, but not persisted and not recorded as
+                // `current_theme`; Esc (`DialogCancelled`) reverts to `current_theme`.
+                Action::ThemePreviewed(previewed) => {
+                    self.diff_viewer.set_overlay_theme(*previewed);
                 }
                 Action::SearchSubmitted(query) => self.handle_search_submitted(query.clone()),
-                Action::DiffModeSelected(mode) => {
-                    if let Some(tx) = self
-                        .pending_diff_mode_tx
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .take()
-                    {
-                        let _ = tx.send(*mode);
-                    }
-                    self.diff_mode_dialog = None;
-                    self.screen = AppScreen::Diffing;
+                Action::SearchQueryChanged(query) => self.handle_search_query_changed(query),
+                Action::JumpToLineSubmitted(line) => {
+                    self.diff_viewer.jump_to_line(*line);
+                    self.line_prompt = None;
+                    self.screen = AppScreen::Viewer;
                 }
                 Action::NoChangesPromptNeeded {
                     forward,
@@ -437,9 +528,54 @@ impl App {
 
             self.diff_viewer.update(action.clone())?;
             if let Some(dialog) = self.file_dialog.as_mut() {
-                dialog.update(action)?;
+                dialog.update(action.clone())?;
+            }
+            // `DiffViewer::load_diff` (triggered by the update call above) resets the cursor to
+            // the first change; a reload/exact re-run of the same pair should instead put it back
+            // where the user had it (clamped - the file may have changed under a reload).
+            if matches!(action, Action::DiffReady(_))
+                && let Some((panel, row, col)) = self.restore_after_reload.take()
+            {
+                self.diff_viewer.restore_cursor(panel, row, col);
             }
         }
+        Ok(())
+    }
+
+    /// Record the focused panel's cursor so the next `DiffReady` puts it back - see
+    /// `restore_after_reload`.
+    fn remember_cursor_for_restore(&mut self) {
+        if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
+            self.restore_after_reload = Some((self.diff_viewer.active_panel(), row, col));
+        }
+    }
+
+    /// The `e` key's other half: release the terminal, run the user's editor on `path` at
+    /// `line` (the `+N` line convention vi/vim/nano/emacs/micro all accept), re-acquire the
+    /// terminal, and re-diff so the edit shows up immediately - closing the read-diff/fix-code
+    /// loop without ever leaving the session. `$VISUAL` beats `$EDITOR`, the POSIX convention;
+    /// `vi` is the last resort. Blocking the async loop here is the *point*: the TUI has no
+    /// terminal to draw on until the editor exits.
+    fn run_editor(&mut self, ui: &mut UI, path: &Path, line: usize) -> Result<()> {
+        let editor = std::env::var("VISUAL")
+            .or_else(|_| std::env::var("EDITOR"))
+            .unwrap_or_else(|_| "vi".to_string());
+        ui.exit()?;
+        let status = std::process::Command::new(&editor)
+            .arg(format!("+{line}"))
+            .arg(path)
+            .status();
+        ui.enter()?;
+        ui.terminal.clear()?;
+        if let Err(err) = status {
+            self.last_error = Some(format!("failed to launch editor '{editor}': {err}"));
+        }
+        if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
+            self.remember_cursor_for_restore();
+            self.action_tx
+                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
+        }
+        self.action_tx.send(Action::Render)?;
         Ok(())
     }
 
@@ -475,27 +611,59 @@ impl App {
         }
 
         if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
-            self.action_tx.send(Action::StartDiff(before, after))?;
+            self.action_tx
+                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
         }
         Ok(())
     }
 
     fn handle_dialog_cancelled(&mut self) {
+        // Cancelling the theme dialog must undo any live preview it applied (see
+        // `Action::ThemePreviewed`); a no-op when no preview happened.
+        if self.theme_dialog.is_some() {
+            self.diff_viewer.set_overlay_theme(self.current_theme);
+        }
+        // Cancelling the search modal reverts its live highlight preview to the last actually
+        // submitted query's matches (or none).
+        if self.search_modal.is_some() {
+            let last = self.last_search_query.clone().unwrap_or_default();
+            self.diff_viewer.preview_search(&last);
+        }
         self.file_dialog = None;
         self.theme_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
         self.no_changes_dialog = None;
+        self.line_prompt = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
     }
 
     /// Apply a search query from the search modal: jump the focused panel's cursor to the nearest
-    /// match and highlight every match, then return to the normal viewer screen.
+    /// match and highlight every match, then return to the normal viewer screen. A bare Enter
+    /// (empty query) repeats the last submitted search, if any - the modal advertises this in its
+    /// hint line.
     fn handle_search_submitted(&mut self, query: String) {
+        let query = if query.is_empty() {
+            self.last_search_query.clone().unwrap_or_default()
+        } else {
+            query
+        };
+        if !query.is_empty() {
+            self.last_search_query = Some(query.clone());
+        }
         self.diff_viewer.search(&query);
         self.search_modal = None;
         self.screen = AppScreen::Viewer;
+    }
+
+    /// Live feedback while typing in the search modal: preview the highlights (no cursor
+    /// movement) and feed the match count back into the modal's `N matches` readout.
+    fn handle_search_query_changed(&mut self, query: &str) {
+        let count = self.diff_viewer.preview_search(query);
+        if let Some(modal) = self.search_modal.as_mut() {
+            modal.set_live_match_count(count);
+        }
     }
 
     /// Apply a theme choice from the theme dialog: update the live viewer, persist it for future
@@ -525,29 +693,37 @@ impl App {
     }
 
     /// Run the (CPU-bound) parse+diff pipeline on a blocking thread so it never stalls the
-    /// render loop, then report the result back as an action.
+    /// render loop, then report the result back as `Action::DiffComputed`, tagged with a fresh
+    /// generation - see `diff_generation` for how that makes cancellation/supersession work.
     ///
     /// The diff pipeline isn't guaranteed panic-free for arbitrary/unsupported input (e.g. it
     /// assumes a parsed AST further down the call chain), and a panic on a `spawn_blocking`
     /// thread would otherwise just vanish, leaving the UI stuck on "Diffing…" forever. Catching
-    /// it here turns that into a reported `Action::DiffFailed` instead.
-    fn start_diff(&self, before: PathBuf, after: PathBuf) {
+    /// it here turns that into a reported failure instead.
+    fn start_diff(&mut self, before: PathBuf, after: PathBuf, mode: DiffMode) {
+        self.diff_generation += 1;
+        let generation = self.diff_generation;
         let tx = self.action_tx.clone();
-        let pending_diff_mode_tx = self.pending_diff_mode_tx.clone();
         tokio::task::spawn_blocking(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                compute_diff_interactive(&before, &after, &tx, &pending_diff_mode_tx)
+                compute_diff(&before, &after, mode)
             }));
-            let action = match result {
-                Ok(Ok(data)) => Action::DiffReady(data),
-                Ok(Err(err)) => Action::DiffFailed(err.to_string()),
-                Err(panic) => Action::DiffFailed(format!(
+            let outcome = match result {
+                Ok(Ok((data, fallback_used))) => DiffOutcome::Ready {
+                    data,
+                    fallback_used,
+                },
+                Ok(Err(err)) => DiffOutcome::Failed(err.to_string()),
+                Err(panic) => DiffOutcome::Failed(format!(
                     "internal error while diffing: {}",
                     panic_message(&panic)
                 )),
             };
             // The receiver only goes away when the app is shutting down.
-            let _ = tx.send(action);
+            let _ = tx.send(Action::DiffComputed {
+                generation,
+                outcome,
+            });
         });
     }
 
@@ -571,9 +747,9 @@ impl App {
                     frame.render_widget(diffing_status_paragraph(), area);
                     Ok(())
                 }
-                AppScreen::SelectDiffMode => self.draw_diff_mode_dialog(frame, area),
                 AppScreen::Help => self.draw_help_modal(frame, area),
                 AppScreen::Search => self.draw_search_modal(frame, area),
+                AppScreen::JumpToLine => self.draw_line_prompt(frame, area),
                 AppScreen::NoChangesPrompt => self.draw_no_changes_dialog(frame, area),
             };
             if let Err(err) = result {
@@ -615,6 +791,7 @@ impl App {
             next += 1;
         }
         self.diff_viewer.draw(frame, layout[next])?;
+        self.draw_recent_pairs(frame, layout[next]);
         next += 1;
         if let Some(message) = &self.last_error {
             frame.render_widget(
@@ -652,13 +829,18 @@ impl App {
         } else if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
             left_parts.push(format!("change {index}/{total}"));
         }
-        // `[fast]`/`[exact]` describe which AST algorithm ran; neither means anything for a
-        // plain-text fallback (no AST algorithm ran at all), so that label takes over instead of
-        // sitting alongside a misleading one.
+        // `[plain text]` flags that no AST algorithm ran at all (unrecognized language on one
+        // side). The old `[fast]`/`[exact]` mode label is gone along with the Fast/Exact prompt:
+        // since the phases-4-7 rearchitecture, `PendingDiff::finish` runs the same pipeline
+        // regardless of `DiffMode` (see its phase-6 comment), so a mode label described a
+        // distinction that no longer exists.
         if self.plain_text_fallback {
             left_parts.push("[plain text]".to_string());
-        } else if let Some(mode) = self.diff_mode {
-            left_parts.push(format_diff_mode(mode));
+        }
+        // The layout override only earns footer space when it's actually overriding something.
+        let layout = self.diff_viewer.layout_override();
+        if layout != crate::tui::theme::PanelLayout::Auto {
+            left_parts.push(format!("[layout: {}]", layout.label()));
         }
         let left = left_parts.join("   ");
 
@@ -678,6 +860,50 @@ impl App {
         );
     }
 
+    /// On the empty-start screen only (no file picked for either panel), overlay a small
+    /// centered list of recently diffed pairs with their digit shortcuts - so a returning user
+    /// can reopen yesterday's comparison with one keypress instead of two file-dialog trips.
+    /// Draws nothing once any file is loaded, or when there's no history to offer.
+    fn draw_recent_pairs(&self, frame: &mut ratatui::Frame, area: Rect) {
+        if self.before_path.is_some() || self.after_path.is_some() || self.recent_pairs.is_empty() {
+            return;
+        }
+        let shown = self.recent_pairs.len().min(9);
+        let mut lines = vec![ratatui::text::Line::from("Recent pairs".to_string())];
+        for (i, (before, after)) in self.recent_pairs.iter().take(shown).enumerate() {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {}  {}  \u{2194}  {}",
+                i + 1,
+                before.display(),
+                after.display()
+            )));
+        }
+        lines.push(ratatui::text::Line::from(
+            "  press a digit to reopen, or 'o' to browse".to_string(),
+        ));
+
+        let width = (lines
+            .iter()
+            .map(|l| l.width() as u16)
+            .max()
+            .unwrap_or(20)
+            .saturating_add(4))
+        .min(area.width);
+        let height = (lines.len() as u16 + 2).min(area.height);
+        let x = area.x + (area.width.saturating_sub(width)) / 2;
+        let y = area.y + (area.height.saturating_sub(height)) / 2;
+        let popup = Rect::new(x, y, width, height);
+        frame.render_widget(Clear, popup);
+        frame.render_widget(
+            Paragraph::new(lines).block(
+                ratatui::widgets::Block::default()
+                    .borders(ratatui::widgets::Borders::ALL)
+                    .border_style(Style::new().fg(Color::Cyan)),
+            ),
+            popup,
+        );
+    }
+
     /// Draw the theme picker as a popup over the (still-visible) viewer behind it.
     fn draw_theme_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
@@ -689,15 +915,20 @@ impl App {
         dialog.draw(frame, popup)
     }
 
-    /// Draw the Fast/Exact prompt as a popup over the "Diffing…" status behind it.
-    fn draw_diff_mode_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
-        frame.render_widget(diffing_status_paragraph(), area);
-        let Some(dialog) = self.diff_mode_dialog.as_mut() else {
+    /// Draw the `g` jump-to-line prompt as a popup over the (still-visible) viewer behind it,
+    /// with a real terminal cursor at the end of the typed number - same convention as the
+    /// search modal.
+    fn draw_line_prompt(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(prompt) = self.line_prompt.as_mut() else {
             return Ok(());
         };
-        let popup = dialog.popup_area(area);
+        let popup = prompt.popup_area(area);
         frame.render_widget(Clear, popup);
-        dialog.draw(frame, popup)
+        prompt.draw(frame, popup)?;
+        let (x, y) = prompt.cursor_screen_position(popup);
+        frame.set_cursor(x, y);
+        Ok(())
     }
 
     /// Draw the `?` keybinding reference as a popup over the (still-visible) viewer behind it.
@@ -741,13 +972,13 @@ impl App {
 
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
-const FOOTER_HINTS: &str = "?:help  o:open  n/p:next/prev  /:search  Tab:switch  q:quit";
+const FOOTER_HINTS: &str = "?:help  o:open  r:reload  n/p:next/prev  /:search  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
 /// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
 /// covered by the status bar above).
 fn format_change_counts(counts: ChangeCounts) -> String {
-    let mut parts = Vec::with_capacity(3);
+    let mut parts = Vec::with_capacity(4);
     if counts.insertions > 0 {
         parts.push(format!("+{}", counts.insertions));
     }
@@ -757,24 +988,17 @@ fn format_change_counts(counts: ChangeCounts) -> String {
     if counts.updates > 0 {
         parts.push(format!("~{}", counts.updates));
     }
+    if counts.moves > 0 {
+        parts.push(format!("M{}", counts.moves));
+    }
     parts.join(" ")
 }
 
-/// Formats the currently loaded diff's `DiffMode` as a compact footer label - `[fast]`/`[exact]`,
-/// so a user can't forget which one they're looking at once the initial prompt (`draw_diff_mode_
-/// dialog`, only shown when `PendingDiff::looks_expensive()` trips) is long gone.
-fn format_diff_mode(mode: DiffMode) -> String {
-    match mode {
-        DiffMode::Fast => "[fast]".to_string(),
-        DiffMode::Exact => "[exact]".to_string(),
-    }
-}
-
-/// The centered "Diffing…" status shown while a background diff computation is in flight -
-/// shared by `render`'s `AppScreen::Diffing` arm and `draw_diff_mode_dialog` (the Fast/Exact
-/// prompt's own background), which previously each built the identical `Paragraph` themselves.
+/// The centered status shown while a blocking (screen-owning) diff computation is in flight.
+/// Mentions the Esc cancel because it's only discoverable here - the footer isn't drawn on the
+/// `Diffing` screen.
 fn diffing_status_paragraph() -> Paragraph<'static> {
-    Paragraph::new("Diffing\u{2026}").alignment(Alignment::Center)
+    Paragraph::new("Diffing\u{2026} (Esc cancels)").alignment(Alignment::Center)
 }
 
 /// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's
@@ -935,54 +1159,6 @@ pub(crate) fn compute_diff(
     Ok((data, fallback_used))
 }
 
-/// Interactive counterpart to `compute_diff`, only ever called from `start_diff`'s
-/// `spawn_blocking` closure: if `PendingDiff::looks_expensive()` trips, sends
-/// `Action::DiffModeChoiceNeeded`, stashes the `oneshot::Sender` in `pending_diff_mode_tx`, and
-/// blocks *this* worker thread on `Receiver::blocking_recv()` until `App` (running on the main
-/// task, a different OS thread) answers via `Action::DiffModeSelected`. Safe to block here
-/// specifically because this runs inside `spawn_blocking`, on tokio's dedicated blocking-pool
-/// thread, not the async executor that drives rendering/input.
-fn compute_diff_interactive(
-    before: &Path,
-    after: &Path,
-    action_tx: &mpsc::UnboundedSender<Action>,
-    pending_diff_mode_tx: &Arc<Mutex<Option<oneshot::Sender<DiffMode>>>>,
-) -> Result<DiffSessionData> {
-    let (before_code, after_code) = parse_before_after(before, after)?;
-    if before_code.ast.is_none() || after_code.ast.is_none() {
-        // No AST on at least one side: there's no tree-edit-distance algorithm to run at all, so
-        // the Fast/Exact prompt below (gated on `PendingDiff::looks_expensive`, which needs an
-        // AST) doesn't apply here either - go straight to the plain-text fallback.
-        return Ok(assemble_plain_text_diff_session_data(
-            before,
-            after,
-            &before_code,
-            &after_code,
-            DiffMode::Fast,
-        ));
-    }
-    let pending = Diff::pending(&before_code, &after_code);
-
-    let mode = if pending.looks_expensive() {
-        let (tx, rx) = oneshot::channel::<DiffMode>();
-        *pending_diff_mode_tx
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some(tx);
-        let (unmatched_before, unmatched_after) = pending.unmatched_counts();
-        let _ = action_tx.send(Action::DiffModeChoiceNeeded {
-            unmatched_before,
-            unmatched_after,
-        });
-        // `App` is shutting down (receiver dropped) => just proceed with the default.
-        rx.blocking_recv().unwrap_or_default()
-    } else {
-        DiffMode::Fast
-    };
-
-    let diff = pending.finish(mode);
-    assemble_diff_session_data(before, after, &before_code, &after_code, &diff, mode)
-}
-
 /// If `code` has no detected language and no content (the `/dev/null` case handled by
 /// `compute_diff`), re-parse it as empty content in `fallback_language` instead of leaving it
 /// unsupported.
@@ -1060,7 +1236,11 @@ mod tests {
             .expect("StartDiff must fire once both sides are set");
         assert_eq!(
             action,
-            Action::StartDiff(before.path().to_path_buf(), after.path().to_path_buf())
+            Action::StartDiff(
+                before.path().to_path_buf(),
+                after.path().to_path_buf(),
+                DiffMode::Fast
+            )
         );
         Ok(())
     }
@@ -1162,15 +1342,57 @@ mod tests {
     fn esc_should_quit_is_false_for_every_screen_with_its_own_dialog() {
         assert!(!esc_should_quit(AppScreen::SelectFile));
         assert!(!esc_should_quit(AppScreen::SelectTheme));
-        assert!(!esc_should_quit(AppScreen::SelectDiffMode));
         assert!(!esc_should_quit(AppScreen::Help));
         assert!(!esc_should_quit(AppScreen::Search));
+        assert!(!esc_should_quit(AppScreen::JumpToLine));
     }
 
     #[test]
-    fn esc_should_quit_is_true_with_no_dialog_open() {
+    fn esc_should_quit_is_true_only_on_the_bare_viewer() {
         assert!(esc_should_quit(AppScreen::Viewer));
-        assert!(esc_should_quit(AppScreen::Diffing));
+        // Esc during Diffing cancels the computation instead of quitting - see the dedicated
+        // Esc arm in `handle_events`.
+        assert!(!esc_should_quit(AppScreen::Diffing));
+    }
+
+    /// Esc during `Diffing` bumps the generation, so the eventually arriving `DiffComputed` is
+    /// recognized as stale and never re-dispatched as `DiffReady` - i.e. the cancel actually
+    /// discards the result instead of just hiding the screen.
+    #[test]
+    fn a_stale_diff_computed_result_is_dropped_after_cancel() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.screen = AppScreen::Diffing;
+        app.diff_generation = 1; // as if start_diff had launched generation 1
+
+        // The cancel: what the Esc arm in handle_events does.
+        app.diff_generation += 1;
+        app.screen = AppScreen::Viewer;
+
+        // The stale result arrives afterwards.
+        app.action_tx.send(Action::DiffComputed {
+            generation: 1,
+            outcome: DiffOutcome::Failed("too late".to_string()),
+        })?;
+        let mut ui_free_actions = Vec::new();
+        while let Ok(action) = app.action_rx.try_recv() {
+            match &action {
+                Action::DiffComputed { .. } => {
+                    // Simulate handle_actions' arm without needing a real UI.
+                    if let Action::DiffComputed { generation, .. } = &action
+                        && *generation == app.diff_generation
+                    {
+                        ui_free_actions.push(action.clone());
+                    }
+                }
+                other => ui_free_actions.push(other.clone()),
+            }
+        }
+        assert!(
+            ui_free_actions.is_empty(),
+            "a stale generation must produce no follow-up actions: {ui_free_actions:?}"
+        );
+        assert!(app.last_error.is_none());
+        Ok(())
     }
 
     #[test]
@@ -1201,7 +1423,9 @@ mod tests {
         use crossterm::event::{KeyEvent, KeyModifiers};
 
         let mut app = App::new(4.0, 60.0).expect("construct App");
-        app.help_modal = Some(crate::tui::components::help_modal::HelpModal::new());
+        app.help_modal = Some(crate::tui::components::help_modal::HelpModal::new(
+            OverlayTheme::default(),
+        ));
         app.screen = AppScreen::Help;
 
         let event = Event::Key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
@@ -1219,7 +1443,7 @@ mod tests {
     fn handle_search_submitted_jumps_the_focused_panel_and_returns_to_the_viewer_screen() {
         let mut app = App::new(4.0, 60.0).expect("construct App");
         app.screen = AppScreen::Search;
-        app.search_modal = Some(SearchModal::new());
+        app.search_modal = Some(SearchModal::new(None));
         app.diff_viewer.load_diff(&DiffSessionData {
             before_path: PathBuf::from("before.rs"),
             after_path: PathBuf::from("after.rs"),
@@ -1248,7 +1472,7 @@ mod tests {
         use crossterm::event::{KeyEvent, KeyModifiers};
 
         let mut app = App::new(4.0, 60.0).expect("construct App");
-        app.search_modal = Some(SearchModal::new());
+        app.search_modal = Some(SearchModal::new(None));
         app.screen = AppScreen::Search;
 
         let event = Event::Key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE));
@@ -1463,14 +1687,16 @@ mod tests {
                 insertions: 12,
                 deletions: 4,
                 updates: 2,
+                moves: 3,
             }),
-            "+12 -4 ~2"
+            "+12 -4 ~2 M3"
         );
         assert_eq!(
             format_change_counts(ChangeCounts {
                 insertions: 3,
                 deletions: 0,
                 updates: 0,
+                moves: 0,
             }),
             "+3"
         );
@@ -1479,6 +1705,7 @@ mod tests {
                 insertions: 0,
                 deletions: 0,
                 updates: 0,
+                moves: 0,
             }),
             ""
         );
@@ -1491,6 +1718,7 @@ mod tests {
             insertions: 12,
             deletions: 4,
             updates: 2,
+            moves: 0,
         });
 
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -1593,37 +1821,8 @@ mod tests {
     }
 
     #[test]
-    fn format_diff_mode_labels_each_mode() {
-        assert_eq!(format_diff_mode(DiffMode::Fast), "[fast]");
-        assert_eq!(format_diff_mode(DiffMode::Exact), "[exact]");
-    }
-
-    #[test]
-    fn draw_viewer_shows_the_active_diff_mode_in_the_footer_when_set() -> Result<()> {
+    fn draw_viewer_shows_plain_text_fallback_in_the_footer() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
-        app.diff_mode = Some(DiffMode::Exact);
-
-        let backend = ratatui::backend::TestBackend::new(80, 24);
-        let mut terminal = ratatui::Terminal::new(backend)?;
-        terminal.draw(|f| {
-            let area = f.size();
-            app.draw_viewer(f, area).unwrap();
-        })?;
-
-        assert!(
-            rendered_text(&terminal).contains("[exact]"),
-            "expected the active diff mode to be drawn in the footer"
-        );
-        Ok(())
-    }
-
-    /// `[plain text]` must take over from `[fast]`/`[exact]`, not sit alongside it - neither
-    /// `DiffMode` label means anything when no AST algorithm ran at all.
-    #[test]
-    fn draw_viewer_shows_plain_text_fallback_in_the_footer_instead_of_the_diff_mode() -> Result<()>
-    {
-        let mut app = App::new(4.0, 60.0)?;
-        app.diff_mode = Some(DiffMode::Fast);
         app.plain_text_fallback = true;
 
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -1637,10 +1836,6 @@ mod tests {
         assert!(
             text.contains("[plain text]"),
             "expected the plain-text fallback indicator to be drawn in the footer"
-        );
-        assert!(
-            !text.contains("[fast]"),
-            "the diff_mode label must not also render alongside [plain text]"
         );
         Ok(())
     }
