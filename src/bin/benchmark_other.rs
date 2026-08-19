@@ -1840,8 +1840,8 @@ fn write_accuracy_csv(rows: &[AccuracyRow], path: &std::path::Path) -> Result<()
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating {parent:?} for the accuracy CSV"))?;
     }
-    let mut writer = Writer::from_path(path)
-        .with_context(|| format!("creating accuracy CSV at {path:?}"))?;
+    let mut writer =
+        Writer::from_path(path).with_context(|| format!("creating accuracy CSV at {path:?}"))?;
 
     let mut header = vec![
         "solution".to_string(),
@@ -2147,7 +2147,11 @@ mod tests {
         // 'é' is one character but two bytes, so the column after it advances by 2.
         let table = char_offset_table("é x");
         assert_eq!(table[0], (0, 0));
-        assert_eq!(table[1], (0, 2), "column is a byte offset, not a char index");
+        assert_eq!(
+            table[1],
+            (0, 2),
+            "column is a byte offset, not a char index"
+        );
         assert_eq!(table[2], (0, 3));
     }
 

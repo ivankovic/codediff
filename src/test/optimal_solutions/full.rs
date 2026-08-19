@@ -38,6 +38,8 @@ mod cpp_llnl_sundials_comment_change;
 #[cfg(test)]
 mod cpp_mikepopoloski_slang_remove_if_condition_and_brackets;
 #[cfg(test)]
+mod cpp_qpdf_qpdf_move_to_assert_from_if_and_throw;
+#[cfg(test)]
 mod csharp_cyanfish_naps2_add_condition_to_if;
 #[cfg(test)]
 mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
@@ -94,6 +96,8 @@ mod java_eclipse_jdt_eclipse_remove_import_and_inheritance;
 #[cfg(test)]
 mod java_hunterhacker_jdom_javadoc_update;
 #[cfg(test)]
+mod java_hunterhacker_jdom_move_a_block;
+#[cfg(test)]
 mod java_jflex_de_jflex_javadoc_update;
 #[cfg(test)]
 mod java_jopt_simple_jopt_simple_remove_import;
@@ -103,6 +107,8 @@ mod java_junit_pioneer_junit_pioneer_add_block_comment;
 mod java_zeroc_ice_ice_comment_only_update;
 #[cfg(test)]
 mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;
+#[cfg(test)]
+mod javascript_jquery_ui_rails_jquery_ui_rails_add_strict_and_move_function_call_parenthesis;
 #[cfg(test)]
 mod javascript_jquery_ui_rails_jquery_ui_rails_update_text_in_string;
 #[cfg(test)]
@@ -159,6 +165,8 @@ mod php_doctrine_orm_delete_3_comments_and_update_1;
 mod php_icinga_icingaweb2_module_graphite_add_a_few_nodes;
 #[cfg(test)]
 mod php_php_fig_log_deleted_a_class;
+#[cfg(test)]
+mod php_rk4an_phpsysinfo_actual_logic_change;
 #[cfg(test)]
 mod php_smarty_php_smarty_change_version_string;
 #[cfg(test)]
@@ -228,6 +236,8 @@ mod scala_com_lihaoyi_mill_version_string_change;
 #[cfg(test)]
 mod scala_sirthias_parboiled_value_change;
 #[cfg(test)]
+mod scala_xerial_xerial_java_actual_code_change;
+#[cfg(test)]
 mod scala_ymnk_jzlib_interesting_probably_has_no_optimal_solution;
 #[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
@@ -249,6 +259,8 @@ mod swift_apple_swift_argument_parser_simplify_code;
 mod swift_apple_swift_argument_parser_small_change;
 #[cfg(test)]
 mod swift_swift_emacs_swift_mode_seems_like_test_code;
+#[cfg(test)]
+mod swift_zeroc_ice_ice_add_an_if_block_and_variable;
 #[cfg(test)]
 mod tsx_greenbone_gsa_add_import_and_use_it;
 #[cfg(test)]

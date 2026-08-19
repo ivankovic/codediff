@@ -1546,7 +1546,12 @@ pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
             is_leaf: node.child_count() == 0,
         });
         let mut cursor = node.walk();
-        for child in node.children(&mut cursor).collect::<Vec<_>>().into_iter().rev() {
+        for child in node
+            .children(&mut cursor)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             stack.push(child);
         }
     }
@@ -3077,13 +3082,19 @@ mod tests {
         let extents = node_extents(&code);
 
         assert_eq!(
-            nodes_touched_by(&extents, &[]).iter().filter(|t| **t).count(),
+            nodes_touched_by(&extents, &[])
+                .iter()
+                .filter(|t| **t)
+                .count(),
             0,
             "no spans must touch nothing"
         );
 
         // Row 1 is `    let a = 1;` - the whole line.
-        let touched = nodes_touched_by(&extents, &[crate::diff::text_range::TextRange::new(1, 0, 1, 14)]);
+        let touched = nodes_touched_by(
+            &extents,
+            &[crate::diff::text_range::TextRange::new(1, 0, 1, 14)],
+        );
         let count = touched.iter().filter(|t| **t).count();
         assert!(count > 0, "a span over a real line must touch some nodes");
         assert!(
