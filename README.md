@@ -3,6 +3,7 @@
 [![CI](https://github.com/ivankovic/codediff/actions/workflows/ci.yml/badge.svg)](https://github.com/ivankovic/codediff/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/ivankovic/codediff)](https://github.com/ivankovic/codediff/releases/latest)
 [![docs.rs](https://docs.rs/codediff/badge.svg)](https://docs.rs/codediff)
+[![License: AGPL v3+](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 
 Fast, robust, syntax-aware code diffing.
 
