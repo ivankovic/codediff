@@ -6,43 +6,42 @@ Every pass-level conclusion below this section was drawn on the **all-nodes** mi
 goals are now stated in visible nodes (README's "Accurate" principle), so the passes were
 re-ablated and the failing fixtures re-attributed against the new objective. Several prior verdicts
 do not survive. Measurements are from `research/data/quality/optimal_solutions_benchmark.csv` as of
-commit `72f80e3` - i.e. with visibility structural (item 0) and the second tier at 1% - over 468
-solved fixtures. An earlier revision of this section was measured before both of those and its
-numbers should not be quoted.
+commit `87f0435` - i.e. with visibility structural (item 0), the second tier at 1%, and the
+similarity alignment of item 1 shipped - over 468 solved fixtures. Earlier revisions of this
+section were measured before those and their numbers should not be quoted.
 
-**Standing** (re-measured 2026-08-20 under structural visibility). Goal 1 (90% zero visible):
-354/468 = 75.6%, **gap 68 fixtures**. Goal 2 (99% within 1% visible): 448/468 = 95.7%, **gap 16
-fixtures**. Runtime p50 4.8ms (goal <100ms, **met**), p99 1029ms (goal <400ms, **missed**), max
-2234ms; 16 of 469 fixtures exceed 400ms and account for 53% of total corpus runtime.
+**Standing** (re-measured 2026-08-20, after `87f0435`). Goal 1 (90% zero visible): 357/468 = 76.3%,
+**gap 65 fixtures**. Goal 2 (99% within 1% visible): 448/468 = 95.7%, **gap 16 fixtures**. Runtime
+p50 4.8ms (goal <100ms, **met**), p99 1029ms (goal <400ms, **missed**), max 2234ms; 16 of 469
+fixtures exceed 400ms and account for 53% of total corpus runtime.
 
-**Where the 2056 visible mismatches across the 114 failing fixtures come from**, attributed by the
-`ASTMappingReason` of the mapping codediff actually produced, counted both ways since the two
-answer different questions - total volume, and how many *fixtures* a producer dominates (>50% of
-that fixture's visible mismatches), which is what the per-fixture goals turn on:
+**Where the 2037 visible mismatches across the 111 failing fixtures come from**, by the
+`ASTMappingReason` of the mapping codediff actually produced. Counted three ways, because they
+rank differently and the goals are per-fixture: total volume, share of the 36 fixtures within 3
+mismatches of zero (goal 1's cheapest route to 65), and share of the 20 fixtures above 1% (goal 2's
+entire target list is 16).
 
-| producer | fixtures dominated | visible mismatches |
-| --- | --- | --- |
-| `APTED("qualified_name")` | 41 | 546 |
-| `APTED("fast_fallback")` | 39 | 431 |
-| `IdenticalHashOfAncestor` | 4 | 347 |
-| `APTED("large_flat_subtree")` | 7 | 187 |
-| `StructurallyIdenticalAncestor` | 1 | 100 |
-| `MovedSubtree` | 1 | 48 |
-| `large_flat_subtree_container` / `greedy_anchor_block` / `IdenticalHash` | 2 | 32 |
-| mixed, no single dominant pass | 11 | - |
-| no mapping at all (wrongly deleted/inserted) | 8 | - |
+| producer | fixtures dominated | mismatches | of 36 cheap wins | of 20 above 1% |
+| --- | --- | --- | --- | --- |
+| `APTED("qualified_name")` | 41 | 546 | 12 | 5 |
+| `APTED("fast_fallback")` | 37 | 419 | **17** | **9** |
+| no mapping at all | 8 | 365 | 1 | 3 |
+| `IdenticalHashOfAncestor` | 4 | 347 | 1 | 1 |
+| `APTED("large_flat_subtree")` | 7 | 187 | 4 | 0 |
+| `StructurallyIdenticalAncestor` | 1 | 100 | 0 | 0 |
+| `MovedSubtree` | 1 | 41 | 0 | 0 |
+| `large_flat_subtree_container` / `greedy_anchor_block` | 2 | 30 | 0 | 0 |
+| mixed, no single dominant pass | 10 | - | 1 | 2 |
 
-`qualified_name` + `fast_fallback` dominate **80 fixtures**, more than the entire 68-fixture gap to
-goal 1. Cost-model framing across the same 114: **91 are search failures** (`algorithm_cost >
+`qualified_name` + `fast_fallback` dominate **78 fixtures**, more than the entire 65-fixture gap to
+goal 1. Cost-model framing across the same 111: **88 are search failures** (`algorithm_cost >
 human_cost` - the optimum exists and was not found), 13 have `algorithm_cost < human_cost`, 10 are
-ties. Overwhelmingly a search problem, not an objective-function problem. **37 of the 114 are
-within 3 visible mismatches of zero.**
+ties. Overwhelmingly a search problem, not an objective-function problem.
 
-`IdenticalHashOfAncestor` is new to this table and is an artifact worth understanding before
-chasing it: it maps every descendant of an already-matched pair in lockstep, so when the pair is
-wrong the whole subtree's leaves are wrong with it. Under renderer-derived visibility those leaves
-were unreachable and invisible; under structural visibility they count. High volume (347), but only
-4 dominated fixtures - the root cause is whatever mis-paired the ancestor, not this pass.
+`IdenticalHashOfAncestor` is an artifact rather than a target: it maps every descendant of an
+already-matched pair in lockstep, so when the pair is wrong the whole subtree's leaves are wrong
+with it. High volume (347) over only 4 dominated fixtures - the root cause is whatever mis-paired
+the ancestor.
 
 ### 0. RESOLVED 2026-08-20: visibility is now structural, not renderer-derived
 
@@ -80,38 +79,68 @@ structural denominator that problem is gone and 0.5% is once again a genuine rel
 than a synonym for zero. Among the 114 fixtures with any visible mismatch the rate distribution is
 median 0.25%, p75 0.75%, p90 2.48%, max 19.35%, so 4% only catches the extreme tail.
 
-### 1. Size-gate the terminal fallback so small residuals get real APTED
+### 1. `fast_fallback` - still the top lever, but NOT via a size gate
 
-**The top lever on both goals.** 39 fixtures dominated, and it leads both target lists: **18 of the
-37 fixtures within 3 mismatches of zero** (the cheapest route to goal 1's 68) and **9 of the 20
-fixtures above 1%** (goal 2's entire target list is 16). No other producer leads both.
+Leads both target lists: **17 of the 36 fixtures within 3 mismatches of zero** and **9 of the 20
+above 1%**. No other producer leads both.
 
-`apted::for_roots_fallback` is called **unconditionally** (`diff.rs:456`) - Phase 1 of the
-rearchitecture promoted it from a rare `DiffMode::Fast` substitute to the always-on terminal step,
-explicitly trading quality for p99. That trade was right then and is mispriced now: p50 is 4.8ms
-and only 16 fixtures exceed 400ms, so the latency it bought has largely been banked.
+**Correction to this item's earlier form, which named the wrong mechanism.** It previously
+recommended size-gating the terminal fallback via Phase 3b's `APTED_REGION_BUDGET`, on the theory
+that the fallback substitutes cheap Myers alignment for real APTED to protect p99. Reading the code
+disproves that: `resolve_residual_forest_via_myers_lcs`'s equal-count branch **already calls real
+APTED, explicitly uncapped** (`common.rs`, "Uncapped in size, same as `resolve_flat_tree_pair`'s own
+equal-count branch"). A size budget could only ever *reduce* matching here. The lossy path is not a
+size gate at all - it is the **unequal-count** fallthrough, where a gap whose two sides hold
+different numbers of substantial unmatched roots is resolved as atomic delete plus insert.
 
-This is Phase 3b of `~/.claude/plans/iterative-herding-panda.md` (`APTED_REGION_BUDGET`), already
-designed: gate on `before_size * after_size` inside `resolve_forest`'s `Algorithm::Apted` branch so
-every caller inherits the bound, falling back to the Myers path only above it. A bounded change to
-one chokepoint rather than a new heuristic. `mod.rs`'s `for_roots_fallback` doc comment still
-describes the deleted `looks_expensive()` gate and should be corrected whatever else happens here.
+That diagnosis is confirmed by what its mistakes look like: of 419 visible mismatches, **331 are
+"the human matched this node and we mapped it to 0"**, 68 are a wrong partner, 20 a wrong
+delete/insert. It under-matches; it does not mis-match. Attack "give up less", not "guess better".
+
+**Shipped 2026-08-20 (`87f0435`), partial:** when the unequal-count gap's exact-hash alignment
+(`resolve_unequal_segment_via_kind_only_anchors`, `myers_lcs` over `node_to_kind_only_hash`) finds
+nothing, fall back to an order-preserving alignment scored by leaf-content similarity
+(`node_to_similarity_sketch`) instead. Instrumenting the exact-hash pass first showed why it was
+needed: across all 468 fixtures it evaluates **128 candidate pairs, 7 distinct**, only one of which
+clears `KIND_ONLY_ANCHOR_MIN_SIZE` - kind-only is coarser than the full hash but still an
+*equality* test, so one added statement anywhere inside a subtree prevents alignment. Result: +3
+zero-visible fixtures, 1 regression, sum visible 2056 -> 2037.
+
+**Still open on this path**, in the order worth trying:
+- The trivial-leaf filter (`TRIVIAL_ENTRY_MAX_SIZE`) drops punctuation entries to unconditional
+  delete/insert with the justification that they would be "resolved independently... exactly as an
+  unmatched leaf would be resolved on its own anyway". That is the flaw: they could often be
+  matched. `cpp-add-templates`' single remaining visible mismatch is exactly this - a `;`
+  reparented under a new `template_declaration`, mapped to 0. Pair leftover trivial entries among
+  themselves by (kind, position) after the substantial ones are paired.
+- `TRIVIAL_ENTRY_MAX_SIZE` was tuned against the **all-nodes** objective. Trivial leaves are
+  exactly the nodes that are always structurally visible now, so it was optimised against the wrong
+  target. Cheap to re-sweep, and it interacts with the item above.
+- Widen the *anchor* key in step 1 (`node_to_full_hash`, byte-identical only), so fewer entries
+  land in unequal gaps at all. Prior art: a `KindOnlyHash` sub-anchor attempt needed a size-50 floor
+  to be safe, and the similarity sketch is now available as a better trust signal than size.
+- 48 of the give-ups are `ERROR` nodes from broken-parse fixtures - a different problem, not worth
+  attacking through this path.
+
+`mod.rs`'s `for_roots_fallback` doc comment still describes the deleted `looks_expensive()` gate and
+should be corrected whatever else happens here.
 
 ### 2. `qualified_name` - most fixtures and most mismatches, but harder
 
-41 fixtures, 546 visible mismatches. Investigated 2026-08-17 and found to be *two* distinct
-problems - commutative reorder, and a search-quality gap - which is why it survived that pass
-unfixed. It leads on volume but trails `fast_fallback` on both target lists (12 of the 37 cheap
-wins, 5 of the 20 above 1%), so it is the bigger prize and the worse starting point. Import-list
-and reorder shapes dominate its failures: `scala-com-lihaoyi-mill-split-import-2` (7/438),
-`go-nwg-piotr-gopsuinfo-shuffle-around-if-blocks` (57/3577),
-`kotlin-nextcloud-android-move-from-one-mocking-library-to-other` (30/676). An import-list-specific
-matcher may be a cheaper subset than solving reorder in general.
+41 fixtures, 546 visible mismatches - the largest single producer by both counts. Investigated
+2026-08-17 and found to be *two* distinct problems, commutative reorder and a search-quality gap,
+which is why it survived that pass unfixed. It trails `fast_fallback` on both target lists (12 of
+the 36 cheap wins, 5 of the 20 above 1%), so it is the bigger prize and the worse starting point.
+
+Import-list and reorder shapes dominate its failures. Worth noting that two of the three fixtures
+`87f0435` fixed were import-list cases (`typescript-n8n-io-n8n-remove-and-add-imports`, and the
+import churn in `typescript-th-ch-youtube-music-...`), which suggests part of this bucket is
+reachable from the residual path rather than needing a dedicated import matcher.
 
 ### 3. Three passes are inert under the new objective
 
-Re-ablated under structural visibility (baseline 354 zero / 448 within-1%; "delta" is what
-*disabling* the pass costs, so positive means the pass helps):
+Re-ablated under structural visibility (baseline before `87f0435`: 354 zero / 448 within-1%;
+"delta" is what *disabling* the pass costs, so positive means the pass helps):
 
 | pass disabled | fixtures w/ visible delta | sum visible delta | sum total delta |
 | --- | --- | --- | --- |
@@ -127,15 +156,13 @@ Re-ablated under structural visibility (baseline 354 zero / 448 within-1%; "delt
 - `solve_bottom_up_propagation` fixes 318 **invisible** nodes and zero visible ones. Do **not**
   delete it on that basis: its stated job (`diff.rs:445`) is to shrink the residual *before* the
   terminal fallback sees it, so its value is conditional on item 1 and it must be re-measured after
-  that lands. Note it is now exactly neutral on goal 2 (448 either way); under the old
-  renderer-derived metric disabling it appeared to *gain* a fixture, which was purely the
-  denominator artifact item 0 removed.
+  further work there. It is exactly neutral on goal 2; under the old renderer-derived metric
+  disabling it appeared to *gain* a fixture, which was purely the denominator artifact item 0
+  removed.
 
 Only `solve_moved_subtrees` clearly earns its place - disabling it costs 6 zero-visible fixtures.
-
-**The ablations also re-confirm the item-0 fix empirically: across all four runs, zero fixtures had
-their visible-node denominator change.** Structural visibility is stable under algorithm changes by
-construction, and the corpus agrees.
+These ablations also re-confirm item 0's fix empirically: across all four runs, **zero fixtures had
+their visible-node denominator change**.
 
 ### 4. Runtime: the p99 tail is shape pathology, not scale
 
@@ -151,8 +178,10 @@ proxy, not the goal's own denominator.)
 
 ### 5. 8 fixtures whose visible mismatches have no mapping at all
 
-Neither matched nor correctly deleted/inserted - the node simply has no entry. A distinct failure
-shape from items 1-2 and not yet diagnosed; worth one pass to see whether it is one bug or eight.
+Neither matched nor correctly deleted/inserted - the node simply has no entry. 365 mismatches over
+8 fixtures, and 3 of the 20 fixtures above 1%, so it is concentrated rather than diffuse. A distinct
+failure shape from items 1-2 and not yet diagnosed; worth one pass to see whether it is one bug or
+eight.
 
 ---
 
@@ -450,38 +479,19 @@ aspirational, the bar for "done":
 - **Quality (RESTATED 2026-08-20, now in VISIBLE nodes): 90% of test cases with zero mismatched
   visible nodes; 99% with at most 1% of visible nodes mismatched.** Superseded the previous
   all-nodes phrasing ("90% zero mismatches, remaining 10% capped at <=0.5% of nodes") once
-  `diff::text::visible_node_ids` made the distinction measurable: most AST nodes are structure the
+  the visible/invisible distinction became measurable: most AST nodes are structure the
   reader never sees on its own, so a wrongly-matched `block` is not the same defect as a
   wrongly-matched identifier. Both bars are on `visible_mismatches` / `visible_nodes` in
   `research/data/quality/optimal_solutions_benchmark.csv`; `benchmark_optimal_solutions` prints
   progress against both after its tables.
 
-  Standing at restatement (468 solved fixtures):
-  - zero visible mismatches: **352/468 = 75.2%**, need 422 - **gap 70 fixtures**
-  - within 1% visible: **448/468 = 95.7%**, need 464 - **gap 16 fixtures**
-  (For reference: zero *total* mismatches is 343/468 = 73.3%, so the visible view is only ~2pp
-  more forgiving at the zero bar - the two are much closer than expected. The visible metric's
-  value is in *which* fixtures it excuses, not in flattering the aggregate.)
+  **Current standing, the threshold history, and the ranked plan all live in this file's
+  2026-08-20 section at the top - do not duplicate them here.** Note in particular that visibility
+  is now `nodes::is_structurally_visible`, a property of the tree and the source bytes; the
+  renderer-derived `diff::text::visible_node_ids` this paragraph originally named is deleted, and
+  any figure computed against it (median 132 visible nodes, "3.4% of all nodes", the 4%-vs-0.5%
+  reasoning) belongs to that definition and does not transfer.
 
-  **Why 4% and not 0.5%.** The second tier was briefly written as 0.5%, carried over from the
-  all-nodes phrasing, and that made it *stricter* than the 90%-at-zero tier rather than the relaxed
-  allowance it is meant to be. Visible nodes are only ~3.4% of all nodes, so 0.5% of them is a ~30x
-  tighter bar than 0.5% of all nodes: the median fixture has 132 visible nodes, so 0.5% is 0.66 of
-  a node, and for 286 of 468 fixtures "at most 0.5%" and "exactly zero" were the same requirement.
-  At 4% the median fixture's allowance is ~5 visible mismatches, only 50/468 fixtures are small
-  enough that one mismatch still breaks it, and the tier gaps order correctly (36 vs 70), so the
-  99% tier is genuinely the more forgiving one.
-
-  40 fixtures remain above 4%, led by `go-nwg-piotr-gopsuinfo-shuffle-around-if-blocks` (48/207 =
-  23.2%), `css-wordpress-reformat` (16/72), `scala-com-lihaoyi-mill-split-import-2` (7/32) and
-  `kotlin-remove-function` (58/266) - import-list and reorder shapes dominate the list.
-
-  Total mismatch instances corpus-wide were previously dominated by
-  `css-shadcn-ui-ui-completely-broken-treesitter-parsing` (16277 at the time, a parse failure not a
-  matching failure). That fixture is now 124 total / **0 visible** - the visible metric removes it
-  from the accounting on its own, without a special case, which is one concrete argument for the
-  restatement. Whether the remaining `broken`/`awful-string-matching` fixtures should count against
-  the quality target is still an open question.
   Cost-model breakdown across the 85 nonzero fixtures (`algorithm_cost` vs `human_cost`): 10 are
   true ties (cost function under-discriminates, see the correction below), 57 have
   `algorithm_cost > human_cost` (search failure - the optimum exists but wasn't found; median gap
