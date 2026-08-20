@@ -476,7 +476,7 @@ pub enum Side {
 /// `after_node_map` already use for "no counterpart" elsewhere in this codebase.
 ///
 /// Exists so a caller can cross-reference `node_id`/`side` against
-/// [`crate::diff::text::visible_node_ids`] and tell a mismatch on a rendered, user-visible node
+/// [`crate::diff::nodes::structurally_visible_node_ids`] and tell a mismatch on a rendered, user-visible node
 /// apart from one on invisible structural scaffolding (a `block`, a `declaration_list`, ...) whose
 /// misclassification has no independent effect on what the diff actually shows.
 #[derive(Debug, Clone)]
@@ -1625,11 +1625,11 @@ pub struct NodeExtent {
     /// [`nodes_touched_by`]'s doc comment.
     pub is_leaf: bool,
     /// This node's own tree-sitter id, so a caller can cross-reference the extent against an
-    /// id-keyed set - specifically [`crate::diff::text::visible_node_ids`], for the
+    /// id-keyed set - specifically [`crate::diff::nodes::structurally_visible_node_ids`], for the
     /// visible-only view of the same scoring (see `benchmark_other`'s `visible_filter`).
     /// Carried on the extent rather than left to the caller to recompute by re-walking in the
     /// same order: [`node_extents`]'s traversal pushes children reversed onto a stack, which is
-    /// *not* the order `visible_node_ids`'s own walk uses, so any attempt to zip the two by
+    /// *not* the order `structurally_visible_node_ids`'s own walk uses, so any attempt to zip the two by
     /// position would silently misattribute visibility to the wrong node.
     pub node_id: usize,
 }
@@ -1967,7 +1967,7 @@ pub fn compute_mismatches_for_with_config(
 /// [`Mismatch::side`] instead of collapsing straight to its message - what
 /// `compute_mismatches_for_with_config` itself is now a thin wrapper around. Exists so a caller
 /// (e.g. `benchmark_optimal_solutions`) can cross-reference each mismatch against
-/// [`crate::diff::text::visible_node_ids`] to separate mismatches on rendered, user-visible nodes
+/// [`crate::diff::nodes::structurally_visible_node_ids`] to separate mismatches on rendered, user-visible nodes
 /// from ones on invisible structural scaffolding - see [`Mismatch`]'s own doc comment.
 pub fn compute_mismatches_detailed_for_with_config(
     name: &str,
@@ -1984,7 +1984,7 @@ pub fn compute_mismatches_detailed_for_with_config(
 /// [`compute_mismatches_detailed_for_with_config`]'s actual body, taking an already-computed
 /// `diff_ast`/`node_cache` instead of running `diff_code_with_config` itself - lets
 /// [`compute_visible_mismatches_for_with_config`] reuse the one diff run for both the mismatch
-/// check and [`crate::diff::text::visible_node_ids`], rather than paying for `diff_code_with_config`
+/// check and [`crate::diff::nodes::structurally_visible_node_ids`], rather than paying for `diff_code_with_config`
 /// twice. `compute_mismatches_detailed_for_with_config` itself stays the entry point for a caller
 /// that doesn't already have a diff to hand.
 fn compute_mismatches_detailed_with_diff(
@@ -2062,10 +2062,10 @@ fn compute_mismatches_detailed_with_diff(
 }
 
 /// [`compute_mismatches_detailed_for_with_config`]'s mismatches, split by whether each one's node
-/// is *visible* - i.e. its classification independently reaches the screen in codediff's own
-/// rendered diff, per [`crate::diff::text::visible_node_ids`] - plus the total visible node count
-/// on each side, the denominator a raw visible-mismatch count needs to be read as a rate rather
-/// than an absolute. A mismatch with the `node_id: 0` sentinel (not about any single node - the
+/// is *visible* - i.e. it carries text of its own, per
+/// [`crate::diff::nodes::is_structurally_visible`] - plus the total visible node count on each
+/// side, the denominator a raw visible-mismatch count needs to be read as a rate rather than an
+/// absolute. Structural, so nothing about the diff being scored can move either number. A mismatch with the `node_id: 0` sentinel (not about any single node - the
 /// nondeterminism check, `ASTDiff::is_valid`, a malformed multi-map group) is never visible.
 pub struct VisibleMismatches {
     pub visible: Vec<Mismatch>,
@@ -2075,7 +2075,7 @@ pub struct VisibleMismatches {
 }
 
 /// Runs a single `diff_code_with_config`/`NodeCache::build` and shares it between the mismatch
-/// check and [`crate::diff::text::visible_node_ids`] - unlike `benchmark_optimal_solutions`'s own
+/// check and [`crate::diff::nodes::structurally_visible_node_ids`] - unlike `benchmark_optimal_solutions`'s own
 /// "each computation gets its own independent diff_code call" convention (see that binary's
 /// `algorithm_cost_for`/`elapsed_ms_for` doc comments), this function is also the body of every
 /// generated `optimal_solutions/<name>.rs` test (via [`assert_matches_human_mapping_within_limit`]),
@@ -2093,8 +2093,8 @@ pub fn compute_visible_mismatches_for_with_config(
 
     let mismatches =
         compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)?;
-    let (before_visible, after_visible) =
-        crate::diff::text::visible_node_ids(before, after, &diff_ast, &node_cache);
+    let before_visible = crate::diff::nodes::structurally_visible_node_ids(before);
+    let after_visible = crate::diff::nodes::structurally_visible_node_ids(after);
 
     let mut visible = Vec::new();
     let mut invisible = Vec::new();
@@ -2134,7 +2134,7 @@ pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
 /**
 * Same as [`assert_matches_human_mapping`], but allows up to `upper_limit_of_mismatched_nodes`
 * total mismatches and up to `upper_limit_of_visible_mismatched_nodes` *visible* mismatches
-* (see [`VisibleMismatches`]/[`crate::diff::text::visible_node_ids`]) instead of requiring an exact
+* (see [`VisibleMismatches`]/[`crate::diff::nodes::structurally_visible_node_ids`]) instead of requiring an exact
 * match. Fails if *either* limit is exceeded - the two are independent bars, not one derived from
 * the other, since a fixture can regress on one without moving the other at all (e.g. a fix that
 * turns invisible mismatches visible without changing the total).

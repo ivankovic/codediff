@@ -78,18 +78,20 @@ The targets (see the README's "Accurate" principle):
 * **90% of test cases with zero mismatched visible nodes.**
 * **99% of test cases with at most 4% of visible nodes mismatched.**
 
-Both are stated in *visible* nodes - the ones the renderer emits a span for, per
-`codediff::diff::text::visible_node_ids` - not all AST nodes. A wrongly-matched `block` or
-`argument_list` the reader never sees on its own is not the same defect as a wrongly-matched
-identifier, and only about 3% of nodes are visible corpus-wide, so the two counts differ a lot. The
-benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `optimal_solutions` test pins
-both (`assert_matches_human_mapping_within_limit(name, total, visible)`, which fails if *either*
-limit is exceeded).
+Both are stated in *visible* nodes - the ones carrying text of their own, per
+`codediff::diff::nodes::is_structurally_visible` - not all AST nodes. A wrongly-matched `block` or
+`argument_list`, whose every readable byte belongs to a child, is not the same defect as a
+wrongly-matched identifier. About 68% of nodes are visible corpus-wide, so the two counts differ.
+The benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `optimal_solutions` test
+pins both (`assert_matches_human_mapping_within_limit(name, total, visible)`, which fails if
+*either* limit is exceeded).
 
-Note what the 4% bar means at this corpus's scale: the median fixture has ~130 visible nodes, so 4%
-of it is about 5 nodes - a median fixture clears the second bar with up to five visible mismatches.
-Only the smallest fixtures (under 25 visible nodes, 50 of 468) are still tight enough that a single
-visible mismatch breaks it.
+**Visibility is a property of the tree and the source, never of a diff.** An earlier version
+derived it from the renderer - does `diff::text::ranges` emit a span for this node - which made
+both the numerator and the denominator move with the algorithm, so a diff that rendered coarsely
+had almost nothing it could get visibly wrong. If you are tempted to reintroduce anything
+diff-dependent here, see `is_structurally_visible`'s doc comment for the fixture that scored a
+perfect zero on 124 real mismatches under the old definition.
 
 ### Speed
 

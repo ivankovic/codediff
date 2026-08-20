@@ -27,6 +27,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-main-branch-process_executer-actual-small-change",
         4,
-        4,
+        2,
     )
 }

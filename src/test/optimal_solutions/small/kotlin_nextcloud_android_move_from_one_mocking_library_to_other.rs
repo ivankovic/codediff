@@ -28,6 +28,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
         46,
-        20,
+        30,
     )
 }

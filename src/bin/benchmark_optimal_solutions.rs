@@ -268,11 +268,10 @@ struct Row {
     /// "how long codediff took on this fixture", independent of whether there's a human mapping to
     /// compare it against.
     elapsed_ms: f64,
-    /// How many of `mismatches`' nodes are *visible* - reach the screen in codediff's own rendered
-    /// diff, per `human_mapping::compute_visible_mismatches_for_with_config` /
-    /// `codediff::diff::text::visible_node_ids` - vs. sitting on invisible structural scaffolding (a
-    /// `block`, a `declaration_list`, ...) whose misclassification has no independent rendering
-    /// consequence. The second element is the total visible-node count (before + after combined),
+    /// How many of `mismatches`' nodes are *visible* - carry text of their own, per
+    /// `codediff::diff::nodes::is_structurally_visible` - vs. sitting on pure structural
+    /// scaffolding (a `block`, a `declaration_list`, ...) whose every readable byte belongs to
+    /// some descendant. The second element is the total visible-node count (before + after combined),
     /// the denominator for the visible-mismatch percentage - same `(count, denominator)` shape as
     /// `mismatches`, and `None` under the same "unsolved" convention.
     visible_mismatches: Option<(usize, usize)>,

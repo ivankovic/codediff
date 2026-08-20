@@ -1584,6 +1584,68 @@ fn callee_text<'a>(node: Node, language: &Language, source: &'a [u8]) -> Option<
     node.child_by_field_name(field_name)?.utf8_text(source).ok()
 }
 
+/// Whether `node` carries text of its own that a reader can actually see, rather than being pure
+/// structure whose every readable byte belongs to some descendant.
+///
+/// True for a leaf (its text is its own by definition), and for an interior node with non-
+/// whitespace content in the gaps its children don't cover - a `line_comment` whose `//` marker is
+/// a separate child, say, leaving the comment's actual words on the parent. False for a `block`,
+/// `argument_list` or `declaration_list`, whose entire visible content is its children's.
+///
+/// **A pure function of the AST and the source bytes - deliberately not of any diff.** An earlier
+/// version of this idea derived visibility from the renderer instead (does `diff::text::ranges`
+/// emit a span for this node), which made it depend on the mapping: the same `block` is one
+/// `Identical` span inside an unchanged function and is descended into inside a changed one. That
+/// is a fine description of what got drawn, but it is unusable as a measurement, because both the
+/// numerator and the denominator of any rate built on it move when the algorithm changes - a diff
+/// that renders coarsely has almost nothing "visible" and so almost nothing it can get visibly
+/// wrong. Measured on the corpus at the time: `css-shadcn-ui-ui-completely-broken-treesitter-
+/// parsing` collapsed 32,682 nodes into 2 rendered spans and thereby scored 0 visible mismatches
+/// while holding 124 real ones. Structural visibility cannot be gamed that way: the set is fixed
+/// by the input alone.
+///
+/// Non-ASCII bytes count as content (they are not ASCII whitespace), which biases toward calling a
+/// node visible - the safe direction for a metric that exists to *find* mistakes.
+pub fn is_structurally_visible(node: Node, source: &[u8]) -> bool {
+    if node.child_count() == 0 {
+        return true;
+    }
+    let has_content =
+        |range: std::ops::Range<usize>| !source[range].iter().all(u8::is_ascii_whitespace);
+
+    let mut pos = node.start_byte();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.start_byte() > pos && has_content(pos..child.start_byte()) {
+            return true;
+        }
+        pos = pos.max(child.end_byte());
+    }
+    node.end_byte() > pos && has_content(pos..node.end_byte())
+}
+
+/// Every node id in `code` for which [`is_structurally_visible`] holds. Depends only on `code`, so
+/// two different diffs of the same file always agree on it - see that function's doc comment for
+/// why that property is the whole point.
+pub fn structurally_visible_node_ids(code: &Code) -> std::collections::HashSet<usize> {
+    let mut visible = std::collections::HashSet::new();
+    let Some(ast) = code.ast.as_ref() else {
+        return visible;
+    };
+    let source = code.contents.as_bytes();
+    let mut stack = vec![ast.root_node()];
+    while let Some(node) = stack.pop() {
+        if is_structurally_visible(node, source) {
+            visible.insert(node.id());
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    visible
+}
+
 /// Whether `node` is a call/macro invocation whose callee looks like it's meant for the
 /// programmer (logging, `bail!`/`panic!`, assertions, debug `printf`s) rather than the end user.
 /// This is intentionally a loose, substring-based heuristic - see [`DIAGNOSTIC_CALLEE_KEYWORDS`] -
@@ -1615,6 +1677,81 @@ mod tests {
     use crate::test::helper;
 
     use super::*;
+
+    /// The property the whole structural definition exists for: the visible set of a file is a
+    /// function of that file alone, so diffing it against two completely different counterparts -
+    /// or against nothing - must yield the identical set. The previous, renderer-derived definition
+    /// failed this by construction, which is what made it unusable as a metric (see
+    /// `is_structurally_visible`'s doc comment).
+    #[test]
+    fn structural_visibility_does_not_depend_on_what_the_file_is_diffed_against() {
+        let subject = Code::from_string(
+            "fn main() {\n    let x = 1;\n    foo(x); // note\n}\n",
+            &Language::Rust,
+        );
+        let baseline = structurally_visible_node_ids(&subject);
+        assert!(!baseline.is_empty());
+
+        for counterpart in [
+            "fn main() {\n    let x = 1;\n    foo(x); // note\n}\n", // identical
+            "fn main() {\n    let y = 2;\n    bar(y); // other\n}\n", // every leaf changed
+            "",                                                      // nothing at all
+            "struct Wholly { different: bool }\n",                   // unrelated shape
+        ] {
+            let other = Code::from_string(counterpart, &Language::Rust);
+            let _ = crate::diff::diff_code(&subject, &other);
+            assert_eq!(
+                structurally_visible_node_ids(&subject),
+                baseline,
+                "visible set moved when diffed against {counterpart:?}"
+            );
+        }
+    }
+
+    /// Pure containers are excluded and text-carrying nodes are kept - the distinction the metric
+    /// is built on. `block` is the canonical container (everything readable in it belongs to a
+    /// child); a Rust `line_comment` is the canonical interior-but-visible node, since its `//`
+    /// marker is a separate child leaving the words on the parent.
+    #[test]
+    fn structural_visibility_excludes_containers_and_keeps_text_carriers() {
+        let code = Code::from_string(
+            "fn main() {\n    // a comment\n    foo();\n}\n",
+            &Language::Rust,
+        );
+        let source = code.contents.as_bytes();
+        let root = code.ast.as_ref().unwrap().root_node();
+
+        let mut seen: Vec<(String, bool)> = Vec::new();
+        let mut stack = vec![root];
+        while let Some(n) = stack.pop() {
+            seen.push((n.kind().to_string(), is_structurally_visible(n, source)));
+            let mut cursor = n.walk();
+            for child in n.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+
+        let visible_of = |kind: &str| seen.iter().find(|(k, _)| k == kind).map(|(_, v)| *v);
+        assert_eq!(
+            visible_of("block"),
+            Some(false),
+            "a block is pure structure"
+        );
+        assert_eq!(
+            visible_of("line_comment"),
+            Some(true),
+            "a comment carries its own words"
+        );
+        assert_eq!(
+            visible_of("identifier"),
+            Some(true),
+            "a leaf is always visible"
+        );
+        assert!(
+            seen.iter().any(|(k, v)| k == "source_file" && !v),
+            "the root is pure structure too"
+        );
+    }
 
     /// The bitmask form `UnitCostModel::ren` uses on the hot path must agree with the string-
     /// scanning `kinds_update_allowed` it replaced, for *every* pair of kinds either of them knows

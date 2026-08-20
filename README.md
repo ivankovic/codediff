@@ -216,11 +216,16 @@ ground-truth mappings in `src/test/data/diffs/`:
 * **99% of test cases with at most 4% of visible nodes mismatched.**
 
 *Visible* is the load-bearing word. Most AST nodes are structure the reader never sees on their
-own - a `block`, an `argument_list`, a `declaration_list`. Getting one of those wrong has no effect
-on the rendered diff unless it changes something the reader actually looks at, so counting it
-alongside a wrongly-matched identifier overstates how wrong the diff is. A node counts as visible
-when the renderer emits its own span for it; `codediff::diff::text::visible_node_ids` is the
-definition, and corpus-wide only about 3% of nodes qualify.
+own - a `block`, an `argument_list`, a `declaration_list`, whose every readable byte belongs to
+some descendant. Getting one of those wrong does not put anything wrong in front of the reader, so
+counting it alongside a wrongly-matched identifier overstates how wrong the diff is.
+
+A node is visible when it carries text of its own: a leaf, or an interior node with non-whitespace
+content its children don't cover (a comment whose `//` marker is a separate child, say). This is a
+property of the syntax tree and the source bytes **and of nothing else** -
+`codediff::diff::nodes::is_structurally_visible` is the definition. In particular it does not
+depend on the diff: a measurement whose own denominator moves when the algorithm changes cannot
+be used to judge the algorithm. Corpus-wide about 68% of nodes are visible.
 
 `make benchmark-optimal` reports both the raw and the visible mismatch count per fixture.
 

@@ -24,6 +24,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-zetacomponents-consoletools-file-with-parse-errors-and-a-few-deletions",
         2,
-        0,
+        2,
     )
 }

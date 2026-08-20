@@ -34,20 +34,21 @@ node counts as touched when a change lands anywhere inside it, that includes eve
 every change up to the root, so the count partly reflects how deep a grammar's tree is.
 `_leaf_node_mismatches` counts only childless nodes - non-nesting, and the granularity the
 AST-aware tools actually report at. `_visible_node_mismatches` (added 2026-08-20) counts only
-nodes that actually reach the screen when the diff is rendered, per
-`codediff::diff::text::visible_node_ids`, with `total_visible_nodes` as its denominator. Report
-whichever you use explicitly; they are not interchangeable.
+nodes carrying text of their own, per `codediff::diff::nodes::is_structurally_visible`, with
+`total_visible_nodes` as its denominator. Report whichever you use explicitly; they are not
+interchangeable.
 
-**Visibility here is judged against the human mapping, not against any tool's own output.** This
-deliberately differs from the visible-mismatch number `benchmark_optimal_solutions` reports,
-which judges codediff's real diff by codediff's own rendering ("what does the user see right
-now"). A comparative benchmark needs one fixed, tool-independent set of visible nodes, or each
-tool gets a different denominator and the columns stop being comparable - and using *codediff's*
-rendering as the basis would quietly privilege codediff. `_visible_node_mismatches` is also
-**not** a synonym for `_leaf_node_mismatches`: the two differ in both directions (an `Identical`
-leaf inside a terminal subtree is never reached by the renderer; a `MatchButNotIdentical`
-container whose own content diverges emits its own span). If they come out close, that is a
-coincidence, not a cross-check.
+**Visibility is structural: a property of the tree and the source bytes, not of any diff.** A node
+is visible if it carries text of its own - a leaf, or an interior node with non-whitespace content
+its children don't cover (`codediff::diff::nodes::is_structurally_visible`). Every tool is
+therefore scored against the identical, fixed set of visible nodes, which is what makes the columns
+comparable at all. An earlier version derived visibility from the renderer, which made the set move
+with whichever diff produced it; that was replaced 2026-08-20 after it turned out a coarse diff
+could score a perfect zero by rendering almost nothing. `_visible_node_mismatches` is a strict
+*superset* of `_leaf_node_mismatches`: every leaf is visible, plus the interior nodes that carry
+their own text (a comment whose marker is a separate child). They will therefore track each other
+closely - the visible count is the leaf count plus the text-carrying interiors, not an independent
+signal, so do not treat their agreement as a cross-check.
 
 **Unix diff has no node columns**, by construction rather than omission: it reports whole changed
 lines with no sub-line structure, so projecting it onto nodes would mark every node on a changed

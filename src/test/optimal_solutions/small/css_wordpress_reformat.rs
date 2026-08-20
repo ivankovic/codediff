@@ -32,6 +32,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-wordpress-reformat",
         30,
-        16,
+        22,
     )
 }

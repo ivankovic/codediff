@@ -30,6 +30,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-mozilla-firefox-firefox-add-a-few-translations-and-a-few-attributes",
         69,
-        33,
+        49,
     )
 }

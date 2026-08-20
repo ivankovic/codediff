@@ -33,21 +33,41 @@ human_cost` - the optimum exists and was not found), 14 are ties, 13 have `algor
 human_cost`. So this is overwhelmingly a search problem, not an objective-function problem.
 **38 of the 116 are within 3 visible mismatches of zero** - the cheapest available route to 70.
 
-### 0. BLOCKING: goal 2's denominator is gameable, fix before trusting any tier-2 number
+### 0. RESOLVED 2026-08-20: visibility is now structural, not renderer-derived
 
-`benchmark_optimal_solutions` computes `visible_nodes` from **codediff's own diff** (deliberately -
-see `visible_ids_for_side`, which answers "what does the user see right now"). That makes goal 2's
-denominator algorithm-dependent: a change that renders *more* spans improves the rate without
-fixing anything. This is not hypothetical - disabling `solver_bottom_up_propagation` moved 40
-fixtures' denominators and pushed `typescript-th-ch-youtube-music-...` under the 4% bar on
-identical mismatches (13/319 = 4.1% -> 13/329 = 4.0%), scoring +1 fixture for a strictly worse
-diff. Goal 1 is unaffected (a zero is a zero at any denominator).
+The original form of this item reported that goal 2's *denominator* was gameable. On investigation
+the numerator was gameable too, and worse. `visible_node_ids` derived visibility from the renderer,
+so both ends of the rate moved with the algorithm: a diff that renders coarsely has almost nothing
+visible and therefore almost nothing it can get visibly wrong.
+`css-shadcn-ui-ui-completely-broken-treesitter-parsing` collapsed 32,682 nodes into **2 rendered
+spans** and scored **0 visible mismatches while holding 124 real ones** - a clean pass on goal 1.
+(An earlier note in this file cited that fixture as evidence *for* the visible metric. That was
+backwards: the metric did not judge those mismatches harmless, our own bad diff hid them.)
 
-Fix: for the *goal* number, take the denominator from the human mapping's own visible set
-(`as_ast_diff` + `visible_node_ids`), exactly as `benchmark_other`'s `visible_filter` already does
-for its cross-tool columns, and for the same reason - a comparative number needs a denominator the
-thing being compared cannot move. Cheap, and everything in tier 2 below is unreliable until it
-lands.
+Replaced by `nodes::is_structurally_visible`: a node is visible if it carries text of its own -
+a leaf, or an interior node with non-whitespace content its children don't cover. A pure function
+of the tree and the source bytes, so no diff can move it;
+`structural_visibility_does_not_depend_on_what_the_file_is_diffed_against` pins exactly that.
+css-shadcn now reads 124 visible of 32,640, as it should.
+
+**Consequence: the 4% threshold needs re-deriving, and every number in items 1-5 below was
+measured under the old definition.** Visible nodes went from 3.4% of all nodes to 68.2%, so the
+same percentage is a ~20x looser bar. Goal 1 barely moved (352 -> 354 of 468, the extra visible
+mismatches concentrated in fixtures that were already failing). Goal 2 went 428 -> **460/468 =
+98.3%**, gap 4. What the bar buys at each setting, and what it allows on a median fixture
+(1,875 visible nodes, up from 132):
+
+| bar | fixtures passing | gap to 99% | allowance on a median fixture |
+| --- | --- | --- | --- |
+| 0.5% | 430/468 = 91.9% | 34 | ~9 mismatches |
+| 1% | 448/468 = 95.7% | 16 | ~19 |
+| 2% | 455/468 = 97.2% | 9 | ~37 |
+| 4% (current) | 460/468 = 98.3% | 4 | ~75 |
+
+4% was chosen to fix an inversion that only existed because the old denominator was tiny; with a
+structural denominator that problem is gone and 0.5% is once again a genuine relaxed tier rather
+than a synonym for zero. Among the 114 fixtures with any visible mismatch the rate distribution is
+median 0.25%, p75 0.75%, p90 2.48%, max 19.35%, so 4% only catches the extreme tail.
 
 ### 1. Size-gate the terminal fallback so small residuals get real APTED
 

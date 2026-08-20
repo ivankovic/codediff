@@ -38,6 +38,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-add-if-around-one-line",
         2,
-        2,
+        0,
     )
 }

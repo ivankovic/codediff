@@ -125,11 +125,11 @@ struct Args {
     /// all. Neither can be asked a mapping-level question at any granularity.
     ///
     /// The `*_visible_node_mismatches` columns restrict the same projection to nodes that
-    /// actually reach the screen (`diff::text::visible_node_ids`) - see `visible_filter` in
-    /// `score_accuracy` for why visibility is judged against the human mapping and not against
-    /// any one tool's output. Note this shares the projection's parser-divergence caveat above:
-    /// it narrows *which* of codediff's nodes are scored, it does not make the tools' own trees
-    /// any more comparable to codediff's.
+    /// carry text of their own (`diff::nodes::is_structurally_visible`) - a leaf, or an interior
+    /// node with non-whitespace content its children don't cover. Structural, so every tool is
+    /// scored against one identical fixed set. Note this shares the projection's parser-divergence
+    /// caveat above: it narrows *which* of codediff's nodes are scored, it does not make the tools'
+    /// own trees any more comparable to codediff's.
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     accuracy_csv: Option<Option<std::path::PathBuf>>,
 
@@ -1792,7 +1792,7 @@ fn score_accuracy(
     let truth_after_leaves = leaf_filter(&truth_after_nodes, &after_extents);
 
     // Visible-only views of the same labelings - the nodes whose classification actually reaches
-    // the screen when the diff is rendered, per `diff::text::visible_node_ids`. A mismatch on a
+    // the screen when the diff is rendered, per `diff::nodes::structurally_visible_node_ids`. A mismatch on a
     // pure container (a `block`, an `argument_list`) has no independent effect on what a reader
     // sees, so this separates "how much of the disagreement is user-visible" from the raw count.
     //
@@ -1810,8 +1810,8 @@ fn score_accuracy(
     // visible), and a `MatchButNotIdentical` container whose own content diverges emits its own
     // span (visible, not a leaf). If the two columns come out close, that's a coincidence worth
     // noting, not a cross-check.
-    let (before_visible_ids, after_visible_ids) =
-        codediff::diff::text::visible_node_ids(before, after, &truth_ast, &node_cache);
+    let before_visible_ids = codediff::diff::nodes::structurally_visible_node_ids(before);
+    let after_visible_ids = codediff::diff::nodes::structurally_visible_node_ids(after);
     let visible_filter = |labels: &[bool],
                           extents: &[human_mapping::NodeExtent],
                           visible: &std::collections::HashSet<usize>|

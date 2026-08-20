@@ -24,6 +24,6 @@ fn optimal_solution() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-symfony-finder-move-elseif-block-to-else",
         2,
-        1,
+        0,
     )
 }
