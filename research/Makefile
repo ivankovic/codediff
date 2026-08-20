@@ -239,12 +239,24 @@ benchmark-timing-report:
 # Compares codediff against other diff tools (Unix diff, GumTree, difftastic, diffsitter) on
 # runtime, plus line-level agreement with the human-authored mapping, then runs the analysis step
 # above. --features test-fixtures: benchmark_other, like benchmark_optimal_solutions, needs
-# codediff::test's fixture-loading helpers. Requires GUMTREE_BIN, DIFFT_BIN, and DIFFSITTER_BIN,
-# each pointing at a built binary - unlike everything else here, these are external, non-Rust
-# (GumTree) or at least non-workspace (difftastic, diffsitter) tool dependencies this target can't
-# provide on its own (see drivers/gumtree-batch/build.sh for GumTree's optional warm-JVM timing
-# variant, and CONTRIBUTING.md's `benchmark-timing` entry for how to install difftastic/diffsitter
-# into /var/tmp without touching the system-wide cargo bin directory).
+# codediff::test's fixture-loading helpers.
+#
+# Requires GUMTREE_BIN, DIFFT_BIN and DIFFSITTER_BIN, each pointing at a built binary - unlike
+# everything else here, these are external, non-Rust (GumTree) or at least non-workspace
+# (difftastic, diffsitter) tool dependencies this target can't provide on its own. All three are
+# required for a full run: a missing one fails loudly on the first fixture in that tool's language
+# scope rather than silently skipping the tool. difftastic and diffsitter are plain
+# `cargo install`-able; install them into a scratch prefix to keep them out of the system-wide
+# cargo bin directory:
+#
+#     cargo install --root /var/tmp/codediff-tools difftastic diffsitter
+#     export DIFFT_BIN=/var/tmp/codediff-tools/bin/difft \
+#            DIFFSITTER_BIN=/var/tmp/codediff-tools/bin/diffsitter
+#
+# GumTree is a built Java distribution, so GUMTREE_BIN points at its `bin/gumtree` script. See
+# drivers/gumtree-batch/build.sh for its optional warm-JVM timing variant, and
+# data/comparison/PROVENANCE.md for which GumTree build is installed and which of its numbers are
+# safe to quote.
 #
 # Named for timing because that is what only this target measures. Its CSV does also carry
 # per-tool `*_mismatches` columns, but those are line-granularity only and are superseded by

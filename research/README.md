@@ -42,8 +42,8 @@ make rq1                   # slow, timing-sensitive: re-measure RQ1 (idle machin
 ```
 
 Most corpus targets take `MODE=tiny` (default) / `MODE=small` / `MODE=full`, choosing which
-checkout set under `/var/tmp/research/` they operate on. See CONTRIBUTING.md's "Makefile targets"
-section for the full reference.
+checkout set under `/var/tmp/research/` they operate on. `Makefile` in this directory is the full
+reference - every target carries its own comment explaining what it measures and what it needs.
 
 Python scripts run via `uv` using this directory's `pyproject.toml`/`uv.lock`; each is also
 independently runnable (`uv run ./analysis/<script>.py`).

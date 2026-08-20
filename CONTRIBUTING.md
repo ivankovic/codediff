@@ -60,6 +60,12 @@ Use the real implementation where possible.
 Where the real implementation is not possible, for example for filesystem or database access, use
 a fake in-memory implementation.
 
+Install `jj` (`cargo install --root /var/tmp/tools jj-cli`, keeping it out of the system-wide
+cargo bin directory) if you touch `src/jj_configure.rs`. That module's claims about how jj invokes
+a diff tool - directory trees by default, file pairs with extensions preserved under
+`diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0, and should
+be re-verified the same way rather than assumed: jj has renamed its config surface before.
+
 ### Quality
 
 Run `cargo run --release --features test-fixtures --bin benchmark_optimal_solutions`, or `make
@@ -116,90 +122,34 @@ specific to that subsystem, for example `src/diff/TODO.md`. `REVIEW.md` stays ro
 
 ## Makefile targets
 
-There are two Makefiles. The repository-root one holds product concerns only - build, test,
-install, the quality gate, release. Everything that exists to produce the papers and empirical
-studies lives in `research/Makefile` and is run from that directory:
+These are the repository-root Makefile's targets - product concerns only: build, test, install, the
+quality gate, release. The corpus, measurement, analysis and paper targets live in
+`research/Makefile`, are run from that directory (`cd research && make <target>`), and are
+documented there.
 
-```
-make test                       # root: product targets
-cd research && make rq1-report  # research: corpus, measurement, analysis, papers
-```
+### Build, test, quality
 
-Sections below are marked accordingly. Most dataset and corpus targets accept `MODE=tiny`
-(default), `MODE=small`, or `MODE=full`. This flag picks the fetched repository set to run against
-(see `list_of_repositories*.csv` at the repository root). The targets `tiny`, `small`, and `full`
-are shorthand for "run fetch-stats analysis in that mode".
-
-### Build, test, quality (root Makefile)
-
-* `test` - `cargo test`.
-* `build` - `cargo test` + `cargo build --release --features stats` (needed by every dataset/stats
-  target below).
+* `test` - `cargo test --release`, plus `test-mapping-site-js` (a plain-Node test of the
+  human-mapping site's vanilla JS, which cargo's suite cannot cover - see the root Makefile).
+* `build` - `cargo test` + `cargo build --release --features stats` (the `stats` feature builds the
+  dataset-analysis binaries in `src/bin/`).
 * `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.
 * `install-hooks` - one-time setup that points git at `.githooks/pre-push`, which runs the fast
   subset of what CI checks (`cargo fmt --check`, a per-feature-config `cargo check`, the
   mapping-site JS tests) before a `git push` leaves your machine - see that file's own comment for
   exactly what it does and does not cover. `git push --no-verify` skips it for one push.
-* `view-diff NAME=<fixture>` - opens one `src/test/data/diffs/` fixture's before/after side by
-  side in nvim's diff mode.
 * `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
   gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
-* `benchmark-optimal-report` (research/) - same as `benchmark-optimal`, plus `--csv` output and a report on how
-  much of the diff each algorithm pass (`ASTMappingReason`) is responsible for.
-* `benchmark-timing` (research/) - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
-  on runtime, plus line-level agreement with the human mapping, then runs `benchmark-timing-report`
-  below. (Renamed from `benchmark-other` on 2026-08-20; the binary, CSV and report script keep
-  their `benchmark_other` names, since that binary serves both this target and
-  `benchmark-accuracy`.) Timing is the reason to run this one - the `*_mismatches` columns in its
-  CSV are line-granularity only and are superseded by `benchmark-accuracy` below.
-  Each external tool needs its own environment variable pointing at a built binary:
-  `GUMTREE_BIN` (a built GumTree distribution - this is the only one with an external, non-Rust
-  dependency), `DIFFT_BIN`, and `DIFFSITTER_BIN`. difftastic and diffsitter are plain
-  `cargo install`-able. To keep both out of the system-wide cargo bin directory, install them into
-  a scratch prefix instead: `cargo install --root /var/tmp/codediff-tools difftastic diffsitter`,
-  then
-  `export DIFFT_BIN=/var/tmp/codediff-tools/bin/difft DIFFSITTER_BIN=/var/tmp/codediff-tools/bin/diffsitter`.
-  All three environment variables are required for a full run - a missing one fails loudly on the
-  first fixture in that tool's language scope, rather than silently skipping the tool (see
-  `src/bin/benchmark_other.rs`'s own doc comment). This is the slow half of the pair below - a
-  fresh GumTree JVM cold-starts once per fixture.
-
-  `jj` is worth installing into the same scratch prefix (`cargo install --root /var/tmp/tools
-  jj-cli`) if you touch `src/jj_configure.rs`: that module's claims about how jj invokes a diff
-  tool - directory trees by default, file pairs with extensions preserved under
-  `diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0 and should
-  be re-verified the same way rather than assumed, since jj's config surface has been renamed
-  before.
-* `benchmark-timing-report` (research/) - just the analysis/plotting step of `benchmark-timing`, over whatever
-  `research/data/comparison/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
-  variables above, since it never runs the benchmark itself. `introductory-paper` below depends on
-  this, not on `benchmark-timing`, so rebuilding the paper never pays for a fresh benchmark run.
-* `benchmark-accuracy` (research/) - the accuracy-only counterpart of `benchmark-timing`: per fixture, every
-  tool's agreement with the human mapping at line, node, leaf-node and visible-node granularity,
-  written to `research/data/comparison/benchmark_accuracy.csv` with `sample.csv` provenance columns.
-  Needs the same three environment variables, but no timing means it doesn't care about machine
-  load - accuracy is deterministic, so there is nothing to repeat and nothing to keep idle for.
-
-  The node columns are a *"did the tool consider this node's text changed"* projection, **not** the
-  node-mapping fidelity `benchmark-optimal` reports for codediff - an external tool parses its own
-  tree and shares no node identities with codediff's, so no mapping-level question can be asked of
-  it. The `*_visible_node_mismatches` columns restrict that projection to nodes that actually reach
-  the screen, with visibility judged against the *human* mapping so every tool is scored against
-  one fixed, tool-independent set. See `research/data/comparison/PROVENANCE.md` for the full
-  semantics, the per-language caveat on how far each tool's own tree diverges from codediff's, and
-  which GumTree numbers are safe to quote.
-* `ablation-study [OUT_DIR=path]` (research/) - a leave-one-out study over the diff algorithm's optional
-  heuristic passes. It measures each pass's real contribution to accuracy on the fixture corpus.
-* `check-quality` - what `deploy` runs before it tags a release. This target gates on
-  `research/data/quality/quality_baseline.txt`. It fails hard on an accuracy regression. It only warns, and does
-  not fail, on a runtime jump of more than 2x.
+* `check-quality` - what `deploy` runs before it tags a release. This target gates on a checked-in
+  quality baseline. It fails hard on an accuracy regression. It only warns, and does not fail, on a
+  runtime jump of more than 2x.
 * `update-quality-baseline` - deliberately lowers that bar, after a reviewed improvement. `deploy`
   never runs this target automatically.
 * `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - a criterion wall-clock benchmark of
   `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
   first command compares against the saved baseline. The second command saves a new baseline.
 
-### Release (root Makefile)
+### Release
 
 * `deploy` - publishes a release everywhere: `deploy-crates` then `deploy-github`, in that order
   (crates.io first, since a publish there can never be undone - only yanked - while a GitHub tag
@@ -212,59 +162,6 @@ are shorthand for "run fetch-stats analysis in that mode".
 * `deploy-github` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push
   triggers `.github/workflows/release.yml`, which builds and publishes the cross-platform
   `codediff` binaries as a GitHub Release.
-
-### Papers (research/Makefile)
-
-* `introductory-paper` - re-renders the benchmark_other charts and table
-  `research/papers/introductory-paper/main.tex` embeds (accuracy chart, runtime chart, and a
-  variance table - a generated `.tex` table `\input` directly, not a PNG) from whatever
-  `research/data/comparison/benchmark_other.csv` already has on disk into `research/plots/` (which that paper's
-  `figures/` symlinks into - there is no copy step), and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-timing` - run
-  that yourself first to refresh the underlying data, this target only re-renders from it, so a
-  paper rebuild stays fast. Needs a LaTeX toolchain with the `acmart` class and `cm-super` (see
-  that paper's own `README.md` for the install command).
-* `introductory-paper-empirical` - re-renders that same paper's empirical-study numbers (Table 1,
-  repository/file/language counts, bytes-AST correlation) and its file-types figure, from whatever
-  `$(RESEARCH_DIR)/stats.sqlite` already exists for the current `MODE` (pass `MODE=small` or
-  `MODE=full` to match whichever `file-stats` run you actually have - see "Dataset / corpus
-  analysis" below). These numbers are LaTeX macros in `research/plots/variables.tex`, assembled by
-  `research/analysis/paper_variables.py`, not hand-transcribed - see that file's own
-  `write_paper_variables` doc comment for why (short version: the paper's original Table 1 numbers
-  turned out to be hand-copied from a conference slide deck whose own source computation was never
-  saved anywhere, and by the time anyone asked why Bytes' max was blank, there was no way to
-  answer it). Depends on `file-stats-report`, not `file-stats` - run that yourself first (slow -
-  it re-parses every file in the corpus) to (re)populate the mode's `stats.sqlite`.
-
-### Dataset / corpus analysis (research/Makefile)
-
-* `fetch` - clones/updates the repository set for the current `MODE`.
-* `file-stats` / `commit-stats` - run `file_stats` or `commit_stats` over the fetched repositories,
-  into a SQLite database. Then each target runs that binary's own `research/analysis/*.py` report
-  (`file-stats-report` is just that report step, over whatever `stats.sqlite` already exists,
-  without re-running `file_stats` itself - see `introductory-paper-empirical` above).
-* `debug-stats DIR=<path> [DEBUG_MODE=dirs|all|repositories]` - runs the same two binaries, ad hoc,
-  over one arbitrary directory, instead of the fetch/`MODE` pipeline. Use this target to debug the
-  binaries directly.
-* `sample-pairs` / `sample-pairs-rust` / `sample-pairs-java` / `sample-pairs-javascript` /
-  `sample-pairs-typescript` - sample real (repository, commit, path) code pairs, per language, for
-  benchmark test data.
-* `benchmark-pairs` / `benchmark-pairs-rust` / `benchmark-pairs-java` /
-  `benchmark-pairs-javascript` / `benchmark-pairs-typescript` - measure `diff_code`'s speed/memory/
-  AST size/mapping-operation count across a sampled CSV. `benchmark-pairs-rust` is the one to
-  re-run after any diff-algorithm change, to track its effect on real Rust commits.
-* `code-pair-diff-stats` - size/LOC-changed statistics and distribution plots for
-  `sample-pairs-rust`'s output.
-* `benchmark-pairs-diff BEFORE=<csv> AFTER=<csv>` - compares two `benchmark-pairs-rust` runs, for
-  example before and after a `diff_code` algorithm change, and charts the difference.
-* `benchmark-sampled` / `benchmark-sampled-extended` - both run
-  `research/measure/benchmark_all_extended.sh` across all sampled pairs, then
-  `research/analysis/benchmark_report.py`. `benchmark-sampled` restricts this to the four primary
-  languages: Rust, Python, Go, and Kotlin. `benchmark-sampled-extended` runs every language with a
-  tree-sitter grammar, at a higher node limit.
-* `analyze` / `tiny` / `small` / `full` - `file-stats`, in the current (or an explicitly
-  overridden) `MODE`.
-* `clean` / `clean-db` - remove the fetched repositories, or just the stats database, or both, for
-  the current `MODE`.
 
 ## CI
 
