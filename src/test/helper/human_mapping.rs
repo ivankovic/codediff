@@ -1624,6 +1624,14 @@ pub struct NodeExtent {
     /// nest, so they're scored separately from the all-nodes count - see
     /// [`nodes_touched_by`]'s doc comment.
     pub is_leaf: bool,
+    /// This node's own tree-sitter id, so a caller can cross-reference the extent against an
+    /// id-keyed set - specifically [`crate::diff::text::visible_node_ids`], for the
+    /// visible-only view of the same scoring (see `benchmark_other`'s `visible_filter`).
+    /// Carried on the extent rather than left to the caller to recompute by re-walking in the
+    /// same order: [`node_extents`]'s traversal pushes children reversed onto a stack, which is
+    /// *not* the order `visible_node_ids`'s own walk uses, so any attempt to zip the two by
+    /// position would silently misattribute visibility to the wrong node.
+    pub node_id: usize,
 }
 
 /// Every node of `code`'s AST, in a deterministic preorder walk.
@@ -1650,6 +1658,7 @@ pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
                 &columns,
             ),
             is_leaf: node.child_count() == 0,
+            node_id: node.id(),
         });
         let mut cursor = node.walk();
         for child in node

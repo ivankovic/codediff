@@ -92,6 +92,44 @@ struct Args {
     /// can be asked of them. codediff is scored through the same projection here, which makes its
     /// column comparable to the other tools' and deliberately *not* comparable to its own
     /// optimal-solutions number. See `nodes_touched_by` in `test::helper::human_mapping`.
+    ///
+    /// Measured 2026-08-20, on whether that limit could be lifted for GumTree specifically:
+    /// GumTree *can* emit a full node-to-node mapping (`textdiff -f JSON` carries a `matches`
+    /// array covering intermediate nodes, not just the edit script's actions, with real byte
+    /// offsets into the file). Whether its tree is comparable to codediff's turns out to be
+    /// entirely per-language, not a single yes/no - node counts on one fixture's before side,
+    /// GumTree vs codediff:
+    ///
+    ///   java-jdt 512 / 997 (1.95x)      python 6708 / 10314 (1.54x)
+    /// ```text
+    /// java-jdt            512 /   997  (1.95x)   python  6708 / 10314  (1.54x)
+    /// java-treesitter-ng  585 /   997  (1.70x)   rust     810 /  1344  (1.66x)
+    /// go                  174 /   233  (1.34x)   kotlin  1330 /  1792  (1.35x)
+    /// js                   51 /    51  (1.00x)   ruby    1427 /  1427  (1.00x)
+    /// c                 23971 / 23969  (1.00x)   php    34779 / 34771  (1.00x)
+    /// cs                 2280 /  2280  (1.00x)
+    /// ```
+    ///
+    /// So for js/ruby/c/php/cs the two trees agree node-for-node (GumTree's tree-sitter-ng
+    /// bindings use the same grammar and keep the same tokens), while Java's *default* generator,
+    /// the one this table selects, is Eclipse JDT: a different parser entirely, which also emits
+    /// synthetic nodes (`METHOD_INVOCATION_ARGUMENTS`, `TYPE_DECLARATION_KIND`) with no
+    /// tree-sitter counterpart. A real mapping-fidelity comparison is therefore plausible for the
+    /// 1.00x languages and not for the rest; it is not attempted here because a metric that only
+    /// answers for some of the corpus, with a per-language caveat driving the result, is harder to
+    /// read than the uniform projection below. Recorded so the option is not re-litigated from
+    /// scratch.
+    ///
+    /// difftastic (`--display json`, gated behind `DFT_UNSTABLE=yes`) emits changed line chunks
+    /// plus line alignment, no node correspondences; diffsitter has no machine-readable output at
+    /// all. Neither can be asked a mapping-level question at any granularity.
+    ///
+    /// The `*_visible_node_mismatches` columns restrict the same projection to nodes that
+    /// actually reach the screen (`diff::text::visible_node_ids`) - see `visible_filter` in
+    /// `score_accuracy` for why visibility is judged against the human mapping and not against
+    /// any one tool's output. Note this shares the projection's parser-divergence caveat above:
+    /// it narrows *which* of codediff's nodes are scored, it does not make the tools' own trees
+    /// any more comparable to codediff's.
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     accuracy_csv: Option<Option<std::path::PathBuf>>,
 
@@ -141,9 +179,13 @@ impl ExternalTool {
     /// fixtures rather than silently failing or zero-filling them.
     ///
     /// GumTree's coverage is every corpus language `gumtree_generator` maps (i.e. every language
-    /// with *any* registered generator, confirmed live via `gumtree list generators` against the
-    /// actual v4.0.0-beta8 build - not just what its "Languages" wiki page claims, which is stale
-    /// in places). This is deliberately wider than "only backends GumTree calls Stable": per that
+    /// with *any* registered generator, confirmed live via `gumtree list GENERATORS` *and* by
+    /// running each one against a real fixture pair from this corpus - the installed build is
+    /// **v4.0.0-beta4**, not the beta8 this comment used to claim, and beta4's generator list
+    /// alone is not trustworthy: it does not include `cpp-treesitter-ng` even though this table
+    /// used to map C++ to it. See `gumtree_generator` for the per-language detail and
+    /// `research/data/comparison/PROVENANCE.md` for the version question, which is still open.)
+    /// This is deliberately wider than "only backends GumTree calls Stable": per that
     /// wiki page (checked 2026-07), only `java-jdt` (Java) and `css-phcss` (CSS) are "Stable" -
     /// every other generator here (`*-treesitter-ng`) is still "Testing" by GumTree's own
     /// classification, with none of this codebase's `nodes.rs`-style per-language tuning. Included
@@ -178,11 +220,16 @@ impl ExternalTool {
     }
 }
 
-/// `(generator id, file extension)` for every corpus language GumTree v4.0.0-beta8 has a
-/// registered generator for at all - confirmed live via `gumtree list generators` against the
-/// actual build (2026-07), not just its wiki page (which is stale: it doesn't list JSON, which
-/// still turns out to have no generator either way - `gen.json`'s only registered generator is
-/// XML, despite the module name).
+/// `(generator id, file extension)` for every corpus language the installed GumTree build has a
+/// registered generator for at all - confirmed live via `gumtree list GENERATORS` *and* by
+/// running each entry against a real fixture pair from this corpus (2026-08-20).
+///
+/// The installed build is **v4.0.0-beta4**; this comment previously said beta8, and previously
+/// claimed JSON had no generator ("`gen.json`'s only registered generator is XML, despite the
+/// module name"). Both were wrong against what is actually installed: beta4 registers
+/// `json-jackson`, and it produces a real mapping on this corpus's JSON fixtures. Re-verify this
+/// whole table against the build in use rather than carrying these claims forward - the C++ entry
+/// below is what happens when a generator is assumed rather than run.
 ///
 /// One backend picked per language, not the pick-by-priority-number default GumTree's own `-g`-
 /// less auto-detection would use: every entry here is passed via `-g <id>` explicitly (see
@@ -207,7 +254,6 @@ fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)>
         Language::Java => Some(("java-jdt", "java")), // Stable
         Language::CSS => Some(("css-phcss", "css")),  // Stable
         Language::Rust => Some(("rust-treesitter-ng", "rs")), // Testing
-        Language::CPP => Some(("cpp-treesitter-ng", "cpp")), // Testing
         Language::Kotlin => Some(("kotlin-treesitter-ng", "kt")), // Testing
         Language::C => Some(("c-treesitter-ng", "c")), // Testing
         Language::Go => Some(("go-treesitter-ng", "go")), // Testing
@@ -215,6 +261,30 @@ fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)>
         Language::TypeScript => Some(("ts-treesitter-ng", "ts")), // Testing
         Language::JavaScript => Some(("js-treesitter-ng", "js")), // Testing
         Language::CSharp => Some(("cs-treesitter-ng", "cs")), // Testing
+        // Added 2026-08-20. Every one of these already existed in the installed GumTree
+        // (4.0.0-beta4) and was being reported as "unsupported" purely because this table
+        // didn't list it - 104 of the 200 unsupported fixtures, i.e. GumTree was being scored
+        // on a non-random 48% of the corpus that excluded whole language families. Each was
+        // verified against a real fixture pair from this corpus before being added here (a
+        // `textdiff -f JSON` run producing a non-empty `matches` array), rather than trusted
+        // from `gumtree list GENERATORS` alone - see the CPP note below for why that matters.
+        Language::PHP => Some(("php-treesitter-ng", "php")),
+        Language::Ruby => Some(("ruby-treesitter-ng", "rb")),
+        Language::Swift => Some(("swift-treesitter-ng", "swift")),
+        Language::R => Some(("r-treesitter-ng", "r")),
+        Language::JSON => Some(("json-jackson", "json")),
+        Language::XML => Some(("xml-jsoup", "xml")),
+        Language::YAML => Some(("yaml-snakeyaml", "yaml")),
+        // `Language::CPP` deliberately absent: this table used to map it to `cpp-treesitter-ng`,
+        // which does *not* exist in GumTree 4.0.0-beta4 (confirmed against `gumtree list
+        // GENERATORS` and by running it - the client errors out on argument parsing). Every C++
+        // fixture therefore counted as a GumTree `error` rather than `unsupported` - 21 of the 26
+        // errors in the 2026-08-19 run. "No generator for this language" is the honest status,
+        // and it stops those 21 from reading as GumTree failing at something it was asked to do.
+        // Restore the mapping if a GumTree build that actually ships a C++ generator is installed.
+        //
+        // Still genuinely unsupported by beta4, and correctly absent: HTML, TSX, LUA, Vimscript,
+        // ShellScript, Scala.
         _ => None,
     }
 }
@@ -1624,6 +1694,9 @@ struct AccuracyRow {
     total_lines: usize,
     total_nodes: usize,
     total_leaf_nodes: usize,
+    /// How many of `total_nodes` are visible in a ground-truth rendering - the denominator the
+    /// `*_visible_node_mismatches` columns need to be read as a rate rather than an absolute.
+    total_visible_nodes: usize,
     /// Per tool (plus codediff itself), in `ExternalTool::ALL` order with codediff first.
     scores: Vec<ToolScore>,
 }
@@ -1635,6 +1708,11 @@ struct ToolScore {
     line_mismatches: Option<usize>,
     node_mismatches: Option<usize>,
     leaf_node_mismatches: Option<usize>,
+    /// Same projection as `node_mismatches`, restricted to the nodes that actually reach the
+    /// screen in a *ground-truth* rendering of this fixture - see `visible_filter` in
+    /// `accuracy_row_for` for why visibility is judged against the human mapping rather than
+    /// against either codediff's or the tool's own output.
+    visible_node_mismatches: Option<usize>,
     /// `ok`, `unsupported` (the tool has no parser/generator for this language - not a failure,
     /// and deliberately not scored as 0, which would read as a perfect result), `error` (the tool
     /// was supposed to handle this language and didn't), or `line_only` (Unix diff, which has no
@@ -1713,6 +1791,43 @@ fn score_accuracy(
     let truth_before_leaves = leaf_filter(&truth_before_nodes, &before_extents);
     let truth_after_leaves = leaf_filter(&truth_after_nodes, &after_extents);
 
+    // Visible-only views of the same labelings - the nodes whose classification actually reaches
+    // the screen when the diff is rendered, per `diff::text::visible_node_ids`. A mismatch on a
+    // pure container (a `block`, an `argument_list`) has no independent effect on what a reader
+    // sees, so this separates "how much of the disagreement is user-visible" from the raw count.
+    //
+    // Visibility is judged against `truth_ast` - the *human* mapping - not against each tool's
+    // own output. This is a deliberate divergence from `diff::text::visible_ids_for_side`'s own
+    // doc'd choice (which judges codediff's real diff by codediff's own rendering, answering
+    // "what does the user see right now"): here the question is comparative, so every tool must
+    // be scored against one fixed, tool-independent set of visible nodes. Judging each tool by
+    // its own rendering would give every tool a different denominator and make the columns
+    // incomparable - and judging all of them by *codediff's* rendering would quietly privilege
+    // codediff. The ground-truth mapping is the only basis that is neutral between them.
+    //
+    // Deliberately *not* the same thing as the leaf view above, in either direction: an
+    // `Identical` leaf inside a terminal subtree is never reached by the renderer (leaf, not
+    // visible), and a `MatchButNotIdentical` container whose own content diverges emits its own
+    // span (visible, not a leaf). If the two columns come out close, that's a coincidence worth
+    // noting, not a cross-check.
+    let (before_visible_ids, after_visible_ids) =
+        codediff::diff::text::visible_node_ids(before, after, &truth_ast, &node_cache);
+    let visible_filter = |labels: &[bool],
+                          extents: &[human_mapping::NodeExtent],
+                          visible: &std::collections::HashSet<usize>|
+     -> Vec<bool> {
+        labels
+            .iter()
+            .zip(extents)
+            .filter(|(_, extent)| visible.contains(&extent.node_id))
+            .map(|(touched, _)| *touched)
+            .collect()
+    };
+    let truth_before_visible =
+        visible_filter(&truth_before_nodes, &before_extents, &before_visible_ids);
+    let truth_after_visible =
+        visible_filter(&truth_after_nodes, &after_extents, &after_visible_ids);
+
     let disagreement = human_mapping::line_disagreement_count;
     let mut scores = Vec::with_capacity(ExternalTool::ALL.len() + 1);
 
@@ -1747,6 +1862,15 @@ fn score_accuracy(
                     &leaf_filter(&cd_after_nodes, &after_extents),
                 ),
             ),
+            visible_node_mismatches: Some(
+                disagreement(
+                    &truth_before_visible,
+                    &visible_filter(&cd_before_nodes, &before_extents, &before_visible_ids),
+                ) + disagreement(
+                    &truth_after_visible,
+                    &visible_filter(&cd_after_nodes, &after_extents, &after_visible_ids),
+                ),
+            ),
             status: "ok",
         });
     }
@@ -1759,6 +1883,7 @@ fn score_accuracy(
                 line_mismatches: None,
                 node_mismatches: None,
                 leaf_node_mismatches: None,
+                visible_node_mismatches: None,
                 status: "unsupported",
             });
             continue;
@@ -1774,38 +1899,52 @@ fn score_accuracy(
             }
         };
         let node_result = tool_node_spans(tool, before, after);
-        let (node_mismatches, leaf_node_mismatches, status) = match node_result {
-            // Unix diff: no sub-line output exists to project onto nodes at all.
-            None => (None, None, "line_only"),
-            Some(Ok((tool_before_spans, tool_after_spans))) => {
-                let tb = human_mapping::nodes_touched_by(&before_extents, &tool_before_spans);
-                let ta = human_mapping::nodes_touched_by(&after_extents, &tool_after_spans);
-                (
-                    Some(
-                        disagreement(&truth_before_nodes, &tb)
-                            + disagreement(&truth_after_nodes, &ta),
-                    ),
-                    Some(
-                        disagreement(&truth_before_leaves, &leaf_filter(&tb, &before_extents))
-                            + disagreement(&truth_after_leaves, &leaf_filter(&ta, &after_extents)),
-                    ),
-                    if line_mismatches.is_some() {
-                        "ok"
-                    } else {
-                        "error"
-                    },
-                )
-            }
-            Some(Err(err)) => {
-                eprintln!("  {name}: {} node scoring failed: {err:#}", tool.name());
-                (None, None, "error")
-            }
-        };
+        let (node_mismatches, leaf_node_mismatches, visible_node_mismatches, status) =
+            match node_result {
+                // Unix diff: no sub-line output exists to project onto nodes at all.
+                None => (None, None, None, "line_only"),
+                Some(Ok((tool_before_spans, tool_after_spans))) => {
+                    let tb = human_mapping::nodes_touched_by(&before_extents, &tool_before_spans);
+                    let ta = human_mapping::nodes_touched_by(&after_extents, &tool_after_spans);
+                    (
+                        Some(
+                            disagreement(&truth_before_nodes, &tb)
+                                + disagreement(&truth_after_nodes, &ta),
+                        ),
+                        Some(
+                            disagreement(&truth_before_leaves, &leaf_filter(&tb, &before_extents))
+                                + disagreement(
+                                    &truth_after_leaves,
+                                    &leaf_filter(&ta, &after_extents),
+                                ),
+                        ),
+                        Some(
+                            disagreement(
+                                &truth_before_visible,
+                                &visible_filter(&tb, &before_extents, &before_visible_ids),
+                            ) + disagreement(
+                                &truth_after_visible,
+                                &visible_filter(&ta, &after_extents, &after_visible_ids),
+                            ),
+                        ),
+                        if line_mismatches.is_some() {
+                            "ok"
+                        } else {
+                            "error"
+                        },
+                    )
+                }
+                Some(Err(err)) => {
+                    eprintln!("  {name}: {} node scoring failed: {err:#}", tool.name());
+                    (None, None, None, "error")
+                }
+            };
         scores.push(ToolScore {
             name: tool.name(),
             line_mismatches,
             node_mismatches,
             leaf_node_mismatches,
+            visible_node_mismatches,
             status,
         });
     }
@@ -1829,6 +1968,7 @@ fn score_accuracy(
         total_nodes: before_extents.len() + after_extents.len(),
         total_leaf_nodes: before_extents.iter().filter(|e| e.is_leaf).count()
             + after_extents.iter().filter(|e| e.is_leaf).count(),
+        total_visible_nodes: truth_before_visible.len() + truth_after_visible.len(),
         scores,
     })
 }
@@ -1852,6 +1992,7 @@ fn write_accuracy_csv(rows: &[AccuracyRow], path: &std::path::Path) -> Result<()
         "total_lines".to_string(),
         "total_nodes".to_string(),
         "total_leaf_nodes".to_string(),
+        "total_visible_nodes".to_string(),
     ];
     let tool_names: Vec<&str> = rows
         .first()
@@ -1861,6 +2002,7 @@ fn write_accuracy_csv(rows: &[AccuracyRow], path: &std::path::Path) -> Result<()
         header.push(format!("{name}_line_mismatches"));
         header.push(format!("{name}_node_mismatches"));
         header.push(format!("{name}_leaf_node_mismatches"));
+        header.push(format!("{name}_visible_node_mismatches"));
         header.push(format!("{name}_status"));
     }
     writer.write_record(&header)?;
@@ -1875,12 +2017,14 @@ fn write_accuracy_csv(rows: &[AccuracyRow], path: &std::path::Path) -> Result<()
             row.total_lines.to_string(),
             row.total_nodes.to_string(),
             row.total_leaf_nodes.to_string(),
+            row.total_visible_nodes.to_string(),
         ];
         let cell = |value: Option<usize>| value.map(|v| v.to_string()).unwrap_or_default();
         for score in &row.scores {
             record.push(cell(score.line_mismatches));
             record.push(cell(score.node_mismatches));
             record.push(cell(score.leaf_node_mismatches));
+            record.push(cell(score.visible_node_mismatches));
             record.push(score.status.to_string());
         }
         writer.write_record(&record)?;
@@ -1922,8 +2066,8 @@ fn run_accuracy(
     // corpus), so a tool that skipped the hard half would otherwise look best simply for having
     // attempted less.
     println!(
-        "\n{:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12}",
-        "tool", "ok", "err", "unsupported", "line mm", "node mm", "leaf mm"
+        "\n{:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12} {:>12}",
+        "tool", "ok", "err", "unsupported", "line mm", "node mm", "leaf mm", "visible mm"
     );
     for (i, name) in tool_names.iter().enumerate() {
         let scores: Vec<&ToolScore> = rows.iter().filter_map(|row| row.scores.get(i)).collect();
@@ -1940,13 +2084,14 @@ fn run_accuracy(
             }
         };
         println!(
-            "{name:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12}",
+            "{name:<14} {:>7} {:>7} {:>13} {:>10} {:>12} {:>12} {:>12}",
             count("ok") + count("line_only"),
             count("error"),
             count("unsupported"),
             sum(|s| s.line_mismatches),
             cell(sum(|s| s.node_mismatches)),
             cell(sum(|s| s.leaf_node_mismatches)),
+            cell(sum(|s| s.visible_node_mismatches)),
         );
     }
 
@@ -1963,15 +2108,16 @@ fn run_accuracy(
     let total_lines: usize = common.iter().map(|r| r.total_lines).sum();
     let total_nodes: usize = common.iter().map(|r| r.total_nodes).sum();
     let total_leaves: usize = common.iter().map(|r| r.total_leaf_nodes).sum();
+    let total_visible: usize = common.iter().map(|r| r.total_visible_nodes).sum();
     println!(
         "\nCommon subset - the {} of {} fixtures every tool scored ({total_lines} lines, \
-         {total_nodes} nodes, {total_leaves} leaf nodes):",
+         {total_nodes} nodes, {total_leaves} leaf nodes, {total_visible} visible nodes):",
         common.len(),
         rows.len()
     );
     println!(
-        "{:<14} {:>10} {:>8} {:>12} {:>8} {:>12} {:>8}",
-        "tool", "line mm", "rate", "node mm", "rate", "leaf mm", "rate"
+        "{:<14} {:>10} {:>8} {:>12} {:>8} {:>12} {:>8} {:>12} {:>8}",
+        "tool", "line mm", "rate", "node mm", "rate", "leaf mm", "rate", "visible mm", "rate"
     );
     let rate = |value: usize, total: usize| {
         if total == 0 {
@@ -1985,23 +2131,28 @@ fn run_accuracy(
         let sum = |f: fn(&ToolScore) -> Option<usize>| -> usize {
             scores.iter().filter_map(|s| f(s)).sum()
         };
-        let (lines, nodes, leaves) = (
+        let (lines, nodes, leaves, visible) = (
             sum(|s| s.line_mismatches),
             sum(|s| s.node_mismatches),
             sum(|s| s.leaf_node_mismatches),
+            sum(|s| s.visible_node_mismatches),
         );
         let has_nodes = scores.iter().any(|s| s.node_mismatches.is_some());
         if has_nodes {
             println!(
-                "{name:<14} {lines:>10} {:>7.2}% {nodes:>12} {:>7.2}% {leaves:>12} {:>7.2}%",
+                "{name:<14} {lines:>10} {:>7.2}% {nodes:>12} {:>7.2}% {leaves:>12} {:>7.2}% \
+                 {visible:>12} {:>7.2}%",
                 rate(lines, total_lines),
                 rate(nodes, total_nodes),
                 rate(leaves, total_leaves),
+                rate(visible, total_visible),
             );
         } else {
             println!(
-                "{name:<14} {lines:>10} {:>7.2}% {:>12} {:>8} {:>12} {:>8}",
+                "{name:<14} {lines:>10} {:>7.2}% {:>12} {:>8} {:>12} {:>8} {:>12} {:>8}",
                 rate(lines, total_lines),
+                "-",
+                "-",
                 "-",
                 "-",
                 "-",
