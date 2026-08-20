@@ -10,7 +10,7 @@
 #
 # NOTE: this gate is a ratchet on the raw all-node mismatch total. It is deliberately NOT the
 # project's quality *goal*, which is stated in visible nodes (README's "Accurate" principle:
-# 90% of test cases with zero mismatched visible nodes, 99% within 0.5% of visible nodes).
+# 90% of test cases with zero mismatched visible nodes, 99% within 4% of visible nodes).
 # The two can move independently - a change can leave TOTAL_MISMATCHES flat while fixing or
 # breaking visible ones. The gate stays on the raw total because it is a single cheap number
 # that cannot silently regress; measure progress toward the goal with the benchmark's own

@@ -76,7 +76,7 @@ output to see whether a change made diffs better or worse.
 The targets (see the README's "Accurate" principle):
 
 * **90% of test cases with zero mismatched visible nodes.**
-* **99% of test cases with at most 0.5% of visible nodes mismatched.**
+* **99% of test cases with at most 4% of visible nodes mismatched.**
 
 Both are stated in *visible* nodes - the ones the renderer emits a span for, per
 `codediff::diff::text::visible_node_ids` - not all AST nodes. A wrongly-matched `block` or
@@ -86,9 +86,10 @@ benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `optimal_so
 both (`assert_matches_human_mapping_within_limit(name, total, visible)`, which fails if *either*
 limit is exceeded).
 
-Note what the 0.5% bar means at this corpus's scale: the median fixture has ~130 visible nodes, so
-0.5% of it is well under one node. For the 61% of fixtures with fewer than 200 visible nodes, "at
-most 0.5%" and "exactly zero" are the same requirement.
+Note what the 4% bar means at this corpus's scale: the median fixture has ~130 visible nodes, so 4%
+of it is about 5 nodes - a median fixture clears the second bar with up to five visible mismatches.
+Only the smallest fixtures (under 25 visible nodes, 50 of 468) are still tight enough that a single
+visible mismatch breaks it.
 
 ### Speed
 

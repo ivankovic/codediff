@@ -213,7 +213,7 @@ CodeDiff must match a human's own reading of a change, measured against the hand
 ground-truth mappings in `src/test/data/diffs/`:
 
 * **90% of test cases with zero mismatched visible nodes.**
-* **99% of test cases with at most 0.5% of visible nodes mismatched.**
+* **99% of test cases with at most 4% of visible nodes mismatched.**
 
 *Visible* is the load-bearing word. Most AST nodes are structure the reader never sees on their
 own - a `block`, an `argument_list`, a `declaration_list`. Getting one of those wrong has no effect

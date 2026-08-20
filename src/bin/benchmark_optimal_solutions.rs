@@ -457,6 +457,13 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// The second accuracy goal's per-fixture ceiling: at most this fraction of a fixture's *visible*
+/// nodes may disagree with the human mapping. 4%, not the 0.5% the all-nodes phrasing used - see
+/// `src/diff/TODO.md`'s "Why 4% and not 0.5%": visible nodes are only ~3.4% of all nodes, so 0.5%
+/// of them is under one node for a median fixture and the 99% tier came out stricter than the
+/// 90%-at-zero tier it is supposed to relax.
+const VISIBLE_RATE_GOAL: f64 = 0.04;
+
 /// Progress against the project's two accuracy goals, both stated in *visible* nodes - see the
 /// README's "Accurate" principle and `src/diff/TODO.md`. Printed after the tables so the number a
 /// change is actually trying to move is the last thing on screen, rather than something a reader
@@ -475,7 +482,9 @@ fn print_goal_progress(rows: &[Row]) {
     // A fixture with no visible nodes at all has nothing to get wrong, so it clears the rate bar.
     let within = scored
         .iter()
-        .filter(|(count, nodes)| *nodes == 0 || (*count as f64) / (*nodes as f64) <= 0.005)
+        .filter(|(count, nodes)| {
+            *nodes == 0 || (*count as f64) / (*nodes as f64) <= VISIBLE_RATE_GOAL
+        })
         .count();
 
     let goal = |have: usize, target_pct: usize| {
@@ -495,7 +504,8 @@ fn print_goal_progress(rows: &[Row]) {
         zero_gap
     );
     println!(
-        "  within 0.5% visible       {within:>4}/{total}  {within_pct:>5.1}%  (goal 99% = {within_need}, {} to go)",
+        "  within {:.0}% visible         {within:>4}/{total}  {within_pct:>5.1}%  (goal 99% = {within_need}, {} to go)",
+        VISIBLE_RATE_GOAL * 100.0,
         within_gap
     );
 }
