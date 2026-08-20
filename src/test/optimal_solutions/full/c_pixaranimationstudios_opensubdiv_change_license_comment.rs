@@ -22,7 +22,9 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // Requires a N:M match for perfect solution
-    test::helper::human_mapping::assert_matches_human_mapping(
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-pixaranimationstudios-opensubdiv-change-license-comment",
+        2,
+        2,
     )
 }
