@@ -5,8 +5,10 @@
 Every pass-level conclusion below this section was drawn on the **all-nodes** mismatch count. The
 goals are now stated in visible nodes (README's "Accurate" principle), so the passes were
 re-ablated and the failing fixtures re-attributed against the new objective. Several prior verdicts
-do not survive. Measurements are from
-`research/data/quality/optimal_solutions_benchmark.csv` at commit `fb74321`, 468 solved fixtures.
+do not survive. Measurements are from `research/data/quality/optimal_solutions_benchmark.csv` as of
+commit `72f80e3` - i.e. with visibility structural (item 0) and the second tier at 1% - over 468
+solved fixtures. An earlier revision of this section was measured before both of those and its
+numbers should not be quoted.
 
 **Standing** (re-measured 2026-08-20 under structural visibility). Goal 1 (90% zero visible):
 354/468 = 75.6%, **gap 68 fixtures**. Goal 2 (99% within 1% visible): 448/468 = 95.7%, **gap 16
