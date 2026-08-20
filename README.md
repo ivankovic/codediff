@@ -207,6 +207,23 @@ In code, I accept less readable, more complex code, if that code is faster.
 
 Benchmarks make sure that performance does not regress.
 
+## Accurate
+
+CodeDiff must match a human's own reading of a change, measured against the hand-authored
+ground-truth mappings in `src/test/data/diffs/`:
+
+* **90% of test cases with zero mismatched visible nodes.**
+* **99% of test cases with at most 0.5% of visible nodes mismatched.**
+
+*Visible* is the load-bearing word. Most AST nodes are structure the reader never sees on their
+own - a `block`, an `argument_list`, a `declaration_list`. Getting one of those wrong has no effect
+on the rendered diff unless it changes something the reader actually looks at, so counting it
+alongside a wrongly-matched identifier overstates how wrong the diff is. A node counts as visible
+when the renderer emits its own span for it; `codediff::diff::text::visible_node_ids` is the
+definition, and corpus-wide only about 3% of nodes qualify.
+
+`make benchmark-optimal` reports both the raw and the visible mismatch count per fixture.
+
 # License
 
 Copyright (C) 2026 Marko Ivankovic

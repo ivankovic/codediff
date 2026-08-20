@@ -291,16 +291,35 @@ aspirational, the bar for "done":
   pathology in phase 6, not raw scale - that's the real target for a redesign, not the huge-file
   cases. Whether the p99 SLO is meant to cover the deliberately-gigantic fixtures at all is an open
   question.
-- **Quality: 90% of corpus datasets with zero mismatches; the remaining 10% capped at <=0.5%
-  of nodes mismatched.** Baseline (same run): 246/332 fixtures (74.1%) at exactly zero mismatches -
-  52 fixtures short of the 298 (90%) needed. 85 fixtures are nonzero and must shrink to <=33 (10%)
-  to fit the allowance, each individually <=0.5%; 34 of the 85 currently exceed that cap. Total
-  mismatch instances corpus-wide: 21090, but this figure is dominated by one fixture,
-  `css-shadcn-ui-ui-completely-broken-treesitter-parsing` (16277 mismatches, 49.8% of its own
-  32682 nodes) - a parse failure, not a matching failure; no pipeline redesign fixes a broken
-  parse.
-  Whether that fixture (and 2-3 similarly-named `broken`/`awful-string-matching` fixtures) should
-  count against the quality target is an open question.
+- **Quality (RESTATED 2026-08-20, now in VISIBLE nodes): 90% of test cases with zero mismatched
+  visible nodes; 99% with at most 0.5% of visible nodes mismatched.** Superseded the previous
+  all-nodes phrasing ("90% zero mismatches, remaining 10% capped at <=0.5% of nodes") once
+  `diff::text::visible_node_ids` made the distinction measurable: most AST nodes are structure the
+  reader never sees on its own, so a wrongly-matched `block` is not the same defect as a
+  wrongly-matched identifier. Both bars are on `visible_mismatches` / `visible_nodes` in
+  `research/data/quality/optimal_solutions_benchmark.csv`.
+
+  Standing at restatement (468 solved fixtures):
+  - zero visible mismatches: **352/468 = 75.2%**, need 422 - **gap 70 fixtures**
+  - within 0.5% visible: **365/468 = 78.0%**, need 464 - **gap 99 fixtures**
+  (For reference: zero *total* mismatches is 343/468 = 73.3%, so the visible view is only ~2pp
+  more forgiving at the zero bar - the two are much closer than expected.)
+
+  **The second bar is the binding one, and it is stricter than the first - check this is intended
+  before optimising for it.** Visible nodes are only ~3.4% of all nodes, so the same 0.5% is a ~30x
+  tighter bar than it was against the all-node denominator (92.1% of fixtures clear 0.5%-of-all-
+  nodes today; only 78.0% clear 0.5%-of-visible-nodes). Concretely: the median fixture has 132
+  visible nodes, so 0.5% of it is 0.66 of a node - **for the 286/468 fixtures with under 200
+  visible nodes, "at most 0.5%" and "exactly zero" are the same requirement.** The 99% tier
+  therefore demands zero visible mismatches on more fixtures than the 90% tier does, rather than
+  acting as the relaxed allowance for the ones the 90% tier gives up on.
+
+  Total mismatch instances corpus-wide were previously dominated by
+  `css-shadcn-ui-ui-completely-broken-treesitter-parsing` (16277 at the time, a parse failure not a
+  matching failure). That fixture is now 124 total / **0 visible** - the visible metric removes it
+  from the accounting on its own, without a special case, which is one concrete argument for the
+  restatement. Whether the remaining `broken`/`awful-string-matching` fixtures should count against
+  the quality target is still an open question.
   Cost-model breakdown across the 85 nonzero fixtures (`algorithm_cost` vs `human_cost`): 10 are
   true ties (cost function under-discriminates, see the correction below), 57 have
   `algorithm_cost > human_cost` (search failure - the optimum exists but wasn't found; median gap

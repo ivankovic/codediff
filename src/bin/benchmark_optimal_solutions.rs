@@ -447,6 +447,7 @@ fn main() -> Result<()> {
 
     print_table(&rows);
     print_reason_table(&rows);
+    print_goal_progress(&rows);
     println!(
         "\nRuntime: {:.3}s total, {:.1}ms/fixture ({} fixtures)",
         elapsed.as_secs_f64(),
@@ -454,6 +455,49 @@ fn main() -> Result<()> {
         rows.len()
     );
     Ok(())
+}
+
+/// Progress against the project's two accuracy goals, both stated in *visible* nodes - see the
+/// README's "Accurate" principle and `src/diff/TODO.md`. Printed after the tables so the number a
+/// change is actually trying to move is the last thing on screen, rather than something a reader
+/// has to recompute from the CSV.
+///
+/// Only "solved" fixtures count, the same scoping the tables use: a fixture with no
+/// `human_mapping.json` has nothing to be right or wrong about.
+fn print_goal_progress(rows: &[Row]) {
+    let scored: Vec<(usize, usize)> = rows.iter().filter_map(|r| r.visible_mismatches).collect();
+    if scored.is_empty() {
+        return;
+    }
+
+    let total = scored.len();
+    let zero = scored.iter().filter(|(count, _)| *count == 0).count();
+    // A fixture with no visible nodes at all has nothing to get wrong, so it clears the rate bar.
+    let within = scored
+        .iter()
+        .filter(|(count, nodes)| *nodes == 0 || (*count as f64) / (*nodes as f64) <= 0.005)
+        .count();
+
+    let goal = |have: usize, target_pct: usize| {
+        let need = (total * target_pct).div_ceil(100);
+        (
+            100.0 * have as f64 / total as f64,
+            need,
+            need.saturating_sub(have),
+        )
+    };
+    let (zero_pct, zero_need, zero_gap) = goal(zero, 90);
+    let (within_pct, within_need, within_gap) = goal(within, 99);
+
+    println!("\nAccuracy goals (visible nodes, {total} solved fixtures):");
+    println!(
+        "  zero visible mismatches   {zero:>4}/{total}  {zero_pct:>5.1}%  (goal 90% = {zero_need}, {} to go)",
+        zero_gap
+    );
+    println!(
+        "  within 0.5% visible       {within:>4}/{total}  {within_pct:>5.1}%  (goal 99% = {within_need}, {} to go)",
+        within_gap
+    );
 }
 
 fn print_table(rows: &[Row]) {
