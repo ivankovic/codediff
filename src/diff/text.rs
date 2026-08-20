@@ -849,7 +849,16 @@ fn plain_text_line_diff_with_max_edit(
     max_edit: usize,
 ) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
     match line_diff_core(before, after, max_edit) {
-        Some(core) => build_line_ranges(core.before_line_count, core.after_line_count, &core.pairs),
+        // Re-split rather than widening `LineDiffCore`: that struct is also the matching
+        // pipeline's own entry point (see its doc comment), which needs only counts and pairs, and
+        // `str::lines` is a cheap linear scan next to the `myers_lcs` that just ran.
+        Some(core) => {
+            let before_lines: Vec<&str> = before.lines().collect();
+            let after_lines: Vec<&str> = after.lines().collect();
+            debug_assert_eq!(before_lines.len(), core.before_line_count);
+            debug_assert_eq!(after_lines.len(), core.after_line_count);
+            build_line_ranges(&before_lines, &after_lines, &core.pairs)
+        }
         None => {
             let before_line_count = before.lines().count();
             let after_line_count = after.lines().count();
@@ -950,6 +959,107 @@ fn whole_line_range(row: usize) -> TextRange {
     TextRange::new(row, 0, row + 1, 0)
 }
 
+/// How much of the longer of two unmatched lines their common prefix and suffix must cover before
+/// [`intra_line_ranges`] will decompose them into "same, changed, same" instead of leaving them as
+/// a whole-line delete + insert.
+///
+/// A *ratio* on the longer line, not an absolute length: structured text shares long affixes by
+/// coincidence all the time (two unrelated rows of a wide CSV both ending `,0,0,0,0,0` clear any
+/// absolute bar trivially), and decomposing an unrelated pair is worse than not decomposing it at
+/// all - it invents a "common prefix" out of two rows that merely share a column layout, and hides
+/// the real change inside a span labelled `Identical`. 50% was chosen against
+/// `research/data/quality/optimal_solutions_benchmark.csv`, where a regenerated row differs only in
+/// its `elapsed_ms` field (~97% shared affix) while two unrelated fixture rows sit far below half.
+const MIN_SHARED_AFFIX_PERCENT: usize = 50;
+
+/// Byte lengths of the common prefix and suffix of two unmatched lines, or `None` if they are too
+/// dissimilar to be treated as one line rewritten (see [`MIN_SHARED_AFFIX_PERCENT`]). Split out
+/// from [`intra_line_ranges`] because [`plan_gap`] needs the *decision* while it is still choosing
+/// which lines pair with which, and only pays for the ranges once that is settled.
+///
+/// The suffix is measured on the already-prefix-trimmed remainders (exactly as
+/// `intra_node_update_ranges` does), so prefix + suffix can never overlap on the shorter line.
+fn shared_affix(before_line: &str, after_line: &str) -> Option<(usize, usize)> {
+    let prefix = common_prefix_byte_len(before_line, after_line);
+    let suffix = common_suffix_byte_len(&before_line[prefix..], &after_line[prefix..]);
+
+    let longer = before_line.len().max(after_line.len());
+    if longer == 0 || (prefix + suffix) * 100 < longer * MIN_SHARED_AFFIX_PERCENT {
+        return None;
+    }
+    // Both middles empty means the two lines are byte-identical. `myers_lcs` can leave such a pair
+    // unmatched when ordering constraints prevent it (reordered duplicate lines), and claiming a
+    // match it deliberately didn't make is not this function's call - the caller's whole-line
+    // treatment is the honest answer.
+    if before_line.len() - suffix == prefix && after_line.len() - suffix == prefix {
+        return None;
+    }
+    Some((prefix, suffix))
+}
+
+/// Sub-line ranges for one *changed* line pair: the common prefix and suffix render as `Identical`
+/// and only the differing middle as `Update`, so a one-field edit in a wide line highlights that
+/// field instead of the whole row. `None` under the same condition as [`shared_affix`].
+///
+/// Columns are byte offsets within the row, matching tree-sitter's own `Point` convention that
+/// `TextRange` inherits - see `text_range::row_col_to_byte_index`, whose doc comment records the
+/// multi-byte-character crash that established it. `common_prefix_byte_len`/`common_suffix_byte_len`
+/// both guarantee char boundaries, and the suffix is measured on the already-prefix-trimmed
+/// remainders (exactly as `intra_node_update_ranges` does) so prefix + suffix can never overlap on
+/// the shorter line.
+///
+/// Both sides always get the same number of ranges. That symmetry is load-bearing: the two
+/// vectors are consumed index-comparably downstream (see `merge_ranges`, and the AST path's own
+/// note in `ranges` about bypassing the merging accumulator to keep the counts from diverging).
+fn intra_line_ranges(
+    before_row: usize,
+    before_line: &str,
+    after_row: usize,
+    after_line: &str,
+) -> Option<(Vec<RangeMatch>, Vec<RangeMatch>)> {
+    let (prefix, suffix) = shared_affix(before_line, after_line)?;
+    let before_middle_end = before_line.len() - suffix;
+    let after_middle_end = after_line.len() - suffix;
+
+    let mut before_ranges = Vec::with_capacity(3);
+    let mut after_ranges = Vec::with_capacity(3);
+
+    let mut push = |b: TextRange, a: TextRange, operation: TextOperation| {
+        before_ranges.push(RangeMatch {
+            source: b.clone(),
+            destination: a.clone(),
+            operation: operation.clone(),
+        });
+        after_ranges.push(RangeMatch {
+            source: a,
+            destination: b,
+            operation,
+        });
+    };
+
+    if prefix > 0 {
+        push(
+            TextRange::new(before_row, 0, before_row, prefix),
+            TextRange::new(after_row, 0, after_row, prefix),
+            TextOperation::Identical,
+        );
+    }
+    push(
+        TextRange::new(before_row, prefix, before_row, before_middle_end),
+        TextRange::new(after_row, prefix, after_row, after_middle_end),
+        TextOperation::Update,
+    );
+    if suffix > 0 {
+        push(
+            TextRange::new(before_row, before_middle_end, before_row, before_line.len()),
+            TextRange::new(after_row, after_middle_end, after_row, after_line.len()),
+            TextOperation::Identical,
+        );
+    }
+
+    Some((before_ranges, after_ranges))
+}
+
 /// Walks `pairs` (matched `(before_row, after_row)`, ascending in both - an LCS matching
 /// preserves relative order on both sides) once, emitting one `Identical` `RangeMatch` per match
 /// and one merged `Delete`/`Insert` `RangeMatch` per *gap* between matches (so a multi-line
@@ -962,10 +1072,11 @@ fn whole_line_range(row: usize) -> TextRange {
 /// instead of at a coordinate-space-confused row (before-side and after-side rows generally
 /// diverge once there's been any earlier insert/delete).
 fn build_line_ranges(
-    before_line_count: usize,
-    after_line_count: usize,
+    before_lines: &[&str],
+    after_lines: &[&str],
     pairs: &[(usize, usize)],
 ) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
+    let (before_line_count, after_line_count) = (before_lines.len(), after_lines.len());
     let mut before_ranges = Vec::new();
     let mut after_ranges = Vec::new();
 
@@ -975,20 +1086,16 @@ fn build_line_ranges(
     let mut last_after_match = TextRange::zero();
 
     for &(bi, ai) in pairs {
-        if bi > next_before_row {
-            before_ranges.push(RangeMatch {
-                source: TextRange::new(next_before_row, 0, bi, 0),
-                destination: last_after_match.right_limit(),
-                operation: TextOperation::Delete,
-            });
-        }
-        if ai > next_after_row {
-            after_ranges.push(RangeMatch {
-                source: TextRange::new(next_after_row, 0, ai, 0),
-                destination: last_before_match.right_limit(),
-                operation: TextOperation::Insert,
-            });
-        }
+        emit_gap(
+            before_lines,
+            after_lines,
+            next_before_row..bi,
+            next_after_row..ai,
+            &last_before_match,
+            &last_after_match,
+            &mut before_ranges,
+            &mut after_ranges,
+        );
 
         let before_line = whole_line_range(bi);
         let after_line = whole_line_range(ai);
@@ -1009,22 +1116,212 @@ fn build_line_ranges(
         next_after_row = ai + 1;
     }
 
-    if before_line_count > next_before_row {
-        before_ranges.push(RangeMatch {
-            source: TextRange::new(next_before_row, 0, before_line_count, 0),
-            destination: last_after_match.right_limit(),
-            operation: TextOperation::Delete,
-        });
-    }
-    if after_line_count > next_after_row {
-        after_ranges.push(RangeMatch {
-            source: TextRange::new(next_after_row, 0, after_line_count, 0),
-            destination: last_before_match.right_limit(),
-            operation: TextOperation::Insert,
-        });
-    }
+    emit_gap(
+        before_lines,
+        after_lines,
+        next_before_row..before_line_count,
+        next_after_row..after_line_count,
+        &last_before_match,
+        &last_after_match,
+        &mut before_ranges,
+        &mut after_ranges,
+    );
 
     (before_ranges, after_ranges)
+}
+
+/// One unmatched run - the before-rows and after-rows between two consecutive LCS matches (or
+/// after the last one).
+///
+/// Default behaviour is one merged `Delete` and one merged `Insert` for the whole run, which is
+/// what makes a block insert/delete read, and `n`/`p`-navigate, as a single change rather than one
+/// step per line. That is preserved exactly whenever the run is a genuine block: if *no* line pairs
+/// off similarly enough for [`intra_line_ranges`], this emits byte-for-byte what it always did.
+///
+/// When lines do pair off - the same row rewritten rather than removed, e.g. a wide CSV row where
+/// one field changed - the run is emitted per [`plan_gap`] instead, so each changed row narrows to
+/// the part that actually differs. Consecutive unpaired rows are still merged into one range, so a
+/// block sitting inside an otherwise-rewritten run keeps reading as a block.
+#[allow(clippy::too_many_arguments)]
+fn emit_gap(
+    before_lines: &[&str],
+    after_lines: &[&str],
+    before_rows: std::ops::Range<usize>,
+    after_rows: std::ops::Range<usize>,
+    last_before_match: &TextRange,
+    last_after_match: &TextRange,
+    before_ranges: &mut Vec<RangeMatch>,
+    after_ranges: &mut Vec<RangeMatch>,
+) {
+    if before_rows.is_empty() && after_rows.is_empty() {
+        return;
+    }
+
+    let plan = plan_gap(
+        before_lines,
+        after_lines,
+        before_rows.clone(),
+        after_rows.clone(),
+    );
+
+    if !plan.iter().any(|op| matches!(op, GapOp::Pair(..))) {
+        if !before_rows.is_empty() {
+            before_ranges.push(RangeMatch {
+                source: TextRange::new(before_rows.start, 0, before_rows.end, 0),
+                destination: last_after_match.right_limit(),
+                operation: TextOperation::Delete,
+            });
+        }
+        if !after_rows.is_empty() {
+            after_ranges.push(RangeMatch {
+                source: TextRange::new(after_rows.start, 0, after_rows.end, 0),
+                destination: last_before_match.right_limit(),
+                operation: TextOperation::Insert,
+            });
+        }
+        return;
+    }
+
+    // Consecutive `Delete`s (and `Insert`s) coalesce into one range, for the same
+    // reads-as-one-change reason the whole-gap merge above exists. `plan_gap` emits each side's
+    // rows in ascending order, so a run of them is always contiguous.
+    let mut pending_delete: Option<std::ops::Range<usize>> = None;
+    let mut pending_insert: Option<std::ops::Range<usize>> = None;
+    let flush_delete = |pending: &mut Option<std::ops::Range<usize>>, out: &mut Vec<RangeMatch>| {
+        if let Some(rows) = pending.take() {
+            out.push(RangeMatch {
+                source: TextRange::new(rows.start, 0, rows.end, 0),
+                destination: last_after_match.right_limit(),
+                operation: TextOperation::Delete,
+            });
+        }
+    };
+    let flush_insert = |pending: &mut Option<std::ops::Range<usize>>, out: &mut Vec<RangeMatch>| {
+        if let Some(rows) = pending.take() {
+            out.push(RangeMatch {
+                source: TextRange::new(rows.start, 0, rows.end, 0),
+                destination: last_before_match.right_limit(),
+                operation: TextOperation::Insert,
+            });
+        }
+    };
+
+    for op in plan {
+        match op {
+            GapOp::Pair(b, a) => {
+                flush_delete(&mut pending_delete, before_ranges);
+                flush_insert(&mut pending_insert, after_ranges);
+                let (before_parts, after_parts) =
+                    intra_line_ranges(b, before_lines[b], a, after_lines[a])
+                        .expect("plan_gap only emits Pair for rows shared_affix accepted");
+                before_ranges.extend(before_parts);
+                after_ranges.extend(after_parts);
+            }
+            GapOp::Delete(b) => match &mut pending_delete {
+                Some(rows) if rows.end == b => rows.end = b + 1,
+                _ => {
+                    flush_delete(&mut pending_delete, before_ranges);
+                    pending_delete = Some(b..b + 1);
+                }
+            },
+            GapOp::Insert(a) => match &mut pending_insert {
+                Some(rows) if rows.end == a => rows.end = a + 1,
+                _ => {
+                    flush_insert(&mut pending_insert, after_ranges);
+                    pending_insert = Some(a..a + 1);
+                }
+            },
+        }
+    }
+    flush_delete(&mut pending_delete, before_ranges);
+    flush_insert(&mut pending_insert, after_ranges);
+}
+
+/// One decision in a gap's line-by-line plan. `Pair` means "the same line, rewritten" and gets
+/// [`intra_line_ranges`]; the other two are ordinary whole-line deletes and inserts.
+enum GapOp {
+    Pair(usize, usize),
+    Delete(usize),
+    Insert(usize),
+}
+
+/// How far [`plan_gap`] will look ahead on one side to resynchronise after the two sides fall out
+/// of step, i.e. the longest run of pure insertions or deletions it can step over and still
+/// recognise the rows after it as pairs.
+///
+/// Needed because a gap's two sides are only aligned at their ends, not throughout: a regenerated
+/// `research/data/quality/optimal_solutions_benchmark.csv` gained 18 rows, and being sorted by
+/// mismatch count, those rows land *among* the existing ones. Strict k-th-with-k-th pairing
+/// recognised the first 33 rows and then silently gave up on all 400+ below the first inserted
+/// row - the whole file downstream of it read as one block rewrite again.
+///
+/// Bounded rather than unbounded so the scan stays O(gap x window) instead of quadratic, and so a
+/// genuinely unrelated pair of blocks can't find a spurious partner far away.
+const GAP_RESYNC_WINDOW: usize = 16;
+
+/// Decides, for one unmatched run, which before-rows are rewrites of which after-rows.
+///
+/// Walks both sides together. Where the current pair clears [`shared_affix`] it is a rewrite; where
+/// it doesn't, the run has fallen out of step, so this looks ahead up to [`GAP_RESYNC_WINDOW`] rows
+/// on each side for the nearest position that does clear it, and emits the rows stepped over as
+/// plain inserts or deletes. Nearest wins, and insertions are preferred on a tie, purely so the
+/// result is deterministic.
+///
+/// The walk is monotonic on both sides - pairs never cross - which the renderer requires: both
+/// range vectors have to come out in ascending row order for `merge_ranges` and the cursor-follow
+/// logic to line up.
+fn plan_gap(
+    before_lines: &[&str],
+    after_lines: &[&str],
+    before_rows: std::ops::Range<usize>,
+    after_rows: std::ops::Range<usize>,
+) -> Vec<GapOp> {
+    let pairs_up = |b: usize, a: usize| shared_affix(before_lines[b], after_lines[a]).is_some();
+
+    let mut plan = Vec::new();
+    let (mut b, mut a) = (before_rows.start, after_rows.start);
+
+    while b < before_rows.end && a < after_rows.end {
+        if pairs_up(b, a) {
+            plan.push(GapOp::Pair(b, a));
+            b += 1;
+            a += 1;
+            continue;
+        }
+
+        let resync = (1..=GAP_RESYNC_WINDOW).find_map(|d| {
+            if a + d < after_rows.end && pairs_up(b, a + d) {
+                Some((d, true))
+            } else if b + d < before_rows.end && pairs_up(b + d, a) {
+                Some((d, false))
+            } else {
+                None
+            }
+        });
+
+        match resync {
+            Some((d, true)) => {
+                plan.extend((a..a + d).map(GapOp::Insert));
+                a += d;
+            }
+            Some((d, false)) => {
+                plan.extend((b..b + d).map(GapOp::Delete));
+                b += d;
+            }
+            // Neither side resynchronises within the window: this row really was replaced rather
+            // than rewritten, so both sides advance and it renders as a delete plus an insert.
+            None => {
+                plan.push(GapOp::Delete(b));
+                plan.push(GapOp::Insert(a));
+                b += 1;
+                a += 1;
+            }
+        }
+    }
+
+    plan.extend((b..before_rows.end).map(GapOp::Delete));
+    plan.extend((a..after_rows.end).map(GapOp::Insert));
+    plan
 }
 
 /// `myers_lcs` gave up (edit distance past `PLAIN_TEXT_MAX_EDIT`): treat the whole file as
@@ -1570,10 +1867,12 @@ mod tests {
         assert_eq!(changed_row_spans(&after), vec![]);
     }
 
-    /// A changed line has no AST-level identity to recognize as an `Update` - it renders as an
-    /// adjacent delete+insert pair instead, same as a plain `diff -u`.
+    /// Two lines that share no common prefix or suffix at all are not a rewrite of each other in
+    /// any useful sense, so they stay an adjacent delete+insert pair, same as a plain `diff -u`.
+    /// The similar-lines case is `plain_text_line_diff_narrows_a_changed_line_to_the_changed_part`
+    /// below.
     #[test]
-    fn plain_text_line_diff_treats_a_changed_line_as_delete_plus_insert() {
+    fn plain_text_line_diff_treats_a_dissimilar_changed_line_as_delete_plus_insert() {
         let (before, after) = plain_text_line_diff("a\nOLD\nc\n", "a\nNEW\nc\n");
         assert_eq!(
             changed_row_spans(&before),
@@ -1582,6 +1881,129 @@ mod tests {
         assert_eq!(
             changed_row_spans(&after),
             vec![(TextOperation::Insert, 1, 2)]
+        );
+    }
+
+    /// Every range on one row, as `(operation, start_column, end_column)` - byte columns, this
+    /// module's convention (see `text_range::row_col_to_byte_index`). The assertion shape the
+    /// intra-line tests below need, where `changed_row_spans` deliberately drops columns.
+    fn row_column_spans(ranges: &[RangeMatch], row: usize) -> Vec<(TextOperation, usize, usize)> {
+        ranges
+            .iter()
+            .filter(|r| r.source.start_row == row && r.source.end_row == row)
+            .map(|r| {
+                (
+                    r.operation.clone(),
+                    r.source.start_column,
+                    r.source.end_column,
+                )
+            })
+            .collect()
+    }
+
+    /// The point of the whole intra-line path: a wide line whose one field changed highlights that
+    /// field, not the row. Modeled on a regenerated CSV row (the case that motivated this - see
+    /// `MIN_SHARED_AFFIX_PERCENT`), where only a timing column differs.
+    #[test]
+    fn plain_text_line_diff_narrows_a_changed_line_to_the_changed_part() {
+        let before = "h\nname,alpha,beta,gamma,delta,37.282,epsilon,zeta\n";
+        let after = "h\nname,alpha,beta,gamma,delta,37.860,epsilon,zeta\n";
+        let (before_ranges, after_ranges) = plain_text_line_diff(before, after);
+
+        // "37." is common prefix, "epsilon,zeta" common suffix; only "282"/"860" differ.
+        let prefix_end = "name,alpha,beta,gamma,delta,37.".len();
+        let middle_end = prefix_end + "282".len();
+        assert_eq!(
+            row_column_spans(&before_ranges, 1),
+            vec![
+                (TextOperation::Identical, 0, prefix_end),
+                (TextOperation::Update, prefix_end, middle_end),
+                (
+                    TextOperation::Identical,
+                    middle_end,
+                    "name,alpha,beta,gamma,delta,37.282,epsilon,zeta".len()
+                ),
+            ]
+        );
+        assert_eq!(
+            row_column_spans(&after_ranges, 1).len(),
+            3,
+            "both sides must produce the same number of sub-ranges - see intra_line_ranges"
+        );
+    }
+
+    /// A pure block insert must keep reading as one change, not become one range per line. This is
+    /// the regression the gap-level gate in `emit_gap` exists for: if it ever leaks, `n`/`p`
+    /// navigation degrades for every grammar-less file.
+    #[test]
+    fn plain_text_line_diff_keeps_a_block_insert_merged() {
+        let before = "same\n";
+        let after = "same\nwholly different one\nwholly different two\nwholly different three\n";
+        let (_, after_ranges) = plain_text_line_diff(before, after);
+        assert_eq!(
+            changed_row_spans(&after_ranges),
+            vec![(TextOperation::Insert, 1, 4)],
+            "three unrelated inserted lines must stay one merged range"
+        );
+    }
+
+    /// Rows inserted *among* changed rows knock the two sides out of step. Without the bounded
+    /// resynchronisation in `plan_gap` the first mismatch ends refinement for the entire rest of
+    /// the run - which is exactly what happened on the CSV that motivated this (33 rows narrowed,
+    /// 400+ below the first inserted row fell back to whole-line).
+    #[test]
+    fn plain_text_line_diff_resynchronises_after_an_inserted_line() {
+        let before = "row-a,1\nrow-b,1\nrow-c,1\n";
+        let after = "row-a,2\nBRAND NEW UNRELATED LINE\nrow-b,2\nrow-c,2\n";
+        let (before_ranges, after_ranges) = plain_text_line_diff(before, after);
+
+        for (before_row, after_row) in [(0usize, 0usize), (1, 2), (2, 3)] {
+            assert_eq!(
+                row_column_spans(&before_ranges, before_row),
+                vec![
+                    (TextOperation::Identical, 0, "row-a,".len()),
+                    (TextOperation::Update, "row-a,".len(), "row-a,1".len()),
+                ],
+                "before row {before_row} should narrow to its trailing digit"
+            );
+            assert_eq!(
+                row_column_spans(&after_ranges, after_row).len(),
+                2,
+                "after row {after_row} must stay symmetric with its partner"
+            );
+        }
+        assert!(
+            changed_row_spans(&after_ranges).contains(&(TextOperation::Insert, 1, 2)),
+            "the genuinely new line must still read as an insert: {:?}",
+            changed_row_spans(&after_ranges)
+        );
+    }
+
+    /// Byte columns, not character counts. A multi-byte character before the changed part shifts
+    /// every later byte offset, and getting this wrong slices mid-character downstream - the crash
+    /// `text_range::row_col_to_byte_index`'s doc comment records.
+    #[test]
+    fn plain_text_line_diff_intra_line_columns_are_byte_offsets() {
+        let before = "x\nprefix — value 1 suffix\n";
+        let after = "x\nprefix — value 2 suffix\n";
+        let (before_ranges, _) = plain_text_line_diff(before, after);
+
+        let prefix_end = "prefix — value ".len(); // 17 bytes, 15 chars - the em dash is 3 bytes
+        assert_eq!(
+            row_column_spans(&before_ranges, 1),
+            vec![
+                (TextOperation::Identical, 0, prefix_end),
+                (TextOperation::Update, prefix_end, prefix_end + 1),
+                (
+                    TextOperation::Identical,
+                    prefix_end + 1,
+                    "prefix — value 1 suffix".len()
+                ),
+            ]
+        );
+        assert_eq!(
+            prefix_end, 17,
+            "sanity: the em dash must count as 3 bytes, not 1 char"
         );
     }
 
