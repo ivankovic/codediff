@@ -707,7 +707,10 @@ pub fn visible_node_ids(
     after: &Code,
     diff: &ASTDiff,
     node_cache: &NodeCache,
-) -> (std::collections::HashSet<usize>, std::collections::HashSet<usize>) {
+) -> (
+    std::collections::HashSet<usize>,
+    std::collections::HashSet<usize>,
+) {
     let before_visible = visible_ids_for_side(before, after, diff, node_cache);
     let after_visible = visible_ids_for_side(after, before, diff, node_cache);
     (before_visible, after_visible)
@@ -2629,13 +2632,16 @@ mod tests {
             "fn main() {\n    let y = 2;\n    bar(y);\n    // stays\n}\n",
         );
 
-        let (before_visible, after_visible) =
-            visible_node_ids(&before, &after, &ast, &node_cache);
+        let (before_visible, after_visible) = visible_node_ids(&before, &after, &ast, &node_cache);
         assert!(!before_visible.is_empty());
         assert!(!after_visible.is_empty());
 
         let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
-        assert_visible_ids_contained_in_rendered_ranges(&before, &before_visible, &text_diff.all(0));
+        assert_visible_ids_contained_in_rendered_ranges(
+            &before,
+            &before_visible,
+            &text_diff.all(0),
+        );
         assert_visible_ids_contained_in_rendered_ranges(&after, &after_visible, &text_diff.all(1));
     }
 

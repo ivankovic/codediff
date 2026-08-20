@@ -1997,8 +1997,7 @@ fn compute_mismatches_detailed_with_diff(
     //
     // Neither of these two checks is about any one node, so both get the `(0, Side::Before)`
     // sentinel - see `Mismatch`'s own doc comment.
-    let mut mismatches: Vec<Mismatch> = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name)
-    {
+    let mut mismatches: Vec<Mismatch> = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name) {
         describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config)
             .into_iter()
             .map(|message| Mismatch {
@@ -2167,7 +2166,11 @@ pub fn assert_matches_human_mapping_within_limit(
             name,
             upper_limit_of_mismatched_nodes,
             upper_limit_of_visible_mismatched_nodes,
-            if total_exceeded { " [TOTAL LIMIT EXCEEDED]" } else { "" },
+            if total_exceeded {
+                " [TOTAL LIMIT EXCEEDED]"
+            } else {
+                ""
+            },
             if visible_exceeded {
                 " [VISIBLE LIMIT EXCEEDED]"
             } else {
