@@ -27,9 +27,5 @@ fn optimal_solution() -> Result<()> {
     // globally-optimal-cost mapping for that one semicolon. Small, understood, and dominated by the
     // fix's corpus-wide net improvement (-9 mismatches; this fixture alone went 16 -> 4 after the
     // fix, from a pre-fix baseline of 0 before `solve_large_flat_subtrees` could even reach it).
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "c-ffmpeg-added-typedef-to-enum",
-        0,
-        0,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("c-ffmpeg-added-typedef-to-enum")
 }

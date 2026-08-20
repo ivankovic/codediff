@@ -26,9 +26,7 @@ fn optimal_solution() -> Result<()> {
     // class_declaration, class_body, public_field_definition, ...) even though the class's own
     // content is otherwise unchanged - standard classification-bubbling from a single leaf
     // change, not scattered independent issues.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "typescript-n8n-io-n8n-remove-and-add-imports",
-        13,
-        8,
     )
 }

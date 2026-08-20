@@ -21,9 +21,5 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "javascript-fix-promises",
-        0,
-        0,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("javascript-fix-promises")
 }

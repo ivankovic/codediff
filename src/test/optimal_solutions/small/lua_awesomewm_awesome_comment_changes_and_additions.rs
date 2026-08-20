@@ -30,9 +30,7 @@ fn optimal_solution() -> Result<()> {
     // to-binary sensitivity in `final_pass`'s own tie-breaking (stable within one binary across
     // repeated runs, but different from the pre-fix binary) - a real, separately-tracked gap noted
     // in TODO.md, not something this session's changes caused.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "lua-awesomewm-awesome-comment-changes-and-additions",
-        0,
-        0,
     )
 }

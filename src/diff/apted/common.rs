@@ -2218,37 +2218,48 @@ fn resolve_unequal_segment_via_kind_only_anchors(
     let before_hash_counts = count_occurrences(&before_hashes);
     let after_hash_counts = count_occurrences(&after_hashes);
 
-    let pairs = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT).unwrap_or_default();
+    // `KIND_ONLY_ANCHOR_MIN_SIZE` and the ambiguity check below both exist to make `KindOnlyHash`
+    // equality trustworthy - they are guards on *that* signal, not general-purpose caution. A
+    // similarity-aligned pair carries a different and stronger signal (see
+    // `align_segment_by_similarity`), so applying a size proxy meant for hash collisions to it
+    // would reject exactly the small genuine matches it exists to find.
+    let mut pairs = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT).unwrap_or_default();
+    let from_hash = !pairs.is_empty();
+    if pairs.is_empty() {
+        pairs = align_segment_by_similarity(before_seg, after_seg, before_meta, after_meta);
+    }
 
     let mut matched_before = vec![false; before_seg.len()];
     let mut matched_after = vec![false; after_seg.len()];
     let cost_model = UnitCostModel::new(before_meta.language);
     for (bi, ai) in &pairs {
-        let before_size = before_meta
-            .node_to_subtree_size
-            .get(&before_seg[*bi])
-            .copied()
-            .unwrap_or(0);
-        let after_size = after_meta
-            .node_to_subtree_size
-            .get(&after_seg[*ai])
-            .copied()
-            .unwrap_or(0);
-        if before_size < KIND_ONLY_ANCHOR_MIN_SIZE || after_size < KIND_ONLY_ANCHOR_MIN_SIZE {
-            continue;
-        }
-        let ambiguous = before_hash_counts
-            .get(&before_hashes[*bi])
-            .copied()
-            .unwrap_or(0)
-            > 1
-            || after_hash_counts
-                .get(&after_hashes[*ai])
+        if from_hash {
+            let before_size = before_meta
+                .node_to_subtree_size
+                .get(&before_seg[*bi])
+                .copied()
+                .unwrap_or(0);
+            let after_size = after_meta
+                .node_to_subtree_size
+                .get(&after_seg[*ai])
+                .copied()
+                .unwrap_or(0);
+            if before_size < KIND_ONLY_ANCHOR_MIN_SIZE || after_size < KIND_ONLY_ANCHOR_MIN_SIZE {
+                continue;
+            }
+            let ambiguous = before_hash_counts
+                .get(&before_hashes[*bi])
                 .copied()
                 .unwrap_or(0)
-                > 1;
-        if ambiguous {
-            continue;
+                > 1
+                || after_hash_counts
+                    .get(&after_hashes[*ai])
+                    .copied()
+                    .unwrap_or(0)
+                    > 1;
+            if ambiguous {
+                continue;
+            }
         }
         matched_before[*bi] = true;
         matched_after[*ai] = true;
@@ -2273,6 +2284,100 @@ fn resolve_unequal_segment_via_kind_only_anchors(
             add_insert_mappings(id, after_meta, source, diff);
         }
     }
+}
+
+/// Minimum leaf-content Jaccard (`node_to_similarity_sketch`, a bottom-k MinHash over the subtree's
+/// leaf hashes) for [`align_segment_by_similarity`] to call two residual entries the same thing.
+///
+/// Calibrated against every candidate the exact-hash path sees on this corpus (measured 2026-08-20,
+/// 128 evaluations, 7 distinct pairs): the one known true positive
+/// (`vimscript-neovim-neovim-improved-asserts`) scores **0.938**, while both documented
+/// `KindOnlyHash` false positives - the size-11 `element` pair in `html-gohugoio-hugo-...` and the
+/// size-14 pair in `css-mozilla-firefox-...` - score **0.556** and **0.538**, with nothing else
+/// above 0.667. 0.9 separates them on *content*, which is the axis that actually distinguishes
+/// them; `KIND_ONLY_ANCHOR_MIN_SIZE` separates the same three cases only because 186 happens to be
+/// far from 11 and 14.
+const SEGMENT_SIMILARITY_MIN: f32 = 0.9;
+
+/// Largest `before.len() * after.len()` [`align_segment_by_similarity`] will run its O(n*m) DP over.
+/// Every cell costs a bottom-k MinHash Jaccard, so this is a real cost bound, not a formality - and
+/// this pass sits on the terminal fallback's path, which exists because p99 matters.
+const SEGMENT_SIMILARITY_MAX_CELLS: usize = 4096;
+
+/// Order-preserving alignment of one residual gap's entries by leaf-content similarity, for the
+/// case where [`resolve_unequal_segment_via_kind_only_anchors`]' exact-hash pass found nothing.
+///
+/// That pass keys on `node_to_kind_only_hash`, which is coarser than the full hash but still an
+/// *equality* test: two subtrees align only if their entire shape matches exactly, so one added
+/// statement anywhere inside is enough to prevent it. Measured on the corpus (2026-08-20) that
+/// leaves it nearly inert - 7 distinct candidate pairs across 468 fixtures - which is why the
+/// unequal-count gap so often falls through to atomic delete/insert, and why 87% of this pass's
+/// visible mismatches are nodes the human matched and it mapped to 0.
+///
+/// This is the same idea one step further: keep the order-preservation that makes the result safe
+/// to recurse per-position (a pair is fixed before APTED ever sees it, so APTED still never gets a
+/// pool to invent a cross-match from - see the caller's own note on `kotlin-refactor-function`),
+/// but score candidate pairs by *similarity* instead of requiring hash equality. A standard LCS DP
+/// maximising total similarity, with [`SEGMENT_SIMILARITY_MIN`] as the floor below which two
+/// entries are not the same thing at all.
+///
+/// Only consulted when the exact-hash pass returns nothing, so it can only ever find *more* reuse,
+/// never contradict a hash-exact alignment.
+fn align_segment_by_similarity(
+    before_seg: &[usize],
+    after_seg: &[usize],
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+) -> Vec<(usize, usize)> {
+    let (n, m) = (before_seg.len(), after_seg.len());
+    if n == 0 || m == 0 || n * m > SEGMENT_SIMILARITY_MAX_CELLS {
+        return Vec::new();
+    }
+
+    let similarity = |bi: usize, ai: usize| -> f32 {
+        match (
+            before_meta.node_to_similarity_sketch.get(&before_seg[bi]),
+            after_meta.node_to_similarity_sketch.get(&after_seg[ai]),
+        ) {
+            (Some(b), Some(a)) => {
+                let j = b.jaccard(a);
+                if j >= SEGMENT_SIMILARITY_MIN { j } else { 0.0 }
+            }
+            _ => 0.0,
+        }
+    };
+
+    // score[i][j] = best total similarity aligning before_seg[..i] with after_seg[..j].
+    let mut score = vec![vec![0.0f32; m + 1]; n + 1];
+    for i in 1..=n {
+        for j in 1..=m {
+            let skip = score[i - 1][j].max(score[i][j - 1]);
+            let sim = similarity(i - 1, j - 1);
+            let take = if sim > 0.0 {
+                score[i - 1][j - 1] + sim
+            } else {
+                0.0
+            };
+            score[i][j] = skip.max(take);
+        }
+    }
+
+    let (mut i, mut j) = (n, m);
+    let mut pairs = Vec::new();
+    while i > 0 && j > 0 {
+        let sim = similarity(i - 1, j - 1);
+        if sim > 0.0 && (score[i][j] - (score[i - 1][j - 1] + sim)).abs() < f32::EPSILON {
+            pairs.push((i - 1, j - 1));
+            i -= 1;
+            j -= 1;
+        } else if score[i - 1][j] >= score[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    pairs.reverse();
+    pairs
 }
 
 /// Counts how many times each value occurs in `values` - used by

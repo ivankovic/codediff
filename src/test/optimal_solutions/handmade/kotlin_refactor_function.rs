@@ -30,9 +30,5 @@ fn optimal_solution() -> Result<()> {
     // wanted). That conflict between two real fixtures is itself evidence there's no single
     // correct general heuristic - this is fixture-specific human judgment, not a bug. Not
     // attempted.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "kotlin-refactor-function",
-        0,
-        0,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("kotlin-refactor-function")
 }

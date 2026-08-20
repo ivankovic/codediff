@@ -28,9 +28,7 @@ fn optimal_solution() -> Result<()> {
     // residual. The fallback deletes+reinserts every one of the 18 identical comment lines instead
     // of matching them, rather than paying for exact tree-edit-distance. Not yet root-caused
     // further; lower (or drop back to assert_matches_human_mapping) if that's revisited.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-fedorenchik-qt-support-add-two-lines",
-        0,
-        0,
     )
 }
