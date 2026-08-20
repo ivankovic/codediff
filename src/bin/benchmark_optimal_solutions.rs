@@ -457,11 +457,17 @@ fn main() -> Result<()> {
 }
 
 /// The second accuracy goal's per-fixture ceiling: at most this fraction of a fixture's *visible*
-/// nodes may disagree with the human mapping. 4%, not the 0.5% the all-nodes phrasing used - see
-/// `src/diff/TODO.md`'s "Why 4% and not 0.5%": visible nodes are only ~3.4% of all nodes, so 0.5%
-/// of them is under one node for a median fixture and the 99% tier came out stricter than the
-/// 90%-at-zero tier it is supposed to relax.
-const VISIBLE_RATE_GOAL: f64 = 0.04;
+/// nodes may disagree with the human mapping.
+///
+/// 1% against the structural visible set (`nodes::is_structurally_visible`), which is ~68% of all
+/// nodes - so this allows roughly 19 visible mismatches on a median fixture's 1,875 visible nodes,
+/// a genuine relaxation of the 90%-at-exactly-zero tier rather than a restatement of it. The
+/// threshold has moved twice and the reason is worth keeping: it was briefly 4%, chosen while
+/// visibility was renderer-derived and the denominator was ~3.4% of nodes, where anything tighter
+/// collapsed into "exactly zero" for most of the corpus. Once visibility became structural that
+/// denominator grew ~20x and 4% stopped discriminating - it passed 98.3% of fixtures and only
+/// caught the extreme tail. See `src/diff/TODO.md` item 0 for the full table.
+const VISIBLE_RATE_GOAL: f64 = 0.01;
 
 /// Progress against the project's two accuracy goals, both stated in *visible* nodes - see the
 /// README's "Accurate" principle and `src/diff/TODO.md`. Printed after the tables so the number a

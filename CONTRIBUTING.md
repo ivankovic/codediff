@@ -76,7 +76,7 @@ output to see whether a change made diffs better or worse.
 The targets (see the README's "Accurate" principle):
 
 * **90% of test cases with zero mismatched visible nodes.**
-* **99% of test cases with at most 4% of visible nodes mismatched.**
+* **99% of test cases with at most 1% of visible nodes mismatched.**
 
 Both are stated in *visible* nodes - the ones carrying text of their own, per
 `codediff::diff::nodes::is_structurally_visible` - not all AST nodes. A wrongly-matched `block` or

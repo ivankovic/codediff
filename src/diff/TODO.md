@@ -60,9 +60,9 @@ mismatches concentrated in fixtures that were already failing). Goal 2 went 428 
 | bar | fixtures passing | gap to 99% | allowance on a median fixture |
 | --- | --- | --- | --- |
 | 0.5% | 430/468 = 91.9% | 34 | ~9 mismatches |
-| 1% | 448/468 = 95.7% | 16 | ~19 |
+| **1% (chosen)** | **448/468 = 95.7%** | **16** | **~19** |
 | 2% | 455/468 = 97.2% | 9 | ~37 |
-| 4% (current) | 460/468 = 98.3% | 4 | ~75 |
+| 4% | 460/468 = 98.3% | 4 | ~75 |
 
 4% was chosen to fix an inversion that only existed because the old denominator was tiny; with a
 structural denominator that problem is gone and 0.5% is once again a genuine relaxed tier rather
@@ -431,7 +431,7 @@ aspirational, the bar for "done":
   cases. Whether the p99 SLO is meant to cover the deliberately-gigantic fixtures at all is an open
   question.
 - **Quality (RESTATED 2026-08-20, now in VISIBLE nodes): 90% of test cases with zero mismatched
-  visible nodes; 99% with at most 4% of visible nodes mismatched.** Superseded the previous
+  visible nodes; 99% with at most 1% of visible nodes mismatched.** Superseded the previous
   all-nodes phrasing ("90% zero mismatches, remaining 10% capped at <=0.5% of nodes") once
   `diff::text::visible_node_ids` made the distinction measurable: most AST nodes are structure the
   reader never sees on its own, so a wrongly-matched `block` is not the same defect as a
@@ -441,7 +441,7 @@ aspirational, the bar for "done":
 
   Standing at restatement (468 solved fixtures):
   - zero visible mismatches: **352/468 = 75.2%**, need 422 - **gap 70 fixtures**
-  - within 4% visible: **428/468 = 91.5%**, need 464 - **gap 36 fixtures**
+  - within 1% visible: **448/468 = 95.7%**, need 464 - **gap 16 fixtures**
   (For reference: zero *total* mismatches is 343/468 = 73.3%, so the visible view is only ~2pp
   more forgiving at the zero bar - the two are much closer than expected. The visible metric's
   value is in *which* fixtures it excuses, not in flattering the aggregate.)
