@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("json-ipfs-ipfs-desktop-only-update-version-strings")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "json-ipfs-ipfs-desktop-only-update-version-strings",
+    )
 }

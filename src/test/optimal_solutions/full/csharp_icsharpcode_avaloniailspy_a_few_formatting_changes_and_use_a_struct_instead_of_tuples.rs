@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples",
+    )
 }

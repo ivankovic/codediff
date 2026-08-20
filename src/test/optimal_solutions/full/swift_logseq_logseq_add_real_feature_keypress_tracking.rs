@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("swift-logseq-logseq-add-real-feature-keypress-tracking")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "swift-logseq-logseq-add-real-feature-keypress-tracking",
+    )
 }

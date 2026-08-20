@@ -22,5 +22,7 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // This is shellscript, but it contains huge strings of cpp code
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-nomad-software-vend-huge-multi-line-strings-updated")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "shellscript-nomad-software-vend-huge-multi-line-strings-updated",
+    )
 }

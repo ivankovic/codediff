@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("typescript-th-ch-youtube-music-add-a-function-and-some-small-changes")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "typescript-th-ch-youtube-music-add-a-function-and-some-small-changes",
+    )
 }
