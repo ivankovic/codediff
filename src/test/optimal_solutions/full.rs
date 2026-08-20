@@ -22,7 +22,11 @@ mod c_libtom_libtomcrypt_change_function_call;
 #[cfg(test)]
 mod c_ondsel_development_ondselsolver_add_include;
 #[cfg(test)]
+mod c_pixaranimationstudios_opensubdiv_change_license_comment;
+#[cfg(test)]
 mod c_pocoproject_poco_replace_0_with_nullptr;
+#[cfg(test)]
+mod c_relianoid_nftlb_zcu_log_to_u_log;
 #[cfg(test)]
 mod c_tripwire_tripwire_open_source_add_single_item_to_list;
 #[cfg(test)]
@@ -47,6 +51,8 @@ mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
 mod csharp_glibsharp_gtksharp_whitespace_only_change;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change_2;
+#[cfg(test)]
+mod csharp_icsharpcode_avaloniailspy_a_few_formatting_changes_and_use_a_struct_instead_of_tuples;
 #[cfg(test)]
 mod csharp_waf_csharprepl_update_string_url;
 #[cfg(test)]
@@ -132,6 +138,8 @@ mod json_fortawesome_font_awesome_string_change;
 #[cfg(test)]
 mod json_governikus_ausweisapp_whitespace_only;
 #[cfg(test)]
+mod json_ipfs_ipfs_desktop_only_update_version_strings;
+#[cfg(test)]
 mod json_iwalton3_jellyfin_web_jmp_gigantic_file_trivial_string_version_change;
 #[cfg(test)]
 mod json_kellyjonbrazil_jc_add_maxhops_to_traceroute;
@@ -144,6 +152,8 @@ mod kotlin_jetbrains_kotlin_add_single_const;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_one_comment_line;
 #[cfg(test)]
+mod kotlin_jetbrains_kotlin_remove_some_deprecation;
+#[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_typealias_with_annotations;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_another_vector2_removal;
@@ -153,6 +163,8 @@ mod kotlin_yairm210_unciv_move_from_vec2_to_hexexpression;
 mod kotlin_yairm210_unciv_remove_tovector2_from_multiple_callsites;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_small_change;
+#[cfg(test)]
+mod kotlin_yairm210_unciv_vector2_to_hexgrid;
 #[cfg(test)]
 mod kotlin_yairm210_unciv_yet_another_vector2_removal;
 #[cfg(test)]
@@ -194,6 +206,8 @@ mod python_aajanki_yle_dl_tiny_change;
 #[cfg(test)]
 mod python_bolero_murakami_sprout_change_copyright_year;
 #[cfg(test)]
+mod python_cloudflare_cloudflare_python_comment_only_changes;
+#[cfg(test)]
 mod python_espressomd_espresso_fix_comment_typo;
 #[cfg(test)]
 mod python_open_telemetry_opentelemetry_python_move_from_one_function_to_other;
@@ -208,11 +222,15 @@ mod r_gtownsend_icon_one_letter_identifier_change;
 #[cfg(test)]
 mod r_mtytel_helm_dummy_file;
 #[cfg(test)]
+mod r_oracle_dtrace_utils_i_have_no_idea_what_this_change_actually_does;
+#[cfg(test)]
 mod ruby_intridea_multi_json_remove_double_colon;
 #[cfg(test)]
 mod ruby_intridea_multi_json_remove_single_comma;
 #[cfg(test)]
 mod ruby_main_branch_process_executer_actual_small_change;
+#[cfg(test)]
+mod ruby_mikel_mail_whitespace_only_change;
 #[cfg(test)]
 mod ruby_moneta_rb_moneta_change_one_identifier;
 #[cfg(test)]
@@ -236,13 +254,19 @@ mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_add_a_function_call;
 #[cfg(test)]
+mod scala_com_lihaoyi_mill_add_a_member_to_expression_chains;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_add_one_argument;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_assert_format_string_change;
 #[cfg(test)]
+mod scala_com_lihaoyi_mill_change_from_one_function_to_other_and_delete_a_function;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_only_change_failure_strings;
+#[cfg(test)]
+mod scala_com_lihaoyi_mill_real_small_change;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_small_change;
 #[cfg(test)]
@@ -270,15 +294,23 @@ mod shellscript_maxsatula_ocp_small_change;
 #[cfg(test)]
 mod shellscript_nicolargo_glances_add_shebang;
 #[cfg(test)]
+mod shellscript_nomad_software_vend_huge_multi_line_strings_updated;
+#[cfg(test)]
 mod shellscript_openlightingproject_ola_real_small_change;
 #[cfg(test)]
 mod shellscript_ropery_ffcast_comment_only_change;
+#[cfg(test)]
+mod swift_apple_swift_argument_parser_if_to_guard;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_simplify_code;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_small_change;
 #[cfg(test)]
+mod swift_logseq_logseq_add_real_feature_keypress_tracking;
+#[cfg(test)]
 mod swift_swift_emacs_swift_mode_seems_like_test_code;
+#[cfg(test)]
+mod swift_tree_sitter_tree_sitter_haskell_remove_a_list_item;
 #[cfg(test)]
 mod swift_zeroc_ice_ice_add_an_if_block_and_variable;
 #[cfg(test)]
@@ -298,9 +330,13 @@ mod tsx_popcorn_official_popcorn_desktop_simple_property_rename;
 #[cfg(test)]
 mod tsx_rektdeckard_departure_mono_import_path;
 #[cfg(test)]
+mod tsx_troyeguo_koodo_reader_pure_insert;
+#[cfg(test)]
 mod typescript_apache_echarts_envelop_2_lines_with_an_if_block;
 #[cfg(test)]
 mod typescript_lxqt_lxqt_openssh_askpass_change_url;
+#[cfg(test)]
+mod typescript_th_ch_youtube_music_add_a_function_and_some_small_changes;
 #[cfg(test)]
 mod vimscript_chikamichi_mediawiki_add_one_autocmd;
 #[cfg(test)]

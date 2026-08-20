@@ -1,0 +1,6026 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:2",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:3",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:4",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:5",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:6",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:7",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:8",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:9",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:10",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:11",
+        "binary_operator:2",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "$:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "extract_operator:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "-:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "-:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1",
+        "float:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "binary_operator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "::1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "float:1"
+      ],
+      "after_path": [
+        "binary_operator:12",
+        "binary_operator:2",
+        "float:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:2",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:2",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:2",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:2",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:2",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:2"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:3",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:3"
+        ],
+        [
+          "binary_operator:3",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:3",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:3",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:3",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:3"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:4",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:4",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:4"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:4",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:4",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:4",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:4"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:5",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:5"
+        ],
+        [
+          "binary_operator:5",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:5",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:5",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:5",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:5"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:6"
+        ],
+        [
+          "binary_operator:6",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:6",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:6",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:6",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:6"
+        ],
+        [
+          "binary_operator:6",
+          "binary_operator:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:7",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:7",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:7"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:7",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:7",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:7",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:7"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:8",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:8"
+        ],
+        [
+          "binary_operator:8",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:8",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:8",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:8"
+        ],
+        [
+          "binary_operator:8",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:9",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:9"
+        ],
+        [
+          "binary_operator:9",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:9",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:9",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:9",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:9"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:10",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:10",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:10"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:10",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:10",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:10",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:10"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:11",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:11"
+        ],
+        [
+          "binary_operator:11",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:11",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:11"
+        ],
+        [
+          "binary_operator:11",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:11",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "binary_operator:12",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:12"
+        ],
+        [
+          "binary_operator:12",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "binary_operator:12",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:12"
+        ],
+        [
+          "binary_operator:12",
+          "binary_operator:1",
+          "binary_operator:1",
+          "binary_operator:1"
+        ],
+        [
+          "binary_operator:12",
+          "binary_operator:1",
+          "binary_operator:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    }
+  ]
+}
