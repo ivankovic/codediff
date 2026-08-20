@@ -56,7 +56,7 @@ fetch: $(LIST) $(SCRIPTS_SAMPLING_DIR)/dataset.sh
 
 # Just the analysis/plotting/paper-variables step of file-stats, over whatever
 # $(RESEARCH_DIR)/stats.sqlite already has on disk, without re-running file_stats itself. Split
-# out for the same reason as benchmark-other-report below - see introductory-paper-empirical,
+# out for the same reason as benchmark-timing-report below - see introductory-paper-empirical,
 # which depends on this, not on file-stats.
 file-stats-report:
 	uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite
@@ -228,41 +228,57 @@ benchmark-optimal-report:
 
 # ── Tool comparison (benchmark_other) ───────────────────────────────────────────────────────────
 
-# Runs benchmark_other's own analysis/plotting step over whatever data/comparison/benchmark_other.csv already
-# has on disk, without re-running the benchmark itself. Split out from benchmark-other below so a
-# paper rebuild (introductory-paper) can re-render from existing data without paying for a fresh
-# (slow - GumTree's JVM cold-starts per fixture) benchmark run.
-benchmark-other-report:
+# Runs the timing benchmark's own analysis/plotting step over whatever
+# data/comparison/benchmark_other.csv already has on disk, without re-running the benchmark
+# itself. Split out from benchmark-timing below so a paper rebuild (introductory-paper) can
+# re-render from existing data without paying for a fresh (slow - GumTree's JVM cold-starts per
+# fixture) benchmark run.
+benchmark-timing-report:
 	uv run ./analysis/benchmark_other_report.py
 
 # Compares codediff against other diff tools (Unix diff, GumTree, difftastic, diffsitter) on
-# line-level agreement with the human-authored mapping, plus runtime, then runs the analysis step
+# runtime, plus line-level agreement with the human-authored mapping, then runs the analysis step
 # above. --features test-fixtures: benchmark_other, like benchmark_optimal_solutions, needs
 # codediff::test's fixture-loading helpers. Requires GUMTREE_BIN, DIFFT_BIN, and DIFFSITTER_BIN,
 # each pointing at a built binary - unlike everything else here, these are external, non-Rust
 # (GumTree) or at least non-workspace (difftastic, diffsitter) tool dependencies this target can't
 # provide on its own (see drivers/gumtree-batch/build.sh for GumTree's optional warm-JVM timing
-# variant, and CONTRIBUTING.md's `benchmark-other` entry for how to install difftastic/diffsitter
+# variant, and CONTRIBUTING.md's `benchmark-timing` entry for how to install difftastic/diffsitter
 # into /var/tmp without touching the system-wide cargo bin directory).
-benchmark-other:
+#
+# Named for timing because that is what only this target measures. Its CSV does also carry
+# per-tool `*_mismatches` columns, but those are line-granularity only and are superseded by
+# benchmark-accuracy below, which scores the same agreement at line, node, leaf and visible
+# granularity. Timing is the reason to pay for this target's slow, machine-load-sensitive run.
+# (Renamed from `benchmark-other` 2026-08-20; the binary, CSV and report script keep their
+# `benchmark_other` names, since the binary genuinely serves both this target and
+# benchmark-accuracy.)
+benchmark-timing:
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-	$(MAKE) benchmark-other-report
+	$(MAKE) benchmark-timing-report
 
-# Accuracy-only counterpart of benchmark-other: per fixture, every tool's line- AND node-level
-# agreement with the human mapping, written to data/comparison/benchmark_accuracy.csv with
-# sample.csv provenance columns for cross-referencing. No timing at all, so unlike benchmark-other
-# this doesn't need the warm-JVM driver and doesn't care about machine load - accuracy is
-# deterministic. Same GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN requirement.
+# Accuracy-only counterpart of benchmark-timing: per fixture, every tool's agreement with the
+# human mapping at line, node, leaf-node and visible-node granularity, written to
+# data/comparison/benchmark_accuracy.csv with sample.csv provenance columns for cross-referencing.
+# No timing at all, so unlike benchmark-timing this doesn't need the warm-JVM driver and doesn't
+# care about machine load - accuracy is deterministic. Same GUMTREE_BIN / DIFFT_BIN /
+# DIFFSITTER_BIN requirement.
 #
 # The node columns are a "did the tool consider this node's text changed" projection, NOT the
 # node-mapping fidelity benchmark_optimal_solutions reports - see data/comparison/PROVENANCE.md
 # and `benchmark_other --help`. Unix diff has no node columns by construction.
+#
+# The `*_visible_node_mismatches` columns restrict that projection to nodes that actually reach
+# the screen when the diff is rendered. Visibility is judged against the *human* mapping, so every
+# tool is scored against one fixed, tool-independent set of visible nodes - deliberately unlike
+# benchmark_optimal_solutions' own visible count, which judges codediff by codediff's own
+# rendering. Visible is not a synonym for leaf; see PROVENANCE.md for why they differ both ways.
 benchmark-accuracy:
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
-# Same slow/fast split as benchmark-other above: `rq1-report` re-renders from whatever
+# Same slow/fast split as benchmark-timing above: `rq1-report` re-renders from whatever
 # data/rq1/apted_only_group*.csv already holds, `rq1` re-measures first.
 rq1-report:
 	uv run ./analysis/apted_only_report.py
@@ -313,20 +329,20 @@ rq1:
 # Invoked from the two paper targets below via a recipe-body $(MAKE), not listed as a prerequisite
 # of either: it must run *after* whichever producer that target depends on (file-stats-report
 # writes the empirical fragment this reads), and prerequisite order isn't guaranteed under
-# `make -j`. Same recipe-body-$(MAKE) convention benchmark-other uses for its own report step.
+# `make -j`. Same recipe-body-$(MAKE) convention benchmark-timing uses for its own report step.
 paper-variables:
 	uv run ./analysis/paper_variables.py
 
 # Rebuilds the paper PDF from the figures and macros already in plots/.
 #
-# Deliberately does NOT depend on benchmark-other-report: that step regenerates the comparison
+# Deliberately does NOT depend on benchmark-timing-report: that step regenerates the comparison
 # charts and variance table from whatever data/comparison/benchmark_other.csv currently holds,
 # and that CSV (156 fixtures) has grown past the corpus every AUTHORED number in the paper was
 # measured on (98 fixtures - see paper_variables.py's COMPARISON block and the TODO in main.tex).
 # A routine PDF rebuild must not silently swap 156-fixture charts into a paper whose prose says
 # 98 - exactly that happened live on 2026-08-19, caught only because the regenerated variance
 # table's n column changed. When the evaluation is deliberately refreshed, run
-# `make benchmark-other` (or benchmark-other-report), update the authored blocks in
+# `make benchmark-timing` (or benchmark-timing-report), update the authored blocks in
 # paper_variables.py to match, and re-render - together, never piecemeal.
 #
 # Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
@@ -365,7 +381,7 @@ introductory-paper:
 # already has on disk for the current MODE (default tiny - pass MODE=small or MODE=full to match
 # whatever `make file-stats` run you actually have). Reuses the fast half of that split
 # (file-stats-report), not file-stats itself, for the same reason introductory-paper depends on
-# benchmark-other-report and not benchmark-other: rebuilding a paper should never pay for the slow
+# benchmark-timing-report and not benchmark-timing: rebuilding a paper should never pay for the slow
 # step. Run `make file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
 introductory-paper-empirical: file-stats-report
 	$(MAKE) paper-variables

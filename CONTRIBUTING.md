@@ -146,9 +146,13 @@ are shorthand for "run fetch-stats analysis in that mode".
   gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
 * `benchmark-optimal-report` (research/) - same as `benchmark-optimal`, plus `--csv` output and a report on how
   much of the diff each algorithm pass (`ASTMappingReason`) is responsible for.
-* `benchmark-other` (research/) - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
-  on line-level agreement with the human mapping, plus runtime, then runs `benchmark-other-report`
-  below. Each external tool needs its own environment variable pointing at a built binary:
+* `benchmark-timing` (research/) - compares codediff against Unix `diff`, GumTree, difftastic, and diffsitter,
+  on runtime, plus line-level agreement with the human mapping, then runs `benchmark-timing-report`
+  below. (Renamed from `benchmark-other` on 2026-08-20; the binary, CSV and report script keep
+  their `benchmark_other` names, since that binary serves both this target and
+  `benchmark-accuracy`.) Timing is the reason to run this one - the `*_mismatches` columns in its
+  CSV are line-granularity only and are superseded by `benchmark-accuracy` below.
+  Each external tool needs its own environment variable pointing at a built binary:
   `GUMTREE_BIN` (a built GumTree distribution - this is the only one with an external, non-Rust
   dependency), `DIFFT_BIN`, and `DIFFSITTER_BIN`. difftastic and diffsitter are plain
   `cargo install`-able. To keep both out of the system-wide cargo bin directory, install them into
@@ -166,10 +170,24 @@ are shorthand for "run fetch-stats analysis in that mode".
   `diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0 and should
   be re-verified the same way rather than assumed, since jj's config surface has been renamed
   before.
-* `benchmark-other-report` (research/) - just the analysis/plotting step of `benchmark-other`, over whatever
+* `benchmark-timing-report` (research/) - just the analysis/plotting step of `benchmark-timing`, over whatever
   `research/data/comparison/benchmark_other.csv` already has on disk. Fast, and needs none of the environment
   variables above, since it never runs the benchmark itself. `introductory-paper` below depends on
-  this, not on `benchmark-other`, so rebuilding the paper never pays for a fresh benchmark run.
+  this, not on `benchmark-timing`, so rebuilding the paper never pays for a fresh benchmark run.
+* `benchmark-accuracy` (research/) - the accuracy-only counterpart of `benchmark-timing`: per fixture, every
+  tool's agreement with the human mapping at line, node, leaf-node and visible-node granularity,
+  written to `research/data/comparison/benchmark_accuracy.csv` with `sample.csv` provenance columns.
+  Needs the same three environment variables, but no timing means it doesn't care about machine
+  load - accuracy is deterministic, so there is nothing to repeat and nothing to keep idle for.
+
+  The node columns are a *"did the tool consider this node's text changed"* projection, **not** the
+  node-mapping fidelity `benchmark-optimal` reports for codediff - an external tool parses its own
+  tree and shares no node identities with codediff's, so no mapping-level question can be asked of
+  it. The `*_visible_node_mismatches` columns restrict that projection to nodes that actually reach
+  the screen, with visibility judged against the *human* mapping so every tool is scored against
+  one fixed, tool-independent set. See `research/data/comparison/PROVENANCE.md` for the full
+  semantics, the per-language caveat on how far each tool's own tree diverges from codediff's, and
+  which GumTree numbers are safe to quote.
 * `ablation-study [OUT_DIR=path]` (research/) - a leave-one-out study over the diff algorithm's optional
   heuristic passes. It measures each pass's real contribution to accuracy on the fixture corpus.
 * `check-quality` - what `deploy` runs before it tags a release. This target gates on
@@ -201,7 +219,7 @@ are shorthand for "run fetch-stats analysis in that mode".
   `research/papers/introductory-paper/main.tex` embeds (accuracy chart, runtime chart, and a
   variance table - a generated `.tex` table `\input` directly, not a PNG) from whatever
   `research/data/comparison/benchmark_other.csv` already has on disk into `research/plots/` (which that paper's
-  `figures/` symlinks into - there is no copy step), and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-other` - run
+  `figures/` symlinks into - there is no copy step), and rebuilds the PDF with `latexmk`. Deliberately does not depend on `benchmark-timing` - run
   that yourself first to refresh the underlying data, this target only re-renders from it, so a
   paper rebuild stays fast. Needs a LaTeX toolchain with the `acmart` class and `cm-super` (see
   that paper's own `README.md` for the install command).
