@@ -278,6 +278,8 @@ mod scala_com_lihaoyi_mill_split_import;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_split_import_2;
 #[cfg(test)]
+mod scala_com_lihaoyi_mill_split_two_asserts_into_six_two_times;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_version_string_change;
 #[cfg(test)]
 mod scala_sirthias_parboiled_value_change;
@@ -303,6 +305,8 @@ mod shellscript_openlightingproject_ola_real_small_change;
 mod shellscript_ropery_ffcast_comment_only_change;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_if_to_guard;
+#[cfg(test)]
+mod swift_apple_swift_argument_parser_refactor_and_improve_tests;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_simplify_code;
 #[cfg(test)]

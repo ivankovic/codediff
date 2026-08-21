@@ -327,7 +327,7 @@ Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,core/eval/src/mi
 Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,integration/feature/output-directory/src/OutputDirectoryTests.scala,scala-com-lihaoyi-mill-split-import-2,full,PROMOTED,The best solution would require a many-to-many map
 Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,libs/util/test/src/mill/util/MainModuleTests.scala,scala-com-lihaoyi-mill-split-import,full,PROMOTED,
 Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,core/api/src/mill/api/ModuleCtx.scala,,full,SAMPLED,
-Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,integration/failure/yaml-config-tasks/src/YamlConfigTasksTests.scala,,full,SAMPLED,
+Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,integration/failure/yaml-config-tasks/src/YamlConfigTasksTests.scala,scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times,full,PROMOTED,The string escape sequences would probably need a N:M mapping
 Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,runner/meta/src/mill/meta/CodeGen.scala,scala-com-lihaoyi-mill-add-a-member-to-expression-chains,full,PROMOTED,
 Scala,sirthias-parboiled,fb1f52da025240fa145b1a95d45f7ee59a6ddd49,project/Dependencies.scala,scala-sirthias-parboiled-value-change,full,PROMOTED,
 Scala,xerial-xerial-java,2468884a2f339780ec30fcbd2dc6d37592eee7c2,project/XerialBuild.scala,scala-xerial-xerial-java-actual-code-change,full,PROMOTED,
@@ -358,7 +358,7 @@ Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Sourc
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Sources/ArgumentParser/Usage/DumpHelpGenerator.swift,swift-apple-swift-argument-parser-simplify-code,full,PROMOTED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserPackageManagerTests/HelpTests.swift,,full,SAMPLED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserPackageManagerTests/Tests.swift,swift-apple-swift-argument-parser-small-change,full,PROMOTED,
-Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserUnitTests/ExitCodeTests.swift,,full,SAMPLED,
+Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserUnitTests/ExitCodeTests.swift,swift-apple-swift-argument-parser-refactor-and-improve-tests,full,PROMOTED,True best mapping would be a 2:1 mapping of the string constant
 Swift,logseq-logseq,28c397e894f07e65c672f192435d7a41db4d7193,ios/App/App/LiquidTabsPlugin.swift,,full,SAMPLED,
 Swift,logseq-logseq,28c397e894f07e65c672f192435d7a41db4d7193,ios/App/App/LiquidTabsRootView.swift,swift-logseq-logseq-add-real-feature-keypress-tracking,full,PROMOTED,
 Swift,nextcloud-ios.git,33c52794edb8b37ab92b5dc68abe944004f4329d,iOSClient/Networking/NCNetworking+Download.swift,swift-nextcloud-ios-actual-control-flow-change,small,PROMOTED,
