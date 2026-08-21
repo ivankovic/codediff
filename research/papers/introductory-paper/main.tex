@@ -12,6 +12,26 @@
 %% this paper's own README.md for how to swap in a full run's numbers once available).
 \input{figures/variables.tex}
 
+%% Result boxes. Each research question stated in the introduction is answered by a correspondingly
+%% numbered research answer, RA1--RA3, set in one of these at the point where its supporting
+%% measurement is reported. A box holds the answer statement only - two or three sentences, every
+%% measured number a macro from figures/variables.tex - with the argument behind it following as
+%% ordinary prose. Keeping the boxes short is a two-column-layout constraint, not a style
+%% preference: a boxed half-page of prose splits badly across a column break.
+\usepackage[most]{tcolorbox}
+\newtcolorbox{resultbox}[1]{%
+  breakable,
+  enhanced,
+  colback=black!3,
+  colframe=black!55,
+  colbacktitle=black!10,
+  coltitle=black,
+  fonttitle=\bfseries,
+  boxrule=0.4pt,
+  left=5pt, right=5pt, top=4pt, bottom=4pt,
+  title={#1},
+}
+
 \setcopyright{acmlicensed}
 \copyrightyear{2026}
 \acmYear{2026}
@@ -112,22 +132,48 @@ robustness targets. The targets come from an empirical study of real open-source
 sizes and shapes of their files and of the changes developers actually make—rather than from
 worst-case analysis alone.
 
-This paper makes the following contributions:
+The paper is organized around three research questions, each answered by the correspondingly
+numbered research answer, RA1--RA3, set in a box at the point in the paper where the measurement
+supporting it is reported.
+
 \begin{itemize}
-  \item It reports an empirical study of \NumRepos{} real-world open-source repositories, showing
+  \item \textbf{RQ1 (Scale).} What percentage of real-world source-code changes can a single,
+  whole-tree tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff
+  tool is built on—complete within a one-second budget? Answered by RA1,
+  Section~\ref{sec:problem-space}.
+  \item \textbf{RQ2 (Tool accuracy).} How accurately do current state-of-the-art code-diffing
+  tools recover real-world code changes, measured against human-authored ground-truth mappings of
+  those changes? Answered by RA2, Section~\ref{sec:evaluation}.
+  \item \textbf{RQ3 (Shapes and heuristics).} Which shapes of real-world
+  change—renames, moves, restructurings—require a dedicated matching heuristic, and do
+  heuristics shown effective in one pipeline and corpus retain that value when reused in a
+  different pipeline and evaluated against a different corpus? Answered by RA3,
+  Section~\ref{sec:evaluation}.
+\end{itemize}
+
+This paper makes four contributions, one empirical, one system, one dataset, and one evaluation:
+\begin{itemize}
+  \item \textbf{Empirical study.} An empirical study of \NumRepos{} real-world open-source
+  repositories, showing
   that the worst-case inputs tree-diffing algorithms are analyzed against are rare in practice,
   but that the tail is real and large enough that a production tool must handle inputs beyond
   what a whole-tree tree-edit-distance computation can process within an interactive budget.
-  \item It reports a quantified comparison of four established diffing
-  tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against human-authored
-  ground-truth mappings of \NumFixtures{} real-world code changes.
-  \item It reports a census of which change shapes occur in that ground truth and how well each is
-  recovered, alongside a leave-one-out ablation study of the heuristics targeting them, showing
+  \item \textbf{System.} \textsc{CodeDiff} itself, a \NumPhasesWord{}-phase diffing pipeline
+  built from APTED tree edit distance, scoped to bounded subtree pairs rather than to whole
+  files, together with GumTree's move-recovery heuristic and Myers' sequence diff, engineered as
+  one production tool meeting the targets the empirical study sets.
+  \item \textbf{Dataset.} A corpus of \NumFixtures{} real-world code changes in
+  \NumFixtureLanguages{} languages, each carrying a human-authored ground-truth AST mapping in
+  which every node is labeled with one of seven operations, produced with a purpose-built
+  annotation tool (Section~\ref{sec:evaluation}). These human solutions are the ground truth every
+  accuracy number in this paper is measured against, and the methodology behind them is
+  reproducible from the project's research repository.
+  \item \textbf{Evaluation.} A quantified comparison of four established diffing
+  tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against that ground truth,
+  together with a census of which change shapes occur in it and a leave-one-out ablation study of
+  the heuristics targeting them, showing
   both that a heuristic's published benefit does not automatically transfer into a different
   pipeline and that the shape carrying the most remaining error has no dedicated heuristic at all.
-  \item It details \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline that combines
-  scoped APTED tree edit distance, GumTree's move-recovery heuristic, and Myers'
-  sequence diff into one production-engineered tool meeting the targets the empirical study sets.
 \end{itemize}
 
 \section{Background}
@@ -192,7 +238,9 @@ documentation states that it targets research use, not production deployment at 
 reasonable scope for its own goals, but one that leaves open a question every production diff
 tool must answer:
 
-\textbf{RQ1 (Scale).} What percentage of real-world source-code changes can a single, whole-tree
+%% Verbatim reprise of the RQ1 statement in Section 1's introduction - edit both or neither.
+\textbf{RQ1 (Scale)}, stated in Section~\ref{sec:intro} and restated here: what percentage of
+real-world source-code changes can a single, whole-tree
 tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff tool is built
 on—complete within a one-second budget?
 
@@ -287,15 +335,18 @@ anything the algorithm does to source code.
   \label{fig:rq1}
 \end{figure*}
 
-\textbf{RA1.} For source code, a whole-tree computation is dependable only for small files, and
-the transition is abrupt rather than gradual: it
-completes within one second for \RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but
-for only \RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines—well inside the
-range of ordinary source files (Table~\ref{tab:file-size-percentiles})—and never recovers above
-one third in any larger bucket. The drop happens between two adjacent buckets, neither of which is
-an unusual size for a source file, which is what makes it a design problem rather than a tail
-problem. Across all sampled code pairs, \RqOneCodePct{}\% complete in
-time; this sample-weighted aggregate deliberately over-represents large files and therefore
+\begin{resultbox}{RA1 (Scale)}
+For source code, a whole-tree tree-edit-distance computation is dependable only for small files,
+and the transition is abrupt rather than gradual: it completes within one second for
+\RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but for only
+\RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines, and never recovers above
+one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in time.
+\end{resultbox}
+
+What makes that a design problem rather than a tail problem is where the collapse falls: between
+two adjacent buckets, neither of which is an unusual size for a source file, and both well inside
+the range ordinary source files occupy (Table~\ref{tab:file-size-percentiles}). The corpus-wide figure is a sample-weighted aggregate: it
+deliberately over-represents large files and therefore
 understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
 the answer regardless of weighting.
 
@@ -415,11 +466,15 @@ kind and sibling position, not by parser-internal node identity, since that iden
 across separate parses of the same file. This human-authored mapping is the ground truth every
 number in this section is measured against.
 
-This section answers two further research questions, building on RQ1's finding that a real,
+This section answers RQ2 and RQ3, stated in Section~\ref{sec:intro} and restated below,
+building on RA1's finding that a real,
 non-negligible tail of large files and commits exists alongside a small common case, and then
 evaluates \textsc{CodeDiff} itself—the paper's system contribution—against the design targets
 stated in Section~\ref{sec:pipeline}.
 
+%% RQ2 and RQ3 below are verbatim copies of the RQ list in Section 1's introduction, restated here
+%% next to the measurements that answer them. Same reason every measured number in this paper is a
+%% macro: a statement typed in two places drifts when only one copy is edited. Edit both or neither.
 \textbf{RQ2 (Tool accuracy).} How accurately do current state-of-the-art code-diffing tools
 recover real-world code changes, measured against human-authored ground-truth mappings of those
 changes?
@@ -469,18 +524,22 @@ applicable subset, not padded with unscored fixtures. Because those subsets diff
 table also reports every tool on the \CommonFixtures{} fixtures all five scored, which holds the
 fixture set fixed at the cost of over-representing the mainstream languages every tool supports.
 
-\textbf{RA2.} Among the four pre-existing tools (Table~\ref{tab:accuracy-vs-others}, excluding
+\begin{resultbox}{RA2 (Tool accuracy)}
+Among the four pre-existing tools (Table~\ref{tab:accuracy-vs-others}, excluding
 \textsc{CodeDiff}'s own row), line-level mismatch rates against the human mapping range from
-\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \GumTreeLineRate{}\% (GumTree). Three results
-stand out. First, every tool agrees with the human mapping on the great majority
-of lines: even the highest mismatch rate leaves more than 95\% of lines in agreement, so the
-question that separates tools is how they handle the small, structurally interesting remainder.
-Second, no AST-aware tool among the four beats plain line-based \texttt{diff} on this measure,
-on either basis.
-Syntax-awareness alone does not guarantee that a tool recovers a change the way a human reads
-it—the gap is in which heuristics act on the syntax tree, which RQ3 turns to next.
+\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \GumTreeLineRate{}\% (GumTree). Every tool agrees
+with the human mapping on the great majority of lines, so what separates them is the small,
+structurally interesting remainder—and on that remainder no AST-aware tool among the four
+beats plain line-based \texttt{diff}, on either basis. Syntax-awareness alone does not guarantee
+that a tool recovers a change the way a human reads it.
+\end{resultbox}
 
-Third, the two bases disagree about \textsc{CodeDiff} itself, and the disagreement is worth
+Two details behind that answer are worth stating. The first is how wide the agreement is: even the
+highest mismatch rate leaves more than 95\% of lines in agreement, so the question that separates
+tools is a narrow one. The second is where a line-based tool's advantage comes from—the gap is
+in which heuristics act on the syntax tree, which RQ3 turns to next.
+
+The two bases also disagree about \textsc{CodeDiff} itself, and the disagreement is worth
 stating plainly. Across the whole corpus \textsc{CodeDiff} has the lowest rate of the five,
 \CodeDiffLineRate{}\% against Unix \texttt{diff}'s \UnixDiffLineRate{}\%. On the
 \CommonFixtures{}-fixture common subset that ordering reverses: Unix \texttt{diff} scores
@@ -583,11 +642,7 @@ two disagree in a way that matters. Across all nodes, three of the four passes e
 restricted to what a reviewer actually sees, only one does. Bottom-up propagation's
 $\AblationBottomUpPropagation{}$ nodes and mutual-ancestor pairing's $\AblationMutualAncestors{}$
 are, without exception, structural interior nodes—the containers and wrappers a rendered diff
-never displays on their own. Unique type matching moves neither column, and the reason is not that
-it is unsound: instrumentation shows it fires \emph{zero} times across the entire corpus. By the
-time it runs, \textsc{CodeDiff}'s earlier phases have already resolved every case it targets, and
-a matched parent's leftover unmatched children essentially never land on the ``exactly one of this
-kind on each side'' configuration it requires.
+never displays on their own. Unique type matching moves neither column.
 
 \begin{table}
   \caption{Ablation study: accuracy change from disabling each optional pass, against a baseline
@@ -607,17 +662,28 @@ kind on each side'' configuration it requires.
   \end{tabular}
 \end{table}
 
-\textbf{RA3.} On this corpus, the move is the one shape whose dedicated heuristic pays for
-itself in a way a reader would notice: move-detection recovery contributes more accuracy than the
-other three optional passes combined, by a factor of seven across all nodes, and is the only one
-of the four that changes the visible-node count at all. This matches the structural argument of
+\begin{resultbox}{RA3 (Shapes and heuristics)}
+On this corpus the move is the one shape whose dedicated heuristic pays for itself in a way a
+reader would notice: move-detection recovery contributes more accuracy than the other three
+optional passes combined, by a factor of seven across all nodes, and is the only one of the four
+that changes the visible-node count at all. A published benefit does not transfer automatically:
+unique type matching, GumTree Simple's own recovery sub-phase, is correct in isolation yet
+contributes exactly nothing here, because earlier phases reach its cases first. The shape carrying
+the most remaining error has no dedicated heuristic at all—reparenting occurs in
+\ShapeAnyReparentPct{}\% of fixtures and carries \ShapeAnyReparentErrorPct{}\% of the corpus's
+remaining error.
+\end{resultbox}
+
+That the move earns its pass matches the structural argument of
 Section~\ref{sec:pipeline}—a relocated subtree is the one
 shape ordered tree edit distance cannot express except as a delete plus an insert, so no
 downstream computation can recover it without a dedicated pass.
 
-Unique type matching is the sharper result for RQ3's second half. It is GumTree Simple's own
-recovery sub-phase, it is unit-tested and correct in isolation, and it contributes exactly nothing
-here—not because the technique fails, but because it never gets a case to work on. A heuristic's
+Unique type matching is the sharper result for RQ3's second half, and the reason it contributes
+nothing is not that it is unsound: instrumentation shows it fires \emph{zero} times across the
+entire corpus. By the time it runs, \textsc{CodeDiff}'s earlier phases have already resolved every
+case it targets, and a matched parent's leftover unmatched children essentially never land on the
+``exactly one of this kind on each side'' configuration it requires. A heuristic's
 value is therefore a property of the pipeline it is placed in, not of the technique alone: the
 same pass that recovers real mappings where it originated can be dead code in a pipeline whose
 earlier phases are comprehensive enough to reach its cases first. We argue this is the more
@@ -628,9 +694,8 @@ Read together with the census, RQ3's two halves answer each other, and they do n
 shape. The ablation says which shipped heuristic earns its place: move-detection recovery, which
 handles relocation across a matched boundary. The census says which shape is still unserved:
 reparenting—a node that stays where it is but gains or loses an enclosing level, the shape
-produced by wrapping a block in a condition or a try—has no dedicated pass at all, occurs in
-\ShapeAnyReparentPct{}\% of fixtures, and carries \ShapeAnyReparentErrorPct{}\% of the corpus's
-remaining error. This is what an ablation cannot report on its own: it can only
+produced by wrapping a block in a condition or a try—has no dedicated pass at all. This is what
+an ablation cannot report on its own: it can only
 report on heuristics somebody wrote, and is silent about the shape nobody wrote one for. We argue
 a shape census belongs alongside an ablation for that reason, not as a substitute for it.
 

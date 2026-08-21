@@ -143,10 +143,21 @@ so `code::language::language_for_path` detects the language correctly with no ex
 
 `main.rs`'s `Args::paths` is a variable-length positional `Vec<PathBuf>` rather than two fixed
 `Option<PathBuf>` fields specifically so a second calling convention can be recognized by argument
-count alone: git's `GIT_EXTERNAL_DIFF` (invoked directly by `git diff`/`git log -p`/etc., not just
-`difftool`) calls the external diff command with 7 positional arguments, `path old-file old-hex
-old-mode new-file new-hex new-mode` - `resolve_before_after` picks `old-file`/`new-file` (indices 1
-and 4) out of that shape and ignores the rest, tested in `main.rs`'s `tests::resolve_before_after_*`.
+count alone: git's `GIT_EXTERNAL_DIFF` (invoked directly by `git diff`/`git log -p --ext-diff`/etc.,
+not just `difftool`) calls the external diff command with 7 positional arguments, `path old-file
+old-hex old-mode new-file new-hex new-mode` - `resolve_before_after` picks `old-file`/`new-file`
+(indices 1 and 4) out of that shape and ignores the rest, tested in `main.rs`'s
+`tests::resolve_before_after_*`.
+
+That count is 9, not 7, when git detected the change as a rename or a copy: it appends `other` (the
+destination path) and a rename/copy score. `old-file`/`new-file` stay at indices 1 and 4 - the
+shape is a suffix of the 7-argument one - so both counts resolve identically and the two extra
+arguments are ignored like the hex/mode fields. This is not an exotic case: `diff.renames` defaults
+to on for `git diff`, so every commit containing a rename hits it, and rejecting the count exited
+non-zero, which git reads as "external diff died" and abandons the whole run over. Argument count
+is also how `invoked_as_git_external_diff` recognizes this convention for the exit-code invariant
+(`exit_code_for`) and the binary notice's wording, so all of them accept 7 or 9 through that one
+predicate rather than each testing a literal.
 
 Both conventions can hand codediff `/dev/null` for one side, representing an added or deleted
 file (git's own behavior, not something either integration path chooses). `/dev/null` reads back
@@ -157,6 +168,33 @@ unrecognized file type", which turns into a normal whole-file insert/delete in t
 (`Code::from_string` also had to stop unconditionally calling `compute_ast_metadata` for a
 language-less, unparsed `Code` - it's an expected state here, not a bug, and the unconditional call
 logged a spurious "Failed to compute AST metadata" line to stderr on every such diff.)
+
+### Binary files
+
+`Code::from_file` reads with `read_to_string`, so a binary side (a PDF, an image) fails the UTF-8
+decode. Left to propagate, that error exits 2 - and git reads *any* non-zero exit from an external
+diff as "external diff died", abandoning the whole run: one PDF in a commit used to take every
+file after it in the sort order down with it, `git diff` printing a `fatal:` and stopping. So
+`main.rs` checks `code::is_binary_file` on both sides *before* the json/headless/TUI split (a
+binary side has the same non-answer in all three, and the interactive viewer cannot show one
+either) and prints a one-line `Binary file <path> differs` stand-in, exiting through the same
+`exit_code_for` as every other non-interactive path. `--mode json` gets the same object shape it
+always does with a `binary` flag set instead, since a prose sentence on stdout would break every
+consumer of that mode.
+
+`is_binary_file` is deliberately not a heuristic of its own - not git's "NUL byte in the first 8KB"
+check - but `from_file`'s own failure condition run against the same bytes. Two independent
+heuristics agree only by coincidence: a Latin-1-encoded source file has no NUL byte, so git's check
+calls it text while `read_to_string` still fails on it, which would land a caller right back on the
+error path this exists to avoid. `code.rs`'s tests assert the agreement in both directions rather
+than the classification alone.
+
+Only *one* side has to be binary. A binary file being added or deleted arrives as `/dev/null`
+opposite the blob, and `/dev/null` reads back as empty, perfectly valid UTF-8.
+
+Note the scope: this covers files codediff cannot *decode*. A file it cannot *open* (missing, no
+permission) is still a genuine error, still exits 2, and under `GIT_EXTERNAL_DIFF` will still stop
+the run.
 
 ### Headless/text mode: `tui::headless`
 

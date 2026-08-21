@@ -39,6 +39,10 @@
 //! }
 //! ```
 //!
+//! One pair never reaches the diff engine: if either side is binary (`code::is_binary_file`),
+//! `main.rs` answers with `binary_diff_json` instead - the same object, with `"binary": true`,
+//! empty `hunks`, and no `summary`. That field is omitted for every ordinary text diff.
+//!
 //! Each side's `hunks` list is that side's own complete account of its changes (`before`'s hunks
 //! are ranges in the before file, `after`'s are ranges in the after file) - the same per-side
 //! split `headless.rs` renders as two separate blocks, just serialized instead of printed. Rows
@@ -187,6 +191,13 @@ struct JsonDiff {
     /// `headless::run` printing no header line at all in that case.
     #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<JsonDiffSummary>,
+    /// Set when at least one side is a file codediff cannot read as text, so no diff was computed
+    /// at all (see `binary_diff_json`). Both sides' `hunks` are empty in that case, which is
+    /// otherwise indistinguishable from "the files are identical" - hence a flag rather than
+    /// leaving the consumer to infer it. Omitted entirely for the ordinary text case, so an
+    /// existing consumer sees the object shape it already knows.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    binary: bool,
 }
 
 /// Builds one side's `JsonSide` from its own complete `RangeMatch` list (`DiffSessionData::
@@ -244,7 +255,33 @@ fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
         after: build_side(&data.after_contents, &data.after_path, &data.after_ranges),
         fallback_used,
         summary,
+        binary: false,
     }
+}
+
+/// The `--mode json` answer for a pair `main.rs` refused to diff because a side is binary: the
+/// same object shape as any other run, with `binary` set, no hunks on either side, and no
+/// `summary` (none of `DiffSummary`'s shapes apply when no diff was computed). Returns the
+/// serialized text rather than printing it, so the single `println!` for JSON output stays at
+/// `main.rs`'s own call site alongside the text-mode notice it replaces.
+///
+/// `language` is still filled in per side from the path's extension, exactly as `build_side`
+/// would: it describes the file, not the diff, and a consumer keying on it should not see it
+/// vanish just because this pair was unreadable.
+pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
+    let side = |path: &Path| JsonSide {
+        path: path.to_path_buf(),
+        language: language_for_path(path).map(|lang| lang.to_string()),
+        hunks: Vec::new(),
+    };
+    let diff = JsonDiff {
+        before: side(before),
+        after: side(after),
+        fallback_used: false,
+        summary: None,
+        binary: true,
+    };
+    Ok(serde_json::to_string_pretty(&diff)?)
 }
 
 /// Entry point for `--mode json` (`main.rs`): computes the diff exactly like `headless::run` and

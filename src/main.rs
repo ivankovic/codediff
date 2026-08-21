@@ -162,6 +162,12 @@ struct Args {
 ///   sides) isn't needed either since `old-file`/`new-file` already carry the real extension
 ///   themselves. An add/delete is represented by `old-file`/`new-file` being the literal path
 ///   `/dev/null`; `compute_diff` (`tui/app.rs`) handles that case specially.
+/// * **9 args**: the same convention when git detected the change as a rename or a copy, which
+///   appends `other` (the destination path) and a rename/copy score to the seven above. `git
+///   help diff` documents this as "when the diff is about a rename or copy"; `diff.renames`
+///   defaults to on for `git diff`, so it is an ordinary case rather than an exotic one. The two
+///   extra arguments are ignored the same way the hex/mode fields are, and `old-file`/`new-file`
+///   stay at indices 1 and 4 - the shape is a suffix of the 7-argument one, not a rearrangement.
 ///
 /// Any other count is almost certainly a mistake (most likely `GIT_EXTERNAL_DIFF` being invoked
 /// with an unexpected git version's argument list) and is rejected with an explanatory error
@@ -170,13 +176,25 @@ fn resolve_before_after(paths: &[PathBuf]) -> Result<Option<(PathBuf, PathBuf)>>
     match paths.len() {
         0 => Ok(None),
         2 => Ok(Some((paths[0].clone(), paths[1].clone()))),
-        7 => Ok(Some((paths[1].clone(), paths[4].clone()))),
+        7 | 9 => Ok(Some((paths[1].clone(), paths[4].clone()))),
         n => anyhow::bail!(
             "expected 0 positional arguments (empty viewer), 2 (BEFORE AFTER), or 7 \
-            (GIT_EXTERNAL_DIFF's `path old-file old-hex old-mode new-file new-hex new-mode`), \
-            got {n}"
+            (GIT_EXTERNAL_DIFF's `path old-file old-hex old-mode new-file new-hex new-mode`, \
+            or 9 with git's two extra rename/copy arguments), got {n}"
         ),
     }
+}
+
+/// Whether this invocation came from git's `GIT_EXTERNAL_DIFF` hook, as opposed to the plain
+/// `BEFORE AFTER` CLI form (which `git difftool` also uses). Recognized by argument count alone,
+/// exactly as `resolve_before_after` picks the pair apart - 7 normally, 9 when git detected a
+/// rename or a copy.
+///
+/// A predicate rather than a `paths.len() == 7` at each site: it is checked in four places
+/// (exit code, binary notice wording, and twice on the way to those), and the day git adds
+/// another argument they all have to move together.
+fn invoked_as_git_external_diff(paths: &[PathBuf]) -> bool {
+    matches!(paths.len(), 7 | 9)
 }
 
 async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Result<()> {
@@ -245,6 +263,73 @@ fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_d
     }
 }
 
+/// The one-line stand-in for a diff of a file codediff cannot parse as text. Wording follows
+/// `diff(1)`/git's own binary notice, since that is what a reader piping this through git's pager
+/// is used to seeing there.
+///
+/// Under the `GIT_EXTERNAL_DIFF` form both sides are git temp blobs
+/// (`/tmp/git-blob-XXXXXX/main.pdf`) - not paths the reader recognizes or can act on, and not two
+/// distinct files in any sense that matters - so that form names `path` (index 0, the
+/// repo-relative path git is actually diffing) once, exactly as git's own binary line does. Every
+/// other invocation has two real paths and names both.
+///
+/// `differed` is a raw byte comparison, not an assumption: git only ever calls an external diff
+/// for a pair it already knows differs, but `codediff a.pdf b.pdf` is under no such obligation,
+/// and reporting two identical files as differing because nothing could be parsed would be a
+/// wrong answer rather than an unavailable one.
+fn binary_notice(
+    paths: &[PathBuf],
+    before: &std::path::Path,
+    after: &std::path::Path,
+    differed: bool,
+) -> String {
+    if invoked_as_git_external_diff(paths) {
+        let name = paths[0].display();
+        return match differed {
+            true => format!("Binary file {name} differs\n"),
+            false => format!("Binary file {name} is unchanged\n"),
+        };
+    }
+    let (before, after) = (before.display(), after.display());
+    match differed {
+        true => format!("Binary files {before} and {after} differ\n"),
+        false => format!("Binary files {before} and {after} are identical\n"),
+    }
+}
+
+/// Handles a pair where at least one side is binary, for every mode at once - this runs before
+/// the json/headless/TUI split below.
+///
+/// Why it has to exist: `Code::from_file` reads with `read_to_string`, so a binary side fails the
+/// UTF-8 decode and the error propagates out as exit 2. Under `GIT_EXTERNAL_DIFF` git reads any
+/// non-zero exit as "external diff died" and abandons the *whole* run, so one PDF in a commit
+/// used to take every remaining file's diff down with it - `git diff` printed a `fatal:` and
+/// stopped, leaving the source files after it in the sort order undiffed. There is nothing useful
+/// to show for a binary file, but "nothing useful" has to be reported as a successful diff of an
+/// unshowable file, not as a crash.
+///
+/// Only *one* side needs to be binary: git represents an added or deleted file with `/dev/null`
+/// on the missing side, which reads back as empty, perfectly valid UTF-8.
+///
+/// The exit code goes through `exit_code_for` like every other non-interactive path, so the
+/// `GIT_EXTERNAL_DIFF`-never-returns-non-zero invariant holds here too.
+fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) -> Result<i32> {
+    let differed = std::fs::read(before)? != std::fs::read(after)?;
+    if should_run_json(args) {
+        // A prose sentence on stdout would break every consumer of `--mode json` (see
+        // `json_output`'s module doc comment), so this stays a JSON object of the same shape,
+        // flagged with `binary` and carrying no hunks.
+        println!("{}", tui::json_output::binary_diff_json(before, after)?);
+    } else {
+        print!("{}", binary_notice(&args.paths, before, after, differed));
+    }
+    Ok(exit_code_for(
+        differed,
+        args.exit_code,
+        invoked_as_git_external_diff(&args.paths),
+    ))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -264,7 +349,28 @@ async fn main() -> Result<()> {
     }
 
     let before_after = resolve_before_after(&args.paths)?;
-    let invoked_as_git_external_diff = args.paths.len() == 7;
+    let invoked_as_git_external_diff = invoked_as_git_external_diff(&args.paths);
+
+    // Ahead of the json/headless/TUI split: a binary side has the same non-answer in all three,
+    // and the interactive viewer cannot show one either. See `run_binary`.
+    if let Some((before, after)) = before_after.as_ref() {
+        // Not `?`: a file that cannot be opened at all is a real error, and it has to keep
+        // leaving by the same door as every other non-interactive failure here ("codediff: ..."
+        // on stderr, exit 2). Propagating instead would hand it to `main`'s own `Result`, which
+        // prints a differently-formatted `Error:` and exits 1.
+        let either_is_binary = codediff::code::is_binary_file(before)
+            .and_then(|binary| Ok(binary || codediff::code::is_binary_file(after)?));
+        match either_is_binary
+            .and_then(|binary| binary.then(|| run_binary(&args, before, after)).transpose())
+        {
+            Ok(Some(code)) => std::process::exit(code),
+            Ok(None) => {}
+            Err(e) => {
+                eprintln!("codediff: {e:#}");
+                std::process::exit(2);
+            }
+        }
+    }
 
     if should_run_json(&args) {
         let (before, after) = before_after
@@ -357,6 +463,46 @@ mod tests {
                 PathBuf::from("/tmp/git-blob-BBBB/foo.rs")
             ))
         );
+    }
+
+    /// git appends `other` (the destination path) and a rename/copy score to the seven when it
+    /// detected the change as a rename or a copy - `diff.renames` defaults to on for `git diff`,
+    /// so this is the ordinary shape for any commit containing one. Rejecting it used to exit
+    /// non-zero, which git reads as "external diff died", abandoning the whole run: a single
+    /// rename took every file after it down with it. `old-file`/`new-file` stay at indices 1
+    /// and 4.
+    #[test]
+    fn resolve_before_after_accepts_gits_nine_argument_rename_form() {
+        let paths = vec![
+            PathBuf::from("README.md"),
+            PathBuf::from("/tmp/git-blob-AAAA/README.md"),
+            PathBuf::from("abc123"),
+            PathBuf::from("100644"),
+            PathBuf::from("/tmp/git-blob-BBBB/README_tmp.md"),
+            PathBuf::from("abc123"),
+            PathBuf::from("100644"),
+            PathBuf::from("README_tmp.md"),
+            PathBuf::from("similarity index 100%"),
+        ];
+        assert_eq!(
+            resolve_before_after(&paths).unwrap(),
+            Some((
+                PathBuf::from("/tmp/git-blob-AAAA/README.md"),
+                PathBuf::from("/tmp/git-blob-BBBB/README_tmp.md")
+            ))
+        );
+        // Same form, so the same exit-code and notice-wording rules apply as for 7 arguments.
+        assert!(invoked_as_git_external_diff(&paths));
+    }
+
+    /// A count that matches no convention is still an error rather than a silent
+    /// misinterpretation - the 9-argument form widened the accepted set, it did not remove the
+    /// guard.
+    #[test]
+    fn resolve_before_after_still_rejects_an_unrecognized_argument_count() {
+        let paths: Vec<PathBuf> = (0..8).map(|n| PathBuf::from(n.to_string())).collect();
+        assert!(resolve_before_after(&paths).is_err());
+        assert!(!invoked_as_git_external_diff(&paths));
     }
 
     /// `GIT_EXTERNAL_DIFF` represents an added or deleted file with `old-file`/`new-file` set to
@@ -453,6 +599,60 @@ mod tests {
     fn the_git_external_diff_form_never_returns_one_even_with_the_flag() {
         assert_eq!(exit_code_for(true, true, true), 0);
         assert_eq!(exit_code_for(false, true, true), 0);
+    }
+
+    /// The regression this whole binary path exists for: `git diff` over a commit touching a PDF
+    /// used to die on the PDF and abandon every file after it. Whatever else changes, the git
+    /// form must keep exiting 0 for a binary pair.
+    #[test]
+    fn a_binary_pair_under_the_git_external_diff_form_still_exits_zero() {
+        assert_eq!(exit_code_for(true, false, true), 0);
+        assert_eq!(exit_code_for(true, true, true), 0);
+    }
+
+    /// Under `GIT_EXTERNAL_DIFF` both sides are temp blob copies with generated directory names,
+    /// so the notice names `path` (index 0) instead - one file, one name, singular wording.
+    #[test]
+    fn the_binary_notice_names_gits_logical_path_not_its_temp_blobs() {
+        let paths = vec![
+            PathBuf::from("doc/paper.pdf"),
+            PathBuf::from("/tmp/git-blob-AAAA/paper.pdf"),
+            PathBuf::from("abc123"),
+            PathBuf::from("100644"),
+            PathBuf::from("/tmp/git-blob-BBBB/paper.pdf"),
+            PathBuf::from("def456"),
+            PathBuf::from("100644"),
+        ];
+        let (before, after) = resolve_before_after(&paths).unwrap().unwrap();
+        assert_eq!(
+            binary_notice(&paths, &before, &after, true),
+            "Binary file doc/paper.pdf differs\n"
+        );
+    }
+
+    /// The plain `BEFORE AFTER` form (also what `difftool.<tool>.cmd` uses) has two real paths
+    /// and names both.
+    #[test]
+    fn the_binary_notice_names_both_sides_for_the_two_argument_form() {
+        let paths = vec![PathBuf::from("old.pdf"), PathBuf::from("new.pdf")];
+        let (before, after) = resolve_before_after(&paths).unwrap().unwrap();
+        assert_eq!(
+            binary_notice(&paths, &before, &after, true),
+            "Binary files old.pdf and new.pdf differ\n"
+        );
+    }
+
+    /// git never asks an external diff about a pair it considers identical, but `codediff a.pdf
+    /// a.pdf` reaches the same code path, and "differ" would be a wrong answer there rather than
+    /// an unavailable one.
+    #[test]
+    fn the_binary_notice_does_not_claim_identical_files_differ() {
+        let paths = vec![PathBuf::from("a.pdf"), PathBuf::from("b.pdf")];
+        let (before, after) = resolve_before_after(&paths).unwrap().unwrap();
+        assert_eq!(
+            binary_notice(&paths, &before, &after, false),
+            "Binary files a.pdf and b.pdf are identical\n"
+        );
     }
 
     #[test]

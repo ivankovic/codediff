@@ -236,6 +236,25 @@ impl Code {
 }
 
 /**
+ * Whether `path` holds bytes `Code::from_file` cannot read as text - i.e. a binary file.
+ *
+ * Deliberately not a heuristic of its own (a NUL byte in the first few KB, the check git uses):
+ * this must agree with `Code::from_file` on *every* input, and two independent heuristics only
+ * agree by coincidence. A Latin-1-encoded source file has no NUL byte, so git's heuristic calls
+ * it text, while `read_to_string` still fails on it - a disagreement that would put a caller
+ * right back on the error path this exists to keep it off. So the test *is* `from_file`'s own
+ * failure condition, run against the same bytes: valid UTF-8 or not.
+ *
+ * An I/O failure (missing file, no permission) is a genuine error and propagates; only the
+ * decode failure means "binary".
+ */
+pub fn is_binary_file(path: &std::path::Path) -> Result<bool> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
+    Ok(std::str::from_utf8(&bytes).is_err())
+}
+
+/**
 * The metadata around the code, but not the code itself.
 *
 * This is only the metadata that is necessary for the diffing. Statistics and test data should not
@@ -565,6 +584,45 @@ impl std::fmt::Display for Type {
 
 #[cfg(test)]
 mod tests {
+    /// `is_binary_file` must answer exactly as `Code::from_file` would, on the same bytes - see
+    /// its doc comment for why an independent heuristic is the wrong shape here. These two cases
+    /// assert the agreement directly rather than the classification alone.
+    #[test]
+    fn is_binary_file_agrees_with_from_file_on_valid_utf8() {
+        let mut file = tempfile::NamedTempFile::new().expect("create temp file");
+        std::io::Write::write_all(&mut file, "fn main() {}\n".as_bytes()).expect("write");
+        assert!(!is_binary_file(file.path()).expect("classify"));
+        assert!(Code::from_file(file.path()).is_ok());
+    }
+
+    #[test]
+    fn is_binary_file_agrees_with_from_file_on_invalid_utf8() {
+        let mut file = tempfile::NamedTempFile::new().expect("create temp file");
+        // A PDF header followed by a byte no UTF-8 sequence can start with - the shape of the
+        // real input this was written for.
+        std::io::Write::write_all(&mut file, b"%PDF-1.7\n\xff\xfe\x00binary").expect("write");
+        assert!(is_binary_file(file.path()).expect("classify"));
+        assert!(Code::from_file(file.path()).is_err());
+    }
+
+    /// git hands `/dev/null` to the side an added or deleted file is missing from. It reads back
+    /// as empty and valid, so a binary file being *added* still classifies on its real side only.
+    #[test]
+    fn is_binary_file_says_dev_null_is_not_binary() {
+        assert!(!is_binary_file(std::path::Path::new("/dev/null")).expect("classify"));
+    }
+
+    /// A NUL byte inside otherwise valid UTF-8 is text as far as parsing is concerned, even
+    /// though git's own binary heuristic would call this file binary. Asserting the disagreement
+    /// keeps anyone from "simplifying" `is_binary_file` into that cheaper check later.
+    #[test]
+    fn is_binary_file_says_valid_utf8_containing_a_nul_byte_is_not_binary() {
+        let mut file = tempfile::NamedTempFile::new().expect("create temp file");
+        std::io::Write::write_all(&mut file, b"let s = \"a\x00b\";\n").expect("write");
+        assert!(!is_binary_file(file.path()).expect("classify"));
+        assert!(Code::from_file(file.path()).is_ok());
+    }
+
     use super::*;
     use crate::test::helper;
 

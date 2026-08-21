@@ -150,6 +150,12 @@ Files with no tree-sitter grammar (an unrecognized extension, or none at all - `
 `Dockerfile`, ...) fall back to a plain line-level diff instead of the syntax-aware one, so a
 change touching one of them never blocks `git diff` from showing the rest.
 
+Binary files - anything codediff cannot read as text, a PDF or an image - get a one-line
+`Binary file <path> differs` notice instead of a diff, the same stand-in git and `diff(1)` print
+for them. They likewise never block the rest of a `git diff`: an external diff that exits non-zero
+makes git abandon the *entire* run, so codediff reports an unshowable file as a successful diff of
+nothing rather than as a failure.
+
 ## Jujutsu (jj) integration
 
 jj does not read git's `difftool`/`diff.external` settings, even in a colocated repo, so it needs
