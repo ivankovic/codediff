@@ -17,8 +17,20 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# Clone depth, in commits from each remote branch tip. Overridable with --depth because the right
+# value is a per-corpus tradeoff, not a constant: it bounds how far back sampling can reach, and
+# `git fetch --depth=N` on an existing shallow clone *shortens* as well as deepens, so lowering it
+# discards history that is already on disk.
+#
+# Why this became a flag (2026-08-20): the `full` corpus on disk had only ~10-20 commits per
+# repository despite this script hardcoding 1000, and the committed sample CSVs referenced commits
+# that no checkout could resolve - roughly 41% of sampled pairs were unreadable, concentrated in
+# whole repositories rather than spread evenly. A sample is only reproducible while the history it
+# points into still exists, so record the depth each corpus was fetched at.
+DEPTH="${DEPTH:-1000}"
+
 function update() {
-  rm "$2"/failed
+  rm -f "$2"/failed
 
   while IFS=, read -r project_name repository category; do
     if [[ "$1" != "all" && "$dataset" != *"$1"* ]]; then
@@ -57,10 +69,11 @@ function update() {
     esac
 
     if [ -d "$project_path" ]; then
-      cd "$project_path"
-      git fetch --depth=1000
+      # Subshell, not a bare `cd`: this loop resolves `$2`/`$3` as relative paths on later
+      # iterations otherwise, since a bare `cd` here leaks into every subsequent repository.
+      ( cd "$project_path" && git fetch --depth="$DEPTH" ) || echo "$project_name" >> "$2"/failed
     else
-      GIT_ASKPASS=true git clone --depth=1000 "$repository" "$project_path"
+      GIT_ASKPASS=true git clone --depth="$DEPTH" "$repository" "$project_path"
       if [ $? -ne 0 ]; then
         echo "$project_name" >> "$2"/failed
       fi
@@ -91,6 +104,10 @@ case "$cmd" in
           LIST="$2"
           shift 2
           ;;
+        -d|--depth)
+          DEPTH="$2"
+          shift 2
+          ;;
         *)
           break
           ;;
@@ -101,14 +118,14 @@ case "$cmd" in
     if [[ -z "$ROOT_FOLDER" ]]; then
       echo "Error: --root parameter is required"
       echo "Usage:"
-      echo "  update --project <filter> --root <folder> --list <csv>"
+      echo "  update --project <filter> --root <folder> --list <csv> [--depth N]"
       exit 1
     fi
 
     if [[ -z "$LIST" ]]; then
       echo "Error: --list parameter is required"
       echo "Usage:"
-      echo "  update --project <filter> --root <folder> --list <csv>"
+      echo "  update --project <filter> --root <folder> --list <csv> [--depth N]"
       exit 1
     fi
 
@@ -116,7 +133,7 @@ case "$cmd" in
     ;;
   *)
     echo "Usage:"
-    echo "  update --project_filter <filter> --root_folder <folder> --list <csv>"
+    echo "  update --project_filter <filter> --root_folder <folder> --list <csv> [--depth N]"
     exit 1
     ;;
 esac

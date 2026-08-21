@@ -45,18 +45,44 @@ if ! cargo build --release --features test-fixtures --bin benchmark_optimal_solu
 fi
 
 # Keep this list in sync with the --no-solver-X flags in src/bin/benchmark_optimal_solutions.rs
-# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Only 3 passes have their own
-# on/off knob post-rework (TODO.md, 2026-07-17/18) - the seven-phase pipeline's other steps run
-# unconditionally, so there's nothing left to ablate for them. A 4th, solver-similar-flow-control,
-# was removed 2026-08-14: it gated solve_similar_flow_control, deleted outright after being
-# disabled by default (net-negative here) since this same 2026-07-15 study and never re-enabled.
+# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Exactly 4 passes have their own
+# on/off knob today - the pipeline's other steps run unconditionally, so there's nothing left to
+# ablate for them.
+#
+# This list went stale twice, and both times the study kept "running" while measuring nothing: a
+# --no-solver-X flag the binary does not define makes clap exit non-zero before a single fixture is
+# scored, which this script reports as a per-flag FAILED row rather than as the list being wrong.
+# Re-read the binary's flags, do not trust this array, whenever a pass is added or deleted.
+#
+# Gone since the 2026-07-15 study, and deliberately not listed: solver-import-nodes and
+# solver-bottom-up-expansion (phases 3/5, Dice-coefficient bottom-up expansion - removed from the
+# pipeline 2026-08-16) and solver-similar-flow-control (deleted 2026-08-14). All three had been
+# net-negative here and permanently off by default; the code behind them is deleted outright, so
+# there is nothing left to switch. solve_bottom_up_propagation below occupies the same conceptual
+# slot as the removed bottom-up expansion but is a different, strict mechanism - the two must not
+# be conflated when reading this study's history.
 FLAGS=(
-  solver-import-nodes
-  solver-bottom-up-expansion
   solver-moved-subtrees
+  solver-bottom-up-propagation
+  solver-unique-type-matching
+  solver-mutual-ancestors
 )
 
 FAILED=()
+
+# Pre-flight: every flag above must actually exist on the binary. Without this the study happily
+# produces a summary table in which a stale flag is indistinguishable from a pass that genuinely
+# crashed, which is how the 2026-07-30 run's numbers outlived the passes they described.
+UNKNOWN=()
+BIN_HELP="$("$BIN" --help 2>&1)"
+for flag in "${FLAGS[@]}"; do
+  grep -q -- "--no-$flag" <<<"$BIN_HELP" || UNKNOWN+=("$flag")
+done
+if [ ${#UNKNOWN[@]} -gt 0 ]; then
+  echo "FLAGS lists ${#UNKNOWN[@]} pass(es) $BIN does not define: ${UNKNOWN[*]}" >&2
+  echo "Re-sync FLAGS with --no-solver-X in src/bin/benchmark_optimal_solutions.rs." >&2
+  exit 1
+fi
 
 echo "Running baseline (all heuristics enabled)..."
 if ! "$BIN" --csv "$OUT_DIR/baseline.csv" > "$OUT_DIR/baseline.log" 2>&1; then

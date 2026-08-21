@@ -53,6 +53,25 @@ than as a chart):
     `research/papers/introductory-paper/main.tex` can include it directly and it never goes stale
     relative to whatever `benchmark_other.csv` says.
 
+And one LaTeX macro fragment:
+
+  - variables_comparison.tex: the per-tool line-level agreement and wall-clock percentiles the
+    introductory paper's comparison and speed tables cite, as `\\newcommand`s. Added 2026-08-20;
+    before that these ~30 numbers were AUTHORED entries in `paper_variables.py`, i.e. transcribed
+    by hand from a console table, which is the exact failure mode the whole `variables.tex`
+    mechanism exists to prevent (see `file_stats.py::write_paper_variables`'s doc comment for the
+    slide-deck story). A fragment, not the file `main.tex` reads: `analysis/paper_variables.py`
+    merges it into the single `plots/variables.tex`, same contract as
+    `apted_only_report.py::write_paper_fragment`.
+
+    The accuracy half reads `data/comparison/benchmark_accuracy.csv` (`make benchmark-accuracy`),
+    not this script's own `--csv` - that file carries an explicit per-tool `_status` column, so
+    "scored" is a recorded fact rather than inferred from a blank cell, and it is machine- and
+    load-independent. The speed half necessarily reads the timing CSV. Passing an accuracy CSV is
+    therefore optional: without it, the speed macros are still written and the accuracy ones are
+    simply absent, which `paper_variables.py` reports as a missing-macro warning rather than
+    silently dropping.
+
 Usage (from research/):
     uv run ./analysis/benchmark_other_report.py
     uv run ./analysis/benchmark_other_report.py --csv benchmark_other.csv --plots-dir plots/
@@ -477,9 +496,127 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
         print(f"{name:<{name_width}}  {n:>4}  {median:>10.1f}%  {p90:>7.1f}%")
 
 
+# LaTeX macro stem for each series id, for `write_paper_fragment`. Deliberately a separate mapping
+# from `DISPLAY_NAMES`: those are chart labels and may be reworded freely, while these are baked
+# into `main.tex`'s macro names and into `paper_variables.py`'s expected-macro list, so renaming one
+# is an edit across three files. Note `gumtree` -> `GumTreeCold`: the paper distinguishes GumTree
+# invoked fresh per fixture (this CSV's `gumtree_ms`) from GumTree inside one persistent JVM
+# (`gumtree_warm_ms`), and "cold" is the name the paper's own table uses for the former.
+PAPER_MACRO_STEMS = {
+    "codediff": "CodeDiff",
+    "unix_diff": "UnixDiff",
+    "gumtree": "GumTree",
+    "difftastic": "Difftastic",
+    "diffsitter": "Diffsitter",
+}
+PAPER_SPEED_STEMS = PAPER_MACRO_STEMS | {"gumtree": "GumTreeCold", "gumtree_warm": "GumTreeWarm"}
+
+
+def read_accuracy_rows(csv_path: Path) -> list[dict] | None:
+    """`benchmark_accuracy.csv`'s rows, or None if it isn't on disk. Optional by design - see this
+    module's doc comment for why the speed half must not depend on the accuracy file existing."""
+    if not csv_path.exists():
+        return None
+    with csv_path.open() as f:
+        return list(csv.DictReader(f))
+
+
+def accuracy_totals(rows: list[dict], tool: str) -> tuple[int, int, int] | None:
+    """`(fixtures, line_mismatches, total_lines)` for `tool` over the fixtures it was actually
+    scored on - `<tool>_status == "ok"`, so `unsupported` (no parser for that language) and `error`
+    rows are excluded rather than counted as zero mismatches, which would make a narrowly-scoped
+    tool look artificially perfect. Unix diff's `line_only` status is scored here too: that status
+    describes its *node* columns, which this function does not read. Returns None for a tool with
+    no scored fixtures at all."""
+    scored = [r for r in rows if r.get(f"{tool}_status") in ("ok", "line_only")]
+    if not scored:
+        return None
+    mismatches = sum(int(r[f"{tool}_line_mismatches"]) for r in scored)
+    total = sum(int(r["total_lines"]) for r in scored)
+    return len(scored), mismatches, total
+
+
+def common_subset(rows: list[dict], tools: list[str]) -> list[dict]:
+    """The fixtures *every* tool in `tools` scored. The per-tool table each tool's own applicable
+    subset produces is not apples-to-apples - diffsitter's compiled-in grammar set covers barely
+    half the corpus, GumTree's rather more - so a tool's headline rate partly reflects which
+    languages it happens to cover rather than how well it diffs them. This subset holds the
+    fixture set fixed across all five, at the cost of being biased toward the mainstream languages
+    every tool supports."""
+    return [r for r in rows if all(r.get(f"{t}_status") in ("ok", "line_only") for t in tools)]
+
+
+def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] | None:
+    """`(p50, p90, p99)` in milliseconds over *every individual repeat* of `id_`, pooled across
+    fixtures - the same population `plot_runtime` draws, so the table and the figure cannot
+    disagree. Pooling is sound here because `benchmark_other` runs a uniform `--repeats` for every
+    fixture and tool, so no fixture is over-weighted; that would stop being true if repeats ever
+    became adaptive (as they are in `benchmark_diff_pairs`, which skips repeats for already-slow
+    pairs). Returns None for a series with no measurements."""
+    values = [v for r in rows_for(id_, rows) for v in ms_values(r, f"{id_}_ms")]
+    if not values:
+        return None
+    array = np.array(values, dtype=float)
+    return tuple(float(np.percentile(array, p)) for p in (50, 90, 99))
+
+
+def write_paper_fragment(
+    rows: list[dict], tools: list[str], accuracy_rows: list[dict] | None, output_path: Path,
+) -> None:
+    """Writes the comparison and speed numbers the introductory paper cites as LaTeX macros. See
+    this module's doc comment for why this exists and which CSV each half comes from."""
+    lines = [
+        "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
+        "% regenerate: make benchmark-timing-report (from research/). Merged into",
+        "% plots/variables.tex by analysis/paper_variables.py; see that script's module doc comment.",
+    ]
+
+    if accuracy_rows is None:
+        print("note: no benchmark_accuracy.csv - writing speed macros only (run `make benchmark-accuracy`).")
+    else:
+        lines.append(f"% Accuracy: {len(accuracy_rows)} fixtures with a human mapping.")
+        for id_ in ordered(list(PAPER_MACRO_STEMS)):
+            totals = accuracy_totals(accuracy_rows, id_)
+            if totals is None:
+                continue
+            fixtures, mismatches, total = totals
+            stem = PAPER_MACRO_STEMS[id_]
+            lines.append(f"\\newcommand{{\\{stem}Fixtures}}{{{fixtures}}}")
+            lines.append(f"\\newcommand{{\\{stem}LineMismatches}}{{{mismatches:,}}}".replace(",", "{,}"))
+            lines.append(f"\\newcommand{{\\{stem}LineRate}}{{{100.0 * mismatches / total:.3f}}}")
+
+        shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))
+        lines.append(f"% Common subset: the {len(shared)} fixtures every tool scored.")
+        lines.append(f"\\newcommand{{\\CommonFixtures}}{{{len(shared)}}}")
+        for id_ in ordered(list(PAPER_MACRO_STEMS)):
+            totals = accuracy_totals(shared, id_)
+            if totals is None:
+                continue
+            _, mismatches, total = totals
+            lines.append(
+                f"\\newcommand{{\\Common{PAPER_MACRO_STEMS[id_]}LineRate}}{{{100.0 * mismatches / total:.3f}}}"
+            )
+
+    lines.append("% Speed: pooled per-repeat wall-clock, milliseconds.")
+    speed_ids = ordered(["codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    for id_ in speed_ids:
+        percentiles = speed_percentiles(rows, id_)
+        if percentiles is None or id_ not in PAPER_SPEED_STEMS:
+            continue
+        stem = PAPER_SPEED_STEMS[id_]
+        for name, value in zip(("PFifty", "PNinety", "PNinetyNine"), percentiles):
+            lines.append(f"\\newcommand{{\\Speed{stem}{name}}}{{{value:.1f}}}")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n")
+    macro_count = sum(1 for line in lines if line.startswith("\\newcommand"))
+    print(f"{macro_count} paper comparison variables written to {output_path}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare codediff against other diff tools from benchmark_other.csv.")
     parser.add_argument("--csv", default="data/comparison/benchmark_other.csv", help="Path to the benchmark CSV (default: data/comparison/benchmark_other.csv)")
+    parser.add_argument("--accuracy-csv", default="data/comparison/benchmark_accuracy.csv", help="Path to the accuracy CSV (default: data/comparison/benchmark_accuracy.csv)")
     parser.add_argument("--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)")
     args = parser.parse_args()
 
@@ -499,3 +636,6 @@ if __name__ == "__main__":
     plot_accuracy(rows, tools, plots_dir / "benchmark_other_accuracy.png")
     plot_runtime(rows, tools, plots_dir / "benchmark_other_runtime.png")
     write_variance_table(rows, tools, plots_dir / "benchmark_other_variance.tex")
+    write_paper_fragment(
+        rows, tools, read_accuracy_rows(Path(args.accuracy_csv)), plots_dir / "variables_comparison.tex",
+    )

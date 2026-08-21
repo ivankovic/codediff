@@ -181,10 +181,11 @@ impl ExternalTool {
     /// GumTree's coverage is every corpus language `gumtree_generator` maps (i.e. every language
     /// with *any* registered generator, confirmed live via `gumtree list GENERATORS` *and* by
     /// running each one against a real fixture pair from this corpus - the installed build is
-    /// **v4.0.0-beta4**, not the beta8 this comment used to claim, and beta4's generator list
-    /// alone is not trustworthy: it does not include `cpp-treesitter-ng` even though this table
-    /// used to map C++ to it. See `gumtree_generator` for the per-language detail and
-    /// `research/data/comparison/PROVENANCE.md` for the version question, which is still open.)
+    /// **v4.0.0-beta8**, which is also what the paper's comparison section claims. A generator
+    /// listing alone is not trustworthy, and the set genuinely moves between builds in both
+    /// directions: beta8 adds C++ and TSX over beta4 and drops JSON. See `gumtree_generator` for
+    /// the per-language detail and `research/data/comparison/PROVENANCE.md` for which build each
+    /// committed measurement was taken against.)
     /// This is deliberately wider than "only backends GumTree calls Stable": per that
     /// wiki page (checked 2026-07), only `java-jdt` (Java) and `css-phcss` (CSS) are "Stable" -
     /// every other generator here (`*-treesitter-ng`) is still "Testing" by GumTree's own
@@ -224,12 +225,11 @@ impl ExternalTool {
 /// registered generator for at all - confirmed live via `gumtree list GENERATORS` *and* by
 /// running each entry against a real fixture pair from this corpus (2026-08-20).
 ///
-/// The installed build is **v4.0.0-beta4**; this comment previously said beta8, and previously
-/// claimed JSON had no generator ("`gen.json`'s only registered generator is XML, despite the
-/// module name"). Both were wrong against what is actually installed: beta4 registers
-/// `json-jackson`, and it produces a real mapping on this corpus's JSON fixtures. Re-verify this
-/// whole table against the build in use rather than carrying these claims forward - the C++ entry
-/// below is what happens when a generator is assumed rather than run.
+/// The installed build is **v4.0.0-beta8** (`/var/tmp/gumtree-installed/gumtree-4.0.0-beta8`),
+/// re-verified entry by entry on 2026-08-20. This table has been wrong about the installed build
+/// twice now, in both directions - it claimed beta8 while beta4 was installed, and mapped C++ to
+/// a generator beta4 does not register - so re-verify the whole table by running it whenever the
+/// build changes, rather than carrying any of these claims forward.
 ///
 /// One backend picked per language, not the pick-by-priority-number default GumTree's own `-g`-
 /// less auto-detection would use: every entry here is passed via `-g <id>` explicitly (see
@@ -247,8 +247,8 @@ impl ExternalTool {
 /// `*-treesitter-ng` entry below is still "Testing" by GumTree's own classification (see
 /// `ExternalTool::supports`'s doc comment for what that means for how to read results on them).
 ///
-/// No entry for `Language::JSON` (1 fixture in the corpus) or any language outside this match:
-/// confirmed no registered generator exists for it in this build.
+/// No entry for any language outside this match: confirmed no registered generator exists for it
+/// in this build.
 fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)> {
     match language {
         Language::Java => Some(("java-jdt", "java")), // Stable
@@ -261,29 +261,33 @@ fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)>
         Language::TypeScript => Some(("ts-treesitter-ng", "ts")), // Testing
         Language::JavaScript => Some(("js-treesitter-ng", "js")), // Testing
         Language::CSharp => Some(("cs-treesitter-ng", "cs")), // Testing
-        // Added 2026-08-20. Every one of these already existed in the installed GumTree
-        // (4.0.0-beta4) and was being reported as "unsupported" purely because this table
-        // didn't list it - 104 of the 200 unsupported fixtures, i.e. GumTree was being scored
-        // on a non-random 48% of the corpus that excluded whole language families. Each was
-        // verified against a real fixture pair from this corpus before being added here (a
-        // `textdiff -f JSON` run producing a non-empty `matches` array), rather than trusted
-        // from `gumtree list GENERATORS` alone - see the CPP note below for why that matters.
+        // Added 2026-08-20, when this table listed only the ten entries above and GumTree was
+        // therefore being scored on a non-random 48% of the corpus that excluded whole language
+        // families. Each entry is verified by *running* it against a real fixture pair from this
+        // corpus (a `textdiff -g <id> -f JSON` run producing a non-empty `matches` array), never
+        // trusted from `gumtree list GENERATORS` alone - see the CPP note below for why that
+        // distinction has already cost this table its accuracy once.
         Language::PHP => Some(("php-treesitter-ng", "php")),
         Language::Ruby => Some(("ruby-treesitter-ng", "rb")),
         Language::Swift => Some(("swift-treesitter-ng", "swift")),
         Language::R => Some(("r-treesitter-ng", "r")),
-        Language::JSON => Some(("json-jackson", "json")),
         Language::XML => Some(("xml-jsoup", "xml")),
         Language::YAML => Some(("yaml-snakeyaml", "yaml")),
-        // `Language::CPP` deliberately absent: this table used to map it to `cpp-treesitter-ng`,
-        // which does *not* exist in GumTree 4.0.0-beta4 (confirmed against `gumtree list
-        // GENERATORS` and by running it - the client errors out on argument parsing). Every C++
-        // fixture therefore counted as a GumTree `error` rather than `unsupported` - 21 of the 26
-        // errors in the 2026-08-19 run. "No generator for this language" is the honest status,
-        // and it stops those 21 from reading as GumTree failing at something it was asked to do.
-        // Restore the mapping if a GumTree build that actually ships a C++ generator is installed.
+        // Added 2026-08-20 in the same re-verification pass, when the installed build changed
+        // from beta4 to beta8 (the beta4 tree under /var/tmp/tools/ no longer exists; beta8 is
+        // what is installed, and is also what the paper's comparison section claims). beta8 ships
+        // both of these and beta4 did not, so this is a build difference, not a corrected
+        // oversight: 22 C++ and 19 TSX fixtures move from `unsupported` into GumTree's scored set.
+        Language::CPP => Some(("cpp-treesitter-ng", "cpp")), // Testing
+        Language::TSX => Some(("tsx-treesitter-ng", "tsx")), // Testing
+        // `Language::JSON` deliberately absent, and this is the *reverse* direction of the same
+        // build change: beta4 registered `json-jackson` and beta8 does not (verified by running
+        // it - the client errors out on argument parsing, exactly as `cpp-treesitter-ng` did
+        // under beta4). beta8's `gen.json` package registers only `xml-jsoup`. 18 JSON fixtures
+        // therefore leave GumTree's scored set. Do not re-add this from a generator listing
+        // alone; run it first.
         //
-        // Still genuinely unsupported by beta4, and correctly absent: HTML, TSX, LUA, Vimscript,
+        // Still genuinely unsupported by beta8, and correctly absent: HTML, LUA, Vimscript,
         // ShellScript, Scala.
         _ => None,
     }
@@ -548,6 +552,7 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
     }
 
     let mut results = HashMap::new();
+    let mut failures = Vec::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         let json: serde_json::Value = serde_json::from_str(line)
             .with_context(|| format!("parsing batch driver response line {line:?}"))?;
@@ -555,13 +560,31 @@ fn gumtree_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMa
             .as_str()
             .context("batch driver response missing `id`")?
             .to_string();
+        // One fixture GumTree cannot parse is a per-fixture gap, not a run-ending failure. This
+        // used to `bail!`, which aborted the entire timing benchmark - and did, on 2026-08-20:
+        // `css-fortawesome-font-awesome-upgrade-version-comment` makes beta8's `css-phcss`
+        // generator throw a `SyntaxException`, and that single fixture killed a run covering all
+        // 469. The per-invocation GumTree path already tolerates exactly this (it records the
+        // fixture as an `error` and moves on), so the warm-JVM path treating it as fatal was an
+        // inconsistency between two measurements of the same tool, not a deliberate policy.
+        // Omitted ids simply have no `gumtree_warm_ms`, which every consumer already handles as
+        // "not scored" rather than as a zero.
         if let Some(error) = json["error"].as_str() {
-            bail!("GumTree batch driver failed on {id:?}: {error}");
+            failures.push(format!("  {id}: {error}"));
+            continue;
         }
         let ms = json["ms"]
             .as_f64()
             .context("batch driver response missing `ms`")?;
         results.insert(id, ms);
+    }
+    if !failures.is_empty() {
+        eprintln!(
+            "gumtree_warm_ms: {} of {} fixtures failed in the batch driver and are unscored:\n{}",
+            failures.len(),
+            fixtures.len(),
+            failures.join("\n")
+        );
     }
     Ok(Some(results))
 }
@@ -935,14 +958,38 @@ fn score_fixture(
         }
         let mut mismatches = 0usize;
         let mut ms = Vec::with_capacity(repeats);
+        let mut failure = None;
         for i in 0..repeats {
             let started = std::time::Instant::now();
-            let (tool_before, tool_after) = tool.line_labels(before, after)?;
-            ms.push(started.elapsed().as_secs_f64() * 1000.0);
-            if i == 0 {
-                mismatches = human_mapping::line_disagreement_count(&human_before, &tool_before)
-                    + human_mapping::line_disagreement_count(&human_after, &tool_after);
+            // A tool that fails on one fixture is a gap in that tool's coverage, not a reason to
+            // abandon a benchmark run over the whole corpus. This used to be a `?`, and on
+            // 2026-08-20 that ended a full run 59 fixtures in, when GumTree's `css-phcss`
+            // generator produced empty output for `css-fortawesome-font-awesome-upgrade-version-
+            // comment` (exit status 0, so the `status.success()` check above did not catch it).
+            // `score_accuracy` already treats a per-tool failure this way, recording an `error`
+            // status and continuing; the timing path diverging from it was an oversight rather
+            // than a decision. A failed tool contributes no timing and no mismatch count for this
+            // fixture, which every consumer already reads as "not scored" rather than as a zero.
+            match tool.line_labels(before, after) {
+                Ok((tool_before, tool_after)) => {
+                    ms.push(started.elapsed().as_secs_f64() * 1000.0);
+                    if i == 0 {
+                        mismatches =
+                            human_mapping::line_disagreement_count(&human_before, &tool_before)
+                                + human_mapping::line_disagreement_count(&human_after, &tool_after);
+                    }
+                }
+                Err(err) => {
+                    failure = Some(err);
+                    break;
+                }
             }
+        }
+        if let Some(err) = failure {
+            eprintln!("  {name}: {} failed, unscored: {err:#}", tool.name());
+            tools.push(None);
+            tool_ms.push(None);
+            continue;
         }
         tool_ms.push(Some(ms));
         tools.push(Some((mismatches, total_lines)));

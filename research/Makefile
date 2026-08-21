@@ -48,9 +48,17 @@ clean-db:
 
 # ── Corpus acquisition ──────────────────────────────────────────────────────────────────────────
 
-# Fetch repositories using the current mode
+# Fetch repositories using the current mode. DEPTH is how many commits back from each branch tip
+# to keep; it bounds how far back `sample-pairs-all` can reach, since a sampled (repository,
+# commit, path) row is only resolvable while that commit is still in the local clone.
+#
+# Note that `git fetch --depth=N` *shortens* an existing shallow clone as well as deepening it, so
+# re-fetching at a lower DEPTH than a corpus was built with discards history already on disk, and
+# silently invalidates any sample drawn against it. Record the depth in that corpus's
+# PROVENANCE.md whenever this is run.
+DEPTH ?= 1000
 fetch: $(LIST) $(SCRIPTS_SAMPLING_DIR)/dataset.sh
-	$(SCRIPTS_SAMPLING_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST)
+	$(SCRIPTS_SAMPLING_DIR)/dataset.sh update --root $(REPOSITORIES_DIR) --list $(LIST) --depth $(DEPTH)
 
 # ── Corpus statistics ───────────────────────────────────────────────────────────────────────────
 
@@ -104,9 +112,14 @@ sample-pairs: build
 # The languages the RQ1 corpus (data/samples/sampled_code_pairs_*.csv) covers, as
 # `<output-file-suffix>:<Language Debug name>` pairs - the two differ in case for most entries, and
 # the --language filter matches the Debug name exactly (see `Language` in src/code.rs).
+# `r:R` and `scala:Scala` were added 2026-08-21. They were missing while `sample_code_pairs`
+# happily sampled both, so 167 of the 3,089 pairs drawn on 2026-08-20 had no per-language CSV and
+# were never measured - a silent gap between what the corpus covers and what RQ1 reports on, not
+# an error anything surfaced. Keep this list in sync with the languages the sampler actually
+# produces (check `sampled_code_pairs_all.csv`'s own `language` column, not this list).
 RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 	javascript:JavaScript json:JSON kotlin:Kotlin lua:LUA php:PHP python:Python \
-	ruby:Ruby rust:Rust shellscript:ShellScript swift:Swift tsx:TSX \
+	r:R ruby:Ruby rust:Rust scala:Scala shellscript:ShellScript swift:Swift tsx:TSX \
 	typescript:TypeScript vimscript:Vimscript xml:XML yaml:YAML
 
 # Re-draws the whole RQ1 corpus, one CSV per language, with identical settings for every language.
@@ -124,8 +137,12 @@ RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 # Stratification follows stats::sampling::LOC_BUCKETS (7 LOC buckets, keyed by the larger of
 # before/after), so --count is split 7 ways per language. Re-run `make rq1` afterwards to
 # re-measure against the new sample.
+# COUNT is per language, split evenly across the 7 LOC buckets, so the per-cell target is
+# COUNT/7: COUNT=140 draws 20 pairs per language per bucket. Sparse cells (a language with few
+# very large files, say) simply fill less; the reservoir cannot invent pairs that do not exist.
+COUNT ?= 1000
 sample-pairs-all: build
-	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_all.csv
+	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_all.csv --count $(COUNT)
 	@for entry in $(RQ1_LANGUAGES); do \
 		suffix=$${entry%%:*}; language=$${entry##*:}; \
 		out=data/samples/sampled_code_pairs_$$suffix.csv; \
@@ -324,7 +341,8 @@ rq1:
 	$(BIN_DIR)/apted_only_benchmark \
 		--csv data/samples/sampled_code_pairs_php.csv data/samples/sampled_code_pairs_tsx.csv \
 			data/samples/sampled_code_pairs_rust.csv data/samples/sampled_code_pairs_html.csv \
-			data/samples/sampled_code_pairs_lua.csv \
+			data/samples/sampled_code_pairs_lua.csv data/samples/sampled_code_pairs_r.csv \
+			data/samples/sampled_code_pairs_scala.csv \
 		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group4.csv
 	$(MAKE) rq1-report
 

@@ -35,6 +35,10 @@ tmp/
 **/research/papers/**/*.blg
 **/research/papers/**/*.log
 **/research/papers/**/*.out
+# latexmk's own bookkeeping. The Makefile's no-latexmk fallback path deletes these itself, so they
+# only appear when latexmk is installed - which is why they went unignored until 2026-08-21.
+**/research/papers/**/*.fls
+**/research/papers/**/*.fdb_latexmk
 
 # ---> Python, only used in research/ directory.
 
