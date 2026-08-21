@@ -44,9 +44,10 @@ another. A single macro used in every position cannot drift.
 number comes from. Two populations, kept visibly distinct in the generated output:
 
 * **Generated** - read back from a measurement artifact. Refreshing is "re-run the producer, re-run
-  the assembler." Three blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
-  RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), and the tool comparison
-  (`benchmark_other_report.py` -> `variables_comparison.tex`).
+  the assembler." Four blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
+  RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), the tool comparison
+  (`benchmark_other_report.py` -> `variables_comparison.tex`), and the change-shape census
+  (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make shapes-report`).
 * **Authored** - no saved producer to read back from, so the value is transcribed, but into one
   version-controlled place with a comment naming the command that produced it. This covers the
   corpus/node-accuracy totals, the ablation deltas, the robustness run, and the design targets.
@@ -111,6 +112,13 @@ That pass changed more than the values:
 * **GumTree is v4.0.0-beta8**, not the beta4 earlier runs used; the beta4 tree no longer exists on
   disk. beta8 adds C++ and TSX generators and drops JSON, so GumTree's scored subset is not
   comparable across that boundary. See `research/data/comparison/PROVENANCE.md`.
+* **RQ3 gained a change-shape census** (Table 3), which is the "which shapes occur" half the
+  section previously left to the ablation alone. It reports how often each shape appears and how
+  often CodeDiff maps a fixture containing it perfectly, and it is what shows that reparenting -
+  the shape with no dedicated pass - carries 58.5% of the corpus's remaining error. Note the two
+  readings differ and both are quoted: reparenting is 26.7% of *fixtures* but 58.5% of
+  *mismatches*, and 35.3% of the error sits in fixtures matching none of the censused shapes, so
+  the census names the dominant factor rather than explaining all of it.
 
 ### Why this mechanism exists
 

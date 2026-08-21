@@ -125,9 +125,10 @@ This paper makes the following contributions:
   \item It reports a quantified comparison of four established diffing
   tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against human-authored
   ground-truth mappings of \NumFixtures{} real-world code changes.
-  \item It reports a leave-one-out ablation study identifying which shapes of change require a
-  dedicated matching heuristic, and showing that a heuristic's published benefit does not
-  automatically transfer into a different pipeline evaluated against a different corpus.
+  \item It reports a census of which change shapes occur in that ground truth and how well each is
+  recovered, alongside a leave-one-out ablation study of the heuristics targeting them, showing
+  both that a heuristic's published benefit does not automatically transfer into a different
+  pipeline and that the shape carrying the most remaining error has no dedicated heuristic at all.
   \item It details \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline that combines
   scoped APTED tree edit distance, GumTree's move-recovery heuristic, and Myers'
   sequence diff into one production-engineered tool meeting the targets the empirical study sets.
@@ -520,6 +521,55 @@ choosing the flattering one.
   \label{fig:accuracy}
 \end{figure*}
 
+\textbf{Change-shape census.} RQ3 has two halves, and the ablation study below answers only the
+second. Before asking which heuristics pay for themselves, we measure which shapes of change
+actually occur. The human-authored mappings record this directly: a mapped node whose path depth
+differs between the two sides is a reparent, a pair of same-kind siblings that swap order under an
+unchanged parent is a reorder, and a mapping entry the annotator deliberately left pointing at
+several candidates is a case where the ground truth itself is ambiguous.
+Table~\ref{tab:shapes} reports how often each occurs across the \ShapeFixtures{} fixtures, and how
+often \textsc{CodeDiff} maps a fixture containing it with no mismatches at all.
+
+The shapes are not mutually exclusive and one fixture can contain several, so the rows do not sum
+to the corpus. The reorder row in particular is a floor rather than a census: it counts only
+same-kind siblings directly under an unchanged parent, so a branch swap that also changes wrapper
+depth is counted as a reparent instead.
+
+\begin{table}
+  \caption{Change shapes in the ground-truth corpus: how many fixtures contain each, and the
+  fraction of those \textsc{CodeDiff} maps with zero mismatches. Rows overlap; the last two are
+  the complement and the whole corpus.}
+  \label{tab:shapes}
+  \begin{tabular}{lrrr}
+    \toprule
+    Shape & Fixtures & Share & Zero mismatches \\
+    \midrule
+    Reparent (depth $\pm1$)   & \ShapeReparentFixtures{} & \ShapeReparentPct{}\% & \ShapeReparentSolvedPct{}\% \\
+    Reparent (depth $\ge2$)   & \ShapeDeepReparentFixtures{} & \ShapeDeepReparentPct{}\% & \ShapeDeepReparentSolvedPct{}\% \\
+    Sibling reorder           & \ShapeReorderFixtures{} & \ShapeReorderPct{}\% & \ShapeReorderSolvedPct{}\% \\
+    Ambiguous ground truth    & \ShapeMultiMapFixtures{} & \ShapeMultiMapPct{}\% & \ShapeMultiMapSolvedPct{}\% \\
+    \midrule
+    None of the above         & \ShapeNoShapeFixtures{} & \ShapeNoShapePct{}\% & \ShapeNoShapeSolvedPct{}\% \\
+    Whole corpus              & \ShapeFixtures{} & 100\% & \ShapeAllSolvedPct{}\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The census draws a sharp line. \ShapeNoShapePct{}\% of fixtures contain none of these shapes, and
+\textsc{CodeDiff} maps \ShapeNoShapeSolvedPct{}\% of those perfectly. Every shape category falls
+far below that: a fixture containing a reparent is mapped perfectly
+\ShapeReparentSolvedPct{}\% of the time, one containing an ambiguous mapping
+\ShapeMultiMapSolvedPct{}\%. The corpus-wide \ShapeAllSolvedPct{}\% therefore averages two
+populations that behave nothing alike.
+
+Weighted by mismatches rather than by fixtures, reparenting at any depth accounts for
+\ShapeAnyReparentErrorPct{}\% of the corpus's total error while occurring in
+\ShapeAnyReparentPct{}\% of its fixtures, and is present in \ShapeAnyReparentFailingPct{}\% of
+every fixture \textsc{CodeDiff} does not map perfectly. It is the largest single identified source
+of error, but not the only one: \ShapeNoShapeErrorPct{}\% of the remaining mismatches sit in
+fixtures exhibiting none of these four shapes, so this census names the dominant factor rather
+than a complete explanation.
+
 \textbf{Ablation study.} RQ3 asks which shapes of change earn a dedicated heuristic.
 \textsc{CodeDiff} has four optional heuristic passes, each targeting a specific shape and each
 behind its own flag: move-detection recovery (whole subtrees relocated across a matched boundary,
@@ -577,6 +627,16 @@ same pass that recovers real mappings where it originated can be dead code in a 
 earlier phases are comprehensive enough to reach its cases first. We argue this is the more
 transferable lesson, and it is only visible by measuring firings and accuracy inside the adopting
 pipeline, rather than inheriting the original paper's result.
+
+Read together with the census, RQ3's two halves answer each other, and they do not name the same
+shape. The ablation says which shipped heuristic earns its place: move-detection recovery, which
+handles relocation across a matched boundary. The census says which shape is still unserved:
+reparenting—a node that stays where it is but gains or loses an enclosing level, the shape
+produced by wrapping a block in a condition or a try—has no dedicated pass at all, occurs in
+\ShapeAnyReparentPct{}\% of fixtures, and carries \ShapeAnyReparentErrorPct{}\% of the corpus's
+remaining error. This is what an ablation cannot report on its own: it can only
+report on heuristics somebody wrote, and is silent about the shape nobody wrote one for. We argue
+a shape census belongs alongside an ablation for that reason, not as a substitute for it.
 
 \textbf{Production viability.} The remaining measurements evaluate \textsc{CodeDiff}
 itself—speed, then robustness—against the Fast and Robust targets stated in
@@ -734,10 +794,14 @@ syntax-aware developer tooling:
 \end{itemize}
 
 Future work includes widening the robustness corpus beyond Rust,
-extending the accuracy comparison to more languages GumTree also supports,
-re-running the ablation study as new heuristic passes are added to the pipeline, and reporting the
-measured distribution of change shapes in the ground-truth corpus alongside the ablation, so that
-RQ3's first half rests on frequencies as well as on each pass's contribution.
+extending the accuracy comparison to more languages GumTree also supports, and
+re-running the ablation study as new heuristic passes are added to the pipeline. The clearest
+direction the evaluation points to is a dedicated pass for the reparenting shape, which carries
+\ShapeAnyReparentErrorPct{}\% of the corpus's remaining error with no heuristic addressing it:
+Section~\ref{sec:pipeline}'s phase ordering offers no anchor for a node whose position is unchanged
+but whose depth is not. The \ShapeNoShapeErrorPct{}\% of error in fixtures matching none of the
+censused shapes is a second, less well-characterized target, and suggests the census itself should
+be extended before more heuristics are written against it.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

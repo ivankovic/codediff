@@ -243,6 +243,15 @@ benchmark-optimal-report:
 	$(MAKE) -C .. benchmark-optimal
 	uv run ./analysis/matching_reasons_report.py
 
+# Change-shape census over the human-authored mappings: which shapes (reparent, sibling reorder,
+# human-confirmed ambiguity) occur, how often, and how well codediff maps a fixture containing each.
+# This is the "which shapes occur" half of the paper's RQ3, which the ablation study alone cannot
+# answer. Reads data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv`
+# first if fixtures were added - that file and data/quality/optimal_solutions_benchmark.csv must
+# describe the same corpus state, since this report joins prevalence against codediff's own result.
+shapes-report:
+	uv run ./analysis/human_mapping_shapes_report.py
+
 # ── Tool comparison (benchmark_other) ───────────────────────────────────────────────────────────
 
 # Runs the timing benchmark's own analysis/plotting step over whatever
