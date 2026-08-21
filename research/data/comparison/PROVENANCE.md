@@ -60,9 +60,20 @@ never a 0, which would read as a perfect score); `error` = the tool was expected
 language and failed; `line_only` = Unix diff's node columns.
 
 **Tool versions are not recorded per row - record them here on every refresh.** The GumTree build
-under `/var/tmp/tools/` is **4.0.0-beta4**, which is *not* the 4.0.0-beta8 the paper's comparison
-section claims. Resolve the version question before any refreshed GumTree number is quoted
-anywhere.
+in use is **4.0.0-beta8**, at `/var/tmp/gumtree-installed/gumtree-4.0.0-beta8`, which is what the
+paper's comparison section claims. This resolves the version question that stood open here: the
+beta4 tree under `/var/tmp/tools/` that earlier measurements ran against no longer exists on disk,
+so the whole generator table was re-verified against beta8 on 2026-08-20, entry by entry, by
+running each one on a real fixture pair rather than reading `gumtree list GENERATORS`.
+
+**The beta4 -> beta8 change moves GumTree's coverage in both directions**, so its scored subset is
+not comparable across that boundary:
+
+- **C++ and TSX gain support.** beta8 registers `cpp-treesitter-ng` and `tsx-treesitter-ng`, which
+  beta4 does not; 22 C++ and 19 TSX fixtures enter GumTree's scored set.
+- **JSON loses support.** beta4 registered `json-jackson`; beta8 does not, and running it errors
+  out on argument parsing. 18 JSON fixtures leave the scored set. beta8's `gen.json` package
+  registers only `xml-jsoup`.
 
 **GumTree coverage was substantially wrong before 2026-08-20, in both directions.** Any GumTree
 number from a run before that date is measured on a non-random 48% of the corpus and should not
@@ -74,12 +85,12 @@ be quoted:
   a real fixture pair from this corpus (a `textdiff -f JSON` run producing a non-empty `matches`
   array) rather than trusted from `gumtree list GENERATORS` alone.
 - **`cpp-treesitter-ng` does not exist in beta4**, but the table mapped C++ to it, so all 21 C++
-  fixtures counted as `error` - 21 of the 26 errors in the 2026-08-19 run. C++ is now absent from
-  the table and reports the honest `unsupported`. Restore the mapping only against a GumTree
-  build that actually ships a C++ generator, and verify by running it, not by reading the
-  generator list - that list is what made this look supported in the first place.
-- Still genuinely unsupported by beta4, and correctly absent: HTML, TSX, LUA, Vimscript,
-  ShellScript, Scala.
+  fixtures counted as `error` - 21 of the 26 errors in the 2026-08-19 run. C++ was dropped from
+  the table on that basis, and is back only now that the installed build genuinely ships the
+  generator and it has been run. Verify by running, not by reading the generator list - that list
+  is what made this look supported in the first place.
+- Still genuinely unsupported by beta8, and correctly absent: HTML, LUA, Vimscript, ShellScript,
+  Scala.
 
 **GumTree's tree is not codediff's tree, and how far apart they are is per-language.** Node
 counts on one fixture's before side, GumTree vs codediff: java-jdt 512/997 (1.95x),

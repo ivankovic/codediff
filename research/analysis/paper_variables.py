@@ -31,18 +31,27 @@ in both places cannot drift.
 
 Two populations of numbers, deliberately kept visibly distinct in the output:
 
-* GENERATED - read back from an on-disk artifact produced by a measurement run. Currently the
-  empirical-study block (repository/file/language counts, size percentiles, bytes-AST
-  correlation), which `file_stats.py::write_paper_variables` writes to `variables_empirical.tex`
-  from `stats.sqlite`. Refreshing these is "re-run the producer, re-run this script."
+* GENERATED - read back from an on-disk artifact produced by a measurement run. Refreshing these
+  is "re-run the producer, re-run this script." Three blocks:
 
-* AUTHORED - a number with no saved producer to read back from, listed in `AUTHORED` below with a
+  - the empirical study (repository/file/language counts, size percentiles, bytes-AST
+    correlation), which `file_stats.py::write_paper_variables` writes to
+    `variables_empirical.tex` from `stats.sqlite`;
+  - RQ1 (whole-tree APTED against a 1-second budget), which `apted_only_report.py::
+    write_paper_fragment` writes to `variables_rq1.tex` from `data/rq1/`;
+  - the tool comparison (per-tool line-level agreement, wall-clock percentiles), which
+    `benchmark_other_report.py::write_paper_fragment` writes to `variables_comparison.tex` from
+    `data/comparison/`. Promoted from AUTHORED on 2026-08-20: at ~30 hand-transcribed numbers it
+    was the largest authored group, and the one a data refresh touches every single time.
+
+* AUTHORED - a number with no saved producer to read back from, each block below carrying a
   comment naming the command that produced it. These are transcribed, and transcription is exactly
   the failure mode this whole mechanism exists to prevent (see `write_paper_variables`'s own doc
   comment for the slide-deck story). They live here, in one version-controlled place with their
   provenance attached, rather than scattered through `main.tex` with none - a real improvement,
-  but not the same guarantee the generated block has. Wiring each group to a real artifact is
-  tracked as follow-up work; the `source` field on each block records what that artifact would be.
+  but not the same guarantee the generated blocks have. What remains authored is the corpus/
+  node-accuracy totals, the ablation deltas, the robustness run's status histogram, and the design
+  targets; the first three are each one command away from their artifact, recorded per block.
 
 Every macro is emitted on every run, whether or not its source was available. A missing source
 emits a loud `\\textbf{??}` placeholder rather than omitting the macro: `main.tex` builds under
@@ -75,63 +84,90 @@ def latex_number(value):
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# NOTE: research/data/quality/optimal_solutions_benchmark.csv currently holds 433 rows, not the 98 below - the
-# corpus has grown since these numbers were transcribed. Refreshing them is a deliberate,
-# separate change: the ablation and comparison blocks below were measured on the same 98 fixtures,
-# so updating this block alone would leave the paper internally inconsistent.
+# Measured 2026-08-20. The corpus directory holds 469 fixtures; 468 of them carry a
+# human_mapping.json and are what every accuracy number in the paper is scored against. The 469th
+# (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
+# pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
+#
+# NumFixtures is therefore the ground-truth-bearing count, 468, which is the denominator of every
+# per-tool row, the ablation study, and the node accuracy below.
 CORPUS = {
-    "NumFixtures": 98,
-    "NodesMatched": 389_398,
-    "NodesTotal": 390_142,
+    "NumFixtures": 468,
+    "NodesMatched": 4_956_544,
+    "NodesTotal": 4_959_531,
+    # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
+    # language" census (24 as of 2026-08-20). Not the same number as the empirical study's
+    # \NumLanguages, which counts languages in the 100-repository file-stats corpus.
+    "NumFixtureLanguages": 24,
 }
 
-# Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline.
-# source: research/measure/ablation_study.sh (prints a summary table to stdout; it does not
-#         currently write a machine-readable file, and research/ablation/ is absent, so these
-#         cannot be read back).
-# NOTE: `solver-similar-flow-control` (the "Flow-control arm matching" row) was deleted from the
-# codebase on 2026-08-14; ablation_study.sh now ablates three passes, not four.
+# Same corpus, same run, counting only nodes that carry text of their own and therefore reach the
+# screen when the diff is rendered (`codediff::diff::nodes::is_structurally_visible`). Reported
+# alongside the all-node figure because the all-node denominator includes every ancestor of every
+# change up to the root, so it partly measures how deep a grammar's tree is.
+CORPUS_VISIBLE = {
+    "VisibleNodesMatched": 3_378_653,
+    "VisibleNodesTotal": 3_380_690,
+}
+
+# Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
+# means disabling the pass HURT accuracy, i.e. the pass earns its place.
+# source: `make ablation-study` from research/ (measure/ablation_study.sh), which writes one CSV
+#         per run to research/data/ablation/. The script prints the node-granularity table; both
+#         granularities below are totalled from those CSVs' `mismatches` and `visible_mismatches`
+#         columns, so unlike the pre-2026-08-20 values these are recomputable from artifacts.
+#
+# Measured 2026-08-20 against the 468-fixture ground-truth corpus. Every one of these four passes
+# is a *different* pass from the four the paper's table carried before this refresh: the earlier
+# set (import-node normalization, flow-control arm matching, bottom-up expansion, move-detection
+# recovery) was measured 2026-07-15, and three of those four have since been deleted from the
+# codebase outright. Do not compare the two tables row by row - only move-detection recovery is
+# the same pass in both.
+#
+# The visible-node column is the newer, stricter reading: it counts only nodes that carry text of
+# their own and therefore reach the screen. Two passes that measurably help at full node
+# granularity move it by exactly zero, i.e. everything they fix is structural interior nodes a
+# reader never sees.
 ABLATION = {
-    "AblationImportNodes": "-89",
-    "AblationFlowControl": "-82",
-    "AblationBottomUp": "-69",
-    "AblationMovedSubtrees": "+3",
+    "AblationMovedSubtrees": "+2{,}266",
+    "AblationBottomUpPropagation": "+318",
+    "AblationMutualAncestors": "+23",
+    "AblationUniqueTypeMatching": "+0",
 }
 
-# Per-tool applicable-fixture counts, line-level mismatches, and mismatch rates (percent).
-# source: cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-#         (research/data/comparison/benchmark_other.csv), via analysis/benchmark_other_report.py.
-# Rates are stored without the percent sign; the prose and tables add `\%` themselves.
-COMPARISON = {
-    "CodeDiff": {"fixtures": 98, "mismatches": 479, "rate": "0.887"},
-    "UnixDiff": {"fixtures": 98, "mismatches": 570, "rate": "1.055"},
-    "GumTree": {"fixtures": 97, "mismatches": 637, "rate": "1.198"},
-    "Difftastic": {"fixtures": 98, "mismatches": 877, "rate": "1.624"},
-    "Diffsitter": {"fixtures": 83, "mismatches": 960, "rate": "1.897"},
+# Same four passes, same runs, scored on visible nodes only. See ABLATION's comment.
+ABLATION_VISIBLE = {
+    "AblationVisibleMovedSubtrees": "+1{,}564",
+    "AblationVisibleBottomUpPropagation": "+0",
+    "AblationVisibleMutualAncestors": "+0",
+    "AblationVisibleUniqueTypeMatching": "+0",
 }
 
-# Wall-clock percentiles in milliseconds. Same source as COMPARISON. Printed as-is, without a
-# thousands separator, matching the paper's existing table.
-SPEED = {
-    "UnixDiff": ("2.6", "3.1", "15.8"),
-    "Diffsitter": ("4.5", "35.3", "122.5"),
-    "CodeDiff": ("9.6", "268.3", "1364.2"),
-    "GumTreeWarm": ("42.6", "440.4", "2418.5"),
-    "Difftastic": ("55.3", "109.6", "2704.5"),
-    "GumTreeCold": ("442.1", "978.1", "2832.8"),
-}
+# NOTE: the per-tool COMPARISON and SPEED blocks that used to live here were promoted to GENERATED
+# on 2026-08-20 - `benchmark_other_report.py::write_paper_fragment` now writes them to
+# `plots/variables_comparison.tex` from `benchmark_accuracy.csv` (accuracy) and
+# `benchmark_other.csv` (timing), and they are merged in below exactly like the empirical and RQ1
+# blocks. That removes ~30 hand-transcribed numbers, which were the largest remaining AUTHORED
+# group and the one most likely to drift: they are the numbers a refresh touches every time.
 
 # Sampled robustness run over real Rust (repository, commit, file) pairs.
-# source: cargo run --release --bin benchmark_diff_pairs (input sample:
-#         research/code_pair_diff_stats_rust.csv, 1,000 rows - but that file records only the
-#         sampled pairs, not the per-pair outcome, so the unavailable/skipped split below cannot
-#         be recomputed from anything currently on disk).
+# source: cargo run --release --bin benchmark_diff_pairs --csv data/samples/sampled_code_pairs_rust.csv
+#         --repo-root /var/tmp/research/small/repositories/ --output data/performance/robustness_rust.csv
+#         Measured 2026-08-20: ok=406, skipped_too_large=142, timed_out=0, panicked=0,
+#         failed_to_read=377, over the 925 pairs in sampled_code_pairs_rust.csv.
+#
+# Recomputing the split from disk: `skipped_too_large` and `ok` are the output CSV's own `status`
+# column, and RobustnessSampled is that input sample's row count. `failed_to_read` is the one
+# value NOT in the output - a pair whose blob cannot be read never gets a row - so it is the
+# difference between the two files' row counts (925 - 548 = 377), not a value to read directly.
+# Every one of those 377 is a `revspec ... not found`: these repositories' histories were rewritten
+# after the sample was drawn, which is a property of the corpus, not a CodeDiff failure.
 ROBUSTNESS = {
-    "RobustnessSampled": 1_000,
+    "RobustnessSampled": 925,
     "RobustnessNodeCap": 16_000,
     "RobustnessTimeoutSeconds": 120,
-    "RobustnessUnavailable": 386,
-    "RobustnessSkipped": 107,
+    "RobustnessUnavailable": 377,
+    "RobustnessSkipped": 142,
 }
 
 # Design targets and fixed descriptive facts. Chosen, not measured - a refresh means a decision,
@@ -139,7 +175,18 @@ ROBUSTNESS = {
 TARGETS = {
     "SpeedTargetMs": "400",
     "SpeedTargetPct": "99.99",
-    "NumPhasesWord": "seven",
+    # Clone depth the corpus under /var/tmp/research/full/ was fetched at, per commit from each
+    # branch tip (`make fetch MODE=full DEPTH=50`, 2026-08-20). Not a measurement - a parameter of
+    # how the corpus was built - but it belongs in the paper: it bounds how far back RQ1's commit
+    # sampling can reach. The paper previously claimed the repositories were cloned in full, which
+    # was never true of these checkouts.
+    "CorpusCloneDepth": "50",
+    # Was "seven" until 2026-08-20. The pipeline's phases are numbered 1-7 in the source, but two
+    # of those numbers are now vacant: the Dice-coefficient bottom-up expansion that occupied
+    # phases 3 and 5 was deleted from the codebase on 2026-08-16 after measuring net-negative.
+    # The paper renumbers the five that remain as 1-5 rather than exposing the source's historical
+    # gaps, so this word and the paper's phase headings must be changed together.
+    "NumPhasesWord": "five",
     "GumTreeVersion": "v4.0.0-beta8",
 }
 
@@ -220,12 +267,62 @@ RQ_ONE_MACROS = [
     "RqOneCodeHundredToThreeHundredPct",
 ]
 
+# Every macro the comparison fragment (benchmark_other_report.py's write_paper_fragment) is
+# expected to define: three accuracy macros for each of the five tools scored at the line level,
+# and three wall-clock percentiles for each of the six timing series. GumTree appears in both
+# halves under different stems - `GumTree*` for its accuracy row, `SpeedGumTreeCold*`/
+# `SpeedGumTreeWarm*` for its two timing series - which is why this list is written out per half
+# rather than as one product over a single tool list.
+COMPARISON_MACROS = [
+    f"{tool}{suffix}"
+    for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+    for suffix in ("Fixtures", "LineMismatches", "LineRate")
+] + ["CommonFixtures"] + [
+    f"Common{tool}LineRate"
+    for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+] + [
+    f"Speed{tool}{suffix}"
+    for tool in ("CodeDiff", "UnixDiff", "GumTreeCold", "GumTreeWarm", "Difftastic", "Diffsitter")
+    for suffix in ("PFifty", "PNinety", "PNinetyNine")
+]
+
 
 def command(name, value):
     return f"\\newcommand{{\\{name}}}{{{value}}}"
 
 
-def build(empirical_lines, rq1_lines):
+def emit_block(fragment_lines, expected_macros, label, refresh_hint):
+    """The lines for one generated block: the fragment's own `\\newcommand`s, plus a loud
+    `\\textbf{??}` placeholder for every expected macro the fragment did not define.
+
+    Never silently omits a macro, for the reason in this module's doc comment: `main.tex` builds
+    under `-interaction=nonstopmode`, where an *undefined* macro yields a PDF with the number
+    quietly missing instead of failing the build. A placeholder is visible on the page; an omission
+    is not."""
+    if fragment_lines is None:
+        print(
+            f"WARNING: no {label} fragment found from any source - emitting placeholders for "
+            f"{len(expected_macros)} macros. Run `{refresh_hint}` first.",
+            file=sys.stderr,
+        )
+        return [command(name, PLACEHOLDER) for name in expected_macros]
+
+    defined = {
+        match.group(1)
+        for line in fragment_lines
+        if (match := re.match(r"\\newcommand\{\\(\w+)\}", line))
+    }
+    missing = [name for name in expected_macros if name not in defined]
+    if missing:
+        print(
+            f"WARNING: {label} fragment is missing {len(missing)} expected macro(s): "
+            f"{', '.join(missing)} - emitting placeholders.",
+            file=sys.stderr,
+        )
+    return fragment_lines + [command(name, PLACEHOLDER) for name in missing]
+
+
+def build(empirical_lines, rq1_lines, comparison_lines):
     """Returns the complete variables.tex as a list of lines."""
     out = [
         "% Auto-generated by research/analysis/paper_variables.py. Do not edit by hand.",
@@ -242,28 +339,9 @@ def build(empirical_lines, rq1_lines):
         "% `make file-stats MODE=<tiny|small|full>` then re-run this script.",
     ]
 
-    if empirical_lines is None:
-        print(
-            "WARNING: no variables_empirical.tex found - emitting placeholders for "
-            f"{len(EMPIRICAL_MACROS)} empirical macros. Run `make file-stats MODE=<mode>` first.",
-            file=sys.stderr,
-        )
-        out += [command(name, PLACEHOLDER) for name in EMPIRICAL_MACROS]
-    else:
-        defined = {
-            match.group(1)
-            for line in empirical_lines
-            if (match := re.match(r"\\newcommand\{\\(\w+)\}", line))
-        }
-        out += empirical_lines
-        missing = [name for name in EMPIRICAL_MACROS if name not in defined]
-        if missing:
-            print(
-                f"WARNING: empirical fragment is missing {len(missing)} expected macro(s): "
-                f"{', '.join(missing)} - emitting placeholders.",
-                file=sys.stderr,
-            )
-            out += [command(name, PLACEHOLDER) for name in missing]
+    out += emit_block(
+        empirical_lines, EMPIRICAL_MACROS, "empirical", "make file-stats MODE=<mode>",
+    )
 
     out += [
         "",
@@ -271,70 +349,46 @@ def build(empirical_lines, rq1_lines):
         "% Generated by analysis/apted_only_report.py from data/rq1/; refresh with",
         "% `make rq1-report` (fast, existing data) or `make rq1` (full re-measurement).",
     ]
-    if rq1_lines is None:
-        print(
-            "WARNING: no RQ1 fragment found from any source - emitting placeholders for "
-            f"{len(RQ_ONE_MACROS)} macros. Run `make rq1-report` first.",
-            file=sys.stderr,
-        )
-        out += [command(name, PLACEHOLDER) for name in RQ_ONE_MACROS]
-    else:
-        defined = {
-            match.group(1)
-            for line in rq1_lines
-            if (match := re.match(r"\\newcommand\{\\(\w+)\}", line))
-        }
-        out += rq1_lines
-        missing = [name for name in RQ_ONE_MACROS if name not in defined]
-        if missing:
-            print(
-                f"WARNING: RQ1 fragment is missing {len(missing)} expected macro(s): "
-                f"{', '.join(missing)} - emitting placeholders.",
-                file=sys.stderr,
-            )
-            out += [command(name, PLACEHOLDER) for name in missing]
+    out += emit_block(rq1_lines, RQ_ONE_MACROS, "RQ1", "make rq1-report")
+
+    out += [
+        "",
+        "% --- Per-tool line-level agreement and wall-clock percentiles. Generated by",
+        "% analysis/benchmark_other_report.py from data/comparison/benchmark_accuracy.csv",
+        "% (accuracy) and benchmark_other.csv (timing); refresh with `make benchmark-timing-report`",
+        "% (fast, existing data), or `make benchmark-accuracy` / `make benchmark-timing` to",
+        "% re-measure. Rates carry no percent sign; the paper adds \\%.",
+    ]
+    out += emit_block(
+        comparison_lines, COMPARISON_MACROS, "comparison", "make benchmark-timing-report",
+    )
 
     # Corpus size and node accuracy. NodeMismatches and NodeAccuracyPct are derived here rather
     # than transcribed separately: three independent literals for one measurement can drift apart,
     # and the paper states all three.
     matched = CORPUS["NodesMatched"]
     total = CORPUS["NodesTotal"]
+    visible_matched = CORPUS_VISIBLE["VisibleNodesMatched"]
+    visible_total = CORPUS_VISIBLE["VisibleNodesTotal"]
     out += [
         "",
         "% --- Ground-truth corpus and AST-node accuracy (AUTHORED - see script's CORPUS block).",
         command("NumFixtures", CORPUS["NumFixtures"]),
+        command("NumFixtureLanguages", CORPUS["NumFixtureLanguages"]),
         command("NodesMatched", latex_number(matched)),
         command("NodesTotal", latex_number(total)),
         command("NodeMismatches", latex_number(total - matched)),
-        command("NodeAccuracyPct", f"{matched / total * 100:.1f}"),
+        command("NodeAccuracyPct", f"{matched / total * 100:.2f}"),
+        command("VisibleNodesMatched", latex_number(visible_matched)),
+        command("VisibleNodesTotal", latex_number(visible_total)),
+        command("VisibleNodeMismatches", latex_number(visible_total - visible_matched)),
+        command("VisibleNodeAccuracyPct", f"{visible_matched / visible_total * 100:.2f}"),
         "",
         "% --- Ablation deltas, in mismatches (AUTHORED - see script's ABLATION block). Signed;",
-        "% used inside math mode in the paper's table.",
+        "% used inside math mode in the paper's table. Positive = disabling the pass hurt accuracy.",
     ]
     out += [command(name, value) for name, value in ABLATION.items()]
-
-    out += [
-        "",
-        "% --- Per-tool line-level agreement (AUTHORED - see script's COMPARISON block). Rates",
-        "% carry no percent sign; the paper adds \\%.",
-    ]
-    for tool, values in COMPARISON.items():
-        out += [
-            command(f"{tool}Fixtures", values["fixtures"]),
-            command(f"{tool}LineMismatches", latex_number(values["mismatches"])),
-            command(f"{tool}LineRate", values["rate"]),
-        ]
-
-    out += [
-        "",
-        "% --- Wall-clock percentiles, milliseconds (AUTHORED - see script's SPEED block).",
-    ]
-    for tool, (p50, p90, p99) in SPEED.items():
-        out += [
-            command(f"Speed{tool}PFifty", p50),
-            command(f"Speed{tool}PNinety", p90),
-            command(f"Speed{tool}PNinetyNine", p99),
-        ]
+    out += [command(name, value) for name, value in ABLATION_VISIBLE.items()]
 
     # Completed = sampled - unavailable - skipped, derived for the same reason as NodeMismatches.
     completed = (
@@ -373,7 +427,11 @@ def main():
     rq1, rq1_source = read_generated_block(
         os.path.join(plots, "variables_rq1.tex"), output_path, RQ_ONE_MACROS, "make rq1-report",
     )
-    lines = build(empirical, rq1)
+    comparison, comparison_source = read_generated_block(
+        os.path.join(plots, "variables_comparison.tex"), output_path, COMPARISON_MACROS,
+        "make benchmark-timing-report",
+    )
+    lines = build(empirical, rq1, comparison)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
@@ -382,7 +440,8 @@ def main():
     macro_count = sum(1 for line in lines if line.startswith("\\newcommand"))
     print(
         f"{macro_count} paper variables written to {output_path} "
-        f"(empirical block from: {empirical_source}; RQ1 block from: {rq1_source})"
+        f"(empirical block from: {empirical_source}; RQ1 block from: {rq1_source}; "
+        f"comparison block from: {comparison_source})"
     )
 
 

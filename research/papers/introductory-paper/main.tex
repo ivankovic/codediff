@@ -62,7 +62,8 @@ onto another. Decades of research have given the field exact tree-edit-distance
 algorithms, Zhang-Shasha and APTED, and source-code-specific heuristics, GumTree, plus a newer
 generation of practical, tree-sitter-based tools, difftastic and diffsitter. This paper presents
 \textsc{CodeDiff}, a syntax-aware code-diffing tool that builds directly on this line of work,
-combining APTED's exact tree edit distance with GumTree's bottom-up and move-recovery heuristics
+combining APTED's exact tree edit distance, applied to bounded subtree pairs rather than to whole
+files, with GumTree's move-recovery heuristic
 and Myers' O(ND) sequence diff into one \NumPhasesWord{}-phase matching pipeline.
 \textsc{CodeDiff}'s own
 contribution is not a new matching algorithm but two engineering disciplines applied on top of
@@ -128,7 +129,7 @@ This paper makes the following contributions:
   dedicated matching heuristic, and showing that a heuristic's published benefit does not
   automatically transfer into a different pipeline evaluated against a different corpus.
   \item It details \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline that combines
-  APTED's exact tree edit distance, GumTree's source-code-specific heuristics, and Myers'
+  scoped APTED tree edit distance, GumTree's move-recovery heuristic, and Myers'
   sequence diff into one production-engineered tool meeting the targets the empirical study sets.
 \end{itemize}
 
@@ -203,9 +204,13 @@ for inputs that never occur in practice. It can under-engineer for a real tail i
 analysis never quantified. Answering RQ1 needs measurement, not further asymptotic analysis.
 
 We measure this directly. We built a corpus of \NumRepos{} open-source repositories, drawn from
-the Gentoo Linux distribution's package list and popular repositories on GitHub. We cloned every
-repository in full and parsed every file with Tree-sitter, recording byte size, line count,
-language, and AST node count per file. The full methodology, and every per-language number, is
+the Gentoo Linux distribution's package list and popular repositories on GitHub. We cloned each
+repository to a depth of \CorpusCloneDepth{} commits from every branch tip and parsed every file
+with Tree-sitter, recording byte size, line count,
+language, and AST node count per file. The depth limit matters for what follows: it bounds how far
+back the commit sampling in this section can reach, and a sampled (repository, commit, path) triple
+stays resolvable only while that commit remains within the depth window of the local clone. The
+full methodology, and every per-language number, is
 reproducible from the project's research repository; here, we summarize the numbers that shape
 \textsc{CodeDiff}'s design.
 
@@ -213,13 +218,12 @@ reproducible from the project's research repository; here, we summarize the numb
 %% computed), not the target 7,423-repository full corpus (slow - see README.md). Re-run
 %% `make introductory-paper-empirical` after a full `file-stats` run to swap in the real numbers.
 %%
-%% TODO: \NumFixtures{} (98) and every number measured on that corpus - the ablation deltas, the
-%% line-level comparison, the speed percentiles, the AST-node accuracy - predate substantial
-%% pipeline work. research/optimal_solutions_benchmark.csv now holds 433 rows and
-%% research/benchmark_other.csv 156, so the corpus has grown well past 98. These must be
-%% refreshed together, not piecemeal: they were all measured on the same corpus, and updating one
-%% block alone would leave the paper internally inconsistent. See paper_variables.py's AUTHORED
-%% blocks for the command that regenerates each.
+%% Section 5's numbers were all refreshed together on 2026-08-20 against the current 468-fixture
+%% corpus - node accuracy, ablation, per-tool comparison, speed percentiles, robustness. Keep that
+%% property: they share a corpus, so refreshing one block alone makes the section inconsistent.
+%% The comparison and speed blocks are now generated (analysis/benchmark_other_report.py writes
+%% plots/variables_comparison.tex), so only the corpus, ablation and robustness blocks in
+%% paper_variables.py still need transcribing by hand.
 
 The corpus has \NumFiles{} files across \NumLanguages{} languages. About two-thirds of all files
 are code. The rest is configuration, data, and documentation (Figure~\ref{fig:tips}). Restricted to
@@ -263,10 +267,18 @@ terminating the computation's process. This implementation includes an optimizat
 faster than a textbook APTED, so the failure rates below are a lower bound on how often a
 whole-tree computation misses the budget, not an upper bound.
 
+Every sampled pair was checked to still resolve against the local clones before measurement, and
+all of them did. This is worth stating because the check has failed before: an earlier sample,
+drawn against a shallower corpus, had decayed to roughly 41\% unresolvable by the time it was
+re-measured, and the losses fell on whole repositories rather than spreading evenly across the
+sample. A measurement over that sample would have reported a healthy-looking rate while quietly
+answering a question about a different, smaller corpus.
+
 Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket,
 split by what kind of artifact the file is: code (\RqOneCodePairs{} pairs across general-purpose
-programming languages), and configuration, data, and markup formats (\RqOneConfigDataPairs{}
-pairs). The split matters because the two populations behave differently—blended, the headline
+programming languages), configuration, data, and markup formats (\RqOneConfigDataPairs{} pairs),
+and scripting languages (\RqOneScriptingPairs{} pairs). The split matters because the three
+populations behave differently—blended, the headline
 number would move with how many configuration files a sample happens to contain, independently of
 anything the algorithm does to source code.
 
@@ -278,14 +290,33 @@ anything the algorithm does to source code.
   \label{fig:rq1}
 \end{figure*}
 
-\textbf{RA1.} For source code, a whole-tree computation is dependable only for small files: it
+\textbf{RA1.} For source code, a whole-tree computation is dependable only for small files, and
+the transition is abrupt rather than gradual: it
 completes within one second for \RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but
 for only \RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines—well inside the
 range of ordinary source files (Table~\ref{tab:file-size-percentiles})—and never recovers above
-one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in
+one third in any larger bucket. The drop happens between two adjacent buckets, neither of which is
+an unusual size for a source file, which is what makes it a design problem rather than a tail
+problem. Across all sampled code pairs, \RqOneCodePct{}\% complete in
 time; this sample-weighted aggregate deliberately over-represents large files and therefore
 understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
-the answer regardless of weighting. The common case is genuinely cheap—most files and most
+the answer regardless of weighting.
+
+The three artifact categories do not behave alike. Scripting languages complete within the budget
+\RqOneScriptingPct{}\% of the time, well clear of code at \RqOneCodePct{}\% and configuration,
+data, and markup formats at \RqOneConfigDataPct{}\%; the latter two are close to each other and
+separated by less than six points, so the meaningful split is scripting against the rest rather
+than a clean three-way ordering. Figure~\ref{fig:rq1} shows the same pattern per bucket: scripting
+stays above every other category in all seven, while configuration and data fall furthest in the
+large buckets, despite containing the most repetitive and most regularly structured files in the
+corpus. We conjecture this reflects tree edit distance being sensitive to tree shape rather than to
+node count alone, a large flat sequence of similar siblings being an unfavorable shape for it—the
+same reasoning \textsc{CodeDiff}'s pipeline acts on in Section~\ref{sec:pipeline}, where large flat
+subtrees are pre-matched with a sequence algorithm rather than handed to tree edit distance at all.
+This measurement does not isolate shape from size, so we state it as a conjecture rather than a
+result.
+
+The common case is genuinely cheap—most files and most
 commits are small—but the tail is real: files up to \AstMax{} AST nodes occur in this corpus, and
 Arafat and Riehle's data shows commits of over 10{,}000 lines occur in practice. A production
 diff tool must be engineered for both regimes, and cannot rely on a whole-tree computation alone
@@ -305,58 +336,65 @@ practice.
 
 \textsc{CodeDiff} matches two ASTs in \NumPhasesWord{} phases. Each phase either resolves part of the
 mapping directly or narrows the residual left for the next phase. Later phases only ever see
-nodes earlier phases left unmatched.
+nodes earlier phases left unmatched. A sixth step closes the mapping, recording the deletion or
+insertion implied by whatever every phase above left undecided.
 
-\textbf{Phase 1, hash-based descent.} \textsc{CodeDiff} matches subtrees by three hash variants,
-in order: byte-identical subtrees, then same-shape subtrees with any leaf value, then import
-statements matched by normalized path. Each variant claims what it can before the next runs. This
+\textbf{Phase 1, hash-based descent.} \textsc{CodeDiff} matches subtrees by two hash variants, in
+order: byte-identical subtrees, then same-shape subtrees with any leaf value. Each variant claims
+what it can before the next runs. This
 phase is \textsc{CodeDiff}'s own design, motivated directly by Section~\ref{sec:problem-space}'s
 commit-size data: since most commits touch a small fraction of a file's lines, most of a typical
 file's AST is byte-identical between before and after. Resolving that identical majority with cheap
 hashing, before any tree-edit-distance computation runs at all, avoids paying that computation's
 cost on content that never changed.
 
-\textbf{Phase 2, contextual exact matching.} Comments that immediately precede an already-matched
-node, and diagnostic statements (logging calls, assertions, panics) that are byte-identical on
+\textbf{Phase 2, contextual exact matching.} Comments and modifiers (attributes, decorators) that
+immediately precede an already-matched node, and diagnostic statements (logging calls, assertions,
+panics) that are byte-identical on
 both sides, get matched directly. Both are cheap, high-confidence matches that reduce the work
-left for the tree-edit-distance phases below.
+left for the tree-edit-distance phases below. Neither is reachable by phase 1's structural hashing:
+comments and modifiers are not part of the hashed AST shape, and diagnostic statements are held
+back deliberately, so that matching one does not fragment a larger match around it.
 
-\textbf{Phases 3 and 5, bottom-up expansion.} This is GumTree's bottom-up matching heuristic: once
-most of an unmatched node's descendants already match the descendants of some unmatched node on
-the other side, by a Dice-coefficient threshold, match the two nodes to each other too, even
-though nothing matched their own labels directly. \textsc{CodeDiff} runs this pass twice, once
-before phase 4 and once after, since phase 4 produces more matched descendants for the second pass
-to vote on. Section~\ref{sec:evaluation} reports that, once combined with the rest of this specific
-pipeline, this heuristic does not carry over the accuracy gain GumTree's own evaluation found for
-it, so \textsc{CodeDiff} ships it disabled by default—a property of this pipeline's measured
-results, not of the heuristic's origin.
-
-\textbf{Phase 4, syntax-aware subtree matching.} This phase generalizes three matching strategies
+\textbf{Phase 3, syntax-aware subtree matching.} This phase generalizes three matching strategies
 into one engine: matching by fully-resolved name (handling overloads and duplicate names across
-scopes), a greedy cost-estimate matcher for containers with no name or arm structure, such as an
-\texttt{if} block or a loop body, and a Jaccard-similarity matcher for flow-control constructs
-whose case arms mostly agree. Before any of these run, large flat subtrees, such as a macro's
+scopes), a greedy cost-estimate matcher for containers with no name structure, such as an
+\texttt{if} block or a loop body, and an overlap matcher pairing import statements that share a
+base path. Before any of these run, large flat subtrees, such as a macro's
 token list or a big flat argument list, are pre-matched directly with Myers'
 algorithm~\cite{myers-1986}, since a flat sequence has no tree structure worth exploiting—exactly
 the structures that drive Section~\ref{sec:problem-space}'s measured AST-size tail. Each accepted
-pair is then handed to APTED (below) to compute its exact internal edit script.
+pair is then handed to APTED~\cite{apted-2015}, scoped to that pair alone, to compute its exact
+internal edit script. This is the only place a tree-edit-distance computation runs at all, and the
+scoping is what keeps it affordable: APTED sees one accepted container pair at a time, never the
+whole file.
 
-\textbf{Phase 6, final APTED.} Whatever remains unmatched after phases 1 through 5 is handed to
-APTED~\cite{apted-2015} for one whole-residual tree-edit-distance computation, giving an exact,
-cost-minimal mapping over that remainder. When the residual is too large for this to finish inside
-\textsc{CodeDiff}'s speed target, a cheaper Myers-LCS alignment~\cite{myers-1986} over the residual
-substitutes for full APTED instead, trading a small amount of match quality for a bounded
-worst-case latency. This fallback exists directly because of the measured size tail in
-Section~\ref{sec:problem-space}: without it, the rare very large residual blows the \SpeedTargetMs{}\,ms target
-outright.
+\textbf{Phase 4, residual alignment.} Whatever remains unmatched after phases 1 through 3 is
+resolved by a Myers-LCS alignment~\cite{myers-1986} over the residual forest, bracketed by two
+passes of strict bottom-up propagation: a node whose children all match the children of exactly
+one node on the other side is matched to it, which shrinks the residual the alignment must guess
+at, and is run again afterward so that pockets the alignment just resolved can still bubble up to
+their now-complete ancestors.
 
-\textbf{Phase 7, move-detection recovery.} The final pass. Ordered tree edit distance cannot
+Earlier versions of \textsc{CodeDiff} instead ran one whole-residual APTED computation here, with
+the Myers-LCS alignment substituting only when that computation looked too expensive. That design
+was abandoned: its cost is driven by residual \emph{shape} rather than size, which makes it
+impossible to gate reliably. Two measured cases make the point—an 11{,}647-node Vimscript residual
+took 87 seconds, while a 258{,}504-node JSON residual took 9.4. No size threshold separates those
+two, so the exact computation was removed from the whole-file path entirely and survives only in
+phase 3's scoped form. This is a direct consequence of the size tail in
+Section~\ref{sec:problem-space}: an unbounded whole-residual computation cannot meet the
+\SpeedTargetMs{}\,ms target at any threshold.
+
+\textbf{Phase 5, move-detection recovery.} The final matching pass. Ordered tree edit distance cannot
 express a subtree that relocated across a matched boundary as anything but a delete plus an
 insert. This phase, adapted directly from GumTree's recovery-mappings
 phase~\cite{gumtreediff-2014}, pairs up whole subtrees left fully deleted on one side and fully
-inserted on the other, when they are byte-identical and large enough to rule out coincidence.
-Unlike phase 3/5's bottom-up heuristic, Section~\ref{sec:evaluation} finds this heuristic
-measurably helps, so it ships enabled by default.
+inserted on the other, when they are byte-identical and large enough to rule out coincidence. It
+runs last by necessity rather than by preference: every phase above requires some anchor—a hash, a
+name, a shared matched ancestor—before it will consider a pair at all, and content that moved
+between two containers that both changed identity has none. Section~\ref{sec:evaluation} finds
+this pass contributes more accuracy than every other optional pass in the pipeline combined.
 
 Zhang-Shasha~\cite{zhang-shasha-1989} plays no role in this pipeline as a shipped algorithm.
 \textsc{CodeDiff}'s own test suite instead implements it from scratch as an independent oracle,
@@ -367,16 +405,11 @@ against a second, independently-implemented ground truth, not only against itsel
 \section{Evaluation}
 \label{sec:evaluation}
 
-%% TODO: when the evaluation numbers are refreshed to the current corpus (see the TODO at the
-%% top of this section's macros), also add a change-shape distribution table from
-%% data/quality/human_mapping_analysis.csv (analysis/human_mapping_shapes_report.py) - RQ3's
-%% "which shapes occur" half currently rests on the ablation alone, and the shape census must be
-%% measured on the SAME corpus version as the rest of this section, which is why it is not added
-%% now (the analysis file on disk covers 417 fixtures against this section's 98).
-\textbf{Dataset.} \textsc{CodeDiff}'s accuracy claims rest on a corpus of \NumFixtures{} fixtures. Each fixture
+\textbf{Dataset.} \textsc{CodeDiff}'s accuracy claims rest on a corpus of \NumFixtures{} fixtures
+spanning \NumFixtureLanguages{} languages. Each fixture
 pairs a before and after version of a source file, representing a realistic code change—a bug
-fix, a refactor, an added feature, or a performance-motivated rewrite—across many languages. Some
-fixtures are captured directly from a specific commit in a real open-source repository. Others are
+fix, a refactor, an added feature, or a performance-motivated rewrite. Most
+fixtures are captured directly from a specific commit in a real open-source repository; the rest are
 curated examples of a common, realistic change pattern. For every fixture, a human annotator used a
 purpose-built tool, \texttt{human\_solver}, to walk the before and after syntax trees side by side
 and label every node with one of seven operations: identical, update, match-but-not-identical,
@@ -408,46 +441,73 @@ This comparison measures one specific property: agreement with the human-authore
 mapping above. difftastic and diffsitter deliberately optimize for something this metric does not
 capture, a diff that reads comfortably to a human, not a mapping that reproduces a ground truth
 line for line, so a lower score here reflects a different design goal, not a defect. GumTree
-remains the foundation two of \textsc{CodeDiff}'s own pipeline phases build on directly
+remains the foundation \textsc{CodeDiff}'s move-recovery phase builds on directly
 (Section~\ref{sec:pipeline}), and its broader language and backend flexibility stays valuable well
-beyond what this single corpus measures. Read what follows as a report of where combining these
+beyond what this single corpus measures. One consequence of that flexibility is visible in the
+numbers below: every generator GumTree offers is included here, and all but two of them are
+marked ``Testing'' rather than ``Stable'' by GumTree's own documentation, so its rate reflects a
+deliberately wide language scope rather than its performance on the backends it considers ready.
+Read what follows as a report of where combining these
 approaches into one production-engineered, ablation-validated pipeline lands, not as a ranking of
 which tool is best.
 
 \textbf{AST-node accuracy.} Measured directly against the human mapping, \textsc{CodeDiff} maps
 \NodesMatched{} of \NodesTotal{} AST nodes correctly across the \NumFixtures{} fixtures, \NodeMismatches{} mismatches, or \NodeAccuracyPct{}\%
-node-level accuracy.
+node-level accuracy. That denominator counts every AST node, including every ancestor of every
+change up to the root, so it partly reflects how deeply a given grammar nests. Restricted to the
+nodes that carry text of their own and therefore reach the screen when the diff is rendered, the
+figure is \VisibleNodeAccuracyPct{}\%, \VisibleNodeMismatches{} mismatches out of
+\VisibleNodesTotal{}. The two rates agreeing to two decimal places is itself the useful result:
+\textsc{CodeDiff}'s residual errors are not concentrated in invisible structural nodes, so the
+headline figure is not being flattered by nodes no reviewer ever sees.
 
 \textbf{Line-level agreement.} None of the other four tools report an AST-node mapping, so we
 compare all five on a common ground: which source lines each tool marks as touched, against the
 same human mapping (Table~\ref{tab:accuracy-vs-others}, Figure~\ref{fig:accuracy}). Coverage
-varies: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the \NumFixtures{} fixtures' languages, GumTree's
-generator set matches \GumTreeFixtures{}, and the rest match all \NumFixtures{}—each tool's own row is scored only on its own
-applicable subset, not padded with unscored fixtures.
+varies widely: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the
+\NumFixtures{} fixtures' languages, GumTree's generator set matches \GumTreeFixtures{},
+difftastic's \DifftasticFixtures{}, and only \textsc{CodeDiff} and Unix \texttt{diff} cover all
+\NumFixtures{}. Each tool's own row is scored only on its own
+applicable subset, not padded with unscored fixtures. Because those subsets differ so much, the
+table also reports every tool on the \CommonFixtures{} fixtures all five scored, which holds the
+fixture set fixed at the cost of over-representing the mainstream languages every tool supports.
 
 \textbf{RA2.} Among the four pre-existing tools (Table~\ref{tab:accuracy-vs-others}, excluding
 \textsc{CodeDiff}'s own row), line-level mismatch rates against the human mapping range from
-\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \DiffsitterLineRate{}\% (diffsitter). Two results
-stand out. First, every tool already agrees with the human mapping on the overwhelming majority
-of lines: even the highest mismatch rate leaves more than 98\% of lines in agreement, so the
+\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \GumTreeLineRate{}\% (GumTree). Three results
+stand out. First, every tool agrees with the human mapping on the great majority
+of lines: even the highest mismatch rate leaves more than 95\% of lines in agreement, so the
 question that separates tools is how they handle the small, structurally interesting remainder.
-Second, no AST-aware tool among the four beats plain line-based \texttt{diff} on this measure.
+Second, no AST-aware tool among the four beats plain line-based \texttt{diff} on this measure,
+on either basis.
 Syntax-awareness alone does not guarantee that a tool recovers a change the way a human reads
 it—the gap is in which heuristics act on the syntax tree, which RQ3 turns to next.
 
+Third, the two bases disagree about \textsc{CodeDiff} itself, and the disagreement is worth
+stating plainly. Across the whole corpus \textsc{CodeDiff} has the lowest rate of the five,
+\CodeDiffLineRate{}\% against Unix \texttt{diff}'s \UnixDiffLineRate{}\%. On the
+\CommonFixtures{}-fixture common subset that ordering reverses: Unix \texttt{diff} scores
+\CommonUnixDiffLineRate{}\% and \textsc{CodeDiff} \CommonCodeDiffLineRate{}\%. We conjecture the
+difference is which languages each basis weights—the common subset is exactly the set of
+mainstream languages with mature grammars, where a line-based diff is hardest to beat, while the
+fixtures only \textsc{CodeDiff} and Unix \texttt{diff} can both attempt include the markup and
+configuration formats where structural matching pays off most. We report both rather than
+choosing the flattering one.
+
 \begin{table}
-  \caption{Line-level mismatches against human ground truth, each tool scored on its own
-  applicable subset of the \NumFixtures{}-fixture corpus.}
+  \caption{Line-level mismatch rate against human ground truth, on each tool's own applicable
+  subset of the \NumFixtures{}-fixture corpus and on the \CommonFixtures{} fixtures every tool
+  scored.}
   \label{tab:accuracy-vs-others}
-  \begin{tabular}{lrrr}
+  \begin{tabular}{lrrrr}
     \toprule
-    Tool & Fixtures & Mismatched lines & Rate \\
+    Tool & Fixtures & Mismatched lines & Rate & Common \\
     \midrule
-    \textsc{CodeDiff} & \CodeDiffFixtures{} & \CodeDiffLineMismatches{} & \CodeDiffLineRate{}\% \\
-    Unix \texttt{diff} & \UnixDiffFixtures{} & \UnixDiffLineMismatches{} & \UnixDiffLineRate{}\% \\
-    GumTree & \GumTreeFixtures{} & \GumTreeLineMismatches{} & \GumTreeLineRate{}\% \\
-    difftastic & \DifftasticFixtures{} & \DifftasticLineMismatches{} & \DifftasticLineRate{}\% \\
-    diffsitter & \DiffsitterFixtures{} & \DiffsitterLineMismatches{} & \DiffsitterLineRate{}\% \\
+    \textsc{CodeDiff} & \CodeDiffFixtures{} & \CodeDiffLineMismatches{} & \CodeDiffLineRate{}\% & \CommonCodeDiffLineRate{}\% \\
+    Unix \texttt{diff} & \UnixDiffFixtures{} & \UnixDiffLineMismatches{} & \UnixDiffLineRate{}\% & \CommonUnixDiffLineRate{}\% \\
+    diffsitter & \DiffsitterFixtures{} & \DiffsitterLineMismatches{} & \DiffsitterLineRate{}\% & \CommonDiffsitterLineRate{}\% \\
+    difftastic & \DifftasticFixtures{} & \DifftasticLineMismatches{} & \DifftasticLineRate{}\% & \CommonDifftasticLineRate{}\% \\
+    GumTree & \GumTreeFixtures{} & \GumTreeLineMismatches{} & \GumTreeLineRate{}\% & \CommonGumTreeLineRate{}\% \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -462,52 +522,61 @@ it—the gap is in which heuristics act on the syntax tree, which RQ3 turns to n
 
 \textbf{Ablation study.} RQ3 asks which shapes of change earn a dedicated heuristic.
 \textsc{CodeDiff} has four optional heuristic passes, each targeting a specific shape and each
-behind its own flag: import-node normalization (renamed or reordered import paths), flow-control
-arm matching (restructured \texttt{if}/\texttt{switch} arms), bottom-up expansion (containers
-whose children already match, phases 3 and 5), and move-detection recovery (whole subtrees
-relocated across a matched boundary, phase 7). A leave-one-out ablation study measured each
+behind its own flag: move-detection recovery (whole subtrees relocated across a matched boundary,
+phase 5), bottom-up propagation (a container whose children all match one container on the other
+side, phase 4), mutual-ancestor pairing (a container sitting above an edit whose descendants all
+survive inside one corresponding container), and unique type matching (a matched parent's single
+remaining child of a given kind on each side), the last adapted from GumTree Simple's recovery
+sub-phase. A leave-one-out ablation study measured each
 pass's real contribution on the \NumFixtures{}-fixture corpus above, by disabling one pass at a
 time and comparing the resulting mismatch count against a baseline with all four enabled.
 
-Table~\ref{tab:ablation} reports the result. Import-node normalization and flow-control arm
-matching, two of \textsc{CodeDiff}'s own heuristics, both turned out net-negative for accuracy on
-this corpus once combined with the rest of the pipeline. Bottom-up expansion, adapted from
-GumTree, shows the same pattern here—not because the technique is unsound (GumTree's own
-evaluation, on GumTree's own pipeline and corpus, found it valuable), but because a heuristic's
-net effect depends on what the rest of the pipeline already resolves before that heuristic gets
-its turn, and \textsc{CodeDiff}'s earlier phases leave GumTree's bottom-up phase less new ground
-to help with. Move-detection recovery, GumTree's other contribution to this pipeline, is the one
-of the four that does carry over: it measurably helps here too, and ships enabled by default. The
-other three ship disabled.
+Table~\ref{tab:ablation} reports the result at two granularities: every AST node, and only those
+nodes that carry text of their own and therefore reach the screen when the diff is rendered. The
+two disagree in a way that matters. Across all nodes, three of the four passes earn their place;
+restricted to what a reviewer actually sees, only one does. Bottom-up propagation's
+$\AblationBottomUpPropagation{}$ nodes and mutual-ancestor pairing's $\AblationMutualAncestors{}$
+are, without exception, structural interior nodes—the containers and wrappers a rendered diff
+never displays on their own. Unique type matching moves neither column, and the reason is not that
+it is unsound: instrumentation shows it fires \emph{zero} times across the entire corpus. By the
+time it runs, \textsc{CodeDiff}'s earlier phases have already resolved every case it targets, and
+a matched parent's leftover unmatched children essentially never land on the ``exactly one of this
+kind on each side'' configuration it requires.
 
 \begin{table}
   \caption{Ablation study: accuracy change from disabling each optional pass, against a baseline
-  with all four enabled. A negative number means disabling the pass improved accuracy, fewer
-  mismatches. A positive number means disabling it hurt accuracy. The two passes GumTree
-  contributes are marked (G).}
+  with all four enabled. A positive number means disabling the pass hurt accuracy, more
+  mismatches. Visible nodes are those carrying text of their own, the ones a rendered diff
+  displays. The two passes adapted from GumTree are marked (G).}
   \label{tab:ablation}
-  \begin{tabular}{lrl}
+  \begin{tabular}{lrr}
     \toprule
-    Pass & $\Delta$ if disabled & Ships \\
+    Pass & $\Delta$ all nodes & $\Delta$ visible \\
     \midrule
-    Import-node normalization & $\AblationImportNodes{}$ & disabled \\
-    Flow-control arm matching & $\AblationFlowControl{}$ & disabled \\
-    Bottom-up expansion (G)   & $\AblationBottomUp{}$ & disabled \\
-    Move-detection recovery (G) & $\AblationMovedSubtrees{}$ & enabled \\
+    Move-detection recovery (G) & $\AblationMovedSubtrees{}$ & $\AblationVisibleMovedSubtrees{}$ \\
+    Bottom-up propagation & $\AblationBottomUpPropagation{}$ & $\AblationVisibleBottomUpPropagation{}$ \\
+    Mutual-ancestor pairing & $\AblationMutualAncestors{}$ & $\AblationVisibleMutualAncestors{}$ \\
+    Unique type matching (G) & $\AblationUniqueTypeMatching{}$ & $\AblationVisibleUniqueTypeMatching{}$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \textbf{RA3.} On this corpus, the move is the one shape whose dedicated heuristic pays for
-itself: move-detection recovery is the only optional pass whose removal hurts accuracy, which
-matches the structural argument of Section~\ref{sec:pipeline}—a relocated subtree is the one
+itself in a way a reader would notice: move-detection recovery contributes more accuracy than the
+other three optional passes combined, by a factor of seven across all nodes, and is the only one
+of the four that changes the visible-node count at all. This matches the structural argument of
+Section~\ref{sec:pipeline}—a relocated subtree is the one
 shape ordered tree edit distance cannot express except as a delete plus an insert, so no
-downstream computation can recover it without a dedicated pass. The heuristics targeting the
-other shapes are net-negative here, including bottom-up expansion, which GumTree's own
-evaluation, on GumTree's own pipeline and corpus, validated as helpful. A technique documented as
-effective in its original paper is therefore not guaranteed to help inside a different pipeline
-evaluated against a different corpus. \textsc{CodeDiff} measures this directly for every optional
-pass, rather than assuming a result from the literature transfers unchanged.
+downstream computation can recover it without a dedicated pass.
+
+Unique type matching is the sharper result for RQ3's second half. It is GumTree Simple's own
+recovery sub-phase, it is unit-tested and correct in isolation, and it contributes exactly nothing
+here—not because the technique fails, but because it never gets a case to work on. A heuristic's
+value is therefore a property of the pipeline it is placed in, not of the technique alone: the
+same pass that recovers real mappings where it originated can be dead code in a pipeline whose
+earlier phases are comprehensive enough to reach its cases first. We argue this is the more
+transferable lesson, and it is only visible by measuring firings and accuracy inside the adopting
+pipeline, rather than inheriting the original paper's result.
 
 \textbf{Production viability.} The remaining measurements evaluate \textsc{CodeDiff}
 itself—speed, then robustness—against the Fast and Robust targets stated in
@@ -517,12 +586,23 @@ Section~\ref{sec:pipeline}.
 percentiles over the same fixtures, sorted fastest to slowest by median. We report GumTree twice:
 once invoked as a fresh process per fixture, the realistic cost of a single CLI invocation, and
 once run inside one persistent JVM across all fixtures, isolating JVM startup from GumTree's own
-matching cost. diffsitter is the fastest AST-aware tool in this comparison at every percentile
-measured, a direct result of its narrower, hand-picked grammar set. difftastic sits close to
-\textsc{CodeDiff} at the median and 90th percentile, but its tail is heavier: at the 99th
-percentile, difftastic is the slowest AST-aware tool here after GumTree invoked as a fresh process.
-Unix \texttt{diff} remains fastest overall at every percentile, since it never parses or compares
-tree structure.
+matching cost. \textsc{CodeDiff} is the fastest AST-aware tool at the median
+(\SpeedCodeDiffPFifty{}\,ms), but this ordering does not hold across the distribution: diffsitter,
+whose narrower hand-picked grammar set does markedly less work, overtakes it at the 90th
+percentile and is an order of magnitude ahead at the 99th (\SpeedDiffsitterPNinetyNine{}\,ms
+against \SpeedCodeDiffPNinetyNine{}\,ms). \textsc{CodeDiff}'s tail is heavy, and
+Section~\ref{sec:pipeline}'s design explains why: the phases that resolve the common case cheaply
+do nothing for a large, genuinely dissimilar residual, which is exactly what the slowest fixtures
+in this corpus are. difftastic's tail is heavier still in aggregate cost and essentially ties
+\textsc{CodeDiff} at the 99th percentile. Unix \texttt{diff} remains fastest at every percentile,
+since it never parses or compares tree structure.
+
+The two GumTree rows bracket how much of its cost is JVM startup rather than matching. A warm JVM
+takes its median from \SpeedGumTreeColdPFifty{}\,ms to \SpeedGumTreeWarmPFifty{}\,ms, so most of
+the per-invocation figure is process startup, not GumTree's algorithm. We report both because each
+answers a different question: the cold number is what a developer running a diff from the command
+line actually waits for, and the warm number is what GumTree's matching costs once that is
+amortized away.
 
 These percentiles must be read against the right population. The Fast target of
 Section~\ref{sec:pipeline}—\SpeedTargetMs{}\,ms for \SpeedTargetPct{}\% of real-world
@@ -544,10 +624,10 @@ here as a design target rather than a measured result.
     Tool & p50 & p90 & p99 \\
     \midrule
     Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} \\
-    diffsitter & \SpeedDiffsitterPFifty{} & \SpeedDiffsitterPNinety{} & \SpeedDiffsitterPNinetyNine{} \\
     \textsc{CodeDiff} & \SpeedCodeDiffPFifty{} & \SpeedCodeDiffPNinety{} & \SpeedCodeDiffPNinetyNine{} \\
-    GumTree (warm JVM) & \SpeedGumTreeWarmPFifty{} & \SpeedGumTreeWarmPNinety{} & \SpeedGumTreeWarmPNinetyNine{} \\
+    diffsitter & \SpeedDiffsitterPFifty{} & \SpeedDiffsitterPNinety{} & \SpeedDiffsitterPNinetyNine{} \\
     difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} \\
+    GumTree (warm JVM) & \SpeedGumTreeWarmPFifty{} & \SpeedGumTreeWarmPNinety{} & \SpeedGumTreeWarmPNinetyNine{} \\
     GumTree (cold, per-invocation) & \SpeedGumTreeColdPFifty{} & \SpeedGumTreeColdPNinety{} & \SpeedGumTreeColdPNinetyNine{} \\
     \bottomrule
   \end{tabular}
@@ -575,13 +655,15 @@ and a \RobustnessTimeoutSeconds{}-second timeout per pair. Of the \RobustnessSam
 because the repository's history had since been rewritten, not a \textsc{CodeDiff} failure, and
 \RobustnessSkipped{} exceeded the node cap and were skipped before \textsc{CodeDiff} ever ran. \textsc{CodeDiff}
 completed all \RobustnessCompleted{} remaining pairs with zero panics and zero timeouts. This is a sampled,
-bounded-scale result, not a claim over the full \NumRepos{}-repository corpus, but it is
-consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:pipeline}.
+bounded-scale result, not a claim over the full \NumRepos{}-repository corpus, and the
+\RobustnessSkipped{} pairs above the node cap are precisely the inputs the Robust target is about,
+so they are excluded from the evidence rather than counted in its favor. Within those limits the
+result is consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:pipeline}.
 
 \textbf{Summary.} Combining established techniques rather than inventing new ones,
 \textsc{CodeDiff} reaches \NodeAccuracyPct{}\% AST-node accuracy against human-verified ground truth, the lowest
-line-level mismatch rate of the five tools compared, wall-clock latency faster than GumTree and
-difftastic at the median, and zero panics or timeouts across the sampled robustness evaluation.
+line-level mismatch rate of the five tools compared over the corpus as a whole, and zero panics or
+timeouts across the sampled robustness evaluation.
 Building a production-grade syntax-aware diffing tool did not require a new matching algorithm,
 only careful combination and measurement of existing ones.
 
@@ -589,8 +671,8 @@ only careful combination and measurement of existing ones.
 \label{sec:related}
 
 \textbf{Tree-diffing tools.} GumTree~\cite{gumtreediff-2014} remains the reference point for
-source-code tree diffing, and two of \textsc{CodeDiff}'s pipeline phases adapt its heuristics
-directly (Section~\ref{sec:pipeline}). The difference is one of goal: GumTree targets research
+source-code tree diffing, and \textsc{CodeDiff}'s move-recovery phase adapts its recovery-mappings
+heuristic directly (Section~\ref{sec:pipeline}). The difference is one of goal: GumTree targets research
 use, with broad language and backend flexibility, while \textsc{CodeDiff} narrows to a
 tree-sitter-only frontend and spends the saved generality on production targets—and, as the
 ablation in Section~\ref{sec:evaluation} shows, on validating each adopted heuristic inside its
@@ -613,7 +695,7 @@ distributions specifically to set, and then evaluate, the engineering targets of
 \label{sec:conclusion}
 
 None of \textsc{CodeDiff}'s matching algorithms are new. Its contribution is combining
-Zhang-Shasha's and APTED's exact tree edit distance, GumTree's source-code-specific heuristics, and
+APTED's exact tree edit distance, GumTree's move-recovery heuristic, and
 Myers' sequence diff into a single pipeline, engineered and measured against the real distribution
 of source code rather than an assumed worst case, and validating every optional piece of that
 combination by measurement instead of by assumption. On the corpus in this paper, that combination
@@ -625,25 +707,37 @@ point: a heuristic's value is a property of the pipeline and corpus it runs in, 
 paper that introduced it. A production tool must measure that value directly, rather than assume
 it carries over.
 
+The same discipline applies to the exact algorithm at the pipeline's core. \textsc{CodeDiff} began
+by running one whole-residual APTED computation per file, exactly as its asymptotic analysis
+invites, and removed it after measurement showed its cost tracks residual shape rather than
+residual size closely enough that no size threshold can gate it safely. What survives is APTED
+scoped to individual container pairs, where the same exactness is affordable. An exact algorithm
+is not automatically the right one to run at whole-file scale, and only measurement distinguishes
+the two regimes.
+
 Based on the lessons reported in this paper, we recommend the following to builders of
 syntax-aware developer tooling:
 \begin{itemize}
-  \item Measure every adopted heuristic inside your own pipeline, against your own corpus: of the
-  two GumTree heuristics adopted here, one helped and one hurt, and only direct measurement told
-  them apart.
+  \item Measure every adopted heuristic inside your own pipeline, against your own corpus, and
+  count how often it fires as well as what it changes: one heuristic adopted here contributes more
+  than all the others combined, while another, correct and unit-tested in isolation, never fires
+  at all.
   \item Engineer against the measured distribution of real inputs, not against the worst-case
   bound alone: the common case and the tail require different machinery, and both occur in
   practice.
+  \item Scope an exact algorithm to the inputs it can serve within budget rather than abandoning
+  or over-applying it: the same computation that is unaffordable over a whole file is the right
+  tool for a bounded subtree pair.
   \item Keep an exact algorithm as an independent test oracle even when the shipped path is
   heuristic: \textsc{CodeDiff} fuzz-checks its APTED implementation against an independently
   implemented Zhang-Shasha on thousands of random trees.
 \end{itemize}
 
-Future work includes widening the ground-truth and robustness corpora beyond Rust and the current
-\NumFixtures{} fixtures, extending the accuracy comparison to more languages GumTree also supports,
-re-running the ablation study as new heuristic passes are added to the pipeline, and quantifying
-the distribution of change shapes in the ground-truth corpus itself, so that RQ3's shape findings
-rest on measured frequencies rather than on the ablation alone.
+Future work includes widening the robustness corpus beyond Rust,
+extending the accuracy comparison to more languages GumTree also supports,
+re-running the ablation study as new heuristic passes are added to the pipeline, and reporting the
+measured distribution of change shapes in the ground-truth corpus alongside the ablation, so that
+RQ3's first half rests on frequencies as well as on each pass's contribution.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

@@ -43,15 +43,19 @@ another. A single macro used in every position cannot drift.
 `research/analysis/paper_variables.py` assembles that file and documents, per block, where each
 number comes from. Two populations, kept visibly distinct in the generated output:
 
-* **Generated** - read back from a measurement artifact. Currently the empirical-study block
-  (corpus size, size percentiles, bytes-AST correlation), which
-  `file_stats.py`'s `write_paper_variables` writes to `plots/variables_empirical.tex` from
-  `stats.sqlite`. Refreshing is "re-run the producer, re-run the assembler."
+* **Generated** - read back from a measurement artifact. Refreshing is "re-run the producer, re-run
+  the assembler." Three blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
+  RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), and the tool comparison
+  (`benchmark_other_report.py` -> `variables_comparison.tex`).
 * **Authored** - no saved producer to read back from, so the value is transcribed, but into one
   version-controlled place with a comment naming the command that produced it. This covers the
-  ablation deltas, the per-tool comparison and speed tables, the robustness run, and the design
-  targets. Wiring each to a real artifact is follow-up work; the assembler records what that
-  artifact would be.
+  corpus/node-accuracy totals, the ablation deltas, the robustness run, and the design targets.
+
+The per-tool comparison and speed tables moved from Authored to Generated on 2026-08-20. At ~30
+hand-transcribed numbers they were the largest authored group and the one every data refresh
+touches, so they were the likeliest to drift. `benchmark_other_report.py` now derives them from
+`benchmark_accuracy.csv` (accuracy, which carries an explicit per-tool `_status` column and is
+machine-independent) and `benchmark_other.csv` (timing).
 
 **Edit authored values in `paper_variables.py`, never in `figures/variables.tex`.** That file is
 generated output: `make introductory-paper` regenerates and overwrites it on every routine PDF
@@ -83,14 +87,30 @@ took 19m50s, 1.35M files, 1,133 files/sec). Swapping in the real full-corpus num
 finishes, is `make file-stats MODE=full` (slow, run once) followed by `make
 introductory-paper-empirical MODE=full` (fast, re-renders and rebuilds) - no hand-editing required.
 
-**The 98-fixture corpus and every number measured on it are also stale**, and by more than the
-empirical block: `research/data/quality/optimal_solutions_benchmark.csv` now holds 433 rows and
-`research/data/comparison/benchmark_other.csv` 156, against the paper's 98. That affects the AST-node accuracy, the
-ablation table, the line-level comparison, and the speed percentiles. These must be refreshed
-*together*, not piecemeal - they were all measured on the same corpus, so updating one block alone
-would leave the paper internally inconsistent. The ablation table additionally describes a
-"Flow-control arm matching" pass that was deleted from the codebase on 2026-08-14;
-`research/measure/ablation_study.sh` now ablates three passes, not four.
+**Everything in Section 5 was refreshed on 2026-08-20** against the current 468-fixture corpus
+(469 fixture directories, 468 of them carrying a `human_mapping.json`), replacing numbers measured
+on 98 fixtures. Refreshed together, deliberately: AST-node accuracy, the ablation study, the
+per-tool line-level comparison, the speed percentiles, and the robustness run were all measured
+against the same corpus, so refreshing one block alone would leave the section internally
+inconsistent. Keep that property on the next refresh.
+
+That pass changed more than the values:
+
+* **The ablation table is a different table.** All four passes it lists are different passes from
+  the four it listed before. `ablation_study.sh`'s `FLAGS` array had gone stale against the binary
+  (it named `solver-import-nodes` and `solver-bottom-up-expansion`, neither of which exists), and
+  a stale flag makes clap exit before scoring a single fixture, which the script reported as a
+  per-flag `FAILED` row rather than as the list being wrong. It now pre-flights every flag against
+  `--help` and fails loudly instead.
+* **The result inverted.** Three of the four passes now measurably help, where three of the old
+  four were net-negative. Move-detection recovery is worth more than the other three combined.
+* **Section 4's pipeline description was rewritten**, because the pipeline itself had changed: the
+  whole-residual APTED call is gone (Myers-LCS runs unconditionally, and APTED survives only
+  scoped to individual container pairs inside phase 3), phases 3 and 5 were deleted outright, and
+  the paper now describes five phases rather than seven.
+* **GumTree is v4.0.0-beta8**, not the beta4 earlier runs used; the beta4 tree no longer exists on
+  disk. beta8 adds C++ and TSX generators and drops JSON, so GumTree's scored subset is not
+  comparable across that boundary. See `research/data/comparison/PROVENANCE.md`.
 
 ### Why this mechanism exists
 
