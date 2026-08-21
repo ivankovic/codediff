@@ -12,8 +12,6 @@
 %% this paper's own README.md for how to swap in a full run's numbers once available).
 \input{figures/variables.tex}
 
-%% TODO: replace with the real venue/rights info once a target venue is chosen (see the ACM
-%% rights-confirmation email); these are placeholder values from the acmart sample template.
 \setcopyright{acmlicensed}
 \copyrightyear{2026}
 \acmYear{2026}
@@ -22,21 +20,19 @@
   confirmation email}{June 03--05, 2026}{Ludbreg, Croatia}
 \acmISBN{978-1-4503-XXXX-X/26/06}
 
-%% TODO: verify/regenerate these against the ACM CCS taxonomy tool (https://dl.acm.org/ccs) once
-%% the paper's framing is finalized.
 \begin{CCSXML}
 <ccs2012>
-<concept>
-<concept_id>10011007.10011074.10011099.10011102</concept_id>
-<concept_desc>Software and its engineering~Software maintenance tools</concept_desc>
-<concept_significance>500</concept_significance>
-</concept>
-<concept>
-<concept_id>10011007.10011074.10011092.10011691</concept_id>
-<concept_desc>Software and its engineering~Empirical software validation</concept_desc>
-<concept_significance>300</concept_significance>
-</concept>
-</ccs2012>
+   <concept>
+       <concept_id>10011007.10011006.10011073</concept_id>
+       <concept_desc>Software and its engineering~Software maintenance tools</concept_desc>
+       <concept_significance>500</concept_significance>
+       </concept>
+   <concept>
+       <concept_id>10011007.10011074.10011099.10011693</concept_id>
+       <concept_desc>Software and its engineering~Empirical software validation</concept_desc>
+       <concept_significance>300</concept_significance>
+       </concept>
+ </ccs2012>
 \end{CCSXML}
 
 \ccsdesc[500]{Software and its engineering~Software maintenance tools}
@@ -64,7 +60,7 @@ generation of practical, tree-sitter-based tools, difftastic and diffsitter. Thi
 \textsc{CodeDiff}, a syntax-aware code-diffing tool that builds directly on this line of work,
 combining APTED's exact tree edit distance, applied to bounded subtree pairs rather than to whole
 files, with GumTree's move-recovery heuristic
-and Myers' O(ND) sequence diff into one \NumPhasesWord{}-phase matching pipeline.
+and Myers' O() sequence diff into one \NumPhasesWord{}-phase matching pipeline.
 \textsc{CodeDiff}'s own
 contribution is not a new matching algorithm but two engineering disciplines applied on top of
 this foundation. First, its performance and robustness targets come from an empirical study of
