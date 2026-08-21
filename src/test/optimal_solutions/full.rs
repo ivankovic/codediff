@@ -114,6 +114,8 @@ mod java_jopt_simple_jopt_simple_remove_import;
 #[cfg(test)]
 mod java_junit_pioneer_junit_pioneer_add_block_comment;
 #[cfg(test)]
+mod java_pdftk_java_pdftk_license_comment_change;
+#[cfg(test)]
 mod java_zeroc_ice_ice_comment_only_update;
 #[cfg(test)]
 mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;

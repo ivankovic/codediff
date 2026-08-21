@@ -154,7 +154,7 @@ Java,junit-pioneer-junit-pioneer,a9735129b3f6e1e790882d8c93e273340e32cc8d,src/ma
 Java,nextcloud-android.git,8a770847202267a9c8c2e0c0c78a2cb29ac7aa82,app/src/main/java/com/owncloud/android/ui/fragment/OCFileListFragment.java,java-nextcloud-android-add-if-branch-with-reused-return,small,PROMOTED,
 Java,nextcloud-android.git,dd8d79d1d914cb33b641ca058a1f9f30d811ce5f,app/src/main/java/com/owncloud/android/operations/UploadFileOperation.java,java-nextcloud-android-add-two-function-calls,small,PROMOTED,
 Java,pdftk-java-pdftk,202a9d96eb2aa40fc55c2d71817656715b6f4128,java/com/gitlab/pdftk_java/com/lowagie/text/pdf/RandomAccessFileOrArray.java,,full,SAMPLED,
-Java,pdftk-java-pdftk,f5a7e3e86af59ff8c9e441e9d892b95b7d316a5f,java/com/gitlab/pdftk_java/com/lowagie/text/pdf/PdfAppearance.java,,full,SAMPLED,
+Java,pdftk-java-pdftk,f5a7e3e86af59ff8c9e441e9d892b95b7d316a5f,java/com/gitlab/pdftk_java/com/lowagie/text/pdf/PdfAppearance.java,java-pdftk-java-pdftk-license-comment-change,full,PROMOTED,
 Java,protocolbuffers-protobuf.git,20b2cd7623c554e3ee39470b70d5583ad5f26f60,java/core/src/main/java/com/google/protobuf/MessageSchema.java,java-protocolbuffers-protobuf-add-import-and-update-field-access,small,PROMOTED,
 Java,protocolbuffers-protobuf.git,3657ce3ba3b4f02978df0bb1c4f0864086186dd2,java/core/src/main/java/com/google/protobuf/Internal.java,java-protobuf-add-two-annotations,small,PROMOTED,
 Java,protocolbuffers-protobuf.git,68bd6bed7923ddade82a57a6fb8274024a3cd5d8,java/core/src/main/java/com/google/protobuf/Internal.java,java-protocolbuffers-protobuf-add-a-method,small,PROMOTED,
@@ -260,8 +260,8 @@ Python,pytorch-pytorch.git,ae0bccf0eba0b22ac30cd62b9a397327d95455bf,torch/nn/att
 Python,ytdl-org-youtube-dl.git,2500300c2a5986ace34390aa473a8bd51f83622c,devscripts/make_lazy_extractors.py,python-ytdl-add-import-and-function-call,small,PROMOTED,
 Python,zaneb-autopage,69786a4190f94fd4327262ae046747954ed7f0df,autopage/tests/isolation.py,python-zaneb-autopage-move-time-sleep,full,PROMOTED,
 R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/cnv.r,,full,REJECTED,Unfortunately .r gets recognized as R and this is CPP
-R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rcolor.r,,full,SAMPLED,
-R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rmisc.r,,full,SAMPLED,
+R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rcolor.r,,full,REJECTED,Unfortunately another R vs CPP
+R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rmisc.r,,full,REJECTED,"Not R, .r for CPP"
 R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rwindow.r,,full,REJECTED,Unfortunately .r is not R
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/data.r,r-gtownsend-icon-one-letter-identifier-change,full,PROMOTED,
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/fload.r,,full,REJECTED,This is not actually in R.
