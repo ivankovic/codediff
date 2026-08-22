@@ -93,7 +93,10 @@ confirmed in \textsc{CodeDiff}'s own pipeline rather than assumed to transfer un
 same ground-truth corpus, \textsc{CodeDiff} maps \NodeAccuracyPct{}\% of AST nodes correctly, and reaches that
 accuracy at a speed and reliability suited to everyday, interactive use—read alongside GumTree,
 difftastic, and diffsitter not as a replacement for any of them, but as one way of combining what
-each already does well.
+each already does well. The corpus also answers a question about evaluation itself: in
+\AmbiguityFreshPct{}\% of the changes annotated with the facility to record it, no single node
+mapping is the correct one, so any accuracy metric scored against one fixed pairing can record
+correct output as wrong on a sixth of them.
 \end{abstract}
 
 \maketitle
@@ -144,10 +147,9 @@ supporting it is reported.
   \item \textbf{RQ2 (Tool accuracy).} How accurately do current state-of-the-art code-diffing
   tools recover real-world code changes, measured against human-authored ground-truth mappings of
   those changes? Answered by RA2, Section~\ref{sec:evaluation}.
-  \item \textbf{RQ3 (Shapes and heuristics).} Which shapes of real-world
-  change—renames, moves, restructurings—require a dedicated matching heuristic, and do
-  heuristics shown effective in one pipeline and corpus retain that value when reused in a
-  different pipeline and evaluated against a different corpus? Answered by RA3,
+  \item \textbf{RQ3 (Ground-truth ambiguity).} When does a real-world code change have no single
+  correct mapping between the two syntax trees—because several one-to-one mappings are equally
+  correct, or because the true correspondence is not one-to-one at all? Answered by RA3,
   Section~\ref{sec:evaluation}.
 \end{itemize}
 
@@ -164,16 +166,19 @@ This paper makes four contributions, one empirical, one system, one dataset, and
   one production tool meeting the targets the empirical study sets.
   \item \textbf{Dataset.} A corpus of \NumFixtures{} real-world code changes in
   \NumFixtureLanguages{} languages, each carrying a human-authored ground-truth AST mapping in
-  which every node is labeled with one of seven operations, produced with a purpose-built
+  which every node is labeled with one of seven operations—and in which a set of interchangeable
+  nodes can be recorded as admitting several equally correct pairings rather than forced to one,
+  which is what makes RQ3 measurable—produced with a purpose-built
   annotation tool (Section~\ref{sec:evaluation}). These human solutions are the ground truth every
   accuracy number in this paper is measured against, and the methodology behind them is
   reproducible from the project's research repository.
   \item \textbf{Evaluation.} A quantified comparison of four established diffing
-  tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against that ground truth,
-  together with a census of which change shapes occur in it and a leave-one-out ablation study of
-  the heuristics targeting them, showing
-  both that a heuristic's published benefit does not automatically transfer into a different
-  pipeline and that the shape carrying the most remaining error has no dedicated heuristic at all.
+  tools—GumTree, Unix \texttt{diff}, difftastic, and diffsitter—against that ground truth, and
+  a measurement of how often that ground truth admits no unique correct mapping, together with
+  instances of a stronger failure in which no one-to-one mapping is correct at all—which together
+  bound what any evaluation scoring a tool against one fixed pairing can report. Separately,
+  a leave-one-out ablation study of \textsc{CodeDiff}'s own optional heuristics, showing that a
+  heuristic's published benefit does not automatically transfer into a different pipeline.
 \end{itemize}
 
 \section{Background}
@@ -256,8 +261,8 @@ language, and AST node count per file. The depth limit matters for what follows:
 back the commit sampling in this section can reach, and a sampled (repository, commit, path) triple
 stays resolvable only while that commit remains within the depth window of the local clone. The
 full methodology, and every per-language number, is
-reproducible from the project's research repository; here, we summarize the numbers that shape
-\textsc{CodeDiff}'s design.
+reproducible from the project's research repository; here, we summarize the numbers that bound
+what any syntax-aware diff tool has to process.
 
 %% TODO: \NumRepos{} etc. currently reflect the 100-repository `small` sample (fast, already
 %% computed), not the target 7,423-repository full corpus (slow - see README.md). Re-run
@@ -306,9 +311,9 @@ over 10{,}000 lines still occur.
 (before, after) file pairs from single-parent commits in these repositories, stratified per
 language and per size bucket so that large files are represented rather than drowned out by the
 far more common small ones. We ran a single whole-tree tree-edit-distance computation on every
-pair—\textsc{CodeDiff}'s own APTED implementation, applied to the full before and after trees
-with none of \textsc{CodeDiff}'s pipeline heuristics—under a hard one-second budget enforced by
-terminating the computation's process. This implementation includes an optimization that makes it
+pair—one APTED implementation, applied to the full before and after trees with no pipeline
+heuristics of any kind around it—under a hard one-second budget enforced by terminating the
+computation's process. This implementation includes an optimization that makes it
 faster than a textbook APTED, so the failure rates below are a lower bound on how often a
 whole-tree computation misses the budget, not an upper bound.
 
@@ -358,9 +363,7 @@ than a clean three-way ordering. Figure~\ref{fig:rq1} shows the same pattern per
 stays above every other category in all seven, while configuration and data fall furthest in the
 large buckets, despite containing the most repetitive and most regularly structured files in the
 corpus. We conjecture this reflects tree edit distance being sensitive to tree shape rather than to
-node count alone, a large flat sequence of similar siblings being an unfavorable shape for it—the
-same reasoning \textsc{CodeDiff}'s pipeline acts on in Section~\ref{sec:pipeline}, where large flat
-subtrees are pre-matched with a sequence algorithm rather than handed to tree edit distance at all.
+node count alone, a large flat sequence of similar siblings being an unfavorable shape for it.
 This measurement does not isolate shape from size, so we state it as a conjecture rather than a
 result.
 
@@ -453,7 +456,7 @@ against a second, independently-implemented ground truth, not only against itsel
 \section{Evaluation}
 \label{sec:evaluation}
 
-\textbf{Dataset.} \textsc{CodeDiff}'s accuracy claims rest on a corpus of \NumFixtures{} fixtures
+\textbf{Dataset.} Every accuracy number in this paper rests on a corpus of \NumFixtures{} fixtures
 spanning \NumFixtureLanguages{} languages. Each fixture
 pairs a before and after version of a source file, representing a realistic code change—a bug
 fix, a refactor, an added feature, or a performance-motivated rewrite. Most
@@ -463,8 +466,16 @@ purpose-built tool, \texttt{human\_solver}, to walk the before and after syntax 
 and label every node with one of seven operations: identical, update, match-but-not-identical,
 insert, insert-with-children, delete, and delete-with-children. Nodes are addressed by a path of
 kind and sibling position, not by parser-internal node identity, since that identity is not stable
-across separate parses of the same file. This human-authored mapping is the ground truth every
-number in this section is measured against.
+across separate parses of the same file.
+
+Where several candidate nodes are genuinely interchangeable, a single pairing would be an
+arbitrary choice rather than a fact about the change, so the tool also lets the annotator record a
+\emph{multi-map group}: a set of $N$ before-side nodes and $M$ after-side nodes in which any
+consistent pairing is correct, scored as correct as long as a tool realizes
+$\min(N, M)$ pairs and treats the remainder of the larger side as inserted or deleted. A group is
+not an expression of annotator uncertainty. It is the annotator's finding that more than one
+mapping is equally right, and it is what RQ3 measures. This human-authored mapping, groups
+included, is the ground truth every number in this section is measured against.
 
 This section answers RQ2 and RQ3, stated in Section~\ref{sec:intro} and restated below,
 building on RA1's finding that a real,
@@ -479,54 +490,44 @@ stated in Section~\ref{sec:pipeline}.
 recover real-world code changes, measured against human-authored ground-truth mappings of those
 changes?
 
-\textbf{RQ3 (Shapes and heuristics).} Which shapes of real-world
-change—renames, moves, restructurings—require a dedicated matching heuristic, and do heuristics
-shown effective in one pipeline and corpus retain that value when reused in a different pipeline
-and evaluated against a different corpus?
+\textbf{RQ3 (Ground-truth ambiguity).} When does a real-world code change have no single correct
+mapping between the two syntax trees—because several one-to-one mappings are equally correct, or
+because the true correspondence is not one-to-one at all?
 
-\textbf{Comparison tools.} We place \textsc{CodeDiff} alongside four established tools, on the same
+\textbf{Comparison tools.} We measure four established tools on the
 \NumFixtures{}-fixture corpus: GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014}, Unix \texttt{diff}, and the two
 tree-sitter-based tools from Section~\ref{sec:background}, difftastic~\cite{difftastic} and
-diffsitter~\cite{diffsitter}.
+diffsitter~\cite{diffsitter}. \textsc{CodeDiff} is deliberately absent from this comparison: RQ2
+asks what the state of the art recovers, and that question is answered without reference to the
+tool this paper introduces. \textsc{CodeDiff}'s own accuracy is reported separately, later in this
+section, against the same ground truth but not as a ranking against these four.
 
 This comparison measures one specific property: agreement with the human-authored ground-truth
 mapping above. difftastic and diffsitter deliberately optimize for something this metric does not
 capture, a diff that reads comfortably to a human, not a mapping that reproduces a ground truth
-line for line, so a lower score here reflects a different design goal, not a defect. GumTree
-remains the foundation \textsc{CodeDiff}'s move-recovery phase builds on directly
-(Section~\ref{sec:pipeline}), and its broader language and backend flexibility stays valuable well
-beyond what this single corpus measures. One consequence of that flexibility is visible in the
+line for line, so a lower score here reflects a different design goal, not a defect. GumTree's
+broader language and backend flexibility likewise stays valuable well beyond what this single
+corpus measures. One consequence of that flexibility is visible in the
 numbers below: every generator GumTree offers is included here, and all but two of them are
 marked ``Testing'' rather than ``Stable'' by GumTree's own documentation, so its rate reflects a
 deliberately wide language scope rather than its performance on the backends it considers ready.
-Read what follows as a report of where combining these
-approaches into one production-engineered, ablation-validated pipeline lands, not as a ranking of
-which tool is best.
+Read what follows as a measurement of where each tool's design goals place it on this one metric,
+not as a ranking of which tool is best.
 
-\textbf{AST-node accuracy.} Measured directly against the human mapping, \textsc{CodeDiff} maps
-\NodesMatched{} of \NodesTotal{} AST nodes correctly across the \NumFixtures{} fixtures, \NodeMismatches{} mismatches, or \NodeAccuracyPct{}\%
-node-level accuracy. That denominator counts every AST node, including every ancestor of every
-change up to the root, so it partly reflects how deeply a given grammar nests. Restricted to the
-nodes that carry text of their own and therefore reach the screen when the diff is rendered, the
-figure is \VisibleNodeAccuracyPct{}\%, \VisibleNodeMismatches{} mismatches out of
-\VisibleNodesTotal{}. The two rates agreeing to two decimal places is itself the useful result:
-\textsc{CodeDiff}'s residual errors are not concentrated in invisible structural nodes, so the
-headline figure is not being flattered by nodes no reviewer ever sees.
-
-\textbf{Line-level agreement.} None of the other four tools report an AST-node mapping, so we
-compare all five on a common ground: which source lines each tool marks as touched, against the
+\textbf{Line-level agreement.} None of the four tools report an AST-node mapping, so we
+compare them on a common ground: which source lines each marks as touched, against the
 same human mapping (Table~\ref{tab:accuracy-vs-others}, Figure~\ref{fig:accuracy}). Coverage
 varies widely: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the
 \NumFixtures{} fixtures' languages, GumTree's generator set matches \GumTreeFixtures{},
-difftastic's \DifftasticFixtures{}, and only \textsc{CodeDiff} and Unix \texttt{diff} cover all
+difftastic's \DifftasticFixtures{}, and only Unix \texttt{diff} covers all
 \NumFixtures{}. Each tool's own row is scored only on its own
 applicable subset, not padded with unscored fixtures. Because those subsets differ so much, the
-table also reports every tool on the \CommonFixtures{} fixtures all five scored, which holds the
+table also reports every tool on the \CommonFixtures{} fixtures all four scored, which holds the
 fixture set fixed at the cost of over-representing the mainstream languages every tool supports.
 
 \begin{resultbox}{RA2 (Tool accuracy)}
-Among the four pre-existing tools (Table~\ref{tab:accuracy-vs-others}, excluding
-\textsc{CodeDiff}'s own row), line-level mismatch rates against the human mapping range from
+Across the four tools (Table~\ref{tab:accuracy-vs-others}), line-level mismatch rates against the
+human mapping range from
 \UnixDiffLineRate{}\% (Unix \texttt{diff}) to \GumTreeLineRate{}\% (GumTree). Every tool agrees
 with the human mapping on the great majority of lines, so what separates them is the small,
 structurally interesting remainder—and on that remainder no AST-aware tool among the four
@@ -536,30 +537,18 @@ that a tool recovers a change the way a human reads it.
 
 Two details behind that answer are worth stating. The first is how wide the agreement is: even the
 highest mismatch rate leaves more than 95\% of lines in agreement, so the question that separates
-tools is a narrow one. The second is where a line-based tool's advantage comes from—the gap is
-in which heuristics act on the syntax tree, which RQ3 turns to next.
-
-The two bases also disagree about \textsc{CodeDiff} itself, and the disagreement is worth
-stating plainly. Across the whole corpus \textsc{CodeDiff} has the lowest rate of the five,
-\CodeDiffLineRate{}\% against Unix \texttt{diff}'s \UnixDiffLineRate{}\%. On the
-\CommonFixtures{}-fixture common subset that ordering reverses: Unix \texttt{diff} scores
-\CommonUnixDiffLineRate{}\% and \textsc{CodeDiff} \CommonCodeDiffLineRate{}\%. We conjecture the
-difference is which languages each basis weights—the common subset is exactly the set of
-mainstream languages with mature grammars, where a line-based diff is hardest to beat, while the
-fixtures only \textsc{CodeDiff} and Unix \texttt{diff} can both attempt include the markup and
-configuration formats where structural matching pays off most. We report both rather than
-choosing the flattering one.
+tools is a narrow one. The second is that a mismatch rate of this kind presumes there is a single
+correct mapping to measure against at all, which is the assumption RQ3 turns to next.
 
 \begin{table}
-  \caption{Line-level mismatch rate against human ground truth, on each tool's own applicable
-  subset of the \NumFixtures{}-fixture corpus and on the \CommonFixtures{} fixtures every tool
-  scored.}
+  \caption{Line-level mismatch rate against human ground truth, for the four established tools, on
+  each tool's own applicable subset of the \NumFixtures{}-fixture corpus and on the
+  \CommonFixtures{} fixtures every tool scored.}
   \label{tab:accuracy-vs-others}
   \begin{tabular}{lrrrr}
     \toprule
     Tool & Fixtures & Mismatched lines & Rate & Common \\
     \midrule
-    \textsc{CodeDiff} & \CodeDiffFixtures{} & \CodeDiffLineMismatches{} & \CodeDiffLineRate{}\% & \CommonCodeDiffLineRate{}\% \\
     Unix \texttt{diff} & \UnixDiffFixtures{} & \UnixDiffLineMismatches{} & \UnixDiffLineRate{}\% & \CommonUnixDiffLineRate{}\% \\
     diffsitter & \DiffsitterFixtures{} & \DiffsitterLineMismatches{} & \DiffsitterLineRate{}\% & \CommonDiffsitterLineRate{}\% \\
     difftastic & \DifftasticFixtures{} & \DifftasticLineMismatches{} & \DifftasticLineRate{}\% & \CommonDifftasticLineRate{}\% \\
@@ -572,62 +561,191 @@ choosing the flattering one.
   \centering
   \includegraphics[width=0.85\linewidth]{figures/benchmark_other_accuracy.png}
   \caption{Line-level agreement rate with the human mapping, bucketed in 10-point increments, all
-  five tools on the same axis. Each series' own $n$ reflects its applicable subset of the corpus.}
+  four tools on the same axis. Each series' own $n$ reflects its applicable subset of the corpus.}
   \label{fig:accuracy}
 \end{figure*}
 
-\textbf{Change-shape census.} RQ3 has two halves, and the ablation study below answers only the
-second. Before asking which heuristics pay for themselves, we measure which shapes of change
-actually occur. The human-authored mappings record this directly: a mapped node whose path depth
-differs between the two sides is a reparent, a pair of same-kind siblings that swap order under an
-unchanged parent is a reorder, and a mapping entry the annotator deliberately left pointing at
-several candidates is a case where the ground truth itself is ambiguous.
-Table~\ref{tab:shapes} reports how often each occurs across the \ShapeFixtures{} fixtures, and how
-often \textsc{CodeDiff} maps a fixture containing it with no mismatches at all.
+\textbf{Ground-truth ambiguity.} Every accuracy number above rests on an assumption worth
+testing: that for a given change there is one correct mapping to recover. RQ3 asks when that
+assumption holds, and the corpus shows it failing in two different ways, which we keep apart
+because they have different consequences.
 
-The shapes are not mutually exclusive and one fixture can contain several, so the rows do not sum
-to the corpus. The reorder row in particular is a floor rather than a census: it counts only
-same-kind siblings directly under an unchanged parent, so a branch swap that also changes wrapper
-depth is counted as a reparent instead.
+\emph{Multiple optimal solutions exist.} Several candidate nodes are genuinely
+interchangeable—one of two identical calls is removed, a member is appended to an expression
+chain, an argument is added to a list of similar arguments—so more than one one-to-one pairing
+reproduces the change equally well, and choosing between them is arbitrary rather than correct. A
+diffing algorithm can still emit a correct answer here; what fails is the assumption that the
+correct answer is unique.
+
+\emph{No one-to-one optimal solution exists.} The true correspondence is $N{:}M$: several nodes on
+one side correspond to one or several on the other, all of them at once. Two call sites are
+refactored into one, a block of comment lines is condensed into a single line, one import is split
+across two. Here no one-to-one mapping is correct, however the algorithm chooses, and the
+qualifier matters: not that no optimal solution exists, but that none in the one-to-one form these
+algorithms produce reaches the true correspondence.
+
+The first is measurable on this corpus, because the annotation tool records it explicitly as a
+multi-map group (dataset paragraph above). The second is not, and we treat it accordingly below.
+
+One property of the corpus has to be stated before the rate, because it bounds what the rate can
+mean. The multi-mapping facility was added to the annotation tool partway through corpus
+construction. \AmbiguityPreFixtures{} fixtures were last annotated before it existed and were
+never revisited; none of them records an ambiguity, and none of them could, whatever the change
+actually contained. Table~\ref{tab:ambiguity} therefore splits the corpus by annotation era rather
+than reporting one blended rate, which would measure annotation practice as much as the
+phenomenon.
 
 \begin{table}
-  \caption{Change shapes in the ground-truth corpus: how many fixtures contain each, and the
-  fraction of those \textsc{CodeDiff} maps with zero mismatches. Rows overlap; the last two are
-  the complement and the whole corpus.}
-  \label{tab:shapes}
+  \caption{How often the ground truth admits no unique mapping, split by whether the annotator had
+  the multi-mapping facility available. Only the second row is an unbiased estimate; the third is
+  selection-biased and the first is structurally zero.}
+  \label{tab:ambiguity}
   \begin{tabular}{lrrr}
     \toprule
-    Shape & Fixtures & Share & Zero mismatches \\
+    Annotation era & Fixtures & Ambiguous & Rate \\
     \midrule
-    Reparent (depth $\pm1$)   & \ShapeReparentFixtures{} & \ShapeReparentPct{}\% & \ShapeReparentSolvedPct{}\% \\
-    Reparent (depth $\ge2$)   & \ShapeDeepReparentFixtures{} & \ShapeDeepReparentPct{}\% & \ShapeDeepReparentSolvedPct{}\% \\
-    Sibling reorder           & \ShapeReorderFixtures{} & \ShapeReorderPct{}\% & \ShapeReorderSolvedPct{}\% \\
-    Ambiguous ground truth    & \ShapeMultiMapFixtures{} & \ShapeMultiMapPct{}\% & \ShapeMultiMapSolvedPct{}\% \\
+    Before the facility existed & \AmbiguityPreFixtures{} & \AmbiguityPreWith{} & \AmbiguityPrePct{}\% \\
+    Annotated with it available & \AmbiguityFreshScored{} & \AmbiguityFreshFixtures{} & \AmbiguityFreshPct{}\% \\
+    Predates it, later revisited & \AmbiguityRevisitedFixtures{} & \AmbiguityRevisitedWith{} & \AmbiguityRevisitedPct{}\% \\
     \midrule
-    None of the above         & \ShapeNoShapeFixtures{} & \ShapeNoShapePct{}\% & \ShapeNoShapeSolvedPct{}\% \\
-    Whole corpus              & \ShapeFixtures{} & 100\% & \ShapeAllSolvedPct{}\% \\
+    Whole corpus (a floor) & \AmbiguityScored{} & \AmbiguityAnyFixtures{} & \AmbiguityAnyPct{}\% \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The census draws a sharp line. \ShapeNoShapePct{}\% of fixtures contain none of these shapes, and
-\textsc{CodeDiff} maps \ShapeNoShapeSolvedPct{}\% of those perfectly. Every shape category falls
-far below that: a fixture containing a reparent is mapped perfectly
-\ShapeReparentSolvedPct{}\% of the time, one containing an ambiguous mapping
-\ShapeMultiMapSolvedPct{}\%. The corpus-wide \ShapeAllSolvedPct{}\% therefore averages two
-populations that behave nothing alike.
+The middle row is the estimate. Of the \AmbiguityFreshScored{} fixtures annotated from the start by
+someone who had multi-mapping available, \AmbiguityFreshFixtures{}—\AmbiguityFreshPct{}\%—contain
+at least one place where no single pairing is the correct one. The third row is reported for
+completeness and excluded from that estimate: those \AmbiguityRevisitedFixtures{} fixtures predate
+the facility and were reopened afterwards, and a fixture is reopened precisely because something
+in it needed attention, so their \AmbiguityRevisitedPct{}\% rate is selection-biased upward by
+construction. The corpus-wide \AmbiguityAnyPct{}\% is a floor rather than a census, for the reason
+the first row makes explicit.
 
-Weighted by mismatches rather than by fixtures, reparenting at any depth accounts for
-\ShapeAnyReparentErrorPct{}\% of the corpus's total error while occurring in
-\ShapeAnyReparentPct{}\% of its fixtures, and is present in \ShapeAnyReparentFailingPct{}\% of
-every fixture \textsc{CodeDiff} does not map perfectly. It is the largest single identified source
-of error, but not the only one: \ShapeNoShapeErrorPct{}\% of the remaining mismatches sit in
-fixtures exhibiting none of these four shapes, so this census names the dominant factor rather
-than a complete explanation.
+The ambiguity is local. Across the \AmbiguityGroups{} groups in the corpus, the median group spans
+\AmbiguityGroupSizeMedian{} candidate nodes on its larger side and the largest spans
+\AmbiguityGroupSizeMax{}; exactly \AmbiguityGroupsWithChildren{} extends the ambiguity to whole
+subtrees rather than to individual nodes. \AmbiguityUnequalPct{}\% of groups have different
+candidate counts on the two sides, and \AmbiguityMinorityPct{}\% of all groups are the smallest
+such case, two candidates on one side and one on the other or the reverse. An unequal group
+usually asks which of $N$ interchangeable nodes is the one that was added or the one that
+survived—but not always, and the next subsection is about the cases where it asks something else.
+Ambiguity is also unevenly spread: one fixture alone carries \AmbiguityMaxGroupsInFixture{} of those
+groups. The two operations a group can carry split almost evenly, \AmbiguityIdenticalGroups{}
+identical against \AmbiguityMatchGroups{} matched-but-not-identical, so ambiguity is not a property
+of unchanged code alone.
 
-\textbf{Ablation study.} RQ3 asks which shapes of change earn a dedicated heuristic.
-\textsc{CodeDiff} has four optional heuristic passes, each targeting a specific shape and each
-behind its own flag: move-detection recovery (whole subtrees relocated across a matched boundary,
+How many fixtures are affected and how much of the ground truth is affected are different
+quantities, and both are worth stating. Weighted by mapping decisions rather than by fixtures, the
+groups account for \AmbiguityPairs{} of the \AmbiguityPairedDecisions{} node pairs the ground
+truth records outside identical code—\AmbiguityPairsPct{}\%. The two readings are both correct and
+they answer different questions: a metric aggregated over nodes or lines absorbs an ambiguity of
+this size almost invisibly, while a metric that asks whether a fixture was mapped exactly right
+inherits the full \AmbiguityFreshPct{}\%, because one ambiguous pair is enough to fail a
+fixture.
+
+\textbf{No one-to-one optimal solution exists.} The second failure is not a matter of degree. An
+ordered tree edit distance maps each node of one tree to at most one node of the other; that is
+part of the definition of the edit script it computes, not a limitation of any particular
+implementation. An $N{:}M$ correspondence is therefore not in the codomain of any algorithm in
+this family, GumTree and \textsc{CodeDiff} included. It cannot be found by a better heuristic,
+because there is nothing in the output language to find it with. The best such an algorithm can do
+is pick one pair and render the rest as insertions or deletions—which is not an approximation
+that happens to score badly, but a statement that is false about the change.
+
+We report this as an existence result, not a rate. Nothing in the corpus format marks it: the
+annotation tool has no way to express $N{:}M$ either, so an annotator who meets one records the
+closest one-to-one approximation and writes the real correspondence in prose, in the fixture's
+test case. The instances in Table~\ref{tab:nm} were found by reading those comments, not by
+enumeration, so they are a lower bound of unknown tightness and no denominator is quoted for them.
+
+\begin{table}
+  \caption{Changes in the corpus whose true correspondence is $N{:}M$, found by inspection of
+  annotator commentary rather than by enumeration. ``Encoded'' is whether the ground truth carries
+  a multi-map group at the site (``Enc.''); where it does, that group is the approximation, not
+  the correspondence.}
+  \label{tab:nm}
+  \small
+  \begin{tabular}{llc}
+    \toprule
+    Change & Correspondence & Enc. \\
+    \midrule
+    License comment condensed  & 5 comments to 1   & yes \\
+    Import split in two        & 1 identifier to 2 & yes \\
+    Two call sites merged      & 2 statements to 1 & no \\
+    Two asserts split into six & escape sequences  & no \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two of the four carry a multi-map group sitting exactly at the $N{:}M$ site, and reading those
+groups is what shows the encoding is doing double duty. In the condensed license block the group
+lists five before-side comment nodes against one after-side comment; in the split import, one
+before-side identifier against two after-side identifiers. Neither is a set of interchangeable
+candidates of which one survived. Every member corresponds, and the group's own semantics—realize
+$\min(N,M)$ pairs, delete or insert the remainder—assert the opposite. The same encoding therefore
+carries two different phenomena, and only the annotator's prose separates them. The other two
+instances carry no group at all: the correspondence was noted and left unencoded, which is the
+more honest of the two options available.
+
+This also qualifies a claim made above. Accepting any consistent pairing within a group removes
+the scoring error for the first phenomenon exactly, because every pairing it admits really is
+correct. For the second it does not: it scores the leftover deletions as correct when the truth is
+that those nodes correspond too. The corpus is right about interchangeability and charitable about
+$N{:}M$. The fourth instance in Table~\ref{tab:nm} postdates the corpus snapshot every other
+number in this section is measured against, which is why it appears here and in no rate.
+
+\begin{resultbox}{RA3 (Ground-truth ambiguity)}
+A correct AST mapping is not always unique. In \AmbiguityFreshPct{}\% of the fixtures annotated
+with multi-mapping available (\AmbiguityFreshFixtures{} of \AmbiguityFreshScored{}), at least one
+set of nodes admits several equally correct pairings, with the corpus-wide \AmbiguityAnyPct{}\%
+standing as a floor; weighted by mapping decisions rather than fixtures, that is
+\AmbiguityPairs{} of \AmbiguityPairedDecisions{} non-identical node pairs, \AmbiguityPairsPct{}\%. An evaluation that scores a diffing tool against one fixed pairing therefore
+risks marking correct output wrong on roughly one change in six—whenever the tool picks a
+different, equally valid pairing—and any accuracy metric defined over a single ground-truth
+mapping carries that error term whether or not it reports it. A second, rarer failure is
+categorical rather than statistical: where the true correspondence is $N{:}M$, no one-to-one
+mapping is correct at all, and no algorithm whose output is a one-to-one node mapping can express
+one. We report instances of that rather than a rate, because neither the corpus format nor the
+algorithms have a way to represent the thing being counted.
+\end{resultbox}
+
+Both rates in Table~\ref{tab:ambiguity} remain lower bounds for a second reason the corpus cannot
+correct for: a group exists only where an annotator noticed the ambiguity and recorded it. Nothing detects an ambiguity the
+annotator resolved without noticing it was a choice. That the count is conservative in this
+direction is what makes it usable—an over-count would be an argument about annotation discipline,
+whereas an under-count still establishes that the phenomenon is common enough to affect how
+accuracy is measured.
+
+The practical consequence is a claim about methodology rather than about any tool. Scoring against
+a single pairing is the default in this area, and on a corpus like this one it puts a
+measurable error term into every reported rate: on the affected sixth of changes, a tool that
+picks a different valid pairing is recorded as wrong for a choice that was never wrong. The corpus
+in this paper avoids that for the first phenomenon by validating any consistent pairing within a
+group, as the dataset paragraph above describes, which is why the accuracy numbers reported here
+do not inherit its error term. For the second it has no such escape, and neither does any corpus
+built on one-to-one mappings. Reporting a fixed-pairing metric is still defensible, but the ambiguity
+rate belongs alongside it.
+
+\textbf{\textsc{CodeDiff}'s own accuracy.} The remaining measurements report the paper's system
+contribution against the same ground truth. They are not part of RA2 or RA3 and are not framed
+against the four tools above. Measured directly against the human mapping, \textsc{CodeDiff} maps
+\NodesMatched{} of \NodesTotal{} AST nodes correctly across the \NumFixtures{} fixtures,
+\NodeMismatches{} mismatches, or \NodeAccuracyPct{}\% node-level accuracy. That denominator counts
+every AST node, including every ancestor of every change up to the root, so it partly reflects how
+deeply a given grammar nests. Restricted to the nodes that carry text of their own and therefore
+reach the screen when the diff is rendered, the figure is \VisibleNodeAccuracyPct{}\%,
+\VisibleNodeMismatches{} mismatches out of \VisibleNodesTotal{}. The two rates agreeing to two
+decimal places is itself the useful result: \textsc{CodeDiff}'s residual errors are not
+concentrated in invisible structural nodes, so the headline figure is not being flattered by nodes
+no reviewer ever sees.
+
+\textbf{Ablation study.} Which of \textsc{CodeDiff}'s optional passes earn their place is a
+question about this pipeline, not about the state of the art, so it is reported here rather than
+as an answer to any of the three research questions. It is still the paper's most transferable
+result, for the reason the unique-type-matching finding below gives.
+\textsc{CodeDiff} has four optional heuristic passes, each targeting a specific shape of change and
+each behind its own flag: move-detection recovery (whole subtrees relocated across a matched boundary,
 phase 5), bottom-up propagation (a container whose children all match one container on the other
 side, phase 4), mutual-ancestor pairing (a container sitting above an edit whose descendants all
 survive inside one corresponding container), and unique type matching (a matched parent's single
@@ -662,24 +780,19 @@ never displays on their own. Unique type matching moves neither column.
   \end{tabular}
 \end{table}
 
-\begin{resultbox}{RA3 (Shapes and heuristics)}
 On this corpus the move is the one shape whose dedicated heuristic pays for itself in a way a
 reader would notice: move-detection recovery contributes more accuracy than the other three
 optional passes combined, by a factor of seven across all nodes, and is the only one of the four
 that changes the visible-node count at all. A published benefit does not transfer automatically:
 unique type matching, GumTree Simple's own recovery sub-phase, is correct in isolation yet
-contributes exactly nothing here, because earlier phases reach its cases first. The shape carrying
-the most remaining error has no dedicated heuristic at all—reparenting occurs in
-\ShapeAnyReparentPct{}\% of fixtures and carries \ShapeAnyReparentErrorPct{}\% of the corpus's
-remaining error.
-\end{resultbox}
+contributes exactly nothing here, because earlier phases reach its cases first.
 
 That the move earns its pass matches the structural argument of
 Section~\ref{sec:pipeline}—a relocated subtree is the one
 shape ordered tree edit distance cannot express except as a delete plus an insert, so no
 downstream computation can recover it without a dedicated pass.
 
-Unique type matching is the sharper result for RQ3's second half, and the reason it contributes
+Unique type matching is the sharper of the two results, and the reason it contributes
 nothing is not that it is unsound: instrumentation shows it fires \emph{zero} times across the
 entire corpus. By the time it runs, \textsc{CodeDiff}'s earlier phases have already resolved every
 case it targets, and a matched parent's leftover unmatched children essentially never land on the
@@ -690,14 +803,11 @@ earlier phases are comprehensive enough to reach its cases first. We argue this 
 transferable lesson, and it is only visible by measuring firings and accuracy inside the adopting
 pipeline, rather than inheriting the original paper's result.
 
-Read together with the census, RQ3's two halves answer each other, and they do not name the same
-shape. The ablation says which shipped heuristic earns its place: move-detection recovery, which
-handles relocation across a matched boundary. The census says which shape is still unserved:
-reparenting—a node that stays where it is but gains or loses an enclosing level, the shape
-produced by wrapping a block in a condition or a try—has no dedicated pass at all. This is what
-an ablation cannot report on its own: it can only
-report on heuristics somebody wrote, and is silent about the shape nobody wrote one for. We argue
-a shape census belongs alongside an ablation for that reason, not as a substitute for it.
+An ablation has one structural limit worth naming, since it bounds what the table above can be
+read to say: it reports only on heuristics somebody wrote. A shape of change that no pass targets
+contributes its errors to the baseline and to every ablated configuration alike, so it never
+appears as a delta in either column. The table ranks the passes that exist; it is silent about the
+ones that do not.
 
 \textbf{Production viability.} The remaining measurements evaluate \textsc{CodeDiff}
 itself—speed, then robustness—against the Fast and Robust targets stated in
@@ -782,8 +892,8 @@ so they are excluded from the evidence rather than counted in its favor. Within 
 result is consistent with \textsc{CodeDiff}'s stated Robust target in Section~\ref{sec:pipeline}.
 
 \textbf{Summary.} Combining established techniques rather than inventing new ones,
-\textsc{CodeDiff} reaches \NodeAccuracyPct{}\% AST-node accuracy against human-verified ground truth, the lowest
-line-level mismatch rate of the five tools compared over the corpus as a whole, and zero panics or
+\textsc{CodeDiff} reaches \NodeAccuracyPct{}\% AST-node accuracy against human-verified ground
+truth, a median well inside its interactive budget, and zero panics or
 timeouts across the sampled robustness evaluation.
 Building a production-grade syntax-aware diffing tool did not require a new matching algorithm,
 only careful combination and measurement of existing ones.
@@ -800,7 +910,9 @@ ablation in Section~\ref{sec:evaluation} shows, on validating each adopted heuri
 own pipeline rather than assuming the published benefit transfers. difftastic~\cite{difftastic}
 and diffsitter~\cite{diffsitter} share \textsc{CodeDiff}'s parsing layer but optimize for a diff
 a human reads comfortably rather than for fidelity of the underlying node mapping; RA2 reflects
-that difference in design goal, not a defect in either tool. Unix \texttt{diff}, built on Myers'
+that difference in design goal, not a defect in either tool. GumTree remains the foundation
+\textsc{CodeDiff}'s move-recovery phase builds on directly, and its language and backend
+flexibility stays valuable well beyond what RA2's single corpus measures. Unix \texttt{diff}, built on Myers'
 algorithm~\cite{myers-1986}, remains the baseline every one of these tools must justify itself
 against—on our corpus it is both the fastest tool measured and, at the line level, more accurate
 than every pre-existing AST-aware tool compared.
@@ -856,13 +968,14 @@ syntax-aware developer tooling:
 
 Future work includes widening the robustness corpus beyond Rust,
 extending the accuracy comparison to more languages GumTree also supports, and
-re-running the ablation study as new heuristic passes are added to the pipeline. The clearest
-direction the evaluation points to is a dedicated pass for the reparenting shape, which carries
-\ShapeAnyReparentErrorPct{}\% of the corpus's remaining error with no heuristic addressing it:
-Section~\ref{sec:pipeline}'s phase ordering offers no anchor for a node whose position is unchanged
-but whose depth is not. The \ShapeNoShapeErrorPct{}\% of error in fixtures matching none of the
-censused shapes is a second, less well-characterized target, and suggests the census itself should
-be extended before more heuristics are written against it.
+re-running the ablation study as new heuristic passes are added to the pipeline. RA3 points at the
+clearest methodological direction: the corpus establishes that ambiguity is common, but it
+establishes it only where an annotator noticed and recorded it. Detecting candidate ambiguity
+automatically, and re-annotating the \AmbiguityPreFixtures{} fixtures that predate the
+multi-mapping facility, would turn a floor into a census and let the rate be measured on a corpus
+rather than on a corpus's annotated half. The $N{:}M$ half needs more than that: it needs a
+ground-truth format able to express a correspondence that no one-to-one mapping represents, before
+its prevalence can be measured at all rather than found by reading.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

@@ -23,7 +23,7 @@ way of combining what each tool already does well, not as a claim that any of th
 
 ## Status
 
-Compiles cleanly, 6 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
+Compiles cleanly, 11 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
 
@@ -44,10 +44,12 @@ another. A single macro used in every position cannot drift.
 number comes from. Two populations, kept visibly distinct in the generated output:
 
 * **Generated** - read back from a measurement artifact. Refreshing is "re-run the producer, re-run
-  the assembler." Four blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
+  the assembler." Five blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
   RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), the tool comparison
-  (`benchmark_other_report.py` -> `variables_comparison.tex`), and the change-shape census
-  (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make shapes-report`).
+  (`benchmark_other_report.py` -> `variables_comparison.tex`), RQ3's ground-truth ambiguity
+  (`ambiguity_report.py` -> `variables_ambiguity.tex`, via `make ambiguity-report`), and the
+  change-shape census (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make
+  shapes-report`) - the last currently generated but unreferenced, see the RQ1-RQ3 rule above.
 * **Authored** - no saved producer to read back from, so the value is transcribed, but into one
   version-controlled place with a comment naming the command that produced it. This covers the
   corpus/node-accuracy totals, the ablation deltas, the robustness run, and the design targets.
@@ -76,6 +78,48 @@ prerequisite of the paper targets, so a routine rebuild must not destroy them. I
 loud `\textbf{??}` when a macro has no value from any source - never silently omits one, because
 `main.tex` builds under `-interaction=nonstopmode`, where an *undefined* macro does not fail the
 build; it just yields a PDF with the number quietly missing.
+
+### RQ1-RQ3 are answered without reference to CodeDiff
+
+Set on 2026-08-22, and it is a structural rule, not a stylistic preference: an RQ answer describes
+the problem or the state of the art, so no RA box and none of the argument supporting one mentions
+CodeDiff. Section 3 keeps one attribution - the RQ1 measurement names the APTED implementation it
+ran, because that is what makes its "lower bound, not upper bound" caveat checkable - but states
+it tool-neutrally. Three consequences that are easy to undo by accident:
+
+* **The four-tool comparison excludes CodeDiff entirely.** Table 2 has four rows, and
+  `benchmark_other_report.py::plot_accuracy` deliberately drops the `codediff` series (see its doc
+  comment). `plot_runtime` keeps it, because speed is reported as CodeDiff's own production
+  viability rather than as an RQ answer. The `\CodeDiffLineRate{}` family of macros is still
+  generated and simply unused; that is intentional, so the number is one edit away if the framing
+  changes back.
+* **RQ3 was pivoted** from "which change shapes need a dedicated heuristic" to "when does a change
+  have no single correct mapping". It now covers two phenomena that are deliberately kept apart,
+  because they have different consequences and different epistemic status:
+  * *Multiple optimal solutions exist* - several one-to-one mappings are equally correct, recorded
+    as a `MultiMapGroup`. Measured, and reported as a rate, by `analysis/ambiguity_report.py`
+    (`make ambiguity-report`).
+  * *No one-to-one optimal solution exists* - the true correspondence is N:M, which ordered tree
+    edit distance cannot express by definition and `human_mapping.json` cannot express either.
+    Reported as an existence result with named instances and **no denominator**; the curated list,
+    the grep that found it, and the two exclusions live in `data/quality/nm_instances.md`. Do not
+    turn that list into a generated macro - the file explains why. The change-shape census that answered
+  the old RQ3's first half was cut from the paper; `human_mapping_shapes_report.py`, `make
+  shapes-report`, and the whole `Shape*` macro block still exist and still run - only `main.tex`'s
+  references were removed.
+* **The ablation study stayed but is no longer an RA.** It sits under CodeDiff's own evaluation,
+  after RA3, reframed as a property of this pipeline rather than an answer about the field. Its
+  "unique type matching fires zero times" result is unchanged and is still cited from the
+  Conclusion's recommendations.
+
+Two properties of `ambiguity_report.py` are load-bearing and easy to break. It scopes itself to
+the fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one
+corpus state. And it reads each fixture's annotation era from the committed
+`data/quality/ambiguity_eras.csv` rather than re-deriving it from `git log` on every run: the
+multi-mapping facility postdates part of the corpus, so the headline rate depends on that
+classification, and without the committed record one formatting sweep over `src/test/data/diffs/`
+would move every pre-facility fixture into "revisited" and change the rate with no corpus change
+at all. `--refresh-eras` re-derives deliberately.
 
 ### Known-stale numbers
 
@@ -112,13 +156,13 @@ That pass changed more than the values:
 * **GumTree is v4.0.0-beta8**, not the beta4 earlier runs used; the beta4 tree no longer exists on
   disk. beta8 adds C++ and TSX generators and drops JSON, so GumTree's scored subset is not
   comparable across that boundary. See `research/data/comparison/PROVENANCE.md`.
-* **RQ3 gained a change-shape census** (Table 3), which is the "which shapes occur" half the
-  section previously left to the ablation alone. It reports how often each shape appears and how
-  often CodeDiff maps a fixture containing it perfectly, and it is what shows that reparenting -
-  the shape with no dedicated pass - carries 58.5% of the corpus's remaining error. Note the two
-  readings differ and both are quoted: reparenting is 26.7% of *fixtures* but 58.5% of
-  *mismatches*, and 35.3% of the error sits in fixtures matching none of the censused shapes, so
-  the census names the dominant factor rather than explaining all of it.
+* **RQ3 gained a change-shape census** (then Table 3), which was the "which shapes occur" half the
+  section previously left to the ablation alone. **Superseded on 2026-08-22** - RQ3 was pivoted to
+  ground-truth ambiguity and the census was cut from the paper (see the RQ1-RQ3 rule above). Its
+  producer, macros and `make shapes-report` target are all still live and still describe the
+  corpus: reparenting is 26.7% of *fixtures* but 58.5% of CodeDiff's *mismatches*, and 35.3% of
+  that error sits in fixtures matching none of the censused shapes. Restoring the table is a
+  `main.tex`-only edit.
 
 ### Why this mechanism exists
 

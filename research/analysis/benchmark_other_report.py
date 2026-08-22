@@ -278,8 +278,14 @@ def plot_accuracy(rows: list[dict], tools: list[str], output_path: Path) -> None
     `treesitter_parse` never appears here, unlike in `plot_runtime` - it produces no line labels,
     so it has nothing to agree or disagree with the human mapping about; it's a runtime reference
     only.
+
+    `codediff` never appears here either, and that is deliberate rather than an oversight. This is
+    the introductory paper's RQ2 figure, and RQ2 asks how accurately *pre-existing* tools recover
+    real-world changes - it is answered without reference to codediff, matching the paper's own
+    accuracy table. `plot_runtime` below is not an RQ answer (it reports codediff's production
+    viability against its own targets), so codediff does stay in that one.
     """
-    ids = ordered(["codediff"] + tools)
+    ids = ordered(tools)
     colors = [COLORS[i] for i in ids]
     legend_labels = [f"{DISPLAY_NAMES[i]} (n={len(applicable_rows(rows, i))})" for i in ids]
 
