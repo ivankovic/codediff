@@ -30,11 +30,15 @@ mod c_relianoid_nftlb_zcu_log_to_u_log;
 #[cfg(test)]
 mod c_tripwire_tripwire_open_source_add_single_item_to_list;
 #[cfg(test)]
+mod cpp_arximboldi_lager_add_two_test_cases;
+#[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_comment_update;
 #[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_update;
 #[cfg(test)]
 mod cpp_bolero_murakami_sprout_copyright_update_3;
+#[cfg(test)]
+mod cpp_cgdb_cgdb_struct_to_pointer;
 #[cfg(test)]
 mod cpp_lancos_ponyprog_remove_a_few_lines;
 #[cfg(test)]
@@ -81,6 +85,8 @@ mod go_cri_o_cri_o_change_importa;
 mod go_darylhjd_mangadesk_remove_a_function_uptade_comments;
 #[cfg(test)]
 mod go_dweymouth_supersonic_remove_two_lines;
+#[cfg(test)]
+mod go_henri_gasc_cliphist_auto_generated_file;
 #[cfg(test)]
 mod go_jesseduffield_lazygit_add_function;
 #[cfg(test)]
@@ -232,6 +238,8 @@ mod ruby_intridea_multi_json_remove_single_comma;
 #[cfg(test)]
 mod ruby_main_branch_process_executer_actual_small_change;
 #[cfg(test)]
+mod ruby_marcandre_backports_actual_small_change;
+#[cfg(test)]
 mod ruby_mikel_mail_whitespace_only_change;
 #[cfg(test)]
 mod ruby_moneta_rb_moneta_change_one_identifier;
@@ -243,6 +251,8 @@ mod ruby_rapid7_ruby_smb_add_import_and_one_expression;
 mod rust_fornwall_rust_script_add_lifecycle_management;
 #[cfg(test)]
 mod rust_quietvoid_dovi_tool_change_to_templated_call;
+#[cfg(test)]
+mod rust_rbspy_rbspy_add_two_test_cases;
 #[cfg(test)]
 mod rust_refirmlabs_binwalk_whitespace_only;
 #[cfg(test)]
@@ -286,6 +296,8 @@ mod scala_sirthias_parboiled_value_change;
 #[cfg(test)]
 mod scala_xerial_xerial_java_actual_code_change;
 #[cfg(test)]
+mod scala_ymnk_jzlib_add_a_test_case;
+#[cfg(test)]
 mod scala_ymnk_jzlib_interesting_probably_has_no_optimal_solution;
 #[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
@@ -307,6 +319,8 @@ mod shellscript_ropery_ffcast_comment_only_change;
 mod swift_apple_swift_argument_parser_if_to_guard;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_refactor_and_improve_tests;
+#[cfg(test)]
+mod swift_apple_swift_argument_parser_remove_trimming_lines_function_call;
 #[cfg(test)]
 mod swift_apple_swift_argument_parser_simplify_code;
 #[cfg(test)]

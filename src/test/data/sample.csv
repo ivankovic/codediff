@@ -24,11 +24,11 @@ CPP,LadybirdBrowser-ladybird.git,a762f623bd49a3ced2588af013ec8c76d8ef8189,Librar
 CPP,LadybirdBrowser-ladybird.git,cfd795f907fb2c6d94453236464db53f67ccfdaf,Libraries/LibWeb/IntersectionObserver/IntersectionObserver.cpp,cpp-laydbird-change-function-signature,small,PROMOTED,
 CPP,MikePopoloski-slang,62164d11ddce3b4c09102b4013fb10ce2bf8cb44,source/analysis/DriverTracker.cpp,cpp-mikepopoloski-slang-remove-if-condition-and-brackets,full,PROMOTED,"Before has 3 comment nodes, after has only 2. But realistically a human would just expect a 3:2 Update mapping."
 CPP,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/cpp/preprocess.cpp,cpp-whitespace-only-change,small,PROMOTED,
-CPP,arximboldi-lager,798f709c7bcf7d91b27b4812b6899094bdd4f32a,test/cursor.cpp,,full,SAMPLED,
+CPP,arximboldi-lager,798f709c7bcf7d91b27b4812b6899094bdd4f32a,test/cursor.cpp,cpp-arximboldi-lager-add-two-test-cases,full,PROMOTED,
 CPP,bolero-MURAKAMI-Sprout,ea06f925655602a39750c2fd4fc88ecb98c9860f,sprout/algorithm/fit/clamp_range_copy.hpp,cpp-bolero-murakami-sprout-copyright-comment-update,full,PROMOTED,
 CPP,bolero-MURAKAMI-Sprout,ea06f925655602a39750c2fd4fc88ecb98c9860f,sprout/math/frac_int.hpp,cpp-bolero-murakami-sprout-copyright-update,full,PROMOTED,
 CPP,bolero-MURAKAMI-Sprout,ea06f925655602a39750c2fd4fc88ecb98c9860f,sprout/numeric/transform_reduce.hpp,cpp-bolero-murakami-sprout-copyright-update-3,full,PROMOTED,
-CPP,cgdb-cgdb,a7c00e7096d20944fe3eec9823f333616273f522,cgdb/cgdb.cpp,,full,SAMPLED,
+CPP,cgdb-cgdb,a7c00e7096d20944fe3eec9823f333616273f522,cgdb/cgdb.cpp,cpp-cgdb-cgdb-struct-to-pointer,full,PROMOTED,Interesting case of which nodes of different kinds should be allowed to map to each other
 CPP,godotengine-godot.git,6f86914f55a149d2b9578ba42f7f2a671f740557,scene/2d/animated_sprite_2d.cpp,cpp-godot-small-bugfix,small,PROMOTED,
 CPP,jpnurmi-znc-playback,c070201765325b0ee4f32e0c3880bed31dd5b5ad,playback.cpp,,full,SAMPLED,
 CPP,lancos-ponyprog,6ca9cb9c151d2bd5eb6d043eb3368a3caf4e8e83,SrcPony/Translator.cpp,cpp-lancos-ponyprog-remove-a-few-lines,full,PROMOTED,
@@ -90,7 +90,7 @@ Go,dweymouth-supersonic,2afef81a11b8431ceed3e04cac76909f853152bf,ui/widgets/larg
 Go,gin-gonic-gin.git,088cdd74d42df20d4e58aa17d3f4403a22e8a545,debug.go,go-gin-constant-change,small,PROMOTED,
 Go,gin-gonic-gin.git,6f94fd05c98d1043e329398f6f742dc680be9b29,examples/custom-validation/server.go,go-gin-change-import,small,PROMOTED,
 Go,gin-gonic-gin.git,c9b344118f6426e9211c2e4530ac983a541f437a,examples/upload-file/single/main.go,go-gin-add-function,small,PROMOTED,
-Go,henri-gasc-cliphist,e465b6d7439c681831a61523216092cec19b0895,vendor/golang.org/x/sys/unix/zsyscall_netbsd_arm.go,,full,SAMPLED,
+Go,henri-gasc-cliphist,e465b6d7439c681831a61523216092cec19b0895,vendor/golang.org/x/sys/unix/zsyscall_netbsd_arm.go,go-henri-gasc-cliphist-auto-generated-file,full,PROMOTED,Auto-generated file
 Go,jesseduffield-lazygit.git,1b60c9d7c6f4121a5561022986a0ae4627668b1b,vendor/golang.org/x/sys/cpu/cpu_gccgo_arm64.go,go-jesseduffield-lazygit-add-function,full,PROMOTED,
 Go,jesseduffield-lazygit.git,89a0542a978b525dab97607dca9c6ae51ea95caf,pkg/gui/presentation/submodules.go,go-lazygit-switch-to-strings,small,PROMOTED,
 Go,jesseduffield-lazygit.git,c5acad777d695425491dc26319260ced9e81677d,pkg/gui/patch_exploring/state.go,go-lazygit-add-to-if-condition,small,PROMOTED,
@@ -288,7 +288,7 @@ Ruby,jmespath-jmespath.rb,fef3ed5f5b7489746390a194e081001400daa356,spec/complian
 Ruby,junegunn-fzf.git,24ff66d4a9d6889988e4d7e373f33f4098870b9e,test/test_go.rb,ruby-junegunn-fzf-add-test-case,small,PROMOTED,
 Ruby,junegunn-fzf.git,3148b0f3e88f8a116491135dc10a7ce6d96899bf,test/test_go.rb,ruby-junegunn-fzf-add-test-case-2,small,PROMOTED,
 Ruby,main-branch-process_executer,da1db9697e5c2be371d308d5790e44dcccf8e40b,lib/process_executer/destinations/file_descriptor.rb,ruby-main-branch-process_executer-actual-small-change,full,PROMOTED,
-Ruby,marcandre-backports,72d6e539c0960506a1afd2cff05e4b257fb865b3,lib/backports/3.2.0/enumerator/product.rb,,full,SAMPLED,
+Ruby,marcandre-backports,72d6e539c0960506a1afd2cff05e4b257fb865b3,lib/backports/3.2.0/enumerator/product.rb,ruby-marcandre-backports-actual-small-change,full,PROMOTED,
 Ruby,mastodon-mastodon.git,7788281759e9bbed23c1ecd4f76ccaa7734eb617,spec/services/activitypub/process_featured_item_service_spec.rb,ruby-mastodon-mastodon-use-context-and-new-test-case,small,PROMOTED,
 Ruby,mikel-mail,956a73eb7c191128facdffe3a766a331cd126242,spec/mail/fields/return_path_field_spec.rb,ruby-mikel-mail-whitespace-only-change,full,PROMOTED,
 Ruby,moneta-rb-moneta,01e493fb66cad85da4d4db40be4818746f002a4d,lib/moneta/version.rb,ruby-moneta-rb-moneta-trivial-version-update,full,PROMOTED,
@@ -297,7 +297,7 @@ Ruby,rapid7-ruby_smb,b95cd7e5d7cff53dcc49951b15d2c18e0ec8b8b0,lib/ruby_smb/dcerp
 Rust,ReFirmLabs-binwalk,e460bddb37d668907ca894181062f4209327d3c5,src/binwalk.rs,rust-refirmlabs-binwalk-whitespace-only,full,PROMOTED,
 Rust,fornwall-rust-script,4e128f4a864625f7959700af8ba9cbc88c9d3ec9,src/manifest.rs,rust-fornwall-rust-script-add-lifecycle-management,full,PROMOTED,
 Rust,quietvoid-dovi_tool,395c45941eb48b30f8a5cfafd1fad1769b36dbe9,dolby_vision/src/rpu/extension_metadata/blocks/level1.rs,rust-quietvoid-dovi_tool-change-to-templated-call,full,PROMOTED,
-Rust,rbspy-rbspy,d7af2134b698e7e2d9d66bbed6c6523011d24012,src/core/ruby_version.rs,,full,SAMPLED,
+Rust,rbspy-rbspy,d7af2134b698e7e2d9d66bbed6c6523011d24012,src/core/ruby_version.rs,rust-rbspy-rbspy-add-two-test-cases,full,PROMOTED,
 Rust,rust-lang-rust.git,cfcbcb715c5120e481b2d1303b590a5eb2417e55,compiler/rustc_query_impl/src/execution.rs,rust-rust-lang-rust-add-key-to-function-arguments-and-call-sites,small,PROMOTED,
 Rust,rustdesk-rustdesk.git,296c6df462b1a8abdc31775200cdcfa8d59909a8,src/lang/th.rs,rust-rustdesk-rustdesk-add-two-values-to-slice,small,PROMOTED,
 Rust,rustdesk-rustdesk.git,5faf0ad3cfef1b7237e6cbca53038d76ffdc281d,src/client/io_loop.rs,rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file,small,PROMOTED,
@@ -333,7 +333,7 @@ Scala,sirthias-parboiled,fb1f52da025240fa145b1a95d45f7ee59a6ddd49,project/Depend
 Scala,xerial-xerial-java,2468884a2f339780ec30fcbd2dc6d37592eee7c2,project/XerialBuild.scala,scala-xerial-xerial-java-actual-code-change,full,PROMOTED,
 Scala,ymnk-jzlib,0fa43afe6be292cca0d545acf00b1771681bfa60,project/Build.scala,scala-ymnk-jzlib-interesting-probably-has-no-optimal-solution,full,PROMOTED,It's not clear if the test string should or should not reuse the junit string.
 Scala,ymnk-jzlib,389af328c466fdcdcf36249e99b82ceed92d5b97,src/test/scala/WrapperTypeTest.scala,,full,SAMPLED,
-Scala,ymnk-jzlib,8b205d660d37503f71d4b1bbbc9779925ed14e8d,src/test/scala/GZIPIOStreamTest.scala,,full,SAMPLED,
+Scala,ymnk-jzlib,8b205d660d37503f71d4b1bbbc9779925ed14e8d,src/test/scala/GZIPIOStreamTest.scala,scala-ymnk-jzlib-add-a-test-case,full,PROMOTED,
 ShellScript,Genymobile-scrcpy.git,c0e2e27cf9eb38a95b324ba9aeeb34dab6d2e72f,server/build_without_gradle.sh,shellscript-genymobile-scrcpy-add-two-flags,small,PROMOTED,
 ShellScript,OpenLightingProject-ola,2058e5c4fae214661f08c5aefaf8e1651f6a8f39,.travis-ci.sh,shellscript-openlightingproject-ola-real-small-change,full,PROMOTED,
 ShellScript,ansible-ansible.git,35750ed3218e7bce68b21f473cecb0a3b9d60321,test/integration/targets/template_jinja2_non_native/runme.sh,shellscript-ansible-ansible-simple-deletion,small,PROMOTED,
@@ -356,7 +356,7 @@ ShellScript,scikit-learn-scikit-learn.git,5464d9a6ce1fc872282bf943c8f40b0829f43e
 ShellScript,torvalds-linux.git,3b4a3a00de8770f3a60c1fa483921ce37415132d,scripts/kconfig/merge_config.sh,shellscript-torvalds-linux-double-equals-to-equals,small,PROMOTED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Sources/ArgumentParser/Parsable Types/ParsableArguments.swift,swift-apple-swift-argument-parser-if-to-guard,full,PROMOTED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Sources/ArgumentParser/Usage/DumpHelpGenerator.swift,swift-apple-swift-argument-parser-simplify-code,full,PROMOTED,
-Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserPackageManagerTests/HelpTests.swift,,full,SAMPLED,
+Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserPackageManagerTests/HelpTests.swift,swift-apple-swift-argument-parser-remove-trimming-lines-function-call,full,PROMOTED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserPackageManagerTests/Tests.swift,swift-apple-swift-argument-parser-small-change,full,PROMOTED,
 Swift,apple-swift-argument-parser,6924db870dae99d2abf8b78a81eed46da1638b09,Tests/ArgumentParserUnitTests/ExitCodeTests.swift,swift-apple-swift-argument-parser-refactor-and-improve-tests,full,PROMOTED,True best mapping would be a 2:1 mapping of the string constant
 Swift,logseq-logseq,28c397e894f07e65c672f192435d7a41db4d7193,ios/App/App/LiquidTabsPlugin.swift,,full,SAMPLED,
