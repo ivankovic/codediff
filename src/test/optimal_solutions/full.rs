@@ -114,6 +114,8 @@ mod java_hunterhacker_jdom_javadoc_update;
 #[cfg(test)]
 mod java_hunterhacker_jdom_move_a_block;
 #[cfg(test)]
+mod java_jakartaee_rest_real_logic_change_of_a_significant_chunck;
+#[cfg(test)]
 mod java_jflex_de_jflex_javadoc_update;
 #[cfg(test)]
 mod java_jopt_simple_jopt_simple_remove_import;
@@ -341,6 +343,8 @@ mod tsx_keybase_client_change_from_one_import_and_call_to_another;
 mod tsx_keybase_client_emoji_to_native;
 #[cfg(test)]
 mod tsx_kong_insomnia_classname_strings_changed;
+#[cfg(test)]
+mod tsx_kong_insomnia_if_to_ternary_operator;
 #[cfg(test)]
 mod tsx_kong_insomnia_rewrite_if_using_ternary_twice;
 #[cfg(test)]

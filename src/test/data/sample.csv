@@ -147,7 +147,7 @@ Java,Genymobile-scrcpy.git,f7b4a18b4398c013b2bed9630b7bb35eb50ad97e,server/src/m
 Java,eclipse-jdt-eclipse.jdt.core,a6af724bba7dffe7c31fb18e1b3c1b16b107607a,org.eclipse.jdt.core.compiler.batch/src/org/eclipse/jdt/internal/compiler/ast/IPolyExpression.java,java-eclipse-jdt-eclipse-remove-import-and-inheritance,full,PROMOTED,
 Java,hunterhacker-jdom,b7cb36b2305a894355c092ebb698fcdd50b1d67d,core/src/java/org/jdom2/output/DOMOutputter.java,java-hunterhacker-jdom-javadoc-update,full,PROMOTED,
 Java,hunterhacker-jdom,bd3ab78370098491911d7fe9d7a43b97144a234e,core/src/java/org/jdom2/input/SAXBuilder.java,java-hunterhacker-jdom-move-a-block,full,PROMOTED,
-Java,jakartaee-rest,6984bfcc1996423a08ae6c0b71ae3da6bc591d9c,jaxrs-api/src/main/java/jakarta/ws/rs/client/ClientBuilder.java,,full,SAMPLED,
+Java,jakartaee-rest,6984bfcc1996423a08ae6c0b71ae3da6bc591d9c,jaxrs-api/src/main/java/jakarta/ws/rs/client/ClientBuilder.java,java-jakartaee-rest-real-logic-change-of-a-significant-chunck,full,PROMOTED,
 Java,jflex-de-jflex,34b526f2364bdd786beb235cd7714d788949a1e6,jflex/src/test/java/jflex/core/unicode/IntCharGen.java,java-jflex-de-jflex-javadoc-update,full,PROMOTED,
 Java,jopt-simple-jopt-simple,fbcd61626db0b7492faa7779917fe2564acb7c08,src/test/java/net/sf/joptsimple/KeyValuePairTest.java,java-jopt-simple-jopt-simple-remove-import,full,PROMOTED,
 Java,junit-pioneer-junit-pioneer,a9735129b3f6e1e790882d8c93e273340e32cc8d,src/main/java/org/junitpioneer/internal/TestNameFormatter.java,java-junit-pioneer-junit-pioneer-add-block-comment,full,PROMOTED,
@@ -265,7 +265,7 @@ R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rmisc.r,,f
 R,gtownsend-icon,023cdccfcd10eb9e3b623b42470982ee0a82794c,src/runtime/rwindow.r,,full,REJECTED,Unfortunately .r is not R
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/data.r,r-gtownsend-icon-one-letter-identifier-change,full,PROMOTED,
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/fload.r,,full,REJECTED,This is not actually in R.
-R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/fmisc.r,,full,SAMPLED,
+R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/fmisc.r,,full,REJECTED,Wrong language
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/init.r,,full,REJECTED,Yet another .r not being R
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/interp.r,,full,REJECTED,Incorrectly identified as R code
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/rcomp.r,,full,REJECTED,Incorrectly identified as R code
@@ -376,7 +376,7 @@ Swift,tree-sitter-tree-sitter-haskell,d0bdf18a667c58f339d599807616bab4c9f2b927,P
 Swift,zeroc-ice-ice,14bc2f79c269266297cd5ff431806b22f858f5d5,swift/src/Ice/Initialize.swift,swift-zeroc-ice-ice-add-an-if-block-and-variable,full,PROMOTED,
 TSX,Kong-insomnia,2f4e3a8e65560efae270d2637ac9d978ce8d7c7b,packages/insomnia/src/ui/components/encoding-picker.tsx,tsx-kong-insomnia-classname-strings-changed,full,PROMOTED,
 TSX,Kong-insomnia,c62a114d28a064c303d0c7114ced1cf68b2a8bc3,packages/insomnia/src/ui/components/modals/workspace-environments-edit-modal.tsx,tsx-kong-insomnia-rewrite-if-using-ternary-twice,full,PROMOTED,Contains a 2:1 mapping not currently expressible with 1-1 maps
-TSX,Kong-insomnia,c62a114d28a064c303d0c7114ced1cf68b2a8bc3,packages/insomnia/src/ui/components/templating/tag-editor.tsx,,full,SAMPLED,
+TSX,Kong-insomnia,c62a114d28a064c303d0c7114ced1cf68b2a8bc3,packages/insomnia/src/ui/components/templating/tag-editor.tsx,tsx-kong-insomnia-if-to-ternary-operator,full,PROMOTED,
 TSX,apache-superset.git,a6a66ca483287783729fa80757395b4282d74987,superset-frontend/src/components/Datasource/DatasourceModal/index.tsx,tsx-apache-superset-error-handling-change,small,PROMOTED,
 TSX,apache-superset.git,fdcb942f3c7c33cac49032ab748eb3a68eaa8bfa,superset-frontend/src/features/home/Menu.test.tsx,tsx-apache-superset-add-test-case,small,PROMOTED,
 TSX,excalidraw-excalidraw.git,e6c3c06c2eb552aed9241aa1e1fb72052e2caf35,packages/excalidraw/components/App.tsx,tsx-excalidraw-excalidraw-huge-file-with-real-logic-change,small,PROMOTED,
