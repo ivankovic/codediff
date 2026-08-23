@@ -23,5 +23,7 @@ use crate::test;
 fn optimal_solution() -> Result<()> {
     // It's hard to say which of the two attributes was added. One has technically closer
     // coordinates, but the other is first in order.
-    test::helper::human_mapping::assert_matches_human_mapping("html-xiaoyeli-superlu-change-a-bunch-of-values-and-add-one-element")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "html-xiaoyeli-superlu-change-a-bunch-of-values-and-add-one-element",
+    )
 }

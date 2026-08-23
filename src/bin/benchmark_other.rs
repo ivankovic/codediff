@@ -399,11 +399,7 @@ fn git_env(command: &mut Command) -> &mut Command {
 /// implementations of the same Myers family, so `git_myers` and `unix_diff` must agree on
 /// essentially every fixture. `git_myers_agrees_with_unix_diff` in this file's tests asserts that,
 /// and a divergence there means this parser is broken, not that a difference was discovered.
-fn git_line_labels(
-    algorithm: &str,
-    before: &Code,
-    after: &Code,
-) -> Result<(Vec<bool>, Vec<bool>)> {
+fn git_line_labels(algorithm: &str, before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let (before_file, after_file) = write_temp_pair(before, after, None)?;
 
     let mut command = Command::new("git");
@@ -560,7 +556,10 @@ fn bdiff_touched_from_script(
     };
 
     for entry in script {
-        let mode = entry.get("mode").and_then(|m| m.as_str()).unwrap_or_default();
+        let mode = entry
+            .get("mode")
+            .and_then(|m| m.as_str())
+            .unwrap_or_default();
         let src = entry.get("src_line").and_then(|v| v.as_u64()).unwrap_or(0);
         let dest = entry.get("dest_line").and_then(|v| v.as_u64()).unwrap_or(0);
         let block = entry
@@ -690,7 +689,10 @@ const NVIM_DRIVER: &str = include_str!("../../assets/nvim_diff_driver.lua");
 
 /// Neovim binary, from `NVIM_BIN`. Not auto-installed, same policy as every other external tool.
 fn nvim_bin() -> Result<std::path::PathBuf> {
-    external_tool_bin("NVIM_BIN", "point it at a neovim binary (nvim-linux64/bin/nvim)")
+    external_tool_bin(
+        "NVIM_BIN",
+        "point it at a neovim binary (nvim-linux64/bin/nvim)",
+    )
 }
 
 /// `(before_touched, after_touched)` from `nvim -d`.
@@ -1611,7 +1613,11 @@ fn main() -> Result<()> {
     // persistent JVM - see `bdiff_warm_batch` for why BDiff needs the same cold/warm split.
     let mut bdiff_warm_runs: Vec<HashMap<String, f64>> = Vec::new();
     for repeat in 0..args.repeats {
-        eprintln!("bdiff_warm_batch: repeat {}/{}...", repeat + 1, args.repeats);
+        eprintln!(
+            "bdiff_warm_batch: repeat {}/{}...",
+            repeat + 1,
+            args.repeats
+        );
         match bdiff_warm_batch(&warm_fixtures)? {
             Some(results) => bdiff_warm_runs.push(results),
             None => break,
@@ -2791,7 +2797,12 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                 .unwrap_or_default(),
         );
         // Same contract as the column above - see `Row::bdiff_warm_ms`.
-        record.push(row.bdiff_warm_ms.as_deref().map(join_ms).unwrap_or_default());
+        record.push(
+            row.bdiff_warm_ms
+                .as_deref()
+                .map(join_ms)
+                .unwrap_or_default(),
+        );
         wtr.write_record(&record)?;
     }
     wtr.flush()?;
@@ -2958,7 +2969,10 @@ mod tests {
             ("a\nb\nc\n", "a\nb\nc\nd\n"),
             ("a\nb\nc\nd\n", "a\nd\n"),
             ("x\n", "x\n"),
-            ("one\ntwo\nthree\nfour\nfive\n", "one\nthree\ntwo\nfour\nsix\n"),
+            (
+                "one\ntwo\nthree\nfour\nfive\n",
+                "one\nthree\ntwo\nfour\nsix\n",
+            ),
         ];
         for (before_text, after_text) in cases {
             let before = Code::from_string(before_text, &Language::Rust);

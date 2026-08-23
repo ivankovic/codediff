@@ -1504,5 +1504,4 @@ mod tests {
                 && !viewer.right_viewer.is_node_highlight_enabled(),
         );
     }
-
 }

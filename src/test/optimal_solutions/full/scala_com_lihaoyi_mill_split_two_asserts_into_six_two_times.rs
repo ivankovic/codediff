@@ -22,5 +22,7 @@ use crate::test;
 #[test]
 fn optimal_solution() -> Result<()> {
     // The string escape sequences would probably need a N:M mapping
-    test::helper::human_mapping::assert_matches_human_mapping("scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times",
+    )
 }
