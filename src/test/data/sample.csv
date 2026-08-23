@@ -30,7 +30,7 @@ CPP,bolero-MURAKAMI-Sprout,ea06f925655602a39750c2fd4fc88ecb98c9860f,sprout/math/
 CPP,bolero-MURAKAMI-Sprout,ea06f925655602a39750c2fd4fc88ecb98c9860f,sprout/numeric/transform_reduce.hpp,cpp-bolero-murakami-sprout-copyright-update-3,full,PROMOTED,
 CPP,cgdb-cgdb,a7c00e7096d20944fe3eec9823f333616273f522,cgdb/cgdb.cpp,cpp-cgdb-cgdb-struct-to-pointer,full,PROMOTED,Interesting case of which nodes of different kinds should be allowed to map to each other
 CPP,godotengine-godot.git,6f86914f55a149d2b9578ba42f7f2a671f740557,scene/2d/animated_sprite_2d.cpp,cpp-godot-small-bugfix,small,PROMOTED,
-CPP,jpnurmi-znc-playback,c070201765325b0ee4f32e0c3880bed31dd5b5ad,playback.cpp,,full,SAMPLED,
+CPP,jpnurmi-znc-playback,c070201765325b0ee4f32e0c3880bed31dd5b5ad,playback.cpp,cpp-jpnurmi-znc-playback-adding-new-feature,full,PROMOTED,
 CPP,lancos-ponyprog,6ca9cb9c151d2bd5eb6d043eb3368a3caf4e8e83,SrcPony/Translator.cpp,cpp-lancos-ponyprog-remove-a-few-lines,full,PROMOTED,
 CPP,libreoffice,5505d3bc4dd1e7350f5d935ead1ea5161d276ad9,store/source/lockbyte.cxx,cpp-libreoffice-add-const,small,PROMOTED,
 CPP,libreoffice,dc513684282e732c7e8ff71dde431d5632f12824,vcl/source/accessibility/accessiblelistbox.cxx,cpp-libreoffice-remove-return-value,small,PROMOTED,
@@ -62,7 +62,7 @@ CSS,source-foundry-Hack,d8458b5c471caa12b4af57a9bb537d9639ca4108,build/web/hack-
 CSharp,GLibSharp-GtkSharp,60b84d5b1bbe93a38a811a214bf93c72f620e15e,Source/gio/generated/GLib_FileAttributeMatcher.cs,,full,SAMPLED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gdk/EventWindowState.cs,csharp-glibsharp-gtksharp-whitespace-only-change-2,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/generator/ObjectField.cs,csharp-glibsharp-gtksharp-whitespace-only-change,full,PROMOTED,
-CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/RadioToolButton.cs,,full,SAMPLED,
+CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/RadioToolButton.cs,csharp-glibsharp-gtksharp-formatting-only-change,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/TreeEnumerator.cs,,full,SAMPLED,
 CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,csharp-lidarr-add-function,small,PROMOTED,
 CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs,csharp-lidarr-call-different-function,small,PROMOTED,
@@ -118,7 +118,7 @@ HTML,mozilla-firefox-firefox.git,a5c6959314b1f185f42a314f41a454ed8652c87f,testin
 HTML,oauth-xx-oauth-ruby,d60384087958c7b416e949f989ac929c0021caab,docs/OAuth/RequestProxy/RackRequest.html,html-oauth-xx-oauth-ruby-version-and-timestamp-update,full,PROMOTED,
 HTML,tcltk-thread,e1ce065e345c259376af26d2cdfc5bc88d3eb210,doc/html/ttrace.html,html-tcltk-thread-one-multiline-value-changed,full,PROMOTED,
 HTML,twbs-bootstrap.git,1d92d0b68f3c00c70bcc6d9a4f4f34e8f3a7be7d,site/content/docs/5.3/examples/sidebars/index.html,html-twbs-bootstrap-add-the-same-attribute-in-many-places,small,PROMOTED,
-HTML,xiaoyeli-superlu,83a3c82b9e44c966ca2bc26991ffdb2bf63e1e2b,DOC/html/dgssv_8c.html,,full,SAMPLED,
+HTML,xiaoyeli-superlu,83a3c82b9e44c966ca2bc26991ffdb2bf63e1e2b,DOC/html/dgssv_8c.html,html-xiaoyeli-superlu-change-a-bunch-of-values-and-add-one-element,full,PROMOTED,"It's hard to say which of the two attributes was added. One has technically closer coordinates, but the other is first in order."
 JSON,FedoraQt-QGnomePlatform,d86d6baab74c3e69094083715ffef4aef2e516dd,src/theme/qgnomeplatformtheme.json,json-fedoraqt-qgnomeplatform-remove-from-list,full,PROMOTED,
 JSON,FortAwesome-Font-Awesome,b476ed9aeef6ff16accd275eca515d4e08c3e724,svg-objects/solid/check-square.json,json-fortawesome-font-awesome-string-change,full,PROMOTED,
 JSON,Governikus-AusweisApp,7e84e665cf04f2ee4cbc61694b22ebc5bd57f0c3,src/card/simulator/metadata.json,json-governikus-ausweisapp-whitespace-only,full,PROMOTED,
@@ -271,7 +271,7 @@ R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/interp.r,,
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/rcomp.r,,full,REJECTED,Incorrectly identified as R code
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/rdebug.r,,full,REJECTED,This is not actually R
 R,gtownsend-icon,27112b991499c513f8d52b59ea71e71687521579,src/runtime/rmemmgt.r,,full,REJECTED,Another case of .r not actually being R
-R,hroptatyr-dateutils,ef9e87072b5829358b091b22df4278177dbaab69,data/snarf-ummulqura.R,,full,SAMPLED,
+R,hroptatyr-dateutils,ef9e87072b5829358b091b22df4278177dbaab69,data/snarf-ummulqura.R,r-hroptatyr-dateutils-real-changes-to-an-r-script,full,PROMOTED,
 R,mtytel-helm,0454059b9508dc81815048d5ce402e996f09f9fc,JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_RTAS.r,r-mtytel-helm-dummy-file,full,PROMOTED,
 R,oracle-dtrace-utils,d17f79f640453be8e7a2ebf033c20fafee338617,test/unittest/usdt/tst.stapsdt-notes-isenabled.r,r-oracle-dtrace-utils-i-have-no-idea-what-this-change-actually-does,full,PROMOTED,
 Ruby,Homebrew-brew.git,0c34674121a5c1e6dfb14993e397adfddf440364,Library/Homebrew/dev-cmd/bump.rb,ruby-homebrew-brew-actual-logic-change,small,PROMOTED,
@@ -284,7 +284,7 @@ Ruby,Homebrew-brew.git,e72e57910cce57177c139868e2ab43dd2efca160,Library/Homebrew
 Ruby,intridea-multi_json,aa0cac16166c00c6d7ad31b3f2d7cd4c98e49dd1,lib/multi_json/adapters/jr_jackson.rb,ruby-intridea-multi_json-remove-double-colon,full,PROMOTED,
 Ruby,intridea-multi_json,edb28ceab21b915aff6354cf9b05a08905d71d35,lib/multi_json/adapters/json_common.rb,ruby-intridea-multi_json-remove-single-comma,full,PROMOTED,
 Ruby,jmespath-jmespath.rb,9e861c736ef88ee99cdd5910f59c9e6c5d5e607a,lib/jmespath/parser.rb,,full,SAMPLED,
-Ruby,jmespath-jmespath.rb,fef3ed5f5b7489746390a194e081001400daa356,spec/compliance_without_errors_spec.rb,,full,SAMPLED,
+Ruby,jmespath-jmespath.rb,fef3ed5f5b7489746390a194e081001400daa356,spec/compliance_without_errors_spec.rb,ruby-jmespath-jmespath-go-from-conditional-to-unless,full,PROMOTED,The deleted end is mateched to the if
 Ruby,junegunn-fzf.git,24ff66d4a9d6889988e4d7e373f33f4098870b9e,test/test_go.rb,ruby-junegunn-fzf-add-test-case,small,PROMOTED,
 Ruby,junegunn-fzf.git,3148b0f3e88f8a116491135dc10a7ce6d96899bf,test/test_go.rb,ruby-junegunn-fzf-add-test-case-2,small,PROMOTED,
 Ruby,main-branch-process_executer,da1db9697e5c2be371d308d5790e44dcccf8e40b,lib/process_executer/destinations/file_descriptor.rb,ruby-main-branch-process_executer-actual-small-change,full,PROMOTED,
@@ -432,7 +432,7 @@ Vimscript,neovim-neovim.git,8754118213d79d316f740e739201b34639b4c8f6,test/old/te
 Vimscript,neovim-neovim.git,9ca69488cf08d78609ad4baef50bbcbbc937a9b7,runtime/pack/dist/opt/matchit/autoload/matchit.vim,vimscript-neovim-neovim-add-two-functions-and-modify-a-few-lines,small,PROMOTED,
 Vimscript,neovim-neovim.git,a4ee34a165ef5b190378740d2c4ce15410f0f477,runtime/ftplugin/rst.vim,vimscript-neovim-neovim-add-a-few-lines,small,PROMOTED,
 Vimscript,preservim-tagbar,8de7694c0aeda253073098bbc9fb890b2902ddb8,autoload/tagbar.vim,vimscript-preservim-tagbar-add-if-statements,full,PROMOTED,
-Vimscript,protesilaos-tempus-themes-vim,28a0a9c9d638b16967aaa032268efe0b2c547879,colors/tempus_winter.vim,,full,SAMPLED,
+Vimscript,protesilaos-tempus-themes-vim,28a0a9c9d638b16967aaa032268efe0b2c547879,colors/tempus_winter.vim,vimscript-protesilaos-tempus-themes-vim-add-terminal-color-scheme,full,PROMOTED,
 Vimscript,protesilaos-tempus-themes-vim,c09b916e11ade23ada966296129580ac9700817f,colors/tempus_winter.vim,vimscript-protesilaos-tempus-themes-vim-change-two-values,full,PROMOTED,
 XML,AdoptOpenJDK-icedtea-web,66422421d703566dd4f4b2b098ad25ae536fd369,integration/pom.xml,xml-adoptopenjdk-icedtea-web-update-version-string,full,PROMOTED,
 XML,FasterXML-jackson-dataformat-xml,841eeb530b1149eb0a9afdedee15043f7d0a5c99,pom.xml,xml-fasterxml-jackson-dataformat-xml-only-string-value-change,full,PROMOTED,

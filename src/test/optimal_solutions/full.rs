@@ -40,6 +40,8 @@ mod cpp_bolero_murakami_sprout_copyright_update_3;
 #[cfg(test)]
 mod cpp_cgdb_cgdb_struct_to_pointer;
 #[cfg(test)]
+mod cpp_jpnurmi_znc_playback_adding_new_feature;
+#[cfg(test)]
 mod cpp_lancos_ponyprog_remove_a_few_lines;
 #[cfg(test)]
 mod cpp_llnl_sundials_comment_change;
@@ -51,6 +53,8 @@ mod cpp_qpdf_qpdf_move_to_assert_from_if_and_throw;
 mod csharp_cyanfish_naps2_add_condition_to_if;
 #[cfg(test)]
 mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
+#[cfg(test)]
+mod csharp_glibsharp_gtksharp_formatting_only_change;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change;
 #[cfg(test)]
@@ -107,6 +111,8 @@ mod html_milkytracker_milkytracker_text_update;
 mod html_oauth_xx_oauth_ruby_version_and_timestamp_update;
 #[cfg(test)]
 mod html_tcltk_thread_one_multiline_value_changed;
+#[cfg(test)]
+mod html_xiaoyeli_superlu_change_a_bunch_of_values_and_add_one_element;
 #[cfg(test)]
 mod java_eclipse_jdt_eclipse_remove_import_and_inheritance;
 #[cfg(test)]
@@ -230,6 +236,8 @@ mod python_zaneb_autopage_move_time_sleep;
 #[cfg(test)]
 mod r_gtownsend_icon_one_letter_identifier_change;
 #[cfg(test)]
+mod r_hroptatyr_dateutils_real_changes_to_an_r_script;
+#[cfg(test)]
 mod r_mtytel_helm_dummy_file;
 #[cfg(test)]
 mod r_oracle_dtrace_utils_i_have_no_idea_what_this_change_actually_does;
@@ -237,6 +245,8 @@ mod r_oracle_dtrace_utils_i_have_no_idea_what_this_change_actually_does;
 mod ruby_intridea_multi_json_remove_double_colon;
 #[cfg(test)]
 mod ruby_intridea_multi_json_remove_single_comma;
+#[cfg(test)]
+mod ruby_jmespath_jmespath_go_from_conditional_to_unless;
 #[cfg(test)]
 mod ruby_main_branch_process_executer_actual_small_change;
 #[cfg(test)]
@@ -375,6 +385,8 @@ mod vimscript_jreybert_vimagit_move_one_line;
 mod vimscript_m_pilia_vim_mediawiki_add_a_new_functon;
 #[cfg(test)]
 mod vimscript_preservim_tagbar_add_if_statements;
+#[cfg(test)]
+mod vimscript_protesilaos_tempus_themes_vim_add_terminal_color_scheme;
 #[cfg(test)]
 mod vimscript_protesilaos_tempus_themes_vim_change_two_values;
 #[cfg(test)]
