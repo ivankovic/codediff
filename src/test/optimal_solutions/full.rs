@@ -28,6 +28,8 @@ mod c_pocoproject_poco_replace_0_with_nullptr;
 #[cfg(test)]
 mod c_relianoid_nftlb_zcu_log_to_u_log;
 #[cfg(test)]
+mod c_sched_ext_scx_many_many_moves_some_deletes_some_adds;
+#[cfg(test)]
 mod c_tripwire_tripwire_open_source_add_single_item_to_list;
 #[cfg(test)]
 mod cpp_arximboldi_lager_add_two_test_cases;
@@ -164,6 +166,8 @@ mod json_kiwix_kiwix_desktop_add_a_few_change_a_few;
 #[cfg(test)]
 mod json_main_branch_track_open_instances_remove_item_from_list;
 #[cfg(test)]
+mod json_webgpu_native_webgpu_headers_only_insertions;
+#[cfg(test)]
 mod kotlin_jetbrains_kotlin_add_single_const;
 #[cfg(test)]
 mod kotlin_jetbrains_kotlin_remove_one_comment_line;
@@ -187,6 +191,8 @@ mod kotlin_yairm210_unciv_yet_another_vector2_removal;
 mod lua_corsixth_corsixth_refactor_if_expressions;
 #[cfg(test)]
 mod lua_dromozoa_dromozoa_utf8_only_comment_text_update;
+#[cfg(test)]
+mod lua_luakit_luakit_actual_test_change_merging_two_tests_into_one;
 #[cfg(test)]
 mod lua_luals_lua_language_server_add_gsub_function_call;
 #[cfg(test)]
@@ -310,6 +316,8 @@ mod scala_xerial_xerial_java_actual_code_change;
 #[cfg(test)]
 mod scala_ymnk_jzlib_add_a_test_case;
 #[cfg(test)]
+mod scala_ymnk_jzlib_add_one_test_case;
+#[cfg(test)]
 mod scala_ymnk_jzlib_interesting_probably_has_no_optimal_solution;
 #[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
@@ -339,6 +347,8 @@ mod swift_apple_swift_argument_parser_simplify_code;
 mod swift_apple_swift_argument_parser_small_change;
 #[cfg(test)]
 mod swift_logseq_logseq_add_real_feature_keypress_tracking;
+#[cfg(test)]
+mod swift_logseq_logseq_insertions_only;
 #[cfg(test)]
 mod swift_swift_emacs_swift_mode_seems_like_test_code;
 #[cfg(test)]
@@ -377,6 +387,8 @@ mod vimscript_chikamichi_mediawiki_add_one_autocmd;
 mod vimscript_chikamichi_mediawiki_remove_3_lines;
 #[cfg(test)]
 mod vimscript_fedorenchik_qt_support_add_two_lines;
+#[cfg(test)]
+mod vimscript_fholgado_minibufexpl_massive_comment_reduction;
 #[cfg(test)]
 mod vimscript_idanarye_vim_merginal_add_one_call;
 #[cfg(test)]
