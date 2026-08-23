@@ -742,8 +742,7 @@ fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>
     let stdout = String::from_utf8_lossy(&output.stdout);
     let line = stdout
         .lines()
-        .filter(|line| !line.trim().is_empty())
-        .next_back()
+        .rfind(|line| !line.trim().is_empty())
         .context("nvim driver produced no output")?;
     let sides: Vec<serde_json::Value> =
         serde_json::from_str(line).context("parsing nvim driver JSON output")?;
