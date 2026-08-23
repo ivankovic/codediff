@@ -121,6 +121,34 @@ classification, and without the committed record one formatting sweep over `src/
 would move every pre-facility fixture into "revisited" and change the rate with no corpus change
 at all. `--refresh-eras` re-derives deliberately.
 
+### The comparison covers nine tools, the paper's tables show five
+
+Added 2026-08-23: four git algorithm variants (`git_myers`, `git_minimal`, `git_patience`,
+`git_histogram`) and BDiff (`bdiff`), all text-based, all covering the full corpus. They are wired
+into `benchmark-timing`, `benchmark-accuracy`, both CSVs, the charts and the generated macros, so
+every future re-benchmark includes them with no further work.
+
+`main.tex` has **not** been changed to add rows for them. Their macros are generated and
+unreferenced, which is this file's established pattern (`Shape*`, `CodeDiffLineRate`) - the
+numbers are one edit away whenever the prose is ready to use them. What the run found:
+
+* The four git variants and Unix `diff` agree with the human mapping to within 0.01 percentage
+  points of each other (1.12-1.13%). `git_minimal` is bit-identical to `git_myers` on every
+  fixture. Choice of line-diff algorithm does not move this metric, which closes the obvious
+  reviewer objection that RA2's baseline used "only" Myers.
+* Nugroho et al.'s "use --histogram for code changes" (EMSE 2020) does **not** transfer here:
+  histogram is marginally the *worst* of the four against human ground truth. Their criterion is
+  edit-script size and miner readability, not agreement with a human mapping - a different
+  question, answered differently, which is the same "a published benefit is a property of the
+  metric and pipeline it was measured in" point the ablation makes.
+* BDiff (1.18%) does not beat plain git on this metric either, despite being block-aware.
+
+Two measurement notes worth keeping. BDiff's per-process time is ~97% Python import overhead, so
+it is reported cold *and* warm exactly like GumTree's JVM (315.6 ms against 7.8 ms median). And
+per-tool *mean* runtimes in this corpus are distorted by run order - whichever tool goes first per
+fixture absorbs cold-cache cost, which is why `unix_diff` and `git_myers` show ~18 ms means
+against ~2.5 ms medians. Quote percentiles, not means; the paper's speed table already does.
+
 ### Known-stale numbers
 
 **The empirical-study numbers (Section 3, Table 1, corpus size) currently reflect the 100-repository

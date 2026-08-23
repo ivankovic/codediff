@@ -289,6 +289,21 @@ benchmark-timing-report:
 #     export DIFFT_BIN=/var/tmp/codediff-tools/bin/difft \
 #            DIFFSITTER_BIN=/var/tmp/codediff-tools/bin/diffsitter
 #
+# NVIM_BIN points at a neovim binary. Neovim is scored because it is the diff a large number of
+# developers actually read, and the only entry here that pairs a line-level match with
+# character-level display; `assets/nvim_diff_driver.lua` drives it headless and reads its
+# classification back through `diff_hlID()`, since Neovim writes its diff to no stream at all.
+# Install without root:
+#
+#     curl -sL https://github.com/neovim/neovim/releases/download/v0.10.2/nvim-linux64.tar.gz \
+#       | tar xz -C /var/tmp/tools
+#     export NVIM_BIN=/var/tmp/tools/nvim-linux64/bin/nvim
+#
+# BDIFF_PYTHON points at a python interpreter with BDiff importable - `make install-bdiff` below
+# builds one. The four git variants need no configuration: they shell out to whatever `git` is on
+# PATH, with the user's git config neutralized (see `git_env` in benchmark_other.rs - this is
+# load-bearing, not hygiene).
+#
 # GumTree is a built Java distribution, so GUMTREE_BIN points at its `bin/gumtree` script. See
 # drivers/gumtree-batch/build.sh for its optional warm-JVM timing variant, and
 # data/comparison/PROVENANCE.md for which GumTree build is installed and which of its numbers are
@@ -323,6 +338,28 @@ benchmark-timing:
 # rendering. Visible is not a synonym for leaf; see PROVENANCE.md for why they differ both ways.
 benchmark-accuracy:
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
+
+# Installs BDiff (arXiv 2510.21094, block-aware text-based differencing) into a virtualenv under
+# /var/tmp, matching where this project's other comparison tools live, and prints the BDIFF_PYTHON
+# export the benchmark targets need.
+#
+# Two things this target exists to encode, both discovered the hard way (2026-08-23):
+#
+#  * BDiff's pyproject.toml under-declares its dependencies - it lists numpy and scipy, but
+#    bdiff/bdiff.py also imports rapidfuzz. A plain `pip install .` produces a package that dies
+#    on ModuleNotFoundError at first use, so rapidfuzz is installed explicitly here.
+#  * BDiff shells out to `git diff --no-index`, so it inherits the user's git config. With
+#    `diff.external` set - which this project's own README recommends - it silently returns an
+#    empty edit script and scores as "nothing changed". benchmark_other neutralizes that per
+#    invocation; see `git_env` there and data/comparison/PROVENANCE.md.
+BDIFF_PREFIX ?= /var/tmp/bdiff-install
+install-bdiff:
+	mkdir -p $(BDIFF_PREFIX)
+	test -d $(BDIFF_PREFIX)/BDiff || git clone --depth 1 https://github.com/BDiff/BDiff.git $(BDIFF_PREFIX)/BDiff
+	test -d $(BDIFF_PREFIX)/venv || python3 -m venv $(BDIFF_PREFIX)/venv
+	$(BDIFF_PREFIX)/venv/bin/pip install -q $(BDIFF_PREFIX)/BDiff rapidfuzz
+	@$(BDIFF_PREFIX)/venv/bin/python -m bdiff --version
+	@echo "export BDIFF_PYTHON=$(BDIFF_PREFIX)/venv/bin/python"
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 

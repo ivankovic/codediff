@@ -211,6 +211,8 @@ impl App {
         self.diff_viewer.set_overlay_theme(self.current_theme);
         self.diff_viewer
             .set_layout_override(theme::load_panel_layout());
+        self.diff_viewer
+            .set_node_highlight(theme::load_node_highlight());
         self.recent_pairs = theme::load_recent_pairs();
 
         let mut ui = UI::new()?

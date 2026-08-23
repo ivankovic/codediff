@@ -113,9 +113,23 @@ BASELINE = "#c3c2b7"
 # cover, mirroring how Okabe-Ito's colorblind-safe 8-palette adds sky-blue and yellow to a base 5
 # for the same reason. Re-validate the full current set before treating it as confirmed
 # colorblind-safe.
+#
+# The four git variants (added 2026-08-23) are one engine reached through one flag, so they share a
+# single hue family (orange) at four lightnesses rather than taking four unrelated categorical
+# slots - the point a reader should take from the chart is "these are the same tool", and four
+# scattered hues would say the opposite. BDiff (green) is a genuinely separate text-based tool and
+# gets its own slot. Re-validate the full set for colorblind-safety before treating it as
+# confirmed; see the note above.
 DISPLAY_NAMES = {
     "treesitter_parse": "TreeSitter parse (lower bound)",
     "unix_diff": "UNIX diff (baseline)",
+    "git_myers": "git (Myers)",
+    "git_minimal": "git (minimal)",
+    "git_patience": "git (patience)",
+    "git_histogram": "git (histogram)",
+    "bdiff": "BDiff (per process)",
+    "nvim_diff": "nvim -d",
+    "bdiff_warm": "BDiff (warm interpreter)",
     "codediff": "CodeDiff",
     "gumtree": "GumTree (binary)",
     "gumtree_warm": "GumTree (warm JVM)",
@@ -126,12 +140,27 @@ DISPLAY_ORDER = list(DISPLAY_NAMES)
 COLORS = {
     "treesitter_parse": INK_PRIMARY,
     "unix_diff": INK_MUTED,
+    "git_myers": "#e07b39",
+    "git_minimal": "#f0a875",
+    "git_patience": "#b85c1e",
+    "git_histogram": "#8a3f10",
+    "bdiff": "#3f8f4f",
+    "nvim_diff": "#57a773",
+    "bdiff_warm": "#7fbf8f",
     "codediff": "#2a78d6",
     "gumtree": "#4a3aa7",
     "gumtree_warm": "#e34948",
     "difftastic": "#c9a227",
     "diffsitter": "#1a9e96",
 }
+
+# Which family each comparable tool belongs to. The accuracy chart is split on this: nine series in
+# one grouped histogram is unreadable, and text-vs-AST is the split the comparison is actually
+# about, not an arbitrary halving to fit the page.
+TEXT_TOOLS = [
+    "unix_diff", "git_myers", "git_minimal", "git_patience", "git_histogram", "bdiff", "nvim_diff",
+]
+AST_TOOLS = ["gumtree", "difftastic", "diffsitter"]
 
 
 def ordered(ids: list[str]) -> list[str]:
@@ -146,11 +175,21 @@ def rows_for(id_: str, rows: list[dict]) -> list[dict]:
     draws from whichever rows the batch driver actually covered that run - its own opt-in
     availability check, not a per-fixture language scope (see `plot_runtime`'s doc comment). Every
     other id is `applicable_rows` - `ExternalTool::supports`'s per-fixture language scope."""
-    if id_ in ("treesitter_parse", "codediff"):
+    if id_ in ("treesitter_parse", "codediff") or id_ in TEXT_TOOLS:
+        # Every text-based tool is language-agnostic (`ExternalTool::supports` returns true for
+        # all of them), so like codediff they always draw from the full corpus.
         return rows
-    if id_ == "gumtree_warm":
-        return [r for r in rows if r["gumtree_warm_ms"] != ""]
+    if id_ in ("gumtree_warm", "bdiff_warm"):
+        return [r for r in rows if r.get(f"{id_}_ms", "") != ""]
     return applicable_rows(rows, id_)
+
+
+def has_warm(rows: list[dict], id_: str) -> bool:
+    """Whether `<id_>_ms` is present and non-empty for at least one row - the generalization of
+    `has_gumtree_warm` below, needed once BDiff gained the same cold/warm split (see
+    `bdiff_warm_batch` in benchmark_other.rs)."""
+    column = f"{id_}_ms"
+    return bool(rows) and column in rows[0] and any(r[column] != "" for r in rows)
 
 
 def has_gumtree_warm(rows: list[dict]) -> bool:
@@ -233,14 +272,20 @@ def _plot_agreement_histogram(
     counts, _, bar_containers = ax.hist(
         series, bins=bins, label=legend_labels or labels, color=colors, edgecolor=SURFACE, linewidth=1, zorder=3,
     )
-    label_offset = max(np.max(counts), 1) * 0.02
-    for container in bar_containers:
-        for bar in container:
-            if bar.get_height() > 0:
-                ax.text(
-                    bar.get_x() + bar.get_width() / 2, bar.get_height() + label_offset,
-                    f"{int(bar.get_height())}", ha="center", va="bottom", fontsize=8.5, color=INK_SECONDARY, zorder=4,
-                )
+    # Per-bar counts only while they can actually be read. Past four series the bars are narrow
+    # enough that adjacent labels overlap into an unreadable smear ("459459459..."), which looks
+    # like a rendering bug rather than data - and the text panel, where six near-identical tools
+    # stack up, is exactly that case. The summary chart carries the precise numbers instead.
+    if len(bar_containers) <= 4:
+        label_offset = max(np.max(counts), 1) * 0.02
+        for container in bar_containers:
+            for bar in container:
+                if bar.get_height() > 0:
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2, bar.get_height() + label_offset,
+                        f"{int(bar.get_height())}", ha="center", va="bottom", fontsize=8.5,
+                        color=INK_SECONDARY, zorder=4,
+                    )
 
     ax.set_xlim(0, 100)
     ax.set_ylim(0, max(np.max(counts), 1) * 1.18)
@@ -259,47 +304,221 @@ def _plot_agreement_histogram(
     ax.legend(loc="upper left", frameon=False, fontsize=9.5, labelcolor=INK_SECONDARY)
 
 
-def plot_accuracy(rows: list[dict], tools: list[str], output_path: Path) -> None:
-    """Grouped histogram, all tools in one panel: how many fixtures fall into each 10-point bucket
-    of *agreement* rate (100 - mismatch rate, so higher is better and 100% means the tool matched
-    the human mapping on every line).
+# Which granularity each tool's *output* actually carries. This groups the bucket table's rows, and
+# it labels a capability, not a measurement: every number in that table is line-level agreement,
+# including for the tools listed here as sub-line. See `write_bucket_table`'s caption.
+#
+# Line-only means the tool's output contains no sub-line information at all - Unix diff and git
+# emit hunk headers and whole lines, and nothing finer exists to extract. Sub-line means the tool
+# reports character or column ranges inside a line: difftastic's per-change `start`/`end` columns,
+# GumTree's and diffsitter's character offsets (both go through `span_from_char_offsets` in
+# benchmark_other.rs), BDiff's `str_diff` ranges, and codediff's own `TextRange` columns.
+#
+# `nvim -d` is in the sub-line group: its line pass is libxdiff, the same engine as the four git
+# rows, but it adds a second pass that highlights changed characters *within* those lines, which
+# `diff_hlID(lnum, col)` exposes per column. It was briefly excluded on the grounds that its line
+# set matched git_myers on 38 of a 40-fixture sample - that was the wrong call. A 2-in-40
+# divergence is the same order as git_myers against unix_diff, which get separate rows, and
+# "redundant at the granularity we happen to measure" is a statement about the metric, not about
+# the tool. It is measured, and the corpus decides.
+GRANULARITY = {
+    "line": ["unix_diff", "git_myers", "git_minimal", "git_patience", "git_histogram"],
+    "subline": ["bdiff", "nvim_diff", "diffsitter", "difftastic", "gumtree", "codediff"],
+}
 
-    Each series is built from that tool's own `applicable_rows` - a fixture outside a tool's
-    language scope (`ExternalTool::supports`, e.g. GumTree has no generator for this corpus's one
-    JSON fixture) is dropped from that tool's series entirely, not coerced to a 0%-agreement
-    fixture it was never scored on. Each legend entry's own "(n=...)" is what makes a narrower-scope
-    tool's bars honestly readable in this shared panel - diffsitter, the narrowest scope in this
-    comparison, still covers 83 of 98 fixtures (its compiled-in language set skips JavaScript,
-    Kotlin, and several others - see `diffsitter_file_type`'s doc comment in `benchmark_other.rs`).
-    If a future tool's scope drops much further than that, give it a second, separately-scaled
-    panel instead of folding it into these bars (see git history around 2026-07 for the two-panel
-    version this replaced, back when GumTree covered only 5 of 93 fixtures).
+# Agreement buckets, most-accurate first. Checked in order and first match wins, so a fixture at
+# exactly 99.0% lands in ">=99%" and one at exactly 95.0% lands in "95-99%".
+#
+# "Perfect" is zero mismatched lines, not a rounded 100%: a 4,000-line fixture with one bad line
+# rounds to 100.0% while not being perfect, and that distinction is the entire point of the column.
+BUCKETS = [
+    ("Perfect", lambda mismatches, agreement: mismatches == 0),
+    (r"$\ge$99\%", lambda mismatches, agreement: agreement >= 99.0),
+    (r"95--99\%", lambda mismatches, agreement: agreement >= 95.0),
+    (r"$<$95\%", lambda mismatches, agreement: True),
+]
+PLAIN_BUCKET_LABELS = ["Perfect", ">=99%", "95-99%", "<95%"]
 
-    `treesitter_parse` never appears here, unlike in `plot_runtime` - it produces no line labels,
-    so it has nothing to agree or disagree with the human mapping about; it's a runtime reference
-    only.
 
-    `codediff` never appears here either, and that is deliberate rather than an oversight. This is
-    the introductory paper's RQ2 figure, and RQ2 asks how accurately *pre-existing* tools recover
-    real-world changes - it is answered without reference to codediff, matching the paper's own
-    accuracy table. `plot_runtime` below is not an RQ answer (it reports codediff's production
-    viability against its own targets), so codediff does stay in that one.
+def bucket_counts(accuracy_rows, tool):
+    """`(fixtures scored, [count per BUCKETS entry])` for `tool`, or None if it scored nothing.
+
+    Scored on the tool's own applicable subset, exactly like every other number in this report: a
+    fixture outside its language scope is excluded, never counted as a failure and never as a
+    perfect score.
     """
-    ids = ordered(tools)
-    colors = [COLORS[i] for i in ids]
-    legend_labels = [f"{DISPLAY_NAMES[i]} (n={len(applicable_rows(rows, i))})" for i in ids]
+    scored = [
+        r
+        for r in accuracy_rows
+        if r.get(f"{tool}_status") != "unsupported" and r.get(f"{tool}_line_mismatches", "") != ""
+    ]
+    if not scored:
+        return None
+    counts = [0] * len(BUCKETS)
+    for row in scored:
+        total = int(row["total_lines"])
+        mismatches = int(row[f"{tool}_line_mismatches"])
+        agreement_pct = 100.0 * (total - mismatches) / total if total else 100.0
+        for index, (_, predicate) in enumerate(BUCKETS):
+            if predicate(mismatches, agreement_pct):
+                counts[index] += 1
+                break
+    return len(scored), counts
 
-    fig, ax = plt.subplots(figsize=(11, 6.5), facecolor=SURFACE)
-    _plot_agreement_histogram(
-        ax, rows, ids, colors,
-        f"Line-level agreement rate, bucketed in 10-point increments ({len(rows)} fixtures in the corpus)",
-        legend_labels=legend_labels,
+
+def write_bucket_table(accuracy_rows, output_path, include_codediff):
+    r"""Per-fixture agreement buckets as a generated LaTeX table, ``\input`` directly.
+
+    This replaced the bucketed-agreement histogram (2026-08-23), which could not show the result it
+    existed to show: with 10-point buckets every tool put the large majority of its fixtures into
+    the single 90--100% bar, so the chart's whole dynamic range sat inside one column. These
+    buckets zoom in where the data actually is, and what they expose is not a small difference -
+    CodeDiff maps 418 of 486 fixtures with zero mismatched lines against Unix diff's 244, where the
+    pooled line rates (0.80% against 1.13%) look nearly tied. Both readings are true: the pooled
+    rate is dominated by a handful of very large fixtures, and this one weights every change
+    equally.
+
+    Percentages as well as counts, because the rows do not share a denominator - diffsitter scores
+    303 fixtures and Unix diff 486, so a bare count of 103 against 244 understates diffsitter badly.
+    """
+    backslash = "\\"
+    row_end = backslash * 2
+    header_labels = " & ".join(label for label, _ in BUCKETS)
+    lines = [
+        "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
+        "% regenerate: make benchmark-timing-report (from research/).",
+        # `table*`, not `table`: six columns of "244 (50%)" cells overflow a single ACM
+        # column and collide with the neighbouring table (observed 2026-08-23).
+        r"\begin{table*}",
+        (
+            r"  \caption{Per-fixture agreement with the human mapping, bucketed. Every number is"
+            r" \emph{line-level} agreement, including for the tools grouped as reporting sub-line"
+            r" detail -- that grouping describes what each tool's output carries, not how it was"
+            r" scored. ``Perfect'' means zero mismatched lines, not a rounded 100\%. Each tool is"
+            r" scored on its own applicable subset ($n$), so percentages, not counts, are"
+            r" comparable across rows.}"
+        ),
+        r"  \label{tab:agreement-buckets}",
+        r"  \small",
+        r"  \begin{tabular}{lrrrrr}",
+        r"    \toprule",
+        f"    Tool & $n$ & {header_labels} {row_end}",
+        r"    \midrule",
+    ]
+    group_titles = {
+        "line": r"    \multicolumn{6}{l}{\emph{Line granularity only}} " + row_end,
+        "subline": r"    \multicolumn{6}{l}{\emph{Reports sub-line detail (not exercised by this"
+        r" line-level metric)}} " + row_end,
+    }
+    for group, members in GRANULARITY.items():
+        lines.append(group_titles[group])
+        for tool in members:
+            if tool == "codediff" and not include_codediff:
+                continue
+            result = bucket_counts(accuracy_rows, tool)
+            if result is None:
+                continue
+            scored, counts = result
+            cells = " & ".join(
+                f"{count} ({100.0 * count / scored:.0f}" + backslash + "%)" for count in counts
+            )
+            name = DISPLAY_NAMES.get(tool, tool).replace("&", backslash + "&")
+            lines.append(f"    {name} & {scored} & {cells} {row_end}")
+        lines.append(r"    \addlinespace")
+    lines = lines[:-1]
+    lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
+    output_path.write_text("\n".join(lines) + "\n")
+    print(f"Table written to {output_path}")
+
+
+def print_bucket_table(accuracy_rows):
+    """The same buckets as plain text, for a terminal reader."""
+    header = f"{'Tool':30}{'n':>6}" + "".join(f"{label:>14}" for label in PLAIN_BUCKET_LABELS)
+    print("\n" + header)
+    print("-" * len(header))
+    for group, members in GRANULARITY.items():
+        print("line granularity only:" if group == "line" else "reports sub-line detail:")
+        for tool in members:
+            result = bucket_counts(accuracy_rows, tool)
+            if result is None:
+                continue
+            scored, counts = result
+            cells = "".join(f"{c:>7} ({100.0 * c / scored:>3.0f}%)" for c in counts)
+            print(f"  {DISPLAY_NAMES.get(tool, tool):28}{scored:>6}{cells}")
+
+
+def plot_summary(rows, tools, output_path):
+    """Median wall-clock per tool, one horizontal bar each.
+
+    Accuracy is deliberately not here: `write_bucket_table` reports it, and a bucket table strictly
+    dominates a bar of the pooled rate - it shows the same ordering plus the distribution behind
+    it. This chart used to carry an accuracy panel too; it was dropped (2026-08-23) rather than
+    maintained as a second, weaker view of numbers the table already carries.
+
+    Speed is the median, not the mean: the per-tool means in this corpus are dominated by a
+    cold-cache tail on whichever tool runs first per fixture (`unix_diff` and `git_myers` show
+    means several times their medians, while the three later git variants - the same engine behind
+    the same flag - do not). That is an artifact of run order, not of the algorithms.
+    """
+    ids = ordered(
+        ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
     )
+    fig, ax = plt.subplots(figsize=(11, 5.5), facecolor=SURFACE)
+
+    present = [(i, median_ms(rows, i)) for i in ids]
+    present = [(i, v) for i, v in present if v is not None]
+    present.sort(key=lambda pair: pair[1])
+    names = [f"{DISPLAY_NAMES[i]}  (n={len(rows_for(i, rows))})" for i, _ in present]
+
+    ax.set_facecolor(SURFACE)
+    bars = ax.barh(
+        range(len(present)),
+        [v for _, v in present],
+        color=[COLORS[i] for i, _ in present],
+        zorder=3,
+        height=0.72,
+    )
+    ax.set_yticks(range(len(present)))
+    ax.set_yticklabels(names, fontsize=9.5, color=INK_SECONDARY)
+    ax.invert_yaxis()
+    ax.set_xscale("log")
+    span = max(v for _, v in present) if present else 1
+    for bar, (_, value) in zip(bars, present):
+        ax.text(
+            bar.get_width() * 1.06,
+            bar.get_y() + bar.get_height() / 2,
+            f"{value:,.1f} ms",
+            va="center",
+            ha="left",
+            fontsize=9.5,
+            color=INK_SECONDARY,
+            zorder=4,
+        )
+    ax.set_xlim(right=span * 2.2)
+    ax.set_xlabel("Milliseconds", fontsize=10.5, color=INK_SECONDARY)
+    ax.set_title(
+        "Median wall-clock per fixture (log scale, lower is better)",
+        fontsize=12,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=10,
+    )
+    ax.tick_params(colors=INK_MUTED, labelsize=9)
+    ax.grid(axis="x", color=GRIDLINE, linewidth=1, zorder=0)
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    ax.spines["bottom"].set_color(BASELINE)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
     plt.close(fig)
     print(f"Plot saved to {output_path}")
+
+
+def median_ms(rows, id_):
+    """Median of every individual repeat measurement for `id_`, or None if it has no timings."""
+    values = [v for r in rows_for(id_, rows) for v in ms_values(r, f"{id_}_ms")]
+    return float(np.median(values)) if values else None
 
 
 def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
@@ -345,7 +564,11 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     fixture count is what determines each violin's real independence (3 repeats of the same
     fixture are correlated with each other, not 3 independent fixtures), so it stays the honest
     number to report as "n"."""
-    ids = ordered(["treesitter_parse", "codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    ids = ordered(
+        ["treesitter_parse", "codediff"]
+        + tools
+        + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+    )
     labels = [DISPLAY_NAMES[i] for i in ids]
     colors = [COLORS[i] for i in ids]
     scoped_rows = [rows_for(i, rows) for i in ids]
@@ -457,7 +680,11 @@ def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, i
     language scope) can't support a meaningful median/p90 - dropped rather than reported from 1-2
     points, same spirit as `applicable_rows` dropping out-of-scope rows entirely instead of
     coercing them to a misleading value."""
-    ids = ordered(["treesitter_parse", "codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    ids = ordered(
+        ["treesitter_parse", "codediff"]
+        + tools
+        + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+    )
     out = []
     for id_ in ids:
         series = coefficients_of_variation(rows_for(id_, rows), f"{id_}_ms")
@@ -508,14 +735,30 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
 # is an edit across three files. Note `gumtree` -> `GumTreeCold`: the paper distinguishes GumTree
 # invoked fresh per fixture (this CSV's `gumtree_ms`) from GumTree inside one persistent JVM
 # (`gumtree_warm_ms`), and "cold" is the name the paper's own table uses for the former.
+# Adding a tool here adds its macros to plots/variables_comparison.tex, and therefore to
+# plots/variables.tex. It does *not* add a row to any table in the paper - main.tex references
+# whichever macros its prose and tables actually use, and the generated-but-unreferenced ones are
+# harmless (see the `Shape*` block for the established precedent). Every tool added 2026-08-23
+# covers the full corpus, so `common_subset` below is unchanged by their presence.
 PAPER_MACRO_STEMS = {
     "codediff": "CodeDiff",
     "unix_diff": "UnixDiff",
+    "git_myers": "GitMyers",
+    "git_minimal": "GitMinimal",
+    "git_patience": "GitPatience",
+    "git_histogram": "GitHistogram",
+    "bdiff": "BDiff",
+    "nvim_diff": "NvimDiff",
     "gumtree": "GumTree",
     "difftastic": "Difftastic",
     "diffsitter": "Diffsitter",
 }
-PAPER_SPEED_STEMS = PAPER_MACRO_STEMS | {"gumtree": "GumTreeCold", "gumtree_warm": "GumTreeWarm"}
+PAPER_SPEED_STEMS = PAPER_MACRO_STEMS | {
+    "gumtree": "GumTreeCold",
+    "gumtree_warm": "GumTreeWarm",
+    "bdiff": "BDiffCold",
+    "bdiff_warm": "BDiffWarm",
+}
 
 
 def read_accuracy_rows(csv_path: Path) -> list[dict] | None:
@@ -604,7 +847,9 @@ def write_paper_fragment(
             )
 
     lines.append("% Speed: pooled per-repeat wall-clock, milliseconds.")
-    speed_ids = ordered(["codediff"] + tools + (["gumtree_warm"] if has_gumtree_warm(rows) else []))
+    speed_ids = ordered(
+        ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+    )
     for id_ in speed_ids:
         percentiles = speed_percentiles(rows, id_)
         if percentiles is None or id_ not in PAPER_SPEED_STEMS:
@@ -639,9 +884,27 @@ if __name__ == "__main__":
     print(f"External tools found: {', '.join(tools)}")
 
     plots_dir = Path(args.plots_dir)
-    plot_accuracy(rows, tools, plots_dir / "benchmark_other_accuracy.png")
+    # The bucketed-agreement histogram was removed 2026-08-23 - see `write_bucket_table` for why
+    # it could not show the result it existed to show. `plot_runtime` stays: its data spans three
+    # orders of magnitude and it is the figure that exposes BDiff's and GumTree's cold/warm split.
+    plot_summary(rows, tools, plots_dir / "benchmark_other_summary.png")
     plot_runtime(rows, tools, plots_dir / "benchmark_other_runtime.png")
     write_variance_table(rows, tools, plots_dir / "benchmark_other_variance.tex")
+    accuracy_rows = read_accuracy_rows(Path(args.accuracy_csv))
+    if accuracy_rows:
+        # Two fragments, same reason `plot_accuracy`/`plot_accuracy_with_codediff` were two files:
+        # the paper answers RQ2 without codediff, and a reader asking where codediff lands wants
+        # it in. Neither audience can be handed the other's table by accident.
+        write_bucket_table(
+            accuracy_rows, plots_dir / "benchmark_other_buckets.tex", include_codediff=False
+        )
+        write_bucket_table(
+            accuracy_rows,
+            plots_dir / "benchmark_other_buckets_with_codediff.tex",
+            include_codediff=True,
+        )
+        print_bucket_table(accuracy_rows)
+
     write_paper_fragment(
-        rows, tools, read_accuracy_rows(Path(args.accuracy_csv)), plots_dir / "variables_comparison.tex",
+        rows, tools, accuracy_rows, plots_dir / "variables_comparison.tex",
     )

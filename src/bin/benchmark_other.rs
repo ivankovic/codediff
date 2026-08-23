@@ -151,6 +151,12 @@ struct Args {
 #[derive(Clone, Copy)]
 enum ExternalTool {
     UnixDiff,
+    GitMyers,
+    GitMinimal,
+    GitPatience,
+    GitHistogram,
+    BDiff,
+    NvimDiff,
     GumTree,
     Difftastic,
     Diffsitter,
@@ -159,6 +165,12 @@ enum ExternalTool {
 impl ExternalTool {
     const ALL: &'static [ExternalTool] = &[
         ExternalTool::UnixDiff,
+        ExternalTool::GitMyers,
+        ExternalTool::GitMinimal,
+        ExternalTool::GitPatience,
+        ExternalTool::GitHistogram,
+        ExternalTool::BDiff,
+        ExternalTool::NvimDiff,
         ExternalTool::GumTree,
         ExternalTool::Difftastic,
         ExternalTool::Diffsitter,
@@ -167,9 +179,28 @@ impl ExternalTool {
     fn name(&self) -> &'static str {
         match self {
             ExternalTool::UnixDiff => "unix_diff",
+            ExternalTool::GitMyers => "git_myers",
+            ExternalTool::GitMinimal => "git_minimal",
+            ExternalTool::GitPatience => "git_patience",
+            ExternalTool::GitHistogram => "git_histogram",
+            ExternalTool::BDiff => "bdiff",
+            ExternalTool::NvimDiff => "nvim_diff",
             ExternalTool::GumTree => "gumtree",
             ExternalTool::Difftastic => "difftastic",
             ExternalTool::Diffsitter => "diffsitter",
+        }
+    }
+
+    /// The `--diff-algorithm` value for the four git variants, `None` for every other tool.
+    /// Git's four algorithms are the same engine (libxdiff) reached through one flag, so they
+    /// share a single labeller rather than getting four near-identical ones.
+    fn git_algorithm(&self) -> Option<&'static str> {
+        match self {
+            ExternalTool::GitMyers => Some("myers"),
+            ExternalTool::GitMinimal => Some("minimal"),
+            ExternalTool::GitPatience => Some("patience"),
+            ExternalTool::GitHistogram => Some("histogram"),
+            _ => None,
         }
     }
 
@@ -199,7 +230,19 @@ impl ExternalTool {
     /// builds - see `difftastic_extension`/`diffsitter_file_type`.
     fn supports(&self, language: Language) -> bool {
         match self {
-            ExternalTool::UnixDiff => true,
+            // Every text-based tool is language-agnostic by construction: it compares lines, and
+            // has no parser or generator that could fail to exist for a language. That makes
+            // their coverage the full corpus, exactly like Unix diff's.
+            ExternalTool::UnixDiff
+            | ExternalTool::GitMyers
+            | ExternalTool::GitMinimal
+            | ExternalTool::GitPatience
+            | ExternalTool::GitHistogram
+            | ExternalTool::BDiff
+            | ExternalTool::NvimDiff => {
+                let _ = language;
+                true
+            }
             ExternalTool::GumTree => gumtree_generator(language).is_some(),
             ExternalTool::Difftastic => difftastic_extension(language).is_some(),
             ExternalTool::Diffsitter => diffsitter_file_type(language).is_some(),
@@ -214,6 +257,16 @@ impl ExternalTool {
             // Shared with `generate_mapping_site`'s index-page columns - see
             // `human_mapping::unix_diff_line_labels`'s own doc comment.
             ExternalTool::UnixDiff => human_mapping::unix_diff_line_labels(before, after),
+            ExternalTool::GitMyers
+            | ExternalTool::GitMinimal
+            | ExternalTool::GitPatience
+            | ExternalTool::GitHistogram => git_line_labels(
+                self.git_algorithm().expect("git variant has an algorithm"),
+                before,
+                after,
+            ),
+            ExternalTool::BDiff => bdiff_line_labels(before, after),
+            ExternalTool::NvimDiff => nvim_line_labels(before, after),
             ExternalTool::GumTree => gumtree_line_labels(before, after),
             ExternalTool::Difftastic => difftastic_line_labels(before, after),
             ExternalTool::Diffsitter => diffsitter_line_labels(before, after),
@@ -306,6 +359,413 @@ fn external_tool_bin(env_var: &str, hint: &str) -> Result<std::path::PathBuf> {
         bail!("{env_var}={:?} does not exist or is not a file", path);
     }
     Ok(path)
+}
+
+/// Neutralizes the user's git configuration for a child process that will run `git` - directly
+/// (`git_line_labels`) or indirectly (`bdiff_line_labels`, since BDiff shells out to
+/// `git diff --no-index ... --unified=0 --numstat` for its raw change detection).
+///
+/// This is not defensive tidiness, it is a fix for an observed silent-wrong-answer (2026-08-23).
+/// This project's own README recommends configuring codediff as git's external diff driver, and
+/// with `diff.external=codediff` set, git emits codediff's output instead of a unified diff.
+/// `--no-ext-diff` suppresses that for our own invocations, but nothing can suppress it inside
+/// BDiff's hard-coded command string - so BDiff parsed zero `@@` headers and returned a **0-entry
+/// edit script with exit status 0**, which scores as "this tool thinks nothing changed" rather
+/// than as a failure. Pointing both config files at /dev/null removes the whole class: no
+/// `diff.external`, no `diff.algorithm` overriding the flag we pass, no `core.autocrlf` rewriting
+/// line endings under the measurement.
+fn git_env(command: &mut Command) -> &mut Command {
+    command
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+}
+
+/// `(before_touched, after_touched)` from `git diff --unified=0`, for one of git's four
+/// `--diff-algorithm` values.
+///
+/// `--unified=0` so every hunk header describes exactly the changed lines with no context, and the
+/// header alone carries everything needed - no need to read the body. A header is
+/// `@@ -N,K +M,L @@`, where a missing `,K` means a count of 1.
+///
+/// **The `,0` case is the whole reason this parses headers by hand rather than counting `-`/`+`
+/// lines.** For a pure insertion git writes `@@ -N,0 +M,L @@`: `N` there is the line *before
+/// which* the insertion lands, and it is not itself touched. Treating it as a touched line shifts
+/// the entire before-side label vector by one on every insertion-only hunk, which produces
+/// completely plausible mismatch rates that are all quietly wrong. A zero count contributes no
+/// lines; a count of `K > 0` contributes lines `N ..= N + K - 1` (1-indexed, as git writes them).
+///
+/// Cross-checked against `unix_diff_line_labels`: GNU diffutils and git's libxdiff are separate
+/// implementations of the same Myers family, so `git_myers` and `unix_diff` must agree on
+/// essentially every fixture. `git_myers_agrees_with_unix_diff` in this file's tests asserts that,
+/// and a divergence there means this parser is broken, not that a difference was discovered.
+fn git_line_labels(
+    algorithm: &str,
+    before: &Code,
+    after: &Code,
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let (before_file, after_file) = write_temp_pair(before, after, None)?;
+
+    let mut command = Command::new("git");
+    git_env(&mut command);
+    let output = command
+        .args([
+            "--no-pager",
+            "diff",
+            "--no-ext-diff",
+            "--no-index",
+            "--no-color",
+            "--unified=0",
+            &format!("--diff-algorithm={algorithm}"),
+        ])
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running git diff --diff-algorithm={algorithm}"))?;
+    // `git diff --no-index` uses exit status 1 for "the files differ", which is the normal case
+    // here, and only >1 is a real failure.
+    if output.status.code().is_none_or(|code| code > 1) {
+        bail!(
+            "git diff --diff-algorithm={algorithm} exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let mut before_touched = vec![false; before.contents.split('\n').count()];
+    let mut after_touched = vec![false; after.contents.split('\n').count()];
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Some(header) = line.strip_prefix("@@ ") else {
+            continue;
+        };
+        let Some((ranges, _)) = header.split_once(" @@") else {
+            continue;
+        };
+        for range in ranges.split_whitespace() {
+            let (sign, spec) = range.split_at(1);
+            let (start, count) = match spec.split_once(',') {
+                Some((start, count)) => (start.parse::<usize>()?, count.parse::<usize>()?),
+                None => (spec.parse::<usize>()?, 1),
+            };
+            if count == 0 {
+                continue;
+            }
+            let touched = match sign {
+                "-" => &mut before_touched,
+                "+" => &mut after_touched,
+                _ => continue,
+            };
+            for line_number in start..start + count {
+                // Headers are 1-indexed; a malformed or out-of-range number is ignored rather
+                // than panicking the whole corpus run on one fixture.
+                if let Some(slot) = line_number.checked_sub(1).and_then(|i| touched.get_mut(i)) {
+                    *slot = true;
+                }
+            }
+        }
+    }
+    Ok((before_touched, after_touched))
+}
+
+/// The BDiff driver script (see its own doc comment), embedded rather than shipped as a loose
+/// file so it cannot drift from the binary that runs it.
+const BDIFF_DRIVER: &str = include_str!("../../assets/bdiff_driver.py");
+
+/// Python interpreter with BDiff importable, from `BDIFF_PYTHON` - by convention the `venv/bin/
+/// python` of a virtualenv that has BDiff installed. Not auto-installed for the same reason
+/// GumTree isn't: it is a separate project with its own dependencies.
+///
+/// Note BDiff's `pyproject.toml` under-declares: it lists numpy and scipy but its `bdiff.py`
+/// also imports `rapidfuzz`, which must be installed separately or every invocation dies on
+/// `ModuleNotFoundError`. See data/comparison/PROVENANCE.md.
+fn bdiff_python() -> Result<std::path::PathBuf> {
+    external_tool_bin(
+        "BDIFF_PYTHON",
+        "point it at a python interpreter with bdiff installed (see research/Makefile's \
+         install-bdiff target)",
+    )
+}
+
+/// `(before_touched, after_touched)` from BDiff's edit script.
+///
+/// BDiff reports eight edit modes. Every one carries `src_line` (before side) and `dest_line`
+/// (after side), 1-indexed, and the block modes also carry `block_length`. Which side each mode
+/// actually *touches* is the only judgement call here, and it is made to match what every other
+/// tool in this comparison is scored on - `changed_spans` counts a line as changed when its
+/// `TextOperation` is anything other than `Identical`, and `Move` is one of those - so a moved
+/// line counts as touched for codediff and must count as touched here too:
+///
+/// * `insert` - after side only. Its `src_line` is the anchor the line was inserted at, not a
+///   before-side line that changed.
+/// * `delete` - before side only, for the mirror-image reason.
+/// * `update`, `m_update`, `c_update` - both sides. The latter two are line-level updates inside
+///   a move or copy block, and are ordinary updates for this metric.
+/// * `move` - both sides, `block_length` lines from `src_line` and from `dest_line`.
+/// * `split` - the one before-side line, and `block_length` after-side lines.
+/// * `merge` - the mirror: `block_length` before-side lines, one after-side line.
+/// * `copy` - **after side only.** A copy leaves its source block in place, unchanged, present
+///   in both files; only the new duplicate at `dest_line` is a change. (Rare: 7 occurrences
+///   across the first 60 fixtures.)
+fn bdiff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let python = bdiff_python()?;
+    let (before_file, after_file) = write_temp_pair(before, after, None)?;
+
+    let mut driver = tempfile::Builder::new()
+        .suffix(".py")
+        .tempfile()
+        .context("creating bdiff driver temp file")?;
+    std::io::Write::write_all(&mut driver, BDIFF_DRIVER.as_bytes())
+        .context("writing bdiff driver temp file")?;
+
+    let mut command = Command::new(&python);
+    git_env(&mut command);
+    let output = command
+        .arg(driver.path())
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {python:?} bdiff_driver.py"))?;
+    if !output.status.success() {
+        bail!(
+            "bdiff driver exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let script: Vec<serde_json::Value> =
+        serde_json::from_slice(&output.stdout).context("parsing bdiff driver JSON output")?;
+    bdiff_touched_from_script(before, after, &script)
+}
+
+/// The pure half of [`bdiff_line_labels`], split out so the mode-to-side rules documented there
+/// are unit-testable without an installed BDiff.
+fn bdiff_touched_from_script(
+    before: &Code,
+    after: &Code,
+    script: &[serde_json::Value],
+) -> Result<(Vec<bool>, Vec<bool>)> {
+    let mut before_touched = vec![false; before.contents.split('\n').count()];
+    let mut after_touched = vec![false; after.contents.split('\n').count()];
+
+    let mark = |touched: &mut Vec<bool>, start: u64, count: u64| {
+        for line_number in start..start + count.max(1) {
+            if let Some(slot) = (line_number as usize)
+                .checked_sub(1)
+                .and_then(|i| touched.get_mut(i))
+            {
+                *slot = true;
+            }
+        }
+    };
+
+    for entry in script {
+        let mode = entry.get("mode").and_then(|m| m.as_str()).unwrap_or_default();
+        let src = entry.get("src_line").and_then(|v| v.as_u64()).unwrap_or(0);
+        let dest = entry.get("dest_line").and_then(|v| v.as_u64()).unwrap_or(0);
+        let block = entry
+            .get("block_length")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1);
+        match mode {
+            "insert" => mark(&mut after_touched, dest, 1),
+            "delete" => mark(&mut before_touched, src, 1),
+            "update" | "m_update" | "c_update" => {
+                mark(&mut before_touched, src, 1);
+                mark(&mut after_touched, dest, 1);
+            }
+            "move" => {
+                mark(&mut before_touched, src, block);
+                mark(&mut after_touched, dest, block);
+            }
+            "split" => {
+                mark(&mut before_touched, src, 1);
+                mark(&mut after_touched, dest, block);
+            }
+            "merge" => {
+                mark(&mut before_touched, src, block);
+                mark(&mut after_touched, dest, 1);
+            }
+            "copy" => mark(&mut after_touched, dest, block),
+            other => bail!("unknown BDiff edit mode {other:?} - see bdiff_line_labels"),
+        }
+    }
+    Ok((before_touched, after_touched))
+}
+
+/// Per-fixture BDiff timings measured inside **one** Python interpreter, mirroring
+/// `gumtree_warm_batch` and existing for exactly the same reason.
+///
+/// Importing BDiff pulls in numpy, scipy and rapidfuzz: ~394 ms, against a ~12 ms bare
+/// interpreter (measured 2026-08-23). A per-invocation wall-clock number for BDiff is therefore
+/// ~97% import overhead, which would put it last in any speed table while saying nothing at all
+/// about its algorithm. `bdiff_ms` keeps that per-process number, because it is what a developer
+/// running the tool once actually waits for; this function supplies `bdiff_warm_ms`, the cost
+/// once startup is amortized. Reporting only one of the two would be misleading in one direction
+/// or the other.
+///
+/// `Ok(None)` when `BDIFF_PYTHON` is unset - the same opt-in-per-run contract `gumtree_warm_batch`
+/// has, not a per-fixture language scope.
+fn bdiff_warm_batch(fixtures: &[(&str, &Code, &Code)]) -> Result<Option<HashMap<String, f64>>> {
+    let Ok(python) = bdiff_python() else {
+        return Ok(None);
+    };
+
+    let mut driver = tempfile::Builder::new()
+        .suffix(".py")
+        .tempfile()
+        .context("creating bdiff batch driver temp file")?;
+    std::io::Write::write_all(&mut driver, BDIFF_DRIVER.as_bytes())
+        .context("writing bdiff batch driver temp file")?;
+
+    // Kept alive until the child has read every path off its stdin, exactly as in
+    // `gumtree_warm_batch`.
+    let mut before_files = Vec::with_capacity(fixtures.len());
+    let mut after_files = Vec::with_capacity(fixtures.len());
+    let mut requests = String::new();
+    for (name, before, after) in fixtures {
+        let (before_file, after_file) = write_temp_pair(before, after, None)?;
+        requests.push_str(
+            &serde_json::json!({
+                "id": name,
+                "before": before_file.path().display().to_string(),
+                "after": after_file.path().display().to_string(),
+            })
+            .to_string(),
+        );
+        requests.push('\n');
+        before_files.push(before_file);
+        after_files.push(after_file);
+    }
+
+    let mut command = Command::new(&python);
+    git_env(&mut command);
+    let mut child = command
+        .arg(driver.path())
+        .arg("--batch")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("spawning the BDiff batch driver")?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .context("bdiff batch driver child has no stdin")?;
+    let writer = std::thread::spawn(move || stdin.write_all(requests.as_bytes()));
+    let output = child
+        .wait_with_output()
+        .context("waiting for the BDiff batch driver")?;
+    writer
+        .join()
+        .expect("bdiff batch driver stdin-writer thread panicked")
+        .context("writing bdiff batch driver stdin")?;
+    if !output.status.success() {
+        bail!(
+            "BDiff batch driver exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let mut results = HashMap::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let json: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("parsing bdiff batch response line {line:?}"))?;
+        let id = json["id"]
+            .as_str()
+            .context("bdiff batch response missing `id`")?
+            .to_string();
+        // A pair BDiff itself fails on is a per-fixture gap, not a run-ending failure - same
+        // policy as the GumTree batch above, and for the same reason.
+        if let Some(ms) = json.get("ms").and_then(|v| v.as_f64()) {
+            results.insert(id, ms);
+        }
+    }
+    Ok(Some(results))
+}
+
+/// The Neovim diff driver (see its own header), embedded so it cannot drift from this binary.
+const NVIM_DRIVER: &str = include_str!("../../assets/nvim_diff_driver.lua");
+
+/// Neovim binary, from `NVIM_BIN`. Not auto-installed, same policy as every other external tool.
+fn nvim_bin() -> Result<std::path::PathBuf> {
+    external_tool_bin("NVIM_BIN", "point it at a neovim binary (nvim-linux64/bin/nvim)")
+}
+
+/// `(before_touched, after_touched)` from `nvim -d`.
+///
+/// Included even though Neovim's *line* pass is libxdiff - the same engine as the four `git`
+/// rows - because excluding it on that basis would be letting this metric's granularity decide
+/// what gets measured. Neovim is the tool a large number of developers actually read diffs in,
+/// and it is the only entry here that pairs a line-level match with character-level display, so
+/// what it costs is one row and what it buys is a data point rather than an assumption. On a
+/// 40-fixture sample its line set matched `git_myers` on 38; the corpus decides the rest.
+///
+/// Run with `-u NONE`: `diffopt` is user-configurable and can change both the algorithm
+/// (`algorithm:histogram`) and the within-line alignment (`linematch:N`), so loading a user
+/// config would silently turn this into a measurement of that config. What is scored is Neovim's
+/// shipped default behaviour.
+///
+/// `-n` disables swap files - without it, concurrent or repeated runs over the same fixture path
+/// prompt for swap recovery and hang a headless process forever.
+fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let nvim = nvim_bin()?;
+    let (before_file, after_file) = write_temp_pair(before, after, None)?;
+
+    let mut driver = tempfile::Builder::new()
+        .suffix(".lua")
+        .tempfile()
+        .context("creating nvim driver temp file")?;
+    std::io::Write::write_all(&mut driver, NVIM_DRIVER.as_bytes())
+        .context("writing nvim driver temp file")?;
+
+    let output = Command::new(&nvim)
+        .args(["--headless", "-n", "-u", "NONE", "-d", "-S"])
+        .arg(driver.path())
+        .arg(before_file.path())
+        .arg(after_file.path())
+        .output()
+        .with_context(|| format!("running {nvim:?} -d"))?;
+    if !output.status.success() {
+        bail!(
+            "nvim -d exited with {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    // The driver writes exactly one JSON line; take the last non-empty one so any startup chatter
+    // Neovim emits on stdout ahead of it is ignored rather than breaking the parse.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let line = stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .next_back()
+        .context("nvim driver produced no output")?;
+    let sides: Vec<serde_json::Value> =
+        serde_json::from_str(line).context("parsing nvim driver JSON output")?;
+    if sides.len() != 2 {
+        bail!("nvim driver returned {} sides, expected 2", sides.len());
+    }
+
+    let touched = |side: &serde_json::Value, line_count: usize| -> Vec<bool> {
+        let mut flags = vec![false; line_count];
+        if let Some(lines) = side.get("lines").and_then(|v| v.as_array()) {
+            for value in lines {
+                if let Some(index) = value.as_u64().and_then(|n| (n as usize).checked_sub(1)) {
+                    if let Some(slot) = flags.get_mut(index) {
+                        *slot = true;
+                    }
+                }
+            }
+        }
+        flags
+    };
+    Ok((
+        touched(&sides[0], before.contents.split('\n').count()),
+        touched(&sides[1], after.contents.split('\n').count()),
+    ))
 }
 
 /// Path to the GumTree CLI script (`bin/gumtree` in its built distribution), from the `GUMTREE_BIN`
@@ -912,6 +1372,13 @@ struct Row {
     /// batch driver `--repeats` times (see `gumtree_warm_batch`'s call site), same all-or-nothing
     /// availability as before, just repeated.
     gumtree_warm_ms: Option<Vec<f64>>,
+    /// Milliseconds BDiff itself spent on this fixture inside one persistent Python interpreter -
+    /// see `bdiff_warm_batch`. Exactly the same contract as `gumtree_warm_ms` above: `None` when
+    /// the batch wasn't available for this run, in lockstep across every row. There is no
+    /// per-fixture language scope to collapse here, because BDiff is text-based and applies to
+    /// every fixture. Accuracy is identical to the per-process `bdiff` entry in `tools` (same
+    /// library call), so this is a second timing only.
+    bdiff_warm_ms: Option<Vec<f64>>,
 }
 
 fn score_fixture(
@@ -920,6 +1387,7 @@ fn score_fixture(
     after: &Code,
     repeats: usize,
     gumtree_warm_ms: Option<Vec<f64>>,
+    bdiff_warm_ms: Option<Vec<f64>>,
 ) -> Result<Row> {
     let language = before.metadata.language.unwrap_or_default();
     let (human_before, human_after, node_cache) =
@@ -1008,6 +1476,7 @@ fn score_fixture(
         tool_ms,
         treesitter_ms,
         gumtree_warm_ms,
+        bdiff_warm_ms,
     })
 }
 
@@ -1138,6 +1607,18 @@ fn main() -> Result<()> {
     }
     let gumtree_warm_available = gumtree_warm_runs.len() == args.repeats && args.repeats > 0;
 
+    // Same shape as the GumTree warm pass above, one persistent interpreter instead of one
+    // persistent JVM - see `bdiff_warm_batch` for why BDiff needs the same cold/warm split.
+    let mut bdiff_warm_runs: Vec<HashMap<String, f64>> = Vec::new();
+    for repeat in 0..args.repeats {
+        eprintln!("bdiff_warm_batch: repeat {}/{}...", repeat + 1, args.repeats);
+        match bdiff_warm_batch(&warm_fixtures)? {
+            Some(results) => bdiff_warm_runs.push(results),
+            None => break,
+        }
+    }
+    let bdiff_warm_available = bdiff_warm_runs.len() == args.repeats && args.repeats > 0;
+
     let started = std::time::Instant::now();
     let mut rows = Vec::with_capacity(names.len());
     for (i, name) in names.iter().enumerate() {
@@ -1156,7 +1637,22 @@ fn main() -> Result<()> {
         // "applicable but somehow always empty," so collapse it back to `None` per-fixture, same
         // as `tool_ms`'s per-fixture `None` for an out-of-scope tool.
         let warm_ms = warm_ms.filter(|v| !v.is_empty());
-        rows.push(score_fixture(name, before, after, args.repeats, warm_ms)?);
+        let bdiff_warm = bdiff_warm_available
+            .then(|| {
+                bdiff_warm_runs
+                    .iter()
+                    .filter_map(|results| results.get(name).copied())
+                    .collect::<Vec<f64>>()
+            })
+            .filter(|v| !v.is_empty());
+        rows.push(score_fixture(
+            name,
+            before,
+            after,
+            args.repeats,
+            warm_ms,
+            bdiff_warm,
+        )?);
     }
     let elapsed = started.elapsed();
 
@@ -1299,7 +1795,7 @@ fn mean_coefficient_of_variation<'a>(samples: impl Iterator<Item = &'a [f64]>) -
 
 fn print_runtime_table(rows: &[Row]) {
     let tool_names: Vec<&str> = ExternalTool::ALL.iter().map(|t| t.name()).collect();
-    let label_width = ["codediff", "treesitter_parse", "gumtree_warm"]
+    let label_width = ["codediff", "treesitter_parse", "gumtree_warm", "bdiff_warm"]
         .iter()
         .chain(&tool_names)
         .map(|s| s.len())
@@ -1403,6 +1899,28 @@ fn print_runtime_table(rows: &[Row]) {
             label_width = label_width
         );
     }
+
+    // The BDiff equivalent, same reason: without it BDiff's per-process row is ~97% Python import
+    // overhead (see `bdiff_warm_batch`).
+    let bdiff_warm: Vec<&[f64]> = rows
+        .iter()
+        .filter_map(|r| r.bdiff_warm_ms.as_deref())
+        .collect();
+    let bdiff_flat: Vec<f64> = bdiff_warm.iter().flat_map(|s| s.iter().copied()).collect();
+    if !bdiff_flat.is_empty() {
+        let total: f64 = bdiff_flat.iter().sum();
+        println!(
+            "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})  <- same algorithm as bdiff, warm interpreter",
+            "bdiff_warm",
+            total,
+            total / bdiff_flat.len() as f64,
+            mean_coefficient_of_variation(bdiff_warm.iter().copied())
+                .map(|cv| format!("{cv:.1}"))
+                .unwrap_or_else(|| "-".to_string()),
+            bdiff_flat.len(),
+            label_width = label_width
+        );
+    }
 }
 
 /// Serializes a repeat-timing sample as a single CSV field: every repeat's value, in run order,
@@ -1494,7 +2012,16 @@ fn tool_node_spans(
     after: &Code,
 ) -> Option<Result<(Vec<TextRange>, Vec<TextRange>)>> {
     match tool {
-        ExternalTool::UnixDiff => None,
+        // Every text-based tool reports changed *lines*, never nodes - there is no tree in its
+        // output to project onto this codebase's AST. `None` here is what makes `score_accuracy`
+        // record them as `line_only` rather than as an error or a perfect zero.
+        ExternalTool::UnixDiff
+        | ExternalTool::GitMyers
+        | ExternalTool::GitMinimal
+        | ExternalTool::GitPatience
+        | ExternalTool::GitHistogram
+        | ExternalTool::BDiff
+        | ExternalTool::NvimDiff => None,
         ExternalTool::GumTree => Some(gumtree_node_spans(before, after)),
         ExternalTool::Difftastic => Some(difftastic_node_spans(before, after)),
         ExternalTool::Diffsitter => Some(diffsitter_node_spans(before, after)),
@@ -2231,6 +2758,7 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         ]
     }));
     header.push("gumtree_warm_ms".to_string());
+    header.push("bdiff_warm_ms".to_string());
     wtr.write_record(&header)?;
 
     for row in rows {
@@ -2262,6 +2790,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                 .map(join_ms)
                 .unwrap_or_default(),
         );
+        // Same contract as the column above - see `Row::bdiff_warm_ms`.
+        record.push(row.bdiff_warm_ms.as_deref().map(join_ms).unwrap_or_default());
         wtr.write_record(&record)?;
     }
     wtr.flush()?;
@@ -2387,5 +2917,101 @@ mod tests {
     #[test]
     fn merge_spans_handles_the_empty_case() {
         assert!(merge_spans(Vec::new()).is_empty());
+    }
+
+    /// The `,0` trap in `git_line_labels`'s doc comment, as a fixed input: a pure insertion whose
+    /// before-side header is `@@ -3,0 +4,2 @@`. Line 3 of the before side is the *anchor*, not a
+    /// touched line, so the before side must come back all-false. This is the one parser bug that
+    /// produces plausible-looking rates rather than an obvious failure, so it is pinned here
+    /// rather than left to the corpus-wide differential check below.
+    #[test]
+    fn git_line_labels_treats_a_zero_count_side_as_untouched() {
+        let before = Code::from_string("a\nb\nc\n", &Language::Rust);
+        let after = Code::from_string("a\nb\nc\nd\ne\n", &Language::Rust);
+        let (before_touched, after_touched) =
+            git_line_labels("myers", &before, &after).expect("git diff runs");
+        assert!(
+            !before_touched.iter().any(|touched| *touched),
+            "a pure insertion touches no before-side line, got {before_touched:?}"
+        );
+        assert_eq!(
+            after_touched
+                .iter()
+                .enumerate()
+                .filter(|(_, touched)| **touched)
+                .map(|(index, _)| index + 1)
+                .collect::<Vec<_>>(),
+            vec![4, 5],
+            "the two inserted lines, 1-indexed"
+        );
+    }
+
+    /// GNU diffutils and git's libxdiff are independent implementations of the same Myers family,
+    /// so on the same input they must mark the same lines. Any divergence here is a bug in
+    /// `git_line_labels`'s header parsing, **not** a finding about the algorithms - which is
+    /// exactly why this compares against the long-standing `unix_diff` path rather than against
+    /// a hand-written expectation.
+    #[test]
+    fn git_myers_agrees_with_unix_diff() {
+        let cases = [
+            ("fn a() {\n  one();\n}\n", "fn a() {\n  two();\n}\n"),
+            ("a\nb\nc\n", "a\nb\nc\nd\n"),
+            ("a\nb\nc\nd\n", "a\nd\n"),
+            ("x\n", "x\n"),
+            ("one\ntwo\nthree\nfour\nfive\n", "one\nthree\ntwo\nfour\nsix\n"),
+        ];
+        for (before_text, after_text) in cases {
+            let before = Code::from_string(before_text, &Language::Rust);
+            let after = Code::from_string(after_text, &Language::Rust);
+            let git = git_line_labels("myers", &before, &after).expect("git diff runs");
+            let unix = human_mapping::unix_diff_line_labels(&before, &after).expect("diff runs");
+            assert_eq!(
+                git, unix,
+                "git myers and unix diff disagree on {before_text:?} -> {after_text:?}"
+            );
+        }
+    }
+
+    /// The mode-to-side rules from `bdiff_line_labels`'s doc comment, against a hand-built script
+    /// so they are pinned without needing BDiff installed. The two that are judgement calls, and
+    /// so the two most likely to be changed by accident, are `insert`/`delete` (whose *other*
+    /// side carries an anchor line number that must not be marked) and `copy` (whose source block
+    /// stays in place unchanged and must not be marked).
+    #[test]
+    fn bdiff_touched_from_script_follows_the_documented_mode_rules() {
+        let before = Code::from_string("1\n2\n3\n4\n5\n6\n", &Language::Rust);
+        let after = Code::from_string("1\n2\n3\n4\n5\n6\n", &Language::Rust);
+        let script: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {"mode": "insert", "src_line": 2, "dest_line": 3},
+                {"mode": "delete", "src_line": 5, "dest_line": 1},
+                {"mode": "copy",   "src_line": 1, "dest_line": 4, "block_length": 2}
+            ]"#,
+        )
+        .expect("valid test JSON");
+        let (before_touched, after_touched) =
+            bdiff_touched_from_script(&before, &after, &script).expect("known modes");
+        let touched = |v: &Vec<bool>| {
+            v.iter()
+                .enumerate()
+                .filter(|(_, t)| **t)
+                .map(|(i, _)| i + 1)
+                .collect::<Vec<_>>()
+        };
+        // Before: only the delete's line 5. The insert's src_line 2 is an anchor, and the copy's
+        // source block (lines 1-2) is unchanged text still present in both files.
+        assert_eq!(touched(&before_touched), vec![5]);
+        // After: the insert's line 3, and the copy's destination block (lines 4-5). The delete's
+        // dest_line 1 is an anchor.
+        assert_eq!(touched(&after_touched), vec![3, 4, 5]);
+    }
+
+    #[test]
+    fn bdiff_touched_from_script_rejects_an_unknown_mode() {
+        let code = Code::from_string("1\n", &Language::Rust);
+        let script: Vec<serde_json::Value> =
+            serde_json::from_str(r#"[{"mode": "teleport", "src_line": 1, "dest_line": 1}]"#)
+                .expect("valid test JSON");
+        assert!(bdiff_touched_from_script(&code, &code, &script).is_err());
     }
 }

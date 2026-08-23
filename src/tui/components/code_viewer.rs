@@ -132,6 +132,18 @@ impl CodeViewer {
         self.state.highlight_destination = destination;
     }
 
+    /// Whether the node highlight is painted on this panel - the `H` toggle. See
+    /// `CodeViewerState::node_highlight` for why it defaults to off.
+    pub fn is_node_highlight_enabled(&self) -> bool {
+        self.state.node_highlight
+    }
+
+    /// Turn the node highlight on or off. Purely a painting change - the cursor still follows its
+    /// counterpart on the other panel either way.
+    pub fn set_node_highlight(&mut self, enable: bool) {
+        self.state.node_highlight = enable;
+    }
+
     /// Mark whether this side's cursor is the one currently driving navigation; see
     /// `CodeViewerState::is_focused`.
     pub fn set_focused(&mut self, focused: bool) {

@@ -2,9 +2,72 @@
 
 `benchmark_other.csv` is measured against the ground-truth fixtures in `src/test/data/diffs/`
 (same fixture set as `../quality/`, not the sampled corpus), by `benchmark_other` with external
-tool binaries supplied via GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN. Rows are only comparable
-within one run: tool versions and machine are not recorded per row, so refresh the whole file,
-never append to it.
+tool binaries supplied via GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN / BDIFF_PYTHON. Rows are only
+comparable within one run: tool versions and machine are not recorded per row, so refresh the
+whole file, never append to it.
+
+## Text-based tools (added 2026-08-23)
+
+Nine tools are now scored, not four. Alongside Unix `diff` there are four git variants and BDiff:
+
+* **`git_myers` / `git_minimal` / `git_patience` / `git_histogram`** - one engine (libxdiff)
+  reached through `git diff --diff-algorithm=`, so they share a single labeller. Motivated by
+  Nugroho, Hata and Matsumoto, "How different are different diff algorithms in Git? Use
+  --histogram for code changes" (EMSE 2020), whose claim this corpus can test directly.
+* **`bdiff`** - BDiff, block-aware text-based differencing (arXiv 2510.21094), cloned from
+  <https://github.com/BDiff/BDiff> into `/var/tmp/bdiff-install` by `make install-bdiff`.
+
+* **`nvim_diff`** - Neovim's own diff mode, driven headless by `assets/nvim_diff_driver.lua` and
+  read back through `diff_hlID(lnum, col)`, which is the only public way to get at it: Neovim's
+  diff result is window state, written to no stream. Always run with `-u NONE`, because `diffopt`
+  is user-configurable and controls both the algorithm (`algorithm:histogram`) and the within-line
+  alignment (`linematch:N`) - loading a user config would make this a measurement of that config.
+  What is scored is Neovim's shipped defaults.
+
+  It was briefly left out on the grounds that its line pass is libxdiff, so its line set matched
+  `git_myers` on 38 of a 40-fixture sample. That was the wrong call: a 2-in-40 divergence is the
+  same order as `git_myers` against `unix_diff`, which get separate rows, and "redundant at the
+  granularity we happen to measure" is a claim about the metric rather than about the tool.
+  Measured over the full corpus it differs from `git_myers` on 13 of 486 fixtures - better on 6,
+  worse on 7, pooled rate 1.125% against 1.123%. Indistinguishable, but now by measurement.
+
+**Two traps, both of which produce a silently wrong number rather than an error.**
+
+1. **BDiff shells out to `git diff --no-index`**, so it inherits the user's git configuration.
+   This project's own README recommends setting `diff.external=codediff`; with that set, git emits
+   codediff's output, BDiff finds no `@@` headers, and `bdiff.bdiff()` returns a **0-entry edit
+   script with exit status 0** - which scores as "this tool thinks nothing changed", i.e. a
+   near-perfect result. `benchmark_other` neutralizes this per invocation by pointing
+   GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM at /dev/null (`git_env`), for its own git calls as well
+   as BDiff's. Anyone running BDiff by hand outside the harness must do the same.
+2. **BDiff's `pyproject.toml` under-declares its dependencies.** It lists numpy and scipy;
+   `bdiff/bdiff.py` also imports `rapidfuzz`. A plain `pip install .` yields a package that dies
+   on `ModuleNotFoundError` at first use. `make install-bdiff` installs it explicitly.
+
+BDiff also has no usable CLI for this purpose: `python -m bdiff a b` calls the library and
+discards the result, printing nothing (verified 2026-08-23 - exit 0, empty stdout and stderr).
+`assets/bdiff_driver.py`, embedded into `benchmark_other` via `include_str!`, exposes the edit
+script and provides the batch mode below.
+
+**Cold and warm timings, for BDiff as well as GumTree.** Importing BDiff costs ~394 ms (numpy,
+scipy, rapidfuzz) against a ~12 ms bare interpreter, so a per-process wall-clock number for BDiff
+is ~97% import overhead. `bdiff_ms` is the per-process cost a developer actually waits for;
+`bdiff_warm_ms` times only the `bdiff.bdiff()` call inside one persistent interpreter. Quote which
+one you mean, exactly as with `gumtree_ms` / `gumtree_warm_ms`.
+
+**The git hunk parser has one trap worth knowing.** With `--unified=0`, a pure insertion is
+`@@ -N,0 +M,K @@`, where before-side line `N` is the line the insertion lands *after* and is not
+itself touched. Counting it shifts every git variant's before-side labels by one and produces
+entirely plausible but wrong rates. `benchmark_other`'s unit tests pin both the `,0` case and a
+differential check that `git_myers` agrees with `unix_diff`, which are independent implementations
+of the same Myers family - a divergence there means the parser broke, not that a finding was made.
+
+**GumTree build, 2026-08-23.** The previously-installed beta8 tree was gone and GitHub publishes
+**no release asset for beta8** (only beta4 and beta3 ship zips), so beta8 was rebuilt from source
+at tag `v4.0.0-beta8` with JDK 17 into `/var/tmp/tools/gumtree-4.0.0-beta8`. Verified by running
+`gumtree list GENERATORS`: it registers `cpp-treesitter-ng` and `tsx-treesitter-ng` and no JSON
+generator, which is the beta8 signature this repository has documented. Do not substitute the
+beta4 zip: its generator set differs in both directions and its numbers are not comparable.
 
 ## `benchmark_accuracy.csv`
 

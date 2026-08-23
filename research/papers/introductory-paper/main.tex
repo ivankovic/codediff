@@ -516,7 +516,8 @@ not as a ranking of which tool is best.
 
 \textbf{Line-level agreement.} None of the four tools report an AST-node mapping, so we
 compare them on a common ground: which source lines each marks as touched, against the
-same human mapping (Table~\ref{tab:accuracy-vs-others}, Figure~\ref{fig:accuracy}). Coverage
+same human mapping (Table~\ref{tab:accuracy-vs-others}, Table~\ref{tab:agreement-buckets}).
+Coverage
 varies widely: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the
 \NumFixtures{} fixtures' languages, GumTree's generator set matches \GumTreeFixtures{},
 difftastic's \DifftasticFixtures{}, and only Unix \texttt{diff} covers all
@@ -534,6 +535,14 @@ structurally interesting remainder—and on that remainder no AST-aware tool amo
 beats plain line-based \texttt{diff}, on either basis. Syntax-awareness alone does not guarantee
 that a tool recovers a change the way a human reads it.
 \end{resultbox}
+
+Table~\ref{tab:agreement-buckets} reports the same agreement per fixture rather than pooled over
+lines, and the two readings weight the corpus differently: a pooled rate is dominated by a handful
+of very large fixtures, while the buckets weight every change equally. On the pooled rate the four
+tools span 1.13\% to 4.85\%; by fixtures mapped with no mismatched line at all they span 50\% down
+to 34\%. The table also groups the tools by whether their output carries sub-line detail at all,
+which is a statement about what each tool reports, not about how it was scored here -- every
+number in this section is line-level.
 
 Two details behind that answer are worth stating. The first is how wide the agreement is: even the
 highest mismatch rate leaves more than 95\% of lines in agreement, so the question that separates
@@ -557,13 +566,7 @@ correct mapping to measure against at all, which is the assumption RQ3 turns to 
   \end{tabular}
 \end{table}
 
-\begin{figure*}
-  \centering
-  \includegraphics[width=0.85\linewidth]{figures/benchmark_other_accuracy.png}
-  \caption{Line-level agreement rate with the human mapping, bucketed in 10-point increments, all
-  four tools on the same axis. Each series' own $n$ reflects its applicable subset of the corpus.}
-  \label{fig:accuracy}
-\end{figure*}
+\input{figures/benchmark_other_buckets.tex}
 
 \textbf{Ground-truth ambiguity.} Every accuracy number above rests on an assumption worth
 testing: that for a given change there is one correct mapping to recover. RQ3 asks when that

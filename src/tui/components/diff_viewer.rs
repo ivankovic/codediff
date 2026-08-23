@@ -199,6 +199,26 @@ impl DiffViewer {
         self.right_viewer.set_syntax_highlighting(enable);
     }
 
+    /// `H`: toggle the node highlight on both panels at once and persist the choice, same
+    /// both-panels-or-neither reasoning as `toggle_syntax_highlighting` above - the highlight is
+    /// one signal spanning the two sides (the node under the cursor, and its counterpart), so
+    /// enabling it on one panel alone would show half of it.
+    ///
+    /// Persisted because it is off by default: a user who wants it wants it every run, and having
+    /// to re-enable it on every start would make the feature not worth reaching for.
+    pub fn toggle_node_highlight(&mut self) {
+        let enable = !self.left_viewer.is_node_highlight_enabled();
+        self.set_node_highlight(enable);
+        crate::tui::theme::save_node_highlight(enable);
+    }
+
+    /// Apply the node-highlight setting to both panels without persisting - the startup path
+    /// (`App::run` loads the saved value) and `toggle_node_highlight`'s shared half.
+    pub fn set_node_highlight(&mut self, enable: bool) {
+        self.left_viewer.set_node_highlight(enable);
+        self.right_viewer.set_node_highlight(enable);
+    }
+
     /// Move the focused panel's cursor to the start of a 1-indexed line (the `g` prompt),
     /// clamped to the file, centered in the viewport, and synced onto the other panel like any
     /// other jump.
@@ -546,6 +566,11 @@ impl Component for DiffViewer {
             // S (capital - lowercase s stays free) toggles syntax highlighting on both panels.
             crossterm::event::KeyCode::Char('S') => {
                 self.toggle_syntax_highlighting();
+                Ok(Some(Action::Render))
+            }
+            // H (capital, pairing with S above) toggles the node highlight, which ships off.
+            crossterm::event::KeyCode::Char('H') => {
+                self.toggle_node_highlight();
                 Ok(Some(Action::Render))
             }
             // Tab switches which panel's cursor drives navigation (and, in single panel mode,
@@ -1454,4 +1479,30 @@ mod tests {
         viewer.load_diff(&sample_diff_data());
         assert_eq!(viewer.focused_search_match_count_and_index(), None);
     }
+
+    /// The node highlight ships off, and `H` turns it on for *both* panels - half of a
+    /// two-panel signal is worse than none of it.
+    #[test]
+    fn node_highlight_is_off_by_default_and_h_enables_both_panels() {
+        let mut viewer = DiffViewer::new();
+        assert!(
+            !viewer.left_viewer.is_node_highlight_enabled()
+                && !viewer.right_viewer.is_node_highlight_enabled(),
+            "the node highlight must ship off on both panels"
+        );
+
+        viewer.set_node_highlight(true);
+        assert!(
+            viewer.left_viewer.is_node_highlight_enabled()
+                && viewer.right_viewer.is_node_highlight_enabled(),
+            "enabling must apply to both panels at once"
+        );
+
+        viewer.set_node_highlight(false);
+        assert!(
+            !viewer.left_viewer.is_node_highlight_enabled()
+                && !viewer.right_viewer.is_node_highlight_enabled(),
+        );
+    }
+
 }

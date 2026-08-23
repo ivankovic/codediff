@@ -258,6 +258,15 @@ pub struct CodeViewerState {
     /// `highlight_destination` - see `CodeViewerWidget::find_matches`. Empty when no search is
     /// active.
     pub search_matches: Vec<TextRange>,
+    /// Whether to paint the node highlight at all - the `H` toggle, **off by default** (which
+    /// `#[derive(Default)]` gives for free on a `bool`, and which `theme::load_node_highlight`
+    /// deliberately matches).
+    ///
+    /// Gates only the painting, never the navigation. `cursor_destination` - which drives
+    /// cursor-following and scroll-syncing between the panels - is a separate lookup from
+    /// `cursor_destination_for_highlight`, so turning this off changes what is drawn and nothing
+    /// about how the cursor moves.
+    pub node_highlight: bool,
 }
 
 impl CodeViewerState {
@@ -736,7 +745,8 @@ impl CodeViewerWidget {
             // Skipped for an `Identical` match - highlighting a range that isn't part of any
             // change at all doesn't tell the user anything (see `sync_cross_highlight`'s matching
             // suppression on the other panel's side of this same signal).
-            if state.is_focused
+            if state.node_highlight
+                && state.is_focused
                 && cursor_range == Some(index)
                 && range_match.operation != TextOperation::Identical
             {
@@ -774,7 +784,8 @@ impl CodeViewerWidget {
         // `cursor_destination_for_highlight` (not `cursor_destination`), which is `None` in that
         // case, so there's no operation to check here the way the focused side's own paint above
         // does.
-        if !state.is_focused
+        if state.node_highlight
+            && !state.is_focused
             && let Some(destination) = &state.highlight_destination
             && let Some((start_col, end_col)) = destination.columns_on_row(row, row_len)
         {
@@ -1118,16 +1129,23 @@ mod tests {
         );
     }
 
-    /// The cross-highlight is always on for a real change (2026-08-08: the earlier `x` toggle
-    /// didn't improve the UX, so it's gone - see `overlay_row`'s doc comments for what replaced
-    /// it) - a fresh widget, with no setup beyond loading ranges, must paint the focused side's
-    /// own cursor range blue when it's sitting on a real (non-`Identical`) change.
+    /// A fresh widget must paint **nothing** extra over the focused side's cursor range: the node
+    /// highlight is off until `H` turns it on.
+    ///
+    /// This test asserted the exact opposite until 2026-08-23, and the flip is deliberate, so the
+    /// full history is worth keeping in one place. The highlight was originally behind an `x`
+    /// toggle; that toggle was removed on 2026-08-08 because it "didn't improve the UX" and the
+    /// highlight became unconditional. It is now toggleable again, under `H` - but off by
+    /// default, which is the part the first attempt got wrong. On by default, a toggle only helps
+    /// a user who already knows the key; the highlight repaints on every cursor movement and
+    /// covers the diff-operation color underneath it, so the default is what determines whether
+    /// it reads as a feature or as interference.
     #[test]
-    fn cross_highlight_is_enabled_by_default_for_a_real_change() {
+    fn node_highlight_is_off_until_enabled() {
         let widget = widget_with_line("hello world");
         let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
         let range_order = build_range_order(&ranges);
-        let focused_state = CodeViewerState {
+        let mut focused_state = CodeViewerState {
             ranges,
             range_order,
             cursor_row: 0,
@@ -1137,11 +1155,21 @@ mod tests {
             ..Default::default()
         };
         let palette = default_palette();
+
+        let focused_span = &widget.overlay_row(0, &focused_state).spans[0];
+        assert_eq!(
+            focused_span.style.bg,
+            background_for_operation(&TextOperation::Insert, &palette),
+            "with the highlight off, the range keeps its own diff color"
+        );
+
+        // ...and `H` brings it back, unchanged from what it always painted.
+        focused_state.node_highlight = true;
         let focused_span = &widget.overlay_row(0, &focused_state).spans[0];
         assert_eq!(
             focused_span.style.bg,
             Some(palette.cross_highlight_bg),
-            "a real change under the cursor should be painted blue with no setup required"
+            "once enabled, a real change under the cursor is painted blue as before"
         );
     }
 
@@ -1185,6 +1213,9 @@ mod tests {
             cursor_col: 0,
             viewport_height: 1,
             is_focused: true,
+            // Opt in: the highlight ships off (see `CodeViewerState::node_highlight`), so a
+            // test of what it paints has to enable it, exactly as a user pressing `H` does.
+            node_highlight: true,
             ..Default::default()
         };
 
@@ -1243,6 +1274,58 @@ mod tests {
         assert!(
             line.spans.iter().all(|span| span.style.bg.is_none()),
             "no span should be painted: highlight_destination is stale once focused"
+        );
+    }
+
+    /// The whole point of the toggle: with it off - the shipped default - the focused panel's
+    /// cursor range is left showing its diff-operation color, not repainted blue.
+    #[test]
+    fn node_highlight_off_leaves_the_cursor_range_showing_its_diff_color() {
+        let widget = widget_with_line("hello world");
+        let ranges = vec![range_match(TextOperation::Insert, 0, 5)];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 0,
+            viewport_height: 1,
+            is_focused: true,
+            // Not set: `Default` is `false`, which is the shipped default.
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        let palette = default_palette();
+        let span = &line.spans[0];
+        assert_eq!(span.content, "hello");
+        assert_ne!(
+            span.style.bg,
+            Some(palette.cross_highlight_bg),
+            "the node highlight must not paint while it is toggled off"
+        );
+        assert_eq!(
+            span.style.bg,
+            background_for_operation(&TextOperation::Insert, &palette),
+            "the underlying diff color must survive - that is what the highlight was covering"
+        );
+    }
+
+    /// The other panel's half of the same signal, also gated.
+    #[test]
+    fn node_highlight_off_leaves_the_counterpart_unpainted() {
+        let widget = widget_with_line("hello world");
+        let state = CodeViewerState {
+            is_focused: false,
+            highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
+            viewport_height: 1,
+            ..Default::default()
+        };
+
+        let line = widget.overlay_row(0, &state);
+        assert!(
+            line.spans.iter().all(|span| span.style.bg.is_none()),
+            "the counterpart highlight must not paint while the toggle is off"
         );
     }
 
@@ -1580,6 +1663,7 @@ mod tests {
             is_focused: false,
             highlight_destination: Some(TextRange::new(0, 6, 0, 11)),
             viewport_height: 1,
+            node_highlight: true,
             ..Default::default()
         };
 

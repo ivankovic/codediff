@@ -43,8 +43,6 @@ Navigation
   Tab              Switch the active panel (Before/After)
   h/j/k/l          Move the cursor left/down/up/right
   Arrow keys       Same as h/j/k/l
-                   The range under the cursor, and its match on the other panel, highlight
-                   when part of a real change; unchanged content is never highlighted
   Enter            Jump to the counterpart of the range under the cursor (again: jump back)
   n/p              Jump to the next/previous change, skipping unchanged lines
   g                Go to a line number
@@ -66,6 +64,9 @@ Appearance
   c                Open the color theme picker (selection previews live; Enter keeps it)
   v                Cycle the panel layout: auto / dual / single (persisted)
   S                Toggle syntax highlighting
+  H                Toggle the node highlight (off by default): the range under the
+                   cursor, and its match on the other panel, highlight when part of a
+                   real change. Unchanged content is never highlighted either way.
 
 Other
   ?                Toggle this help

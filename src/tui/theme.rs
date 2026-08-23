@@ -248,6 +248,10 @@ struct ThemeConfig {
     layout: PanelLayout,
     #[serde(default)]
     recent_pairs: Vec<(PathBuf, PathBuf)>,
+    /// Whether the node highlight (the `H` key) is on. `bool`'s `Default` is `false`, which is
+    /// deliberately also this feature's shipped default - see `load_node_highlight`.
+    #[serde(default)]
+    node_highlight: bool,
 }
 
 /// The config file's path: a dotfile in the current working directory, per the exploratory-
@@ -292,6 +296,25 @@ pub fn load_panel_layout() -> PanelLayout {
 pub fn save_panel_layout(layout: PanelLayout) {
     let mut config = load_from(config_path());
     config.layout = layout;
+    save_to(config_path(), config);
+}
+
+/// Whether the node highlight is enabled (the `H` key), defaulting to **off**.
+///
+/// Off by default because it is a constant, cursor-following repaint: every cursor movement
+/// recolors the range under the cursor and its counterpart on the other panel, which reads as
+/// flicker while navigating and obscures the diff coloring underneath it - the thing the user is
+/// actually there to read. It stays available for the case it was built for, answering "what does
+/// this specific node map to", which is a question you ask occasionally rather than continuously.
+pub fn load_node_highlight() -> bool {
+    load_from(config_path()).node_highlight
+}
+
+/// Persist the node-highlight toggle, preserving the other settings in the same file - same
+/// non-fatal failure semantics as `save_overlay_theme`.
+pub fn save_node_highlight(enabled: bool) {
+    let mut config = load_from(config_path());
+    config.node_highlight = enabled;
     save_to(config_path(), config);
 }
 
@@ -341,6 +364,28 @@ mod tests {
         assert_eq!(
             load_from(file.path().to_path_buf()).theme,
             OverlayTheme::SolarizedLight
+        );
+    }
+
+    /// The node highlight persists, and - the part that matters - a config file written before
+    /// the setting existed loads as **off**, not as "unset means the old always-on behaviour".
+    #[test]
+    fn node_highlight_round_trips_and_defaults_to_off_for_an_older_config() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        save_to(
+            file.path().to_path_buf(),
+            ThemeConfig {
+                node_highlight: true,
+                ..Default::default()
+            },
+        );
+        assert!(load_from(file.path().to_path_buf()).node_highlight);
+
+        // Exactly what a config written by a build predating this setting looks like.
+        std::fs::write(file.path(), "theme = \"Default\"\n").expect("write legacy config");
+        assert!(
+            !load_from(file.path().to_path_buf()).node_highlight,
+            "a config with no node_highlight key must load as off"
         );
     }
 

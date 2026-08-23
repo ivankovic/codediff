@@ -71,6 +71,14 @@ directly:
   shows the matched AST node's full extent, while the cursor pinpoints the exact character. The
   blue is deliberately brighter/more saturated than the four diff colors so it doesn't blend in
   with similarly-dark diff backgrounds.
+- **That blue range highlight ships off, behind the `H` toggle** (persisted in `.codediff.toml`,
+  `theme::load_node_highlight`). It is a cursor-following repaint: every movement recolors the
+  range under the cursor and its counterpart, which reads as flicker while navigating and, by
+  design, paints *over* the diff-operation color underneath it - so the more the user moves, the
+  more of the actual diff coloring is hidden behind a momentary signal. Turned off it costs
+  nothing else: the flag gates painting only, and cursor-following still uses
+  `cursor_destination` (a different lookup from `cursor_destination_for_highlight`), so the two
+  panels' cursors track each other exactly as before.
 - Every diff/cursor overlay background is paired with an explicit light foreground (`OVERLAY_FG`
   in `widgets/code_viewer.rs`), rather than leaving the foreground at whatever it already was.
   Plain, non-overlaid text relies on the terminal's own default foreground (fine, since it's then
