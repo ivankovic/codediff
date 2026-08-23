@@ -2,7 +2,7 @@
 
 Provenance for Table 4 of `papers/introductory-paper`. **Authored, not generated** - this is a
 hand-curated list found by reading annotator commentary, and it is deliberately not produced by a
-script. A regex over prose comments emitting LaTeX would dress four hand-picked fixtures as a
+script. A regex over prose comments emitting LaTeX would dress a handful of hand-picked fixtures as a
 measurement artifact and would silently drift the day someone rewords a comment; a named fixture
 plus its verbatim comment is checkable in a way a derived count is not.
 
@@ -24,9 +24,15 @@ It is a lower bound of unknown tightness. No denominator is quoted for it anywhe
 ## How the list was found
 
 ```
-grep -rniE "N:M|N-to-M|multi-to-multi|many.to.(one|many)|[0-9]+-to-[0-9]+|mutli" \
+grep -rniE "[0-9]+:[0-9]+ (map|match)|N:M|N-to-M|multi-to-multi|many.to.(one|many)|[0-9]+-to-[0-9]+|mutli" \
   src/test/optimal_solutions/*/*.rs
 ```
+
+**The `[0-9]+:[0-9]+` alternative is load-bearing and was missing from the first version of this
+sweep** (2026-08-22), which is how two instances were missed until 2026-08-23: annotators write
+both "a 2:1 mapping" and "a 2-to-1 mapping", and the original pattern only caught the hyphenated
+form and the literal string "N:M". If you extend this list, widen the pattern first and re-read
+every hit - the detector is the whole methodology here.
 
 That sweep also matches fixtures whose comments merely mention a `MultiMapGroup` (the first
 category), and one - `handmade/kotlin_refactor_function.rs`, "there's no single correct general
@@ -40,6 +46,8 @@ detector that exists.
 |---|---|---|
 | `c-pixaranimationstudios-opensubdiv-change-license-comment` | 5 comment nodes to 1 | yes |
 | `scala-com-lihaoyi-mill-split-import-2` | 1 identifier to 2 | yes |
+| `swift-apple-swift-argument-parser-refactor-and-improve-tests` | 2 string literals to 1 | yes |
+| `tsx-kong-insomnia-rewrite-if-using-ternary-twice` | 2 statements to 1 | yes |
 | `c-postgres-real-logic-change` | 2 statements to 1 | no |
 | `scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times` | string escapes, N:M | no |
 
@@ -55,10 +63,14 @@ Verbatim, from `src/test/optimal_solutions/`:
   the mapping or visually at this time!"
 * `full/scala_com_lihaoyi_mill_split_two_asserts_into_six_two_times.rs`:
   "The string escape sequences would probably need a N:M mapping"
+* `full/swift_apple_swift_argument_parser_refactor_and_improve_tests.rs`:
+  "True best mapping would be a 2:1 mapping of the string constant"
+* `full/tsx_kong_insomnia_rewrite_if_using_ternary_twice.rs`:
+  "Contains a 2:1 mapping not currently expressible with 1-1 maps"
 
 ## Two facts the paper draws on, both re-checkable from the JSON
 
-**The first two carry a `MultiMapGroup` sitting exactly at the N:M site**, which is what shows the
+**Four of the six carry a `MultiMapGroup` sitting exactly at the N:M site**, which is what shows the
 encoding is doing double duty - the same construct records genuine interchangeability in most
 fixtures and a one-to-one approximation of an inexpressible correspondence in these:
 
@@ -69,14 +81,19 @@ c-pixaranimationstudios-opensubdiv-change-license-comment
 scala-com-lihaoyi-mill-split-import-2
   before: import_declaration:1/namespace_selectors:1/identifier:2      (1 node)
   after:  import_declaration:2/identifier:3, import_declaration:2/identifier:4
+swift-apple-swift-argument-parser-refactor-and-improve-tests
+  4 groups, each 2 -> 1 on the merged literal: line_string_literal, line_str_text, and its quotes
+tsx-kong-insomnia-rewrite-if-using-ternary-twice
+  16 groups, each 2 -> 1: expression_statement, assignment_expression, member_expression, ...
 ```
 
-Neither is a set of interchangeable candidates of which one survived; every member corresponds,
-and the group's own semantics (realize `min(N, M)` pairs, delete or insert the remainder) assert
-the opposite. The other two instances carry no group at all - the correspondence was noted in
+None of those is a set of interchangeable candidates of which one survived; every member
+corresponds, and the group's own semantics (realize `min(N, M)` pairs, delete or insert the
+remainder) assert the opposite. The remaining two instances carry no group at all - the correspondence was noted in
 prose and left unencoded.
 
-**`scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times` postdates the corpus snapshot**
-that `human_mapping_analysis.csv` defines, so it is outside the fixture set every rate in the
-paper's Section 5 is measured against. Because this list is an existence result and feeds no
-denominator, it is listed anyway, with the fact stated in the paper.
+**Two instances postdate the corpus snapshot** that `human_mapping_analysis.csv` defines -
+`scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times` and
+`swift-apple-swift-argument-parser-refactor-and-improve-tests` - so they are outside the fixture
+set every rate in the paper's Section 5 is measured against. Because this list is an existence
+result and feeds no denominator, they are listed anyway, with the fact stated in the paper.

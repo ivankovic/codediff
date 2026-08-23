@@ -672,19 +672,22 @@ enumeration, so they are a lower bound of unknown tightness and no denominator i
     \midrule
     License comment condensed  & 5 comments to 1   & yes \\
     Import split in two        & 1 identifier to 2 & yes \\
+    Two string literals merged & 2 literals to 1   & yes \\
+    If rewritten as a ternary  & 2 statements to 1 & yes \\
     Two call sites merged      & 2 statements to 1 & no \\
     Two asserts split into six & escape sequences  & no \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Two of the four carry a multi-map group sitting exactly at the $N{:}M$ site, and reading those
+Four of the six carry a multi-map group sitting exactly at the $N{:}M$ site, and reading those
 groups is what shows the encoding is doing double duty. In the condensed license block the group
 lists five before-side comment nodes against one after-side comment; in the split import, one
-before-side identifier against two after-side identifiers. Neither is a set of interchangeable
-candidates of which one survived. Every member corresponds, and the group's own semantics—realize
+before-side identifier against two after-side identifiers. None of the four is a set of
+interchangeable candidates of which one survived. Every member corresponds, and the group's own
+semantics—realize
 $\min(N,M)$ pairs, delete or insert the remainder—assert the opposite. The same encoding therefore
-carries two different phenomena, and only the annotator's prose separates them. The other two
+carries two different phenomena, and only the annotator's prose separates them. The remaining two
 instances carry no group at all: the correspondence was noted and left unencoded, which is the
 more honest of the two options available.
 
@@ -692,8 +695,8 @@ This also qualifies a claim made above. Accepting any consistent pairing within 
 the scoring error for the first phenomenon exactly, because every pairing it admits really is
 correct. For the second it does not: it scores the leftover deletions as correct when the truth is
 that those nodes correspond too. The corpus is right about interchangeability and charitable about
-$N{:}M$. The fourth instance in Table~\ref{tab:nm} postdates the corpus snapshot every other
-number in this section is measured against, which is why it appears here and in no rate.
+$N{:}M$. Two of the instances in Table~\ref{tab:nm} postdate the corpus snapshot every other
+number in this section is measured against, which is why they appear here and in no rate.
 
 \begin{resultbox}{RA3 (Ground-truth ambiguity)}
 A correct AST mapping is not always unique. In \AmbiguityFreshPct{}\% of the fixtures annotated
