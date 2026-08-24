@@ -28,16 +28,21 @@ use strum::{Display, EnumIter};
 /// Picked explicitly by the user via the `c` theme picker (`tui/components/theme_dialog.rs`)
 /// and persisted across runs (`tui/app.rs`), since no single hardcoded palette reads well on
 /// every terminal: the original all-dark bands are unreadable on a light-background terminal.
+///
+/// `Dracula` is the `#[default]` (2026-08-24, was `Dark`). The variant order below is the theme
+/// picker's display order and is deliberately left alone - only the `#[default]` attribute and
+/// the two "(default)" labels moved, so an existing `.codediff.toml` with an explicit `theme` is
+/// unaffected. Anyone who never opened the picker gets Dracula on the next run.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, Display)]
 pub enum OverlayTheme {
-    #[default]
-    #[strum(to_string = "Dark (default)")]
+    #[strum(to_string = "Dark")]
     Dark,
     #[strum(to_string = "Solarized Dark")]
     SolarizedDark,
     #[strum(to_string = "Solarized Light")]
     SolarizedLight,
-    #[strum(to_string = "Dracula")]
+    #[default]
+    #[strum(to_string = "Dracula (default)")]
     Dracula,
     #[strum(to_string = "Nord")]
     Nord,
