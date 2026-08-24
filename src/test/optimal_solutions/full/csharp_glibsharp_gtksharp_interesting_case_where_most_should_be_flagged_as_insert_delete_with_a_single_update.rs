@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("csharp-glibsharp-gtksharp-interesting-case-where-most-should-be-flagged-as-insert-delete-with-a-single-update")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "csharp-glibsharp-gtksharp-interesting-case-where-most-should-be-flagged-as-insert-delete-with-a-single-update",
+    )
 }
