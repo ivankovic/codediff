@@ -16,6 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #[cfg(test)]
+mod c_awslabs_aws_c_common_only_insert;
+#[cfg(test)]
 mod c_intel_vpl_gpu_rt_whitespace_only_change;
 #[cfg(test)]
 mod c_libtom_libtomcrypt_change_function_call;
@@ -63,6 +65,8 @@ mod csharp_glibsharp_gtksharp_interesting_case_where_most_should_be_flagged_as_i
 mod csharp_glibsharp_gtksharp_whitespace_only_change;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change_2;
+#[cfg(test)]
+mod csharp_glibsharp_gtksharp_whitespace_only_change_3;
 #[cfg(test)]
 mod csharp_icsharpcode_avaloniailspy_a_few_formatting_changes_and_use_a_struct_instead_of_tuples;
 #[cfg(test)]
@@ -228,11 +232,15 @@ mod php_zetacomponents_consoletools_file_with_parse_errors_and_a_few_deletions;
 #[cfg(test)]
 mod python_aajanki_yle_dl_tiny_change;
 #[cfg(test)]
+mod python_aboutcode_org_license_expression_excellent_test_case;
+#[cfg(test)]
 mod python_bolero_murakami_sprout_change_copyright_year;
 #[cfg(test)]
 mod python_cloudflare_cloudflare_python_comment_only_changes;
 #[cfg(test)]
 mod python_espressomd_espresso_fix_comment_typo;
+#[cfg(test)]
+mod python_fuzzyray_esearch_whitespace_only_change;
 #[cfg(test)]
 mod python_open_telemetry_opentelemetry_python_move_from_one_function_to_other;
 #[cfg(test)]
@@ -253,6 +261,8 @@ mod r_oracle_dtrace_utils_i_have_no_idea_what_this_change_actually_does;
 mod ruby_intridea_multi_json_remove_double_colon;
 #[cfg(test)]
 mod ruby_intridea_multi_json_remove_single_comma;
+#[cfg(test)]
+mod ruby_jmespath_jmespath_formatting_and_style_guide_fixes;
 #[cfg(test)]
 mod ruby_jmespath_jmespath_go_from_conditional_to_unless;
 #[cfg(test)]
@@ -296,6 +306,8 @@ mod scala_com_lihaoyi_mill_change_from_one_function_to_other_and_delete_a_functi
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_expand_import_path;
 #[cfg(test)]
+mod scala_com_lihaoyi_mill_new_import_used_to_remove_a_lot_of_code;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_only_change_failure_strings;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_real_small_change;
@@ -327,6 +339,8 @@ mod shellscript_fleetingheart_ksre_multiline_string_change;
 mod shellscript_go_delve_delve_add_if;
 #[cfg(test)]
 mod shellscript_hgst_libzbc_add_variable;
+#[cfg(test)]
+mod shellscript_imapsync_imapsync_add_some_test_cases_and_a_few_other_changes;
 #[cfg(test)]
 mod shellscript_maxsatula_ocp_small_change;
 #[cfg(test)]

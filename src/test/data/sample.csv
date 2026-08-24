@@ -3,7 +3,7 @@ C,FFmpeg-FFmpeg.git,1d16161a8bb897a2a6f20bfcad0486e966b3f086,libswscale/ops.h,c-
 C,Ondsel-Development-OndselSolver,07785b7576a0655660badd845f06ed286208da1a,OndselSolver/Part.h,c-ondsel-development-ondselsolver-add-include,full,PROMOTED,
 C,PixarAnimationStudios-OpenSubdiv,17530d964d082f9f59fd1b429c5501bb61178329,regression/common/far_utils.h,c-pixaranimationstudios-opensubdiv-change-license-comment,full,PROMOTED,Requires a N:M match for perfect solution
 C,Tripwire-tripwire-open-source,d06b001efec627f2c287cff3ed660e1182c93cd1,src/core/fsservices.h,c-tripwire-tripwire-open-source-add-single-item-to-list,full,PROMOTED,
-C,awslabs-aws-c-common,fbb21230e117d2afe49d03ebe8605270dacb4ab3,include/aws/common/file.h,,full,SAMPLED,
+C,awslabs-aws-c-common,fbb21230e117d2afe49d03ebe8605270dacb4ab3,include/aws/common/file.h,c-awslabs-aws-c-common-only-insert,full,PROMOTED,
 C,freeciv-freeciv.git,556f7def010b5f34fbe3c994c66e313bfc9fc2f7,ai/default/daiair.h,c-freeciv-add-parameter-to-function,small,PROMOTED,
 C,graph-algorithms-edge-addition-planarity-suite,4636e2184a315d38ca9a9efdc4d6de000cc53fd6,c/planarityApp/planarityUtils.c,,full,SAMPLED,
 C,htop-dev-htop.git,23ebdbb5ebcd261d86dc8ba18e6bf0b9b57cf345,Table.h,c-htop-remove-function-declaration,small,PROMOTED,
@@ -63,7 +63,7 @@ CSharp,GLibSharp-GtkSharp,60b84d5b1bbe93a38a811a214bf93c72f620e15e,Source/gio/ge
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gdk/EventWindowState.cs,csharp-glibsharp-gtksharp-whitespace-only-change-2,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/generator/ObjectField.cs,csharp-glibsharp-gtksharp-whitespace-only-change,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/RadioToolButton.cs,csharp-glibsharp-gtksharp-formatting-only-change,full,PROMOTED,
-CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/TreeEnumerator.cs,,full,SAMPLED,
+CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/TreeEnumerator.cs,csharp-glibsharp-gtksharp-whitespace-only-change-3,full,PROMOTED,
 CSharp,Lidarr-Lidarr.git,33b12a532c8483a61a5de9d9ec77c9269ab643d3,src/NzbDrone.Common/Http/Dispatchers/ManagedHttpDispatcher.cs,csharp-lidarr-add-function,small,PROMOTED,
 CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.Core/Download/Clients/Sabnzbd/Sabnzbd.cs,csharp-lidarr-call-different-function,small,PROMOTED,
 CSharp,Lidarr-Lidarr.git,a4af75b60cdc531c2280d994a1ef1141bb7c830e,src/Lidarr.Api.V1/Calendar/CalendarController.cs,csharp-lidarr-new-feature,small,PROMOTED,
@@ -242,14 +242,14 @@ PHP,zetacomponents-ConsoleTools,2730724f7563599d78079ce0a3825179e9a240d4,src/inp
 Python,OpenHands-OpenHands.git,fccc6f31961ef2792e1d08a1659b5ecaf4d44a37,openhands/app_server/utils/encryption_key.py,python-openhands-openhands-change-string-constant,small,PROMOTED,
 Python,PaddlePaddle-PaddleOCR.git,416ea0ccee4fd79960e3a4363d02779f4904fb56,ppocr/data/imaug/operators.py,python-paddlepaddle-paddleocr-formatting-only-change,small,PROMOTED,
 Python,aajanki-yle-dl,5c9a163b65b059c0686f26d16a6d5a4b8396d34d,yledl/areena_api.py,python-aajanki-yle-dl-tiny-change,full,PROMOTED,
-Python,aboutcode-org-license-expression,af87cfab2d06fb034a90412a87e0d4e660e214ee,etc/scripts/utils_thirdparty.py,,full,SAMPLED,
+Python,aboutcode-org-license-expression,af87cfab2d06fb034a90412a87e0d4e660e214ee,etc/scripts/utils_thirdparty.py,python-aboutcode-org-license-expression-excellent-test-case,full,PROMOTED,"True solution requires a N:M multi-map because two strings should map to one. And it has a interesting case of modifying the list with version numbers being removed and added, which requires logical analysis not just syntax."
 Python,ansible-ansible.git,244c2f06edd3331495de27ecce2066cfa49d1e00,lib/ansible/plugins/connection/ssh.py,python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes,small,PROMOTED,
 Python,ansible-ansible.git,df0b417f2db6a51a7f74a6bc1bfa8e8f24676899,lib/ansible/parsing/vault/__init__.py,python-ansible-ansible-field-rename,small,PROMOTED,
 Python,bolero-MURAKAMI-Sprout,26299dad18a7e16fcb4873ce7f9f26a3d2ac1925,tools/darkroom/darkcult.py,python-bolero-murakami-sprout-change-copyright-year,full,PROMOTED,
 Python,cloudflare-cloudflare-python,fc6ca90779cd230dc06445ba42e4c540da186ce0,src/cloudflare/types/radar/email/security/summary_dkim_params.py,python-cloudflare-cloudflare-python-comment-only-changes,full,PROMOTED,
 Python,django-django.git,d82f25d3f0f4eb7be721a72d0e79a8d13d394d32,tests/template_tests/test_partials.py,python-django-django-update-unit-tests-actual-logic-change,small,PROMOTED,
 Python,espressomd-espresso,72e1d874fe6b39401fd839d1a69e6c451c6fac83,testsuite/python/lb_lees_edwards_particle_coupling.py,python-espressomd-espresso-fix-comment-typo,full,PROMOTED,
-Python,fuzzyray-esearch,3281acefc8d48f3eaa250957bbc87eb89ae6d917,setup.py,,full,SAMPLED,
+Python,fuzzyray-esearch,3281acefc8d48f3eaa250957bbc87eb89ae6d917,setup.py,python-fuzzyray-esearch-whitespace-only-change,full,PROMOTED,
 Python,langflow-ai-langflow.git,324caf486c2274efcbeaf8648f5165c76c38c6ce,src/backend/base/langflow/logging/logger.py,python-langflow-ai-langflow-actual-change-of-logic,small,PROMOTED,
 Python,nvbn-thefuck.git,9ba36c9d2ac424698ada226c8a0c452402244a06,thefuck/shells/zsh.py,python-thefuck-multiline-string-change,small,PROMOTED,
 Python,open-telemetry-opentelemetry-python,546e47b0001b40ca777515325953106e81ed8dbd,opentelemetry-sdk/benchmarks/logs/test_benchmark_logging_handler.py,python-open-telemetry-opentelemetry-python-move-from-one-function-to-other,full,PROMOTED,
@@ -283,7 +283,7 @@ Ruby,Homebrew-brew.git,d58ce5dc4482cff792126703eebe789cdb2296b8,Library/Homebrew
 Ruby,Homebrew-brew.git,e72e57910cce57177c139868e2ab43dd2efca160,Library/Homebrew/test/livecheck/skip_conditions_spec.rb,ruby-homebrew-brew-function-callsite-argument-change,small,PROMOTED,
 Ruby,intridea-multi_json,aa0cac16166c00c6d7ad31b3f2d7cd4c98e49dd1,lib/multi_json/adapters/jr_jackson.rb,ruby-intridea-multi_json-remove-double-colon,full,PROMOTED,
 Ruby,intridea-multi_json,edb28ceab21b915aff6354cf9b05a08905d71d35,lib/multi_json/adapters/json_common.rb,ruby-intridea-multi_json-remove-single-comma,full,PROMOTED,
-Ruby,jmespath-jmespath.rb,9e861c736ef88ee99cdd5910f59c9e6c5d5e607a,lib/jmespath/parser.rb,,full,SAMPLED,
+Ruby,jmespath-jmespath.rb,9e861c736ef88ee99cdd5910f59c9e6c5d5e607a,lib/jmespath/parser.rb,ruby-jmespath-jmespath-formatting-and-style-guide-fixes,full,PROMOTED,Interesting case. Technically requires a N:M (2:1) multi-mapping of bare_symbol and it's string to simple_symbol for a perfect solution.
 Ruby,jmespath-jmespath.rb,fef3ed5f5b7489746390a194e081001400daa356,spec/compliance_without_errors_spec.rb,ruby-jmespath-jmespath-go-from-conditional-to-unless,full,PROMOTED,The deleted end is mateched to the if
 Ruby,junegunn-fzf.git,24ff66d4a9d6889988e4d7e373f33f4098870b9e,test/test_go.rb,ruby-junegunn-fzf-add-test-case,small,PROMOTED,
 Ruby,junegunn-fzf.git,3148b0f3e88f8a116491135dc10a7ce6d96899bf,test/test_go.rb,ruby-junegunn-fzf-add-test-case-2,small,PROMOTED,
@@ -326,7 +326,7 @@ Scala,com-lihaoyi-mill,28b8ac2204a25a92ca617772abf11f9957e1e12d,mill-build/src/m
 Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,core/eval/src/mill/eval/SelectiveExecutionImpl.scala,scala-com-lihaoyi-mill-expand-import-path,full,PROMOTED,
 Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,integration/feature/output-directory/src/OutputDirectoryTests.scala,scala-com-lihaoyi-mill-split-import-2,full,PROMOTED,The best solution would require a many-to-many map
 Scala,com-lihaoyi-mill,6ff59dd551eedf467c062993da6b7218e69ca237,libs/util/test/src/mill/util/MainModuleTests.scala,scala-com-lihaoyi-mill-split-import,full,PROMOTED,
-Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,core/api/src/mill/api/ModuleCtx.scala,,full,SAMPLED,
+Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,core/api/src/mill/api/ModuleCtx.scala,scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code,full,PROMOTED,
 Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,integration/failure/yaml-config-tasks/src/YamlConfigTasksTests.scala,scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times,full,PROMOTED,The string escape sequences would probably need a N:M mapping
 Scala,com-lihaoyi-mill,8090811f5a7682ab0d7d6a27d17152bfb1697e4e,runner/meta/src/mill/meta/CodeGen.scala,scala-com-lihaoyi-mill-add-a-member-to-expression-chains,full,PROMOTED,
 Scala,sirthias-parboiled,fb1f52da025240fa145b1a95d45f7ee59a6ddd49,project/Dependencies.scala,scala-sirthias-parboiled-value-change,full,PROMOTED,
@@ -342,7 +342,7 @@ ShellScript,docker-docker-bench-security,958f5fa6c378fc8f9a73e7f89204ed434cf09d2
 ShellScript,fleetingheart-ksre,3ea71d606765ba0c1a88bbc42cf975dc512eced2,tl_videos_gen/translate.sh,shellscript-fleetingheart-ksre-multiline-string-change,full,PROMOTED,
 ShellScript,go-delve-delve,997463564b7d53d72fc4f664b4382459470eb319,_scripts/test_linux.sh,shellscript-go-delve-delve-add-if,full,PROMOTED,
 ShellScript,hgst-libzbc,ae872375126497f66898d8d79f7b12e66b158ef1,test/scripts/05_xmr_per_activation/432.sh,shellscript-hgst-libzbc-add-variable,full,PROMOTED,
-ShellScript,imapsync-imapsync,399651d088c477435e1bf507c6f482f0b44504c2,tests.sh,,full,SAMPLED,
+ShellScript,imapsync-imapsync,399651d088c477435e1bf507c6f482f0b44504c2,tests.sh,shellscript-imapsync-imapsync-add-some-test-cases-and-a-few-other-changes,full,PROMOTED,
 ShellScript,langchain-ai-langchain.git,07fa576de1c4d6485331691d4ac8cabc6d80f960,libs/partners/chroma/scripts/lint_imports.sh,shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content,small,PROMOTED,
 ShellScript,maxsatula-ocp,b239ec344f09e852da1cf89a607c8450c5872897,.travis/test.sh,shellscript-maxsatula-ocp-small-change,full,PROMOTED,
 ShellScript,nextcloud-server.git,9741f5f17d95418178c64a106624f8e525a59e75,autotest.sh,shellscript-nextcloud-server-change-invocation-string,small,PROMOTED,
