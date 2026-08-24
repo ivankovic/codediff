@@ -1973,6 +1973,107 @@ fn subtree_has_any_match(
 /// segment spanning everything, which will only qualify for recursion if both sides happen to have
 /// equal counts, falling back to the original atomic behavior otherwise, same as before this
 /// function recursed at all.
+/// Resolve the trivial (leaf) entries the wrap/reparent branch filtered out, rescuing the ones
+/// that were wrapped *along with* the code instead of deleting every one of them.
+///
+/// The calling branch pairs a reparented segment's substantial entries - a `class_specifier` that
+/// became a `template_declaration`'s child - and used to delete and re-insert every leaf it had
+/// filtered out. Right when the leaf is unrelated; wrong when the leaf moved with the code.
+/// `cpp-add-templates` is the minimal case and was its entire remaining mismatch: the
+/// declaration's trailing `;` ends up *inside* the new `template_declaration`, and got deleted.
+///
+/// Two things the tracing (2026-08-24) established, both of which shape this:
+///
+/// * The counterpart is **not a peer** in this segment - the before side has one leftover leaf and
+///   the after side has zero, because the after `;` is a descendant of the partner. A
+///   peer-to-peer pairing can never find it.
+/// * By the time this runs, the substantial recursion above has already emitted that descendant
+///   as an `Insert`, so it no longer looks unmatched. Rescuing it means *re-pointing* an existing
+///   insert (`ASTDiff::remove_insert_mapping`), not matching a free node.
+///
+/// Deliberately narrow, because the enclosing function's doc comment records what happens when
+/// this gap guesses: matching a `;` to "random other `;` in the code" is the exact failure it
+/// warns about. A leftover leaf is rescued only when the partner subtree contains **exactly one**
+/// inserted leaf of the same kind (`node_to_kind_only_hash`, which for a leaf is its kind). One
+/// candidate means no choice is being made. Everything else keeps the old behaviour exactly.
+fn rescue_wrapped_trivial_entries(
+    before_seg: &[usize],
+    after_seg: &[usize],
+    after_substantial: &[usize],
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let is_trivial = |id: usize, meta: &ASTMetadata| {
+        meta.node_to_subtree_size.get(&id).copied().unwrap_or(0) <= TRIVIAL_ENTRY_MAX_SIZE
+    };
+    let is_descendant_of = |mut id: usize, ancestor: usize, meta: &ASTMetadata| {
+        while let Some(&parent) = meta.node_to_parent.get(&id) {
+            if parent == ancestor {
+                return true;
+            }
+            id = parent;
+        }
+        false
+    };
+
+    let cost_model = UnitCostModel::new(before_meta.language);
+    for &b in before_seg {
+        if !is_trivial(b, before_meta) || diff.before_node_map.contains_key(&b) {
+            continue;
+        }
+        let Some(&kind) = before_meta.node_to_kind_only_hash.get(&b) else {
+            continue;
+        };
+        // The sole inserted leaf of this kind anywhere inside the reparented partners.
+        let mut candidate = None;
+        let mut ambiguous = false;
+        for (&after_id, &after_kind) in &after_meta.node_to_kind_only_hash {
+            if after_kind != kind
+                || !is_trivial(after_id, after_meta)
+                || diff.after_node_map.get(&after_id) != Some(&0)
+                || !after_substantial
+                    .iter()
+                    .any(|&root| is_descendant_of(after_id, root, after_meta))
+            {
+                continue;
+            }
+            if candidate.is_some() {
+                ambiguous = true;
+                break;
+            }
+            candidate = Some(after_id);
+        }
+        if ambiguous {
+            continue;
+        }
+        let Some(a) = candidate else { continue };
+        diff.remove_insert_mapping(a);
+        resolve_forest(
+            vec![b],
+            vec![a],
+            before_meta,
+            after_meta,
+            &cost_model,
+            Algorithm::Apted,
+            source,
+            diff,
+        );
+    }
+
+    for &id in before_seg {
+        if is_trivial(id, before_meta) && !diff.before_node_map.contains_key(&id) {
+            add_delete_mappings(id, before_meta, source, diff);
+        }
+    }
+    for &id in after_seg {
+        if is_trivial(id, after_meta) && !diff.after_node_map.contains_key(&id) {
+            add_insert_mappings(id, after_meta, source, diff);
+        }
+    }
+}
+
 pub(crate) fn resolve_residual_forest_via_myers_lcs(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -2105,28 +2206,15 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
                         diff,
                     );
                 }
-                for &id in &before_seg {
-                    if before_meta
-                        .node_to_subtree_size
-                        .get(&id)
-                        .copied()
-                        .unwrap_or(0)
-                        <= TRIVIAL_ENTRY_MAX_SIZE
-                    {
-                        add_delete_mappings(id, before_meta, source, diff);
-                    }
-                }
-                for &id in &after_seg {
-                    if after_meta
-                        .node_to_subtree_size
-                        .get(&id)
-                        .copied()
-                        .unwrap_or(0)
-                        <= TRIVIAL_ENTRY_MAX_SIZE
-                    {
-                        add_insert_mappings(id, after_meta, source, diff);
-                    }
-                }
+                rescue_wrapped_trivial_entries(
+                    &before_seg,
+                    &after_seg,
+                    &after_substantial,
+                    before_meta,
+                    after_meta,
+                    source,
+                    diff,
+                );
             } else {
                 resolve_unequal_segment_via_kind_only_anchors(
                     &before_seg,

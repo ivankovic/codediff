@@ -25,13 +25,12 @@ fn optimal_solution() -> Result<()> {
     // 2 mismatches (2026-08-17) by `resolve_residual_forest_via_myers_lcs`'s trivial-entry
     // filtering (`TRIVIAL_ENTRY_MAX_SIZE`, apted/common.rs) - excluding an unrelated size-1 `;` in
     // the same gap from the count comparison let the real `class_specifier`/`template_declaration`
-    // pair recurse through real APTED instead of falling to atomic delete/insert. The remaining 2
-    // are the root's own `MatchButNotIdentical` (needs one more propagation pass to pick up) and
-    // that same `;`, which is now nested one level deeper after the wrap and wasn't matched since
-    // it was one of the filtered trivial entries.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "cpp-add-templates",
-        1,
-        1,
-    )
+    // pair recurse through real APTED instead of falling to atomic delete/insert.
+    //
+    // Exact since 2026-08-24: `rescue_wrapped_trivial_entries` finishes the job. That filtered `;`
+    // was not unrelated after all - it was wrapped along with the declaration and ends up *inside*
+    // the new `template_declaration`, where the substantial pair's own recursion had already
+    // emitted it as an `Insert`. Re-pointing that insert to the before-side `;` closes the last
+    // mismatch. This is now an exact-match fixture; keep it that way.
+    test::helper::human_mapping::assert_matches_human_mapping("cpp-add-templates")
 }
