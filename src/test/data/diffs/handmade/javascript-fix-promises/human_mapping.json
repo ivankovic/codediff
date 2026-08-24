@@ -2799,6 +2799,122 @@
         "expression_statement:1",
         ";:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "new_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "try_statement:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "new_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "new_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "arguments:1",
+        "arrow_function:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "expression_statement:1",
+          "call_expression:1"
+        ],
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1",
+          "call_expression:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "expression_statement:1",
+          "call_expression:1"
+        ],
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1",
+          "call_expression:1"
+        ],
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1",
+          "call_expression:1",
+          "member_expression:1",
+          "call_expression:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1"
+        ],
+        [
+          "expression_statement:1",
+          "call_expression:1",
+          "member_expression:1",
+          "call_expression:1",
+          "member_expression:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
     }
   ]
 }

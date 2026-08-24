@@ -401,19 +401,6 @@
       "before_path": [
         "use_declaration:1",
         "scoped_identifier:1",
-        "scoped_identifier:1"
-      ],
-      "after_path": [
-        "use_declaration:1",
-        "scoped_use_list:1",
-        "scoped_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "use_declaration:1",
-        "scoped_identifier:1",
         ":::1"
       ],
       "after_path": [
@@ -490,6 +477,30 @@
         "use_declaration:1",
         ";:1"
       ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "use_declaration:1",
+          "scoped_identifier:1",
+          "scoped_identifier:1"
+        ],
+        [
+          "use_declaration:1",
+          "scoped_identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:1",
+          "scoped_use_list:1",
+          "scoped_identifier:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
     }
   ]
 }
