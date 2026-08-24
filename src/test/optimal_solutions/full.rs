@@ -58,6 +58,8 @@ mod csharp_dotnet_script_dotnet_script_remove_two_arguments;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_formatting_only_change;
 #[cfg(test)]
+mod csharp_glibsharp_gtksharp_interesting_case_where_most_should_be_flagged_as_insert_delete_with_a_single_update;
+#[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change;
 #[cfg(test)]
 mod csharp_glibsharp_gtksharp_whitespace_only_change_2;

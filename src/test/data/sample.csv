@@ -59,7 +59,7 @@ CSS,microsoft-playwright.git,5d5b28f782e17b2a74f208aa0d532a2e10e50651,packages/h
 CSS,mozilla-firefox-firefox.git,4305a8c706562bebf669267f5de8984053285fe4,toolkit/themes/shared/global-shared.css,css-mozilla-firefox-firefox-actual-style-changes,small,PROMOTED,
 CSS,shadcn-ui-ui.git,b75796ed76882f30aa86da90c71fbad14a10ccd8,apps/v4/registry/styles/style-maia.css,css-shadcn-ui-ui-completely-broken-treesitter-parsing,small,PROMOTED,
 CSS,source-foundry-Hack,d8458b5c471caa12b4af57a9bb537d9639ca4108,build/web/hack-subset.css,css-source-foundry-hack-change-font-string,full,PROMOTED,
-CSharp,GLibSharp-GtkSharp,60b84d5b1bbe93a38a811a214bf93c72f620e15e,Source/gio/generated/GLib_FileAttributeMatcher.cs,,full,SAMPLED,
+CSharp,GLibSharp-GtkSharp,60b84d5b1bbe93a38a811a214bf93c72f620e15e,Source/gio/generated/GLib_FileAttributeMatcher.cs,csharp-glibsharp-gtksharp-interesting-case-where-most-should-be-flagged-as-insert-delete-with-a-single-update,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gdk/EventWindowState.cs,csharp-glibsharp-gtksharp-whitespace-only-change-2,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/generator/ObjectField.cs,csharp-glibsharp-gtksharp-whitespace-only-change,full,PROMOTED,
 CSharp,GLibSharp-GtkSharp,64b436dbde99fee8326a6ab0fc48a9c6eaba6988,Source/gtk/RadioToolButton.cs,csharp-glibsharp-gtksharp-formatting-only-change,full,PROMOTED,
