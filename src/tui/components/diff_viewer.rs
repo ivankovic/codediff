@@ -199,6 +199,12 @@ impl DiffViewer {
         self.right_viewer.set_syntax_highlighting(enable);
     }
 
+    /// Apply a syntax-highlighting theme to both panels (the theme dialog's syntax dropdown).
+    pub fn set_syntax_theme(&mut self, name: String) {
+        self.left_viewer.set_syntax_theme(name.clone());
+        self.right_viewer.set_syntax_theme(name);
+    }
+
     /// `H`: toggle the node highlight on both panels at once and persist the choice, same
     /// both-panels-or-neither reasoning as `toggle_syntax_highlighting` above - the highlight is
     /// one signal spanning the two sides (the node under the cursor, and its counterpart), so
@@ -759,7 +765,7 @@ impl Component for DiffViewer {
                 frame,
                 left_area,
                 " Before ",
-                Color::Red,
+                self.overlay_theme.palette().before_title_fg,
                 &left_filename,
                 self.active_panel == Panel::Before,
             );
@@ -778,7 +784,7 @@ impl Component for DiffViewer {
                 frame,
                 right_area,
                 " After ",
-                Color::Green,
+                self.overlay_theme.palette().after_title_fg,
                 &right_filename,
                 self.active_panel == Panel::After,
             );
@@ -807,9 +813,10 @@ impl Component for DiffViewer {
             }
         } else {
             // Single panel mode: show only one panel at a time
+            let palette = self.overlay_theme.palette();
             let title_color = match self.active_panel {
-                Panel::Before => Color::Red,
-                Panel::After => Color::Green,
+                Panel::Before => palette.before_title_fg,
+                Panel::After => palette.after_title_fg,
             };
 
             let panel_name = match self.active_panel {

@@ -118,6 +118,11 @@ pub enum Action {
     /// viewer behind the dialog as a preview, without persisting anything. Esc reverts to the
     /// last persisted choice; Enter (`ThemeSelected`) makes it stick.
     ThemePreviewed(OverlayTheme),
+    /// A live preview of a syntax-highlighting theme while the theme dialog's syntax dropdown
+    /// moves. Same contract as `ThemePreviewed` above: applied to the viewers behind the dialog,
+    /// persisted only when the dialog is accepted (which the dialog itself does, since no action
+    /// carries the value that far).
+    SyntaxThemePreviewed(String),
     /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
     /// cursor to the nearest match and highlight every match.
     SearchSubmitted(String),

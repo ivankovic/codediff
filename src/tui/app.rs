@@ -141,6 +141,10 @@ pub struct App {
     dialog_target: Option<Panel>,
     /// The currently active overlay color theme, persisted across runs (see `tui::theme`).
     current_theme: OverlayTheme,
+    /// The chosen syntax-highlighting theme name, persisted alongside the overlay theme. `None`
+    /// until the user picks one in the theme dialog, in which case the code viewer keeps its own
+    /// built-in default.
+    syntax_theme: Option<String>,
     /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
     /// The "After" file path, once a file has been picked for that panel.
@@ -191,6 +195,7 @@ impl App {
             pending_editor: None,
             recent_pairs: Vec::new(),
             screen: AppScreen::default(),
+            syntax_theme: None,
             dialog_target: None,
             current_theme: OverlayTheme::default(),
             before_path: None,
@@ -213,6 +218,14 @@ impl App {
             .set_layout_override(theme::load_panel_layout());
         self.diff_viewer
             .set_node_highlight(theme::load_node_highlight());
+        // The custom palette has to be installed before anything renders: `OverlayTheme::Custom`
+        // resolves through the process-global one, so a user whose saved theme is Custom would
+        // otherwise see Dracula's defaults for the first frame.
+        theme::set_custom_palette(theme::load_custom_palette());
+        self.syntax_theme = theme::load_syntax_theme();
+        if let Some(name) = self.syntax_theme.clone() {
+            self.diff_viewer.set_syntax_theme(name);
+        }
         self.recent_pairs = theme::load_recent_pairs();
 
         let mut ui = UI::new()?
@@ -338,7 +351,10 @@ impl App {
                     globally_handled = true;
                 }
                 KeyCode::Char('c') if self.screen == AppScreen::Viewer => {
-                    self.theme_dialog = Some(ThemeDialog::new(self.current_theme));
+                    self.theme_dialog = Some(ThemeDialog::with_syntax_theme(
+                        self.current_theme,
+                        self.syntax_theme.as_deref(),
+                    ));
                     self.screen = AppScreen::SelectTheme;
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
@@ -510,6 +526,9 @@ impl App {
                 // `current_theme`; Esc (`DialogCancelled`) reverts to `current_theme`.
                 Action::ThemePreviewed(previewed) => {
                     self.diff_viewer.set_overlay_theme(*previewed);
+                }
+                Action::SyntaxThemePreviewed(name) => {
+                    self.diff_viewer.set_syntax_theme(name.clone());
                 }
                 Action::SearchSubmitted(query) => self.handle_search_submitted(query.clone()),
                 Action::SearchQueryChanged(query) => self.handle_search_query_changed(query),

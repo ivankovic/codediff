@@ -51,6 +51,16 @@ fn theme_set() -> &'static ThemeSet {
     THEME_SET.get_or_init(ThemeSet::load_defaults)
 }
 
+/// Every syntax-highlighting theme name syntect ships, sorted, for the theme dialog's dropdown.
+/// Deliberately syntect's own built-ins rather than a curated subset: they are what
+/// `set_theme`/`get_theme` can actually resolve, so anything else would be an option that
+/// silently does nothing.
+pub fn syntax_theme_names() -> Vec<String> {
+    let mut names: Vec<String> = theme_set().themes.keys().cloned().collect();
+    names.sort();
+    names
+}
+
 /// Map our internal Language enum to syntect syntax name
 fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
     use crate::code::Language::*;

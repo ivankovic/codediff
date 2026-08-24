@@ -132,6 +132,11 @@ impl CodeViewer {
         self.state.highlight_destination = destination;
     }
 
+    /// Apply a syntax-highlighting theme by name (rebuilds the widget's highlight cache).
+    pub fn set_syntax_theme(&mut self, name: String) {
+        self.widget.set_theme(name);
+    }
+
     /// Whether the node highlight is painted on this panel - the `H` toggle. See
     /// `CodeViewerState::node_highlight` for why it defaults to off.
     pub fn is_node_highlight_enabled(&self) -> bool {

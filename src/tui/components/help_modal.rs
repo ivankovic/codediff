@@ -61,7 +61,12 @@ Files and diffing
   Esc              While a diff is computing: cancel it and keep the previous result
 
 Appearance
-  c                Open the color theme picker (selection previews live; Enter keeps it)
+  c                Open the theme editor: a Theme dropdown, a syntax-highlighting
+                   dropdown, and one editable color per diff operation, the cursor
+                   counterpart, search matches, and the Before/After titles.
+                   Up/Down moves, Left/Right changes a dropdown, Enter edits a color
+                   (type #rrggbb) or accepts, Esc cancels. Editing any color forks the
+                   selection to Custom, leaving the presets untouched.
   v                Cycle the panel layout: auto / dual / single (persisted)
   S                Toggle syntax highlighting
   H                Toggle the node highlight (off by default): the range under the

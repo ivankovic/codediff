@@ -52,6 +52,140 @@ pub enum OverlayTheme {
     Monokai,
     #[strum(to_string = "One Dark")]
     OneDark,
+    /// The user's own palette, edited in the theme dialog and persisted as
+    /// [`CustomPalette`] in `.codediff.toml`.
+    ///
+    /// Unlike every other variant, this one is *not* a pure function of the enum: its colors come
+    /// from `custom_palette()`, process-global state loaded once at startup and updated when the
+    /// dialog commits an edit. That asymmetry is deliberate and contained - `palette()` stays the
+    /// single resolution point, so every existing call site keeps working unchanged rather than
+    /// threading a palette through `render_minimap`, the widgets and the help modal.
+    #[strum(to_string = "Custom")]
+    Custom,
+}
+
+/// A user-edited palette, stored as `#rrggbb` strings so the config file is readable and
+/// hand-editable. Parsed via [`parse_hex_color`]; anything unparseable falls back to the
+/// corresponding Dracula color rather than failing the load, so a typo in a hand-edited config
+/// costs one wrong color instead of the whole theme.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomPalette {
+    pub insert_bg: String,
+    pub delete_bg: String,
+    pub move_bg: String,
+    pub update_bg: String,
+    pub overlay_fg: String,
+    pub cross_highlight_bg: String,
+    pub search_bg: String,
+    pub before_title_fg: String,
+    pub after_title_fg: String,
+}
+
+impl Default for CustomPalette {
+    /// Dracula, the shipped default theme - so "switch to Custom" starts from what the user was
+    /// already looking at rather than from an empty or arbitrary palette.
+    fn default() -> Self {
+        Self::from_palette(&OverlayTheme::Dracula.palette())
+    }
+}
+
+impl CustomPalette {
+    /// Snapshot an existing palette as editable hex - what "editing a preset forks it to Custom"
+    /// does.
+    pub fn from_palette(palette: &OverlayPalette) -> Self {
+        Self {
+            insert_bg: format_hex_color(palette.insert_bg),
+            delete_bg: format_hex_color(palette.delete_bg),
+            move_bg: format_hex_color(palette.move_bg),
+            update_bg: format_hex_color(palette.update_bg),
+            overlay_fg: format_hex_color(palette.overlay_fg),
+            cross_highlight_bg: format_hex_color(palette.cross_highlight_bg),
+            search_bg: format_hex_color(palette.search_bg),
+            before_title_fg: format_hex_color(palette.before_title_fg),
+            after_title_fg: format_hex_color(palette.after_title_fg),
+        }
+    }
+
+    /// Resolve back to concrete colors, falling back per field (see the struct's doc comment).
+    pub fn to_palette(&self) -> OverlayPalette {
+        let fallback = OverlayTheme::Dracula.palette();
+        let at = |hex: &str, default: Color| parse_hex_color(hex).unwrap_or(default);
+        OverlayPalette {
+            insert_bg: at(&self.insert_bg, fallback.insert_bg),
+            delete_bg: at(&self.delete_bg, fallback.delete_bg),
+            move_bg: at(&self.move_bg, fallback.move_bg),
+            update_bg: at(&self.update_bg, fallback.update_bg),
+            overlay_fg: at(&self.overlay_fg, fallback.overlay_fg),
+            cross_highlight_bg: at(&self.cross_highlight_bg, fallback.cross_highlight_bg),
+            search_bg: at(&self.search_bg, fallback.search_bg),
+            before_title_fg: at(&self.before_title_fg, fallback.before_title_fg),
+            after_title_fg: at(&self.after_title_fg, fallback.after_title_fg),
+        }
+    }
+}
+
+/// `#rrggbb` (or bare `rrggbb`) to a `Color`. `None` for anything else - including the named and
+/// indexed `Color` variants, which have no hex form; a preset using `Color::Red` for a panel
+/// title round-trips through [`format_hex_color`]'s ANSI table instead.
+pub fn parse_hex_color(text: &str) -> Option<Color> {
+    let hex = text.trim().trim_start_matches('#');
+    if hex.len() != 6 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |range: std::ops::Range<usize>| u8::from_str_radix(&hex[range], 16).ok();
+    Some(Color::Rgb(channel(0..2)?, channel(2..4)?, channel(4..6)?))
+}
+
+/// A `Color` as `#rrggbb`, for display and for the config file.
+///
+/// The 16 named ANSI colors have no true RGB value - the terminal decides what they look like -
+/// so they are rendered at their conventional xterm values purely so the dialog has something to
+/// show and edit. Editing one produces a real `Color::Rgb`, which is why a preset's panel title
+/// (`Color::Red`) becomes a concrete `#cd0000` the moment it is forked into Custom.
+pub fn format_hex_color(color: Color) -> String {
+    let (r, g, b) = match color {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Black => (0, 0, 0),
+        Color::Red => (205, 0, 0),
+        Color::Green => (0, 205, 0),
+        Color::Yellow => (205, 205, 0),
+        Color::Blue => (0, 0, 238),
+        Color::Magenta => (205, 0, 205),
+        Color::Cyan => (0, 205, 205),
+        Color::Gray => (229, 229, 229),
+        Color::DarkGray => (127, 127, 127),
+        Color::LightRed => (255, 0, 0),
+        Color::LightGreen => (0, 255, 0),
+        Color::LightYellow => (255, 255, 0),
+        Color::LightBlue => (92, 92, 255),
+        Color::LightMagenta => (255, 0, 255),
+        Color::LightCyan => (0, 255, 255),
+        Color::White => (255, 255, 255),
+        _ => (0, 0, 0),
+    };
+    format!("#{r:02x}{g:02x}{b:02x}")
+}
+
+/// Process-global custom palette - see [`OverlayTheme::Custom`] for why this is not threaded
+/// through call sites. Written once at startup from the config and again whenever the theme
+/// dialog commits an edit.
+static CUSTOM_PALETTE: std::sync::RwLock<Option<CustomPalette>> = std::sync::RwLock::new(None);
+
+/// The current custom palette, defaulting to Dracula's colors if none has been loaded or saved.
+pub fn custom_palette() -> CustomPalette {
+    CUSTOM_PALETTE
+        .read()
+        .ok()
+        .and_then(|guard| guard.clone())
+        .unwrap_or_default()
+}
+
+/// Replace the in-memory custom palette (the theme dialog's live preview path). Persisting is
+/// separate - see `save_custom_palette`.
+pub fn set_custom_palette(palette: CustomPalette) {
+    if let Ok(mut guard) = CUSTOM_PALETTE.write() {
+        *guard = Some(palette);
+    }
 }
 
 /// The concrete colors making up one [`OverlayTheme`].
@@ -68,7 +202,18 @@ pub struct OverlayPalette {
     /// the `>`/`<` keys would step to next. Every theme uses its own orange accent - the one hue
     /// none of the four diff bands or the blue/cyan cursor highlight occupy.
     pub search_bg: Color,
+    /// Foreground for the "Before" panel title, and its "After" counterpart below. Hardcoded as
+    /// `Color::Red`/`Color::Green` in `diff_viewer` until 2026-08-24; moved here so the custom
+    /// theme can change them. Every *preset* keeps exactly those two values, so presets look
+    /// identical to before - only `OverlayTheme::Custom` can vary them.
+    pub before_title_fg: Color,
+    pub after_title_fg: Color,
 }
+
+/// The `before_title_fg`/`after_title_fg` every preset uses - the colors the panel titles had
+/// when they were hardcoded in `diff_viewer::draw`.
+pub const PRESET_BEFORE_TITLE_FG: Color = Color::Red;
+pub const PRESET_AFTER_TITLE_FG: Color = Color::Green;
 
 impl OverlayTheme {
     /// The colors for this theme.
@@ -83,6 +228,7 @@ impl OverlayTheme {
     /// previously a fixed dark RGB triple regardless of terminal background.
     pub fn palette(self) -> OverlayPalette {
         match self {
+            OverlayTheme::Custom => custom_palette().to_palette(),
             OverlayTheme::Dark => OverlayPalette {
                 insert_bg: Color::Rgb(20, 60, 20),
                 delete_bg: Color::Rgb(70, 20, 20),
@@ -91,6 +237,8 @@ impl OverlayTheme {
                 overlay_fg: Color::Rgb(225, 225, 225),
                 cross_highlight_bg: Color::Rgb(40, 90, 200),
                 search_bg: Color::Rgb(160, 90, 10),
+                before_title_fg: PRESET_BEFORE_TITLE_FG,
+                after_title_fg: PRESET_AFTER_TITLE_FG,
             },
             OverlayTheme::SolarizedDark => OverlayPalette {
                 insert_bg: Color::Rgb(53, 87, 32),
@@ -101,6 +249,8 @@ impl OverlayTheme {
                 cross_highlight_bg: Color::Rgb(23, 101, 148),
                 // Solarized orange blended 0.4 toward base03, same vividness as the cursor blue.
                 search_bg: Color::Rgb(122, 62, 35),
+                before_title_fg: PRESET_BEFORE_TITLE_FG,
+                after_title_fg: PRESET_AFTER_TITLE_FG,
             },
             OverlayTheme::SolarizedLight => OverlayPalette {
                 insert_bg: Color::Rgb(205, 209, 136),
@@ -111,6 +261,8 @@ impl OverlayTheme {
                 cross_highlight_bg: Color::Rgb(124, 182, 217),
                 // Solarized orange blended 0.4 toward base3, same vividness as the cursor blue.
                 search_bg: Color::Rgb(223, 143, 104),
+                before_title_fg: PRESET_BEFORE_TITLE_FG,
+                after_title_fg: PRESET_AFTER_TITLE_FG,
             },
             // The five palettes below all follow the same recipe, reverse-engineered from the
             // Solarized variants above (whose values were hand-picked before this helper existed):
@@ -131,6 +283,8 @@ impl OverlayTheme {
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((139, 233, 253), bg, 0.4), // cyan
                     search_bg: blend_toward_base((255, 184, 108), bg, 0.4), // orange
+                    before_title_fg: PRESET_BEFORE_TITLE_FG,
+                    after_title_fg: PRESET_AFTER_TITLE_FG,
                 }
             }
             OverlayTheme::Nord => {
@@ -145,6 +299,8 @@ impl OverlayTheme {
                     overlay_fg: Color::Rgb(236, 239, 244),                  // nord6
                     cross_highlight_bg: blend_toward_base((129, 161, 193), bg, 0.4), // nord9
                     search_bg: blend_toward_base((208, 135, 112), bg, 0.4), // nord12, orange
+                    before_title_fg: PRESET_BEFORE_TITLE_FG,
+                    after_title_fg: PRESET_AFTER_TITLE_FG,
                 }
             }
             OverlayTheme::GruvboxDark => {
@@ -158,6 +314,8 @@ impl OverlayTheme {
                     overlay_fg: Color::Rgb(235, 219, 178),                 // fg1
                     cross_highlight_bg: blend_toward_base((131, 165, 152), bg, 0.4), // bright blue
                     search_bg: blend_toward_base((254, 128, 25), bg, 0.4), // bright orange
+                    before_title_fg: PRESET_BEFORE_TITLE_FG,
+                    after_title_fg: PRESET_AFTER_TITLE_FG,
                 }
             }
             OverlayTheme::Monokai => {
@@ -171,6 +329,8 @@ impl OverlayTheme {
                     overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
                     cross_highlight_bg: blend_toward_base((102, 217, 239), bg, 0.4), // cyan
                     search_bg: blend_toward_base((253, 151, 31), bg, 0.4), // orange
+                    before_title_fg: PRESET_BEFORE_TITLE_FG,
+                    after_title_fg: PRESET_AFTER_TITLE_FG,
                 }
             }
             OverlayTheme::OneDark => {
@@ -185,6 +345,8 @@ impl OverlayTheme {
                     overlay_fg: Color::Rgb(171, 178, 191),                  // foreground
                     cross_highlight_bg: blend_toward_base((97, 175, 239), bg, 0.4), // blue
                     search_bg: blend_toward_base((209, 154, 102), bg, 0.4), // orange
+                    before_title_fg: PRESET_BEFORE_TITLE_FG,
+                    after_title_fg: PRESET_AFTER_TITLE_FG,
                 }
             }
         }
@@ -253,6 +415,14 @@ struct ThemeConfig {
     layout: PanelLayout,
     #[serde(default)]
     recent_pairs: Vec<(PathBuf, PathBuf)>,
+    /// The user's edited palette, used when `theme` is `OverlayTheme::Custom`. Kept even while a
+    /// preset is selected, so switching back to Custom restores the edits rather than resetting.
+    #[serde(default)]
+    custom_palette: CustomPalette,
+    /// Syntax-highlighting theme name, one of syntect's built-ins (see `syntax_theme_names`).
+    /// Empty means "whatever the code viewer defaults to".
+    #[serde(default)]
+    syntax_theme: String,
     /// Whether the node highlight (the `H` key) is on. `bool`'s `Default` is `false`, which is
     /// deliberately also this feature's shipped default - see `load_node_highlight`.
     #[serde(default)]
@@ -301,6 +471,33 @@ pub fn load_panel_layout() -> PanelLayout {
 pub fn save_panel_layout(layout: PanelLayout) {
     let mut config = load_from(config_path());
     config.layout = layout;
+    save_to(config_path(), config);
+}
+
+/// The persisted custom palette, or Dracula's colors if none was ever saved.
+pub fn load_custom_palette() -> CustomPalette {
+    load_from(config_path()).custom_palette
+}
+
+/// Persist the custom palette *and* install it as the live one, so the caller cannot save a
+/// palette the running process isn't using.
+pub fn save_custom_palette(palette: CustomPalette) {
+    set_custom_palette(palette.clone());
+    let mut config = load_from(config_path());
+    config.custom_palette = palette;
+    save_to(config_path(), config);
+}
+
+/// The persisted syntax-highlighting theme name, or `None` if the user never picked one.
+pub fn load_syntax_theme() -> Option<String> {
+    let name = load_from(config_path()).syntax_theme;
+    (!name.is_empty()).then_some(name)
+}
+
+/// Persist the syntax-highlighting theme choice.
+pub fn save_syntax_theme(name: &str) {
+    let mut config = load_from(config_path());
+    config.syntax_theme = name.to_string();
     save_to(config_path(), config);
 }
 
