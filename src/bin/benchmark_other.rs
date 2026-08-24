@@ -503,6 +503,14 @@ fn bdiff_python() -> Result<std::path::PathBuf> {
 ///   in both files; only the new duplicate at `dest_line` is a change. (Rare: 7 occurrences
 ///   across the first 60 fixtures.)
 fn bdiff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let script = bdiff_edit_script(before, after)?;
+    bdiff_touched_from_script(before, after, &script)
+}
+
+/// Runs BDiff once and returns its raw edit script. Shared by [`bdiff_line_labels`] and
+/// [`bdiff_node_spans`], which read different fields of the same entries - the same
+/// one-invocation-per-metric shape `gumtree_line_labels`/`gumtree_node_spans` already have.
+fn bdiff_edit_script(before: &Code, after: &Code) -> Result<Vec<serde_json::Value>> {
     let python = bdiff_python()?;
     let (before_file, after_file) = write_temp_pair(before, after, None)?;
 
@@ -529,9 +537,7 @@ fn bdiff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool
         );
     }
 
-    let script: Vec<serde_json::Value> =
-        serde_json::from_slice(&output.stdout).context("parsing bdiff driver JSON output")?;
-    bdiff_touched_from_script(before, after, &script)
+    serde_json::from_slice(&output.stdout).context("parsing bdiff driver JSON output")
 }
 
 /// The pure half of [`bdiff_line_labels`], split out so the mode-to-side rules documented there
@@ -695,23 +701,10 @@ fn nvim_bin() -> Result<std::path::PathBuf> {
     )
 }
 
-/// `(before_touched, after_touched)` from `nvim -d`.
-///
-/// Included even though Neovim's *line* pass is libxdiff - the same engine as the four `git`
-/// rows - because excluding it on that basis would be letting this metric's granularity decide
-/// what gets measured. Neovim is the tool a large number of developers actually read diffs in,
-/// and it is the only entry here that pairs a line-level match with character-level display, so
-/// what it costs is one row and what it buys is a data point rather than an assumption. On a
-/// 40-fixture sample its line set matched `git_myers` on 38; the corpus decides the rest.
-///
-/// Run with `-u NONE`: `diffopt` is user-configurable and can change both the algorithm
-/// (`algorithm:histogram`) and the within-line alignment (`linematch:N`), so loading a user
-/// config would silently turn this into a measurement of that config. What is scored is Neovim's
-/// shipped default behaviour.
-///
-/// `-n` disables swap files - without it, concurrent or repeated runs over the same fixture path
-/// prompt for swap recovery and hang a headless process forever.
-fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+/// Runs `nvim -d` once and returns the driver's two side objects (before, after), each carrying
+/// `lines` and `subline`. Shared by [`nvim_line_labels`] and [`nvim_node_spans`], which read
+/// different fields of the same output.
+fn nvim_diff_sides(before: &Code, after: &Code) -> Result<Vec<serde_json::Value>> {
     let nvim = nvim_bin()?;
     let (before_file, after_file) = write_temp_pair(before, after, None)?;
 
@@ -750,6 +743,27 @@ fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>
         bail!("nvim driver returned {} sides, expected 2", sides.len());
     }
 
+    Ok(sides)
+}
+
+/// `(before_touched, after_touched)` from `nvim -d`.
+///
+/// Included even though Neovim's *line* pass is libxdiff - the same engine as the four `git`
+/// rows - because excluding it on that basis would be letting this metric's granularity decide
+/// what gets measured. Neovim is the tool a large number of developers actually read diffs in,
+/// and it is the only entry here that pairs a line-level match with character-level display, so
+/// what it costs is one row and what it buys is a data point rather than an assumption. On a
+/// 40-fixture sample its line set matched `git_myers` on 38; the corpus decides the rest.
+///
+/// Run with `-u NONE`: `diffopt` is user-configurable and can change both the algorithm
+/// (`algorithm:histogram`) and the within-line alignment (`linematch:N`), so loading a user
+/// config would silently turn this into a measurement of that config. What is scored is Neovim's
+/// shipped default behaviour.
+///
+/// `-n` disables swap files - without it, concurrent or repeated runs over the same fixture path
+/// prompt for swap recovery and hang a headless process forever.
+fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
+    let sides = nvim_diff_sides(before, after)?;
     let touched = |side: &serde_json::Value, line_count: usize| -> Vec<bool> {
         let mut flags = vec![false; line_count];
         if let Some(lines) = side.get("lines").and_then(|v| v.as_array()) {
@@ -1997,11 +2011,11 @@ fn span_on_row(row: usize, start: usize, end: usize) -> TextRange {
 /// The changed regions each AST-aware external tool reports, as `(before_spans, after_spans)` in
 /// the same space `human_mapping::node_extents` produces node extents in.
 ///
-/// `None` for `UnixDiff` by construction, not by omission: a line-based tool reports whole lines
-/// with no sub-line structure at all, so projecting it onto nodes would mark every node on a
-/// changed line as changed. That isn't a worse node score, it's a different (and meaningless)
-/// question - which is why the CSV leaves Unix diff's node columns empty rather than filling in a
-/// number that would read as comparable.
+/// `None` for the purely line-based tools (Unix diff and the four git algorithms) by
+/// construction, not by omission: they report whole lines with no sub-line structure at all, so
+/// projecting one onto nodes would mark every node on a changed line as changed. That isn't a
+/// worse node score, it's a different (and meaningless) question - which is why the CSV leaves
+/// their node columns empty rather than filling in a number that would read as comparable.
 ///
 /// Coordinate conventions, all three verified empirically (2026-08-19) against a fixture with a
 /// multi-byte character before the change, since a char/byte mix-up would silently shift every
@@ -2017,20 +2031,254 @@ fn tool_node_spans(
     after: &Code,
 ) -> Option<Result<(Vec<TextRange>, Vec<TextRange>)>> {
     match tool {
-        // Every text-based tool reports changed *lines*, never nodes - there is no tree in its
-        // output to project onto this codebase's AST. `None` here is what makes `score_accuracy`
-        // record them as `line_only` rather than as an error or a perfect zero.
+        // These five report changed *lines* and nothing finer - there is no sub-line structure in
+        // the output to project onto this codebase's AST at all. `None` here is what makes
+        // `score_accuracy` record them as `line_only` rather than as an error or a perfect zero.
         ExternalTool::UnixDiff
         | ExternalTool::GitMyers
         | ExternalTool::GitMinimal
         | ExternalTool::GitPatience
-        | ExternalTool::GitHistogram
-        | ExternalTool::BDiff
-        | ExternalTool::NvimDiff => None,
+        | ExternalTool::GitHistogram => None,
+        // BDiff and Neovim are *not* line-only, despite both matching lines with libxdiff-class
+        // machinery: BDiff's edit script carries `str_diff` character offsets and Neovim paints
+        // `DiffText` per column. Both were scored `line_only` here until 2026-08-24, which meant
+        // the two tools in this comparison whose distinctive output is sub-line were the two whose
+        // sub-line output was never read. See their span builders below.
+        ExternalTool::BDiff => Some(bdiff_node_spans(before, after)),
+        ExternalTool::NvimDiff => Some(nvim_node_spans(before, after)),
         ExternalTool::GumTree => Some(gumtree_node_spans(before, after)),
         ExternalTool::Difftastic => Some(difftastic_node_spans(before, after)),
         ExternalTool::Diffsitter => Some(diffsitter_node_spans(before, after)),
     }
+}
+
+/// The `TextRange` covering characters `[start_char, end_char)` of `row` (0-based), converted to
+/// the **byte** columns `TextRange` uses everywhere else in this codebase.
+///
+/// BDiff is a Python program, so every offset in its edit script indexes a Python `str` - i.e.
+/// characters, not bytes. `span_on_row` takes byte columns. Getting this wrong is invisible on
+/// ASCII and silently shifts every span past the first non-ASCII character on the line, which is
+/// the same trap `tool_node_spans`' doc comment already records for the other three tools.
+fn span_on_row_chars(lines: &[&str], row: usize, start_char: usize, end_char: usize) -> TextRange {
+    let line = lines.get(row).copied().unwrap_or("");
+    let byte_at = |char_index: usize| -> usize {
+        line.char_indices()
+            .nth(char_index)
+            .map(|(byte, _)| byte)
+            .unwrap_or(line.len())
+    };
+    span_on_row(row, byte_at(start_char), byte_at(end_char))
+}
+
+/// The `TextRange` covering all of `row`.
+fn whole_row_span(lines: &[&str], row: usize) -> TextRange {
+    span_on_row(row, 0, lines.get(row).copied().unwrap_or("").len())
+}
+
+/// BDiff's changed regions, from the same edit script `bdiff_line_labels` parses - but keeping
+/// each `update` entry's real character range instead of collapsing it to the line it sits on.
+///
+/// This is what moves BDiff out of the `line_only` bucket. Its edit script carries a `str_diff`
+/// field on every `update`-family entry: `[before_ranges, after_ranges]`, where each side is a
+/// list of **inclusive** `[start, end]` character offsets into that line (an empty `[]` means the
+/// side has nothing there, e.g. a pure insertion into a line). Verified live, 2026-08-24:
+///
+/// * `abcdefghij` -> `abcXYZfghij` gives `[[[3, 4]], [[3, 5]]]` - `de` on one side, `XYZ` on the
+///   other, so both ends are inclusive and the two sides' lengths differ independently.
+/// * `hello world` -> `hello there world` gives `[[[]], [[6, 11]]]` - the before side's empty
+///   list is the insertion's zero-width position.
+///
+/// One limitation worth knowing before reading the resulting numbers: BDiff reports the **hull**
+/// of a line's changes, not each one. `one two three four` -> `onX two threX four` gives a single
+/// `[2, 12]`, spanning the untouched `e two thre` between the two edited characters, rather than
+/// two ranges. So its sub-line output is finer than a line but coarser than the true edit, and it
+/// will over-report on lines with several separated changes.
+///
+/// Modes with no `str_diff` (`insert`, `delete`, `move`, `split`, `merge`, `copy`) contribute
+/// whole-line spans, following exactly the same mode-to-side rules `bdiff_line_labels` documents -
+/// dropping them would leave BDiff scored only on the lines it happens to call updates.
+fn bdiff_node_spans(before: &Code, after: &Code) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let script = bdiff_edit_script(before, after)?;
+    bdiff_spans_from_script(before, after, &script)
+}
+
+/// The pure half of [`bdiff_node_spans`], split out for the same reason
+/// [`bdiff_touched_from_script`] is: the range conventions above are unit-testable without an
+/// installed BDiff, and they are exactly the part that is easy to get wrong.
+fn bdiff_spans_from_script(
+    before: &Code,
+    after: &Code,
+    script: &[serde_json::Value],
+) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let before_lines: Vec<&str> = before.contents.split('\n').collect();
+    let after_lines: Vec<&str> = after.contents.split('\n').collect();
+    let mut before_spans = Vec::new();
+    let mut after_spans = Vec::new();
+
+    // BDiff line numbers are 1-based; `TextRange` rows are 0-based.
+    let whole = |spans: &mut Vec<TextRange>, lines: &[&str], start: u64, count: u64| {
+        for line_number in start..start + count.max(1) {
+            if let Some(row) = (line_number as usize).checked_sub(1) {
+                if row < lines.len() {
+                    spans.push(whole_row_span(lines, row));
+                }
+            }
+        }
+    };
+
+    /// One side of a `str_diff` field, as `(start, end)` **inclusive** character offsets.
+    fn side_ranges(str_diff: &serde_json::Value, side: usize) -> Vec<(usize, usize)> {
+        str_diff
+            .get(side)
+            .and_then(|v| v.as_array())
+            .map(|ranges| {
+                ranges
+                    .iter()
+                    .filter_map(|range| {
+                        let pair = range.as_array()?;
+                        // `[]` is the empty range BDiff emits for the side that has no text here.
+                        Some((
+                            pair.first()?.as_u64()? as usize,
+                            pair.get(1)?.as_u64()? as usize,
+                        ))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    for entry in script {
+        let mode = entry
+            .get("mode")
+            .and_then(|m| m.as_str())
+            .unwrap_or_default();
+        let src = entry.get("src_line").and_then(|v| v.as_u64()).unwrap_or(0);
+        let dest = entry.get("dest_line").and_then(|v| v.as_u64()).unwrap_or(0);
+        let block = entry
+            .get("block_length")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1);
+
+        match mode {
+            "insert" => whole(&mut after_spans, &after_lines, dest, 1),
+            "delete" => whole(&mut before_spans, &before_lines, src, 1),
+            "update" | "m_update" | "c_update" => {
+                let str_diff = entry.get("str_diff");
+                let sub = str_diff
+                    .map(|d| (side_ranges(d, 0), side_ranges(d, 1)))
+                    .unwrap_or_default();
+                let (before_sub, after_sub) = sub;
+                // No `str_diff` at all (or one that named nothing on either side) means BDiff
+                // gave no sub-line detail for this update, so fall back to the whole lines rather
+                // than silently reporting no change there.
+                if before_sub.is_empty() && after_sub.is_empty() {
+                    whole(&mut before_spans, &before_lines, src, 1);
+                    whole(&mut after_spans, &after_lines, dest, 1);
+                    continue;
+                }
+                for (row_1based, ranges, lines, spans) in [
+                    (src, before_sub, &before_lines, &mut before_spans),
+                    (dest, after_sub, &after_lines, &mut after_spans),
+                ] {
+                    let Some(row) = (row_1based as usize).checked_sub(1) else {
+                        continue;
+                    };
+                    for (start, end) in ranges {
+                        // Inclusive end -> half-open, which is what every other span here is.
+                        spans.push(span_on_row_chars(lines, row, start, end + 1));
+                    }
+                }
+            }
+            "move" => {
+                whole(&mut before_spans, &before_lines, src, block);
+                whole(&mut after_spans, &after_lines, dest, block);
+            }
+            "split" => {
+                whole(&mut before_spans, &before_lines, src, 1);
+                whole(&mut after_spans, &after_lines, dest, block);
+            }
+            "merge" => {
+                whole(&mut before_spans, &before_lines, src, block);
+                whole(&mut after_spans, &after_lines, dest, 1);
+            }
+            "copy" => whole(&mut after_spans, &after_lines, dest, block),
+            other => bail!("unknown BDiff edit mode {other:?} - see bdiff_line_labels"),
+        }
+    }
+
+    Ok((before_spans, after_spans))
+}
+
+/// Neovim's changed regions, from the same driver output `nvim_line_labels` parses - but keeping
+/// the `DiffText` column runs instead of collapsing each changed line to a boolean.
+///
+/// This is what moves `nvim -d` out of the `line_only` bucket, and it is the only thing in this
+/// comparison that measures what Neovim actually adds over the four `git` rows: its *line* pass
+/// is libxdiff, the same engine, so on a line-level metric it can only ever tie them. The
+/// within-line highlight is computed by Neovim itself and is the whole difference.
+///
+/// A changed line with no `DiffText` run on it is a wholly added or removed line (`DiffAdd` /
+/// `DiffDelete`), not a rewritten one, so it contributes its whole row - the same treatment
+/// [`bdiff_spans_from_script`] gives an `insert` or a `delete`.
+fn nvim_node_spans(before: &Code, after: &Code) -> Result<(Vec<TextRange>, Vec<TextRange>)> {
+    let sides = nvim_diff_sides(before, after)?;
+    let before_lines: Vec<&str> = before.contents.split('\n').collect();
+    let after_lines: Vec<&str> = after.contents.split('\n').collect();
+
+    let spans_for = |side: &serde_json::Value, lines: &[&str]| -> Vec<TextRange> {
+        // `{lnum, start_col, end_col}`, 1-based byte columns with an exclusive end - see the
+        // driver's own comment on why these are runs rather than a per-line flag.
+        let mut runs: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
+        if let Some(entries) = side.get("subline").and_then(|v| v.as_array()) {
+            for entry in entries {
+                let Some(triple) = entry.as_array() else {
+                    continue;
+                };
+                let (Some(lnum), Some(start), Some(end)) = (
+                    triple.first().and_then(|v| v.as_u64()),
+                    triple.get(1).and_then(|v| v.as_u64()),
+                    triple.get(2).and_then(|v| v.as_u64()),
+                ) else {
+                    continue;
+                };
+                let Some(row) = (lnum as usize).checked_sub(1) else {
+                    continue;
+                };
+                runs.entry(row)
+                    .or_default()
+                    .push((start as usize - 1, end as usize - 1));
+            }
+        }
+
+        let mut spans = Vec::new();
+        if let Some(entries) = side.get("lines").and_then(|v| v.as_array()) {
+            for entry in entries {
+                let Some(row) = entry
+                    .as_u64()
+                    .and_then(|lnum| (lnum as usize).checked_sub(1))
+                else {
+                    continue;
+                };
+                if row >= lines.len() {
+                    continue;
+                }
+                match runs.get(&row) {
+                    Some(line_runs) if !line_runs.is_empty() => spans.extend(
+                        line_runs
+                            .iter()
+                            .map(|&(start, end)| span_on_row(row, start, end)),
+                    ),
+                    _ => spans.push(whole_row_span(lines, row)),
+                }
+            }
+        }
+        spans
+    };
+
+    Ok((
+        spans_for(&sides[0], &before_lines),
+        spans_for(&sides[1], &after_lines),
+    ))
 }
 
 /// GumTree's changed spans, from the same `textdiff -f JSON` output `gumtree_line_labels` parses
@@ -2294,8 +2542,8 @@ struct ToolScore {
     visible_node_mismatches: Option<usize>,
     /// `ok`, `unsupported` (the tool has no parser/generator for this language - not a failure,
     /// and deliberately not scored as 0, which would read as a perfect result), `error` (the tool
-    /// was supposed to handle this language and didn't), or `line_only` (Unix diff, which has no
-    /// node-level output at all by construction).
+    /// was supposed to handle this language and didn't), or `line_only` (Unix diff and the four
+    /// git algorithms, which have no sub-line output at all by construction).
     status: &'static str,
 }
 
@@ -2983,6 +3231,102 @@ mod tests {
                 "git myers and unix diff disagree on {before_text:?} -> {after_text:?}"
             );
         }
+    }
+
+    /// BDiff's `str_diff` offsets are **inclusive** on both ends and index a Python `str`, i.e.
+    /// characters. Both conventions are transcribed from live output (see
+    /// `bdiff_spans_from_script`'s doc comment); either one wrong is invisible on ASCII-only
+    /// input and silently shifts every span, so they get a test with a multi-byte character in
+    /// front of the change.
+    #[test]
+    fn bdiff_spans_from_script_reads_str_diff_as_inclusive_character_offsets() {
+        // 'é' is two bytes, so byte columns run ahead of character offsets from column 4 on.
+        let before = Code::from_string("let é = abcdefghij;\n", &Language::Rust);
+        let after = Code::from_string("let é = abcXYZfghij;\n", &Language::Rust);
+        // Characters 11..=12 of the before line are "de"; 11..=13 of the after line are "XYZ".
+        let script: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[{"mode": "update", "src_line": 1, "dest_line": 1,
+                 "str_diff": [[[11, 12]], [[11, 13]]]}]"#,
+        )
+        .unwrap();
+
+        let (before_spans, after_spans) =
+            bdiff_spans_from_script(&before, &after, &script).unwrap();
+
+        // "let é = abc" is 12 bytes (the 'é' costs two), so the change starts at byte column 12.
+        assert_eq!(before_spans, vec![span_on_row(0, 12, 14)]);
+        assert_eq!(after_spans, vec![span_on_row(0, 12, 15)]);
+        // And the columns really do name the changed text on each side.
+        assert_eq!(&before.contents[12..14], "de");
+        assert_eq!(&after.contents[12..15], "XYZ");
+    }
+
+    /// A pure insertion into a line gives the before side an empty `[]` range - "nothing here" -
+    /// which must contribute no span rather than a zero-width one at offset 0.
+    #[test]
+    fn bdiff_spans_from_script_skips_an_empty_side_range() {
+        let before = Code::from_string("hello world\n", &Language::Rust);
+        let after = Code::from_string("hello there world\n", &Language::Rust);
+        let script: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[{"mode": "update", "src_line": 1, "dest_line": 1,
+                 "str_diff": [[[]], [[6, 11]]]}]"#,
+        )
+        .unwrap();
+
+        let (before_spans, after_spans) =
+            bdiff_spans_from_script(&before, &after, &script).unwrap();
+
+        assert!(before_spans.is_empty(), "got {before_spans:?}");
+        assert_eq!(after_spans, vec![span_on_row(0, 6, 12)]);
+        assert_eq!(&after.contents[6..12], "there ");
+    }
+
+    /// Every mode without a `str_diff` still has to contribute its whole lines, on the same sides
+    /// `bdiff_line_labels` documents - otherwise BDiff would be scored only on the lines it calls
+    /// updates, which is not a comparison of the same thing.
+    #[test]
+    fn bdiff_spans_from_script_falls_back_to_whole_lines_without_str_diff() {
+        let before = Code::from_string("aa\nbb\ncc\n", &Language::Rust);
+        let after = Code::from_string("aa\nbb\ncc\n", &Language::Rust);
+        let script: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {"mode": "delete", "src_line": 1, "dest_line": 1},
+                {"mode": "insert", "src_line": 1, "dest_line": 2},
+                {"mode": "update", "src_line": 3, "dest_line": 3},
+                {"mode": "copy",   "src_line": 1, "dest_line": 1, "block_length": 2}
+            ]"#,
+        )
+        .unwrap();
+
+        let (before_spans, after_spans) =
+            bdiff_spans_from_script(&before, &after, &script).unwrap();
+
+        // delete -> before row 0; update with no str_diff -> both sides' row 2.
+        assert_eq!(
+            before_spans,
+            vec![span_on_row(0, 0, 2), span_on_row(2, 0, 2)]
+        );
+        // insert -> after row 1; update -> after row 2; copy -> after rows 0 and 1.
+        assert_eq!(
+            after_spans,
+            vec![
+                span_on_row(1, 0, 2),
+                span_on_row(2, 0, 2),
+                span_on_row(0, 0, 2),
+                span_on_row(1, 0, 2),
+            ]
+        );
+    }
+
+    #[test]
+    fn span_on_row_chars_converts_character_offsets_to_byte_columns() {
+        let lines = vec!["aéb", "plain"];
+
+        // Characters 1..3 of "aéb" are "éb", which starts at byte 1 and ends at byte 4.
+        assert_eq!(span_on_row_chars(&lines, 0, 1, 3), span_on_row(0, 1, 4));
+        // Past the end of the line clamps rather than panicking.
+        assert_eq!(span_on_row_chars(&lines, 0, 0, 99), span_on_row(0, 0, 4));
+        assert_eq!(span_on_row_chars(&lines, 9, 0, 1), span_on_row(9, 0, 0));
     }
 
     /// The mode-to-side rules from `bdiff_line_labels`'s doc comment, against a hand-built script

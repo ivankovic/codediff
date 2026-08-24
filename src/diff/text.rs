@@ -706,10 +706,15 @@ const PLAIN_TEXT_MAX_EDIT: usize = 10_000;
 /// `DiffSummary`) works unchanged - none of them actually require an AST, only a `RangeMatch`
 /// list.
 ///
-/// Only ever produces `Identical`/`Insert`/`Delete` - there is no AST-level node identity to
-/// detect an `Update` (a changed line one side, at the same position) or a `Move` (a line
-/// relocated elsewhere) from, so a changed line renders as an adjacent delete+insert pair instead
-/// of a single `Update`, same as a plain `diff -u`.
+/// Never produces `Move`: detecting one needs a notion of identity that survives relocation, and
+/// hashed lines give none - a line that moved elsewhere is a delete plus an unrelated insert here,
+/// same as a plain `diff -u`.
+///
+/// It *does* produce `Update`, with sub-line columns, which `diff -u` cannot. `plan_gap` pairs
+/// rows inside a hunk by [`shared_affix`] rather than positionally, and each paired row goes
+/// through [`intra_line_ranges`], which splits it into an identical prefix, an `Update` over the
+/// differing middle, and an identical suffix. So a rewritten line renders as one changed line with
+/// the changed characters marked, not as an adjacent delete+insert pair.
 pub fn plain_text_line_diff(before: &str, after: &str) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
     plain_text_line_diff_with_max_edit(before, after, PLAIN_TEXT_MAX_EDIT)
 }

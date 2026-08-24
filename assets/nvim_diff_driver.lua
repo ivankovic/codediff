@@ -44,11 +44,26 @@ for window = 1, 2 do
     if vim.fn.diff_hlID(lnum, 1) ~= 0 then
       lines[#lines + 1] = lnum
       local content = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+      -- `subline` entries are `{lnum, start_col, end_col}` with 1-based **byte** columns and an
+      -- exclusive end - the runs of this line Neovim paints `DiffText` rather than `DiffChange`,
+      -- i.e. the characters it considers actually changed as opposed to merely on a changed line.
+      -- Recorded as runs rather than as a per-line boolean because that is the whole reason
+      -- `nvim -d` is in this comparison at all: it is one of only two tools here whose output is
+      -- finer than a line (BDiff's `str_diff` is the other), and a boolean throws away exactly
+      -- the part that distinguishes it from `git diff`. `diff_hlID` takes a byte index, so a
+      -- multi-byte character simply yields consecutive columns inside one run.
+      local run_start = nil
       for col = 1, #content do
-        if vim.fn.synIDattr(vim.fn.diff_hlID(lnum, col), "name") == "DiffText" then
-          subline[#subline + 1] = lnum
-          break
+        local is_text = vim.fn.synIDattr(vim.fn.diff_hlID(lnum, col), "name") == "DiffText"
+        if is_text and not run_start then
+          run_start = col
+        elseif not is_text and run_start then
+          subline[#subline + 1] = { lnum, run_start, col }
+          run_start = nil
         end
+      end
+      if run_start then
+        subline[#subline + 1] = { lnum, run_start, #content + 1 }
       end
     end
   end

@@ -113,21 +113,53 @@ their own text (a comment whose marker is a separate child). They will therefore
 closely - the visible count is the leaf count plus the text-carrying interiors, not an independent
 signal, so do not treat their agreement as a cross-check.
 
-**Unix diff has no node columns**, by construction rather than omission: it reports whole changed
-lines with no sub-line structure, so projecting it onto nodes would mark every node on a changed
-line as changed. Its `_status` is `line_only`.
+**The purely line-based tools have no node columns**, by construction rather than omission: Unix
+diff and the four git algorithms report whole changed lines with no sub-line structure, so
+projecting one onto nodes would mark every node on a changed line as changed. Their `_status` is
+`line_only`.
+
+**BDiff and `nvim -d` are not in that group, though they were scored as if they were until
+2026-08-24.** Both match *lines* with libxdiff-class machinery, which is why they tie the git rows
+on the line metric - but both then report which characters inside a line actually changed, and
+that sub-line output was being parsed and discarded:
+
+- BDiff's edit script carries a `str_diff` field on every `update`-family entry:
+  `[before_ranges, after_ranges]`, each a list of **inclusive** `[start, end]` **character**
+  offsets into that line (an empty `[]` = the side has nothing there, e.g. a pure insertion).
+  Verified live 2026-08-24: `abcdefghij` -> `abcXYZfghij` gives `[[[3, 4]], [[3, 5]]]`. Caveat
+  worth knowing when reading its node numbers: BDiff reports the **hull** of a line's changes, not
+  each one - `one two three four` -> `onX two threX four` gives a single `[2, 12]` spanning the
+  untouched middle - so it will over-report on lines with several separated edits.
+- Neovim paints `DiffText` per column, readable only through `diff_hlID(lnum, col)`;
+  `assets/nvim_diff_driver.lua` now records the runs of those columns rather than a per-line
+  boolean.
+
+Modes and lines with no sub-line detail (BDiff's `insert`/`delete`/`move`/`split`/`merge`/`copy`,
+and any changed line Neovim paints `DiffAdd`/`DiffDelete` rather than `DiffText`) contribute their
+whole line, on the same sides `bdiff_line_labels` documents - otherwise each tool would be scored
+only on the subset it happens to call an update, which is not the same question.
+
+This matters for what the two tables mean: the line-granularity table cannot distinguish a tool
+that marks a whole changed line from one that marks the three characters that changed, and for
+these two tools that difference is the only thing they add over `git diff`. Any claim about
+sub-line quality has to come from the node columns, not the line ones.
 
 **`_status` distinguishes an unscored cell from a zero.** `ok` = scored; `unsupported` = the tool
 has no parser/generator for that language, so the fixture is out of its coverage (an empty cell,
 never a 0, which would read as a perfect score); `error` = the tool was expected to handle the
-language and failed; `line_only` = Unix diff's node columns.
+language and failed; `line_only` = the node columns of a tool with no sub-line output at all (Unix
+diff and the four git algorithms - *not* BDiff or `nvim -d`, see above).
 
 **Tool versions are not recorded per row - record them here on every refresh.** The GumTree build
-in use is **4.0.0-beta8**, at `/var/tmp/gumtree-installed/gumtree-4.0.0-beta8`, which is what the
-paper's comparison section claims. This resolves the version question that stood open here: the
-beta4 tree under `/var/tmp/tools/` that earlier measurements ran against no longer exists on disk,
-so the whole generator table was re-verified against beta8 on 2026-08-20, entry by entry, by
-running each one on a real fixture pair rather than reading `gumtree list GENERATORS`.
+in use is **4.0.0-beta8**, at `/var/tmp/tools/gumtree-4.0.0-beta8`, which is what the
+paper's comparison section claims. Re-verified 2026-08-24 by running `gumtree list GENERATORS`
+against that path: `cpp-treesitter-ng` and `tsx-treesitter-ng` present, no JSON generator. This resolves the version question that stood open here: the
+beta4 tree under `/var/tmp/tools/` that earlier measurements ran against **is back on disk** at
+`/var/tmp/tools/gumtree-4.0.0-beta4` (re-checked 2026-08-24; an earlier revision of this file said
+it was gone). Do not point `GUMTREE_BIN` at it: its generator set differs from beta8's in both
+directions, so it fails no louder than producing a different scored subset. The whole generator
+table was re-verified against beta8 on 2026-08-20, entry by entry, by running each one on a real
+fixture pair rather than reading `gumtree list GENERATORS`.
 
 **The beta4 -> beta8 change moves GumTree's coverage in both directions**, so its scored subset is
 not comparable across that boundary:
