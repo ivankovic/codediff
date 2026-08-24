@@ -36,6 +36,8 @@ use clap::Parser;
 use tree_sitter::Node;
 
 use codediff::code::{Code, Language};
+use codediff::diff::NodeCache;
+use codediff::diff::text::{RangeMatch, TextDiff, TextOperation};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanOperation, MarkKind, NodeStatus, is_identical_after, is_identical_before,
@@ -194,6 +196,53 @@ fn render_fixture_page(
         true,
     );
 
+    // The second view of the same mapping: the tree above says which *nodes* the human paired,
+    // this says what that looks like as code. They answer different questions - a tree node like
+    // an `expression_statement` wrapper has no visible text of its own, so a reader scanning the
+    // tree cannot tell which annotations correspond to something they would actually see on
+    // screen (the same visible-vs-scaffolding split `visible_node_ids` draws for mismatch
+    // counting). The code panel is the visible half, rendered directly.
+    //
+    // Routed through exactly the machinery codediff's own output uses - `as_ast_diff_for_mapping`
+    // turns the human mapping into a real `ASTDiff`, which `TextDiff::from` projects to per-side
+    // ranges - so the highlighting here is the human's answer rendered the way the TUI renders
+    // codediff's, not a second, separately-written interpretation of `human_mapping.json` that
+    // could drift from the first.
+    let human_diff = human_mapping::as_ast_diff_for_mapping(mapping, before, after)
+        .with_context(|| format!("building a synthetic ASTDiff for '{name}'"))?;
+    let node_cache = NodeCache::build(before, after);
+    let text_diff = TextDiff::from(before, after, &human_diff, &node_cache);
+    let before_ranges = text_diff.all(0);
+    let after_ranges = text_diff.all(1);
+    let before_code_html = render_code_panel(
+        &before.contents,
+        &before_ranges,
+        &code_markers(&after_ranges, before.contents.split('\n').count()),
+        'b',
+        &code_counterparts(&before_ranges, &after_ranges, 'a'),
+    );
+    let after_code_html = render_code_panel(
+        &after.contents,
+        &after_ranges,
+        &code_markers(&before_ranges, after.contents.split('\n').count()),
+        'a',
+        &code_counterparts(&after_ranges, &before_ranges, 'b'),
+    );
+
+    // `representative_entries` (via `as_ast_diff_for_mapping`) has to collapse each multi-map
+    // group down to one concrete pairing to produce an `ASTDiff` at all - but a group exists
+    // precisely because several pairings are equally correct. Say so, rather than letting a page
+    // that shows one of them imply it is the answer.
+    let groups_notice = if mapping.groups.is_empty() {
+        String::new()
+    } else {
+        let count = mapping.groups.len();
+        let plural = if count == 1 { "" } else { "s" };
+        format!(
+            r#"<p class="notice">This mapping has {count} multi-map group{plural}: several pairings are equally correct there. The code view shows one arbitrary valid pairing, not the only one.</p>"#
+        )
+    };
+
     let language = before.metadata.language.unwrap_or_default();
     // `diffs_case_dir` resolves which `DIFF_DATASETS` folder this fixture actually lives under
     // (`helper::DIFF_DATASETS`) - the URL needs that segment, even though every other parameter
@@ -235,8 +284,31 @@ fn render_fixture_page(
 <li><span class="status-deleted">&#9679;</span> deleted</li>
 <li><span class="status-inserted">&#9679;</span> inserted</li>
 </ul>
+<ul class="legend code-legend">
+<li><span class="cd cd-inserted-swatch cd-insert"></span> inserted</li>
+<li><span class="cd cd-inserted-swatch cd-delete"></span> deleted</li>
+<li><span class="cd cd-inserted-swatch cd-update"></span> updated</li>
+<li><span class="cd cd-inserted-swatch cd-move"></span> moved</li>
+<li>click a highlight to reveal its counterpart</li>
+</ul>
+<div class="view-switch" role="group" aria-label="View">
+<button type="button" data-view="split" aria-pressed="true">Split</button>
+<button type="button" data-view="code" aria-pressed="false">Code</button>
+<button type="button" data-view="tree" aria-pressed="false">Tree</button>
+</div>
 </header>
-<div class="panels">
+{groups_notice}
+<div class="panels code-panels">
+<section class="panel code-panel" data-side="before">
+<h2>Before</h2>
+<div class="code">{before_code_html}</div>
+</section>
+<section class="panel code-panel" data-side="after">
+<h2>After</h2>
+<div class="code">{after_code_html}</div>
+</section>
+</div>
+<div class="panels tree-panels">
 <section class="panel" data-side="before">
 <h2>Before</h2>
 <div class="tree">{before_html}</div>
@@ -257,6 +329,9 @@ fn render_fixture_page(
 </body>
 </html>
 "##,
+        before_code_html = before_code_html,
+        after_code_html = after_code_html,
+        groups_notice = groups_notice,
         name_escaped = escape_html_text(name),
         name_attr = escape_html_attr(name),
         repo = REPO,
@@ -268,13 +343,14 @@ fn render_fixture_page(
 const HELP_OVERLAY_HTML: &str = r#"<div id="help-overlay" class="hidden" role="dialog" aria-label="Keybindings">
 <h2>Keybindings</h2>
 <dl>
-<dt>j / k</dt><dd>next / previous visible node</dd>
+<dt>j / k</dt><dd>next / previous visible node (tree panels)</dd>
 <dt>h / l</dt><dd>collapse / expand the focused node</dd>
 <dt>g / G</dt><dd>jump to first / last visible node</dd>
 <dt>Tab</dt><dd>switch focus between Before/After panels</dd>
 <dt>/</dt><dd>search: jump to next node whose text contains a given string</dd>
 <dt>a</dt><dd>jump the other panel to this node's mapped counterpart</dd>
 <dt>i</dt><dd>hide identical matches, showing only inserted/deleted/updated nodes and their ancestors</dd>
+<dt>v</dt><dd>cycle the view: split / code only / tree only</dd>
 <dt>?</dt><dd>toggle this help</dd>
 </dl>
 </div>"#;
@@ -508,6 +584,365 @@ fn mark_fully_quiet(
     }
 }
 
+/// Rows of unchanged context kept around every changed row in a code panel. A code panel renders
+/// the file's real source text, so unlike the tree panels (whose markup is several times the size
+/// of the code it describes) it is cheap per row - but the corpus's `full` dataset holds real
+/// multi-thousand-line source files whose diffs touch a handful of lines, and rendering all of
+/// those rows twice per page for nothing is exactly the page-size problem `OMIT_THRESHOLD` already
+/// solves for the trees. Same treatment, same reason, just a much more generous budget.
+const CODE_CONTEXT_ROWS: usize = 6;
+
+/// A run of consecutive unchanged, out-of-context rows shorter than this is rendered in full
+/// rather than folded: below it the fold placeholder costs about as much markup as the rows it
+/// replaces, and reading around a two-line gap is worse than reading through it.
+const CODE_FOLD_THRESHOLD: usize = 4;
+
+/// The CSS class painting `operation`, or `None` for the two sentinels that mean "not a change" -
+/// `Identical` text is the panel's plain, unhighlighted background, so it gets no span at all.
+fn code_operation_class(operation: &TextOperation) -> Option<&'static str> {
+    match operation {
+        TextOperation::Insert => Some("cd-insert"),
+        TextOperation::Delete => Some("cd-delete"),
+        TextOperation::Update => Some("cd-update"),
+        TextOperation::Move => Some("cd-move"),
+        TextOperation::Identical | TextOperation::NotYetSet => None,
+    }
+}
+
+/// Snaps `column` down to the nearest UTF-8 character boundary of `line`, clamped to its length.
+///
+/// `TextRange` columns are tree-sitter's own *byte* columns, and every range this module renders
+/// comes from a node boundary, so a column should always already land on a character boundary.
+/// This exists so that "should" can't turn a malformed range into a panicking site generator:
+/// slicing a `&str` mid-character panics, and a whole site build failing over one odd range in one
+/// fixture is a far worse outcome than that fixture's highlight being a byte or two off.
+fn snap_to_char_boundary(line: &str, column: usize) -> usize {
+    let mut column = column.min(line.len());
+    while column > 0 && !line.is_char_boundary(column) {
+        column -= 1;
+    }
+    column
+}
+
+/// A caret drawn on one side to mark where the *other* side's inserted or deleted text belongs -
+/// the only thing a pure insertion's before panel, or a pure deletion's after panel, has to show
+/// at all.
+///
+/// Derived from the other side's ranges, not this side's. `TextRange`'s doc comment describes a
+/// symmetric scheme where each side gets its own zero-width placeholder for what the other side
+/// added or removed, but that is not what reaches a consumer: on a pure deletion the before side
+/// carries a `Delete` range whose *destination* is the zero-width after-side position, and the
+/// after side's range list has no non-`Identical` entry at all (verified on
+/// `c-htop-remove-function-declaration`, whose after panel this makes the difference between a
+/// page of unmarked context and a readable one). So the mark has to be read off the counterpart's
+/// `destination`.
+struct CodeMarker {
+    row: usize,
+    column: usize,
+    operation: TextOperation,
+    /// Index into the *other* side's range list of the text this caret stands in for. Both this
+    /// caret's own `data-range` (`{side}m{index}`) and the id it points at (`{other side}{index}`)
+    /// are derived from it, which is what keeps the two ends of the pair naming each other.
+    other_index: usize,
+}
+
+/// Every caret one side should draw, read off `other`'s ranges (see [`CodeMarker`]).
+///
+/// `row_count` is this side's own line count, and the clamp against it is load-bearing rather than
+/// defensive: a delete at end-of-file puts its destination at the position *after* the last line,
+/// which is not a row that gets rendered. Unclamped, `code_visible_rows` would still anchor there
+/// (it clamps for its own indexing) while the per-row lookup in `render_code_panel` would find
+/// nothing - dropping the one mark that panel had to show, silently. One corpus fixture does
+/// exactly this: `python-api-change` puts a caret at row 18 of an 18-row side.
+fn code_markers(other: &[RangeMatch], row_count: usize) -> Vec<CodeMarker> {
+    other
+        .iter()
+        .enumerate()
+        .filter(|(_, range_match)| {
+            code_operation_class(&range_match.operation).is_some()
+                && !range_match.source.is_empty()
+                && range_match.destination.is_empty()
+        })
+        .map(|(index, range_match)| CodeMarker {
+            row: range_match
+                .destination
+                .start_row
+                .min(row_count.saturating_sub(1)),
+            column: range_match.destination.start_column,
+            operation: range_match.operation.clone(),
+            other_index: index,
+        })
+        .collect()
+}
+
+/// Maps each index in `from`'s range list to the `data-range` id of the thing on the *other* side
+/// that it points at, so a clicked span can reveal its counterpart.
+///
+/// `RangeMatch::destination` already carries the counterpart's extent directly, so the ordinary
+/// case is just a lookup of that extent in the other side's own range list - the two lists are
+/// built from one `TextDiff` over the same pair, so a destination that names real text is
+/// normally present there verbatim as some range's `source`. "Normally" measured, not assumed:
+/// across the corpus's 493 mapped fixtures, 2214 of 2232 linkable ranges (99.2%) find their
+/// counterpart by exact key, so the 18 that don't are not worth a fuzzy nearest-overlap fallback -
+/// they simply render without a link, which is what an unlinkable range should do anyway.
+///
+/// An insert or a delete has no real text on the other side to point at, only a position; that
+/// position is drawn as a caret (see [`code_markers`]), and this links to the caret instead, so
+/// the pairing reads the same in both directions.
+fn code_counterparts(
+    from: &[RangeMatch],
+    to: &[RangeMatch],
+    to_side: char,
+) -> HashMap<usize, String> {
+    let key = |r: &codediff::diff::text_range::TextRange| {
+        (r.start_row, r.start_column, r.end_row, r.end_column)
+    };
+    let mut by_source: HashMap<(usize, usize, usize, usize), usize> = HashMap::new();
+    for (index, range_match) in to.iter().enumerate() {
+        if range_match.source.is_empty() {
+            continue;
+        }
+        by_source.entry(key(&range_match.source)).or_insert(index);
+    }
+
+    from.iter()
+        .enumerate()
+        .filter(|(_, range_match)| code_operation_class(&range_match.operation).is_some())
+        .filter_map(|(index, range_match)| {
+            if range_match.destination.is_empty() {
+                // The other side has only a caret here, and `code_markers` names it after the
+                // range it stands in for - which is this one.
+                return Some((index, format!("{to_side}m{index}")));
+            }
+            by_source
+                .get(&key(&range_match.destination))
+                .map(|&other| (index, format!("{to_side}{other}")))
+        })
+        .collect()
+}
+
+/// Which rows of a panel are actually rendered: every row worth anchoring on, plus
+/// `CODE_CONTEXT_ROWS` on each side of it. Everything else is folded away by `render_code_panel`.
+///
+/// Two kinds of anchor, and the second one is not optional. The obvious one is a changed row (per
+/// `line_operations`, the same row-granular projection `benchmark_other` scores tools with). The
+/// other is a caret ([`CodeMarker`]) - `line_operations` cannot see those, since they have no
+/// columns on this side to color, so a panel anchored on changed rows alone folds a pure
+/// deletion's after side away entirely and renders a page with nothing on it.
+///
+/// If nothing anchors at all (the two sides are wholly unchanged), everything stays visible:
+/// there is no change to center a fold on, and a blank panel is strictly worse than a long one.
+fn code_visible_rows(markers: &[CodeMarker], ops: &[TextOperation]) -> Vec<bool> {
+    let mut anchors: Vec<usize> = ops
+        .iter()
+        .enumerate()
+        .filter(|(_, op)| **op != TextOperation::Identical && **op != TextOperation::NotYetSet)
+        .map(|(row, _)| row)
+        .collect();
+    anchors.extend(markers.iter().map(|marker| marker.row));
+
+    if anchors.is_empty() {
+        return vec![true; ops.len()];
+    }
+
+    let mut visible = vec![false; ops.len()];
+    for row in anchors {
+        let start = row.saturating_sub(CODE_CONTEXT_ROWS);
+        let end = (row + CODE_CONTEXT_ROWS + 1).min(ops.len());
+        for slot in visible.iter_mut().take(end).skip(start) {
+            *slot = true;
+        }
+    }
+    visible
+}
+
+/// Renders one side's source text with the mapping's changes painted onto it, character-precise -
+/// the code-shaped counterpart to `render_node`'s tree.
+///
+/// Built *source-text-first*: the file's own bytes are walked row by row and a `<span>` is opened
+/// only where a non-`Identical` range covers them. It deliberately does not concatenate the
+/// ranges' own text, which would look equivalent and silently corrupt the output - `diff::text`
+/// ranges are whitespace-insensitive and leave gaps between themselves (leading indentation
+/// especially; see `line_operations`' doc comment on why *it* is row-granular for the same
+/// reason), so range-concatenation would drop exactly those gap bytes. The
+/// `render_code_panel_reproduces_the_source_text_exactly` test below is what holds this property
+/// down: strip the tags back off and what remains must be the file, byte for byte.
+fn render_code_panel(
+    contents: &str,
+    ranges: &[RangeMatch],
+    markers: &[CodeMarker],
+    side: char,
+    counterparts: &HashMap<usize, String>,
+) -> String {
+    let lines: Vec<&str> = contents.split('\n').collect();
+    let ops = codediff::diff::text::line_operations(ranges, lines.len());
+    let visible = code_visible_rows(markers, &ops);
+
+    let mut markers_by_row: HashMap<usize, Vec<&CodeMarker>> = HashMap::new();
+    for marker in markers {
+        markers_by_row.entry(marker.row).or_default().push(marker);
+    }
+    let no_markers: Vec<&CodeMarker> = Vec::new();
+    let row_html = |row: usize| {
+        render_code_row(
+            lines[row],
+            row,
+            &ops[row],
+            ranges,
+            markers_by_row.get(&row).unwrap_or(&no_markers),
+            side,
+            counterparts,
+        )
+    };
+
+    let mut html = String::new();
+    let mut row = 0usize;
+    while row < lines.len() {
+        if visible[row] {
+            html.push_str(&row_html(row));
+            row += 1;
+            continue;
+        }
+        let start = row;
+        while row < lines.len() && !visible[row] {
+            row += 1;
+        }
+        let folded = row - start;
+        if folded >= CODE_FOLD_THRESHOLD {
+            // The 1-indexed line range, not just a count: the count alone is impossible to check
+            // against the gutter (and `split('\n')` contributes a trailing empty row that makes it
+            // read one high), while the range says exactly which lines to go look at on GitHub.
+            let (first, last) = (start + 1, row);
+            html.push_str(&format!(
+                r#"<div class="cl fold"><span class="ln">&hellip;</span><span class="lt">lines {first}&ndash;{last} unchanged ({folded} lines)</span></div>"#
+            ));
+        } else {
+            // Too short to be worth a placeholder - render it after all.
+            for short_row in start..row {
+                html.push_str(&row_html(short_row));
+            }
+        }
+    }
+    html
+}
+
+/// One row of a code panel: a line-number gutter cell plus the row's text, split into plain
+/// stretches, highlighted spans, and any carets that belong on it.
+fn render_code_row(
+    line: &str,
+    row: usize,
+    row_op: &TextOperation,
+    ranges: &[RangeMatch],
+    markers: &[&CodeMarker],
+    side: char,
+    counterparts: &HashMap<usize, String>,
+) -> String {
+    let row_len = line.len();
+
+    // Every span this row draws, as byte-column bounds in left-to-right order: this side's own
+    // ranges as real, text-covering spans, plus the other side's carets as zero-width ones.
+    // `Identical` ranges are the unpainted default, so they produce nothing.
+    let mut segments: Vec<(usize, usize, &TextOperation, String, Option<&String>)> = ranges
+        .iter()
+        .enumerate()
+        .filter(|(_, range_match)| {
+            code_operation_class(&range_match.operation).is_some() && !range_match.source.is_empty()
+        })
+        .filter_map(|(index, range_match)| {
+            range_match.source.columns_on_row(row, row_len).map(
+                |(start, end)| -> (usize, usize, &TextOperation, String, Option<&String>) {
+                    (
+                        start,
+                        end,
+                        &range_match.operation,
+                        format!("{side}{index}"),
+                        counterparts.get(&index),
+                    )
+                },
+            )
+        })
+        .collect();
+    let other_side = if side == 'b' { 'a' } else { 'b' };
+    let marker_ids: Vec<(String, String)> = markers
+        .iter()
+        .map(|marker| {
+            (
+                format!("{side}m{}", marker.other_index),
+                format!("{other_side}{}", marker.other_index),
+            )
+        })
+        .collect();
+    segments.extend(
+        markers
+            .iter()
+            .zip(&marker_ids)
+            .map(|(marker, (id, points_at))| {
+                let column = snap_to_char_boundary(line, marker.column);
+                (
+                    column,
+                    column,
+                    &marker.operation,
+                    id.clone(),
+                    Some(points_at),
+                )
+            }),
+    );
+    // End position as the secondary key, so a zero-width caret sharing a start column with a real
+    // range sorts before it - the same ordering `widgets::code_viewer::build_range_order` uses.
+    segments.sort_by_key(|(start, end, _, _, _)| (*start, *end));
+
+    let mut text = String::new();
+    let mut cursor = 0usize;
+    let mut has_marker = false;
+    for (start, end, operation, id, counterpart) in segments {
+        let start = snap_to_char_boundary(line, start).max(cursor);
+        let end = snap_to_char_boundary(line, end).max(start);
+        if start > cursor {
+            text.push_str(&escape_html_text(&line[cursor..start]));
+        }
+        // `code_operation_class` returned `Some` for every segment that survived the filter above,
+        // so this can't be `None` - but default rather than unwrap, since a panic here would take
+        // down the whole site build over one row.
+        let class = code_operation_class(operation).unwrap_or("cd-update");
+        let counterpart_attr = counterpart
+            .map(|other| format!(" data-counterpart=\"{other}\""))
+            .unwrap_or_default();
+        if end > start {
+            text.push_str(&format!(
+                r#"<span class="cd {class}" data-range="{id}"{counterpart_attr} tabindex="0">{}</span>"#,
+                escape_html_text(&line[start..end])
+            ));
+        } else {
+            has_marker = true;
+            let title = match operation {
+                TextOperation::Delete => "deleted here",
+                _ => "inserted here",
+            };
+            text.push_str(&format!(
+                r#"<span class="cd cd-gap {class}" data-range="{id}"{counterpart_attr} title="{title}" tabindex="0"></span>"#
+            ));
+        }
+        cursor = end;
+    }
+    if cursor < row_len {
+        text.push_str(&escape_html_text(&line[cursor..]));
+    }
+
+    // The row-level class is the coarse signal (a tint across the whole row, so changed rows are
+    // findable while scrolling); the spans above are the precise one. Both are wanted: the spans
+    // alone are easy to scroll straight past on a long line. A row that only carries a caret gets
+    // no tint - its own text really is unchanged - just a marker class so it stays findable.
+    let row_class = match code_operation_class(row_op) {
+        Some(class) => format!(" row-{class}"),
+        None if has_marker => " row-gap".to_string(),
+        None => String::new(),
+    };
+    format!(
+        r#"<div class="cl{row_class}" id="{side}L{row}"><span class="ln">{}</span><span class="lt">{text}</span></div>"#,
+        row + 1
+    )
+}
+
 /// One row of the index page's sortable table - `main`'s corpus loop builds one of these per
 /// fixture that has a `human_mapping.json`, computing `codediff_mismatches`/`unix_diff_mismatches`
 /// via `human_mapping::line_mismatches_for` alongside the page it already renders for that
@@ -596,6 +1031,269 @@ fn escape_html_attr(s: &str) -> String {
 mod tests {
     use super::*;
     use codediff::test::helper::human_mapping::{HumanMapping, HumanMappingEntry, HumanOperation};
+
+    /// Undoes `escape_html_text` and strips every tag, recovering the plain text of one rendered
+    /// row. Only usable on this module's own output, which emits a fixed, tiny set of tags and
+    /// entities - not a general HTML parser.
+    fn strip_tags(html: &str) -> String {
+        let mut out = String::new();
+        let mut in_tag = false;
+        for ch in html.chars() {
+            match ch {
+                '<' => in_tag = true,
+                '>' => in_tag = false,
+                _ if !in_tag => out.push(ch),
+                _ => {}
+            }
+        }
+        // `&amp;` last: unescaping it first would turn a literal `&amp;lt;` in the source into
+        // `<`, which was never there.
+        out.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+    }
+
+    /// Every rendered row of a code panel, as `(row index, plain text)`, recovered from the
+    /// `id="{side}L{row}"` attribute `render_code_row` stamps on each one. Fold placeholders carry
+    /// no id and are skipped.
+    fn rendered_rows(html: &str, side: char) -> Vec<(usize, String)> {
+        let id_prefix = format!("\" id=\"{side}L");
+        html.split("<div class=\"cl")
+            .filter_map(|chunk| {
+                let id_start = chunk.find(&id_prefix)? + id_prefix.len();
+                let id_end = id_start + chunk[id_start..].find('"')?;
+                let row: usize = chunk[id_start..id_end].parse().ok()?;
+                let text_start = chunk.find("<span class=\"lt\">")? + "<span class=\"lt\">".len();
+                let text_end = chunk.rfind("</span></div>")?;
+                Some((row, strip_tags(&chunk[text_start..text_end])))
+            })
+            .collect()
+    }
+
+    /// The property that makes the code panel trustworthy at all: it renders the *file*, with the
+    /// mapping's changes painted on top, not a reassembly of the mapping's own range texts.
+    ///
+    /// Those two look identical on a page and are not: `diff::text` ranges are whitespace-
+    /// insensitive and leave gaps between themselves (leading indentation especially - the same
+    /// property that forces `line_operations` to be row-granular), so a panel built by
+    /// concatenating range texts silently loses the gap bytes and renders code that was never in
+    /// the file. Eyeballing a generated page does not catch that; comparing the stripped rows back
+    /// against the source does.
+    #[test]
+    fn render_code_panel_reproduces_the_source_text_exactly() {
+        let mut checked = 0usize;
+        for name in codediff::test::helper::UNIT_TEST_FIXTURES {
+            let Ok((before, after)) = helper::handmade_test_code_pair(name) else {
+                continue;
+            };
+            let Ok(mapping) = human_mapping::load(name) else {
+                continue;
+            };
+            let Ok(diff) = human_mapping::as_ast_diff_for_mapping(&mapping, &before, &after) else {
+                continue;
+            };
+            let node_cache = NodeCache::build(&before, &after);
+            let text_diff = TextDiff::from(&before, &after, &diff, &node_cache);
+
+            for (side, code, ranges, other) in [
+                ('b', &before, text_diff.all(0), text_diff.all(1)),
+                ('a', &after, text_diff.all(1), text_diff.all(0)),
+            ] {
+                let html = render_code_panel(
+                    &code.contents,
+                    &ranges,
+                    &code_markers(&other, code.contents.split('\n').count()),
+                    side,
+                    &HashMap::new(),
+                );
+                let source_lines: Vec<&str> = code.contents.split('\n').collect();
+                let rows = rendered_rows(&html, side);
+                assert!(
+                    !rows.is_empty(),
+                    "'{name}' side '{side}' rendered no rows at all"
+                );
+                for (row, text) in rows {
+                    assert_eq!(
+                        text, source_lines[row],
+                        "'{name}' side '{side}' row {row} does not reproduce its source line"
+                    );
+                }
+            }
+            checked += 1;
+        }
+        assert!(
+            checked > 0,
+            "no fixture in UNIT_TEST_FIXTURES had a loadable human mapping - \
+             this test would silently pass while checking nothing"
+        );
+    }
+
+    #[test]
+    fn render_code_row_paints_only_the_changed_columns() {
+        let ranges = vec![
+            RangeMatch {
+                source: codediff::diff::text_range::TextRange::new(0, 4, 0, 7),
+                destination: codediff::diff::text_range::TextRange::new(0, 4, 0, 7),
+                operation: TextOperation::Update,
+            },
+            RangeMatch {
+                source: codediff::diff::text_range::TextRange::new(0, 0, 0, 4),
+                destination: codediff::diff::text_range::TextRange::new(0, 0, 0, 4),
+                operation: TextOperation::Identical,
+            },
+        ];
+        let html = render_code_row(
+            "let foo = 1;",
+            0,
+            &TextOperation::Update,
+            &ranges,
+            &[],
+            'b',
+            &HashMap::new(),
+        );
+
+        assert!(
+            html.contains(r#"<span class="cd cd-update" data-range="b0" tabindex="0">foo</span>"#),
+            "expected exactly the update columns to be wrapped, got: {html}"
+        );
+        // The Identical range contributes no span, and the untouched tail is plain text - but all
+        // of it is still present, which is what `strip_tags` proves.
+        assert_eq!(strip_tags(&html), "1let foo = 1;");
+    }
+
+    /// On a pure deletion the after side has no changed text at all - and, as `code_markers`'
+    /// own doc comment records, no range of its own either: the mark has to be read off the
+    /// before side's `destination`. Without the caret that panel is a page of unmarked context
+    /// and the reader cannot tell what happened or where.
+    #[test]
+    fn render_code_row_draws_a_caret_for_the_other_sides_deletion() {
+        use codediff::diff::text_range::TextRange;
+
+        // A before-side delete: it owns real text on its own side, and points at a zero-width
+        // position on the after side.
+        let before = vec![RangeMatch {
+            source: TextRange::new(7, 0, 9, 0),
+            destination: TextRange::new(0, 4, 0, 4),
+            operation: TextOperation::Delete,
+        }];
+        let markers = code_markers(&before, 20);
+        assert_eq!(
+            markers.len(),
+            1,
+            "the delete should produce exactly one caret"
+        );
+
+        let html = render_code_row(
+            "let foo = 1;",
+            0,
+            &TextOperation::Identical,
+            &[],
+            &markers.iter().collect::<Vec<_>>(),
+            'a',
+            &HashMap::new(),
+        );
+
+        assert!(
+            html.contains(
+                r#"<span class="cd cd-gap cd-delete" data-range="am0" data-counterpart="b0" title="deleted here" tabindex="0"></span>"#
+            ),
+            "expected an empty caret span pointing back at the deleted text, got: {html}"
+        );
+        // And the other end of the pair names the caret, so clicking either reveals the other.
+        assert_eq!(
+            code_counterparts(&before, &[], 'a')
+                .get(&0)
+                .map(String::as_str),
+            Some("am0")
+        );
+        // A caret marks a position, it does not change the row - so the row keeps its own text
+        // intact and gets the marker class rather than a full operation tint.
+        assert!(html.contains(r#"class="cl row-gap""#), "got: {html}");
+        assert_eq!(strip_tags(&html), "1let foo = 1;");
+    }
+
+    #[test]
+    fn code_visible_rows_keeps_context_around_a_change_and_drops_the_rest() {
+        let mut ops = vec![TextOperation::Identical; 30];
+        ops[15] = TextOperation::Insert;
+
+        let visible = code_visible_rows(&[], &ops);
+
+        assert!(visible[15], "the changed row itself must be visible");
+        assert!(visible[15 - CODE_CONTEXT_ROWS], "context above");
+        assert!(visible[15 + CODE_CONTEXT_ROWS], "context below");
+        assert!(
+            !visible[15 - CODE_CONTEXT_ROWS - 1],
+            "beyond the context above"
+        );
+        assert!(
+            !visible[15 + CODE_CONTEXT_ROWS + 1],
+            "beyond the context below"
+        );
+        assert!(!visible[0] && !visible[29]);
+    }
+
+    /// The regression this function was rewritten for: on a pure deletion the after side has no
+    /// changed row at all, only the caret marking where the deleted text used to be. Anchoring on
+    /// `line_operations` alone folds that whole panel away.
+    #[test]
+    fn code_visible_rows_anchors_on_a_caret_with_no_changed_row() {
+        use codediff::diff::text_range::TextRange;
+
+        let ops = vec![TextOperation::Identical; 30];
+        let markers = code_markers(
+            &[RangeMatch {
+                source: TextRange::new(3, 0, 5, 0),
+                destination: TextRange::new(15, 0, 15, 0),
+                operation: TextOperation::Delete,
+            }],
+            ops.len(),
+        );
+
+        let visible = code_visible_rows(&markers, &ops);
+
+        assert!(visible[15], "the caret's own row must be visible");
+        assert!(visible[15 - CODE_CONTEXT_ROWS] && visible[15 + CODE_CONTEXT_ROWS]);
+        assert!(!visible[0] && !visible[29]);
+    }
+
+    #[test]
+    fn code_visible_rows_shows_everything_when_nothing_anchors() {
+        let ops = vec![TextOperation::Identical; 30];
+
+        assert!(code_visible_rows(&[], &ops).iter().all(|v| *v));
+    }
+
+    #[test]
+    fn code_counterparts_links_real_text_directly_and_a_deletion_to_its_caret() {
+        use codediff::diff::text_range::TextRange;
+
+        let before = vec![
+            // Update: a real counterpart on the other side.
+            RangeMatch {
+                source: TextRange::new(0, 0, 0, 3),
+                destination: TextRange::new(5, 0, 5, 3),
+                operation: TextOperation::Update,
+            },
+            // Delete: the after side has no text of its own here, only the caret `code_markers`
+            // puts at that position - which is what this links to instead.
+            RangeMatch {
+                source: TextRange::new(1, 0, 1, 3),
+                destination: TextRange::new(9, 0, 9, 0),
+                operation: TextOperation::Delete,
+            },
+        ];
+        let after = vec![RangeMatch {
+            source: TextRange::new(5, 0, 5, 3),
+            destination: TextRange::new(0, 0, 0, 3),
+            operation: TextOperation::Update,
+        }];
+
+        let links = code_counterparts(&before, &after, 'a');
+
+        assert_eq!(links.get(&0).map(String::as_str), Some("a0"));
+        assert_eq!(links.get(&1).map(String::as_str), Some("am1"));
+    }
 
     #[test]
     fn escape_html_text_escapes_the_three_html_metacharacters_but_not_quotes() {

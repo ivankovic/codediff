@@ -400,3 +400,195 @@ body.hide-identical .node:not(.status-deleted, .status-inserted, .changed):not(
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
 }
+
+/* ---------------------------------------------------------------- code panels
+ * The rendered-source counterpart to the tree panels. Uses the same four operation colors as the
+ * tree, but as backgrounds rather than text color: code has its own reasons to want the foreground
+ * (and a whole line tinted is what makes a change findable while scrolling), so each operation gets
+ * a muted background token alongside the strong foreground one it already had.
+ */
+
+:root {
+  --deleted-bg: #ffd7d5;
+  --inserted-bg: #cdf3d5;
+  --update-bg: #f7e6bd;
+  --moved-bg: #e6dbfb;
+  --deleted-row-bg: #ffefee;
+  --inserted-row-bg: #eaf9ee;
+  --update-row-bg: #fbf4e2;
+  --moved-row-bg: #f3eefc;
+  --counterpart-outline: #0969da;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --deleted-bg: #67282c;
+    --inserted-bg: #1f5c30;
+    --update-bg: #5c4409;
+    --moved-bg: #402e63;
+    --deleted-row-bg: #2b1b1d;
+    --inserted-row-bg: #172a1d;
+    --update-row-bg: #2a2413;
+    --moved-row-bg: #221c2f;
+    --counterpart-outline: #58a6ff;
+  }
+}
+
+.code-panels {
+  margin-bottom: 1rem;
+}
+
+.code {
+  white-space: pre;
+  line-height: 1.45;
+}
+
+.cl {
+  display: flex;
+  align-items: flex-start;
+}
+
+.cl .ln {
+  flex: 0 0 4ch;
+  text-align: right;
+  padding-right: 1ch;
+  color: var(--muted);
+  user-select: none;
+}
+
+.cl .lt {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cl.fold {
+  color: var(--muted);
+  font-style: italic;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+  margin: 0.15rem 0;
+}
+
+.cl.row-cd-delete {
+  background: var(--deleted-row-bg);
+}
+.cl.row-cd-insert {
+  background: var(--inserted-row-bg);
+}
+.cl.row-cd-update {
+  background: var(--update-row-bg);
+}
+.cl.row-cd-move {
+  background: var(--moved-row-bg);
+}
+
+.cd {
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cd-delete {
+  background: var(--deleted-bg);
+}
+.cd-insert {
+  background: var(--inserted-bg);
+}
+.cd-update {
+  background: var(--update-bg);
+}
+.cd-move {
+  background: var(--moved-bg);
+}
+
+/* A zero-width placeholder range: the side with nothing to show for an insert/delete still gets a
+ * range at the position the other side's text belongs (see TextRange's doc comment). Drawn as a
+ * caret between two characters - it is the only thing marking, say, where a deleted function used
+ * to be on the after side. Clickable like any other span, and its counterpart is the real text. */
+.cd.cd-gap {
+  display: inline-block;
+  width: 0;
+  background: none;
+  border-left: 2px solid var(--deleted);
+  margin: 0 -1px;
+}
+
+.cd.cd-gap.cd-insert {
+  border-left-color: var(--inserted);
+}
+
+.cl.row-gap .ln {
+  border-right: 2px solid var(--muted);
+}
+
+.cd.selected {
+  outline: 2px solid var(--selected-fg);
+  outline-offset: -1px;
+}
+
+.cd.counterpart {
+  outline: 2px dashed var(--counterpart-outline);
+  outline-offset: -1px;
+}
+
+/* Only the tree panels carry the "hide identical matches" behaviour and the keyboard cursor; the
+ * view switch below is what hides one half or the other wholesale. */
+body[data-view="code"] .tree-panels,
+body[data-view="tree"] .code-panels {
+  display: none;
+}
+
+.view-switch {
+  display: inline-flex;
+  gap: 0;
+  margin-top: 0.5rem;
+}
+
+.view-switch button {
+  font: inherit;
+  padding: 0.15rem 0.6rem;
+  background: var(--button-bg);
+  color: var(--fg);
+  border: 1px solid var(--button-border);
+  cursor: pointer;
+}
+
+.view-switch button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.view-switch button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.view-switch button + button {
+  border-left: none;
+}
+
+.view-switch button[aria-pressed="true"] {
+  background: var(--matched);
+  border-color: var(--matched);
+  color: var(--bg);
+}
+
+.notice {
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--update);
+  background: var(--panel-bg);
+  color: var(--muted);
+}
+
+/* The tree legend names foreground dot colors, the code legend background swatches - the same four
+ * operations, but a reader comparing them side by side would be comparing two different palettes,
+ * so each view shows only its own. */
+body[data-view="tree"] .code-legend,
+body[data-view="code"] .legend:not(.code-legend) {
+  display: none;
+}
+
+.cd-inserted-swatch {
+  display: inline-block;
+  width: 1.2em;
+  height: 0.85em;
+  cursor: default;
+}

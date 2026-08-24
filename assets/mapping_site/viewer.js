@@ -8,8 +8,11 @@
 
   const SIDES = ["before", "after"];
   const panels = {
-    before: document.querySelector('.panel[data-side="before"]'),
-    after: document.querySelector('.panel[data-side="after"]'),
+    // Scoped to `.tree-panels`: the page now has a second `.panel[data-side=...]` pair for the
+    // code view, which comes *first* in the document, so an unscoped selector would silently hand
+    // every tree keybinding the wrong element.
+    before: document.querySelector('.tree-panels .panel[data-side="before"]'),
+    after: document.querySelector('.tree-panels .panel[data-side="after"]'),
   };
   const statusLine = document.getElementById("status-line");
   const issueLink = document.getElementById("file-issue");
@@ -328,6 +331,9 @@
         promptSearch();
         event.preventDefault();
         break;
+      case "v":
+        cycleView();
+        break;
       case "?":
         toggleHelp();
         break;
@@ -337,6 +343,103 @@
       default:
         return;
     }
+  });
+
+  // ---------------------------------------------------------------- code panels
+  //
+  // The tree panels answer "which nodes did the human pair"; the code panels answer "what does
+  // that look like as code". Both are rendered server-side by generate_mapping_site.rs from the
+  // same mapping - all this does is switch between them and wire up cross-panel highlighting.
+
+  const VIEWS = ["split", "code", "tree"];
+  const VIEW_STORAGE_KEY = "codediff-mapping-view";
+  const viewButtons = Array.from(
+    document.querySelectorAll(".view-switch button")
+  );
+
+  function setView(view) {
+    if (VIEWS.indexOf(view) === -1) view = "split";
+    document.body.dataset.view = view;
+    viewButtons.forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.view === view ? "true" : "false"
+      );
+    });
+    // Best-effort: a page opened from a file:// URL, or with storage disabled, still works - the
+    // preference just doesn't survive navigating to the next fixture.
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function cycleView() {
+    const current = VIEWS.indexOf(document.body.dataset.view);
+    setView(VIEWS[(current + 1) % VIEWS.length]);
+  }
+
+  viewButtons.forEach((button) => {
+    button.addEventListener("click", () => setView(button.dataset.view));
+  });
+
+  let storedView = "split";
+  try {
+    storedView = window.localStorage.getItem(VIEW_STORAGE_KEY) || "split";
+  } catch (e) {
+    /* ignore */
+  }
+  setView(storedView);
+
+  let selectedSpans = [];
+  let counterpartSpans = [];
+
+  function clearCodeSelection() {
+    selectedSpans.forEach((el) => el.classList.remove("selected"));
+    counterpartSpans.forEach((el) => el.classList.remove("counterpart"));
+    selectedSpans = [];
+    counterpartSpans = [];
+  }
+
+  // A range spanning several rows is rendered as one span per row, all sharing one `data-range`
+  // id - so both the selection and the counterpart highlight are always a `querySelectorAll`,
+  // never a single element.
+  function spansForRange(id) {
+    if (!id) return [];
+    return Array.from(
+      document.querySelectorAll('.code .cd[data-range="' + id + '"]')
+    );
+  }
+
+  function selectCodeSpan(span) {
+    clearCodeSelection();
+    selectedSpans = spansForRange(span.dataset.range);
+    selectedSpans.forEach((el) => el.classList.add("selected"));
+
+    const counterpart = span.dataset.counterpart;
+    counterpartSpans = spansForRange(counterpart);
+    counterpartSpans.forEach((el) => el.classList.add("counterpart"));
+    if (counterpartSpans.length > 0) {
+      counterpartSpans[0].scrollIntoView({ block: "center" });
+      setStatus(span.dataset.range + " ↔ " + counterpart);
+    } else {
+      // Insert and Delete have a zero-width counterpart by construction (the side with nothing to
+      // show still gets a placeholder range, see TextRange's doc comment), so "no counterpart"
+      // here is the normal case for exactly those two, not a failure.
+      setStatus("no counterpart on the other side");
+    }
+  }
+
+  document.querySelectorAll(".code").forEach((code) => {
+    code.addEventListener("click", (event) => {
+      const span = event.target.closest(".cd");
+      if (span) {
+        selectCodeSpan(span);
+      } else {
+        clearCodeSelection();
+      }
+    });
   });
 
   setFocusedSide("before");
