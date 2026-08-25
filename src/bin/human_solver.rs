@@ -255,6 +255,10 @@ t              text view: read the source, and paint the human text-range ground
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
                  Z marks a nothing-to-paint fixture, Esc unselects or closes.
+                 x banks a selection so another can be made on the same side, c
+                 clears the banks; banked and live ranges commit together, which
+                 is how an N:M match is made -- every span on ONE side must read
+                 the same, so any pairing of them says the same thing.
                  A fixture may hold several named paintings, for edits with more
                  than one defensible rendering; a check passes on ANY of them.
                  s branches the current one to another name, keeping both on
@@ -1574,6 +1578,13 @@ struct TextPaintState {
     cursor: [(usize, usize); 2],
     /// Where a selection was started with `v`, per side; `None` when nothing is selected.
     anchor: [Option<(usize, usize)>; 2],
+    /// Ranges banked with `x`, per side, waiting to be committed by `d`/`i`/`m`.
+    ///
+    /// This is what makes an N:M match possible: one live selection can only ever describe one
+    /// range, so several occurrences on a side have to accumulate somewhere first. Named and keyed
+    /// to match the tree panels' own multi-map selection (`x` to bank, `c` to clear), since it is
+    /// the same idea one granularity down.
+    pending: [Vec<HumanTextSpan>; 2],
     /// Top visible row per side. Independent, unlike the read-only view this replaced: painting a
     /// move means looking at two places that are nowhere near each other.
     scroll: [usize; 2],
@@ -1663,6 +1674,20 @@ impl TextPaintState {
         (!span.is_empty()).then_some(span)
     }
 
+    /// Every range `side` would commit right now: whatever `x` has banked, plus the live selection
+    /// if there is one.
+    ///
+    /// Banked-plus-live rather than either alone, so `v`-select-`x`-select-`m` works without a
+    /// final `x` - forgetting to bank the last range before committing would otherwise silently
+    /// drop it, which is exactly the kind of loss this view has no undo for.
+    fn committable(&self, side: usize, source: &str) -> Vec<HumanTextSpan> {
+        let mut spans = self.pending[side].clone();
+        if let Some(live) = self.selection(side, source) {
+            spans.push(live);
+        }
+        spans
+    }
+
     /// Keeps the cursor's row inside a `height`-row viewport.
     fn scroll_into_view(&mut self, height: usize) {
         let row = self.cursor[self.side].0;
@@ -1675,48 +1700,69 @@ impl TextPaintState {
     }
 }
 
-/// `m`: pairs the two sides' current selections into a `Match`.
+/// `m`: pairs everything selected on the before side with everything selected on the after side,
+/// as one `Match`.
 ///
-/// Needs a selection on *both* sides, deliberately: that mirrors the tree's own `m`, which pairs
-/// the two panel cursors in one keystroke rather than making the human hold a pending selection in
+/// Needs ranges on *both* sides, deliberately: that mirrors the tree's own `m`, which pairs the
+/// two panel cursors in one keystroke rather than making the human hold a pending selection in
 /// their head across a panel switch.
+///
+/// N:M falls out of the same key. Bank extra ranges with `x` and they all go into one entry - three
+/// occurrences of a token before against two after is a single correspondence, not five. What that
+/// entry is worth is then checked immediately rather than at save time: `verdict` refuses a group
+/// whose spans disagree within a side, and refusing at the keystroke is the only point where the
+/// human still has the selection in front of them to fix.
 fn action_paint_match(
     app: &mut App,
     state: &mut TextPaintState,
     before_src: &str,
     after_src: &str,
 ) {
-    let (Some(before), Some(after)) = (
-        state.selection(0, before_src),
-        state.selection(1, after_src),
-    ) else {
+    let before = state.committable(0, before_src);
+    let after = state.committable(1, after_src);
+    if before.is_empty() || after.is_empty() {
         app.status =
             Some("Match needs a selection on both sides - press v on each, then m".to_string());
         return;
-    };
+    }
 
     let entry = HumanTextEntry {
         operation: HumanTextOperation::Match,
-        before: Some(before),
-        after: Some(after),
+        before,
+        after,
     };
-    // Resolve now rather than at save time, so the human is told what they just asserted -
-    // move-versus-update is derived from the two spans' contents and is the one part of this they
-    // don't control directly.
-    let verdict = entry.verdict(before_src, after_src);
+    // Resolved now, not at save time: the human is told what they just asserted, and a group whose
+    // spans don't hold up is rejected while the selection is still on screen.
+    let verdict = match entry.verdict(before_src, after_src) {
+        Ok(verdict) => verdict,
+        Err(err) => {
+            app.status = Some(format!("Not matched: {err:#}"));
+            return;
+        }
+    };
+
+    let shape = format!("{}:{}", entry.before.len(), entry.after.len());
     let solution = app.text_solution.clone();
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor = [None; 2];
+    state.pending = [Vec::new(), Vec::new()];
     app.status = Some(match verdict {
-        Ok(HumanTextVerdict::Move) => "Matched: identical text, recorded as a move".to_string(),
-        Ok(HumanTextVerdict::Update) => "Matched: text differs, recorded as an update".to_string(),
-        Ok(other) => format!("Matched ({other:?})"),
-        Err(err) => format!("Matched, but the spans don't read back: {err:#}"),
+        HumanTextVerdict::Move => {
+            format!("Matched {shape}: identical text, recorded as a move")
+        }
+        HumanTextVerdict::Update => {
+            format!("Matched {shape}: text differs, recorded as an update")
+        }
+        other => format!("Matched {shape} ({other:?})"),
     });
 }
 
-/// `d` / `i`: paints the focused side's selection as a one-sided removal or addition.
+/// `d` / `i`: paints everything selected on the focused side as a one-sided removal or addition.
+///
+/// Takes banked ranges too, so the same token removed in several places is one decision rather
+/// than one per occurrence - but unlike a match, these carry no identity constraint: with nothing
+/// to pair against, spans that read differently assert nothing unsound.
 fn action_paint_one_sided(
     app: &mut App,
     state: &mut TextPaintState,
@@ -1730,7 +1776,8 @@ fn action_paint_one_sided(
         HumanTextOperation::Match => return,
     };
     let source = if side == 0 { before_src } else { after_src };
-    let Some(span) = state.selection(side, source) else {
+    let spans = state.committable(side, source);
+    if spans.is_empty() {
         let (key, what, panel) = match operation {
             HumanTextOperation::Delete => ("d", "delete", "Before"),
             _ => ("i", "insert", "After"),
@@ -1739,28 +1786,35 @@ fn action_paint_one_sided(
             "Nothing selected on the {panel} side - press v there, move, then {key} to {what}"
         ));
         return;
-    };
+    }
 
+    let count = spans.len();
     let entry = if side == 0 {
         HumanTextEntry {
             operation,
-            before: Some(span),
-            after: None,
+            before: spans,
+            after: Vec::new(),
         }
     } else {
         HumanTextEntry {
             operation,
-            before: None,
-            after: Some(span),
+            before: Vec::new(),
+            after: spans,
         }
     };
+    if let Err(err) = entry.verdict(before_src, after_src) {
+        app.status = Some(format!("Not painted: {err:#}"));
+        return;
+    }
+
     let solution = app.text_solution.clone();
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor[side] = None;
+    state.pending[side].clear();
     app.status = Some(match operation {
-        HumanTextOperation::Delete => "Painted a deletion".to_string(),
-        _ => "Painted an insertion".to_string(),
+        HumanTextOperation::Delete => format!("Painted {count} deletion(s)"),
+        _ => format!("Painted {count} insertion(s)"),
     });
 }
 
@@ -1779,8 +1833,14 @@ fn action_paint_unmark(app: &mut App, state: &TextPaintState, before_src: &str, 
     let entries = solution_entries_mut(&mut app.mapping, &solution);
     let before_count = entries.len();
     entries.retain(|entry| {
-        let span = if side == 0 { entry.before } else { entry.after };
-        !span.is_some_and(|span| span_covers(span, row, column, row_len))
+        let spans = if side == 0 {
+            &entry.before
+        } else {
+            &entry.after
+        };
+        !spans
+            .iter()
+            .any(|span| span_covers(*span, row, column, row_len))
     });
     let removed = before_count - entries.len();
     if removed == 0 {
@@ -4526,9 +4586,14 @@ fn painted_spans(
         .iter()
         .filter_map(|entry| {
             let verdict = entry.verdict(before_src, after_src).ok()?;
-            let span = if side == 0 { entry.before } else { entry.after }?;
-            Some((span, verdict))
+            let spans = if side == 0 {
+                &entry.before
+            } else {
+                &entry.after
+            };
+            Some(spans.iter().map(move |span| (*span, verdict)))
         })
+        .flatten()
         .collect()
 }
 
@@ -4552,6 +4617,9 @@ fn verdict_style(verdict: HumanTextVerdict) -> Style {
 enum PaintClass {
     Plain,
     Painted(HumanTextVerdict),
+    /// A range banked with `x`, waiting to be committed. Ranked below the live selection so the
+    /// one being edited right now stays the one that stands out.
+    Banked,
     Selected,
     Cursor,
 }
@@ -4571,6 +4639,7 @@ fn render_paint_side(
     height: usize,
 ) -> Vec<Line<'static>> {
     let selection = state.selection(side, source);
+    let banked = &state.pending[side];
     let (cursor_row, cursor_column) = state.cursor[side];
     let focused = state.side == side;
     let top = state.scroll[side];
@@ -4583,6 +4652,11 @@ fn render_paint_side(
         for (span, verdict) in spans {
             if span_covers(*span, row, column, line.len()) {
                 class = class.max(PaintClass::Painted(*verdict));
+            }
+        }
+        for span in banked {
+            if span_covers(*span, row, column, line.len()) {
+                class = class.max(PaintClass::Banked);
             }
         }
         if let Some(selection) = selection {
@@ -4648,6 +4722,11 @@ fn paint_class_style(class: PaintClass) -> Style {
     match class {
         PaintClass::Plain => Style::default(),
         PaintClass::Painted(verdict) => verdict_style(verdict),
+        // Dimmer than the live selection, and the same hue: banked and selected are the same kind
+        // of thing at different stages, not two unrelated states.
+        PaintClass::Banked => Style::default()
+            .bg(overlay_palette().cross_highlight_bg)
+            .add_modifier(Modifier::DIM),
         // The same colour the TUI paints a cursor's counterpart with: both mean "this is the
         // region you are pointing at", one live and one committed.
         PaintClass::Selected => {
@@ -4725,14 +4804,23 @@ fn render_text_view_modal(
     };
 
     for (side, source, title) in [
-        (
-            0usize,
-            before_src,
+        (0usize, before_src, {
+            let pending =
+                state.committable(0, before_src).len() + state.committable(1, after_src).len();
+            let banked = if pending > 0 {
+                format!(
+                    " — {}:{} pending",
+                    state.committable(0, before_src).len(),
+                    state.committable(1, after_src).len()
+                )
+            } else {
+                String::new()
+            };
             format!(
-                "Before [{solution}] {painted} painted — showing {} (p cycles)",
+                "Before [{solution}] {painted} painted{banked} — showing {} (p cycles)",
                 overlay.label()
-            ),
-        ),
+            )
+        }),
         (
             1usize,
             after_src,
@@ -6700,6 +6788,28 @@ fn handle_modal_key(
                         None => "Selection cleared".to_string(),
                     });
                 }
+                // Same pair the tree panels use for their own multi-map selection: `x` banks what
+                // is selected so another range can be selected on the same side, `c` clears both
+                // sides' banks. This is what makes an N:M match reachable - one live selection can
+                // only ever describe one range.
+                KeyCode::Char('x') => match state.selection(state.side, focused_source) {
+                    Some(span) => {
+                        state.pending[state.side].push(span);
+                        state.anchor[state.side] = None;
+                        let banked = state.pending[state.side].len();
+                        app.status = Some(format!(
+                            "Banked {banked} range(s) on this side - select another, then d/i/m"
+                        ));
+                    }
+                    None => {
+                        app.status = Some("Nothing selected to bank - press v first".to_string())
+                    }
+                },
+                KeyCode::Char('c') => {
+                    state.pending = [Vec::new(), Vec::new()];
+                    state.anchor = [None; 2];
+                    app.status = Some("Cleared banked ranges on both sides".to_string());
+                }
                 KeyCode::Char('m') => action_paint_match(app, &mut state, before_text, after_text),
                 KeyCode::Char('d') => action_paint_one_sided(
                     app,
@@ -6789,11 +6899,15 @@ fn handle_modal_key(
                     Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
                 },
                 KeyCode::Esc => {
-                    // Esc backs out of a selection first, so an accidental `v` doesn't cost the
-                    // whole view - only a second Esc closes.
+                    // Esc backs out one step at a time, so an accidental `v` - or a half-built
+                    // N:M group - doesn't cost the whole view. Only an Esc with nothing pending
+                    // closes.
                     if state.anchor[state.side].is_some() {
                         state.anchor[state.side] = None;
                         app.status = Some("Selection cleared".to_string());
+                    } else if !state.pending[state.side].is_empty() {
+                        state.pending[state.side].clear();
+                        app.status = Some("Banked ranges cleared on this side".to_string());
                     } else {
                         close = true;
                     }
@@ -8674,13 +8788,13 @@ mod tests {
                 mapping: HumanTextMapping {
                     entries: vec![HumanTextEntry {
                         operation: HumanTextOperation::Delete,
-                        before: Some(HumanTextSpan {
+                        before: vec![HumanTextSpan {
                             start_row: 0,
                             start_column: 0,
                             end_row: 0,
                             end_column: 4,
-                        }),
-                        after: None,
+                        }],
+                        after: vec![],
                     }],
                 },
             },
@@ -8868,6 +8982,247 @@ mod tests {
         );
     }
 
+    /// The shape this exists for: several ranges banked on each side commit as ONE match, so three
+    /// occurrences before against two after is a single correspondence rather than five.
+    #[test]
+    fn x_banks_ranges_so_m_can_commit_an_n_to_m_match() {
+        let (before_src, after_src) = ("foo\nfoo\nfoo\n", "bar\nbar\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+
+        // Two banked before-ranges plus a live third; two live/banked after-ranges.
+        state.pending[0] = vec![
+            HumanTextSpan {
+                start_row: 0,
+                start_column: 0,
+                end_row: 0,
+                end_column: 3,
+            },
+            HumanTextSpan {
+                start_row: 1,
+                start_column: 0,
+                end_row: 1,
+                end_column: 3,
+            },
+        ];
+        state.anchor[0] = Some((2, 0));
+        state.cursor[0] = (2, 2);
+        state.pending[1] = vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        }];
+        state.anchor[1] = Some((1, 0));
+        state.cursor[1] = (1, 2);
+
+        action_paint_match(&mut app, &mut state, before_src, after_src);
+
+        let entries = solution_entries(&app.mapping, &app.text_solution);
+        assert_eq!(entries.len(), 1, "one entry, not five");
+        assert_eq!(entries[0].before.len(), 3);
+        assert_eq!(entries[0].after.len(), 2);
+        assert_eq!(
+            entries[0].verdict(before_src, after_src).unwrap(),
+            HumanTextVerdict::Update,
+            "foo against bar is an edit"
+        );
+        assert_eq!(state.pending, [vec![], vec![]], "the bank is consumed");
+        assert!(
+            app.status.as_deref().unwrap_or("").contains("3:2"),
+            "the shape should be reported: {:?}",
+            app.status
+        );
+    }
+
+    /// The live selection commits along with the bank, so forgetting the final `x` before `m`
+    /// doesn't silently drop a range - a loss this view has no undo for.
+    #[test]
+    fn the_live_selection_commits_together_with_banked_ranges() {
+        let source = "foo\nfoo\n";
+        let mut state = TextPaintState::default();
+        state.pending[0] = vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        }];
+        state.anchor[0] = Some((1, 0));
+        state.cursor[0] = (1, 2);
+
+        assert_eq!(state.committable(0, source).len(), 2);
+    }
+
+    /// A group whose spans disagree within one side is refused at the keystroke, while the
+    /// selection is still on screen to fix - not silently stored to fail at save time.
+    #[test]
+    fn m_refuses_a_group_whose_spans_differ_within_a_side() {
+        let (before_src, after_src) = ("foo\nqux\n", "bar\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.pending[0] = vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        }];
+        state.anchor[0] = Some((1, 0));
+        state.cursor[0] = (1, 2);
+        state.anchor[1] = Some((0, 0));
+        state.cursor[1] = (0, 2);
+
+        action_paint_match(&mut app, &mut state, before_src, after_src);
+
+        assert!(
+            app.mapping.text_mappings.is_empty(),
+            "nothing should have been stored"
+        );
+        assert!(!app.dirty);
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or("")
+                .contains("identical text"),
+            "the reason has to reach the human: {:?}",
+            app.status
+        );
+        assert_eq!(
+            state.pending[0].len(),
+            1,
+            "the selection must survive so it can be corrected"
+        );
+    }
+
+    #[test]
+    fn d_paints_every_banked_range_as_one_entry() {
+        let (before_src, after_src) = ("foo\nbar\n", "\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.pending[0] = vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        }];
+        state.anchor[0] = Some((1, 0));
+        state.cursor[0] = (1, 2);
+
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+
+        let entries = solution_entries(&app.mapping, &app.text_solution);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].before.len(),
+            2,
+            "one decision covering both ranges, not two decisions"
+        );
+    }
+
+    /// Drives the text view through `handle_modal_key` rather than calling the actions directly,
+    /// because the bug this pins was a missing *key binding*, not a broken action: `x` banked
+    /// nothing because its match arm was never wired into the text view at all, while every test
+    /// that called `action_paint_match` with a pre-filled bank kept passing.
+    #[test]
+    fn x_in_the_text_view_banks_the_live_selection() {
+        let source = "foo\nfoo\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 2);
+        app.modal = Some(Modal::TextView { state });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('x'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+
+        let Some(Modal::TextView { state }) = &app.modal else {
+            panic!("the text view should still be open, got {:?}", app.modal);
+        };
+        assert_eq!(state.pending[0].len(), 1, "x must bank the selection");
+        assert!(
+            state.anchor[0].is_none(),
+            "and clear it, so the next v starts a fresh range"
+        );
+        assert!(
+            app.status.as_deref().unwrap_or("").contains("Banked"),
+            "got {:?}",
+            app.status
+        );
+    }
+
+    /// `c` is the other half of the same pair, and was missing alongside `x`.
+    #[test]
+    fn c_in_the_text_view_clears_both_sides_banks() {
+        let source = "foo\nfoo\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        let mut state = TextPaintState::default();
+        state.pending[0] = vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        }];
+        state.pending[1] = state.pending[0].clone();
+        app.modal = Some(Modal::TextView { state });
+
+        handle_modal_key(
+            &mut app,
+            KeyCode::Char('c'),
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+
+        let Some(Modal::TextView { state }) = &app.modal else {
+            panic!("the text view should still be open, got {:?}", app.modal);
+        };
+        assert!(state.pending[0].is_empty() && state.pending[1].is_empty());
+    }
+
     /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
     /// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
     /// one line.
@@ -9030,18 +9385,15 @@ mod tests {
         let entries = &solution_entries(&app.mapping, &app.text_solution);
         assert_eq!(entries.len(), 2);
         assert_eq!(
-            codediff::test::helper::human_mapping::span_text(
-                before_src,
-                entries[0].before.unwrap()
-            ),
+            codediff::test::helper::human_mapping::span_text(before_src, entries[0].before[0]),
             Some("gone")
         );
-        assert!(entries[0].after.is_none(), "a delete has no after side");
+        assert!(entries[0].after.is_empty(), "a delete has no after side");
         assert_eq!(
-            codediff::test::helper::human_mapping::span_text(after_src, entries[1].after.unwrap()),
+            codediff::test::helper::human_mapping::span_text(after_src, entries[1].after[0]),
             Some("new")
         );
-        assert!(entries[1].before.is_none(), "an insert has no before side");
+        assert!(entries[1].before.is_empty(), "an insert has no before side");
     }
 
     /// `u` removes the whole entry, both halves of a `Match` included: a half-removed match is a
@@ -9129,13 +9481,13 @@ mod tests {
                 mapping: HumanTextMapping {
                     entries: vec![HumanTextEntry {
                         operation: HumanTextOperation::Delete,
-                        before: Some(HumanTextSpan {
+                        before: vec![HumanTextSpan {
                             start_row: 0,
                             start_column: 3,
                             end_row: 0,
                             end_column: 11,
-                        }),
-                        after: None,
+                        }],
+                        after: vec![],
                     }],
                 },
             }],

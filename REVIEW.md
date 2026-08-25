@@ -5,7 +5,6 @@
 * n/p should always say "There are changes in the other panel, would you like me to move you to the
   other panel" when you try to go beyond the last diff in the current panel and the other panel
   actually has changes. If the files are identical, a popup "Files are identical" is good.
-* kotil-refactor-function requires multi-map for true optimal painting
 
 Scope: duplicate code, code length, refactoring/generalization opportunities, structure,
 readability. Ordered by expected payoff within each section. Line numbers are as of commit

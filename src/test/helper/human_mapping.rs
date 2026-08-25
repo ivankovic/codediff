@@ -33,7 +33,7 @@
 * and the test that later verifies it parses the code again to compute the diff. Paths, being
 * derived purely from node kind and sibling position, are stable across both parses.
 */
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -203,15 +203,64 @@ pub enum HumanTextOperation {
     Insert,
 }
 
-/// One human-painted decision: a `Match` carries both spans, a `Delete` only `before`, an `Insert`
-/// only `after`.
+/// One human-painted decision: a `Match` carries spans on both sides, a `Delete` only `before`, an
+/// `Insert` only `after`.
+///
+/// **Both sides are lists, so a `Match` can be N:M.** Several occurrences of a token on the before
+/// side corresponding to several on the after side is a real and common shape - and, exactly as
+/// for [`MultiMapGroup`] in the tree, which specific occurrence pairs with which is not a question
+/// the painter can answer or the reader cares about. The group asserts the correspondence whole. A
+/// 1:1 match is just the case where both lists hold one span, so there is one entry type, not two.
+///
+/// For a `Match`, **every span on a side must cover identical text**. That invariant is what makes
+/// an N:M group meaningful rather than a bag of unrelated ranges: if all three before spans read
+/// `foo` and both after spans read `bar`, any pairing of them says the same thing, which is
+/// precisely why the pairing can be left unspecified. [`HumanTextEntry::verdict`] enforces it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanTextEntry {
     pub operation: HumanTextOperation,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub before: Option<HumanTextSpan>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub after: Option<HumanTextSpan>,
+    #[serde(
+        default,
+        deserialize_with = "spans_from_one_or_many",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub before: Vec<HumanTextSpan>,
+    #[serde(
+        default,
+        deserialize_with = "spans_from_one_or_many",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub after: Vec<HumanTextSpan>,
+}
+
+/// Reads a side's spans from either shape: a bare span object, or a list of them.
+///
+/// These fields held **one** span before N:M matches existed (2026-08-25), and fixtures painted
+/// against that schema are already committed. Rejecting them would turn every one into a parse
+/// error - the loudest possible failure for data that is perfectly readable and that nobody can
+/// re-paint from memory. A single span is exactly a one-element list, so accepting both costs one
+/// adaptor and no ambiguity.
+///
+/// Serialization is always a list: a file re-saved by the solver comes out in the current shape,
+/// so the old one fades rather than being maintained forever.
+fn spans_from_one_or_many<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Vec<HumanTextSpan>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(HumanTextSpan),
+        Many(Vec<HumanTextSpan>),
+    }
+
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        None => Vec::new(),
+        Some(OneOrMany::One(span)) => vec![span],
+        Some(OneOrMany::Many(spans)) => spans,
+    })
 }
 
 /// What a [`HumanTextEntry`] actually asserts once its spans have been read - the four operations
@@ -236,26 +285,41 @@ impl HumanTextEntry {
     pub fn verdict(&self, before: &str, after: &str) -> Result<HumanTextVerdict> {
         match self.operation {
             HumanTextOperation::Delete => {
-                let span = self.before.context("a Delete entry has no `before` span")?;
-                span_text(before, span)
-                    .context("a Delete entry's span is outside the before file")?;
+                ensure!(
+                    !self.before.is_empty(),
+                    "a Delete entry has no `before` span"
+                );
+                ensure!(
+                    self.after.is_empty(),
+                    "a Delete entry must not carry an `after` span"
+                );
+                Self::check_readable(before, &self.before, "Delete", "before")?;
                 Ok(HumanTextVerdict::Delete)
             }
             HumanTextOperation::Insert => {
-                let span = self.after.context("an Insert entry has no `after` span")?;
-                span_text(after, span)
-                    .context("an Insert entry's span is outside the after file")?;
+                ensure!(
+                    !self.after.is_empty(),
+                    "an Insert entry has no `after` span"
+                );
+                ensure!(
+                    self.before.is_empty(),
+                    "an Insert entry must not carry a `before` span"
+                );
+                Self::check_readable(after, &self.after, "Insert", "after")?;
                 Ok(HumanTextVerdict::Insert)
             }
             HumanTextOperation::Match => {
-                let before_span = self.before.context("a Match entry has no `before` span")?;
-                let after_span = self.after.context("a Match entry has no `after` span")?;
-                let before_text = span_text(before, before_span)
-                    .context("a Match entry's before span is outside the before file")?;
-                let after_text = span_text(after, after_span)
-                    .context("a Match entry's after span is outside the after file")?;
+                ensure!(
+                    !self.before.is_empty(),
+                    "a Match entry has no `before` span"
+                );
+                ensure!(!self.after.is_empty(), "a Match entry has no `after` span");
+                let before_text = self.side_text(before, &self.before, "Match", "before")?;
+                let after_text = self.side_text(after, &self.after, "Match", "after")?;
                 // The whole derivation, and the reason a human is never asked: byte-identical
-                // means the code was relocated, anything else means it was edited.
+                // means the code was relocated, anything else means it was edited. Well defined
+                // for an N:M group precisely because `side_text` has already established that
+                // every span on a side reads the same.
                 Ok(if before_text == after_text {
                     HumanTextVerdict::Move
                 } else {
@@ -263,6 +327,53 @@ impl HumanTextEntry {
                 })
             }
         }
+    }
+
+    /// Every span reads back from the source. Used for the one-sided operations, which carry no
+    /// identity constraint: with nothing to pair against, spans that read differently assert
+    /// nothing unsound - the same token deleted in three places is one decision, and so is three
+    /// different tokens deleted together.
+    fn check_readable(
+        source: &str,
+        spans: &[HumanTextSpan],
+        operation: &str,
+        side: &str,
+    ) -> Result<()> {
+        for (index, span) in spans.iter().enumerate() {
+            span_text(source, *span).with_context(|| {
+                format!("a {operation} entry's {side} span {index} is outside the {side} file")
+            })?;
+        }
+        Ok(())
+    }
+
+    /// The text one side's spans cover, checking they all cover the *same* text.
+    ///
+    /// Returning one string for a whole side is only sound because of that check, and the check is
+    /// what an N:M group means: spans that read differently are unrelated ranges wearing a group's
+    /// clothes, and pairing them would assert a correspondence nobody established.
+    fn side_text<'a>(
+        &self,
+        source: &'a str,
+        spans: &[HumanTextSpan],
+        operation: &str,
+        side: &str,
+    ) -> Result<&'a str> {
+        let mut text: Option<&str> = None;
+        for (index, span) in spans.iter().enumerate() {
+            let this = span_text(source, *span).with_context(|| {
+                format!("a {operation} entry's {side} span {index} is outside the {side} file")
+            })?;
+            match text {
+                None => text = Some(this),
+                Some(first) => ensure!(
+                    first == this,
+                    "a {operation} entry's {side} spans must all cover identical text, but span 0 \
+                     reads {first:?} and span {index} reads {this:?}"
+                ),
+            }
+        }
+        text.context("no spans")
     }
 }
 
@@ -508,11 +619,11 @@ fn disagreements_for(
     let mut painted_after: Vec<(HumanTextSpan, TextLabel)> = Vec::new();
     for entry in &text_mapping.entries {
         let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
-        if let Some(span) = entry.before {
-            painted_before.push((span, label));
+        for span in &entry.before {
+            painted_before.push((*span, label));
         }
-        if let Some(span) = entry.after {
-            painted_after.push((span, label));
+        for span in &entry.after {
+            painted_after.push((*span, label));
         }
     }
 
@@ -2689,8 +2800,8 @@ mod tests {
 
         let moved = HumanTextEntry {
             operation: HumanTextOperation::Match,
-            before: Some(span(0, 0, 0, 5)),
-            after: Some(span(1, 0, 1, 5)),
+            before: vec![span(0, 0, 0, 5)],
+            after: vec![span(1, 0, 1, 5)],
         };
         assert_eq!(
             moved.verdict(before, after).unwrap(),
@@ -2700,13 +2811,93 @@ mod tests {
 
         let edited = HumanTextEntry {
             operation: HumanTextOperation::Match,
-            before: Some(span(0, 0, 0, 5)),
-            after: Some(span(0, 0, 0, 4)),
+            before: vec![span(0, 0, 0, 5)],
+            after: vec![span(0, 0, 0, 4)],
         };
         assert_eq!(
             edited.verdict(before, after).unwrap(),
             HumanTextVerdict::Update,
             "corresponding text that differs is an edit"
+        );
+    }
+
+    /// The shape this entry type exists for: several occurrences on one side corresponding to
+    /// several on the other, with no claim about which pairs with which.
+    #[test]
+    fn a_match_may_be_n_to_m_when_each_side_reads_the_same() {
+        let before = "foo\nfoo\nfoo\n";
+        let after = "bar\nbar\n";
+
+        let group = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3), span(2, 0, 2, 3)],
+            after: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+        };
+
+        assert_eq!(
+            group.verdict(before, after).unwrap(),
+            HumanTextVerdict::Update,
+            "3 'foo' corresponding to 2 'bar' is one edit, not five"
+        );
+    }
+
+    #[test]
+    fn an_n_to_m_match_whose_sides_read_the_same_is_a_move() {
+        let before = "foo\nfoo\n";
+        let after = "x\nfoo\nfoo\n";
+
+        let group = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+            after: vec![span(1, 0, 1, 3), span(2, 0, 2, 3)],
+        };
+
+        assert_eq!(
+            group.verdict(before, after).unwrap(),
+            HumanTextVerdict::Move
+        );
+    }
+
+    /// The invariant that makes an unspecified pairing sound. Spans that read differently are
+    /// unrelated ranges wearing a group's clothes, and pairing them would assert a correspondence
+    /// nobody established - so this is an error, not a silently-picked first span.
+    #[test]
+    fn a_match_whose_spans_disagree_within_one_side_is_rejected() {
+        let before = "foo\nqux\n";
+        let after = "bar\n";
+
+        let group = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+            after: vec![span(0, 0, 0, 3)],
+        };
+
+        let err = group.verdict(before, after).unwrap_err().to_string();
+        assert!(
+            err.contains("identical text"),
+            "the error must say why, got: {err}"
+        );
+        assert!(err.contains("foo") && err.contains("qux"), "got: {err}");
+    }
+
+    /// A one-sided entry may also cover several spans - the same token removed in three places is
+    /// one decision. No identity constraint there: with nothing to pair against, spans that read
+    /// differently assert nothing unsound.
+    #[test]
+    fn a_delete_may_cover_several_spans() {
+        let before = "foo\nbar\n";
+        let after = "\n";
+
+        let entry = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+            after: vec![],
+        };
+
+        // Deliberately differing text, to pin that the Match-only invariant is not applied here.
+        assert_eq!(
+            entry.verdict(before, after).unwrap(),
+            HumanTextVerdict::Delete
         );
     }
 
@@ -2717,15 +2908,15 @@ mod tests {
 
         let no_after = HumanTextEntry {
             operation: HumanTextOperation::Match,
-            before: Some(span(0, 0, 0, 5)),
-            after: None,
+            before: vec![span(0, 0, 0, 5)],
+            after: vec![],
         };
         assert!(no_after.verdict(before, after).is_err());
 
         let outside = HumanTextEntry {
             operation: HumanTextOperation::Delete,
-            before: Some(span(9, 0, 9, 1)),
-            after: None,
+            before: vec![span(9, 0, 9, 1)],
+            after: vec![],
         };
         assert!(outside.verdict(before, after).is_err());
     }
@@ -2785,8 +2976,8 @@ mod tests {
             mapping: HumanTextMapping {
                 entries: vec![HumanTextEntry {
                     operation: HumanTextOperation::Match,
-                    before: Some(span(0, 8, 0, 9)),
-                    after: Some(span(0, 8, 0, 9)),
+                    before: vec![span(0, 8, 0, 9)],
+                    after: vec![span(0, 8, 0, 9)],
                 }],
             },
         }];
@@ -2814,8 +3005,8 @@ mod tests {
             mapping: HumanTextMapping {
                 entries: vec![HumanTextEntry {
                     operation: HumanTextOperation::Match,
-                    before: Some(span(0, 4, 0, 5)),
-                    after: Some(span(0, 4, 0, 5)),
+                    before: vec![span(0, 4, 0, 5)],
+                    after: vec![span(0, 4, 0, 5)],
                 }],
             },
         }];
