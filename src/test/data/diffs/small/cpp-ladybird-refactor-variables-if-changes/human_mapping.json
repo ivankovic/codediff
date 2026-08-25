@@ -167596,6 +167596,42 @@
         "compound_statement:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:7",
+        "compound_statement:1",
+        "declaration:5"
+      ],
+      "after_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:7",
+        "compound_statement:1",
+        "declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:7",
+        "compound_statement:1",
+        "declaration:5",
+        ";:1"
+      ],
+      "after_path": [
+        "namespace_definition:1",
+        "declaration_list:1",
+        "function_definition:7",
+        "compound_statement:1",
+        "declaration:4",
+        ";:1"
+      ]
     }
   ],
   "groups": [

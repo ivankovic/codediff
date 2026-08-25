@@ -7672,6 +7672,50 @@
         "declaration_list:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "local_declaration_statement:4",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "local_declaration_statement:4",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "namespace_declaration:1",
+        "declaration_list:1",
+        "class_declaration:1",
+        "declaration_list:1",
+        "method_declaration:1",
+        "block:1",
+        "local_declaration_statement:4",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
     }
   ]
 }
