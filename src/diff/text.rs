@@ -656,14 +656,143 @@ fn merge_ranges(
     result
 }
 
+/// How many rows a range covers, in `line_operations`' convention: an end column of 0 already
+/// means "up to, not including, this row", so only a genuinely mid-row end needs the extra one.
+/// Never zero - a sub-line range still occupies the row it sits on.
+fn rows_covered(range: &TextRange) -> usize {
+    let end_row = if range.end_column == 0 {
+        range.end_row
+    } else {
+        range.end_row + 1
+    };
+    end_row.saturating_sub(range.start_row).max(1)
+}
+
+/// Makes the two sides agree on *which* matched pair relocated, by believing whichever side
+/// blames fewer rows.
+///
+/// `TextDiff::from` builds each side by walking that side's tree in its own order, and `ranges`'
+/// `crossed_backwards` test asks whether a node's destination lands behind the walk's running
+/// anchor. That is a question about walk order, not about the pair - so on a reorder the two
+/// walks name *different* pairs. Moving one import below a block of five, the before walk passes
+/// the mover first (advancing its anchor past the block) and then sees all five land behind it, so
+/// it flags the five; the after walk passes the five in order and sees only the mover land behind,
+/// so it flags one. Both are self-consistent and only one can be right.
+///
+/// Neither the union nor the intersection is the answer. The intersection is empty here - each
+/// pair is flagged by exactly one walk - which loses the reorder entirely, the very regression
+/// `crossed_backwards` exists to prevent. The union paints all six, which is worse than either
+/// walk alone. What separates them is size: relocating one line past five is one move, not five,
+/// and the walk that says "one" is the one that matched a reader's account of the edit.
+///
+/// So: sum the rows each side blames *where the two disagree*, and keep the smaller account,
+/// rewriting the other side to match it. Agreed pairs are never touched, so a file whose walks
+/// already agree comes out byte-identical.
+///
+/// Two limits worth stating rather than discovering later. The comparison is **per file, not per
+/// reorder**: a file containing two independent reorders that disagree in opposite directions gets
+/// one global verdict, and the minority one is decided wrongly. Grouping disagreements into
+/// clusters needs a notion of which reorder a pair belongs to that nothing here has. And promoting
+/// the winner's counterpart needs to *find* it - an exact extent lookup into the other side's
+/// range list, which is not quite total (measured at 99.2% for the analogous lookup in
+/// `generate_mapping_site`), so a counterpart that isn't found stays unpainted rather than being
+/// invented.
+fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
+    use std::collections::HashMap;
+
+    let key = |r: &TextRange| (r.start_row, r.start_column, r.end_row, r.end_column);
+    let index_of = |ranges: &[RangeMatch]| -> HashMap<(usize, usize, usize, usize), usize> {
+        let mut map = HashMap::new();
+        for (index, range_match) in ranges.iter().enumerate() {
+            if range_match.source.is_empty() {
+                continue;
+            }
+            map.entry(key(&range_match.source)).or_insert(index);
+        }
+        map
+    };
+    let before_index = index_of(before);
+    let after_index = index_of(after);
+
+    // `(this side's index, the other side's index for the same pair)` for every `Move` whose
+    // counterpart is *not* also a `Move` - i.e. exactly the pairs the two walks disagree about.
+    let disagreements = |side: &[RangeMatch],
+                         other: &[RangeMatch],
+                         other_index: &HashMap<(usize, usize, usize, usize), usize>|
+     -> Vec<(usize, Option<usize>)> {
+        side.iter()
+            .enumerate()
+            .filter(|(_, range_match)| {
+                range_match.operation == TextOperation::Move && !range_match.destination.is_empty()
+            })
+            .filter_map(|(index, range_match)| {
+                match other_index.get(&key(&range_match.destination)).copied() {
+                    Some(other_index) if other[other_index].operation == TextOperation::Move => {
+                        None
+                    }
+                    counterpart => Some((index, counterpart)),
+                }
+            })
+            .collect()
+    };
+
+    let before_disagreed = disagreements(before, after, &after_index);
+    let after_disagreed = disagreements(after, before, &before_index);
+    if before_disagreed.is_empty() && after_disagreed.is_empty() {
+        return;
+    }
+
+    let blamed_rows = |ranges: &[RangeMatch], disagreed: &[(usize, Option<usize>)]| -> usize {
+        disagreed
+            .iter()
+            .map(|&(index, _)| rows_covered(&ranges[index].source))
+            .sum()
+    };
+    let before_rows = blamed_rows(before, &before_disagreed);
+    let after_rows = blamed_rows(after, &after_disagreed);
+
+    // Ties go to the before side. Arbitrary, but it has to be *some* fixed side or the result
+    // stops being a function of the input; the symmetric case this reaches is two accounts of
+    // equal size, where neither is more economical than the other.
+    let (winner, loser) = if before_rows <= after_rows {
+        (&before_disagreed, &mut *after)
+    } else {
+        (&after_disagreed, &mut *before)
+    };
+
+    // The loser's own claims are withdrawn: their counterparts on the winning side are already
+    // `Identical`, which is what makes this the half of the pair that has to change.
+    for &(index, _) in if before_rows <= after_rows {
+        &after_disagreed
+    } else {
+        &before_disagreed
+    } {
+        loser[index].operation = TextOperation::Identical;
+    }
+    // ...and the winner's counterparts are painted, which is the whole point: a `Move` the reader
+    // can follow to a highlighted node on the other side rather than to an unmarked one.
+    //
+    // Safe against the loop above: a counterpart found here was by definition *not* a `Move`, so
+    // it is never one of the indices just withdrawn.
+    for &(_, counterpart) in winner {
+        if let Some(counterpart) = counterpart {
+            loser[counterpart].operation = TextOperation::Move;
+        }
+    }
+}
+
 impl TextDiff {
     /// Construct the TextDiff from an ASTDiff.
     ///
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
-        let before_ranges_plain = ranges(before, after, diff, node_cache);
-        let after_ranges_plain = ranges(after, before, diff, node_cache);
+        let mut before_ranges_plain = ranges(before, after, diff, node_cache);
+        let mut after_ranges_plain = ranges(after, before, diff, node_cache);
+
+        // Each `ranges` call above decided `Move` from its own walk order, so the two can name
+        // different pairs for the same reorder - see `reconcile_moves`.
+        reconcile_moves(&mut before_ranges_plain, &mut after_ranges_plain);
 
         let before_ranges = merge_ranges(&before_ranges_plain, &after_ranges_plain);
         let after_ranges = merge_ranges(&after_ranges_plain, &before_ranges_plain);

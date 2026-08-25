@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("ruby-jmespath-jmespath-formatting-and-style-guide-fixes")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "ruby-jmespath-jmespath-formatting-and-style-guide-fixes",
+    )
 }

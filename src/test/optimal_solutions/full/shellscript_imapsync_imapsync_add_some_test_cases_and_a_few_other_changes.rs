@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-imapsync-imapsync-add-some-test-cases-and-a-few-other-changes")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "shellscript-imapsync-imapsync-add-some-test-cases-and-a-few-other-changes",
+    )
 }

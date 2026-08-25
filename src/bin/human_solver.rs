@@ -187,9 +187,9 @@ use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::code::{Code, Language};
 use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
 use codediff::test::helper::human_mapping::{
-    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, MarkKind, MultiMapGroup,
-    NodeStatus, is_inherited_removed, path_refs, rebuild_caches_for_mapping, status_after,
-    status_before,
+    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
+    HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup, NodeStatus,
+    is_inherited_removed, path_refs, rebuild_caches_for_mapping, status_after, status_before,
 };
 // Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
 // one the non-test code path uses).
@@ -245,7 +245,15 @@ n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 /              search: jump to the next leaf node whose text contains the
                  given string (plain substring, no regex)
 
-t              view raw before/after text (not the AST tree)
+t              text view: read the raw before/after source, and paint the human
+                 text-range ground truth onto it (stored alongside the tree
+                 mapping, not derived from it). Tab switches side, hjkl/0/$/g/G
+                 move, v starts a selection; then d/i paint the Before/After
+                 selection deleted/inserted, m pairs BOTH sides' selections as
+                 a match (move vs update is derived from whether the two spans
+                 hold identical text), u removes the range under the cursor,
+                 Z marks a fixture with nothing to paint as painted anyway,
+                 Esc clears the selection or closes
 T              view the output of unix `diff -u`
                  (t/T switch between these two views while either is open)
 H              toggle hiding fully solved subtrees (unmarked nodes and their
@@ -260,9 +268,11 @@ e              on a sample, enter/edit a free-form comment (recorded in sample.c
                  if present when later promoted)
 o              open a different test case (src/test/data/diffs/); press d inside
                  this picker to cycle which dataset it's narrowed to (all,
-                 handmade, small, full, stratified), or H to narrow to cases with at
+                 handmade, small, full, stratified), H to narrow to cases with at
                  least one unmarked node left (first press scans the whole
-                 corpus, so it can take a few seconds) -- both persist across o
+                 corpus, so it can take a few seconds), or X to narrow to cases
+                 with no text-range painting yet (see t) -- H and X are separate
+                 queues and combine as an AND; all three persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\", rejected ones \" - REJECTED\" --
                  press H inside this picker to hide/show both, or s to cycle its
@@ -402,6 +412,8 @@ fn visible_diff_options(
     filter: Option<&'static str>,
     hide_complete: bool,
     completeness: Option<&std::collections::HashMap<String, bool>>,
+    hide_painted: bool,
+    text_painted: Option<&std::collections::HashMap<String, bool>>,
 ) -> Vec<String> {
     options
         .iter()
@@ -413,6 +425,16 @@ fn visible_diff_options(
                     .copied()
                     .unwrap_or(true)
         })
+        // Fails open the same way `hide_complete` does, but toward the opposite default: a case
+        // the scan never reached is treated as *unpainted* and stays visible, since hiding
+        // something never confirmed as done would quietly drop it out of the work queue.
+        .filter(|(name, _)| {
+            !hide_painted
+                || !text_painted
+                    .and_then(|m| m.get(name))
+                    .copied()
+                    .unwrap_or(false)
+        })
         .map(|(name, _)| name.clone())
         .collect()
 }
@@ -423,14 +445,24 @@ fn visible_diff_options(
 /// `diff_hide_complete`) - same shape as `open_sample_picker_modal` for `O`, and for the same
 /// reason: keeping the real logic here, not in the `KeyCode::Char('o')`/`'d'`/`'H'` handlers,
 /// makes it unit-testable without real files under src/test/data/diffs/.
+#[allow(clippy::too_many_arguments)]
 fn open_diff_picker_modal(
     options: Vec<(String, &'static str)>,
     current_name: &str,
     dataset_filter: Option<&'static str>,
     hide_complete: bool,
     completeness: Option<&std::collections::HashMap<String, bool>>,
+    hide_painted: bool,
+    text_painted: Option<&std::collections::HashMap<String, bool>>,
 ) -> Modal {
-    let visible = visible_diff_options(&options, dataset_filter, hide_complete, completeness);
+    let visible = visible_diff_options(
+        &options,
+        dataset_filter,
+        hide_complete,
+        completeness,
+        hide_painted,
+        text_painted,
+    );
     let selected = visible
         .iter()
         .position(|name| name == current_name)
@@ -441,6 +473,7 @@ fn open_diff_picker_modal(
         selected,
         dataset_filter,
         hide_complete,
+        hide_painted,
     }
 }
 
@@ -527,6 +560,66 @@ fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
         .map(|(name, _)| {
             let incomplete = diff_case_is_incomplete(&name).unwrap_or(true);
             (name, incomplete)
+        })
+        .collect()
+}
+
+/// Whether `name`'s human mapping already carries a painted text-range mapping (see
+/// `HumanTextMapping`) - the text-painting counterpart of `diff_case_is_incomplete`.
+///
+/// **A substring scan, not a JSON parse, and that is not a micro-optimization.** The corpus's 500
+/// `human_mapping.json` files come to ~1.4 GB (one is ~29,600 lines on its own), and parsing them
+/// all to ask whether one key is present costs about ten seconds - the same order as the `H` scan
+/// this was meant to be the cheap counterpart of. Searching for the quoted key instead is a
+/// linear scan with no allocation per entry.
+///
+/// The token includes its quotes deliberately. Every string this file stores is either a
+/// tree-sitter node kind or a `kind:index` path element, and `serde_json` escapes any quote inside
+/// a string value as `\"` - so a bare `"text_mapping"` can only be a JSON *key*, never content.
+/// Key order doesn't matter either, unlike a tail-only read: a hand-edited file that moved the key
+/// is still found.
+///
+/// `None` if the file can't be read, which `compute_diff_text_painted` treats as "not painted" for
+/// the same fail-open reason `compute_diff_completeness` treats its failures as "needs attention":
+/// a case this can't read is exactly what the filter should surface, not hide.
+///
+/// Deliberately keyed on presence, not on emptiness. A fixture whose two files are identical has
+/// nothing to paint, and `Z` in the text view records that as `Some` with no entries - which is
+/// painted, and must not come back into the queue every session. That distinction is the entire
+/// reason `HumanMapping::text_mapping` is an `Option` rather than a plain `Vec`.
+fn diff_case_has_text_mapping(name: &str) -> Option<bool> {
+    let path = human_mapping::mapping_path(name);
+    let contents = std::fs::read_to_string(path).ok()?;
+    Some(contents.contains("\"text_mapping\""))
+}
+
+/// Refreshes just `name`'s entry in `App::diff_text_painted`, for the same reason (and at the same
+/// call sites) as `refresh_diff_completeness`: saving is the only thing that can change a case's
+/// painted-ness mid-session.
+fn refresh_diff_text_painted(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_text_painted
+        && let Some(painted) = diff_case_has_text_mapping(name)
+    {
+        map.insert(name.to_string(), painted);
+    }
+}
+
+/// Builds `App::diff_text_painted` for every case `list_available_cases` lists - the `o` picker's
+/// `X` toggle needs the whole corpus before it can filter.
+///
+/// Much cheaper than `compute_diff_completeness`, which it otherwise mirrors: this scans bytes,
+/// where that one parses both source files with tree-sitter and walks two trees. Still done lazily
+/// on first `X` rather than eagerly on every `o`, both to match `H`'s behaviour and because 1.4 GB
+/// of mapping files is not free to read however cheap the per-file test is.
+fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
+    let Ok(options) = list_available_cases() else {
+        return std::collections::HashMap::new();
+    };
+    options
+        .into_iter()
+        .map(|(name, _)| {
+            let painted = diff_case_has_text_mapping(&name).unwrap_or(false);
+            (name, painted)
         })
         .collect()
 }
@@ -1129,6 +1222,274 @@ impl PanelState {
     }
 }
 
+/// Cursor, selection and scroll for the `t` text-painting view, one set per side.
+///
+/// Both sides carry a live cursor and an independent selection at all times, mirroring the AST
+/// panels: that is what lets `m` pair the two current selections in one keystroke instead of
+/// needing a pending-selection handshake, exactly as the tree's own `m` pairs the two panel
+/// cursors.
+///
+/// Columns are **byte** offsets into a row, matching `HumanTextSpan` and `TextRange`, so a painted
+/// span needs no conversion on the way out. Cursor movement steps by *characters* even so - see
+/// [`TextPaintState::step_column`] - since landing mid-character would produce a span that
+/// `span_text` correctly refuses to read back.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct TextPaintState {
+    /// 0 = before, 1 = after. Same side convention as `TextDiff::all`.
+    side: usize,
+    /// `(row, byte column)` per side.
+    cursor: [(usize, usize); 2],
+    /// Where a selection was started with `v`, per side; `None` when nothing is selected.
+    anchor: [Option<(usize, usize)>; 2],
+    /// Top visible row per side. Independent, unlike the read-only view this replaced: painting a
+    /// move means looking at two places that are nowhere near each other.
+    scroll: [usize; 2],
+}
+
+impl TextPaintState {
+    /// The row's text, or `""` past the end of the file.
+    fn row_text(source: &str, row: usize) -> &str {
+        source.split('\n').nth(row).unwrap_or("")
+    }
+
+    fn row_count(source: &str) -> usize {
+        source.split('\n').count()
+    }
+
+    /// Moves the cursor `delta` rows, clamping the column to the new row and to a character
+    /// boundary.
+    fn step_row(&mut self, delta: isize, source: &str) {
+        let (row, column) = self.cursor[self.side];
+        let last = Self::row_count(source).saturating_sub(1);
+        let row = if delta < 0 {
+            row.saturating_sub(delta.unsigned_abs())
+        } else {
+            (row + delta as usize).min(last)
+        };
+        let line = Self::row_text(source, row);
+        let column = column.min(line.len());
+        // Clamping can land mid-character on a row whose earlier bytes are multi-byte; walk back
+        // to the nearest boundary rather than storing a column no span can be read from.
+        let column = (0..=column)
+            .rev()
+            .find(|&c| line.is_char_boundary(c))
+            .unwrap_or(0);
+        self.cursor[self.side] = (row, column);
+    }
+
+    /// Moves the cursor one *character* left or right, wrapping across rows at the ends.
+    fn step_column(&mut self, forward: bool, source: &str) {
+        let (row, column) = self.cursor[self.side];
+        let line = Self::row_text(source, row);
+        if forward {
+            match line[column..].chars().next() {
+                Some(ch) => self.cursor[self.side] = (row, column + ch.len_utf8()),
+                None if row + 1 < Self::row_count(source) => self.cursor[self.side] = (row + 1, 0),
+                None => {}
+            }
+        } else if column > 0 {
+            let previous = line[..column]
+                .char_indices()
+                .next_back()
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+            self.cursor[self.side] = (row, previous);
+        } else if row > 0 {
+            let previous_row = row - 1;
+            self.cursor[self.side] = (previous_row, Self::row_text(source, previous_row).len());
+        }
+    }
+
+    /// The selection on `side` as a span, or `None` if nothing is selected there.
+    ///
+    /// The end is exclusive and includes the character *under* the cursor, which is what a reader
+    /// painting a range sees highlighted - a selection that stopped one character short of its own
+    /// cursor would be a surprise every time.
+    fn selection(&self, side: usize, source: &str) -> Option<HumanTextSpan> {
+        let anchor = self.anchor[side]?;
+        let cursor = self.cursor[side];
+        let (start, end) = if anchor <= cursor {
+            (anchor, cursor)
+        } else {
+            (cursor, anchor)
+        };
+        let end_line = Self::row_text(source, end.0);
+        let end_column = match end_line[end.1.min(end_line.len())..].chars().next() {
+            Some(ch) => end.1 + ch.len_utf8(),
+            // The cursor sits past the last character of its row: extend through the newline, so
+            // selecting to end-of-line and pressing `d` deletes the line rather than all but its
+            // break.
+            None => end.1,
+        };
+        let span = HumanTextSpan {
+            start_row: start.0,
+            start_column: start.1,
+            end_row: end.0,
+            end_column,
+        };
+        (!span.is_empty()).then_some(span)
+    }
+
+    /// Keeps the cursor's row inside a `height`-row viewport.
+    fn scroll_into_view(&mut self, height: usize) {
+        let row = self.cursor[self.side].0;
+        let top = &mut self.scroll[self.side];
+        if row < *top {
+            *top = row;
+        } else if height > 0 && row >= *top + height {
+            *top = row + 1 - height;
+        }
+    }
+}
+
+/// The text mapping, created empty on first paint.
+///
+/// Creating it here is what turns `None` ("nobody has painted this fixture") into `Some` ("this
+/// fixture has been painted"), which is the distinction the field's `Option` exists to preserve -
+/// so a fixture whose painting is genuinely empty still has to be reached deliberately, via `Z`.
+fn text_mapping_mut(app: &mut App) -> &mut codediff::test::helper::human_mapping::HumanTextMapping {
+    app.mapping
+        .text_mapping
+        .get_or_insert_with(Default::default)
+}
+
+/// `m`: pairs the two sides' current selections into a `Match`.
+///
+/// Needs a selection on *both* sides, deliberately: that mirrors the tree's own `m`, which pairs
+/// the two panel cursors in one keystroke rather than making the human hold a pending selection in
+/// their head across a panel switch.
+fn action_paint_match(
+    app: &mut App,
+    state: &mut TextPaintState,
+    before_src: &str,
+    after_src: &str,
+) {
+    let (Some(before), Some(after)) = (
+        state.selection(0, before_src),
+        state.selection(1, after_src),
+    ) else {
+        app.status =
+            Some("Match needs a selection on both sides - press v on each, then m".to_string());
+        return;
+    };
+
+    let entry = HumanTextEntry {
+        operation: HumanTextOperation::Match,
+        before: Some(before),
+        after: Some(after),
+    };
+    // Resolve now rather than at save time, so the human is told what they just asserted -
+    // move-versus-update is derived from the two spans' contents and is the one part of this they
+    // don't control directly.
+    let verdict = entry.verdict(before_src, after_src);
+    text_mapping_mut(app).entries.push(entry);
+    app.dirty = true;
+    state.anchor = [None; 2];
+    app.status = Some(match verdict {
+        Ok(HumanTextVerdict::Move) => "Matched: identical text, recorded as a move".to_string(),
+        Ok(HumanTextVerdict::Update) => "Matched: text differs, recorded as an update".to_string(),
+        Ok(other) => format!("Matched ({other:?})"),
+        Err(err) => format!("Matched, but the spans don't read back: {err:#}"),
+    });
+}
+
+/// `d` / `i`: paints the focused side's selection as a one-sided removal or addition.
+fn action_paint_one_sided(
+    app: &mut App,
+    state: &mut TextPaintState,
+    operation: HumanTextOperation,
+    before_src: &str,
+    after_src: &str,
+) {
+    let side = match operation {
+        HumanTextOperation::Delete => 0,
+        HumanTextOperation::Insert => 1,
+        HumanTextOperation::Match => return,
+    };
+    let source = if side == 0 { before_src } else { after_src };
+    let Some(span) = state.selection(side, source) else {
+        let (key, what, panel) = match operation {
+            HumanTextOperation::Delete => ("d", "delete", "Before"),
+            _ => ("i", "insert", "After"),
+        };
+        app.status = Some(format!(
+            "Nothing selected on the {panel} side - press v there, move, then {key} to {what}"
+        ));
+        return;
+    };
+
+    let entry = if side == 0 {
+        HumanTextEntry {
+            operation,
+            before: Some(span),
+            after: None,
+        }
+    } else {
+        HumanTextEntry {
+            operation,
+            before: None,
+            after: Some(span),
+        }
+    };
+    text_mapping_mut(app).entries.push(entry);
+    app.dirty = true;
+    state.anchor[side] = None;
+    app.status = Some(match operation {
+        HumanTextOperation::Delete => "Painted a deletion".to_string(),
+        _ => "Painted an insertion".to_string(),
+    });
+}
+
+/// `u`: removes whichever painted entry covers the focused cursor.
+///
+/// Removes the *whole entry*, both sides of a `Match` included. A half-removed match would be a
+/// malformed entry, which `HumanTextEntry::verdict` rightly refuses to read - so the alternative
+/// to removing both is not a smaller edit, it is a broken file.
+fn action_paint_unmark(app: &mut App, state: &TextPaintState, before_src: &str, after_src: &str) {
+    let side = state.side;
+    let source = if side == 0 { before_src } else { after_src };
+    let (row, column) = state.cursor[side];
+    let row_len = TextPaintState::row_text(source, row).len();
+
+    let Some(text_mapping) = app.mapping.text_mapping.as_mut() else {
+        app.status = Some("Nothing painted here".to_string());
+        return;
+    };
+    let before_count = text_mapping.entries.len();
+    text_mapping.entries.retain(|entry| {
+        let span = if side == 0 { entry.before } else { entry.after };
+        !span.is_some_and(|span| span_covers(span, row, column, row_len))
+    });
+    let removed = before_count - text_mapping.entries.len();
+    if removed == 0 {
+        app.status = Some("Nothing painted here".to_string());
+        return;
+    }
+    app.dirty = true;
+    app.status = Some(format!("Removed {removed} painted range(s)"));
+}
+
+/// `Z`: marks this fixture's painting as complete even though nothing was painted.
+///
+/// Only reachable when there is genuinely nothing to paint - two identical files. Without it that
+/// case is indistinguishable from an unvisited fixture, since both would leave `text_mapping` at
+/// `None`, and a completeness count would quietly under-report forever.
+fn action_paint_mark_empty(app: &mut App) {
+    if app
+        .mapping
+        .text_mapping
+        .as_ref()
+        .is_some_and(|text_mapping| !text_mapping.entries.is_empty())
+    {
+        app.status =
+            Some("This fixture already has painted ranges - u removes them one at a time".into());
+        return;
+    }
+    text_mapping_mut(app);
+    app.dirty = true;
+    app.status = Some("Marked as painted with no changes (save with s)".to_string());
+}
+
 /// A blocking prompt raised by `m`/`M` that needs a direct human answer before the mapping entry
 /// can be finalized. While `App::modal` is `Some`, the event loop routes keys to
 /// `handle_modal_key` instead of the normal keybindings.
@@ -1169,6 +1530,9 @@ enum Modal {
         selected: usize,
         dataset_filter: Option<&'static str>,
         hide_complete: bool,
+        /// The `X` filter: narrow to cases with no painted text mapping yet (see
+        /// `App::diff_hide_painted`).
+        hide_painted: bool,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with its `SampleTriageStatus` (per the matching sample.csv
@@ -1221,9 +1585,11 @@ enum Modal {
     /// unlike `PromptPromoteName`, a failed search isn't invalid input to correct, just "nothing
     /// found from here", reported on the status line instead of re-prompting.
     PromptSearch { input: String },
-    /// Raised by `t`: shows the raw before/after source side by side, for reading the actual code
-    /// instead of navigating the AST tree. `T` while open switches to `UnixDiffView` instead.
-    TextView { scroll: u16 },
+    /// Raised by `t`: both sides' source side by side, for reading the actual code instead of
+    /// navigating the AST tree - and for *painting* the human's text-range ground truth onto it
+    /// (see `HumanTextMapping`), which is a second, independent account of the same diff that the
+    /// tree mapping cannot supply. `T` while open switches to `UnixDiffView` instead.
+    TextView { state: TextPaintState },
     /// Raised by `T`: shows the output of running the system `diff -u` between the before and
     /// after content -- a plain line-based diff, as a point of comparison against codediff's own
     /// AST-based diff (`p`). `t` while open switches to `TextView` instead.
@@ -1336,6 +1702,17 @@ struct App {
     /// The `o` picker's "incomplete only" filter (toggled by `H` inside it), persisted here for
     /// the same reason as `diff_dataset_filter` above.
     diff_hide_complete: bool,
+    /// The `o` picker's "unpainted only" filter (toggled by `X` inside it), persisted for the same
+    /// reason. Independent of `diff_hide_complete`: a fixture's tree mapping and its text-range
+    /// painting are two separate ground truths (see `HumanTextMapping`), so "still needs nodes
+    /// marked" and "still needs text painted" are different queues and combine as an AND when both
+    /// are on.
+    diff_hide_painted: bool,
+    /// Cache of, for every case `list_available_cases` lists, whether it already has a painted
+    /// text mapping (see `diff_case_has_text_mapping`). `None` until the first `X` press, the same
+    /// lazy-once-per-session contract `diff_completeness` has - though this scan is much cheaper,
+    /// since it skims JSON rather than parsing source with tree-sitter.
+    diff_text_painted: Option<std::collections::HashMap<String, bool>>,
     /// Cache of, for every case `list_available_cases` lists, whether it has at least one
     /// `NodeStatus::Unmarked` node left (see `diff_case_is_incomplete`) - `None` until the first
     /// time `H` is pressed inside the `o` picker, since scanning the whole corpus (parsing every
@@ -1388,6 +1765,8 @@ impl App {
             sample_sort_order: SampleSortOrder::Alphabetical,
             diff_dataset_filter: None,
             diff_hide_complete: false,
+            diff_hide_painted: false,
+            diff_text_painted: None,
             diff_completeness: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
@@ -3503,7 +3882,9 @@ fn draw_ui(
             promote_target_dataset(&app.origin),
             std::str::from_utf8(before_src).unwrap_or(""),
             std::str::from_utf8(after_src).unwrap_or(""),
+            &app.mapping,
             app.diff_completeness.as_ref(),
+            app.diff_text_painted.as_ref(),
         );
     }
 }
@@ -3563,7 +3944,9 @@ fn render_modal(
     promote_dataset: Option<&str>,
     before_src: &str,
     after_src: &str,
+    mapping: &HumanMapping,
     diff_completeness: Option<&std::collections::HashMap<String, bool>>,
+    diff_text_painted: Option<&std::collections::HashMap<String, bool>>,
 ) {
     match modal {
         Modal::ConfirmKindMismatch {
@@ -3603,6 +3986,7 @@ fn render_modal(
             selected,
             dataset_filter,
             hide_complete,
+            hide_painted,
         } => {
             render_open_diff_picker(
                 frame,
@@ -3612,6 +3996,8 @@ fn render_modal(
                 *dataset_filter,
                 *hide_complete,
                 diff_completeness,
+                *hide_painted,
+                diff_text_painted,
             );
         }
         Modal::OpenSamplePicker {
@@ -3689,8 +4075,8 @@ fn render_modal(
                 input,
             ),
         ),
-        Modal::TextView { scroll } => {
-            render_text_view_modal(frame, area, before_src, after_src, *scroll);
+        Modal::TextView { state } => {
+            render_text_view_modal(frame, area, before_src, after_src, mapping, state);
         }
         Modal::UnixDiffView { output, scroll } => {
             render_unix_diff_modal(frame, area, output, *scroll);
@@ -3738,18 +4124,180 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
     );
 }
 
-/// Renders the `t` (text view) modal: the raw before/after source, side by side, as plain text
-/// rather than the AST tree -- useful for just reading the code. `scroll` applies to both sides
-/// identically, since it's meant for eyeballing roughly-aligned content, not precise per-side
-/// navigation.
+/// Every painted span on one side, with the verdict its entry resolves to - the four operations a
+/// renderer needs, derived from the three a human paints (see `HumanTextEntry::verdict`).
+///
+/// A malformed entry is skipped rather than failing the render: the view is how a human would
+/// notice and fix it, so refusing to draw would take away the only tool for the job.
+fn painted_spans(
+    mapping: &HumanMapping,
+    side: usize,
+    before_src: &str,
+    after_src: &str,
+) -> Vec<(HumanTextSpan, HumanTextVerdict)> {
+    let Some(text_mapping) = mapping.text_mapping.as_ref() else {
+        return Vec::new();
+    };
+    text_mapping
+        .entries
+        .iter()
+        .filter_map(|entry| {
+            let verdict = entry.verdict(before_src, after_src).ok()?;
+            let span = if side == 0 { entry.before } else { entry.after }?;
+            Some((span, verdict))
+        })
+        .collect()
+}
+
+fn verdict_style(verdict: HumanTextVerdict) -> Style {
+    let color = match verdict {
+        HumanTextVerdict::Move => Color::Magenta,
+        HumanTextVerdict::Update => Color::Yellow,
+        HumanTextVerdict::Delete => Color::Red,
+        HumanTextVerdict::Insert => Color::Green,
+    };
+    Style::default().bg(color).fg(Color::Black)
+}
+
+/// What one byte of a row should be drawn as. Ordered so the highest-precedence class wins a
+/// simple `max`: the cursor must stay findable on top of a selection, and a selection on top of
+/// whatever is already painted underneath it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum PaintClass {
+    Plain,
+    Painted(HumanTextVerdict),
+    Selected,
+    Cursor,
+}
+
+/// Renders one side's source as styled lines, with painted spans, the active selection and the
+/// cursor drawn on top of each other in that order.
+///
+/// Built byte-class-first rather than by splitting on span boundaries: spans, selection and cursor
+/// overlap freely, and resolving that as a per-byte precedence is the only version that stays
+/// correct when they do. Iterating `char_indices` then groups the classes back into runs, so a
+/// multi-byte character is styled as one unit and never split.
+fn render_paint_side(
+    source: &str,
+    spans: &[(HumanTextSpan, HumanTextVerdict)],
+    state: &TextPaintState,
+    side: usize,
+    height: usize,
+) -> Vec<Line<'static>> {
+    let selection = state.selection(side, source);
+    let (cursor_row, cursor_column) = state.cursor[side];
+    let focused = state.side == side;
+    let top = state.scroll[side];
+
+    let lines: Vec<&str> = source.split('\n').collect();
+    let gutter_width = lines.len().to_string().len().max(3);
+
+    let class_at = |row: usize, column: usize, line: &str| -> PaintClass {
+        let mut class = PaintClass::Plain;
+        for (span, verdict) in spans {
+            if span_covers(*span, row, column, line.len()) {
+                class = class.max(PaintClass::Painted(*verdict));
+            }
+        }
+        if let Some(selection) = selection {
+            if span_covers(selection, row, column, line.len()) {
+                class = class.max(PaintClass::Selected);
+            }
+        }
+        if focused && row == cursor_row && column == cursor_column {
+            class = PaintClass::Cursor;
+        }
+        class
+    };
+
+    let mut out = Vec::with_capacity(height);
+    for (row, line) in lines
+        .iter()
+        .enumerate()
+        .take((top + height).min(lines.len()))
+        .skip(top)
+    {
+        let line = *line;
+        let mut spans_out = vec![Span::styled(
+            format!("{:>width$} ", row + 1, width = gutter_width),
+            Style::default().fg(Color::DarkGray),
+        )];
+
+        let mut run = String::new();
+        let mut run_class: Option<PaintClass> = None;
+        let push_run =
+            |run: &mut String, class: Option<PaintClass>, out: &mut Vec<Span<'static>>| {
+                if run.is_empty() {
+                    return;
+                }
+                out.push(Span::styled(
+                    std::mem::take(run),
+                    class.map(paint_class_style).unwrap_or_default(),
+                ));
+            };
+
+        for (offset, ch) in line.char_indices() {
+            let class = class_at(row, offset, line);
+            if run_class != Some(class) {
+                push_run(&mut run, run_class, &mut spans_out);
+                run_class = Some(class);
+            }
+            run.push(ch);
+        }
+        push_run(&mut run, run_class, &mut spans_out);
+
+        // An empty row still needs to show a cursor or a selection sitting on it, which no
+        // character run can carry - draw one space for it.
+        let end_class = class_at(row, line.len(), line);
+        if end_class != PaintClass::Plain {
+            spans_out.push(Span::styled(" ".to_string(), paint_class_style(end_class)));
+        }
+
+        out.push(Line::from(spans_out));
+    }
+    out
+}
+
+fn paint_class_style(class: PaintClass) -> Style {
+    match class {
+        PaintClass::Plain => Style::default(),
+        PaintClass::Painted(verdict) => verdict_style(verdict),
+        PaintClass::Selected => Style::default().bg(Color::Cyan).fg(Color::Black),
+        PaintClass::Cursor => Style::default().add_modifier(Modifier::REVERSED),
+    }
+}
+
+/// Whether `span` covers `(row, column)`, with `row_len` used to decide whether a span that ends
+/// on a later row runs to the end of this one.
+fn span_covers(span: HumanTextSpan, row: usize, column: usize, row_len: usize) -> bool {
+    if row < span.start_row || row > span.end_row {
+        return false;
+    }
+    let start = if row == span.start_row {
+        span.start_column
+    } else {
+        0
+    };
+    let end = if row == span.end_row {
+        span.end_column
+    } else {
+        // Past the last character, so a multi-row span also covers this row's newline.
+        row_len + 1
+    };
+    column >= start && column < end
+}
+
+/// Renders the `t` text-painting modal: both sides' source, side by side, with the human's painted
+/// ranges on top and an independent cursor, selection and scroll per side.
 fn render_text_view_modal(
     frame: &mut Frame,
     area: Rect,
     before_src: &str,
     after_src: &str,
-    scroll: u16,
+    mapping: &HumanMapping,
+    state: &TextPaintState,
 ) {
-    let popup_area = centered_rect(92, 90, area);
+    let popup_area = centered_rect(96, 92, area);
     frame.render_widget(Clear, popup_area);
 
     let columns = Layout::default()
@@ -3757,31 +4305,46 @@ fn render_text_view_modal(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(popup_area);
 
-    let block_style = Style::default()
-        .fg(Color::Cyan)
-        .add_modifier(Modifier::BOLD);
-    frame.render_widget(
-        Paragraph::new(before_src)
-            .block(
+    // Two rows go to the block's own borders.
+    let height = popup_area.height.saturating_sub(2) as usize;
+
+    let painted = mapping
+        .text_mapping
+        .as_ref()
+        .map(|text_mapping| text_mapping.entries.len())
+        .unwrap_or(0);
+
+    for (side, source, title) in [
+        (
+            0usize,
+            before_src,
+            format!("Before — v sel/d del/m match ({painted} painted)"),
+        ),
+        (
+            1usize,
+            after_src,
+            "After — v sel/i ins/u unmark/Tab/Esc".to_string(),
+        ),
+    ] {
+        let spans = painted_spans(mapping, side, before_src, after_src);
+        let lines = render_paint_side(source, &spans, state, side, height);
+        let border_style = if state.side == side {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        frame.render_widget(
+            Paragraph::new(lines).block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("Before (text) — j/k scroll, T diff view, Esc close")
-                    .border_style(block_style),
-            )
-            .scroll((scroll, 0)),
-        columns[0],
-    );
-    frame.render_widget(
-        Paragraph::new(after_src)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("After (text)")
-                    .border_style(block_style),
-            )
-            .scroll((scroll, 0)),
-        columns[1],
-    );
+                    .title(title)
+                    .border_style(border_style),
+            ),
+            columns[side],
+        );
+    }
 }
 
 /// Renders the `T` (unix diff) modal: the already-computed output of `diff -u` between the before
@@ -3860,8 +4423,17 @@ fn render_open_diff_picker(
     dataset_filter: Option<&'static str>,
     hide_complete: bool,
     completeness: Option<&std::collections::HashMap<String, bool>>,
+    hide_painted: bool,
+    text_painted: Option<&std::collections::HashMap<String, bool>>,
 ) {
-    let visible = visible_diff_options(options, dataset_filter, hide_complete, completeness);
+    let visible = visible_diff_options(
+        options,
+        dataset_filter,
+        hide_complete,
+        completeness,
+        hide_painted,
+        text_painted,
+    );
 
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
@@ -3888,9 +4460,10 @@ fn render_open_diff_picker(
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open diff [{}]{} ({}/{}) — j/k move, d dataset, H incomplete-only, Enter open, Esc cancel",
+            "Open diff [{}]{}{} ({}/{}) — j/k, d dataset, H incomplete-only, X unpainted-only, Enter, Esc",
             dataset_filter.unwrap_or("all"),
             if hide_complete { " [incomplete only]" } else { "" },
+            if hide_painted { " [unpainted only]" } else { "" },
             selected + 1,
             visible.len()
         ))
@@ -4793,7 +5366,9 @@ fn handle_key(
             None
         }
         KeyCode::Char('t') => {
-            app.modal = Some(Modal::TextView { scroll: 0 });
+            app.modal = Some(Modal::TextView {
+                state: TextPaintState::default(),
+            });
             None
         }
         KeyCode::Char('T') => {
@@ -4826,6 +5401,7 @@ fn handle_key(
                 let result = action_save(&mut app.mapping, &mut app.dirty, &app.name, None);
                 if result.is_ok() {
                     refresh_diff_completeness(app, &app.name.clone());
+                    refresh_diff_text_painted(app, &app.name.clone());
                 }
                 Some(result)
             }
@@ -4881,6 +5457,8 @@ fn handle_key(
                         app.diff_dataset_filter,
                         app.diff_hide_complete,
                         app.diff_completeness.as_ref(),
+                        app.diff_hide_painted,
+                        app.diff_text_painted.as_ref(),
                     ));
                 }
                 Ok(_) => {
@@ -5064,12 +5642,15 @@ fn handle_modal_key(
             selected,
             dataset_filter,
             hide_complete,
+            hide_painted,
         } => {
             let visible = visible_diff_options(
                 &options,
                 dataset_filter,
                 hide_complete,
                 app.diff_completeness.as_ref(),
+                hide_painted,
+                app.diff_text_painted.as_ref(),
             );
             match code {
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -5078,6 +5659,7 @@ fn handle_modal_key(
                         options,
                         dataset_filter,
                         hide_complete,
+                        hide_painted,
                     });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
@@ -5086,6 +5668,7 @@ fn handle_modal_key(
                         options,
                         dataset_filter,
                         hide_complete,
+                        hide_painted,
                     });
                 }
                 KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -5101,6 +5684,8 @@ fn handle_modal_key(
                         new_filter,
                         hide_complete,
                         app.diff_completeness.as_ref(),
+                        hide_painted,
+                        app.diff_text_painted.as_ref(),
                     ));
                 }
                 // Deliberately `H` only, not `h`/`H` the way `O`'s sample picker binds its own
@@ -5126,6 +5711,32 @@ fn handle_modal_key(
                         dataset_filter,
                         new_hide_complete,
                         app.diff_completeness.as_ref(),
+                        hide_painted,
+                        app.diff_text_painted.as_ref(),
+                    ));
+                }
+                // `X`, not `x`: same reasoning as `H` just above, and the two are neighbours in
+                // spirit - one narrows to fixtures whose *tree* mapping is unfinished, this one to
+                // fixtures whose *text* painting hasn't been started. They are separate ground
+                // truths (see `HumanTextMapping`), so these are separate queues; turning both on
+                // shows only cases that need work on both.
+                KeyCode::Char('X') => {
+                    let current_name = visible.get(selected).cloned();
+                    // Lazily once per session, like `H`'s scan - much cheaper than that one (JSON
+                    // skim, no tree-sitter), but not free across the whole corpus.
+                    if app.diff_text_painted.is_none() {
+                        app.diff_text_painted = Some(compute_diff_text_painted());
+                    }
+                    let new_hide_painted = !hide_painted;
+                    app.diff_hide_painted = new_hide_painted;
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        current_name.as_deref().unwrap_or(&app.name),
+                        dataset_filter,
+                        hide_complete,
+                        app.diff_completeness.as_ref(),
+                        new_hide_painted,
+                        app.diff_text_painted.as_ref(),
                     ));
                 }
                 KeyCode::Enter => {
@@ -5143,6 +5754,7 @@ fn handle_modal_key(
                             selected,
                             dataset_filter,
                             hide_complete,
+                            hide_painted,
                         });
                     }
                 }
@@ -5155,6 +5767,7 @@ fn handle_modal_key(
                         selected,
                         dataset_filter,
                         hide_complete,
+                        hide_painted,
                     });
                 }
             }
@@ -5362,6 +5975,7 @@ fn handle_modal_key(
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name, None) {
                     Ok(_) => {
                         refresh_diff_completeness(app, &app.name.clone());
+                        refresh_diff_text_painted(app, &app.name.clone());
                         return Some(target);
                     }
                     Err(err) => {
@@ -5515,38 +6129,97 @@ fn handle_modal_key(
                 app.modal = Some(Modal::PromptSearch { input });
             }
         },
-        Modal::TextView { scroll } => match code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                app.modal = Some(Modal::TextView {
-                    scroll: scroll.saturating_sub(1),
-                });
+        Modal::TextView { mut state } => {
+            // `before_src`/`after_src` are the bytes of a `String` (`Code::contents`), so these
+            // conversions cannot fail; the fallback exists so a hypothetical non-UTF-8 source
+            // degrades to an empty painting surface rather than panicking mid-session.
+            let before_text = std::str::from_utf8(before_src).unwrap_or_default();
+            let after_text = std::str::from_utf8(after_src).unwrap_or_default();
+            // The viewport height the cursor has to stay inside. The real popup height isn't known
+            // outside `render_text_view_modal`, and threading it back here would couple the key
+            // handler to the layout for one number - a conservative constant keeps the cursor on
+            // screen for any terminal at least this tall and merely over-scrolls on a shorter one.
+            const VIEWPORT_ROWS: usize = 20;
+            let focused_source = if state.side == 0 {
+                before_text
+            } else {
+                after_text
+            };
+            let mut close = false;
+
+            match code {
+                KeyCode::Tab => state.side = 1 - state.side,
+                KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
+                KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),
+                KeyCode::Left | KeyCode::Char('h') => state.step_column(false, focused_source),
+                KeyCode::Right | KeyCode::Char('l') => state.step_column(true, focused_source),
+                KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
+                KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
+                KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
+                KeyCode::Char('$') | KeyCode::End => {
+                    let row = state.cursor[state.side].0;
+                    state.cursor[state.side].1 =
+                        TextPaintState::row_text(focused_source, row).len();
+                }
+                KeyCode::Char('g') => state.cursor[state.side] = (0, 0),
+                KeyCode::Char('G') => {
+                    let last = TextPaintState::row_count(focused_source).saturating_sub(1);
+                    state.cursor[state.side] = (last, 0);
+                }
+                KeyCode::Char('v') => {
+                    state.anchor[state.side] = match state.anchor[state.side] {
+                        Some(_) => None,
+                        None => Some(state.cursor[state.side]),
+                    };
+                    app.status = Some(match state.anchor[state.side] {
+                        Some(_) => "Selecting - move, then d/i/m".to_string(),
+                        None => "Selection cleared".to_string(),
+                    });
+                }
+                KeyCode::Char('m') => action_paint_match(app, &mut state, before_text, after_text),
+                KeyCode::Char('d') => action_paint_one_sided(
+                    app,
+                    &mut state,
+                    HumanTextOperation::Delete,
+                    before_text,
+                    after_text,
+                ),
+                KeyCode::Char('i') => action_paint_one_sided(
+                    app,
+                    &mut state,
+                    HumanTextOperation::Insert,
+                    before_text,
+                    after_text,
+                ),
+                KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
+                KeyCode::Char('Z') => action_paint_mark_empty(app),
+                KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
+                    Ok(output) => {
+                        app.modal = Some(Modal::UnixDiffView { output, scroll: 0 });
+                        return None;
+                    }
+                    Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
+                },
+                KeyCode::Esc => {
+                    // Esc backs out of a selection first, so an accidental `v` doesn't cost the
+                    // whole view - only a second Esc closes.
+                    if state.anchor[state.side].is_some() {
+                        state.anchor[state.side] = None;
+                        app.status = Some("Selection cleared".to_string());
+                    } else {
+                        close = true;
+                    }
+                }
+                _ => {}
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                app.modal = Some(Modal::TextView {
-                    scroll: scroll.saturating_add(1),
-                });
-            }
-            KeyCode::PageUp => {
-                app.modal = Some(Modal::TextView {
-                    scroll: scroll.saturating_sub(10),
-                });
-            }
-            KeyCode::PageDown => {
-                app.modal = Some(Modal::TextView {
-                    scroll: scroll.saturating_add(10),
-                });
-            }
-            KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
-                Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
-                Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
-            },
-            KeyCode::Esc => {
+
+            if close {
                 app.status = Some("Closed text view".to_string());
+            } else {
+                state.scroll_into_view(VIEWPORT_ROWS);
+                app.modal = Some(Modal::TextView { state });
             }
-            _ => {
-                app.modal = Some(Modal::TextView { scroll });
-            }
-        },
+        }
         Modal::UnixDiffView { output, scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
                 app.modal = Some(Modal::UnixDiffView {
@@ -5573,7 +6246,9 @@ fn handle_modal_key(
                 });
             }
             KeyCode::Char('t') => {
-                app.modal = Some(Modal::TextView { scroll: 0 });
+                app.modal = Some(Modal::TextView {
+                    state: TextPaintState::default(),
+                });
             }
             KeyCode::Esc => {
                 app.status = Some("Closed diff view".to_string());
@@ -5761,6 +6436,7 @@ fn action_promote(
         comment.as_deref(),
     )?;
     refresh_diff_completeness(app, new_name);
+    refresh_diff_text_painted(app, new_name);
 
     let csv_note = match &sample_source {
         Some(source) => match update_sample_csv(source, new_name) {
@@ -6999,7 +7675,20 @@ mod tests {
         };
 
         terminal
-            .draw(|f| render_modal(f, area, &modal, "test", None, "", "", None))
+            .draw(|f| {
+                render_modal(
+                    f,
+                    area,
+                    &modal,
+                    "test",
+                    None,
+                    "",
+                    "",
+                    &HumanMapping::default(),
+                    None,
+                    None,
+                )
+            })
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -7024,7 +7713,20 @@ mod tests {
         };
 
         terminal
-            .draw(|f| render_modal(f, area, &modal, "test", Some("handmade"), "", "", None))
+            .draw(|f| {
+                render_modal(
+                    f,
+                    area,
+                    &modal,
+                    "test",
+                    Some("handmade"),
+                    "",
+                    "",
+                    &HumanMapping::default(),
+                    None,
+                    None,
+                )
+            })
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -7132,6 +7834,363 @@ mod tests {
 
     /// Concatenates every cell's symbol in a `TestBackend`'s buffer, so a rendered frame's
     /// content can be checked with a plain `contains`.
+    /// The `X` filter narrows to cases with no painted text mapping, and fails *open* on a case
+    /// the scan never reached - the opposite default from `hide_complete`, and deliberately so:
+    /// hiding something never confirmed as painted would silently drop it out of the work queue.
+    #[test]
+    fn visible_diff_options_can_narrow_to_unpainted_cases() {
+        let options = vec![
+            ("painted".to_string(), "handmade"),
+            ("unpainted".to_string(), "handmade"),
+            ("never-scanned".to_string(), "handmade"),
+        ];
+        let painted = std::collections::HashMap::from([
+            ("painted".to_string(), true),
+            ("unpainted".to_string(), false),
+        ]);
+
+        assert_eq!(
+            visible_diff_options(&options, None, false, None, false, Some(&painted)),
+            vec!["painted", "unpainted", "never-scanned"],
+            "the filter off shows everything"
+        );
+        assert_eq!(
+            visible_diff_options(&options, None, false, None, true, Some(&painted)),
+            vec!["unpainted", "never-scanned"],
+            "on, it hides only cases confirmed painted"
+        );
+    }
+
+    /// The two filters are separate queues over separate ground truths, so turning both on shows
+    /// only what needs work on both.
+    #[test]
+    fn the_incomplete_and_unpainted_filters_combine_as_an_and() {
+        let options = vec![
+            ("both".to_string(), "handmade"),
+            ("tree-only".to_string(), "handmade"),
+            ("text-only".to_string(), "handmade"),
+            ("done".to_string(), "handmade"),
+        ];
+        let incomplete = std::collections::HashMap::from([
+            ("both".to_string(), true),
+            ("tree-only".to_string(), true),
+            ("text-only".to_string(), false),
+            ("done".to_string(), false),
+        ]);
+        let painted = std::collections::HashMap::from([
+            ("both".to_string(), false),
+            ("tree-only".to_string(), true),
+            ("text-only".to_string(), false),
+            ("done".to_string(), true),
+        ]);
+
+        assert_eq!(
+            visible_diff_options(
+                &options,
+                None,
+                true,
+                Some(&incomplete),
+                true,
+                Some(&painted)
+            ),
+            vec!["both"],
+            "only the case needing both an unmarked node and a painting survives"
+        );
+    }
+
+    /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
+    /// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
+    /// one line.
+    fn test_app() -> App {
+        App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            0,
+            0,
+            HumanMapping::default(),
+        )
+    }
+
+    fn paint_state_at(
+        side: usize,
+        cursor: (usize, usize),
+        anchor: Option<(usize, usize)>,
+    ) -> TextPaintState {
+        let mut state = TextPaintState {
+            side,
+            ..Default::default()
+        };
+        state.cursor[side] = cursor;
+        state.anchor[side] = anchor;
+        state
+    }
+
+    /// A selection includes the character *under* the cursor. Anything else surprises a reader
+    /// every time: they see a highlight covering `foo` and get a span covering `fo`.
+    #[test]
+    fn a_selection_includes_the_character_under_the_cursor() {
+        let source = "let foo = 1;\n";
+        let state = paint_state_at(0, (0, 6), Some((0, 4)));
+
+        let span = state.selection(0, source).expect("a selection");
+
+        assert_eq!(
+            codediff::test::helper::human_mapping::span_text(source, span),
+            Some("foo")
+        );
+    }
+
+    /// Selecting backwards is the same selection - the anchor may be after the cursor.
+    #[test]
+    fn a_backwards_selection_normalizes_to_the_same_span() {
+        let source = "let foo = 1;\n";
+        let forward = paint_state_at(0, (0, 6), Some((0, 4)));
+        let backward = paint_state_at(0, (0, 4), Some((0, 6)));
+
+        // Both cover `foo`, but each includes the character under its own cursor, so the backward
+        // one runs from 4 through the cursor at 4 and out to the anchor at 6 inclusive.
+        assert_eq!(
+            forward.selection(0, source).unwrap(),
+            backward.selection(0, source).unwrap()
+        );
+    }
+
+    /// Byte columns, not character columns - a multi-byte character before the selection must not
+    /// shift it. The same trap `span_text`'s own test pins from the other side.
+    #[test]
+    fn a_selection_past_a_multibyte_character_lands_on_the_right_text() {
+        let source = "let é = foo;\n";
+        // "let é = " is 9 bytes ('é' costs two), so `foo` starts at byte 9 and its last character
+        // starts at byte 11.
+        let state = paint_state_at(0, (0, 11), Some((0, 9)));
+
+        let span = state.selection(0, source).expect("a selection");
+
+        assert_eq!(
+            codediff::test::helper::human_mapping::span_text(source, span),
+            Some("foo")
+        );
+    }
+
+    /// `h`/`l` step by characters, so the cursor can never land inside one - a column that did
+    /// would produce a span `span_text` correctly refuses to read back.
+    #[test]
+    fn stepping_across_a_multibyte_character_lands_on_boundaries() {
+        let source = "aéb\n";
+        let mut state = paint_state_at(0, (0, 0), None);
+
+        state.step_column(true, source);
+        assert_eq!(state.cursor[0], (0, 1), "onto the two-byte character");
+        state.step_column(true, source);
+        assert_eq!(state.cursor[0], (0, 3), "past it in one step, not into it");
+        state.step_column(false, source);
+        assert_eq!(state.cursor[0], (0, 1), "and back the same way");
+    }
+
+    #[test]
+    fn m_pairs_both_sides_selections_and_derives_move_from_identical_text() {
+        let (before_src, after_src) = ("alpha\nbeta\n", "beta\nalpha\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 4);
+        state.anchor[1] = Some((1, 0));
+        state.cursor[1] = (1, 4);
+
+        action_paint_match(&mut app, &mut state, before_src, after_src);
+
+        let entries = &app.mapping.text_mapping.as_ref().unwrap().entries;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].operation, HumanTextOperation::Match);
+        assert_eq!(
+            entries[0].verdict(before_src, after_src).unwrap(),
+            HumanTextVerdict::Move,
+            "identical text on both sides is a relocation"
+        );
+        assert!(app.dirty);
+        assert_eq!(state.anchor, [None, None], "both selections are consumed");
+    }
+
+    #[test]
+    fn m_without_a_selection_on_both_sides_paints_nothing_and_says_so() {
+        let (before_src, after_src) = ("alpha\n", "alpha\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 4);
+
+        action_paint_match(&mut app, &mut state, before_src, after_src);
+
+        assert!(app.mapping.text_mapping.is_none(), "nothing was painted");
+        assert!(!app.dirty);
+        assert!(
+            app.status.as_deref().unwrap_or("").contains("both sides"),
+            "got {:?}",
+            app.status
+        );
+    }
+
+    #[test]
+    fn d_and_i_paint_one_sided_ranges_on_their_own_side() {
+        let (before_src, after_src) = ("gone\nkept\n", "kept\nnew\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 3);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+
+        state.side = 1;
+        state.anchor[1] = Some((1, 0));
+        state.cursor[1] = (1, 2);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Insert,
+            before_src,
+            after_src,
+        );
+
+        let entries = &app.mapping.text_mapping.as_ref().unwrap().entries;
+        assert_eq!(entries.len(), 2);
+        assert_eq!(
+            codediff::test::helper::human_mapping::span_text(
+                before_src,
+                entries[0].before.unwrap()
+            ),
+            Some("gone")
+        );
+        assert!(entries[0].after.is_none(), "a delete has no after side");
+        assert_eq!(
+            codediff::test::helper::human_mapping::span_text(after_src, entries[1].after.unwrap()),
+            Some("new")
+        );
+        assert!(entries[1].before.is_none(), "an insert has no before side");
+    }
+
+    /// `u` removes the whole entry, both halves of a `Match` included: a half-removed match is a
+    /// malformed entry that `verdict` refuses to read, so removing one side is not a smaller edit
+    /// but a broken file.
+    #[test]
+    fn u_removes_a_whole_match_from_either_side() {
+        let (before_src, after_src) = ("alpha\nbeta\n", "beta\nalpha\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 4);
+        state.anchor[1] = Some((1, 0));
+        state.cursor[1] = (1, 4);
+        action_paint_match(&mut app, &mut state, before_src, after_src);
+
+        // Stand on the *after* half and unmark; the before half must go too.
+        state.side = 1;
+        state.cursor[1] = (1, 2);
+        action_paint_unmark(&mut app, &state, before_src, after_src);
+
+        assert!(
+            app.mapping
+                .text_mapping
+                .as_ref()
+                .unwrap()
+                .entries
+                .is_empty(),
+            "both halves of the match should be gone"
+        );
+    }
+
+    /// The `None`/`Some(empty)` distinction the field's `Option` exists for, reachable only
+    /// deliberately.
+    #[test]
+    fn z_marks_an_unpainted_fixture_as_deliberately_empty() {
+        let mut app = test_app();
+        assert!(app.mapping.text_mapping.is_none());
+
+        action_paint_mark_empty(&mut app);
+
+        let text_mapping = app.mapping.text_mapping.as_ref().expect("now present");
+        assert!(text_mapping.entries.is_empty());
+        assert!(app.dirty);
+    }
+
+    #[test]
+    fn z_refuses_to_touch_a_fixture_that_already_has_painted_ranges() {
+        let (before_src, after_src) = ("gone\n", "\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 3);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+
+        action_paint_mark_empty(&mut app);
+
+        assert_eq!(
+            app.mapping.text_mapping.as_ref().unwrap().entries.len(),
+            1,
+            "Z must not clear an existing painting"
+        );
+        assert!(
+            app.status.as_deref().unwrap_or("").contains("already has"),
+            "got {:?}",
+            app.status
+        );
+    }
+
+    #[test]
+    fn the_text_view_renders_painted_ranges() {
+        let backend = ratatui::backend::TestBackend::new(100, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 100, 24);
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![],
+            text_mapping: Some(codediff::test::helper::human_mapping::HumanTextMapping {
+                entries: vec![HumanTextEntry {
+                    operation: HumanTextOperation::Delete,
+                    before: Some(HumanTextSpan {
+                        start_row: 0,
+                        start_column: 3,
+                        end_row: 0,
+                        end_column: 11,
+                    }),
+                    after: None,
+                }],
+            }),
+        };
+
+        terminal
+            .draw(|f| {
+                render_text_view_modal(
+                    f,
+                    area,
+                    "fn old_name() {}",
+                    "fn new_name() {}",
+                    &mapping,
+                    &TextPaintState::default(),
+                );
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains("old_name"), "before content missing: {text}");
+        assert!(text.contains("new_name"), "after content missing: {text}");
+        assert!(
+            text.contains("1 painted"),
+            "the painted count should be in the title: {text}"
+        );
+    }
+
     fn rendered_text(terminal: &Terminal<ratatui::backend::TestBackend>) -> String {
         terminal
             .backend()
@@ -7150,7 +8209,14 @@ mod tests {
 
         terminal
             .draw(|f| {
-                render_text_view_modal(f, area, "fn old_name() {}", "fn new_name() {}", 0);
+                render_text_view_modal(
+                    f,
+                    area,
+                    "fn old_name() {}",
+                    "fn new_name() {}",
+                    &HumanMapping::default(),
+                    &TextPaintState::default(),
+                );
             })
             .unwrap();
 
@@ -7895,16 +8961,16 @@ mod tests {
         ];
 
         assert_eq!(
-            visible_diff_options(&options, None, false, None),
+            visible_diff_options(&options, None, false, None, false, None),
             vec!["alpha", "bravo", "charlie", "delta"],
             "no filter should show every dataset"
         );
         assert_eq!(
-            visible_diff_options(&options, Some("handmade"), false, None),
+            visible_diff_options(&options, Some("handmade"), false, None, false, None),
             vec!["alpha", "charlie"]
         );
         assert_eq!(
-            visible_diff_options(&options, Some("full"), false, None),
+            visible_diff_options(&options, Some("full"), false, None, false, None),
             vec!["delta"]
         );
     }
@@ -7922,12 +8988,12 @@ mod tests {
         // "charlie" deliberately absent - not yet scanned.
 
         assert_eq!(
-            visible_diff_options(&options, None, true, Some(&completeness)),
+            visible_diff_options(&options, None, true, Some(&completeness), false, None),
             vec!["alpha", "charlie"],
             "complete should be hidden, incomplete and unscanned should both stay"
         );
         assert_eq!(
-            visible_diff_options(&options, None, false, Some(&completeness)),
+            visible_diff_options(&options, None, false, Some(&completeness), false, None),
             vec!["alpha", "bravo", "charlie"],
             "hide_complete=false should show everything regardless of the map"
         );
@@ -7956,7 +9022,15 @@ mod tests {
 
         // "charlie" is index 2 in `options`' own order, but index 1 once filtered to just
         // "handmade" - proves `selected` is computed against the filtered view, not raw options.
-        let modal = open_diff_picker_modal(options, "charlie", Some("handmade"), false, None);
+        let modal = open_diff_picker_modal(
+            options,
+            "charlie",
+            Some("handmade"),
+            false,
+            None,
+            false,
+            None,
+        );
 
         match modal {
             Modal::OpenDiffPicker {
@@ -7981,7 +9055,8 @@ mod tests {
         // "alpha" is the currently open case, but it's a "handmade" fixture and the filter below
         // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
         // first visible entry instead of panicking or landing out of bounds.
-        let modal = open_diff_picker_modal(options, "alpha", Some("small"), false, None);
+        let modal =
+            open_diff_picker_modal(options, "alpha", Some("small"), false, None, false, None);
         match modal {
             Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
@@ -8006,6 +9081,7 @@ mod tests {
             selected: 0,
             dataset_filter: None,
             hide_complete: false,
+            hide_painted: false,
         });
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
@@ -8299,6 +9375,7 @@ mod tests {
             selected: 0,
             dataset_filter: None,
             hide_complete: false,
+            hide_painted: false,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
@@ -8370,6 +9447,7 @@ mod tests {
             selected: 0,
             dataset_filter: None,
             hide_complete: false,
+            hide_painted: false,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);

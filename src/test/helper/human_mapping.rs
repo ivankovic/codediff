@@ -127,6 +127,404 @@ pub struct HumanMapping {
     /// existing fixture keeps parsing (and re-saving byte-for-byte) unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<MultiMapGroup>,
+    /// The human-painted *text* account of the same diff (see [`HumanTextMapping`]) - a second,
+    /// independent ground truth, deliberately not derived from `entries`.
+    ///
+    /// `Option`, not a plain `Vec` like `groups`, because the empty case is meaningful here and
+    /// has to stay distinguishable: `None` is "nobody has painted this fixture yet", while
+    /// `Some` with no entries is "somebody painted it and there was nothing to paint" (two
+    /// identical files). Collapsing those would make a completeness count silently wrong. As with
+    /// `groups`, a file written before this field existed still parses, and one with no text
+    /// mapping still re-saves byte-for-byte unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_mapping: Option<HumanTextMapping>,
+}
+
+// ─── Human-painted text ranges ──────────────────────────────────────────────────────────────
+//
+// A second, independent ground truth living in the same file as the tree mapping above, and
+// deliberately not derived from it. See [`HumanTextMapping`] for why both exist.
+
+/// One span of source text, in exactly the row/**byte**-column space
+/// [`crate::diff::text_range::TextRange`] uses everywhere else in this codebase: rows and columns
+/// are 0-based, the end is exclusive, and an end column of 0 means "up to, not including, this
+/// row".
+///
+/// Not a `TextRange` directly, for the same reason `generate_mapping_site`'s `JsonRange` isn't:
+/// that keeps `diff::text_range` free of a serde dependency on its public type. Convert with
+/// [`HumanTextSpan::to_text_range`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HumanTextSpan {
+    pub start_row: usize,
+    pub start_column: usize,
+    pub end_row: usize,
+    pub end_column: usize,
+}
+
+impl HumanTextSpan {
+    pub fn to_text_range(self) -> crate::diff::text_range::TextRange {
+        crate::diff::text_range::TextRange::new(
+            self.start_row,
+            self.start_column,
+            self.end_row,
+            self.end_column,
+        )
+    }
+
+    pub fn is_empty(&self) -> bool {
+        (self.start_row, self.start_column) >= (self.end_row, self.end_column)
+    }
+}
+
+/// What a human said about one painted span, and *only* what a human should have to say about it.
+///
+/// Deliberately three variants, not the five [`HumanOperation`] carries. A person reading a diff
+/// can reliably answer "this text is gone", "this text is new" and "this text corresponds to that
+/// text". Asking them to further split a correspondence into moved-versus-updated is asking them
+/// to do something a machine does better and more consistently: the two differ precisely by
+/// whether the two spans' contents are byte-identical, which [`HumanTextEntry::verdict`] decides
+/// by looking. Recording a human judgement there would add a second, less reliable source for a
+/// fact already determined by the spans themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HumanTextOperation {
+    /// The before span and the after span are the same code. Whether that renders as a move or an
+    /// update is derived, not recorded - see [`HumanTextEntry::verdict`].
+    Match,
+    /// The before span is gone from the after side.
+    Delete,
+    /// The after span is new.
+    Insert,
+}
+
+/// One human-painted decision: a `Match` carries both spans, a `Delete` only `before`, an `Insert`
+/// only `after`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HumanTextEntry {
+    pub operation: HumanTextOperation,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub before: Option<HumanTextSpan>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub after: Option<HumanTextSpan>,
+}
+
+/// What a [`HumanTextEntry`] actually asserts once its spans have been read - the four operations
+/// a renderer needs, from the three a human is asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HumanTextVerdict {
+    /// A `Match` whose two spans hold byte-identical text: the same code, somewhere else.
+    Move,
+    /// A `Match` whose two spans differ: the same code, edited in place.
+    Update,
+    Delete,
+    Insert,
+}
+
+impl HumanTextEntry {
+    /// Resolves this entry against the actual source, deriving `Move` vs `Update` for a `Match`.
+    ///
+    /// `Err` if the entry is malformed for its operation (a `Match` missing a side, a `Delete`
+    /// with no before span) or if a span doesn't land inside its file - both of which mean the
+    /// file was hand-edited or the fixture text changed underneath it, and neither is something
+    /// to paper over with a default.
+    pub fn verdict(&self, before: &str, after: &str) -> Result<HumanTextVerdict> {
+        match self.operation {
+            HumanTextOperation::Delete => {
+                let span = self.before.context("a Delete entry has no `before` span")?;
+                span_text(before, span)
+                    .context("a Delete entry's span is outside the before file")?;
+                Ok(HumanTextVerdict::Delete)
+            }
+            HumanTextOperation::Insert => {
+                let span = self.after.context("an Insert entry has no `after` span")?;
+                span_text(after, span)
+                    .context("an Insert entry's span is outside the after file")?;
+                Ok(HumanTextVerdict::Insert)
+            }
+            HumanTextOperation::Match => {
+                let before_span = self.before.context("a Match entry has no `before` span")?;
+                let after_span = self.after.context("a Match entry has no `after` span")?;
+                let before_text = span_text(before, before_span)
+                    .context("a Match entry's before span is outside the before file")?;
+                let after_text = span_text(after, after_span)
+                    .context("a Match entry's after span is outside the after file")?;
+                // The whole derivation, and the reason a human is never asked: byte-identical
+                // means the code was relocated, anything else means it was edited.
+                Ok(if before_text == after_text {
+                    HumanTextVerdict::Move
+                } else {
+                    HumanTextVerdict::Update
+                })
+            }
+        }
+    }
+}
+
+/// A human-painted account of a diff *as text*, stored alongside - and deliberately independent
+/// of - the tree mapping in the same [`HumanMapping`].
+///
+/// **Why a second ground truth rather than one derived from the other.** The tree mapping records
+/// which AST nodes correspond. That is not enough to determine what a reader should see, for two
+/// separate reasons this project has now hit in practice:
+///
+/// * Many nodes carry no visible text of their own (`expression_statement` wrappers and the like),
+///   so a node-level answer cannot be checked against what appears on screen without an extra,
+///   unvalidated projection step - the same visible-versus-scaffolding split `visible_node_ids`
+///   draws for mismatch counting.
+/// * Even a mapping that is not in doubt anywhere leaves the *rendering* underdetermined. For a
+///   reorder, "one line moved past five" and "five lines moved past one" describe the identical
+///   set of matched pairs; the mapping, and any cost function over it, is indifferent between
+///   them. See `research/data/quality/move_attribution.md`.
+///
+/// So this records what a person says the diff *looks like*, and the tree mapping records what
+/// corresponds to what. Neither is derivable from the other, which is exactly what makes checking
+/// one against the other worth doing - see [`text_mapping_disagreements`].
+///
+/// **Unpainted text is unchanged.** A person paints only what changed, so the absence of a span
+/// is a positive claim that the text there is identical and in place. That is what makes a `Match`
+/// whose two spans hold identical text meaningful rather than redundant: it says "this same code
+/// is somewhere else", which is precisely a move.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HumanTextMapping {
+    pub entries: Vec<HumanTextEntry>,
+}
+
+/// The text a span covers, or `None` if it falls outside `contents`.
+///
+/// Rows are split on `'\n'` and columns are byte offsets into a row, matching `TextRange`. A span
+/// ending at column 0 of row *r* ends just before row *r* begins, i.e. it includes row *r-1*'s
+/// newline - the convention `line_operations` and `columns_on_row` already use.
+pub fn span_text(contents: &str, span: HumanTextSpan) -> Option<&str> {
+    let start = byte_offset(contents, span.start_row, span.start_column)?;
+    let end = byte_offset(contents, span.end_row, span.end_column)?;
+    if end < start {
+        return None;
+    }
+    contents.get(start..end)
+}
+
+/// Absolute byte offset of `(row, column)` in `contents`, or `None` if that position doesn't
+/// exist. A column exactly at a row's length is valid (the position just past the last character).
+fn byte_offset(contents: &str, row: usize, column: usize) -> Option<usize> {
+    let mut offset = 0usize;
+    for (index, line) in contents.split('\n').enumerate() {
+        if index == row {
+            if column > line.len() || !contents.is_char_boundary(offset + column) {
+                return None;
+            }
+            return Some(offset + column);
+        }
+        offset += line.len() + 1;
+    }
+    None
+}
+
+/// One byte-granular label for a side of the diff, shared by both the painted text mapping and
+/// the tree mapping projected down to text, so the two can be compared on equal footing.
+///
+/// `None` (absent from a label vector) is "unchanged and in place", which both sources express by
+/// saying nothing about that byte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextLabel {
+    Move,
+    Update,
+    Delete,
+    Insert,
+}
+
+impl TextLabel {
+    fn from_verdict(verdict: HumanTextVerdict) -> Self {
+        match verdict {
+            HumanTextVerdict::Move => TextLabel::Move,
+            HumanTextVerdict::Update => TextLabel::Update,
+            HumanTextVerdict::Delete => TextLabel::Delete,
+            HumanTextVerdict::Insert => TextLabel::Insert,
+        }
+    }
+
+    fn from_text_operation(operation: &crate::diff::text::TextOperation) -> Option<Self> {
+        match operation {
+            crate::diff::text::TextOperation::Move => Some(TextLabel::Move),
+            crate::diff::text::TextOperation::Update => Some(TextLabel::Update),
+            crate::diff::text::TextOperation::Delete => Some(TextLabel::Delete),
+            crate::diff::text::TextOperation::Insert => Some(TextLabel::Insert),
+            crate::diff::text::TextOperation::Identical
+            | crate::diff::text::TextOperation::NotYetSet => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            TextLabel::Move => "move",
+            TextLabel::Update => "update",
+            TextLabel::Delete => "delete",
+            TextLabel::Insert => "insert",
+        }
+    }
+}
+
+/// One place the painted text mapping and the tree mapping disagree about a side's text.
+#[derive(Debug, Clone)]
+pub struct TextMappingDisagreement {
+    /// `0` = before, `1` = after, matching `TextDiff::all`'s own side convention.
+    pub side: usize,
+    /// The run of bytes over which both sources hold the same pair of opinions.
+    pub start_byte: usize,
+    pub end_byte: usize,
+    /// 0-based row the run starts on, for a human-readable report.
+    pub start_row: usize,
+    /// What the painted text mapping says. `None` = "unchanged and in place".
+    pub painted: Option<TextLabel>,
+    /// What the tree mapping says, projected through `TextDiff`.
+    pub from_tree: Option<TextLabel>,
+}
+
+/// Per-byte labels for one side, from a list of `(span, label)`. Later spans win on overlap, which
+/// only matters for a malformed painting - the solver never produces overlapping spans.
+fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Option<TextLabel>> {
+    let mut labels = vec![None; contents.len()];
+    for &(span, label) in spans {
+        let (Some(start), Some(end)) = (
+            byte_offset(contents, span.start_row, span.start_column),
+            byte_offset(contents, span.end_row, span.end_column),
+        ) else {
+            continue;
+        };
+        for slot in labels.iter_mut().take(end.min(contents.len())).skip(start) {
+            *slot = Some(label);
+        }
+    }
+    labels
+}
+
+/// Per-byte labels for one side, from `TextDiff`'s own range list.
+fn label_bytes_from_ranges(
+    contents: &str,
+    ranges: &[crate::diff::text::RangeMatch],
+) -> Vec<Option<TextLabel>> {
+    let spans: Vec<(HumanTextSpan, TextLabel)> = ranges
+        .iter()
+        .filter(|range_match| !range_match.source.is_empty())
+        .filter_map(|range_match| {
+            TextLabel::from_text_operation(&range_match.operation).map(|label| {
+                (
+                    HumanTextSpan {
+                        start_row: range_match.source.start_row,
+                        start_column: range_match.source.start_column,
+                        end_row: range_match.source.end_row,
+                        end_column: range_match.source.end_column,
+                    },
+                    label,
+                )
+            })
+        })
+        .collect();
+    label_bytes(contents, &spans)
+}
+
+/// Every byte run where the painted text mapping and the tree mapping disagree about what happened
+/// to that text.
+///
+/// This is the check the two mappings are kept separate *for*. They are independent accounts of
+/// the same edit - one recording which AST nodes correspond, the other what a reader should see -
+/// so neither can be derived from the other and each can be wrong on its own. Where they disagree,
+/// at least one of them is, and the fixture needs a human to look. An empty result is the two
+/// agreeing, which is the only evidence available that either is right.
+///
+/// Compared **per byte**, not per span or per line: the two sources chunk the same edit completely
+/// differently (a painted `Match` covering five lines against a dozen small node-derived ranges),
+/// so comparing spans would report differences in bookkeeping as differences in opinion. Adjacent
+/// bytes carrying the same pair of opinions are then coalesced into one run, so a five-line
+/// disagreement is reported once rather than three hundred times.
+///
+/// `Ok(vec![])` when the fixture has no painted text mapping at all - nothing to check, which is
+/// not the same as agreement and callers that count fixtures should test `text_mapping.is_some()`
+/// themselves rather than reading an empty result as a pass.
+pub fn text_mapping_disagreements(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<Vec<TextMappingDisagreement>> {
+    let Some(text_mapping) = mapping.text_mapping.as_ref() else {
+        return Ok(Vec::new());
+    };
+
+    // The painted side.
+    let mut painted_before: Vec<(HumanTextSpan, TextLabel)> = Vec::new();
+    let mut painted_after: Vec<(HumanTextSpan, TextLabel)> = Vec::new();
+    for entry in &text_mapping.entries {
+        let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+        if let Some(span) = entry.before {
+            painted_before.push((span, label));
+        }
+        if let Some(span) = entry.after {
+            painted_after.push((span, label));
+        }
+    }
+
+    // The tree side, through exactly the projection every renderer uses.
+    let ast_diff = as_ast_diff_for_mapping(mapping, before, after)?;
+    let node_cache = crate::diff::NodeCache::build(before, after);
+    let text_diff = crate::diff::text::TextDiff::from(before, after, &ast_diff, &node_cache);
+
+    let mut disagreements = Vec::new();
+    for (side, contents, painted, ranges) in [
+        (0usize, &before.contents, &painted_before, text_diff.all(0)),
+        (1usize, &after.contents, &painted_after, text_diff.all(1)),
+    ] {
+        let painted_labels = label_bytes(contents, painted);
+        let tree_labels = label_bytes_from_ranges(contents, &ranges);
+
+        let mut row_of = RowIndex::new(contents);
+        let mut byte = 0usize;
+        while byte < contents.len() {
+            if painted_labels[byte] == tree_labels[byte] {
+                byte += 1;
+                continue;
+            }
+            let (painted_label, tree_label) = (painted_labels[byte], tree_labels[byte]);
+            let start = byte;
+            while byte < contents.len()
+                && painted_labels[byte] == painted_label
+                && tree_labels[byte] == tree_label
+            {
+                byte += 1;
+            }
+            disagreements.push(TextMappingDisagreement {
+                side,
+                start_byte: start,
+                end_byte: byte,
+                start_row: row_of.row_at(start),
+                painted: painted_label,
+                from_tree: tree_label,
+            });
+        }
+    }
+    Ok(disagreements)
+}
+
+/// Byte offset -> row, for annotating a disagreement without rescanning the file each time.
+struct RowIndex {
+    /// Byte offset at which each row starts, ascending.
+    starts: Vec<usize>,
+}
+
+impl RowIndex {
+    fn new(contents: &str) -> Self {
+        let mut starts = vec![0usize];
+        for (offset, byte) in contents.bytes().enumerate() {
+            if byte == b'\n' {
+                starts.push(offset + 1);
+            }
+        }
+        Self { starts }
+    }
+
+    fn row_at(&mut self, byte: usize) -> usize {
+        match self.starts.binary_search(&byte) {
+            Ok(row) => row,
+            Err(next) => next.saturating_sub(1),
+        }
+    }
 }
 
 /// Path to the `human_mapping.json` file for a given test case name (e.g. "rust-add-if"),
@@ -2198,6 +2596,232 @@ mod tests {
     use crate::code::Language;
     use crate::test::helper::path_for_node;
 
+    fn span(
+        start_row: usize,
+        start_column: usize,
+        end_row: usize,
+        end_column: usize,
+    ) -> HumanTextSpan {
+        HumanTextSpan {
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+        }
+    }
+
+    /// Columns are **byte** offsets, matching `TextRange` - the trap a char/byte mix-up sets is
+    /// invisible on ASCII and silently shifts every span past the first multi-byte character.
+    #[test]
+    fn span_text_uses_byte_columns_and_an_exclusive_end() {
+        let contents = "let é = 1;\nsecond line\nthird\n";
+
+        // "é" is two bytes, so byte 4..6 is the character itself, not "é" plus one.
+        assert_eq!(span_text(contents, span(0, 4, 0, 6)), Some("é"));
+        assert_eq!(span_text(contents, span(0, 0, 0, 3)), Some("let"));
+        // A whole row, ending at column 0 of the next one, includes the newline.
+        assert_eq!(span_text(contents, span(1, 0, 2, 0)), Some("second line\n"));
+        // Multi-row.
+        assert_eq!(span_text(contents, span(0, 9, 1, 6)), Some("1;\nsecond"));
+        // Past the end of a row, and past the end of the file, are both absent rather than
+        // clamped - a span that doesn't fit means the file changed underneath the mapping.
+        assert_eq!(span_text(contents, span(2, 0, 2, 99)), None);
+        assert_eq!(span_text(contents, span(99, 0, 99, 1)), None);
+        // Mid-character is refused rather than panicking on the slice.
+        assert_eq!(span_text(contents, span(0, 5, 0, 6)), None);
+    }
+
+    /// The derivation that is the whole reason a human is only asked for three operations.
+    #[test]
+    fn a_match_derives_move_from_identical_text_and_update_from_differing_text() {
+        let before = "alpha\nbeta\n";
+        let after = "beta\nalpha\n";
+
+        let moved = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: Some(span(0, 0, 0, 5)),
+            after: Some(span(1, 0, 1, 5)),
+        };
+        assert_eq!(
+            moved.verdict(before, after).unwrap(),
+            HumanTextVerdict::Move,
+            "identical text in two places is a relocation"
+        );
+
+        let edited = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: Some(span(0, 0, 0, 5)),
+            after: Some(span(0, 0, 0, 4)),
+        };
+        assert_eq!(
+            edited.verdict(before, after).unwrap(),
+            HumanTextVerdict::Update,
+            "corresponding text that differs is an edit"
+        );
+    }
+
+    #[test]
+    fn a_malformed_entry_is_an_error_rather_than_a_default() {
+        let before = "alpha\n";
+        let after = "alpha\n";
+
+        let no_after = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: Some(span(0, 0, 0, 5)),
+            after: None,
+        };
+        assert!(no_after.verdict(before, after).is_err());
+
+        let outside = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: Some(span(9, 0, 9, 1)),
+            after: None,
+        };
+        assert!(outside.verdict(before, after).is_err());
+    }
+
+    /// A file with no text mapping must still round-trip byte-for-byte: every fixture in the
+    /// corpus predates this field, and re-saving one from the solver must not rewrite them all.
+    #[test]
+    fn a_mapping_without_a_text_mapping_serializes_without_the_key() {
+        let mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Identical,
+                before_path: Some(vec!["source_file:1".to_string()]),
+                after_path: Some(vec!["source_file:1".to_string()]),
+            }],
+            groups: vec![],
+            text_mapping: None,
+        };
+
+        let json = serde_json::to_string_pretty(&mapping).unwrap();
+
+        assert!(!json.contains("text_mapping"), "got: {json}");
+        let round_tripped: HumanMapping = serde_json::from_str(&json).unwrap();
+        assert!(round_tripped.text_mapping.is_none());
+    }
+
+    /// `None` and `Some(empty)` have to stay distinguishable: "nobody has painted this" is not
+    /// "somebody painted it and there was nothing to paint".
+    #[test]
+    fn an_empty_text_mapping_is_distinguishable_from_an_absent_one() {
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![],
+            text_mapping: Some(HumanTextMapping::default()),
+        };
+
+        let json = serde_json::to_string_pretty(&mapping).unwrap();
+        let round_tripped: HumanMapping = serde_json::from_str(&json).unwrap();
+
+        assert!(json.contains("text_mapping"), "got: {json}");
+        assert!(round_tripped.text_mapping.is_some());
+        assert!(round_tripped.text_mapping.unwrap().entries.is_empty());
+    }
+
+    #[test]
+    fn text_mapping_disagreements_reports_nothing_when_the_two_accounts_agree() {
+        // A one-token edit: `1` becomes `2`. The tree mapping calls the integer an Update; the
+        // painted mapping says the same thing about the same bytes.
+        let before = crate::code::Code::from_string("let x = 1;\n", &crate::code::Language::Rust);
+        let after = crate::code::Code::from_string("let x = 2;\n", &crate::code::Language::Rust);
+        let mut mapping = build_full_identical_mapping(&before, &after);
+        mapping.text_mapping = Some(HumanTextMapping {
+            entries: vec![HumanTextEntry {
+                operation: HumanTextOperation::Match,
+                before: Some(span(0, 8, 0, 9)),
+                after: Some(span(0, 8, 0, 9)),
+            }],
+        });
+
+        let disagreements = text_mapping_disagreements(&mapping, &before, &after).unwrap();
+
+        assert!(
+            disagreements.is_empty(),
+            "expected agreement, got {disagreements:#?}"
+        );
+    }
+
+    #[test]
+    fn text_mapping_disagreements_finds_text_only_one_account_calls_changed() {
+        let before = crate::code::Code::from_string("let x = 1;\n", &crate::code::Language::Rust);
+        let after = crate::code::Code::from_string("let x = 2;\n", &crate::code::Language::Rust);
+        let mut mapping = build_full_identical_mapping(&before, &after);
+        // Paint the wrong token: `x` instead of the literal that actually changed.
+        mapping.text_mapping = Some(HumanTextMapping {
+            entries: vec![HumanTextEntry {
+                operation: HumanTextOperation::Match,
+                before: Some(span(0, 4, 0, 5)),
+                after: Some(span(0, 4, 0, 5)),
+            }],
+        });
+
+        let disagreements = text_mapping_disagreements(&mapping, &before, &after).unwrap();
+
+        assert!(
+            !disagreements.is_empty(),
+            "painting the wrong token should disagree with the tree mapping"
+        );
+        // Both directions show up: text the painter called changed and the tree did not, and text
+        // the tree called changed and the painter did not.
+        assert!(
+            disagreements
+                .iter()
+                .any(|d| d.painted.is_some() && d.from_tree.is_none()),
+            "got {disagreements:#?}"
+        );
+        assert!(
+            disagreements
+                .iter()
+                .any(|d| d.painted.is_none() && d.from_tree.is_some()),
+            "got {disagreements:#?}"
+        );
+    }
+
+    /// A tree mapping pairing each side's root, used by the disagreement tests above so they
+    /// exercise the real `as_ast_diff_for_mapping` -> `TextDiff` projection rather than a stub.
+    fn build_full_identical_mapping(
+        before: &crate::code::Code,
+        after: &crate::code::Code,
+    ) -> HumanMapping {
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let mut entries = Vec::new();
+        let mut before_stack = vec![before_root];
+        let mut after_stack = vec![after_root];
+        while let (Some(b), Some(a)) = (before_stack.pop(), after_stack.pop()) {
+            let before_path = Some(path_for_node(b));
+            let after_path = Some(path_for_node(a));
+            let (Some(before_path), Some(after_path)) = (before_path, after_path) else {
+                continue;
+            };
+            let b_text = b.utf8_text(before.contents.as_bytes()).unwrap_or("");
+            let a_text = a.utf8_text(after.contents.as_bytes()).unwrap_or("");
+            entries.push(HumanMappingEntry {
+                operation: if b_text == a_text {
+                    HumanOperation::Identical
+                } else if b.child_count() == 0 {
+                    HumanOperation::Update
+                } else {
+                    HumanOperation::MatchButNotIdentical
+                },
+                before_path: Some(before_path),
+                after_path: Some(after_path),
+            });
+            let mut b_cursor = b.walk();
+            let mut a_cursor = a.walk();
+            for (bc, ac) in b.children(&mut b_cursor).zip(a.children(&mut a_cursor)) {
+                before_stack.push(bc);
+                after_stack.push(ac);
+            }
+        }
+        HumanMapping {
+            entries,
+            groups: vec![],
+            text_mapping: None,
+        }
+    }
+
     /// Same convention as `generate_mapping_site.rs`'s and `human_solver.rs`'s own `parse_rust`
     /// test helpers - a one-line stand-in for the `Parser::new`/`set_language`/`parse` sequence
     /// this module's tests would otherwise repeat by hand.
@@ -2293,6 +2917,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
+            text_mapping: None,
         };
 
         let json = serde_json::to_string_pretty(&mapping)?;
@@ -3025,6 +3650,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: false,
             }],
+            text_mapping: None,
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3060,6 +3686,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
+            text_mapping: None,
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3099,6 +3726,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: false,
             }],
+            text_mapping: None,
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3143,6 +3771,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
+            text_mapping: None,
         };
 
         let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
@@ -3207,6 +3836,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
+            text_mapping: None,
         };
 
         let diff = as_ast_diff_for_mapping(&mapping, &before, &after)?;

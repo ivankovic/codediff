@@ -24,5 +24,7 @@ fn optimal_solution() -> Result<()> {
     // True solution requires a N:M multi-map because two strings should map to one. And it has
     // a interesting case of modifying the list with version numbers being removed and added,
     // which requires logical analysis not just syntax.
-    test::helper::human_mapping::assert_matches_human_mapping("python-aboutcode-org-license-expression-excellent-test-case")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "python-aboutcode-org-license-expression-excellent-test-case",
+    )
 }

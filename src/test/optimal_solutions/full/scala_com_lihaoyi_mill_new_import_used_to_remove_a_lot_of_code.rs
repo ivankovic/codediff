@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code",
+    )
 }
