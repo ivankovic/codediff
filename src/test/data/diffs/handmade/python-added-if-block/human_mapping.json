@@ -3057,5 +3057,50 @@
         "call:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 20,
+            "start_column": 4,
+            "end_row": 20,
+            "end_column": 24
+          }
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 20,
+            "start_column": 4,
+            "end_row": 20,
+            "end_column": 24
+          }
+        },
+        {
+          "operation": "Match",
+          "before": {
+            "start_row": 20,
+            "start_column": 4,
+            "end_row": 20,
+            "end_column": 31
+          },
+          "after": {
+            "start_row": 21,
+            "start_column": 8,
+            "end_row": 21,
+            "end_column": 35
+          }
+        }
+      ]
+    }
   ]
 }

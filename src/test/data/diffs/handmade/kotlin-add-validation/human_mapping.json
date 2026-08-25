@@ -1800,5 +1800,21 @@
         "function_body:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 1,
+            "start_column": 4,
+            "end_row": 6,
+            "end_column": 5
+          }
+        }
+      ]
+    }
   ]
 }

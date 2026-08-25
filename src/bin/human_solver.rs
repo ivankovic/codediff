@@ -185,12 +185,15 @@ use tree_sitter::Node;
 
 use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::code::{Code, Language};
-use codediff::diff::{ASTDiff, ASTMappingReason, diff_code};
+use codediff::diff::text::TextDiff;
+use codediff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
-    HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup, NodeStatus,
-    is_inherited_removed, path_refs, rebuild_caches_for_mapping, status_after, status_before,
+    HumanTextMapping, HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup,
+    NamedTextMapping, NodeStatus, is_inherited_removed, path_refs, rebuild_caches_for_mapping,
+    status_after, status_before,
 };
+use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 // Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
 // one the non-test code path uses).
 #[cfg(test)]
@@ -245,15 +248,21 @@ n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 /              search: jump to the next leaf node whose text contains the
                  given string (plain substring, no regex)
 
-t              text view: read the raw before/after source, and paint the human
-                 text-range ground truth onto it (stored alongside the tree
-                 mapping, not derived from it). Tab switches side, hjkl/0/$/g/G
-                 move, v starts a selection; then d/i paint the Before/After
-                 selection deleted/inserted, m pairs BOTH sides' selections as
-                 a match (move vs update is derived from whether the two spans
-                 hold identical text), u removes the range under the cursor,
-                 Z marks a fixture with nothing to paint as painted anyway,
-                 Esc clears the selection or closes
+t              text view: read the source, and paint the human text-range ground
+                 truth onto it (stored beside the tree mapping, not derived from
+                 it). Tab side, hjkl/0/$/g/G move, v select; d/i paint the
+                 Before/After selection deleted/inserted, m pairs BOTH sides'
+                 selections as a match (move vs update derived from whether the
+                 spans' text is identical), u removes the range under the cursor,
+                 Z marks a nothing-to-paint fixture, Esc unselects or closes.
+                 A fixture may hold several named paintings, for edits with more
+                 than one defensible rendering; a check passes on ANY of them.
+                 s branches the current one to another name, keeping both on
+                 file (Enter copies its ranges, e starts empty; Minimal / Full /
+                 Only one solution offered, none required, free-form ok); L
+                 switches which one you edit.
+                 p cycles what is drawn: your painting, codediff's own rendering
+                 of the same pair, or only the bytes where the two disagree
 T              view the output of unix `diff -u`
                  (t/T switch between these two views while either is open)
 H              toggle hiding fully solved subtrees (unmarked nodes and their
@@ -266,13 +275,11 @@ R              on a sample, prompt for a reason and reject it instead of
 e              on a sample, enter/edit a free-form comment (recorded in sample.csv,
                  works regardless of status; carried into the generated test stub
                  if present when later promoted)
-o              open a different test case (src/test/data/diffs/); press d inside
-                 this picker to cycle which dataset it's narrowed to (all,
-                 handmade, small, full, stratified), H to narrow to cases with at
-                 least one unmarked node left (first press scans the whole
-                 corpus, so it can take a few seconds), or X to narrow to cases
-                 with no text-range painting yet (see t) -- H and X are separate
-                 queues and combine as an AND; all three persist across o
+o              open a different test case (src/test/data/diffs/); inside, d cycles
+                 the dataset (all, handmade, small, full, stratified), H narrows
+                 to cases with an unmarked node left (first press scans the whole
+                 corpus, a few seconds), X narrows to cases with no text painting
+                 yet -- H and X are separate queues, AND-ed; all persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\", rejected ones \" - REJECTED\" --
                  press H inside this picker to hide/show both, or s to cycle its
@@ -590,7 +597,7 @@ fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
 fn diff_case_has_text_mapping(name: &str) -> Option<bool> {
     let path = human_mapping::mapping_path(name);
     let contents = std::fs::read_to_string(path).ok()?;
-    Some(contents.contains("\"text_mapping\""))
+    Some(contents.contains("\"text_mappings\""))
 }
 
 /// Refreshes just `name`'s entry in `App::diff_text_painted`, for the same reason (and at the same
@@ -1128,6 +1135,13 @@ fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
+    // Read the theme the `codediff` binary is configured with, from the same `.codediff.toml`, so
+    // the two tools paint a diff identically. `set_custom_palette` first, because `OverlayTheme::
+    // Custom` resolves its colours from that process-global rather than from the enum - installing
+    // the theme without it would leave a custom theme rendering as Dracula.
+    theme::set_custom_palette(theme::load_custom_palette());
+    let _ = OVERLAY_THEME.set(theme::load_overlay_theme());
+
     // Loading a case requires an initial, valid AST pair, so when no name is given on the
     // command line, fall back to the first available case rather than restructuring the rest of
     // the app to tolerate no case being loaded at all - press `o` to open a different one.
@@ -1220,6 +1234,325 @@ impl PanelState {
             viewport_height: 0,
         }
     }
+}
+
+/// The overlay theme this session paints with, read once at startup from the same
+/// `.codediff.toml` the `codediff` binary uses - so a theme picked there applies here too, and
+/// Dracula (that file's own default) applies when nothing was ever picked.
+///
+/// A process-wide `OnceLock` rather than a field threaded through every render function, for the
+/// same reason `tui::theme` keeps its custom palette process-global: `palette()` stays the single
+/// resolution point and the dozen call sites below stay unchanged. human_solver has no theme
+/// picker of its own, so there is nothing to change it at runtime and nothing `OnceLock` costs.
+static OVERLAY_THEME: std::sync::OnceLock<OverlayTheme> = std::sync::OnceLock::new();
+
+/// The colors to paint with. Falls back to the default theme (Dracula) when `main` hasn't
+/// installed one - which is exactly the case in this file's own render tests, keeping them
+/// deterministic instead of dependent on whatever `.codediff.toml` the machine happens to have.
+fn overlay_palette() -> OverlayPalette {
+    OVERLAY_THEME.get().copied().unwrap_or_default().palette()
+}
+
+/// Names offered first in the save-as picker, in this order.
+///
+/// Suggestions, not a schema. `Minimal` and `Full` are the two ends of the commonest genuine
+/// ambiguity - the same edit painted as tightly as it can be, or as generously - and
+/// `Only one solution` records the opposite finding, that this fixture has exactly one defensible
+/// answer. Nothing requires any of them: the picker's last entry takes a free-form name, a fixture
+/// may carry one painting or five, and a painting may be empty.
+const SUGGESTED_SOLUTION_NAMES: &[&str] = &["Minimal", "Full", "Only one solution"];
+
+/// Which painting to start on when a case is opened: its first existing one, or the first
+/// suggestion when it has none.
+fn starting_solution(mapping: &HumanMapping) -> String {
+    mapping
+        .text_mappings
+        .first()
+        .map(|named| named.name.clone())
+        .unwrap_or_else(|| SUGGESTED_SOLUTION_NAMES[0].to_string())
+}
+
+/// The names offered by the save-as picker: every painting this fixture already has, then whichever
+/// suggestions it doesn't. Existing names come first so the common case - resaving the painting
+/// currently being edited - is at the top rather than buried under three constants.
+fn solution_picker_names(mapping: &HumanMapping) -> Vec<String> {
+    let mut names: Vec<String> = mapping
+        .text_mappings
+        .iter()
+        .map(|named| named.name.clone())
+        .collect();
+    for suggestion in SUGGESTED_SOLUTION_NAMES {
+        if !names.iter().any(|name| name == suggestion) {
+            names.push((*suggestion).to_string());
+        }
+    }
+    names
+}
+
+/// The entries of the painting named `solution`, or an empty slice if this fixture has no painting
+/// under that name yet.
+fn solution_entries<'a>(mapping: &'a HumanMapping, solution: &str) -> &'a [HumanTextEntry] {
+    mapping
+        .text_mappings
+        .iter()
+        .find(|named| named.name == solution)
+        .map(|named| named.mapping.entries.as_slice())
+        .unwrap_or(&[])
+}
+
+/// The entries of the painting named `solution`, creating it if this is the first range painted
+/// under that name.
+///
+/// Creating it here is what turns "this fixture has no painting called X" into "it has one", which
+/// is the distinction `text_mappings` carries in place of an `Option` - so a painting that ends up
+/// empty still has to be reached deliberately, via `Z`.
+fn solution_entries_mut<'a>(
+    mapping: &'a mut HumanMapping,
+    solution: &str,
+) -> &'a mut Vec<HumanTextEntry> {
+    if !mapping
+        .text_mappings
+        .iter()
+        .any(|named| named.name == solution)
+    {
+        mapping.text_mappings.push(NamedTextMapping {
+            name: solution.to_string(),
+            mapping: HumanTextMapping::default(),
+        });
+    }
+    &mut mapping
+        .text_mappings
+        .iter_mut()
+        .find(|named| named.name == solution)
+        .expect("just inserted if missing")
+        .mapping
+        .entries
+}
+
+/// `s`: stores the current painting under another name, **keeping the one it came from**.
+///
+/// This is a branch, not a rename, and the difference is the whole point: a fixture whose text
+/// rendering has more than one defensible answer needs both answers on disk at once. An earlier
+/// version moved the ranges to the target and dropped the source, which meant a fixture could only
+/// ever hold one painting however many times you saved - the exact thing named paintings exist to
+/// avoid.
+///
+/// `copy` decides what a *new* name starts from: the current painting's ranges (the usual case -
+/// two answers to the same edit normally share most of their spans, so starting from a copy and
+/// diverging is far less work than repainting), or nothing.
+///
+/// Choosing a name that already exists never writes: it just switches to it, exactly as `L` would.
+/// Merging would leave overlapping duplicates and replacing would silently discard a painting
+/// somebody made, and neither is recoverable here - there is no undo.
+fn action_save_solution_as(app: &mut App, target: &str, copy: bool) {
+    let target = target.trim();
+    if target.is_empty() {
+        app.status = Some("A solution needs a name".to_string());
+        return;
+    }
+    if target == app.text_solution {
+        app.status = Some(format!("Already painting under '{target}'"));
+        return;
+    }
+    if app
+        .mapping
+        .text_mappings
+        .iter()
+        .any(|named| named.name == target)
+    {
+        action_load_solution(app, target);
+        app.status = Some(format!(
+            "'{target}' already exists - switched to it, nothing was overwritten"
+        ));
+        return;
+    }
+
+    let entries = if copy {
+        solution_entries(&app.mapping, &app.text_solution).to_vec()
+    } else {
+        Vec::new()
+    };
+    let count = entries.len();
+    app.mapping.text_mappings.push(NamedTextMapping {
+        name: target.to_string(),
+        mapping: HumanTextMapping { entries },
+    });
+    app.text_solution = target.to_string();
+    app.dirty = true;
+    app.status = Some(if copy {
+        format!(
+            "Started '{target}' as a copy of the previous painting ({count} range(s)) - {} now on file",
+            app.mapping.text_mappings.len()
+        )
+    } else {
+        format!(
+            "Started '{target}' empty - {} painting(s) now on file",
+            app.mapping.text_mappings.len()
+        )
+    });
+}
+
+/// Switches which painting the text view is editing, without touching any of them.
+fn action_load_solution(app: &mut App, target: &str) {
+    app.text_solution = target.to_string();
+    let count = solution_entries(&app.mapping, target).len();
+    app.status = Some(format!("Editing '{target}' ({count} range(s))"));
+}
+
+/// What the `t` view is painting on screen. Cycled by `p`, the same key that runs codediff's diff
+/// in the tree view.
+///
+/// The point of the third mode is that neither of the first two answers the question a person
+/// painting ground truth actually has, which is "where do we differ". Flipping between two full
+/// renderings and spotting the difference by eye is exactly the job `text_mapping_disagreements`
+/// already does per byte.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum TextOverlay {
+    /// The human's own painting for the current solution.
+    #[default]
+    Human,
+    /// What codediff's own diff renders, through the same `TextDiff` projection the TUI and the
+    /// mapping site use - not a re-derivation, the real thing.
+    CodeDiff,
+    /// Only the bytes where the two disagree, painted with the *human's* label so the colour still
+    /// says what the human claimed. Empty means they agree everywhere.
+    Disagreements,
+}
+
+impl TextOverlay {
+    fn next(self) -> Self {
+        match self {
+            TextOverlay::Human => TextOverlay::CodeDiff,
+            TextOverlay::CodeDiff => TextOverlay::Disagreements,
+            TextOverlay::Disagreements => TextOverlay::Human,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            TextOverlay::Human => "human",
+            TextOverlay::CodeDiff => "codediff",
+            TextOverlay::Disagreements => "disagreements",
+        }
+    }
+}
+
+/// codediff's own text ranges for this case, as painting spans - one list per side.
+///
+/// Goes through `TextDiff::from`, the same projection the real TUI renders and the mapping site
+/// draws, so what shows here is what codediff actually produces rather than a second
+/// interpretation of its node mapping that could drift from it.
+fn codediff_text_spans(before: &Code, after: &Code) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
+    let diff = diff_code(before, after);
+    let Some(ast_diff) = diff.ast.as_ref() else {
+        return [Vec::new(), Vec::new()];
+    };
+    let node_cache = NodeCache::build(before, after);
+    let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
+
+    let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
+        ranges
+            .into_iter()
+            .filter(|range_match| !range_match.source.is_empty())
+            .filter_map(|range_match| {
+                let verdict = match range_match.operation {
+                    codediff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
+                    codediff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
+                    codediff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
+                    codediff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
+                    // Identical text is the unpainted background on both sides of this comparison.
+                    _ => return None,
+                };
+                Some((
+                    HumanTextSpan {
+                        start_row: range_match.source.start_row,
+                        start_column: range_match.source.start_column,
+                        end_row: range_match.source.end_row,
+                        end_column: range_match.source.end_column,
+                    },
+                    verdict,
+                ))
+            })
+            .collect()
+    };
+    [convert(text_diff.all(0)), convert(text_diff.all(1))]
+}
+
+/// The spans where the human's painting and codediff's rendering disagree, labelled with the
+/// human's verdict.
+///
+/// Computed here rather than through `text_mapping_disagreements` because that one compares the
+/// painting against the *tree* mapping, which is a different question: this view is about the
+/// human's text against codediff's text, with no node mapping in between.
+fn overlay_disagreement_spans(
+    painted: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
+    algo: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
+    before_src: &str,
+    after_src: &str,
+) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
+    let mut out = [Vec::new(), Vec::new()];
+    for (side, source) in [(0usize, before_src), (1usize, after_src)] {
+        let lines: Vec<&str> = source.split('\n').collect();
+        for (row, line) in lines.iter().enumerate() {
+            // One pass per row, coalescing adjacent disagreeing columns into a single span so a
+            // whole differing line shows as one range rather than eighty.
+            let mut run_start: Option<usize> = None;
+            let mut run_verdict = HumanTextVerdict::Update;
+            let push = |start: usize, end: usize, verdict, out: &mut Vec<_>| {
+                out.push((
+                    HumanTextSpan {
+                        start_row: row,
+                        start_column: start,
+                        end_row: row,
+                        end_column: end,
+                    },
+                    verdict,
+                ));
+            };
+            for (column, _) in line.char_indices() {
+                let human = verdict_at(&painted[side], row, column, line.len());
+                let theirs = verdict_at(&algo[side], row, column, line.len());
+                if human == theirs {
+                    if let Some(start) = run_start.take() {
+                        push(start, column, run_verdict, &mut out[side]);
+                    }
+                    continue;
+                }
+                // Colour by whichever side has an opinion, preferring the human's - the reader is
+                // checking their own work, so "what I said" is the more useful signal.
+                let verdict = human.or(theirs).unwrap_or(HumanTextVerdict::Update);
+                match run_start {
+                    Some(_) if run_verdict == verdict => {}
+                    Some(start) => {
+                        push(start, column, run_verdict, &mut out[side]);
+                        run_start = Some(column);
+                        run_verdict = verdict;
+                    }
+                    None => {
+                        run_start = Some(column);
+                        run_verdict = verdict;
+                    }
+                }
+            }
+            if let Some(start) = run_start {
+                push(start, line.len(), run_verdict, &mut out[side]);
+            }
+        }
+    }
+    out
+}
+
+/// The verdict covering `(row, column)`, or `None` where nothing does.
+fn verdict_at(
+    spans: &[(HumanTextSpan, HumanTextVerdict)],
+    row: usize,
+    column: usize,
+    row_len: usize,
+) -> Option<HumanTextVerdict> {
+    spans
+        .iter()
+        .find(|(span, _)| span_covers(*span, row, column, row_len))
+        .map(|(_, verdict)| *verdict)
 }
 
 /// Cursor, selection and scroll for the `t` text-painting view, one set per side.
@@ -1342,17 +1675,6 @@ impl TextPaintState {
     }
 }
 
-/// The text mapping, created empty on first paint.
-///
-/// Creating it here is what turns `None` ("nobody has painted this fixture") into `Some` ("this
-/// fixture has been painted"), which is the distinction the field's `Option` exists to preserve -
-/// so a fixture whose painting is genuinely empty still has to be reached deliberately, via `Z`.
-fn text_mapping_mut(app: &mut App) -> &mut codediff::test::helper::human_mapping::HumanTextMapping {
-    app.mapping
-        .text_mapping
-        .get_or_insert_with(Default::default)
-}
-
 /// `m`: pairs the two sides' current selections into a `Match`.
 ///
 /// Needs a selection on *both* sides, deliberately: that mirrors the tree's own `m`, which pairs
@@ -1382,7 +1704,8 @@ fn action_paint_match(
     // move-versus-update is derived from the two spans' contents and is the one part of this they
     // don't control directly.
     let verdict = entry.verdict(before_src, after_src);
-    text_mapping_mut(app).entries.push(entry);
+    let solution = app.text_solution.clone();
+    solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor = [None; 2];
     app.status = Some(match verdict {
@@ -1431,7 +1754,8 @@ fn action_paint_one_sided(
             after: Some(span),
         }
     };
-    text_mapping_mut(app).entries.push(entry);
+    let solution = app.text_solution.clone();
+    solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor[side] = None;
     app.status = Some(match operation {
@@ -1451,16 +1775,14 @@ fn action_paint_unmark(app: &mut App, state: &TextPaintState, before_src: &str, 
     let (row, column) = state.cursor[side];
     let row_len = TextPaintState::row_text(source, row).len();
 
-    let Some(text_mapping) = app.mapping.text_mapping.as_mut() else {
-        app.status = Some("Nothing painted here".to_string());
-        return;
-    };
-    let before_count = text_mapping.entries.len();
-    text_mapping.entries.retain(|entry| {
+    let solution = app.text_solution.clone();
+    let entries = solution_entries_mut(&mut app.mapping, &solution);
+    let before_count = entries.len();
+    entries.retain(|entry| {
         let span = if side == 0 { entry.before } else { entry.after };
         !span.is_some_and(|span| span_covers(span, row, column, row_len))
     });
-    let removed = before_count - text_mapping.entries.len();
+    let removed = before_count - entries.len();
     if removed == 0 {
         app.status = Some("Nothing painted here".to_string());
         return;
@@ -1475,19 +1797,16 @@ fn action_paint_unmark(app: &mut App, state: &TextPaintState, before_src: &str, 
 /// case is indistinguishable from an unvisited fixture, since both would leave `text_mapping` at
 /// `None`, and a completeness count would quietly under-report forever.
 fn action_paint_mark_empty(app: &mut App) {
-    if app
-        .mapping
-        .text_mapping
-        .as_ref()
-        .is_some_and(|text_mapping| !text_mapping.entries.is_empty())
-    {
-        app.status =
-            Some("This fixture already has painted ranges - u removes them one at a time".into());
+    let solution = app.text_solution.clone();
+    if !solution_entries(&app.mapping, &solution).is_empty() {
+        app.status = Some(format!(
+            "'{solution}' already has painted ranges - u removes them one at a time"
+        ));
         return;
     }
-    text_mapping_mut(app);
+    solution_entries_mut(&mut app.mapping, &solution);
     app.dirty = true;
-    app.status = Some("Marked as painted with no changes (save with s)".to_string());
+    app.status = Some(format!("Marked '{solution}' as painted with no changes"));
 }
 
 /// A blocking prompt raised by `m`/`M` that needs a direct human answer before the mapping entry
@@ -1590,6 +1909,22 @@ enum Modal {
     /// (see `HumanTextMapping`), which is a second, independent account of the same diff that the
     /// tree mapping cannot supply. `T` while open switches to `UnixDiffView` instead.
     TextView { state: TextPaintState },
+    /// Raised by `s` (saving) or `L` (loading) inside the text view: which named painting
+    /// (`HumanMapping::text_mappings`) to store the current ranges under, or to switch to editing.
+    ///
+    /// `names` is `solution_picker_names`' output - this fixture's existing paintings first, then
+    /// whichever of `SUGGESTED_SOLUTION_NAMES` it doesn't have - and the list always renders one
+    /// extra row past its end for a free-form name, which `new_name` fills in once typing starts.
+    /// `state` is carried so closing this picker returns to the text view exactly where it was.
+    SolutionPicker {
+        names: Vec<String>,
+        selected: usize,
+        /// `true` for `s` (save the current ranges under the chosen name), `false` for `L` (just
+        /// switch which painting is being edited). The two differ only in what `Enter` does.
+        saving: bool,
+        new_name: Option<String>,
+        state: TextPaintState,
+    },
     /// Raised by `T`: shows the output of running the system `diff -u` between the before and
     /// after content -- a plain line-based diff, as a point of comparison against codediff's own
     /// AST-based diff (`p`). `t` while open switches to `TextView` instead.
@@ -1713,6 +2048,17 @@ struct App {
     /// lazy-once-per-session contract `diff_completeness` has - though this scan is much cheaper,
     /// since it skims JSON rather than parsing source with tree-sitter.
     diff_text_painted: Option<std::collections::HashMap<String, bool>>,
+    /// What the `t` view is painting on screen (see `TextOverlay`) - the human's own ranges,
+    /// codediff's, or only where they differ. Cycled by `p` inside that view.
+    text_overlay: TextOverlay,
+    /// codediff's own text ranges for the open case, per side, computed on first use and dropped
+    /// when the case changes. `None` until `p` has cycled past `Human` at least once - running the
+    /// diff costs real time on a large fixture, and the default view never needs it.
+    algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
+    /// Which named text painting (`HumanMapping::text_mappings`) the `t` view is editing. Starts
+    /// at the fixture's first existing painting, or `SUGGESTED_SOLUTION_NAMES[0]` when it has
+    /// none, and is changed by `s` (save-as) / `L` (load) inside that view.
+    text_solution: String,
     /// Cache of, for every case `list_available_cases` lists, whether it has at least one
     /// `NodeStatus::Unmarked` node left (see `diff_case_is_incomplete`) - `None` until the first
     /// time `H` is pressed inside the `o` picker, since scanning the whole corpus (parsing every
@@ -1744,6 +2090,9 @@ impl App {
         after_root_id: usize,
         mapping: HumanMapping,
     ) -> Self {
+        // Start on whichever painting this fixture already has, so reopening a case resumes where
+        // it was left rather than silently starting a second, near-duplicate solution.
+        let text_solution = starting_solution(&mapping);
         Self {
             name,
             origin,
@@ -1767,6 +2116,9 @@ impl App {
             diff_hide_complete: false,
             diff_hide_painted: false,
             diff_text_painted: None,
+            text_solution,
+            text_overlay: TextOverlay::default(),
+            algo_text_spans: None,
             diff_completeness: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
@@ -3883,6 +4235,9 @@ fn draw_ui(
             std::str::from_utf8(before_src).unwrap_or(""),
             std::str::from_utf8(after_src).unwrap_or(""),
             &app.mapping,
+            &app.text_solution,
+            app.text_overlay,
+            app.algo_text_spans.as_ref(),
             app.diff_completeness.as_ref(),
             app.diff_text_painted.as_ref(),
         );
@@ -3945,6 +4300,9 @@ fn render_modal(
     before_src: &str,
     after_src: &str,
     mapping: &HumanMapping,
+    text_solution: &str,
+    text_overlay: TextOverlay,
+    algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     diff_completeness: Option<&std::collections::HashMap<String, bool>>,
     diff_text_painted: Option<&std::collections::HashMap<String, bool>>,
 ) {
@@ -4076,7 +4434,35 @@ fn render_modal(
             ),
         ),
         Modal::TextView { state } => {
-            render_text_view_modal(frame, area, before_src, after_src, mapping, state);
+            render_text_view_modal(
+                frame,
+                area,
+                before_src,
+                after_src,
+                mapping,
+                text_solution,
+                text_overlay,
+                algo_text_spans,
+                state,
+            );
+        }
+        Modal::SolutionPicker {
+            names,
+            selected,
+            saving,
+            new_name,
+            ..
+        } => {
+            render_solution_picker(
+                frame,
+                area,
+                names,
+                *selected,
+                text_solution,
+                *saving,
+                new_name.as_deref(),
+                mapping,
+            );
         }
         Modal::UnixDiffView { output, scroll } => {
             render_unix_diff_modal(frame, area, output, *scroll);
@@ -4131,15 +4517,12 @@ fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
 /// notice and fix it, so refusing to draw would take away the only tool for the job.
 fn painted_spans(
     mapping: &HumanMapping,
+    solution: &str,
     side: usize,
     before_src: &str,
     after_src: &str,
 ) -> Vec<(HumanTextSpan, HumanTextVerdict)> {
-    let Some(text_mapping) = mapping.text_mapping.as_ref() else {
-        return Vec::new();
-    };
-    text_mapping
-        .entries
+    solution_entries(mapping, solution)
         .iter()
         .filter_map(|entry| {
             let verdict = entry.verdict(before_src, after_src).ok()?;
@@ -4149,14 +4532,17 @@ fn painted_spans(
         .collect()
 }
 
+/// The four operation colours, taken from the shared overlay palette rather than hardcoded - so a
+/// painted range here looks exactly like the same range does in the `codediff` TUI.
 fn verdict_style(verdict: HumanTextVerdict) -> Style {
+    let palette = overlay_palette();
     let color = match verdict {
-        HumanTextVerdict::Move => Color::Magenta,
-        HumanTextVerdict::Update => Color::Yellow,
-        HumanTextVerdict::Delete => Color::Red,
-        HumanTextVerdict::Insert => Color::Green,
+        HumanTextVerdict::Move => palette.move_bg,
+        HumanTextVerdict::Update => palette.update_bg,
+        HumanTextVerdict::Delete => palette.delete_bg,
+        HumanTextVerdict::Insert => palette.insert_bg,
     };
-    Style::default().bg(color).fg(Color::Black)
+    Style::default().bg(color).fg(palette.overlay_fg)
 }
 
 /// What one byte of a row should be drawn as. Ordered so the highest-precedence class wins a
@@ -4262,7 +4648,14 @@ fn paint_class_style(class: PaintClass) -> Style {
     match class {
         PaintClass::Plain => Style::default(),
         PaintClass::Painted(verdict) => verdict_style(verdict),
-        PaintClass::Selected => Style::default().bg(Color::Cyan).fg(Color::Black),
+        // The same colour the TUI paints a cursor's counterpart with: both mean "this is the
+        // region you are pointing at", one live and one committed.
+        PaintClass::Selected => {
+            let palette = overlay_palette();
+            Style::default()
+                .bg(palette.cross_highlight_bg)
+                .fg(palette.overlay_fg)
+        }
         PaintClass::Cursor => Style::default().add_modifier(Modifier::REVERSED),
     }
 }
@@ -4287,6 +4680,7 @@ fn span_covers(span: HumanTextSpan, row: usize, column: usize, row_len: usize) -
     column >= start && column < end
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Renders the `t` text-painting modal: both sides' source, side by side, with the human's painted
 /// ranges on top and an independent cursor, selection and scroll per side.
 fn render_text_view_modal(
@@ -4295,6 +4689,9 @@ fn render_text_view_modal(
     before_src: &str,
     after_src: &str,
     mapping: &HumanMapping,
+    solution: &str,
+    overlay: TextOverlay,
+    algo_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     state: &TextPaintState,
 ) {
     let popup_area = centered_rect(96, 92, area);
@@ -4308,26 +4705,45 @@ fn render_text_view_modal(
     // Two rows go to the block's own borders.
     let height = popup_area.height.saturating_sub(2) as usize;
 
-    let painted = mapping
-        .text_mapping
-        .as_ref()
-        .map(|text_mapping| text_mapping.entries.len())
-        .unwrap_or(0);
+    let painted = solution_entries(mapping, solution).len();
+    let others = mapping.text_mappings.len().saturating_sub(1);
+
+    // Built once for both panels: the disagreement overlay needs each side's human *and* algo
+    // spans together, so it can't be derived per panel inside the loop below.
+    let human_spans = [
+        painted_spans(mapping, solution, 0, before_src, after_src),
+        painted_spans(mapping, solution, 1, before_src, after_src),
+    ];
+    let empty = [Vec::new(), Vec::new()];
+    let algo = algo_spans.unwrap_or(&empty);
+    let shown = match overlay {
+        TextOverlay::Human => human_spans,
+        TextOverlay::CodeDiff => algo.clone(),
+        TextOverlay::Disagreements => {
+            overlay_disagreement_spans(&human_spans, algo, before_src, after_src)
+        }
+    };
 
     for (side, source, title) in [
         (
             0usize,
             before_src,
-            format!("Before — v sel/d del/m match ({painted} painted)"),
+            format!(
+                "Before [{solution}] {painted} painted — showing {} (p cycles)",
+                overlay.label()
+            ),
         ),
         (
             1usize,
             after_src,
-            "After — v sel/i ins/u unmark/Tab/Esc".to_string(),
+            if others > 0 {
+                format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
+            } else {
+                "After — v sel/i ins/u unmark, s save-as, Tab, Esc".to_string()
+            },
         ),
     ] {
-        let spans = painted_spans(mapping, side, before_src, after_src);
-        let lines = render_paint_side(source, &spans, state, side, height);
+        let lines = render_paint_side(source, &shown[side], state, side, height);
         let border_style = if state.side == side {
             Style::default()
                 .fg(Color::Cyan)
@@ -4345,6 +4761,90 @@ fn render_text_view_modal(
             columns[side],
         );
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Renders the solution picker raised by `s`/`L` inside the text view: which named painting to
+/// save the current ranges under, or to switch to editing.
+fn render_solution_picker(
+    frame: &mut Frame,
+    area: Rect,
+    names: &[String],
+    selected: usize,
+    current: &str,
+    saving: bool,
+    new_name: Option<&str>,
+    mapping: &HumanMapping,
+) {
+    let popup_area = centered_rect(56, 50, area);
+    frame.render_widget(Clear, popup_area);
+
+    let mut items: Vec<ListItem> = names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            let count = solution_entries(mapping, name).len();
+            let exists = mapping
+                .text_mappings
+                .iter()
+                .any(|named| named.name == *name);
+            let label = if !exists {
+                format!("{name}  (new)")
+            } else if name == current {
+                format!("{name}  ({count} range(s), editing now)")
+            } else {
+                format!("{name}  ({count} range(s))")
+            };
+            let style = if index == selected {
+                Style::default().bg(Color::Yellow).fg(Color::Black)
+            } else if name == current {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(label, style)))
+        })
+        .collect();
+
+    // The free-form entry always sits last, so its index is `names.len()` - the one position the
+    // key handler treats specially.
+    let typing = new_name.is_some();
+    let free_form = new_name.unwrap_or("");
+    let free_label = if typing {
+        format!("New name: {free_form}_")
+    } else {
+        "New name...".to_string()
+    };
+    items.push(ListItem::new(Line::from(Span::styled(
+        free_label,
+        if selected == names.len() {
+            Style::default().bg(Color::Yellow).fg(Color::Black)
+        } else {
+            Style::default()
+        },
+    ))));
+
+    let title = if typing {
+        "Type a name — Enter confirm, Esc back".to_string()
+    } else if saving {
+        format!("Branch '{current}' to — Enter copy, e empty, Esc cancel")
+    } else {
+        "Switch to painting — j/k, Enter, Esc cancel".to_string()
+    };
+
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title)
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+        ),
+        popup_area,
+    );
 }
 
 /// Renders the `T` (unix diff) modal: the already-computed output of `diff -u` between the before
@@ -4766,6 +5266,12 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_text_spans = None;
+                    app.text_overlay = TextOverlay::default();
+                    // Follow the newly-opened case's own paintings rather than carrying the last
+                    // case's solution name into it, which would silently start a second, near-
+                    // duplicate painting under a name that means nothing here.
+                    app.text_solution = starting_solution(&app.mapping);
                     app.before_multi_select.clear();
                     app.after_multi_select.clear();
                     app.status = Some(format!("Opened '{}'", app.name));
@@ -4788,6 +5294,12 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_text_spans = None;
+                    app.text_overlay = TextOverlay::default();
+                    // Follow the newly-opened case's own paintings rather than carrying the last
+                    // case's solution name into it, which would silently start a second, near-
+                    // duplicate painting under a name that means nothing here.
+                    app.text_solution = starting_solution(&app.mapping);
                     app.before_multi_select.clear();
                     app.after_multi_select.clear();
                     app.status = Some(format!(
@@ -4824,6 +5336,12 @@ fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_text_spans = None;
+                    app.text_overlay = TextOverlay::default();
+                    // Follow the newly-opened case's own paintings rather than carrying the last
+                    // case's solution name into it, which would silently start a second, near-
+                    // duplicate painting under a name that means nothing here.
+                    app.text_solution = starting_solution(&app.mapping);
                     app.before_multi_select.clear();
                     app.after_multi_select.clear();
                 }
@@ -5012,6 +5530,8 @@ fn run_case_session(
                 &frame_state.caches,
                 frame_state.before_src,
                 frame_state.after_src,
+                before,
+                after,
             );
         } else {
             handle_key(
@@ -5540,6 +6060,10 @@ fn handle_modal_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
+    // Needed only by the text view's `p` (running codediff to show its own rendering), but the
+    // modal handler is one function, so it takes the pair the same way `handle_key` does.
+    before: &Code,
+    after: &Code,
 ) -> Option<OpenTarget> {
     let modal = app.modal.take()?;
 
@@ -6193,6 +6717,70 @@ fn handle_modal_key(
                 ),
                 KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
                 KeyCode::Char('Z') => action_paint_mark_empty(app),
+                KeyCode::Char('p') => {
+                    let next = app.text_overlay.next();
+                    // Computed on the first cycle away from `Human` and kept for the rest of the
+                    // case: running codediff is real work on a large fixture, and the default view
+                    // never needs it.
+                    if next != TextOverlay::Human && app.algo_text_spans.is_none() {
+                        app.algo_text_spans = Some(codediff_text_spans(before, after));
+                    }
+                    app.text_overlay = next;
+                    app.status = Some(match next {
+                        TextOverlay::Human => "Showing your painting".to_string(),
+                        TextOverlay::CodeDiff => "Showing codediff's own diff".to_string(),
+                        TextOverlay::Disagreements => {
+                            let differing: usize = app
+                                .algo_text_spans
+                                .as_ref()
+                                .map(|_| {
+                                    overlay_disagreement_spans(
+                                        &[
+                                            painted_spans(
+                                                &app.mapping,
+                                                &app.text_solution,
+                                                0,
+                                                before_text,
+                                                after_text,
+                                            ),
+                                            painted_spans(
+                                                &app.mapping,
+                                                &app.text_solution,
+                                                1,
+                                                before_text,
+                                                after_text,
+                                            ),
+                                        ],
+                                        app.algo_text_spans.as_ref().expect("just computed"),
+                                        before_text,
+                                        after_text,
+                                    )
+                                    .iter()
+                                    .map(Vec::len)
+                                    .sum()
+                                })
+                                .unwrap_or(0);
+                            if differing == 0 {
+                                "You and codediff agree everywhere".to_string()
+                            } else {
+                                format!("Showing {differing} disagreeing range(s)")
+                            }
+                        }
+                    });
+                }
+                // `s` and `L` both raise the same picker; `saving` is the only difference, and it
+                // decides only what Enter does with the chosen name.
+                KeyCode::Char('s') | KeyCode::Char('L') => {
+                    let saving = matches!(code, KeyCode::Char('s'));
+                    app.modal = Some(Modal::SolutionPicker {
+                        names: solution_picker_names(&app.mapping),
+                        selected: 0,
+                        saving,
+                        new_name: None,
+                        state,
+                    });
+                    return None;
+                }
                 KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
                     Ok(output) => {
                         app.modal = Some(Modal::UnixDiffView { output, scroll: 0 });
@@ -6218,6 +6806,83 @@ fn handle_modal_key(
             } else {
                 state.scroll_into_view(VIEWPORT_ROWS);
                 app.modal = Some(Modal::TextView { state });
+            }
+        }
+        Modal::SolutionPicker {
+            names,
+            selected,
+            saving,
+            new_name,
+            state,
+        } => {
+            let reopen = |app: &mut App, names, selected, new_name| {
+                app.modal = Some(Modal::SolutionPicker {
+                    names,
+                    selected,
+                    saving,
+                    new_name,
+                    state: state.clone(),
+                });
+            };
+            // The free-form row always sits one past the named ones.
+            let free_form_index = names.len();
+
+            match (new_name, code) {
+                // ── typing a new name ────────────────────────────────────────────────────────
+                (Some(mut typed), KeyCode::Char(c)) => {
+                    typed.push(c);
+                    reopen(app, names, selected, Some(typed));
+                }
+                (Some(mut typed), KeyCode::Backspace) => {
+                    typed.pop();
+                    reopen(app, names, selected, Some(typed));
+                }
+                (Some(typed), KeyCode::Enter) => {
+                    if saving {
+                        action_save_solution_as(app, &typed, true);
+                    } else {
+                        action_load_solution(app, typed.trim());
+                    }
+                    app.modal = Some(Modal::TextView { state });
+                }
+                // Esc backs out of typing to the list rather than closing outright, so a mistyped
+                // name costs one key, not the whole picker.
+                (Some(_), KeyCode::Esc) => reopen(app, names, selected, None),
+                (Some(typed), _) => reopen(app, names, selected, Some(typed)),
+
+                // ── choosing from the list ───────────────────────────────────────────────────
+                (None, KeyCode::Up | KeyCode::Char('k')) => {
+                    reopen(app, names, selected.saturating_sub(1), None)
+                }
+                (None, KeyCode::Down | KeyCode::Char('j')) => {
+                    let next = (selected + 1).min(free_form_index);
+                    reopen(app, names, next, None)
+                }
+                (None, KeyCode::Enter) => {
+                    if selected == free_form_index {
+                        reopen(app, names, selected, Some(String::new()));
+                    } else {
+                        let chosen = names[selected].clone();
+                        if saving {
+                            action_save_solution_as(app, &chosen, true);
+                        } else {
+                            action_load_solution(app, &chosen);
+                        }
+                        app.modal = Some(Modal::TextView { state });
+                    }
+                }
+                // `e` is the one-key alternative to Enter: start the chosen name from nothing
+                // instead of from a copy of what is currently painted.
+                (None, KeyCode::Char('e')) if saving && selected < free_form_index => {
+                    let chosen = names[selected].clone();
+                    action_save_solution_as(app, &chosen, false);
+                    app.modal = Some(Modal::TextView { state });
+                }
+                (None, KeyCode::Esc) => {
+                    app.status = Some("Cancelled".to_string());
+                    app.modal = Some(Modal::TextView { state });
+                }
+                (None, _) => reopen(app, names, selected, None),
             }
         }
         Modal::UnixDiffView { output, scroll } => match code {
@@ -7528,6 +8193,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert_eq!(app.last_search.as_deref(), Some("alpha"));
@@ -7568,6 +8235,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert_eq!(
@@ -7607,6 +8276,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(app.last_search.is_none());
@@ -7642,6 +8313,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
         match &app.modal {
             Some(Modal::PromptSearch { input }) => assert_eq!(input, "al"),
@@ -7658,6 +8331,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
         match &app.modal {
             Some(Modal::PromptSearch { input }) => assert_eq!(input, "alx"),
@@ -7685,6 +8360,9 @@ mod tests {
                     "",
                     "",
                     &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
                     None,
                     None,
                 )
@@ -7723,6 +8401,9 @@ mod tests {
                     "",
                     "",
                     &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
                     None,
                     None,
                 )
@@ -7898,6 +8579,295 @@ mod tests {
         );
     }
 
+    /// The picker offers this fixture's own paintings first, then whichever suggestions it lacks -
+    /// so resaving the painting being edited is at the top, not buried under three constants.
+    #[test]
+    fn the_solution_picker_lists_existing_paintings_before_suggestions() {
+        let mut app = test_app();
+        app.mapping.text_mappings = vec![NamedTextMapping {
+            name: "Full".to_string(),
+            mapping: HumanTextMapping::default(),
+        }];
+
+        assert_eq!(
+            solution_picker_names(&app.mapping),
+            vec!["Full", "Minimal", "Only one solution"],
+            "an existing name must not be offered twice"
+        );
+    }
+
+    /// The property this whole feature exists for: a fixture can hold more than one painting at
+    /// once. An earlier version *moved* the ranges to the new name and dropped the old one, so
+    /// however many times you saved you still ended up with exactly one.
+    #[test]
+    fn branching_keeps_both_paintings_on_file() {
+        let (before_src, after_src) = ("gone\n", "\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 3);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+        assert_eq!(app.text_solution, "Minimal");
+
+        action_save_solution_as(&mut app, "Full", true);
+
+        assert_eq!(
+            app.text_solution, "Full",
+            "editing continues on the new one"
+        );
+        assert_eq!(
+            app.mapping.text_mappings.len(),
+            2,
+            "both paintings must survive: {:?}",
+            app.mapping.text_mappings
+        );
+        assert_eq!(solution_entries(&app.mapping, "Minimal").len(), 1);
+        assert_eq!(
+            solution_entries(&app.mapping, "Full").len(),
+            1,
+            "a copy starts from what was painted"
+        );
+    }
+
+    /// Two answers to one edit usually share most of their spans, so `e` (start empty) is the
+    /// rarer option and Enter copies - but both have to be reachable.
+    #[test]
+    fn branching_empty_starts_the_new_painting_from_nothing() {
+        let (before_src, after_src) = ("gone\n", "\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 3);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+
+        action_save_solution_as(&mut app, "Full", false);
+
+        assert_eq!(app.mapping.text_mappings.len(), 2);
+        assert_eq!(solution_entries(&app.mapping, "Minimal").len(), 1);
+        assert!(solution_entries(&app.mapping, "Full").is_empty());
+    }
+
+    /// Picking a name that already exists must never write: merging would leave overlapping
+    /// duplicates, replacing would silently discard somebody's work, and there is no undo here.
+    #[test]
+    fn branching_to_an_existing_name_switches_without_overwriting_it() {
+        let mut app = test_app();
+        app.mapping.text_mappings = vec![
+            NamedTextMapping {
+                name: "Minimal".to_string(),
+                mapping: HumanTextMapping::default(),
+            },
+            NamedTextMapping {
+                name: "Full".to_string(),
+                mapping: HumanTextMapping {
+                    entries: vec![HumanTextEntry {
+                        operation: HumanTextOperation::Delete,
+                        before: Some(HumanTextSpan {
+                            start_row: 0,
+                            start_column: 0,
+                            end_row: 0,
+                            end_column: 4,
+                        }),
+                        after: None,
+                    }],
+                },
+            },
+        ];
+
+        action_save_solution_as(&mut app, "Full", true);
+
+        assert_eq!(app.text_solution, "Full");
+        assert_eq!(app.mapping.text_mappings.len(), 2);
+        assert_eq!(
+            solution_entries(&app.mapping, "Full").len(),
+            1,
+            "the existing painting must be untouched, not merged into or replaced"
+        );
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or("")
+                .contains("already exists"),
+            "the reader has to be told nothing was written: {:?}",
+            app.status
+        );
+    }
+
+    #[test]
+    fn loading_switches_which_painting_is_edited_without_touching_any() {
+        let mut app = test_app();
+        app.mapping.text_mappings = vec![
+            NamedTextMapping {
+                name: "Minimal".to_string(),
+                mapping: HumanTextMapping::default(),
+            },
+            NamedTextMapping {
+                name: "Full".to_string(),
+                mapping: HumanTextMapping::default(),
+            },
+        ];
+
+        action_load_solution(&mut app, "Full");
+
+        assert_eq!(app.text_solution, "Full");
+        assert_eq!(app.mapping.text_mappings.len(), 2);
+        assert!(!app.dirty, "switching which one you edit changes nothing");
+    }
+
+    /// Two paintings must not bleed into each other: painting under one name and switching leaves
+    /// the other empty.
+    #[test]
+    fn ranges_painted_under_one_name_stay_out_of_another() {
+        let (before_src, after_src) = ("gone\n", "\n");
+        let mut app = test_app();
+        let mut state = TextPaintState::default();
+        state.anchor[0] = Some((0, 0));
+        state.cursor[0] = (0, 3);
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+
+        action_load_solution(&mut app, "Full");
+
+        assert_eq!(solution_entries(&app.mapping, "Minimal").len(), 1);
+        assert!(solution_entries(&app.mapping, "Full").is_empty());
+    }
+
+    /// The overlay cycles through all three and back, so `p` is always the only key needed.
+    #[test]
+    fn the_text_overlay_cycles_human_codediff_disagreements() {
+        assert_eq!(TextOverlay::default(), TextOverlay::Human);
+        assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
+        assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
+        assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::Human);
+    }
+
+    /// codediff's own rendering comes through `TextDiff`, the projection the real TUI and the
+    /// mapping site both draw - so what the solver shows is what codediff produces, not a second
+    /// reading of its node mapping.
+    #[test]
+    fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
+        let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
+        let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
+
+        let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+
+        assert!(
+            !before_spans.is_empty(),
+            "a renamed call must show as changed"
+        );
+        assert!(!after_spans.is_empty());
+        // Identical text contributes nothing: the untouched `fn main() {` line is not painted.
+        assert!(
+            before_spans.iter().all(|(span, _)| span.start_row > 0),
+            "row 0 is unchanged and should carry no span: {before_spans:?}"
+        );
+    }
+
+    /// The disagreement overlay is empty exactly when the two accounts agree, which is the signal
+    /// a person painting ground truth is actually looking for.
+    #[test]
+    fn the_disagreement_overlay_is_empty_when_the_two_accounts_match() {
+        let (before_src, after_src) = ("alpha\n", "beta\n");
+        let spans = [
+            vec![(
+                HumanTextSpan {
+                    start_row: 0,
+                    start_column: 0,
+                    end_row: 0,
+                    end_column: 5,
+                },
+                HumanTextVerdict::Update,
+            )],
+            vec![(
+                HumanTextSpan {
+                    start_row: 0,
+                    start_column: 0,
+                    end_row: 0,
+                    end_column: 4,
+                },
+                HumanTextVerdict::Update,
+            )],
+        ];
+
+        let same = overlay_disagreement_spans(&spans, &spans, before_src, after_src);
+        assert!(
+            same[0].is_empty() && same[1].is_empty(),
+            "identical accounts must show nothing: {same:?}"
+        );
+
+        let empty = [Vec::new(), Vec::new()];
+        let differing = overlay_disagreement_spans(&spans, &empty, before_src, after_src);
+        assert!(
+            !differing[0].is_empty(),
+            "text one side calls changed and the other does not must show"
+        );
+    }
+
+    /// The painted ranges use the shared overlay palette, not hardcoded ANSI colours - so a range
+    /// looks the same here as the same range does in the `codediff` TUI.
+    #[test]
+    fn painted_ranges_use_the_shared_overlay_palette() {
+        let palette = OverlayTheme::default().palette();
+
+        assert_eq!(
+            verdict_style(HumanTextVerdict::Move).bg,
+            Some(palette.move_bg)
+        );
+        assert_eq!(
+            verdict_style(HumanTextVerdict::Update).bg,
+            Some(palette.update_bg)
+        );
+        assert_eq!(
+            verdict_style(HumanTextVerdict::Delete).bg,
+            Some(palette.delete_bg)
+        );
+        assert_eq!(
+            verdict_style(HumanTextVerdict::Insert).bg,
+            Some(palette.insert_bg)
+        );
+        assert_eq!(
+            verdict_style(HumanTextVerdict::Move).fg,
+            Some(palette.overlay_fg)
+        );
+    }
+
+    /// Unset means Dracula, which is what makes these render tests deterministic rather than
+    /// dependent on whatever `.codediff.toml` the machine running them happens to hold.
+    #[test]
+    fn the_palette_falls_back_to_the_default_theme_when_none_was_installed() {
+        assert_eq!(
+            overlay_palette().move_bg,
+            OverlayTheme::Dracula.palette().move_bg
+        );
+    }
+
+    /// A live selection is drawn in the same colour the TUI paints a cursor's counterpart: both
+    /// mean "the region you are pointing at".
+    #[test]
+    fn a_selection_uses_the_cross_panel_highlight_colour() {
+        assert_eq!(
+            paint_class_style(PaintClass::Selected).bg,
+            Some(OverlayTheme::default().palette().cross_highlight_bg)
+        );
+    }
+
     /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
     /// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
     /// one line.
@@ -7999,7 +8969,7 @@ mod tests {
 
         action_paint_match(&mut app, &mut state, before_src, after_src);
 
-        let entries = &app.mapping.text_mapping.as_ref().unwrap().entries;
+        let entries = &solution_entries(&app.mapping, &app.text_solution);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].operation, HumanTextOperation::Match);
         assert_eq!(
@@ -8021,7 +8991,7 @@ mod tests {
 
         action_paint_match(&mut app, &mut state, before_src, after_src);
 
-        assert!(app.mapping.text_mapping.is_none(), "nothing was painted");
+        assert!(app.mapping.text_mappings.is_empty(), "nothing was painted");
         assert!(!app.dirty);
         assert!(
             app.status.as_deref().unwrap_or("").contains("both sides"),
@@ -8057,7 +9027,7 @@ mod tests {
             after_src,
         );
 
-        let entries = &app.mapping.text_mapping.as_ref().unwrap().entries;
+        let entries = &solution_entries(&app.mapping, &app.text_solution);
         assert_eq!(entries.len(), 2);
         assert_eq!(
             codediff::test::helper::human_mapping::span_text(
@@ -8094,12 +9064,7 @@ mod tests {
         action_paint_unmark(&mut app, &state, before_src, after_src);
 
         assert!(
-            app.mapping
-                .text_mapping
-                .as_ref()
-                .unwrap()
-                .entries
-                .is_empty(),
+            solution_entries(&app.mapping, &app.text_solution).is_empty(),
             "both halves of the match should be gone"
         );
     }
@@ -8109,12 +9074,16 @@ mod tests {
     #[test]
     fn z_marks_an_unpainted_fixture_as_deliberately_empty() {
         let mut app = test_app();
-        assert!(app.mapping.text_mapping.is_none());
+        assert!(app.mapping.text_mappings.is_empty());
 
         action_paint_mark_empty(&mut app);
 
-        let text_mapping = app.mapping.text_mapping.as_ref().expect("now present");
-        assert!(text_mapping.entries.is_empty());
+        assert_eq!(
+            app.mapping.text_mappings.len(),
+            1,
+            "a named painting exists"
+        );
+        assert!(app.mapping.text_mappings[0].mapping.entries.is_empty());
         assert!(app.dirty);
     }
 
@@ -8136,7 +9105,7 @@ mod tests {
         action_paint_mark_empty(&mut app);
 
         assert_eq!(
-            app.mapping.text_mapping.as_ref().unwrap().entries.len(),
+            solution_entries(&app.mapping, &app.text_solution).len(),
             1,
             "Z must not clear an existing painting"
         );
@@ -8155,18 +9124,21 @@ mod tests {
         let mapping = HumanMapping {
             entries: vec![],
             groups: vec![],
-            text_mapping: Some(codediff::test::helper::human_mapping::HumanTextMapping {
-                entries: vec![HumanTextEntry {
-                    operation: HumanTextOperation::Delete,
-                    before: Some(HumanTextSpan {
-                        start_row: 0,
-                        start_column: 3,
-                        end_row: 0,
-                        end_column: 11,
-                    }),
-                    after: None,
-                }],
-            }),
+            text_mappings: vec![NamedTextMapping {
+                name: "Minimal".to_string(),
+                mapping: HumanTextMapping {
+                    entries: vec![HumanTextEntry {
+                        operation: HumanTextOperation::Delete,
+                        before: Some(HumanTextSpan {
+                            start_row: 0,
+                            start_column: 3,
+                            end_row: 0,
+                            end_column: 11,
+                        }),
+                        after: None,
+                    }],
+                },
+            }],
         };
 
         terminal
@@ -8177,6 +9149,9 @@ mod tests {
                     "fn old_name() {}",
                     "fn new_name() {}",
                     &mapping,
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
                     &TextPaintState::default(),
                 );
             })
@@ -8215,6 +9190,9 @@ mod tests {
                     "fn old_name() {}",
                     "fn new_name() {}",
                     &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
                     &TextPaintState::default(),
                 );
             })
@@ -8514,6 +9492,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         match target {
@@ -8560,6 +9540,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(target.is_none(), "s should not switch cases directly");
@@ -8613,6 +9595,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(
@@ -8654,6 +9638,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
         match &app.modal {
             Some(Modal::OpenCommitPicker { selected, .. }) => assert_eq!(*selected, 0),
@@ -8672,6 +9658,8 @@ mod tests {
                 &caches,
                 source.as_bytes(),
                 source.as_bytes(),
+                &Code::from_string(source, &Language::Rust),
+                &Code::from_string(source, &Language::Rust),
             );
         }
         match &app.modal {
@@ -8709,6 +9697,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(target.is_none());
@@ -8747,6 +9737,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(
@@ -8796,6 +9788,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         match target {
@@ -8849,6 +9843,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(
@@ -8901,6 +9897,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(target.is_none());
@@ -9095,6 +10093,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert_eq!(
@@ -9191,9 +10191,16 @@ mod tests {
     fn help_modal_renders_keybindings() {
         // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
         // clipped by the popup's width or height -- this test is about content, not layout.
-        let backend = ratatui::backend::TestBackend::new(140, 80);
+        //
+        // The height has to stay ahead of HELP_TEXT: the popup takes 90% of it and spends two rows
+        // on borders, so it renders `0.9 * height - 2` lines. At 80 rows that was 70 against a
+        // 73-line reference, and this test started failing for the reference having grown rather
+        // than for anything it exists to check - which had already cost two rounds of trimming
+        // real content to fit a fixture. The modal scrolls (j/k) precisely because the reference
+        // outgrew one screen long ago on any ordinary terminal.
+        let backend = ratatui::backend::TestBackend::new(140, 120);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 140, 80);
+        let area = Rect::new(0, 0, 140, 120);
 
         terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
@@ -9390,6 +10397,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         assert!(
@@ -9462,6 +10471,8 @@ mod tests {
             &caches,
             source.as_bytes(),
             source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
         );
 
         let map = app

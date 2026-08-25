@@ -2455,5 +2455,30 @@
         "range_expression:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": {
+            "start_row": 1,
+            "start_column": 16,
+            "end_row": 1,
+            "end_column": 21
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 1,
+            "start_column": 15,
+            "end_row": 1,
+            "end_column": 17
+          }
+        }
+      ]
+    }
   ]
 }

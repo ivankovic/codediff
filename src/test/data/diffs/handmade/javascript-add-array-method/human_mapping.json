@@ -1253,5 +1253,39 @@
         "property_identifier:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": {
+            "start_row": 1,
+            "start_column": 4,
+            "end_row": 5,
+            "end_column": 5
+          }
+        },
+        {
+          "operation": "Delete",
+          "before": {
+            "start_row": 6,
+            "start_column": 11,
+            "end_row": 6,
+            "end_column": 13
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 1,
+            "start_column": 11,
+            "end_row": 1,
+            "end_column": 32
+          }
+        }
+      ]
+    }
   ]
 }

@@ -1807,5 +1807,27 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": {
+            "start_row": 2,
+            "start_column": 26,
+            "end_row": 2,
+            "end_column": 28
+          },
+          "after": {
+            "start_row": 2,
+            "start_column": 26,
+            "end_row": 2,
+            "end_column": 27
+          }
+        }
+      ]
+    }
   ]
 }

@@ -127,17 +127,24 @@ pub struct HumanMapping {
     /// existing fixture keeps parsing (and re-saving byte-for-byte) unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<MultiMapGroup>,
-    /// The human-painted *text* account of the same diff (see [`HumanTextMapping`]) - a second,
+    /// The human-painted *text* accounts of the same diff (see [`HumanTextMapping`]) - a second,
     /// independent ground truth, deliberately not derived from `entries`.
     ///
-    /// `Option`, not a plain `Vec` like `groups`, because the empty case is meaningful here and
-    /// has to stay distinguishable: `None` is "nobody has painted this fixture yet", while
-    /// `Some` with no entries is "somebody painted it and there was nothing to paint" (two
-    /// identical files). Collapsing those would make a completeness count silently wrong. As with
-    /// `groups`, a file written before this field existed still parses, and one with no text
-    /// mapping still re-saves byte-for-byte unchanged.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text_mapping: Option<HumanTextMapping>,
+    /// A **list of named paintings**, not one painting, because a diff's text rendering often has
+    /// several equally defensible answers where its node mapping has one. Wrapping two statements
+    /// in an `if` can be painted as two moves into a new block or as one update of the enclosing
+    /// region; neither is wrong. This is the text-level counterpart of what [`MultiMapGroup`] does
+    /// for the tree, and it is stored the same way: record every valid answer, and let a checker
+    /// accept a diff that matches any one of them.
+    ///
+    /// An empty list means nobody has painted this fixture. A named painting with no entries means
+    /// somebody painted it and there was nothing to paint (two identical files) - the distinction
+    /// a completeness count needs, carried by the name's presence rather than by an `Option`.
+    ///
+    /// As with `groups`, a file written before this field existed still parses, and one with no
+    /// paintings still re-saves byte-for-byte unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub text_mappings: Vec<NamedTextMapping>,
 }
 
 // ─── Human-painted text ranges ──────────────────────────────────────────────────────────────
@@ -288,6 +295,19 @@ pub struct HumanTextMapping {
     pub entries: Vec<HumanTextEntry>,
 }
 
+/// One painting under a name.
+///
+/// The name is free text. `human_solver` offers `Minimal`, `Full` and `Only one solution` as
+/// starting points - the first two for the common case where a region can be painted tightly or
+/// generously, the third to record that a fixture genuinely has one answer - but nothing requires
+/// those, requires all of them, or requires more than one.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NamedTextMapping {
+    pub name: String,
+    #[serde(flatten)]
+    pub mapping: HumanTextMapping,
+}
+
 /// The text a span covers, or `None` if it falls outside `contents`.
 ///
 /// Rows are split on `'\n'` and columns are byte offsets into a row, matching `TextRange`. A span
@@ -421,34 +441,69 @@ fn label_bytes_from_ranges(
     label_bytes(contents, &spans)
 }
 
-/// Every byte run where the painted text mapping and the tree mapping disagree about what happened
-/// to that text.
+/// How well one named painting agrees with the tree mapping.
+#[derive(Debug, Clone)]
+pub struct TextMappingCheck {
+    /// The name of the painting this result is for.
+    pub solution: String,
+    pub disagreements: Vec<TextMappingDisagreement>,
+}
+
+/// Checks the tree mapping against every painted text solution, and returns the one that agrees
+/// with it best - fewest disagreeing byte runs, ties broken by list order.
 ///
-/// This is the check the two mappings are kept separate *for*. They are independent accounts of
-/// the same edit - one recording which AST nodes correspond, the other what a reader should see -
-/// so neither can be derived from the other and each can be wrong on its own. Where they disagree,
-/// at least one of them is, and the fixture needs a human to look. An empty result is the two
-/// agreeing, which is the only evidence available that either is right.
+/// **Best, not all, and deliberately.** The paintings are alternatives, not conjuncts: a fixture
+/// carrying `Minimal` and `Full` is asserting that either is a correct rendering of the same edit,
+/// exactly as a [`MultiMapGroup`] asserts that any consistent pairing is correct. Requiring the
+/// tree mapping to agree with all of them would fail every fixture that records more than one
+/// answer, which is the opposite of what recording them is for. So a diff is judged against the
+/// answer it came closest to, and the name of that answer comes back with the result so a reader
+/// knows which one was used.
 ///
-/// Compared **per byte**, not per span or per line: the two sources chunk the same edit completely
-/// differently (a painted `Match` covering five lines against a dozen small node-derived ranges),
-/// so comparing spans would report differences in bookkeeping as differences in opinion. Adjacent
-/// bytes carrying the same pair of opinions are then coalesced into one run, so a five-line
-/// disagreement is reported once rather than three hundred times.
-///
-/// `Ok(vec![])` when the fixture has no painted text mapping at all - nothing to check, which is
-/// not the same as agreement and callers that count fixtures should test `text_mapping.is_some()`
-/// themselves rather than reading an empty result as a pass.
+/// `Ok(None)` when nothing has been painted - not the same as agreement, and callers counting
+/// fixtures should test `text_mappings.is_empty()` themselves rather than read `None` as a pass.
 pub fn text_mapping_disagreements(
     mapping: &HumanMapping,
     before: &crate::code::Code,
     after: &crate::code::Code,
-) -> Result<Vec<TextMappingDisagreement>> {
-    let Some(text_mapping) = mapping.text_mapping.as_ref() else {
-        return Ok(Vec::new());
-    };
+) -> Result<Option<TextMappingCheck>> {
+    if mapping.text_mappings.is_empty() {
+        return Ok(None);
+    }
 
-    // The painted side.
+    // The tree side is the same for every painting, so it is built once rather than per solution.
+    let ast_diff = as_ast_diff_for_mapping(mapping, before, after)?;
+    let node_cache = crate::diff::NodeCache::build(before, after);
+    let text_diff = crate::diff::text::TextDiff::from(before, after, &ast_diff, &node_cache);
+    let tree_labels = [
+        label_bytes_from_ranges(&before.contents, &text_diff.all(0)),
+        label_bytes_from_ranges(&after.contents, &text_diff.all(1)),
+    ];
+
+    let mut best: Option<TextMappingCheck> = None;
+    for named in &mapping.text_mappings {
+        let disagreements = disagreements_for(&named.mapping, before, after, &tree_labels)
+            .with_context(|| format!("checking the '{}' text painting", named.name))?;
+        let better = best
+            .as_ref()
+            .is_none_or(|current| disagreements.len() < current.disagreements.len());
+        if better {
+            best = Some(TextMappingCheck {
+                solution: named.name.clone(),
+                disagreements,
+            });
+        }
+    }
+    Ok(best)
+}
+
+/// One painting against already-computed tree labels.
+fn disagreements_for(
+    text_mapping: &HumanTextMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    tree_labels: &[Vec<Option<TextLabel>>; 2],
+) -> Result<Vec<TextMappingDisagreement>> {
     let mut painted_before: Vec<(HumanTextSpan, TextLabel)> = Vec::new();
     let mut painted_after: Vec<(HumanTextSpan, TextLabel)> = Vec::new();
     for entry in &text_mapping.entries {
@@ -461,18 +516,13 @@ pub fn text_mapping_disagreements(
         }
     }
 
-    // The tree side, through exactly the projection every renderer uses.
-    let ast_diff = as_ast_diff_for_mapping(mapping, before, after)?;
-    let node_cache = crate::diff::NodeCache::build(before, after);
-    let text_diff = crate::diff::text::TextDiff::from(before, after, &ast_diff, &node_cache);
-
     let mut disagreements = Vec::new();
-    for (side, contents, painted, ranges) in [
-        (0usize, &before.contents, &painted_before, text_diff.all(0)),
-        (1usize, &after.contents, &painted_after, text_diff.all(1)),
+    for (side, contents, painted) in [
+        (0usize, &before.contents, &painted_before),
+        (1usize, &after.contents, &painted_after),
     ] {
         let painted_labels = label_bytes(contents, painted);
-        let tree_labels = label_bytes_from_ranges(contents, &ranges);
+        let tree_labels = &tree_labels[side];
 
         let mut row_of = RowIndex::new(contents);
         let mut byte = 0usize;
@@ -2683,7 +2733,7 @@ mod tests {
     /// A file with no text mapping must still round-trip byte-for-byte: every fixture in the
     /// corpus predates this field, and re-saving one from the solver must not rewrite them all.
     #[test]
-    fn a_mapping_without_a_text_mapping_serializes_without_the_key() {
+    fn a_mapping_without_a_text_painting_serializes_without_the_key() {
         let mapping = HumanMapping {
             entries: vec![HumanMappingEntry {
                 operation: HumanOperation::Identical,
@@ -2691,32 +2741,36 @@ mod tests {
                 after_path: Some(vec!["source_file:1".to_string()]),
             }],
             groups: vec![],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let json = serde_json::to_string_pretty(&mapping).unwrap();
 
         assert!(!json.contains("text_mapping"), "got: {json}");
         let round_tripped: HumanMapping = serde_json::from_str(&json).unwrap();
-        assert!(round_tripped.text_mapping.is_none());
+        assert!(round_tripped.text_mappings.is_empty());
     }
 
     /// `None` and `Some(empty)` have to stay distinguishable: "nobody has painted this" is not
     /// "somebody painted it and there was nothing to paint".
     #[test]
-    fn an_empty_text_mapping_is_distinguishable_from_an_absent_one() {
+    fn a_named_but_empty_painting_is_distinguishable_from_no_painting_at_all() {
         let mapping = HumanMapping {
             entries: vec![],
             groups: vec![],
-            text_mapping: Some(HumanTextMapping::default()),
+            text_mappings: vec![NamedTextMapping {
+                name: "Minimal".to_string(),
+                mapping: HumanTextMapping::default(),
+            }],
         };
 
         let json = serde_json::to_string_pretty(&mapping).unwrap();
         let round_tripped: HumanMapping = serde_json::from_str(&json).unwrap();
 
-        assert!(json.contains("text_mapping"), "got: {json}");
-        assert!(round_tripped.text_mapping.is_some());
-        assert!(round_tripped.text_mapping.unwrap().entries.is_empty());
+        assert!(json.contains("text_mappings"), "got: {json}");
+        assert_eq!(round_tripped.text_mappings.len(), 1);
+        assert_eq!(round_tripped.text_mappings[0].name, "Minimal");
+        assert!(round_tripped.text_mappings[0].mapping.entries.is_empty());
     }
 
     #[test]
@@ -2726,19 +2780,26 @@ mod tests {
         let before = crate::code::Code::from_string("let x = 1;\n", &crate::code::Language::Rust);
         let after = crate::code::Code::from_string("let x = 2;\n", &crate::code::Language::Rust);
         let mut mapping = build_full_identical_mapping(&before, &after);
-        mapping.text_mapping = Some(HumanTextMapping {
-            entries: vec![HumanTextEntry {
-                operation: HumanTextOperation::Match,
-                before: Some(span(0, 8, 0, 9)),
-                after: Some(span(0, 8, 0, 9)),
-            }],
-        });
+        mapping.text_mappings = vec![NamedTextMapping {
+            name: "Only one solution".to_string(),
+            mapping: HumanTextMapping {
+                entries: vec![HumanTextEntry {
+                    operation: HumanTextOperation::Match,
+                    before: Some(span(0, 8, 0, 9)),
+                    after: Some(span(0, 8, 0, 9)),
+                }],
+            },
+        }];
 
-        let disagreements = text_mapping_disagreements(&mapping, &before, &after).unwrap();
+        let check = text_mapping_disagreements(&mapping, &before, &after)
+            .unwrap()
+            .expect("a painting exists");
 
+        assert_eq!(check.solution, "Only one solution");
         assert!(
-            disagreements.is_empty(),
-            "expected agreement, got {disagreements:#?}"
+            check.disagreements.is_empty(),
+            "expected agreement, got {:#?}",
+            check.disagreements
         );
     }
 
@@ -2748,15 +2809,21 @@ mod tests {
         let after = crate::code::Code::from_string("let x = 2;\n", &crate::code::Language::Rust);
         let mut mapping = build_full_identical_mapping(&before, &after);
         // Paint the wrong token: `x` instead of the literal that actually changed.
-        mapping.text_mapping = Some(HumanTextMapping {
-            entries: vec![HumanTextEntry {
-                operation: HumanTextOperation::Match,
-                before: Some(span(0, 4, 0, 5)),
-                after: Some(span(0, 4, 0, 5)),
-            }],
-        });
+        mapping.text_mappings = vec![NamedTextMapping {
+            name: "Minimal".to_string(),
+            mapping: HumanTextMapping {
+                entries: vec![HumanTextEntry {
+                    operation: HumanTextOperation::Match,
+                    before: Some(span(0, 4, 0, 5)),
+                    after: Some(span(0, 4, 0, 5)),
+                }],
+            },
+        }];
 
-        let disagreements = text_mapping_disagreements(&mapping, &before, &after).unwrap();
+        let disagreements = text_mapping_disagreements(&mapping, &before, &after)
+            .unwrap()
+            .expect("a painting exists")
+            .disagreements;
 
         assert!(
             !disagreements.is_empty(),
@@ -2818,7 +2885,7 @@ mod tests {
         HumanMapping {
             entries,
             groups: vec![],
-            text_mapping: None,
+            text_mappings: vec![],
         }
     }
 
@@ -2917,7 +2984,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let json = serde_json::to_string_pretty(&mapping)?;
@@ -3650,7 +3717,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: false,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3686,7 +3753,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3726,7 +3793,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: false,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let entries = representative_entries(&mapping, before_root, after_root)?;
@@ -3771,7 +3838,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
@@ -3836,7 +3903,7 @@ mod tests {
                 operation: HumanOperation::Identical,
                 with_children: true,
             }],
-            text_mapping: None,
+            text_mappings: vec![],
         };
 
         let diff = as_ast_diff_for_mapping(&mapping, &before, &after)?;

@@ -2010,5 +2010,39 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 3,
+            "start_column": 17,
+            "end_row": 3,
+            "end_column": 22
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 11,
+            "start_column": 4,
+            "end_row": 11,
+            "end_column": 9
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 3,
+            "start_column": 39,
+            "end_row": 3,
+            "end_column": 40
+          }
+        }
+      ]
+    }
   ]
 }

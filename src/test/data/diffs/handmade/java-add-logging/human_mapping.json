@@ -2782,5 +2782,39 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 2,
+            "start_column": 8,
+            "end_row": 2,
+            "end_column": 57
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 8,
+            "start_column": 8,
+            "end_row": 8,
+            "end_column": 54
+          }
+        },
+        {
+          "operation": "Insert",
+          "after": {
+            "start_row": 11,
+            "start_column": 8,
+            "end_row": 11,
+            "end_column": 52
+          }
+        }
+      ]
+    }
   ]
 }
