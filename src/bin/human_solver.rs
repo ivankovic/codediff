@@ -7181,6 +7181,11 @@ fn action_save(
 ) -> Result<String> {
     human_mapping::save(name, mapping)?;
     let created = ensure_stub_test(name, comment)?;
+    // Only once there is something to score: an unpainted fixture has no painting for the test to
+    // compare against, and a stub for it would fail rather than report a distance.
+    if !mapping.text_mappings.is_empty() {
+        ensure_painting_stub_test(name)?;
+    }
     *dirty = false;
     Ok(if created {
         format!(
@@ -7723,6 +7728,115 @@ fn wrap_comment_lines(comment: &str) -> String {
         .into_iter()
         .map(|line| format!("{PREFIX}{line}\n"))
         .collect()
+}
+
+/// Creates `src/test/painting_agreement/<name>.rs` and lists it, the painting counterpart of
+/// [`ensure_stub_test`]. Returns whether a new file was written.
+///
+/// Only called once a fixture actually has a painting: an unpainted one has nothing to score, and
+/// `assert_matches_human_painting_within_limit` would fail with "paint it first" rather than
+/// report a distance. That is why this is not folded into `ensure_stub_test` - the two ground
+/// truths are finished at different times, and a fixture routinely has a tree mapping months
+/// before anyone paints it.
+///
+/// The stub is clamped at 100.0 rather than 0.0. Nothing in the corpus agrees exactly yet (the
+/// rates run from hundredths of a percent to about 60%), so a fresh 0.0 would fail on the first
+/// run and the writer would have to loosen it - which is exactly the "clamp moved for a reason
+/// that was not a measurement" habit the per-file layout exists to prevent. 100.0 always passes,
+/// and the comment says in plain words that it means nothing until measured.
+fn ensure_painting_stub_test(name: &str) -> Result<bool> {
+    let module = module_name(name);
+    let dir = painting_agreement_dir();
+    let stub_path = dir.join(format!("{module}.rs"));
+
+    let created = if stub_path.exists() {
+        false
+    } else {
+        fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
+        fs::write(&stub_path, painting_stub_contents(name))
+            .with_context(|| format!("writing painting stub to {:?}", stub_path))?;
+        true
+    };
+
+    insert_painting_mod_declaration(&module)?;
+    Ok(created)
+}
+
+/// The contents of a fresh painting stub - pure string building, no filesystem access, so it is
+/// unit-testable without writing into the real `src/test/painting_agreement/`.
+fn painting_stub_contents(name: &str) -> String {
+    format!(
+        "{LICENSE_HEADER}use anyhow::Result;\n\n\
+         use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n\n\
+         #[test]\nfn painting_agreement() -> Result<()> {{\n\
+         \x20   // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it\n\
+         \x20   // reports for both modes, and record that instead.\n\
+         \x20   assert_matches_human_painting_within_limit(\"{name}\", 100.0)\n}}\n"
+    )
+}
+
+/// Adds `mod <module>;` to `src/test/painting_agreement.rs`, keeping the list sorted and the
+/// module doc above it untouched. A module already listed is left alone, so this is idempotent.
+fn insert_painting_mod_declaration(module: &str) -> Result<()> {
+    let mod_file = painting_agreement_mod_file();
+    let content =
+        fs::read_to_string(&mod_file).with_context(|| format!("reading {:?}", mod_file))?;
+
+    let mut lines = content.lines().peekable();
+    let mut header_lines = Vec::new();
+    while let Some(&line) = lines.peek() {
+        if line.trim() == "#[cfg(test)]" {
+            break;
+        }
+        header_lines.push(line.to_string());
+        lines.next();
+    }
+
+    let mut entries: Vec<String> = Vec::new();
+    while let Some(line) = lines.next() {
+        if line.trim() != "#[cfg(test)]" {
+            continue;
+        }
+        let mod_line = lines.next().with_context(|| {
+            format!(
+                "'#[cfg(test)]' not followed by a mod line in {:?}",
+                mod_file
+            )
+        })?;
+        entries.push(mod_line.trim().to_string());
+    }
+
+    let wanted = format!("mod {module};");
+    if !entries.contains(&wanted) {
+        entries.push(wanted);
+    }
+    entries.sort();
+    entries.dedup();
+
+    let mut out = header_lines.join("\n");
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    for entry in entries {
+        out.push_str("#[cfg(test)]\n");
+        out.push_str(&entry);
+        out.push('\n');
+    }
+    fs::write(&mod_file, out).with_context(|| format!("writing {:?}", mod_file))
+}
+
+fn painting_agreement_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("painting_agreement")
+}
+
+fn painting_agreement_mod_file() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("painting_agreement.rs")
 }
 
 /// Adds `#[cfg(test)]\nmod <module>;` to `optimal_solutions/<dataset>.rs`, keeping the list
@@ -9429,6 +9543,27 @@ mod tests {
                 "{key:?} should preserve the frame state"
             );
         }
+    }
+
+    /// The painting stub is clamped at 100.0, not 0.0. Nothing in the corpus agrees exactly yet,
+    /// so a fresh 0.0 would fail on the first run and have to be loosened - which is the "clamp
+    /// moved for a reason that was not a measurement" habit the per-file layout exists to prevent.
+    #[test]
+    fn a_fresh_painting_stub_passes_and_says_it_means_nothing_yet() {
+        let contents = painting_stub_contents("rust-add-if");
+
+        assert!(
+            contents
+                .contains(r#"assert_matches_human_painting_within_limit("rust-add-if", 100.0)"#),
+            "got: {contents}"
+        );
+        assert!(contents.contains("Not measured yet"), "got: {contents}");
+        assert!(
+            contents.contains("fn painting_agreement()"),
+            "the test name has to match the module's convention: {contents}"
+        );
+        // Same licence header every generated file in this repository carries.
+        assert!(contents.starts_with("/*  This file is part of the CodeDiff"));
     }
 
     /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
