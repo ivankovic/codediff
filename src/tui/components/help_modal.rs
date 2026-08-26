@@ -44,7 +44,10 @@ Navigation
   h/j/k/l          Move the cursor left/down/up/right
   Arrow keys       Same as h/j/k/l
   Enter            Jump to the counterpart of the range under the cursor (again: jump back)
-  n/p              Jump to the next/previous change, skipping unchanged lines
+  n/p              Jump to the next/previous change, skipping unchanged lines.
+                   Walks both panels as one ordered sequence, switching sides when
+                   that is where the next change is - so an insertion with nothing
+                   on the before side is reached like any other change.
   g                Go to a line number
   /                Search the focused panel (smart-case; Enter jumps to nearest, Esc cancels)
                    A bare Enter repeats the last search; an empty query clears the highlights

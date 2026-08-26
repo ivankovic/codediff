@@ -22,7 +22,7 @@ use ratatui::{prelude::*, text::Line, widgets::Paragraph};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
-use crate::diff::text::{RangeMatch, RenderMode, ranges_for_mode};
+use crate::diff::text::{RangeMatch, RenderMode, TextOperation, ranges_for_mode};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::theme::{OverlayTheme, PanelLayout};
 
@@ -80,8 +80,14 @@ enum DisplayMode {
     Single,
 }
 
+/// A `(row, column)` position, in whichever file's coordinates the context implies.
+type Position = (usize, usize);
+
+/// One stop in the merged `n`/`p` walk: which panel it is on, and where.
+type ChangeStop = (Panel, Position);
+
 /// Which of the two panels is active.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Panel {
     #[default]
     Before,
@@ -184,16 +190,135 @@ impl DiffViewer {
         self.sync_scroll();
     }
 
-    /// Move the focused panel's cursor to the next (`forward = true`) or previous (`forward =
-    /// false`) actual change (`n`/`p`), and push the resulting matched node onto the other
-    /// panel's cross-highlight, same as any other cursor movement - but centers *both* panels'
-    /// viewports on the destination (see `CodeViewer::jump_to_change`/`sync_scroll_centered`)
-    /// rather than the usual minimal "keep visible" scroll: jumping between scattered changes
-    /// benefits from full context around the target on both sides, not just the focused one.
+    /// Every change in the pair, once each, ordered as a reader meets them going down the diff.
+    ///
+    /// `n`/`p` used to walk one panel at a time, which reads badly: a diff is one sequence of
+    /// edits that happens to be *displayed* in two columns, and stepping through the before column
+    /// to its end before starting on the after column is not the order anybody reads it in. Worse,
+    /// a pure insertion put no stops in the before panel at all, so `n` there had nowhere to go and
+    /// had to stop and ask whether to switch sides.
+    ///
+    /// Each change appears exactly once, on the side that actually holds its text:
+    ///
+    /// * a `Delete` and every paired change (`Update`, `Move`) stop on the **before** side, where
+    ///   the cross-panel highlight already shows the counterpart - so visiting the other half
+    ///   separately would be the same stop twice;
+    /// * an `Insert` has no before-side text, so it stops on the **after** side.
+    ///
+    /// Ordering is in *before-file* coordinates, which is the one space both sides can be compared
+    /// in: a before-side stop sorts by its own position, and an after-side insertion by its
+    /// `destination` - the zero-width position in the before file marking where it belongs. That is
+    /// exactly the placement `TextRange`'s symmetric placeholders exist to record.
+    fn change_stops(&self) -> Vec<ChangeStop> {
+        let mut stops: Vec<(Position, ChangeStop)> = Vec::new();
+
+        let interesting = |range_match: &RangeMatch| {
+            !matches!(
+                range_match.operation,
+                TextOperation::Identical | TextOperation::NotYetSet
+            ) && !range_match.source.is_empty()
+        };
+
+        for range_match in self.left_viewer.ranges().iter().filter(|r| interesting(r)) {
+            let at = (
+                range_match.source.start_row,
+                range_match.source.start_column,
+            );
+            stops.push((at, (Panel::Before, at)));
+        }
+        for range_match in self.right_viewer.ranges().iter().filter(|r| interesting(r)) {
+            // Only the after-side changes with no before-side text of their own: anything paired
+            // was already stopped at on the before side.
+            if !range_match.destination.is_empty() {
+                continue;
+            }
+            let at = (
+                range_match.source.start_row,
+                range_match.source.start_column,
+            );
+            let key = (
+                range_match.destination.start_row,
+                range_match.destination.start_column,
+            );
+            stops.push((key, (Panel::After, at)));
+        }
+
+        // Before the after side at the same key: a deletion and the insertion replacing it read in
+        // that order. Ties within a side keep document order, which the sort's stability preserves.
+        stops.sort_by_key(|(key, (panel, _))| (*key, *panel == Panel::After));
+        stops.dedup_by_key(|(key, stop)| (*key, *stop));
+        stops.into_iter().map(|(_, stop)| stop).collect()
+    }
+
+    /// Where the cursor currently sits in [`change_stops`]' ordering, if it is on a stop.
+    fn current_stop_index(&self, stops: &[ChangeStop]) -> Option<usize> {
+        let cursor = self.focused_cursor_position()?;
+        stops
+            .iter()
+            .position(|&(panel, at)| panel == self.active_panel && at == cursor)
+    }
+
+    /// `n`/`p`: step to the next or previous change anywhere in the pair, switching panels when
+    /// that is where the next one is.
+    ///
+    /// Wraps at both ends, the same convention the single-panel version had. With no stop under
+    /// the cursor - the usual case, since the cursor moves freely - this picks the nearest stop in
+    /// the direction of travel rather than restarting from the top.
     pub fn jump_to_change(&mut self, forward: bool) {
-        self.focused_viewer().jump_to_change(forward);
+        let stops = self.change_stops();
+        if stops.is_empty() {
+            return;
+        }
+        let next = match self.current_stop_index(&stops) {
+            Some(index) if forward => (index + 1) % stops.len(),
+            Some(index) => (index + stops.len() - 1) % stops.len(),
+            // Not on a stop: find where the cursor sits in the ordering and take the neighbour on
+            // the side we are heading for.
+            None => {
+                let cursor = self.focused_cursor_position().unwrap_or((0, 0));
+                let here = (self.active_panel, cursor);
+                let after = stops
+                    .iter()
+                    .position(|&(panel, at)| (panel, at) > here)
+                    .unwrap_or(stops.len());
+                if forward {
+                    after % stops.len()
+                } else {
+                    (after + stops.len() - 1) % stops.len()
+                }
+            }
+        };
+        let (panel, (row, column)) = stops[next];
+        if self.active_panel != panel {
+            self.toggle_active_panel();
+        }
+        self.focused_viewer().set_cursor_position(row, column);
+        // Centre the focused panel too, not just its counterpart: jumping between scattered
+        // changes benefits from context on both sides, and `set_cursor_position` alone only
+        // scrolls the minimum needed to bring the row on screen.
+        self.focused_viewer().scroll_to_center_row(row);
+        self.focused_viewer().scroll_to_show_col(column);
         self.sync_cross_highlight();
         self.sync_scroll_centered();
+    }
+
+    /// `(1-based index, total)` over [`change_stops`] - what the footer's `change N/M` reports.
+    ///
+    /// Counts the *merged* walk, so the total is the number of changes in the diff rather than the
+    /// number in whichever panel happens to be focused. A reader stepping with `n` sees the index
+    /// climb monotonically to the total, across both panels, which is the whole point.
+    pub fn merged_change_count_and_index(&self) -> Option<(usize, usize)> {
+        let stops = self.change_stops();
+        if stops.is_empty() {
+            return None;
+        }
+        let cursor = self.focused_cursor_position()?;
+        let here = (self.active_panel, cursor);
+        let passed = stops
+            .iter()
+            .filter(|&&(panel, at)| (panel, at) <= here)
+            .count();
+        Some((passed.max(1), stops.len()))
     }
 
     /// Move the focused panel's cursor by half a viewport (`Ctrl-d`/`Ctrl-u`), the vim
@@ -308,34 +433,6 @@ impl DiffViewer {
     /// An empty query clears the preview (and returns 0).
     pub fn preview_search(&mut self, query: &str) -> usize {
         self.focused_viewer().preview_search(query)
-    }
-
-    /// `n`/`p`'s actual key handler: jumps normally if the focused panel has a change to jump
-    /// to. If it doesn't, but the *other* panel does (e.g. this is the "before" side of a diff
-    /// that's pure insertions), that's `Action::NoChangesPromptNeeded` instead of a silent no-op,
-    /// so `App` shows `NoChangesDialog` (see its own doc comment) - confirming it calls
-    /// `jump_to_change_on_other_panel` below. If neither panel has any changes at all, there is
-    /// genuinely nothing to offer, so this stays a no-op exactly as before.
-    fn jump_to_change_or_prompt(&mut self, forward: bool) -> Option<Action> {
-        if self.focused_viewer().change_count_and_index().is_some() {
-            self.jump_to_change(forward);
-            return Some(Action::Render);
-        }
-        if self.other_viewer().change_count_and_index().is_some() {
-            return Some(Action::NoChangesPromptNeeded {
-                forward,
-                empty_panel: self.active_panel,
-            });
-        }
-        Some(Action::Render)
-    }
-
-    /// Confirmed via `NoChangesDialog`: switch to the other panel (which has changes - the
-    /// dialog wouldn't have been offered otherwise) and jump `forward`/backward on it, same as a
-    /// normal `n`/`p` jump once there.
-    pub fn jump_to_change_on_other_panel(&mut self, forward: bool) {
-        self.toggle_active_panel();
-        self.jump_to_change(forward);
     }
 
     /// Search the focused panel for `query`, replacing any previous search, and jump its cursor to
@@ -671,8 +768,14 @@ impl Component for DiffViewer {
             // unchanged content entirely - unlike h/j/k/l, which move one character/line at a
             // time regardless of what's there. See `jump_to_change_or_prompt`'s doc comment for
             // what happens when the focused panel has no changes to jump to at all.
-            crossterm::event::KeyCode::Char('n') => Ok(self.jump_to_change_or_prompt(true)),
-            crossterm::event::KeyCode::Char('p') => Ok(self.jump_to_change_or_prompt(false)),
+            crossterm::event::KeyCode::Char('n') => {
+                self.jump_to_change(true);
+                Ok(Some(Action::Render))
+            }
+            crossterm::event::KeyCode::Char('p') => {
+                self.jump_to_change(false);
+                Ok(Some(Action::Render))
+            }
             // >/< jump the cursor between search matches (see the `/` search modal), the same
             // wrap-around convention as n/p - a distinct pair rather than overloading n/p, since
             // help_modal.rs already documents those as change-navigation specifically.
@@ -1458,88 +1561,85 @@ mod tests {
         }
     }
 
-    /// `n`/`p` on the empty "before" side of a pure-insertion diff must not silently do nothing
-    /// (the old, confusing behavior) - it should ask `App` to offer switching to "after" instead.
+    /// `n` on the empty "before" side of a pure-insertion diff walks straight to the change on the
+    /// "after" side, switching panels on the way.
+    ///
+    /// This used to stop and ask, because the walk was per-panel and the before side had no stops
+    /// at all. Merging the two sides into one ordered walk makes the question moot: there is one
+    /// sequence of changes, and `n` goes to the next one wherever it lives.
     #[test]
-    fn jump_to_change_prompts_when_focused_panel_has_no_changes_but_the_other_does() {
+    fn n_crosses_to_the_other_panel_when_that_is_where_the_next_change_is() {
         let mut viewer = DiffViewer::new();
         viewer.load_diff(&pure_insertion_diff_data());
         assert_eq!(viewer.active_panel, Panel::Before);
 
-        let action = viewer.jump_to_change_or_prompt(true);
+        viewer.jump_to_change(true);
+
         assert_eq!(
-            action,
-            Some(Action::NoChangesPromptNeeded {
-                forward: true,
-                empty_panel: Panel::Before,
-            })
+            viewer.active_panel,
+            Panel::After,
+            "the only change is on the after side, so that is where n should land"
         );
-        // Declining (or not yet confirming) must not have moved anything.
-        assert_eq!(viewer.active_panel, Panel::Before);
     }
 
-    /// The same prompt, triggered by `p` instead of `n` - the direction must be carried through
-    /// unchanged so confirming replays the right one.
+    /// The footer's `change N/M` counts the merged walk, so M is the number of changes in the
+    /// diff rather than the number in whichever panel happens to be focused.
     #[test]
-    fn jump_to_change_prompt_carries_the_backward_direction_too() {
+    fn the_change_counter_reports_the_merged_total() {
         let mut viewer = DiffViewer::new();
         viewer.load_diff(&pure_insertion_diff_data());
 
-        let action = viewer.jump_to_change_or_prompt(false);
-        assert_eq!(
-            action,
-            Some(Action::NoChangesPromptNeeded {
-                forward: false,
-                empty_panel: Panel::Before,
-            })
-        );
+        viewer.jump_to_change(true);
+
+        let (_, total) = viewer
+            .merged_change_count_and_index()
+            .expect("a diff with one change should report a total");
+        assert_eq!(total, 1);
     }
 
-    /// Once the *other* panel is focused (e.g. after `Tab`), it's the one with the real changes,
-    /// so `n`/`p` there must jump normally - no prompt.
+    /// `p` crosses panels the same way `n` does - the walk is one ordered sequence in both
+    /// directions.
     #[test]
-    fn jump_to_change_does_not_prompt_when_the_focused_panel_has_changes() {
+    fn p_crosses_to_the_other_panel_too() {
         let mut viewer = DiffViewer::new();
         viewer.load_diff(&pure_insertion_diff_data());
-        viewer.toggle_active_panel(); // focus "after", which has the real change
 
-        let action = viewer.jump_to_change_or_prompt(true);
-        assert_eq!(action, Some(Action::Render));
-        assert_eq!(
-            viewer.right_viewer.state().cursor_row,
-            3,
-            "should have jumped normally"
-        );
+        viewer.jump_to_change(false);
+
+        assert_eq!(viewer.active_panel, Panel::After);
     }
 
-    /// Neither side has any changes at all (e.g. two identical files) - genuinely nothing to
-    /// offer, so this must stay the same silent no-op it always was, not a pointless prompt.
+    /// Landing on the change itself, not merely on the right panel.
     #[test]
-    fn jump_to_change_does_not_prompt_when_neither_panel_has_changes() {
+    fn crossing_panels_lands_on_the_change() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&pure_insertion_diff_data());
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(viewer.right_viewer.state().cursor_row, 3);
+    }
+
+    /// Neither side has any changes at all (e.g. two identical files) - genuinely nothing to go
+    /// to, so this stays the silent no-op it always was.
+    #[test]
+    fn jumping_with_no_changes_anywhere_does_nothing() {
         let mut viewer = DiffViewer::new();
         let mut data = sample_diff_data();
         data.before_contents = "same\n".to_string();
         data.after_contents = "same\n".to_string();
+        data.before_ranges = Vec::new();
+        data.after_ranges = Vec::new();
         viewer.load_diff(&data);
+        let before = (viewer.active_panel, viewer.focused_cursor_position());
 
-        let action = viewer.jump_to_change_or_prompt(true);
-        assert_eq!(action, Some(Action::Render));
-    }
+        viewer.jump_to_change(true);
 
-    /// Confirming the prompt (`Action::NoChangesPromptConfirmed`, handled by `App` calling this)
-    /// must switch focus to the other panel and land on its change, in one step.
-    #[test]
-    fn jump_to_change_on_other_panel_switches_focus_and_jumps() {
-        let mut viewer = DiffViewer::new();
-        viewer.load_diff(&pure_insertion_diff_data());
-        assert_eq!(viewer.active_panel, Panel::Before);
-
-        viewer.jump_to_change_on_other_panel(true);
-
-        assert_eq!(viewer.active_panel, Panel::After);
-        assert_eq!(viewer.right_viewer.state().cursor_row, 3);
-        assert!(viewer.right_viewer.state().is_focused);
-        assert!(!viewer.left_viewer.state().is_focused);
+        assert_eq!(
+            (viewer.active_panel, viewer.focused_cursor_position()),
+            before
+        );
+        assert_eq!(viewer.merged_change_count_and_index(), None);
     }
 
     /// `search` (the `/` modal's Enter) must operate on the focused panel and, like every other

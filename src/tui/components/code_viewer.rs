@@ -123,6 +123,12 @@ impl CodeViewer {
         self.desired_col = None;
     }
 
+    /// This panel's ranges, as last loaded - read by `DiffViewer::change_stops`, which has to see
+    /// both panels' ranges at once to order them into a single walk.
+    pub fn ranges(&self) -> &[RangeMatch] {
+        &self.state.ranges
+    }
+
     /// The destination range matched to wherever the cursor currently sits, i.e. the range the
     /// other panel's cursor should follow.
     pub fn cursor_destination(&self) -> Option<TextRange> {

@@ -42,7 +42,6 @@ use crate::tui::components::{
     file_dialog::FileDialog,
     help_modal::HelpModal,
     line_prompt::LinePrompt,
-    no_changes_dialog::NoChangesDialog,
     search_modal::SearchModal,
     theme_dialog::ThemeDialog,
 };
@@ -68,9 +67,6 @@ pub enum AppScreen {
     Search,
     /// The `g` jump-to-line prompt is open, drawn over the (still-visible) viewer.
     JumpToLine,
-    /// `n`/`p` was pressed on a panel with no changes while the other panel has some -
-    /// `NoChangesDialog` is open, drawn over the (still-visible) viewer, offering to switch.
-    NoChangesPrompt,
 }
 
 /// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
@@ -94,8 +90,7 @@ fn esc_should_quit(screen: AppScreen) -> bool {
         | AppScreen::SelectTheme
         | AppScreen::Help
         | AppScreen::Search
-        | AppScreen::JumpToLine
-        | AppScreen::NoChangesPrompt => false,
+        | AppScreen::JumpToLine => false,
     }
 }
 
@@ -108,7 +103,6 @@ pub struct App {
     file_dialog: Option<FileDialog>,
     theme_dialog: Option<ThemeDialog>,
     help_modal: Option<HelpModal>,
-    no_changes_dialog: Option<NoChangesDialog>,
     search_modal: Option<SearchModal>,
     line_prompt: Option<LinePrompt>,
 
@@ -184,7 +178,6 @@ impl App {
             file_dialog: None,
             theme_dialog: None,
             help_modal: None,
-            no_changes_dialog: None,
             search_modal: None,
             line_prompt: None,
             action_tx,
@@ -424,10 +417,6 @@ impl App {
                 Some(modal) => modal.handle_events(Some(event)),
                 None => Ok(None),
             },
-            AppScreen::NoChangesPrompt => match self.no_changes_dialog.as_mut() {
-                Some(dialog) => dialog.handle_events(Some(event)),
-                None => Ok(None),
-            },
         }
     }
 
@@ -537,13 +526,6 @@ impl App {
                     self.diff_viewer.jump_to_line(*line);
                     self.line_prompt = None;
                     self.screen = AppScreen::Viewer;
-                }
-                Action::NoChangesPromptNeeded {
-                    forward,
-                    empty_panel,
-                } => self.open_no_changes_prompt(*forward, *empty_panel),
-                Action::NoChangesPromptConfirmed { forward } => {
-                    self.confirm_no_changes_prompt(*forward)
                 }
                 _ => {}
             }
@@ -655,7 +637,6 @@ impl App {
         self.theme_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
-        self.no_changes_dialog = None;
         self.line_prompt = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
@@ -695,22 +676,6 @@ impl App {
         self.diff_viewer.set_overlay_theme(selected_theme);
         theme::save_overlay_theme(selected_theme);
         self.theme_dialog = None;
-        self.screen = AppScreen::Viewer;
-    }
-
-    /// `n`/`p` on a panel with no changes while the other panel has some (`Action::
-    /// NoChangesPromptNeeded`, from `DiffViewer::jump_to_change_or_prompt`) - open the
-    /// confirmation dialog instead of the normal (silent, would-be-no-op) jump.
-    fn open_no_changes_prompt(&mut self, forward: bool, empty_panel: Panel) {
-        self.no_changes_dialog = Some(NoChangesDialog::new(forward, empty_panel));
-        self.screen = AppScreen::NoChangesPrompt;
-    }
-
-    /// The user confirmed `NoChangesDialog` (Enter) - switch to the other panel, jump on it, and
-    /// return to the normal viewer screen.
-    fn confirm_no_changes_prompt(&mut self, forward: bool) {
-        self.diff_viewer.jump_to_change_on_other_panel(forward);
-        self.no_changes_dialog = None;
         self.screen = AppScreen::Viewer;
     }
 
@@ -772,7 +737,6 @@ impl App {
                 AppScreen::Help => self.draw_help_modal(frame, area),
                 AppScreen::Search => self.draw_search_modal(frame, area),
                 AppScreen::JumpToLine => self.draw_line_prompt(frame, area),
-                AppScreen::NoChangesPrompt => self.draw_no_changes_dialog(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -848,7 +812,7 @@ impl App {
         // once would risk overflowing the footer's fixed-width left column on a narrow terminal.
         if let Some((index, total)) = self.diff_viewer.focused_search_match_count_and_index() {
             left_parts.push(format!("match {index}/{total}"));
-        } else if let Some((index, total)) = self.diff_viewer.focused_change_count_and_index() {
+        } else if let Some((index, total)) = self.diff_viewer.merged_change_count_and_index() {
             left_parts.push(format!("change {index}/{total}"));
         }
         // `[plain text]` flags that no AST algorithm ran at all (unrecognized language on one
@@ -987,17 +951,6 @@ impl App {
         let (x, y) = modal.cursor_screen_position(popup);
         frame.set_cursor(x, y);
         Ok(())
-    }
-
-    /// Draw the `n`/`p`-no-changes prompt as a popup over the (still-visible) viewer behind it.
-    fn draw_no_changes_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
-        self.draw_viewer(frame, area)?;
-        let Some(dialog) = self.no_changes_dialog.as_mut() else {
-            return Ok(());
-        };
-        let popup = dialog.popup_area(area);
-        frame.render_widget(Clear, popup);
-        dialog.draw(frame, popup)
     }
 }
 
@@ -1549,86 +1502,6 @@ mod tests {
         assert!(app.theme_dialog.is_none());
 
         let _ = std::fs::remove_file(theme::config_path());
-    }
-
-    /// A pure-insertion diff, loaded into a fresh `App`'s viewer: the "before" side is 100%
-    /// `Identical`, so it has zero navigable changes even though "after" has a real one - the
-    /// scenario `NoChangesPromptNeeded`/`NoChangesDialog` exist for. Mirrors `DiffViewer`'s own
-    /// `pure_insertion_diff_data` test fixture; duplicated rather than shared since that one is
-    /// private to `diff_viewer.rs`'s test module.
-    fn app_with_pure_insertion_diff_loaded() -> App {
-        use crate::diff::text::{RangeMatch, TextOperation};
-        use crate::diff::text_range::TextRange;
-
-        let mut app = App::new(4.0, 60.0).expect("construct App");
-        app.diff_viewer.load_diff(&DiffSessionData {
-            before_path: PathBuf::from("before.txt"),
-            after_path: PathBuf::from("after.txt"),
-            before_contents: "a\nb\nc\n".to_string(),
-            after_contents: "a\nb\nc\nd\n".to_string(),
-            before_ranges: vec![
-                RangeMatch {
-                    source: TextRange::new(0, 0, 3, 0),
-                    destination: TextRange::new(0, 0, 3, 0),
-                    operation: TextOperation::Identical,
-                },
-                RangeMatch {
-                    source: TextRange::new(3, 0, 3, 0),
-                    destination: TextRange::new(3, 0, 4, 0),
-                    operation: TextOperation::Insert,
-                },
-            ],
-            after_ranges: vec![
-                RangeMatch {
-                    source: TextRange::new(0, 0, 3, 0),
-                    destination: TextRange::new(0, 0, 3, 0),
-                    operation: TextOperation::Identical,
-                },
-                RangeMatch {
-                    source: TextRange::new(3, 0, 4, 0),
-                    destination: TextRange::new(3, 0, 3, 0),
-                    operation: TextOperation::Insert,
-                },
-            ],
-            comment_only: false,
-            mode: crate::diff::DiffMode::Fast,
-            plain_text_fallback: false,
-        });
-        app
-    }
-
-    #[test]
-    fn open_no_changes_prompt_shows_the_dialog() {
-        let mut app = App::new(4.0, 60.0).expect("construct App");
-
-        app.open_no_changes_prompt(true, Panel::Before);
-
-        assert_eq!(app.screen, AppScreen::NoChangesPrompt);
-        assert!(app.no_changes_dialog.is_some());
-    }
-
-    #[test]
-    fn confirm_no_changes_prompt_switches_panel_jumps_and_returns_to_the_viewer_screen() {
-        let mut app = app_with_pure_insertion_diff_loaded();
-        app.open_no_changes_prompt(true, Panel::Before);
-
-        app.confirm_no_changes_prompt(true);
-
-        assert_eq!(app.screen, AppScreen::Viewer);
-        assert!(app.no_changes_dialog.is_none());
-        assert_eq!(app.diff_viewer.active_panel(), Panel::After);
-        assert_eq!(app.diff_viewer.focused_cursor_position(), Some((3, 0)));
-    }
-
-    #[test]
-    fn handle_dialog_cancelled_resets_the_no_changes_dialog_too() {
-        let mut app = App::new(4.0, 60.0).expect("construct App");
-        app.open_no_changes_prompt(true, Panel::Before);
-
-        app.handle_dialog_cancelled();
-
-        assert_eq!(app.screen, AppScreen::Viewer);
-        assert!(app.no_changes_dialog.is_none());
     }
 
     fn rendered_text(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {

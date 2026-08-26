@@ -20,7 +20,6 @@ pub mod diff_viewer;
 pub mod file_dialog;
 pub mod help_modal;
 pub mod line_prompt;
-pub mod no_changes_dialog;
 pub mod search_modal;
 pub mod theme_dialog;
 
