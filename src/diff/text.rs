@@ -371,7 +371,32 @@ fn ranges(
                                             last_non_move_range.start_row,
                                             last_non_move_range.start_column,
                                         );
-                                if s.start_column == d.start_column && !crossed_backwards {
+                                // A column change means the node was relocated - *unless* it is a
+                                // multi-row node that stayed on its own starting row, in which
+                                // case the shift is text inserted earlier on that line pushing it
+                                // rightwards, and only its first row moved at all.
+                                //
+                                // Marking the whole subtree moved on that evidence over-reports by
+                                // the size of the subtree: adding `const ` to one parameter used
+                                // to paint an entire function body as moved
+                                // (`cpp-add-const-correctness`, where the human paints only the
+                                // inserted `const`).
+                                //
+                                // The two exclusions are both load-bearing, and each was put here
+                                // by a measurement:
+                                //
+                                // * single-row nodes keep the old treatment - the painted corpus
+                                //   holds 16 human-painted moves that are column-only on one row,
+                                //   across six fixtures, so the rule is right there;
+                                // * a multi-row node that *also* changed rows keeps it too - that
+                                //   is a real relocation, and excluding it regressed
+                                //   `rust-add-if` (a block genuinely moved into a new `if`) from
+                                //   0.7% to 56.5% disagreement with its painting.
+                                let shifted_within_its_own_line =
+                                    s.start_row == d.start_row && s.end_row > s.start_row;
+                                let column_shift_is_meaningful = s.start_column != d.start_column
+                                    && !shifted_within_its_own_line;
+                                if !column_shift_is_meaningful && !crossed_backwards {
                                     last_non_move_range = d.clone();
 
                                     new_ranges.push(RangeMatch {

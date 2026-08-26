@@ -50,8 +50,8 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn cpp_add_const_correctness() -> Result<()> {
-    // measured 2026-08-26: minimal 55.971%, full 55.971%
-    assert_matches_human_painting_within_limit("cpp-add-const-correctness", 55.99)
+    // measured 2026-08-26: minimal 22.103%, full 22.103%
+    assert_matches_human_painting_within_limit("cpp-add-const-correctness", 22.12)
 }
 
 #[test]
@@ -68,8 +68,8 @@ fn cpp_add_templates() -> Result<()> {
 
 #[test]
 fn cpp_fix_segfault() -> Result<()> {
-    // measured 2026-08-26: minimal 24.072%, full 24.072%
-    assert_matches_human_painting_within_limit("cpp-fix-segfault", 24.09)
+    // measured 2026-08-26: minimal 2.817%, full 2.817%
+    assert_matches_human_painting_within_limit("cpp-fix-segfault", 2.83)
 }
 
 #[test]
@@ -98,8 +98,8 @@ fn java_add_logging() -> Result<()> {
 
 #[test]
 fn java_fix_array_index() -> Result<()> {
-    // measured 2026-08-26: minimal 43.977%, full 43.977%
-    assert_matches_human_painting_within_limit("java-fix-array-index", 43.99)
+    // measured 2026-08-26: minimal 7.266%, full 7.266%
+    assert_matches_human_painting_within_limit("java-fix-array-index", 7.28)
 }
 
 #[test]
@@ -128,8 +128,8 @@ fn javascript_add_event_listener() -> Result<()> {
 
 #[test]
 fn javascript_fix_promises() -> Result<()> {
-    // measured 2026-08-26: minimal 8.432%, full 3.710%
-    assert_matches_human_painting_within_limit("javascript-fix-promises", 8.45)
+    // measured 2026-08-26: minimal 7.420%, full 2.698%
+    assert_matches_human_painting_within_limit("javascript-fix-promises", 7.43)
 }
 
 #[test]
@@ -140,8 +140,8 @@ fn javascript_refactor_arrow_func() -> Result<()> {
 
 #[test]
 fn kotlin_add_data_class() -> Result<()> {
-    // measured 2026-08-26: minimal 4.255%, full 4.965%
-    assert_matches_human_painting_within_limit("kotlin-add-data-class", 4.98)
+    // measured 2026-08-26: minimal 3.546%, full 5.201%
+    assert_matches_human_painting_within_limit("kotlin-add-data-class", 5.22)
 }
 
 #[test]
@@ -158,8 +158,8 @@ fn kotlin_add_validation() -> Result<()> {
 
 #[test]
 fn kotlin_fix_loop_bug() -> Result<()> {
-    // measured 2026-08-26: minimal 29.361%, full 29.361%
-    assert_matches_human_painting_within_limit("kotlin-fix-loop-bug", 29.38)
+    // measured 2026-08-26: minimal 3.800%, full 3.800%
+    assert_matches_human_painting_within_limit("kotlin-fix-loop-bug", 3.81)
 }
 
 #[test]
@@ -170,8 +170,8 @@ fn kotlin_refactor_function() -> Result<()> {
 
 #[test]
 fn python_add_remove_block() -> Result<()> {
-    // measured 2026-08-26: minimal 2.268%, full 2.268%
-    assert_matches_human_painting_within_limit("python-add-remove-block", 2.28)
+    // measured 2026-08-26: minimal 1.479%, full 1.479%
+    assert_matches_human_painting_within_limit("python-add-remove-block", 1.49)
 }
 
 #[test]
@@ -202,4 +202,46 @@ fn python_bugfix_loop() -> Result<()> {
 fn python_refactoring() -> Result<()> {
     // measured 2026-08-26: minimal 2.611%, full 2.611%
     assert_matches_human_painting_within_limit("python-refactoring", 2.63)
+}
+
+#[test]
+fn rust_add_if() -> Result<()> {
+    // measured 2026-08-26: minimal 44.203%, full 0.725%
+    assert_matches_human_painting_within_limit("rust-add-if", 44.22)
+}
+
+#[test]
+fn rust_add_to_existing_use() -> Result<()> {
+    // measured 2026-08-26: minimal 11.189%, full 4.196%
+    assert_matches_human_painting_within_limit("rust-add-to-existing-use", 11.20)
+}
+
+#[test]
+fn rust_add_value_to_enum() -> Result<()> {
+    // measured 2026-08-26: minimal 0.069%, full 0.069%
+    assert_matches_human_painting_within_limit("rust-add-value-to-enum", 0.08)
+}
+
+#[test]
+fn rust_cost_optimization() -> Result<()> {
+    // measured 2026-08-26: minimal 5.495%, full 5.495%
+    assert_matches_human_painting_within_limit("rust-cost-optimization", 5.51)
+}
+
+#[test]
+fn rust_sniffnet_protocol() -> Result<()> {
+    // measured 2026-08-26: minimal 0.105%, full 0.315%
+    assert_matches_human_painting_within_limit("rust-sniffnet-protocol", 0.33)
+}
+
+#[test]
+fn rust_tauri_api_build_1() -> Result<()> {
+    // measured 2026-08-26: minimal 0.028%, full 0.028%
+    assert_matches_human_painting_within_limit("rust-tauri-api-build-1", 0.04)
+}
+
+#[test]
+fn typescript_async_await() -> Result<()> {
+    // measured 2026-08-26: minimal 30.474%, full 33.634%
+    assert_matches_human_painting_within_limit("typescript-async-await", 33.65)
 }
