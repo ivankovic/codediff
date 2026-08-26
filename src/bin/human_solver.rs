@@ -265,7 +265,9 @@ t              text view: read the source, and paint the human text-range ground
                  s branches the current one to another name, keeping both on
                  file (Enter copies its ranges, e starts empty; Minimal / Full /
                  Only one solution offered, none required, free-form ok); L
-                 switches which one you edit.
+                 switches which one you edit; D twice in either list deletes the
+                 highlighted painting, which is how a fixture painted Only one
+                 solution becomes a Minimal + Full pair.
                  p cycles what is drawn: your painting, codediff's own rendering
                  of the same pair, or only the bytes where the two disagree
 T              view the output of unix `diff -u`, with before/after line numbers
@@ -1397,6 +1399,51 @@ fn action_save_solution_as(app: &mut App, target: &str, copy: bool) {
     });
 }
 
+/// Deletes the painting named `target`, and picks something sensible to edit next.
+///
+/// The way out of a fixture painted `Only one solution` that turns out to need `Minimal` and
+/// `Full` after all: the single painting has to go, or it sits there claiming the rendering is
+/// unambiguous while two paintings next to it say it is not.
+///
+/// Deleting the last painting leaves the fixture *unpainted* - `text_mappings` empty, which is a
+/// different state from a painting with no ranges in it (see `HumanMapping::text_mappings`). That
+/// is the honest outcome and the status line says so, because it is also what the `X` open-picker
+/// filter and `diffs.csv` will report from then on.
+fn action_delete_solution(app: &mut App, target: &str) {
+    let before = app.mapping.text_mappings.len();
+    app.mapping
+        .text_mappings
+        .retain(|named| named.name != target);
+    if app.mapping.text_mappings.len() == before {
+        app.status = Some(format!("No painting called '{target}'"));
+        return;
+    }
+    app.dirty = true;
+
+    // Only the painting being edited forces a move. Deleting some *other* one must leave the
+    // reader where they were - being yanked into a different painting because a third was thrown
+    // away is how you paint ranges into the wrong one without noticing.
+    let was_editing = app.text_solution == target;
+    if was_editing {
+        app.text_solution = starting_solution(&app.mapping);
+    }
+    app.status = Some(if app.mapping.text_mappings.is_empty() {
+        format!("Deleted '{target}' - this fixture is now unpainted (save with s)")
+    } else if was_editing {
+        format!(
+            "Deleted '{target}' - now editing '{}' ({} painting(s) left)",
+            app.text_solution,
+            app.mapping.text_mappings.len()
+        )
+    } else {
+        format!(
+            "Deleted '{target}' - still editing '{}' ({} painting(s) left)",
+            app.text_solution,
+            app.mapping.text_mappings.len()
+        )
+    });
+}
+
 /// Switches which painting the text view is editing, without touching any of them.
 fn action_load_solution(app: &mut App, target: &str) {
     app.text_solution = target.to_string();
@@ -1991,6 +2038,13 @@ enum Modal {
         /// switch which painting is being edited). The two differ only in what `Enter` does.
         saving: bool,
         new_name: Option<String>,
+        /// The painting `D` has been pressed once on, awaiting a second `D` to actually delete it.
+        ///
+        /// Two keystrokes rather than one, and the name carried through rather than an index:
+        /// deleting a painting throws away work that may have taken an hour and there is no undo
+        /// here, so the confirmation has to be about the *painting the reader saw named on screen*
+        /// - not about whichever row the cursor happens to be on by the time the second key lands.
+        confirm_delete: Option<String>,
         state: TextPaintState,
     },
     /// Raised by `T`: shows the output of running the system `diff -u` between the before and
@@ -4524,6 +4578,7 @@ fn render_modal(
             selected,
             saving,
             new_name,
+            confirm_delete,
             ..
         } => {
             render_solution_picker(
@@ -4534,6 +4589,7 @@ fn render_modal(
                 text_solution,
                 *saving,
                 new_name.as_deref(),
+                confirm_delete.as_deref(),
                 mapping,
             );
         }
@@ -4887,6 +4943,7 @@ fn render_solution_picker(
     current: &str,
     saving: bool,
     new_name: Option<&str>,
+    confirm_delete: Option<&str>,
     mapping: &HumanMapping,
 ) {
     let popup_area = centered_rect(56, 50, area);
@@ -4908,7 +4965,12 @@ fn render_solution_picker(
             } else {
                 format!("{name}  ({count} range(s))")
             };
-            let style = if index == selected {
+            let style = if confirm_delete == Some(name.as_str()) {
+                Style::default()
+                    .bg(Color::Red)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else if index == selected {
                 Style::default().bg(Color::Yellow).fg(Color::Black)
             } else if name == current {
                 Style::default().fg(Color::Cyan)
@@ -4937,12 +4999,14 @@ fn render_solution_picker(
         },
     ))));
 
-    let title = if typing {
+    let title = if let Some(doomed) = confirm_delete {
+        format!("Delete '{doomed}'? D again confirms, any other key cancels")
+    } else if typing {
         "Type a name — Enter confirm, Esc back".to_string()
     } else if saving {
-        format!("Branch '{current}' to — Enter copy, e empty, Esc cancel")
+        format!("Branch '{current}' to — Enter copy, e empty, D delete, Esc cancel")
     } else {
-        "Switch to painting — j/k, Enter, Esc cancel".to_string()
+        "Switch to painting — j/k, Enter, D delete, Esc cancel".to_string()
     };
 
     frame.render_widget(
@@ -4952,7 +5016,11 @@ fn render_solution_picker(
                 .title(title)
                 .border_style(
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(if confirm_delete.is_some() {
+                            Color::Red
+                        } else {
+                            Color::Yellow
+                        })
                         .add_modifier(Modifier::BOLD),
                 ),
         ),
@@ -6996,6 +7064,7 @@ fn handle_modal_key(
                         selected: 0,
                         saving,
                         new_name: None,
+                        confirm_delete: None,
                         state,
                     });
                     return None;
@@ -7036,14 +7105,16 @@ fn handle_modal_key(
             selected,
             saving,
             new_name,
+            confirm_delete,
             state,
         } => {
-            let reopen = |app: &mut App, names, selected, new_name| {
+            let reopen = |app: &mut App, names, selected, new_name, confirm_delete| {
                 app.modal = Some(Modal::SolutionPicker {
                     names,
                     selected,
                     saving,
                     new_name,
+                    confirm_delete,
                     state: state.clone(),
                 });
             };
@@ -7054,11 +7125,11 @@ fn handle_modal_key(
                 // ── typing a new name ────────────────────────────────────────────────────────
                 (Some(mut typed), KeyCode::Char(c)) => {
                     typed.push(c);
-                    reopen(app, names, selected, Some(typed));
+                    reopen(app, names, selected, Some(typed), None);
                 }
                 (Some(mut typed), KeyCode::Backspace) => {
                     typed.pop();
-                    reopen(app, names, selected, Some(typed));
+                    reopen(app, names, selected, Some(typed), None);
                 }
                 (Some(typed), KeyCode::Enter) => {
                     if saving {
@@ -7070,20 +7141,20 @@ fn handle_modal_key(
                 }
                 // Esc backs out of typing to the list rather than closing outright, so a mistyped
                 // name costs one key, not the whole picker.
-                (Some(_), KeyCode::Esc) => reopen(app, names, selected, None),
-                (Some(typed), _) => reopen(app, names, selected, Some(typed)),
+                (Some(_), KeyCode::Esc) => reopen(app, names, selected, None, None),
+                (Some(typed), _) => reopen(app, names, selected, Some(typed), None),
 
                 // ── choosing from the list ───────────────────────────────────────────────────
                 (None, KeyCode::Up | KeyCode::Char('k')) => {
-                    reopen(app, names, selected.saturating_sub(1), None)
+                    reopen(app, names, selected.saturating_sub(1), None, None)
                 }
                 (None, KeyCode::Down | KeyCode::Char('j')) => {
                     let next = (selected + 1).min(free_form_index);
-                    reopen(app, names, next, None)
+                    reopen(app, names, next, None, None)
                 }
                 (None, KeyCode::Enter) => {
                     if selected == free_form_index {
-                        reopen(app, names, selected, Some(String::new()));
+                        reopen(app, names, selected, Some(String::new()), None);
                     } else {
                         let chosen = names[selected].clone();
                         if saving {
@@ -7101,11 +7172,37 @@ fn handle_modal_key(
                     action_save_solution_as(app, &chosen, false);
                     app.modal = Some(Modal::TextView { state });
                 }
+                // `D` twice deletes the highlighted painting. Capital, and twice, because there
+                // is no undo: the first press names what is about to go in the picker's title, the
+                // second acts on that name rather than on whatever row the cursor reached in
+                // between. Any other key clears the pending confirmation.
+                (None, KeyCode::Char('D')) if selected < free_form_index => {
+                    let chosen = names[selected].clone();
+                    let exists = app
+                        .mapping
+                        .text_mappings
+                        .iter()
+                        .any(|named| named.name == chosen);
+                    if !exists {
+                        app.status = Some(format!(
+                            "'{chosen}' is only a suggestion - nothing to delete"
+                        ));
+                        reopen(app, names, selected, None, None);
+                    } else if confirm_delete.as_deref() == Some(chosen.as_str()) {
+                        action_delete_solution(app, &chosen);
+                        let names = solution_picker_names(&app.mapping);
+                        let selected = selected.min(names.len());
+                        reopen(app, names, selected, None, None);
+                    } else {
+                        app.status = Some(format!("Press D again to delete '{chosen}'"));
+                        reopen(app, names, selected, None, Some(chosen));
+                    }
+                }
                 (None, KeyCode::Esc) => {
                     app.status = Some("Cancelled".to_string());
                     app.modal = Some(Modal::TextView { state });
                 }
-                (None, _) => reopen(app, names, selected, None),
+                (None, _) => reopen(app, names, selected, None, None),
             }
         }
         Modal::UnixDiffView { output, scroll } => match code {
@@ -8931,6 +9028,199 @@ mod tests {
             vec!["Full", "Minimal", "Only one solution"],
             "an existing name must not be offered twice"
         );
+    }
+
+    /// Opens the solution picker over a fixture holding `paintings`, and presses `keys` in it.
+    ///
+    /// Drives `handle_modal_key` rather than `action_delete_solution`, because that is the layer
+    /// where this feature has already failed once: `x` and `c` were implemented, unit-tested
+    /// through their actions, and unreachable for a week because the key arm was never added.
+    fn press_in_solution_picker(paintings: &[&str], keys: &[KeyCode]) -> App {
+        press_in_solution_picker_editing(paintings, None, keys)
+    }
+
+    /// As above, but editing `editing` rather than whichever painting `starting_solution` picks -
+    /// the only way to reach the case where the deleted painting is *not* the current one.
+    fn press_in_solution_picker_editing(
+        paintings: &[&str],
+        editing: Option<&str>,
+        keys: &[KeyCode],
+    ) -> App {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = test_app();
+        app.mapping.text_mappings = paintings
+            .iter()
+            .map(|name| NamedTextMapping {
+                name: (*name).to_string(),
+                mapping: HumanTextMapping::default(),
+            })
+            .collect();
+        app.text_solution = editing
+            .map(str::to_string)
+            .unwrap_or_else(|| starting_solution(&app.mapping));
+
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::SolutionPicker {
+            names: solution_picker_names(&app.mapping),
+            selected: 0,
+            saving: false,
+            new_name: None,
+            confirm_delete: None,
+            state: TextPaintState::default(),
+        });
+
+        for &code in keys {
+            handle_modal_key(
+                &mut app,
+                code,
+                &flat,
+                &flat,
+                root,
+                root,
+                &caches,
+                source.as_bytes(),
+                source.as_bytes(),
+                &Code::from_string(source, &Language::Rust),
+                &Code::from_string(source, &Language::Rust),
+            );
+        }
+        app
+    }
+
+    fn painting_names(app: &App) -> Vec<String> {
+        app.mapping
+            .text_mappings
+            .iter()
+            .map(|named| named.name.clone())
+            .collect()
+    }
+
+    /// One `D` arms, the second fires. There is no undo for a painting that may have taken an
+    /// hour, so a single keystroke next to `d` (delete-range) must not be able to destroy one.
+    #[test]
+    fn deleting_a_painting_takes_two_presses_of_d() {
+        let armed = press_in_solution_picker(&["Full", "Minimal"], &[KeyCode::Char('D')]);
+        assert_eq!(
+            painting_names(&armed),
+            vec!["Full", "Minimal"],
+            "one D must only arm the confirmation"
+        );
+        match &armed.modal {
+            Some(Modal::SolutionPicker { confirm_delete, .. }) => {
+                assert_eq!(confirm_delete.as_deref(), Some("Full"))
+            }
+            other => panic!("expected the picker to stay open, got {other:?}"),
+        }
+
+        let deleted = press_in_solution_picker(
+            &["Full", "Minimal"],
+            &[KeyCode::Char('D'), KeyCode::Char('D')],
+        );
+        assert_eq!(painting_names(&deleted), vec!["Minimal"]);
+    }
+
+    /// The case this exists for: a fixture painted once turns out to need a Minimal and a Full
+    /// answer, so the single painting has to go before the pair can be made.
+    #[test]
+    fn deleting_the_last_painting_leaves_the_fixture_unpainted() {
+        let app = press_in_solution_picker(
+            &["Only one solution"],
+            &[KeyCode::Char('D'), KeyCode::Char('D')],
+        );
+
+        assert!(
+            app.mapping.text_mappings.is_empty(),
+            "the fixture goes back to unpainted, not to an empty painting - those are different \
+             states, and only the first is what `X` and diffs.csv should report"
+        );
+        assert!(app.dirty, "the deletion still has to be saved");
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or_default()
+                .contains("unpainted"),
+            "the reader has to be told the fixture is now unpainted: {:?}",
+            app.status
+        );
+    }
+
+    /// The confirmation is about a painting, not about a row. Moving the cursor between the two
+    /// presses must not let the second `D` land on whatever ended up highlighted instead.
+    #[test]
+    fn moving_the_cursor_cancels_a_pending_deletion() {
+        let app = press_in_solution_picker(
+            &["Full", "Minimal"],
+            &[KeyCode::Char('D'), KeyCode::Char('j'), KeyCode::Char('D')],
+        );
+
+        assert_eq!(
+            painting_names(&app),
+            vec!["Full", "Minimal"],
+            "j cleared the confirmation, so the second D only re-armed - on Minimal"
+        );
+        match &app.modal {
+            Some(Modal::SolutionPicker { confirm_delete, .. }) => {
+                assert_eq!(confirm_delete.as_deref(), Some("Minimal"))
+            }
+            other => panic!("expected the picker to stay open, got {other:?}"),
+        }
+    }
+
+    /// Deleting a painting you are not editing must not move you. The harness's default always
+    /// deletes the current one (the picker lists it first), so this is the case the other tests
+    /// structurally cannot reach.
+    #[test]
+    fn deleting_another_painting_leaves_you_editing_your_own() {
+        // Three paintings, not two: `starting_solution` returns the *first* survivor, so with two
+        // it happens to return the one being edited anyway and an unguarded reset would look
+        // correct. Deleting "Full" while editing "Custom" leaves "Minimal" first, so the two
+        // behaviours finally differ.
+        let app = press_in_solution_picker_editing(
+            &["Full", "Minimal", "Custom"],
+            Some("Custom"),
+            &[KeyCode::Char('D'), KeyCode::Char('D')],
+        );
+
+        assert_eq!(painting_names(&app), vec!["Minimal", "Custom"]);
+        assert_eq!(
+            app.text_solution, "Custom",
+            "deleting 'Full' has nothing to do with which painting the reader is in"
+        );
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or_default()
+                .contains("still editing"),
+            "{:?}",
+            app.status
+        );
+    }
+
+    /// The picker lists suggestions the fixture has not used yet alongside its real paintings.
+    /// Pressing `D` on one of those is a misunderstanding, not a request, and must not silently
+    /// look like it worked.
+    #[test]
+    fn d_on_an_unused_suggestion_deletes_nothing() {
+        // "Full" exists; "Minimal" and "Only one solution" are offered but unused, so j lands on a
+        // suggestion.
+        let app = press_in_solution_picker(
+            &["Full"],
+            &[KeyCode::Char('j'), KeyCode::Char('D'), KeyCode::Char('D')],
+        );
+
+        assert_eq!(painting_names(&app), vec!["Full"]);
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or_default()
+                .contains("only a suggestion"),
+            "saying so beats an armed confirmation for something that cannot be deleted: {:?}",
+            app.status
+        );
+        assert!(!app.dirty, "nothing changed, so nothing needs saving");
     }
 
     /// The property this whole feature exists for: a fixture can hold more than one painting at
