@@ -10974,6 +10974,78 @@
         "block:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "field_expression:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "reference_expression:1",
+        "array_expression:1",
+        ",:3"
+      ],
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "field_expression:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "reference_expression:1",
+        "array_expression:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "expression_statement:1",
+        "call_expression:1",
+        "field_expression:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "call_expression:1",
+        "arguments:1",
+        "reference_expression:1",
+        "array_expression:1",
+        ",:4"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 19,
+              "start_column": 8,
+              "end_row": 19,
+              "end_column": 15
+            }
+          ]
+        }
+      ]
     }
   ]
 }

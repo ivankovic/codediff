@@ -9509,6 +9509,97 @@
         "declaration_list:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "enum_item:1",
+        "enum_variant_list:1",
+        ",:3"
+      ],
+      "after_path": [
+        "enum_item:1",
+        "enum_variant_list:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "enum_item:1",
+        "enum_variant_list:1",
+        ",:4"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 12,
+              "start_column": 4,
+              "end_row": 13,
+              "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 21,
+              "start_column": 30,
+              "end_row": 21,
+              "end_column": 31
+            }
+          ],
+          "after": [
+            {
+              "start_row": 23,
+              "start_column": 30,
+              "end_row": 23,
+              "end_column": 31
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 23,
+              "start_column": 80,
+              "end_row": 23,
+              "end_column": 95
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 37,
+              "start_column": 16,
+              "end_row": 37,
+              "end_column": 73
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 48,
+              "start_column": 8,
+              "end_row": 48,
+              "end_column": 66
+            }
+          ]
+        }
+      ]
     }
   ]
 }

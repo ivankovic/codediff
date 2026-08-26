@@ -72,7 +72,7 @@ CSharp,Radarr-Radarr.git,219477273675b23a426554896a145d553fc9a319,src/NzbDrone.C
 CSharp,Sonarr-Sonarr.git,8c67a3bdee65aa35bdd82ac8614be875236d88de,src/NzbDrone.Core/DecisionEngine/DownloadDecision.cs,csharp-sonarr-change-type,small,PROMOTED,
 CSharp,Sonarr-Sonarr.git,8ee10adbd4b53fba5be6a870291d3107c1962436,src/Sonarr.Api.V3/Calendar/CalendarFeedController.cs,csharp-sonarr-add-true-to-function-call,small,PROMOTED,
 CSharp,Sonarr-Sonarr.git,9a69222c9a1c42c2571f21e2d4a2e02b90216248,src/NzbDrone.Core/DataAugmentation/Scene/SceneMappingService.cs,csharp-sonarr-add-if-block,small,PROMOTED,
-CSharp,ValveSoftware-openvr,15f0838a0487feb7da60acd39aab8099b994234c,headers/openvr_api.cs,,full,SAMPLED,
+CSharp,ValveSoftware-openvr,15f0838a0487feb7da60acd39aab8099b994234c,headers/openvr_api.cs,csharp-valvesoftware-openvr-add-many-constants-and-fields,full,PROMOTED,
 CSharp,cyanfish-naps2,773837e50f8d4c9a2ce4eda78b88c3aaf3090714,NAPS2.Sdk/Scan/Internal/Sane/SaneScanDriver.cs,csharp-cyanfish-naps2-add-condition-to-if,full,PROMOTED,
 CSharp,dotnet-script-dotnet-script,a99843d4ea2bce37ad2106bbb29149dfe56a10bf,src/Dotnet.Script.Tests/ScriptExecutionTests.cs,csharp-dotnet-script-dotnet-script-remove-two-arguments,full,PROMOTED,
 CSharp,icsharpcode-AvaloniaILSpy,d92df4c5fc3bcc434bb9c8657a18852839b3604a,ILSpy.Core/Languages/CSharpLanguage.cs,csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples,full,PROMOTED,
