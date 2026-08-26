@@ -1,0 +1,86 @@
+#!/bin/bash
+#
+#  This file is part of the CodeDiff code diffing tool.
+#
+#  Copyright (C) 2026 Marko Ivankovic
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Keeps src/test/data/diffs.csv in step with the fixture corpus it describes.
+#
+# The inventory (src/bin/diff_inventory.rs) is entirely derived from src/test/data/diffs/, so a
+# commit that adds, edits or deletes a fixture - or finishes a tree mapping, or paints text ranges -
+# leaves the checked-in CSV describing a corpus that no longer exists. Regenerating by hand works
+# right up until somebody forgets, and a stale inventory is worse than none: it reads as current.
+#
+# Runs *only* when the commit actually touches the corpus, which is a small minority of commits.
+# Everything else exits in one `git diff --cached` and costs nothing.
+#
+# Enable with `make install-hooks` (or `git config core.hooksPath .githooks`). Skip once with
+# `git commit --no-verify`.
+
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+# What the inventory is derived from, and therefore what has to trigger it. `sample.csv` is in the
+# list because the inventory joins its provenance and comment columns per fixture, so editing a
+# comment there changes the CSV just as surely as adding a fixture does.
+CORPUS=("src/test/data/diffs" "src/test/data/sample.csv")
+INVENTORY="src/test/data/diffs.csv"
+
+# ACDMR: added, copied, deleted, modified, renamed - every way a fixture can change. `--cached`,
+# so this asks what is being committed rather than what happens to be lying around.
+staged_fixture_changes="$(git diff --cached --name-only --diff-filter=ACDMR -- "${CORPUS[@]}")"
+if [ -z "$staged_fixture_changes" ]; then
+    exit 0
+fi
+
+# The hook regenerates from the *working tree*, but the commit records the *index*. Those are the
+# same thing only when every fixture change is staged. When they differ, the CSV written here would
+# describe a corpus different from the one being committed - a wrong inventory that looks right,
+# which is precisely the failure this hook exists to prevent. So it stops rather than guessing.
+unstaged="$(git diff --name-only -- "${CORPUS[@]}")"
+untracked="$(git ls-files --others --exclude-standard -- "${CORPUS[@]}")"
+if [ -n "$unstaged$untracked" ]; then
+    echo "pre-commit: this commit changes the corpus, but some of its files are not staged:" >&2
+    # shellcheck disable=SC2001  # one sed is clearer here than a read loop
+    echo "$unstaged$untracked" | sed 's/^/    /' >&2
+    cat >&2 <<'EOF'
+
+The inventory is regenerated from the working tree, so committing now would record a
+src/test/data/diffs.csv describing a corpus different from the one in this commit.
+
+Either stage them too:
+    git add src/test/data/diffs src/test/data/sample.csv
+or commit the fixtures separately from the rest of your work.
+
+To skip this check deliberately, commit with --no-verify and run `make diff-inventory` yourself
+afterwards.
+EOF
+    exit 1
+fi
+
+echo "pre-commit: fixtures changed, regenerating $INVENTORY"
+# `--release`, not a debug build: the inventory parses every fixture with tree-sitter, which takes
+# a couple of seconds optimized and well over a minute unoptimized. The first run after a clean
+# checkout has to compile it, and this crate's release profile is `lto = "fat"` - so say what is
+# happening rather than leaving a silent multi-minute hang at commit time.
+if ! cargo run --quiet --release --features test-fixtures --bin diff_inventory; then
+    echo "pre-commit: diff_inventory failed - see the error above" >&2
+    echo "  (commit with --no-verify to bypass, then fix the inventory separately)" >&2
+    exit 1
+fi
+
+git add "$INVENTORY"
+echo "pre-commit: staged $INVENTORY"

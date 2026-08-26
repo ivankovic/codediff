@@ -44,7 +44,10 @@ install:
 # does not do this automatically just because .githooks/ exists in the repo.
 install-hooks:
 	git config core.hooksPath .githooks
-	@echo "pre-push hook enabled (git config core.hooksPath .githooks) - see .githooks/pre-push"
+	@echo "hooks enabled (git config core.hooksPath .githooks):"
+	@echo "  pre-commit - regenerates src/test/data/diffs.csv when a commit touches the fixture"
+	@echo "               corpus, so the checked-in inventory never goes stale (.githooks/pre-commit)"
+	@echo "  pre-push   - fmt + clippy + site JS tests, the fast subset of CI (.githooks/pre-push)"
 
 # Scores codediff's diffing accuracy against the human-authored ground truth corpus in
 # src/test/data/ - the project's own primary regression gate for any change to the diff
@@ -52,6 +55,13 @@ install-hooks:
 # fixture-loading helpers, gated separately from `stats` since it needs no git2/rusqlite.
 benchmark-optimal:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
+
+# Regenerates src/test/data/diffs.csv: one row per fixture with its provenance, size, and how far
+# each of its two ground truths has been taken. Cheap and fully derived from the corpus, so re-run
+# it after adding fixtures, finishing a tree mapping, or painting text ranges - the file is
+# checked in so the inventory is readable without running anything, not because it is authored.
+diff-inventory:
+	cargo run --release --features test-fixtures --bin diff_inventory
 
 QUALITY_BASELINE := research/data/quality/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
