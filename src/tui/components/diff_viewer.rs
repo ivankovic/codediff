@@ -22,6 +22,7 @@ use ratatui::{prelude::*, text::Line, widgets::Paragraph};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
+use crate::diff::text::{RangeMatch, RenderMode, ranges_for_mode};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::theme::{OverlayTheme, PanelLayout};
 
@@ -57,6 +58,16 @@ pub struct DiffViewer {
     /// frame).
     last_before_content: Option<Rect>,
     last_after_content: Option<Rect>,
+
+    /// The mode the diff is painted in (the `M` key) - see `crate::diff::text::RenderMode`.
+    render_mode: RenderMode,
+    /// The unfiltered ranges and sources from the last `load_diff`, per side (0 = before).
+    ///
+    /// Kept so `set_render_mode` can re-apply the filter without a reload: `load_diff` resets the
+    /// cursor and the cross-panel highlight, which is right when a new diff arrives and wrong when
+    /// the reader merely asked to see more or less of the one already on screen.
+    full_ranges: [Vec<RangeMatch>; 2],
+    sources: [String; 2],
 }
 
 /// Display mode for the diff viewer
@@ -106,11 +117,48 @@ impl DiffViewer {
             .load_contents(data.before_path.clone(), data.before_contents.clone());
         self.right_viewer
             .load_contents(data.after_path.clone(), data.after_contents.clone());
-        self.left_viewer.set_ranges(data.before_ranges.clone());
-        self.right_viewer.set_ranges(data.after_ranges.clone());
+        self.full_ranges = [data.before_ranges.clone(), data.after_ranges.clone()];
+        self.sources = [data.before_contents.clone(), data.after_contents.clone()];
+        self.apply_render_mode();
         self.active_panel = Panel::Before;
         self.sync_focus();
         self.sync_cross_highlight();
+    }
+
+    /// Flip between `Full` and `Minimal` and remember the choice for the next run - the `M` key.
+    pub fn toggle_render_mode(&mut self) {
+        let next = match self.render_mode {
+            RenderMode::Full => RenderMode::Minimal,
+            RenderMode::Minimal => RenderMode::Full,
+        };
+        self.set_render_mode(next);
+        crate::tui::theme::save_render_mode(next);
+    }
+
+    /// Switch how much of the diff is painted, keeping the cursor and scroll where they are.
+    ///
+    /// Re-filters the ranges captured by the last `load_diff` rather than recomputing anything:
+    /// the mapping is identical in both modes, and only how much of it is shown differs.
+    pub fn set_render_mode(&mut self, mode: RenderMode) {
+        self.render_mode = mode;
+        self.apply_render_mode();
+    }
+
+    pub fn render_mode(&self) -> RenderMode {
+        self.render_mode
+    }
+
+    fn apply_render_mode(&mut self) {
+        self.left_viewer.set_ranges(ranges_for_mode(
+            &self.full_ranges[0],
+            &self.sources[0],
+            self.render_mode,
+        ));
+        self.right_viewer.set_ranges(ranges_for_mode(
+            &self.full_ranges[1],
+            &self.sources[1],
+            self.render_mode,
+        ));
     }
 
     /// Move the focused panel's cursor vertically (by one line) and push the resulting matched
@@ -577,6 +625,14 @@ impl Component for DiffViewer {
             // H (capital, pairing with S above) toggles the node highlight, which ships off.
             crossterm::event::KeyCode::Char('H') => {
                 self.toggle_node_highlight();
+                Ok(Some(Action::Render))
+            }
+            // Switch how much of the diff is painted. Not a re-diff: the mapping is identical
+            // either way, and only how much of it is worth showing differs - which is why the
+            // hand-painted ground truth records both readings rather than one plus a mistake (see
+            // `research/data/quality/text_painting_findings.md`).
+            crossterm::event::KeyCode::Char('M') => {
+                self.toggle_render_mode();
                 Ok(Some(Action::Render))
             }
             // Tab switches which panel's cursor drives navigation (and, in single panel mode,
@@ -1114,7 +1170,7 @@ mod tests {
     /// follow the matched leaf node.
     #[test]
     fn moving_cursor_on_active_side_moves_inactive_side_cursor_to_matched_node() {
-        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text::TextOperation;
         use crate::diff::text_range::TextRange;
 
         let mut viewer = DiffViewer::new();

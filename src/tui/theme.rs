@@ -427,6 +427,11 @@ struct ThemeConfig {
     /// deliberately also this feature's shipped default - see `load_node_highlight`.
     #[serde(default)]
     node_highlight: bool,
+    /// How much of the diff to paint (the `M` key) - see `crate::diff::text::RenderMode`. Defaults
+    /// to `Full`, which is what every release before this setting existed rendered, so an existing
+    /// config file keeps behaving exactly as it did.
+    #[serde(default)]
+    render_mode: crate::diff::text::RenderMode,
 }
 
 /// The config file's path: a dotfile in the current working directory, per the exploratory-
@@ -485,6 +490,19 @@ pub fn save_custom_palette(palette: CustomPalette) {
     set_custom_palette(palette.clone());
     let mut config = load_from(config_path());
     config.custom_palette = palette;
+    save_to(config_path(), config);
+}
+
+/// The persisted render mode (the `M` key), or `RenderMode::Full` if none was ever chosen.
+pub fn load_render_mode() -> crate::diff::text::RenderMode {
+    load_from(config_path()).render_mode
+}
+
+/// Persist the render mode, preserving the other settings in the same file - same non-fatal
+/// failure semantics as `save_overlay_theme`.
+pub fn save_render_mode(mode: crate::diff::text::RenderMode) {
+    let mut config = load_from(config_path());
+    config.render_mode = mode;
     save_to(config_path(), config);
 }
 

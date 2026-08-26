@@ -663,6 +663,174 @@ fn disagreements_for(
     Ok(disagreements)
 }
 
+/// How closely codediff's own rendering, in one [`RenderMode`], matches the human painting that
+/// mode is answerable to.
+#[derive(Debug, Clone)]
+pub struct PaintingComparison {
+    pub mode: crate::diff::text::RenderMode,
+    /// The painting compared against, by name.
+    pub solution: String,
+    /// Bytes where the two disagree about what happened to that text, summed over both sides.
+    pub mismatched_bytes: usize,
+    /// Bytes in both files - the denominator, so the rate is comparable across fixtures of wildly
+    /// different sizes.
+    pub total_bytes: usize,
+}
+
+impl PaintingComparison {
+    /// Disagreement as a percentage of the corpus's bytes. `0.0` is exact agreement.
+    pub fn percent(&self) -> f64 {
+        if self.total_bytes == 0 {
+            return 0.0;
+        }
+        100.0 * self.mismatched_bytes as f64 / self.total_bytes as f64
+    }
+}
+
+/// Which painting a given mode is answerable to.
+///
+/// A fixture painted twice has one answer per mode. A fixture painted once is asserting that its
+/// rendering is *unambiguous* - the painter looked and judged there to be a single defensible
+/// answer - so both modes are held to it, which is exactly the property a single painting claims.
+/// That is why the name matters less than the count: `Only one solution` is the conventional name
+/// for the single case, but any single painting means the same thing.
+pub fn painting_for_mode(
+    mapping: &HumanMapping,
+    mode: crate::diff::text::RenderMode,
+) -> Result<&NamedTextMapping> {
+    match mapping.text_mappings.len() {
+        0 => bail!("this fixture has no text painting yet - paint it in human_solver's `t` view"),
+        1 => Ok(&mapping.text_mappings[0]),
+        _ => {
+            let wanted = match mode {
+                crate::diff::text::RenderMode::Minimal => "Minimal",
+                crate::diff::text::RenderMode::Full => "Full",
+            };
+            mapping
+                .text_mappings
+                .iter()
+                .find(|named| named.name == wanted)
+                .with_context(|| {
+                    let have: Vec<&str> = mapping
+                        .text_mappings
+                        .iter()
+                        .map(|named| named.name.as_str())
+                        .collect();
+                    format!(
+                        "no '{wanted}' painting to hold {mode:?} mode to - this fixture has {have:?}. \
+                         A fixture with several paintings needs one named for each mode, or a \
+                         single painting if its rendering is unambiguous"
+                    )
+                })
+        }
+    }
+}
+
+/// Compares codediff's rendering in `mode` against the painting that mode is answerable to.
+///
+/// Both sides are reduced to **per-byte labels** and compared byte for byte, the same projection
+/// [`text_mapping_disagreements`] uses and for the same reason: the two sources chunk one edit
+/// completely differently - a painted `Match` covering five lines against a dozen node-derived
+/// ranges - so comparing ranges would report bookkeeping differences as disagreements.
+///
+/// The result is a *rate*, not a count, because the fixtures span three orders of magnitude in
+/// size and a count would make one large fixture's residual dwarf every small fixture's exactness.
+pub fn compare_painting(
+    name: &str,
+    mode: crate::diff::text::RenderMode,
+) -> Result<PaintingComparison> {
+    let (before, after) = super::handmade_test_code_pair(name)?;
+    let mapping = load(name)?;
+    let painting = painting_for_mode(&mapping, mode)?;
+
+    // The human's side.
+    let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+    for entry in &painting.mapping.entries {
+        let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+        for span in &entry.before {
+            painted[0].push((*span, label));
+        }
+        for span in &entry.after {
+            painted[1].push((*span, label));
+        }
+    }
+
+    // codediff's side, through exactly the pipeline the TUI renders: a real diff, projected by
+    // `TextDiff`, then filtered by the mode. Not a re-derivation - what is compared is what a
+    // reader would actually see.
+    let diff = crate::diff::diff_code(&before, &after);
+    let ast = diff
+        .ast
+        .as_ref()
+        .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+    let node_cache = crate::diff::NodeCache::build(&before, &after);
+    let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &node_cache);
+
+    let mut mismatched_bytes = 0usize;
+    let mut total_bytes = 0usize;
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        let ours = crate::diff::text::ranges_for_mode(&text_diff.all(side), contents, mode);
+        let ours = label_bytes_from_ranges(contents, &ours);
+        let theirs = label_bytes(contents, &painted[side]);
+        total_bytes += contents.len();
+        mismatched_bytes += ours
+            .iter()
+            .zip(&theirs)
+            .filter(|(ours, theirs)| ours != theirs)
+            .count();
+    }
+
+    Ok(PaintingComparison {
+        mode,
+        solution: painting.name.clone(),
+        mismatched_bytes,
+        total_bytes,
+    })
+}
+
+/// Asserts codediff's rendering matches the human painting in **both** modes, within
+/// `max_percent` of the fixture's bytes.
+///
+/// One assertion covering both modes, rather than two tests per fixture: the modes are two
+/// readings of one mapping, and a fixture where they disagree in opposite directions is one
+/// finding, not two. The failure message reports both so the shape is visible at a glance.
+///
+/// `max_percent` is a clamp in exactly the sense
+/// [`assert_matches_human_mapping_within_limit`] is one - a recorded distance, not a target. `0.0`
+/// means exact agreement.
+pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) -> Result<()> {
+    use crate::diff::text::RenderMode;
+
+    let mut failures = Vec::new();
+    for mode in [RenderMode::Minimal, RenderMode::Full] {
+        let comparison = compare_painting(name, mode)?;
+        if comparison.percent() > max_percent {
+            failures.push(format!(
+                "  {:?} vs '{}': {:.3}% ({} of {} bytes) exceeds the {:.3}% limit",
+                comparison.mode,
+                comparison.solution,
+                comparison.percent(),
+                comparison.mismatched_bytes,
+                comparison.total_bytes,
+                max_percent,
+            ));
+        }
+    }
+    if failures.is_empty() {
+        return Ok(());
+    }
+    bail!(
+        "codediff's rendering disagrees with the human painting for '{name}':\n{}",
+        failures.join("\n")
+    );
+}
+
+/// [`assert_matches_human_painting_within_limit`] with no allowance - both modes must agree with
+/// the painting exactly.
+pub fn assert_matches_human_painting(name: &str) -> Result<()> {
+    assert_matches_human_painting_within_limit(name, 0.0)
+}
+
 /// Byte offset -> row, for annotating a disagreement without rescanning the file each time.
 struct RowIndex {
     /// Byte offset at which each row starts, ascending.

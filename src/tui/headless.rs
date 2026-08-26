@@ -30,7 +30,9 @@ use crate::code::Code;
 use crate::code::language::language_for_path;
 use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
-use crate::diff::text::{RangeMatch, TextOperation, summarize_diff_with_comment_check};
+use crate::diff::text::{
+    RangeMatch, RenderMode, TextOperation, ranges_for_mode, summarize_diff_with_comment_check,
+};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
 
@@ -519,8 +521,13 @@ pub fn run(
     use_color: bool,
     mode: DiffMode,
     context: usize,
+    render_mode: RenderMode,
 ) -> Result<bool> {
-    let (data, fallback_used) = compute_diff(before, after, mode)?;
+    let (mut data, fallback_used) = compute_diff(before, after, mode)?;
+    // Applied here rather than inside `compute_diff`: the mapping is identical in both modes, so
+    // this is a presentation filter over a finished diff, not a different diff.
+    data.before_ranges = ranges_for_mode(&data.before_ranges, &data.before_contents, render_mode);
+    data.after_ranges = ranges_for_mode(&data.after_ranges, &data.after_contents, render_mode);
     if fallback_used {
         // Deliberately no "--exact fixes this" suggestion: since the phases-4-7
         // rearchitecture, `PendingDiff::finish` runs the same pipeline regardless of mode, so

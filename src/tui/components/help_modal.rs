@@ -72,6 +72,9 @@ Appearance
   H                Toggle the node highlight (off by default): the range under the
                    cursor, and its match on the other panel, highlight when part of a
                    real change. Unchanged content is never highlighted either way.
+  M                Switch how much of the diff is painted, full or minimal (persisted).
+                   Minimal leaves standalone brackets and separators unpainted; both
+                   are faithful renderings of the same mapping, not one plus a mistake.
 
 Other
   ?                Toggle this help

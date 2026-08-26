@@ -110,6 +110,15 @@ struct Args {
     #[arg(long)]
     exact: bool,
 
+    /// Paint only the ranges that carry meaning, leaving standalone brackets and separators
+    /// unpainted (the TUI's `M` key, and its persisted setting when this flag is absent).
+    ///
+    /// Both readings of a diff are faithful to the same mapping - the corpus's hand-authored
+    /// ground truth records them as two separate paintings rather than one answer plus a mistake.
+    /// See `codediff::diff::text::RenderMode`.
+    #[arg(long)]
+    minimal: bool,
+
     /// When to ANSI-color headless output: `always`, `never`, or `auto` (the default - color on
     /// unless the `NO_COLOR` environment variable is set; see `use_color` for why auto is not
     /// tied to stdout being a terminal). The flag beats the environment variable in both
@@ -227,6 +236,20 @@ fn should_run_headless(args: &Args, stdout_is_terminal: bool) -> bool {
 /// `GIT_EXTERNAL_DIFF`/script integration that isn't asking for JSON.
 fn should_run_json(args: &Args) -> bool {
     args.mode.eq_ignore_ascii_case("json")
+}
+
+/// Which [`RenderMode`] to paint with: `--minimal` if given, otherwise whatever the TUI's `M` key
+/// last persisted.
+///
+/// The flag wins over the saved setting rather than toggling it, so a script that passes
+/// `--minimal` gets minimal regardless of how the machine it runs on happens to be configured -
+/// and passing nothing keeps the two front ends agreeing about what the user last chose.
+fn render_mode(args: &Args) -> codediff::diff::text::RenderMode {
+    if args.minimal {
+        codediff::diff::text::RenderMode::Minimal
+    } else {
+        codediff::tui::theme::load_render_mode()
+    }
 }
 
 /// Whether headless output should be ANSI-colored. `Auto` is deliberately not tied to
@@ -380,7 +403,7 @@ async fn main() -> Result<()> {
         } else {
             DiffMode::Fast
         };
-        match tui::json_output::run(&before, &after, mode) {
+        match tui::json_output::run(&before, &after, mode, render_mode(&args)) {
             Ok(differed) => std::process::exit(exit_code_for(
                 differed,
                 args.exit_code,
@@ -403,7 +426,14 @@ async fn main() -> Result<()> {
         } else {
             DiffMode::Fast
         };
-        match tui::headless::run(&before, &after, use_color(args.color), mode, args.context) {
+        match tui::headless::run(
+            &before,
+            &after,
+            use_color(args.color),
+            mode,
+            args.context,
+            render_mode(&args),
+        ) {
             Ok(differed) => std::process::exit(exit_code_for(
                 differed,
                 args.exit_code,
@@ -535,6 +565,7 @@ mod tests {
             mode: mode.to_string(),
             headless,
             exact: false,
+            minimal: false,
             color: ColorChoice::Auto,
             exit_code: false,
             context: tui::headless::CONTEXT_LINES,

@@ -17,6 +17,8 @@
  */
 pub mod helper;
 pub mod optimal_solutions;
+#[cfg(test)]
+mod painting_agreement;
 
 #[cfg(test)]
 mod tests {

@@ -68,7 +68,8 @@ use crate::code::Code;
 use crate::code::language::language_for_path;
 use crate::diff::DiffMode;
 use crate::diff::text::{
-    DiffSummary, RangeMatch, TextOperation, summarize_diff_with_comment_check,
+    DiffSummary, RangeMatch, RenderMode, TextOperation, ranges_for_mode,
+    summarize_diff_with_comment_check,
 };
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::DiffSessionData;
@@ -290,8 +291,11 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
 /// the schema.
 /// Returns whether the two files differ at all (raw byte comparison, same convention as
 /// `headless::run`) so `main.rs` can turn it into a `diff`-style exit code.
-pub fn run(before: &Path, after: &Path, mode: DiffMode) -> Result<bool> {
-    let (data, fallback_used) = compute_diff(before, after, mode)?;
+pub fn run(before: &Path, after: &Path, mode: DiffMode, render_mode: RenderMode) -> Result<bool> {
+    let (mut data, fallback_used) = compute_diff(before, after, mode)?;
+    // See `headless::run`'s note: a presentation filter over a finished diff, not a different one.
+    data.before_ranges = ranges_for_mode(&data.before_ranges, &data.before_contents, render_mode);
+    data.after_ranges = ranges_for_mode(&data.after_ranges, &data.after_contents, render_mode);
     let diff = build_diff(&data, fallback_used);
     println!("{}", serde_json::to_string_pretty(&diff)?);
     Ok(std::fs::read(before)? != std::fs::read(after)?)

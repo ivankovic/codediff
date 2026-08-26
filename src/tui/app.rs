@@ -218,6 +218,7 @@ impl App {
             .set_layout_override(theme::load_panel_layout());
         self.diff_viewer
             .set_node_highlight(theme::load_node_highlight());
+        self.diff_viewer.set_render_mode(theme::load_render_mode());
         // The custom palette has to be installed before anything renders: `OverlayTheme::Custom`
         // resolves through the process-global one, so a user whose saved theme is Custom would
         // otherwise see Dracula's defaults for the first frame.

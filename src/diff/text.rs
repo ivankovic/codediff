@@ -1431,6 +1431,108 @@ pub enum TextOperation {
     Delete,
 }
 
+/// How much of a diff to actually paint.
+///
+/// Not a difference in what was computed - the mapping is identical either way - but in how much
+/// of it is worth showing. Both readings of the same diff are defensible, which is why the
+/// human-authored ground truth records them as two separate paintings rather than one answer plus
+/// a mistake (see `HumanTextMapping`, and `research/data/quality/text_painting_findings.md` for
+/// the measurements this is built from).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RenderMode {
+    /// Paint every changed range, brackets and separators included. Nothing is dropped, so this is
+    /// exactly `TextDiff::all`.
+    #[default]
+    Full,
+    /// Drop ranges that consist solely of structural punctuation, keeping the content that
+    /// carries meaning.
+    ///
+    /// Measured against the corpus's hand-painted ground truth: across the ten fixtures painted
+    /// both ways, `Full` carries 27 entries `Minimal` does not, and **16 of those 27 are a single
+    /// punctuation token** - eight `(`, five `)`, two `):` and one `;`. So the difference between
+    /// the two styles is more than half brackets, and dropping standalone punctuation is what
+    /// most of the distance between them consists of.
+    Minimal,
+}
+
+/// The characters [`RenderMode::Minimal`] treats as structural - brackets, separators and
+/// whitespace.
+///
+/// **Operators are deliberately absent.** `+`, `=`, `<`, `&&` are punctuation to a tokenizer but
+/// carry the entire meaning of a change to a reader: an edit from `<` to `<=` is the whole edit,
+/// and a mode that hid it would be reporting a different diff rather than a tighter one. Every
+/// token this actually drops was observed being dropped by hand in the painted corpus; nothing
+/// here is included on the grounds that it merely looks like punctuation.
+const STRUCTURAL_PUNCTUATION: &[char] = &['(', ')', '[', ']', '{', '}', ',', ';', ':'];
+
+/// Whether `text` is nothing but structural punctuation and whitespace - i.e. whether a range
+/// covering it says anything a reader needs in [`RenderMode::Minimal`].
+///
+/// Empty text is *not* structural: a zero-width range is an insert/delete placeholder marking a
+/// position, and dropping those would remove the only mark one side has for what the other side
+/// gained or lost.
+pub fn is_structural_only(text: &str) -> bool {
+    !text.is_empty()
+        && text
+            .chars()
+            .all(|c| c.is_whitespace() || STRUCTURAL_PUNCTUATION.contains(&c))
+}
+
+/// One side's ranges as `mode` would paint them.
+///
+/// `Full` returns them unchanged. `Minimal` drops the ranges whose own text is structural only,
+/// and drops nothing else - in particular it never merges, splits or re-operates a range, so a
+/// range that survives is byte-for-byte the one `Full` would have shown. That keeps the two modes
+/// comparable: any disagreement between them is a whole range being present or absent, never the
+/// same region described two ways.
+pub fn ranges_for_mode(ranges: &[RangeMatch], source: &str, mode: RenderMode) -> Vec<RangeMatch> {
+    match mode {
+        RenderMode::Full => ranges.to_vec(),
+        RenderMode::Minimal => ranges
+            .iter()
+            .filter(|range_match| {
+                // An `Identical` range is the unpainted background in every consumer, so whether
+                // it survives changes nothing on screen - but keeping it keeps the two modes'
+                // range lists structurally comparable, and `line_operations` relies on the
+                // identical ranges being present to colour a row it would otherwise leave blank.
+                if range_match.operation == TextOperation::Identical
+                    || range_match.operation == TextOperation::NotYetSet
+                {
+                    return true;
+                }
+                match range_text(source, &range_match.source) {
+                    Some(text) => !is_structural_only(text),
+                    // A range that doesn't read back is left alone rather than silently dropped:
+                    // this is a display filter, and it has no business deciding that a range it
+                    // could not interpret is uninteresting.
+                    None => true,
+                }
+            })
+            .cloned()
+            .collect(),
+    }
+}
+
+/// The text `range` covers in `source`, or `None` if it falls outside it.
+///
+/// Rows split on `'\n'` and columns are byte offsets into a row - `TextRange`'s own convention.
+fn range_text<'a>(source: &'a str, range: &TextRange) -> Option<&'a str> {
+    let offset = |row: usize, column: usize| -> Option<usize> {
+        let mut at = 0usize;
+        for (index, line) in source.split('\n').enumerate() {
+            if index == row {
+                return (column <= line.len() && source.is_char_boundary(at + column))
+                    .then_some(at + column);
+            }
+            at += line.len() + 1;
+        }
+        None
+    };
+    let start = offset(range.start_row, range.start_column)?;
+    let end = offset(range.end_row, range.end_column)?;
+    (end >= start).then(|| source.get(start..end))?
+}
+
 /// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
 /// (`TextDiff::all`).
 ///
@@ -1830,6 +1932,119 @@ mod tests {
     use anyhow::Result;
 
     use super::*;
+
+    fn text_range_on(row: usize, start: usize, end: usize) -> TextRange {
+        TextRange::new(row, start, row, end)
+    }
+
+    fn changed(row: usize, start: usize, end: usize) -> RangeMatch {
+        RangeMatch {
+            source: text_range_on(row, start, end),
+            destination: text_range_on(row, start, end),
+            operation: TextOperation::Update,
+        }
+    }
+
+    /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
+    /// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
+    /// modelling the style it is named after.
+    #[test]
+    fn minimal_drops_the_punctuation_the_painted_corpus_drops() {
+        for text in ["(", ")", "):", ";", "{", "}", "[]", "  ", " ,\n", "( )"] {
+            assert!(
+                is_structural_only(text),
+                "{text:?} should be structural-only"
+            );
+        }
+    }
+
+    /// Operators look like punctuation and are the entire content of the change they appear in.
+    /// Dropping them would report a different diff, not a tighter one.
+    #[test]
+    fn minimal_keeps_operators_and_anything_carrying_meaning() {
+        for text in ["+", "=", "<=", "&&", "=>", "foo", "1", "_", "a,", "->"] {
+            assert!(!is_structural_only(text), "{text:?} should survive Minimal");
+        }
+    }
+
+    /// A zero-width range marks where the other side gained or lost text - the only mark that side
+    /// has. Treating "no characters" as "only structural characters" would erase it.
+    #[test]
+    fn an_empty_range_is_not_structural() {
+        assert!(!is_structural_only(""));
+    }
+
+    #[test]
+    fn full_returns_every_range_unchanged() {
+        let source = "foo(bar);\n";
+        let ranges = vec![changed(0, 3, 4), changed(0, 4, 7)];
+
+        assert_eq!(
+            ranges_for_mode(&ranges, source, RenderMode::Full),
+            ranges,
+            "Full is exactly TextDiff::all"
+        );
+    }
+
+    #[test]
+    fn minimal_drops_a_standalone_bracket_but_keeps_its_neighbour() {
+        let source = "foo(bar);\n";
+        // `(` alone, then `bar`.
+        let ranges = vec![changed(0, 3, 4), changed(0, 4, 7)];
+
+        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+
+        assert_eq!(minimal.len(), 1, "got {minimal:?}");
+        assert_eq!(minimal[0].source, text_range_on(0, 4, 7));
+    }
+
+    /// A bracket *inside* a larger range is not a standalone bracket - only whole ranges are
+    /// dropped, never parts of one, so a surviving range is byte-for-byte what `Full` shows.
+    #[test]
+    fn minimal_keeps_a_range_that_merely_contains_punctuation() {
+        let source = "foo(bar);\n";
+        let ranges = vec![changed(0, 0, 9)];
+
+        assert_eq!(
+            ranges_for_mode(&ranges, source, RenderMode::Minimal),
+            ranges
+        );
+    }
+
+    /// `Identical` ranges are the unpainted background, so dropping them changes nothing on
+    /// screen - but `line_operations` reads them to colour rows, and the two modes stay
+    /// comparable only if their range lists differ by content ranges alone.
+    #[test]
+    fn minimal_keeps_identical_ranges_even_when_they_are_pure_punctuation() {
+        let source = "foo(bar);\n";
+        let identical = RangeMatch {
+            source: text_range_on(0, 3, 4),
+            destination: text_range_on(0, 3, 4),
+            operation: TextOperation::Identical,
+        };
+
+        assert_eq!(
+            ranges_for_mode(
+                std::slice::from_ref(&identical),
+                source,
+                RenderMode::Minimal
+            ),
+            vec![identical]
+        );
+    }
+
+    /// A range that doesn't read back is left alone. This is a display filter; deciding that
+    /// something it could not interpret is uninteresting is not its call to make.
+    #[test]
+    fn minimal_keeps_a_range_it_cannot_read() {
+        let source = "short\n";
+        let ranges = vec![changed(99, 0, 4)];
+
+        assert_eq!(
+            ranges_for_mode(&ranges, source, RenderMode::Minimal),
+            ranges
+        );
+    }
 
     /// Every non-Identical range's source row span, in order - the shape of assertion these tests
     /// care about (what changed, and in what order), without pinning down destination anchors
