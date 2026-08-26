@@ -31,7 +31,7 @@ use crate::code::{Code, Language};
 use crate::diff::{
     Diff, DiffMode, NodeCache,
     text::{
-        ChangeCounts, DiffSummary, TextDiff, change_counts, is_comment_only_diff,
+        ChangeCounts, DiffSummary, RenderMode, TextDiff, change_counts, is_comment_only_diff,
         plain_text_line_diff, summarize_diff_with_comment_check,
     },
 };
@@ -864,6 +864,15 @@ impl App {
         if layout != crate::tui::theme::PanelLayout::Auto {
             left_parts.push(format!("[layout: {}]", layout.label()));
         }
+        // Same rule as the layout override above, and it matters more here: `Minimal` deliberately
+        // leaves standalone brackets and separators unpainted, so without a badge a reader who
+        // forgot they pressed `M` - or inherited the setting from a previous run, since it
+        // persists - would read the missing highlights as codediff having missed them. `Full` is
+        // the default and what every release before the mode existed rendered, so labelling it
+        // would put a permanent badge on a screen that has nothing to report.
+        if self.diff_viewer.render_mode() == RenderMode::Minimal {
+            left_parts.push("[minimal]".to_string());
+        }
         let left = left_parts.join("   ");
 
         let layout = Layout::default()
@@ -994,7 +1003,8 @@ impl App {
 
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
-const FOOTER_HINTS: &str = "?:help  o:open  r:reload  n/p:next/prev  /:search  Tab:switch  q:quit";
+const FOOTER_HINTS: &str =
+    "?:help  o:open  r:reload  n/p:next/prev  /:search  M:mode  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
 /// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
@@ -1629,6 +1639,48 @@ mod tests {
             .iter()
             .map(|cell| cell.symbol())
             .collect()
+    }
+
+    /// `Minimal` deliberately leaves brackets and separators unpainted, and the setting persists
+    /// across runs - so without this badge, missing highlights read as codediff having missed
+    /// them rather than as a mode the reader chose (possibly in a previous session).
+    #[test]
+    fn draw_viewer_badges_minimal_mode_in_the_footer() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.set_render_mode(RenderMode::Minimal);
+
+        let backend = ratatui::backend::TestBackend::new(120, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        assert!(
+            rendered_text(&terminal).contains("[minimal]"),
+            "expected the minimal badge in the footer"
+        );
+        Ok(())
+    }
+
+    /// `Full` is the default and what every release before the mode existed rendered, so a badge
+    /// for it would sit permanently on a screen with nothing to report.
+    #[test]
+    fn draw_viewer_does_not_badge_full_mode() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.set_render_mode(RenderMode::Full);
+
+        let backend = ratatui::backend::TestBackend::new(120, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        assert!(!text.contains("[minimal]"), "got: {text}");
+        assert!(!text.contains("[full]"), "got: {text}");
+        Ok(())
     }
 
     #[test]
