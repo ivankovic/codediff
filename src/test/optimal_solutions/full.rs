@@ -294,6 +294,8 @@ mod rust_weggli_rs_weggli_move_import_around_and_formatting_change;
 #[cfg(test)]
 mod rust_xou816_spot_add_some_around_existing_code;
 #[cfg(test)]
+mod rust_yannjor_krabby_actual_normal_change;
+#[cfg(test)]
 mod scala_com_lihaoyi_mill_add_a_function_call;
 #[cfg(test)]
 mod scala_com_lihaoyi_mill_add_a_member_to_expression_chains;

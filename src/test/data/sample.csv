@@ -50,7 +50,7 @@ CSS,WordPress-WordPress.git,1802bd631a7459c44307e408ab51e1a5732e7ae4,wp-admin/cs
 CSS,WordPress-WordPress.git,9c13eca1c394738d9e576b48640061fd5fe66765,wp-includes/css/jquery-ui-dialog-rtl.css,css-wordpress-wordpress-change-simple-values-to-vars,small,PROMOTED,
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/html/editor.css,css-wordpress-add-comment,small,PROMOTED,
 CSS,WordPress-WordPress.git,db567e7f82022f0bfae34e83c52e2c12f11d6e46,wp-includes/css/jquery-ui-dialog.css,css-wordpress-smalll-change,small,PROMOTED,
-CSS,adapta-project-adapta-gtk-theme,59e461b52902691264c1a41c7469b04fa8a8331a,gtk/sass/common/_colors-public.scss,,full,SAMPLED,
+CSS,adapta-project-adapta-gtk-theme,59e461b52902691264c1a41c7469b04fa8a8331a,gtk/sass/common/_colors-public.scss,,full,REJECTED,The treesitter parser in Rust on the current version just fails to parse this file correctly.
 CSS,horst3180-vertex-theme,2eb0291c28e75c20a7836a97bb9660f9044de364,common/gtk-3.0/3.20/gtk-light.css,css-horst3180-vertex-theme-add-spaces-to-change-class-selector-into-descendant-selectors,full,PROMOTED,A whitespace change that actually modifies the AST and the code logic
 CSS,horst3180-vertex-theme,5170be73f229fcbfea3d95b05e4973ec43f5e66f,common/gtk-3.0/3.20/gtk-dark.css,css-horst3180-vertex-theme-remove-single-rule,full,PROMOTED,
 CSS,lassekongo83-zuki-themes,0b6eacd73cb5fe1050eea3a85fcbafe74f222a3d,gnome-shell/src/gnome-shell-sass/widgets/_message-list.scss,css-lassekongo83-zuki-themes-fails-to-parse,full,PROMOTED,
@@ -312,7 +312,7 @@ Rust,vercel-next.js.git,5719439f24c81e62b90b7b53b332b6e615d9565b,turbopack/crate
 Rust,vercel-next.js.git,5c70b4beaa80ec7031284153ba012b243788ef1e,turbopack/crates/turbopack-ecmascript-runtime/src/browser_runtime.rs,rust-vercel-nextjs-move-from-one-struct-to-another-and-add-some-code,small,PROMOTED,
 Rust,weggli-rs-weggli,9399c2cac29d721fc1f64952cbec5d9c86ba9592,src/main.rs,rust-weggli-rs-weggli-move-import-around-and-formatting-change,full,PROMOTED,
 Rust,xou816-spot,9b443ac55ef3436b60a6d1ca59d8e37c7e8553b5,src/app/components/settings/settings.rs,rust-xou816-spot-add-Some-around-existing-code,full,PROMOTED,
-Rust,yannjor-krabby,07e4ce6b59b390d2d1827418aabb0fe4c021552c,src/main.rs,,full,SAMPLED,
+Rust,yannjor-krabby,07e4ce6b59b390d2d1827418aabb0fe4c021552c,src/main.rs,rust-yannjor-krabby-actual-normal-change,full,PROMOTED,
 Rust,zed-industries-zed.git,e9e71431bb26ce554d4ed2024569745df6dd9047,crates/worktree/src/worktree.rs,rust-zed-industries-zed-add-argument,small,PROMOTED,
 Scala,com-lihaoyi-mill,12e7f625639498dbad56ce50864a4e309d749e3a,core/api/daemon/src/mill/api/daemon/internal/MillScalaParser.scala,scala-com-lihaoyi-mill-add-one-argument,full,PROMOTED,
 Scala,com-lihaoyi-mill,1a3ab3bf6b3bb336d15e95a5b34f0d63f6cf8bca,core/api/src/mill/api/ScriptModule.scala,scala-com-lihaoyi-mill-add-a-function-call,full,PROMOTED,
