@@ -54,7 +54,6 @@
 //!
 //! See `research/data/quality/text_painting_findings.md` for what the two painting styles mean,
 //! where they came from, and which of their rules the renderer already implements.
-
 #[cfg(test)]
 mod cpp_add_const_correctness;
 #[cfg(test)]
@@ -121,5 +120,7 @@ mod rust_small_addition_with_reuse_of_binary_expressions;
 mod rust_sniffnet_protocol;
 #[cfg(test)]
 mod rust_tauri_api_build_1;
+#[cfg(test)]
+mod typescript_add_type_annotations;
 #[cfg(test)]
 mod typescript_async_await;

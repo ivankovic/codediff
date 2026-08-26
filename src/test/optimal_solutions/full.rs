@@ -88,6 +88,8 @@ mod css_horst3180_vertex_theme_remove_single_rule;
 #[cfg(test)]
 mod css_lassekongo83_zuki_themes_fails_to_parse;
 #[cfg(test)]
+mod css_madmaxms_theme_obsidian_2_add_gnome_44_and_a_few_changes;
+#[cfg(test)]
 mod css_source_foundry_hack_change_font_string;
 #[cfg(test)]
 mod go_cloudflare_cfssl_change_zero_value_to_is_zero;
@@ -111,6 +113,10 @@ mod go_prometheus_node_exporter_remove_one_comment;
 mod go_stackexchange_blackbox_add_comment;
 #[cfg(test)]
 mod html_abs_lang_abs_version_update_in_string;
+#[cfg(test)]
+mod html_berndporr_iir1_a_lot_of_new_functionality;
+#[cfg(test)]
+mod html_chennes_med_extreme_test;
 #[cfg(test)]
 mod html_chennes_med_only_text_value_change;
 #[cfg(test)]
