@@ -269,6 +269,7 @@ rust-multi-map-duplicate-calls,src/test/data/diffs/handmade/rust-multi-map-dupli
 rust-next-font-imports-generator,src/test/data/diffs/handmade/rust-next-font-imports-generator,handmade,Rust,,,,,275,2389,275,2372,18,none,
 rust-no-change,src/test/data/diffs/handmade/rust-no-change,handmade,Rust,,,,,50,383,50,383,0,none,
 rust-real-logic-change-in-a-huge-75k-node-file,src/test/data/diffs/handmade/rust-real-logic-change-in-a-huge-75k-node-file,handmade,Rust,,,,,9146,74748,9586,78381,152209,none,
+rust-small-addition-with-reuse-of-binary-expressions,src/test/data/diffs/handmade/rust-small-addition-with-reuse-of-binary-expressions,handmade,Rust,,,,,3547,26544,3572,26626,0,none,
 rust-sniffnet-protocol,src/test/data/diffs/handmade/rust-sniffnet-protocol,handmade,Rust,,,,,48,415,52,480,0,single,Only one solution
 rust-tauri-api-build-1,src/test/data/diffs/handmade/rust-tauri-api-build-1,handmade,Rust,,,,,52,451,53,456,0,single,Only one solution
 rust-tauri-api-build-2,src/test/data/diffs/handmade/rust-tauri-api-build-2,handmade,Rust,,,,,53,456,53,453,0,none,

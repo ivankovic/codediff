@@ -106,6 +106,8 @@ mod rust_no_change;
 #[cfg(test)]
 mod rust_real_logic_change_in_a_huge_75k_node_file;
 #[cfg(test)]
+mod rust_small_addition_with_reuse_of_binary_expressions;
+#[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
 mod rust_tauri_api_build_1;
