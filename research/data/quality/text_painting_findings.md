@@ -10,8 +10,12 @@ reading `text_mappings` out of `src/test/data/diffs/*/*/human_mapping.json`.
 
 ## The corpus these come from, 2026-08-26
 
-26 fixtures painted: 10 carry both a `Minimal` and a `Full` painting, 16 carry a single
-`Only one solution`. 275 entries in total - 91 `Match`, 58 `Delete`, 126 `Insert`. Of the matches,
+**Rules 1-3 below were measured over the first 26 painted fixtures (2026-08-26); rule 4 and the
+agreement rates were re-measured at 33.** The corpus grows as painting continues - 34 as of this
+writing - so re-derive rather than quoting a count as current.
+
+26 fixtures painted at the time rules 1-3 were taken: 10 carry both a `Minimal` and a `Full`
+painting, 16 carry a single `Only one solution`. 275 entries in total - 91 `Match`, 58 `Delete`, 126 `Insert`. Of the matches,
 66 resolve to a move (both sides byte-identical) and 25 to an update. 8 of the 91 are N:M rather
 than 1:1 - five 3:1 and three 2:1 - which is roughly one match in eleven, and the reason
 [`HumanTextEntry`] carries a list of spans per side at all.
@@ -83,6 +87,43 @@ falls *inside a word*: `Box` against `Box<T>` shares `Box`, `calculateArea` agai
 `rea` would be absurd, and none of those are what the rule is about. The rule is about **line
 tails**, and a check that does not anchor on end-of-line measures something else and cries wolf.
 
+## 4. Whitespace at the ends of a range is never painted
+
+A highlight that starts in the indentation, or runs off the end of the line past the last
+character, reads as though the blank space were part of the change. Painting by hand, nobody does
+that - the range starts at the first real character and stops after the last one. Whitespace
+*inside* a range is a different matter and is usually kept: it sits between two things the range is
+genuinely about, and cutting there would report one edit as two.
+
+This one is a rule about `Minimal` specifically. `Full` accounts for every byte whose role changed,
+padding included, and is left alone.
+
+**Shipped, and measured both ways.** `diff::text::ranges_for_mode` trims leading and trailing
+whitespace off every surviving `Minimal` range - the real rendering path, so the TUI, `--headless`
+and `--mode json` all get it. Across the 33 painted fixtures:
+
+| | before trimming | after |
+|---|---|---|
+| `Minimal` fixtures improved | - | **26** |
+| unchanged | - | 7 |
+| **worse** | - | **0** |
+| mean `Minimal` disagreement | 12.628% | **12.185%** |
+| `Full` fixtures whose rate changed | - | **0** |
+
+The `Full` row is the check that matters as much as the improvement: trimming is a `Minimal`-only
+rule, and a change that quietly moved `Full` would mean it had leaked into the mode that is
+supposed to paint everything.
+
+Only the range's own `source` is narrowed, never its `destination`. The destination is a position
+in the *other* file, whose text that side's filter cannot see - each side is trimmed independently
+against its own source, and cross-panel navigation still jumps to the untrimmed counterpart region.
+
+**A trap the tests pin.** A multi-row range must not be judged by its first row: a range whose
+first row is blank but whose later rows hold real content is not whitespace, and an early version
+that answered the "is this all whitespace?" question from the first row alone would have dropped
+it. Checking runs the covered rows, and the newline joining them counts as whitespace, so a range
+that is blank on *every* row is still dropped.
+
 ## What this suggests building
 
 In rough order of value against effort:
@@ -95,3 +136,8 @@ In rough order of value against effort:
 3. **A line-tail hint**, much more cautiously. Rule 3 holds 15 times in 16, but the trap above
    shows how easily a naive version misfires - and at one exception in sixteen it would be firing
    about as often as it is right.
+
+Rule 4 is already shipped rather than suggested, and it is the pattern the other three should
+follow: a rule stated from painting by hand, turned into a change in the real renderer, then scored
+against the paintings both before and after - including a check that the mode it was *not* meant to
+touch did not move.

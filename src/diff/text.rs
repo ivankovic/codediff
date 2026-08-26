@@ -1506,56 +1506,142 @@ pub fn is_structural_only(text: &str) -> bool {
 /// One side's ranges as `mode` would paint them.
 ///
 /// `Full` returns them unchanged. `Minimal` drops the ranges whose own text is structural only,
-/// and drops nothing else - in particular it never merges, splits or re-operates a range, so a
-/// range that survives is byte-for-byte the one `Full` would have shown. That keeps the two modes
-/// comparable: any disagreement between them is a whole range being present or absent, never the
-/// same region described two ways.
+/// and trims whitespace off the ends of the ones that survive.
+///
+/// **Trimming, not just dropping.** A range that starts or ends in whitespace paints a highlight
+/// running out to the indentation or off the end of the line, which reads as though the blank
+/// space were part of the change. Painting by hand, nobody does that: leading and trailing
+/// whitespace is never marked. Interior whitespace is left alone - it sits *between* two things
+/// the range is genuinely about, and cutting the range in two there would report one edit as two.
+///
+/// A range is never merged, split or re-operated, only narrowed, so a range that survives still
+/// describes the same edit `Full` describes - just without the padding.
 pub fn ranges_for_mode(ranges: &[RangeMatch], source: &str, mode: RenderMode) -> Vec<RangeMatch> {
-    match mode {
-        RenderMode::Full => ranges.to_vec(),
-        RenderMode::Minimal => ranges
-            .iter()
-            .filter(|range_match| {
-                // An `Identical` range is the unpainted background in every consumer, so whether
-                // it survives changes nothing on screen - but keeping it keeps the two modes'
-                // range lists structurally comparable, and `line_operations` relies on the
-                // identical ranges being present to colour a row it would otherwise leave blank.
-                if range_match.operation == TextOperation::Identical
-                    || range_match.operation == TextOperation::NotYetSet
-                {
-                    return true;
-                }
-                match range_text(source, &range_match.source) {
-                    Some(text) => !is_structural_only(text),
-                    // A range that doesn't read back is left alone rather than silently dropped:
-                    // this is a display filter, and it has no business deciding that a range it
-                    // could not interpret is uninteresting.
-                    None => true,
-                }
-            })
-            .cloned()
-            .collect(),
+    if mode == RenderMode::Full {
+        return ranges.to_vec();
     }
+    // Built once for the whole call rather than rescanning the file per range: `range_text` walked
+    // from the top of the source for every range it was asked about, which on a large file with
+    // many ranges is the dominant cost of painting a frame.
+    let lines: Vec<&str> = source.split('\n').collect();
+
+    ranges
+        .iter()
+        .filter_map(|range_match| {
+            // An `Identical` range is the unpainted background in every consumer, so whether it
+            // survives changes nothing on screen - but keeping it keeps the two modes' range lists
+            // structurally comparable, and `line_operations` relies on the identical ranges being
+            // present to colour a row it would otherwise leave blank.
+            if range_match.operation == TextOperation::Identical
+                || range_match.operation == TextOperation::NotYetSet
+            {
+                return Some(range_match.clone());
+            }
+            match range_is_structural_only(&lines, &range_match.source) {
+                Some(true) => return None,
+                Some(false) => {}
+                // A range that doesn't read back is left alone rather than silently dropped: this
+                // is a display filter, and it has no business deciding that a range it could not
+                // interpret is uninteresting.
+                None => return Some(range_match.clone()),
+            }
+            let mut trimmed = range_match.clone();
+            trimmed.source = trim_whitespace(&lines, &range_match.source)?;
+            Some(trimmed)
+        })
+        .collect()
 }
 
-/// The text `range` covers in `source`, or `None` if it falls outside it.
+/// `range` with leading and trailing whitespace removed, or `None` if nothing but whitespace is
+/// left (which `is_structural_only` will already have caught for any caller that checks it first).
 ///
-/// Rows split on `'\n'` and columns are byte offsets into a row - `TextRange`'s own convention.
-fn range_text<'a>(source: &'a str, range: &TextRange) -> Option<&'a str> {
-    let offset = |row: usize, column: usize| -> Option<usize> {
-        let mut at = 0usize;
-        for (index, line) in source.split('\n').enumerate() {
-            if index == row {
-                return (column <= line.len() && source.is_char_boundary(at + column))
-                    .then_some(at + column);
-            }
-            at += line.len() + 1;
+/// Only the `source` side is narrowed. The `destination` is a position in the *other* file, whose
+/// text this function cannot see, and each side's ranges are filtered independently against their
+/// own source - so trimming here and there happens separately and correctly, while `destination`
+/// keeps pointing at the untrimmed counterpart region that cross-panel navigation jumps to.
+fn trim_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRange> {
+    let (mut start_row, mut start_column) = (range.start_row, range.start_column);
+    let (mut end_row, mut end_column) = (range.end_row, range.end_column);
+
+    // Forward from the start, over whitespace, wrapping to the next row at end of line.
+    loop {
+        if (start_row, start_column) >= (end_row, end_column) {
+            return None;
         }
-        None
-    };
-    let start = offset(range.start_row, range.start_column)?;
-    let end = offset(range.end_row, range.end_column)?;
-    (end >= start).then(|| source.get(start..end))?
+        let line = *lines.get(start_row)?;
+        match line[start_column.min(line.len())..].chars().next() {
+            Some(c) if c.is_whitespace() => start_column += c.len_utf8(),
+            // Past the last character of this row: the newline itself is whitespace, so step over
+            // it to the start of the next row.
+            None => {
+                start_row += 1;
+                start_column = 0;
+            }
+            Some(_) => break,
+        }
+    }
+    // Backward from the end, symmetrically.
+    loop {
+        if (start_row, start_column) >= (end_row, end_column) {
+            return None;
+        }
+        let line = *lines.get(end_row)?;
+        let column = end_column.min(line.len());
+        match line[..column].chars().next_back() {
+            Some(c) if c.is_whitespace() => end_column = column - c.len_utf8(),
+            // At column 0 the previous character is the previous row's newline.
+            None => {
+                end_row = end_row.checked_sub(1)?;
+                end_column = lines.get(end_row)?.len();
+            }
+            Some(_) => break,
+        }
+    }
+    Some(TextRange::new(start_row, start_column, end_row, end_column))
+}
+
+/// Whether every character `range` covers is structural punctuation or whitespace, given the
+/// source already split into rows. `None` if the range falls outside the source.
+///
+/// Walks the rows rather than materializing the covered text: a multi-row range's text would have
+/// to be joined into a fresh `String` just to be scanned once and dropped, and the covered rows
+/// are exactly what needs checking either way.
+fn range_is_structural_only(lines: &[&str], range: &TextRange) -> Option<bool> {
+    if range.start_row > range.end_row {
+        return None;
+    }
+    let mut saw_any = false;
+    for row in range.start_row..=range.end_row {
+        let line = *lines.get(row)?;
+        let start = if row == range.start_row {
+            range.start_column
+        } else {
+            0
+        };
+        let end = if row == range.end_row {
+            range.end_column
+        } else {
+            line.len()
+        };
+        if start > line.len() || end > line.len() || start > end {
+            return None;
+        }
+        let covered = line.get(start..end)?;
+        if !covered.is_empty() {
+            saw_any = true;
+            if !is_structural_only(covered) {
+                return Some(false);
+            }
+        }
+        // The newline joining this row to the next is itself whitespace, so a multi-row range that
+        // is blank on every row stays structural-only.
+        if row < range.end_row {
+            saw_any = true;
+        }
+    }
+    // An empty range covers nothing, and `is_structural_only` deliberately says a zero-width
+    // placeholder is not structural - it marks a position the other side changed.
+    Some(saw_any)
 }
 
 /// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
@@ -2056,6 +2142,97 @@ mod tests {
             ),
             vec![identical]
         );
+    }
+
+    /// Painting by hand, nobody marks the indentation in front of a change or the blank running
+    /// off the end of the line - a highlight that includes them reads as though the blank space
+    /// were part of the edit.
+    #[test]
+    fn minimal_trims_leading_and_trailing_whitespace_off_a_range() {
+        let source = "    foo   \n";
+        let ranges = vec![changed(0, 0, 10)];
+
+        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+
+        assert_eq!(minimal.len(), 1);
+        assert_eq!(
+            minimal[0].source,
+            text_range_on(0, 4, 7),
+            "the range should cover exactly `foo`"
+        );
+    }
+
+    /// Interior whitespace sits *between* two things the range is genuinely about; cutting there
+    /// would report one edit as two.
+    #[test]
+    fn minimal_keeps_whitespace_inside_a_range() {
+        let source = "a   b\n";
+        let ranges = vec![changed(0, 0, 5)];
+
+        assert_eq!(
+            ranges_for_mode(&ranges, source, RenderMode::Minimal)[0].source,
+            text_range_on(0, 0, 5)
+        );
+    }
+
+    /// `Full` is untouched by any of this - it is exactly `TextDiff::all`.
+    #[test]
+    fn full_does_not_trim() {
+        let source = "    foo   \n";
+        let ranges = vec![changed(0, 0, 10)];
+
+        assert_eq!(ranges_for_mode(&ranges, source, RenderMode::Full), ranges);
+    }
+
+    /// Trimming narrows the source only. The destination is a position in the *other* file, whose
+    /// text this side cannot see, and cross-panel navigation jumps to it.
+    #[test]
+    fn trimming_leaves_the_destination_alone() {
+        let source = "  foo  \n";
+        let ranges = vec![RangeMatch {
+            source: text_range_on(0, 0, 7),
+            destination: text_range_on(3, 0, 7),
+            operation: TextOperation::Update,
+        }];
+
+        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+
+        assert_eq!(minimal[0].source, text_range_on(0, 2, 5));
+        assert_eq!(minimal[0].destination, text_range_on(3, 0, 7));
+    }
+
+    /// A multi-row range must not be judged by its first row alone: whitespace there says nothing
+    /// about the rows below it.
+    #[test]
+    fn a_multi_row_range_with_content_below_a_blank_first_row_survives() {
+        let source = "   \n  keep\n";
+        let ranges = vec![RangeMatch {
+            source: TextRange::new(0, 0, 1, 6),
+            destination: TextRange::new(0, 0, 1, 6),
+            operation: TextOperation::Update,
+        }];
+
+        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+
+        assert_eq!(minimal.len(), 1, "got {minimal:?}");
+        assert_eq!(
+            minimal[0].source,
+            TextRange::new(1, 2, 1, 6),
+            "and it should trim down to `keep`"
+        );
+    }
+
+    /// A range that is nothing but blank rows is still dropped.
+    #[test]
+    fn a_multi_row_range_of_only_whitespace_is_dropped() {
+        let source = "   \n   \n";
+        let ranges = vec![RangeMatch {
+            source: TextRange::new(0, 0, 1, 3),
+            destination: TextRange::new(0, 0, 1, 3),
+            operation: TextOperation::Update,
+        }];
+
+        assert!(ranges_for_mode(&ranges, source, RenderMode::Minimal).is_empty());
     }
 
     /// A range that doesn't read back is left alone. This is a display filter; deciding that
