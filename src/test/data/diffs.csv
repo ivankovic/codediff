@@ -249,14 +249,14 @@ python-api-change,src/test/data/diffs/handmade/python-api-change,handmade,Python
 python-bugfix-loop,src/test/data/diffs/handmade/python-bugfix-loop,handmade,Python,,,,,24,148,30,190,0,single,Only one solution
 python-refactoring,src/test/data/diffs/handmade/python-refactoring,handmade,Python,,,,,28,148,19,119,0,single,Only one solution
 rust-add-comments-and-real-new-logic,src/test/data/diffs/handmade/rust-add-comments-and-real-new-logic,handmade,Rust,,,,,437,3784,469,4043,0,none,
-rust-add-if,src/test/data/diffs/handmade/rust-add-if,handmade,Rust,,,,,9,58,11,81,0,none,
-rust-add-to-existing-use,src/test/data/diffs/handmade/rust-add-to-existing-use,handmade,Rust,,,,,6,32,8,37,0,none,
-rust-add-value-to-enum,src/test/data/diffs/handmade/rust-add-value-to-enum,handmade,Rust,,,,,22,137,23,140,0,none,
+rust-add-if,src/test/data/diffs/handmade/rust-add-if,handmade,Rust,,,,,9,58,11,81,0,minimal+full,Full|Minimal
+rust-add-to-existing-use,src/test/data/diffs/handmade/rust-add-to-existing-use,handmade,Rust,,,,,6,32,8,37,0,minimal+full,Full|Minimal
+rust-add-value-to-enum,src/test/data/diffs/handmade/rust-add-value-to-enum,handmade,Rust,,,,,22,137,23,140,0,single,Only one solution
 rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg,src/test/data/diffs/handmade/rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg,handmade,Rust,,,,,140,858,226,1460,0,none,
 rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,src/test/data/diffs/handmade/rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,handmade,Rust,,,,,478,3224,482,3252,0,none,
 rust-algorithm-change,src/test/data/diffs/handmade/rust-algorithm-change,handmade,Rust,,,,,20,184,24,184,28,none,
 rust-completely-unrelated-main-files,src/test/data/diffs/handmade/rust-completely-unrelated-main-files,handmade,Rust,,,,,241,1806,900,8462,10268,none,
-rust-cost-optimization,src/test/data/diffs/handmade/rust-cost-optimization,handmade,Rust,,,,,29,201,34,217,0,none,
+rust-cost-optimization,src/test/data/diffs/handmade/rust-cost-optimization,handmade,Rust,,,,,29,201,34,217,0,single,Only one solution
 rust-data-structure,src/test/data/diffs/handmade/rust-data-structure,handmade,Rust,,,,,16,104,28,212,0,none,
 rust-error-handling,src/test/data/diffs/handmade/rust-error-handling,handmade,Rust,,,,,14,133,15,168,15,none,
 rust-firefox-webrenderer-borders,src/test/data/diffs/handmade/rust-firefox-webrenderer-borders,handmade,Rust,,,,,369,2472,369,2444,12,none,

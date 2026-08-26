@@ -2314,5 +2314,23 @@
         ",:2"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 13,
+              "start_column": 4,
+              "end_row": 13,
+              "end_column": 17
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
