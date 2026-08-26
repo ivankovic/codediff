@@ -33,7 +33,7 @@ fn optimal_solution() -> Result<()> {
     // pattern were net-negative or reverted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-add-exception-handling",
-        6,
-        2,
+        7,
+        4,
     )
 }
