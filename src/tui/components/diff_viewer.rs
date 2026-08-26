@@ -119,7 +119,7 @@ impl DiffViewer {
             .load_contents(data.after_path.clone(), data.after_contents.clone());
         self.full_ranges = [data.before_ranges.clone(), data.after_ranges.clone()];
         self.sources = [data.before_contents.clone(), data.after_contents.clone()];
-        self.apply_render_mode();
+        self.apply_render_mode(true);
         self.active_panel = Panel::Before;
         self.sync_focus();
         self.sync_cross_highlight();
@@ -141,24 +141,31 @@ impl DiffViewer {
     /// the mapping is identical in both modes, and only how much of it is shown differs.
     pub fn set_render_mode(&mut self, mode: RenderMode) {
         self.render_mode = mode;
-        self.apply_render_mode();
+        self.apply_render_mode(false);
+        // The counterpart highlight was dropped with the old ranges; recompute it for whatever the
+        // cursor is now sitting on, so the two panels stay in step across the switch.
+        self.sync_cross_highlight();
     }
 
     pub fn render_mode(&self) -> RenderMode {
         self.render_mode
     }
 
-    fn apply_render_mode(&mut self) {
-        self.left_viewer.set_ranges(ranges_for_mode(
-            &self.full_ranges[0],
-            &self.sources[0],
-            self.render_mode,
-        ));
-        self.right_viewer.set_ranges(ranges_for_mode(
-            &self.full_ranges[1],
-            &self.sources[1],
-            self.render_mode,
-        ));
+    /// `reset_cursor` distinguishes the two callers: `load_diff` (a new diff arrived - jump to its
+    /// first change) from `set_render_mode` (the same diff, painted differently - stay put).
+    fn apply_render_mode(&mut self, reset_cursor: bool) {
+        for (viewer, side) in [(&mut self.left_viewer, 0), (&mut self.right_viewer, 1)] {
+            let ranges = ranges_for_mode(
+                &self.full_ranges[side],
+                &self.sources[side],
+                self.render_mode,
+            );
+            if reset_cursor {
+                viewer.set_ranges(ranges);
+            } else {
+                viewer.replace_ranges(ranges);
+            }
+        }
     }
 
     /// Move the focused panel's cursor vertically (by one line) and push the resulting matched
@@ -1049,6 +1056,43 @@ mod tests {
     /// exactly the "After" side shows its own cursor highlight and the "Before" side shows only
     /// the pushed cross-highlight - never the other way around, and never both blues on one
     /// panel at once.
+    /// Pressing `M` at line 400 must not land you back at the top: it changes how the same diff is
+    /// painted, not which diff is loaded.
+    #[test]
+    fn switching_render_mode_keeps_the_cursor_where_it_is() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+
+        for _ in 0..3 {
+            viewer.move_cursor_vertical(1);
+        }
+        let before = viewer.focused_cursor_position();
+        assert!(before.is_some());
+
+        viewer.set_render_mode(RenderMode::Minimal);
+
+        assert_eq!(
+            viewer.focused_cursor_position(),
+            before,
+            "the cursor should survive a mode switch"
+        );
+    }
+
+    /// The other half of the same rule: a *new* diff should still jump to its first change.
+    #[test]
+    fn loading_a_diff_still_jumps_to_the_first_change() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&sample_diff_data());
+        let at_load = viewer.focused_cursor_position();
+
+        for _ in 0..3 {
+            viewer.move_cursor_vertical(1);
+        }
+        viewer.load_diff(&sample_diff_data());
+
+        assert_eq!(viewer.focused_cursor_position(), at_load);
+    }
+
     #[test]
     fn tab_moves_focus_exclusively_to_the_other_panel() {
         let mut viewer = DiffViewer::new();

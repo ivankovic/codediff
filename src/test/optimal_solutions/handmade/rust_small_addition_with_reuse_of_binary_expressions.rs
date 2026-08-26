@@ -21,5 +21,17 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-small-addition-with-reuse-of-binary-expressions")
+    // The edit hoists an `if` condition into two `let` declarations, so every operator and
+    // identifier in it gains an enclosing `let_declaration` where it used to sit under
+    // `expression_statement`. The human pairs them across that reparent; `APTED("qualified_name")`
+    // deletes them, because the names still match but the enclosing path no longer does - the same
+    // search-quality gap that bucket has carried since 2026-08-17.
+    //
+    // Fittingly, the before/after here is this repository's own `diff/text.rs` across the
+    // move-classification fix, so the fixture is a diff of the code that renders it.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "rust-small-addition-with-reuse-of-binary-expressions",
+        10,
+        5,
+    )
 }

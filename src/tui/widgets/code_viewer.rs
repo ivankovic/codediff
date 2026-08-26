@@ -304,6 +304,22 @@ impl CodeViewerState {
         self.search_matches = Vec::new();
     }
 
+    /// Swap the ranges without moving the cursor - for a change in how the *same* diff is painted,
+    /// as opposed to a new diff arriving.
+    ///
+    /// `load_ranges` jumping to the first change is right when a diff is loaded and wrong when the
+    /// reader merely asked to see more or less of the one already on screen: pressing `M` at line
+    /// 400 and landing back at the top loses their place for no reason. The cursor is clamped
+    /// rather than trusted, since the caller could in principle pass ranges for a different file.
+    pub fn replace_ranges(&mut self, ranges: Vec<RangeMatch>, line_count: usize) {
+        self.ranges = ranges;
+        self.range_order = build_range_order(&self.ranges);
+        self.cursor_row = self.cursor_row.min(line_count.saturating_sub(1));
+        // The cross-panel highlight points at a range that may no longer exist; the search hits
+        // are still valid, since they index text rather than ranges.
+        self.highlight_destination = None;
+    }
+
     /// Every change's `(row, column)` start position (anything but `Identical`/the `NotYetSet`
     /// sentinel, and not a zero-width placeholder), in document order - the ordered list
     /// `next_change_position`/`change_count_and_index` both walk.

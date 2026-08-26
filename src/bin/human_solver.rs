@@ -254,7 +254,8 @@ t              text view: read the source, and paint the human text-range ground
                  Before/After selection deleted/inserted, m pairs BOTH sides'
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
-                 Z marks a nothing-to-paint fixture, Esc unselects or closes.
+                 Z marks a nothing-to-paint fixture, : jumps to a line number,
+                 Esc unselects or closes.
                  x banks a selection so another can be made on the same side, c
                  clears the banks; banked and live ranges commit together, which
                  is how an N:M match is made -- every span on ONE side must read
@@ -267,7 +268,7 @@ t              text view: read the source, and paint the human text-range ground
                  switches which one you edit.
                  p cycles what is drawn: your painting, codediff's own rendering
                  of the same pair, or only the bytes where the two disagree
-T              view the output of unix `diff -u`
+T              view the output of unix `diff -u`, with before/after line numbers
                  (t/T switch between these two views while either is open)
 H              toggle hiding fully solved subtrees (unmarked nodes and their
                  ancestors always stay visible)
@@ -1578,6 +1579,13 @@ struct TextPaintState {
     cursor: [(usize, usize); 2],
     /// Where a selection was started with `v`, per side; `None` when nothing is selected.
     anchor: [Option<(usize, usize)>; 2],
+    /// The digits typed so far at the `:` line prompt, if it is open.
+    ///
+    /// Kept on the paint state rather than raised as its own modal: the text view *is* a modal,
+    /// and nesting one inside it to read a number would mean carrying the whole painting state
+    /// through the nested modal and back. A file worth jumping around in is exactly one too big to
+    /// reach with `j`, which is the case this exists for.
+    line_prompt: Option<String>,
     /// Ranges banked with `x`, per side, waiting to be committed by `d`/`i`/`m`.
     ///
     /// This is what makes an N:M match possible: one live selection can only ever describe one
@@ -2942,7 +2950,10 @@ fn clear_after_descendants(entries: &mut Vec<HumanMappingEntry>, ancestor: Node,
 /// or nothing needed to change), or it needs a direct human answer before anything is written.
 enum ActionOutcome {
     Done(String),
-    NeedsModal(Modal),
+    /// Boxed: `Modal`'s largest variant is much bigger than `Done`'s `String`, so an unboxed
+    /// enum would pay that size on every `ActionOutcome` returned. One indirection on a
+    /// keystroke-rate path is free; the size difference is what clippy flags.
+    NeedsModal(Box<Modal>),
 }
 
 /// True if `b` and `a` have the exact same text.
@@ -3167,13 +3178,15 @@ fn action_commit_multi_map_group(
         .collect();
 
     if kinds.len() > 1 {
-        return Ok(ActionOutcome::NeedsModal(Modal::ConfirmMultiMapGroup {
-            before_ids: before_ids.iter().copied().collect(),
-            after_ids: after_ids.iter().copied().collect(),
-            operation,
-            with_children,
-            kinds,
-        }));
+        return Ok(ActionOutcome::NeedsModal(Box::new(
+            Modal::ConfirmMultiMapGroup {
+                before_ids: before_ids.iter().copied().collect(),
+                after_ids: after_ids.iter().copied().collect(),
+                operation,
+                with_children,
+                kinds,
+            },
+        )));
     }
 
     let msg = commit_multi_map_group(
@@ -3193,13 +3206,13 @@ fn action_commit_multi_map_group(
 /// distinguishes a single-node match attempt (`m`, `false`) from a whole-subtree one (`M`, `true`)
 /// - see [`Modal::ConfirmKindMismatch`].
 fn kind_mismatch_modal(before_node: Node, after_node: Node, recursive: bool) -> ActionOutcome {
-    ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
+    ActionOutcome::NeedsModal(Box::new(Modal::ConfirmKindMismatch {
         before_id: before_node.id(),
         after_id: after_node.id(),
         before_kind: before_node.kind().to_string(),
         after_kind: after_node.kind().to_string(),
         recursive,
-    })
+    }))
 }
 
 /// Classifies a same-kind cursor pair as it would be auto-classified by a single `m` press:
@@ -4647,9 +4660,19 @@ fn render_paint_side(
     let lines: Vec<&str> = source.split('\n').collect();
     let gutter_width = lines.len().to_string().len().max(3);
 
+    // Bucketed by row once, rather than scanning every span for every byte of every visible row.
+    // A file with a few hundred painted ranges made that inner loop the render's whole cost.
+    let mut spans_by_row: HashMap<usize, Vec<&(HumanTextSpan, HumanTextVerdict)>> = HashMap::new();
+    for entry in spans {
+        for row in entry.0.start_row..=entry.0.end_row {
+            spans_by_row.entry(row).or_default().push(entry);
+        }
+    }
+    let no_spans: Vec<&(HumanTextSpan, HumanTextVerdict)> = Vec::new();
+
     let class_at = |row: usize, column: usize, line: &str| -> PaintClass {
         let mut class = PaintClass::Plain;
-        for (span, verdict) in spans {
+        for (span, verdict) in spans_by_row.get(&row).unwrap_or(&no_spans) {
             if span_covers(*span, row, column, line.len()) {
                 class = class.max(PaintClass::Painted(*verdict));
             }
@@ -4824,10 +4847,12 @@ fn render_text_view_modal(
         (
             1usize,
             after_src,
-            if others > 0 {
-                format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
-            } else {
-                "After — v sel/i ins/u unmark, s save-as, Tab, Esc".to_string()
+            match (&state.line_prompt, state.side) {
+                (Some(typed), 1) => format!("After — jump to line: {typed}_"),
+                _ if others > 0 => {
+                    format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
+                }
+                _ => "After — v sel/i ins/u unmark, s save-as, : jump, Tab, Esc".to_string(),
             },
         ),
     ] {
@@ -4942,27 +4967,59 @@ fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str, scroll: u
     let popup_area = centered_rect(92, 90, area);
     frame.render_widget(Clear, popup_area);
 
+    // `diff -u` reports positions only in its `@@ -a,b +c,d @@` headers, so a reader counting to
+    // the line a hunk mentions has to do it by hand. Tracking the two counters across the hunk and
+    // printing them per row turns that into reading. A deleted line has no after-side number and
+    // an inserted one has no before-side number, which the blank half says directly.
+    let mut before_line = 0usize;
+    let mut after_line = 0usize;
     let lines: Vec<Line> = output
         .lines()
         .map(|line| {
-            let style = if line.starts_with("+++") || line.starts_with("---") {
-                Style::default().add_modifier(Modifier::BOLD)
+            let (style, gutter) = if line.starts_with("+++") || line.starts_with("---") {
+                (Style::default().add_modifier(Modifier::BOLD), String::new())
+            } else if let Some(rest) = line.strip_prefix("@@") {
+                (Style::default().fg(Color::Cyan), {
+                    // `@@ -a,b +c,d @@` - the two starting positions, which reset both counters.
+                    let mut numbers = rest.split_whitespace();
+                    for (target, sign) in [(&mut before_line, '-'), (&mut after_line, '+')] {
+                        if let Some(start) = numbers.next().and_then(|token| {
+                            token
+                                .strip_prefix(sign)?
+                                .split(',')
+                                .next()?
+                                .parse::<usize>()
+                                .ok()
+                        }) {
+                            *target = start;
+                        }
+                    }
+                    String::new()
+                })
             } else if line.starts_with('+') {
-                Style::default().fg(Color::Green)
+                let g = format!("{:>6} {:>6} ", "", after_line);
+                after_line += 1;
+                (Style::default().fg(Color::Green), g)
             } else if line.starts_with('-') {
-                Style::default().fg(Color::Red)
-            } else if line.starts_with("@@") {
-                Style::default().fg(Color::Cyan)
+                let g = format!("{:>6} {:>6} ", before_line, "");
+                before_line += 1;
+                (Style::default().fg(Color::Red), g)
             } else {
-                Style::default()
+                let g = format!("{:>6} {:>6} ", before_line, after_line);
+                before_line += 1;
+                after_line += 1;
+                (Style::default(), g)
             };
-            Line::from(Span::styled(line.to_string(), style))
+            Line::from(vec![
+                Span::styled(gutter, Style::default().fg(Color::DarkGray)),
+                Span::styled(line.to_string(), style),
+            ])
         })
         .collect();
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title("unix `diff -u` — j/k scroll, t text view, Esc close")
+        .title("unix `diff -u` — before/after line numbers — j/k scroll, t text view, Esc close")
         .border_style(
             Style::default()
                 .fg(Color::Cyan)
@@ -5510,6 +5567,22 @@ fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
         | Some(Modal::PromptComment { .. }) => {
             matches!(code, KeyCode::Char(_) | KeyCode::Backspace)
         }
+        // The text-painting views cannot invalidate the cached `FrameState`, so *every* key in
+        // them preserves it - including the ones that write.
+        //
+        // `FrameState` caches the flattened trees and the `Caches` built from them, and
+        // `rebuild_caches_for_mapping` reads only `entries`/`groups`. Painting writes
+        // `text_mappings`, a separate ground truth that no tree state is derived from (see
+        // `HumanTextMapping`), so nothing the `t` view does can make the cache wrong.
+        //
+        // This is a correctness observation with a large performance consequence. Falling through
+        // to `false` re-flattened both ASTs and rebuilt every cache on each cursor keystroke; on a
+        // ~900 KB fixture that is a full walk of a few hundred thousand nodes per keypress, which
+        // is what made the view unusable on big files. The painting view is exactly where a reader
+        // holds down `j`.
+        Some(Modal::TextView { .. })
+        | Some(Modal::SolutionPicker { .. })
+        | Some(Modal::UnixDiffView { .. }) => true,
         Some(_) => false,
     }
 }
@@ -5777,7 +5850,7 @@ fn handle_key(
                         after_root,
                     );
                 }
-                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
+                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(*modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
             }
             None
@@ -5795,7 +5868,7 @@ fn handle_key(
                 after_hash,
             ) {
                 Ok(ActionOutcome::Done(msg)) => app.status = Some(msg),
-                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
+                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(*modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
             }
             None
@@ -5846,7 +5919,7 @@ fn handle_key(
                         after_root,
                     );
                 }
-                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(modal),
+                Ok(ActionOutcome::NeedsModal(modal)) => app.modal = Some(*modal),
                 Err(err) => app.status = Some(format!("Error: {:#}", err)),
             }
             None
@@ -6759,8 +6832,44 @@ fn handle_modal_key(
             };
             let mut close = false;
 
+            // While the `:` prompt is open it takes every keystroke, so a digit is a digit rather
+            // than a movement command.
+            if let Some(mut typed) = state.line_prompt.take() {
+                match code {
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
+                        typed.push(c);
+                        state.line_prompt = Some(typed);
+                    }
+                    KeyCode::Backspace => {
+                        typed.pop();
+                        state.line_prompt = Some(typed);
+                    }
+                    KeyCode::Enter => match typed.parse::<usize>() {
+                        // 1-based in, 0-based out: the gutter shows 1-based numbers, so that is
+                        // what a reader will type.
+                        Ok(line) if line >= 1 => {
+                            let last = TextPaintState::row_count(focused_source).saturating_sub(1);
+                            let row = (line - 1).min(last);
+                            state.cursor[state.side] = (row, 0);
+                            app.status = Some(format!("Jumped to line {}", row + 1));
+                        }
+                        _ => app.status = Some(format!("Not a line number: {typed:?}")),
+                    },
+                    KeyCode::Esc => app.status = Some("Cancelled".to_string()),
+                    _ => state.line_prompt = Some(typed),
+                }
+                state.scroll_into_view(VIEWPORT_ROWS);
+                app.modal = Some(Modal::TextView { state });
+                return None;
+            }
+
             match code {
                 KeyCode::Tab => state.side = 1 - state.side,
+                KeyCode::Char(':') => {
+                    state.line_prompt = Some(String::new());
+                    app.status =
+                        Some("Jump to line: type a number, Enter to go, Esc to cancel".to_string());
+                }
                 KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
                 KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),
                 KeyCode::Left | KeyCode::Char('h') => state.step_column(false, focused_source),
@@ -9223,6 +9332,105 @@ mod tests {
         assert!(state.pending[0].is_empty() && state.pending[1].is_empty());
     }
 
+    /// `diff -u` reports positions only in its hunk headers; the gutter turns counting into
+    /// reading. A deleted line has no after-side number and an inserted one has no before-side
+    /// number - the blank half is the point, not an omission.
+    #[test]
+    fn the_unix_diff_view_numbers_both_sides() {
+        let backend = ratatui::backend::TestBackend::new(110, 16);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 110, 16);
+        let output = "--- a\n+++ b\n@@ -10,3 +20,3 @@\n context\n-gone\n+new\n";
+
+        terminal
+            .draw(|f| render_unix_diff_modal(f, area, output, 0))
+            .unwrap();
+
+        // Asserted per row on collapsed whitespace, not on exact column padding: the gutter's
+        // field width is a layout choice, and pinning it would make this test fail for a cosmetic
+        // change while saying nothing about the numbering it exists to check.
+        let rows: Vec<String> = rendered_text(&terminal)
+            .split('\u{2502}')
+            .map(|row| row.split_whitespace().collect::<Vec<_>>().join(" "))
+            .collect();
+        let has = |wanted: &str| rows.iter().any(|row| row.contains(wanted));
+
+        // The context line carries both counters, starting at the hunk header's positions.
+        assert!(has("10 20 context"), "got: {rows:#?}");
+        // A deletion advances only the before side, an insertion only the after side - so each
+        // shows one number and leaves the other half of the gutter blank.
+        assert!(has("11 -gone"), "got: {rows:#?}");
+        assert!(has("21 +new"), "got: {rows:#?}");
+    }
+
+    /// `:` opens the jump prompt, digits accumulate, Enter moves the cursor - the whole point
+    /// being a file too big to reach with `j`.
+    #[test]
+    fn colon_jumps_to_a_line_in_the_text_view() {
+        let source = "a\nb\nc\nd\ne\nf\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::TextView {
+            state: TextPaintState::default(),
+        });
+
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+        for key in [KeyCode::Char(':'), KeyCode::Char('4'), KeyCode::Enter] {
+            handle_modal_key(
+                &mut app,
+                key,
+                &flat,
+                &flat,
+                root,
+                root,
+                &caches,
+                source.as_bytes(),
+                source.as_bytes(),
+                &before,
+                &after,
+            );
+        }
+
+        let Some(Modal::TextView { state }) = &app.modal else {
+            panic!("the text view should still be open, got {:?}", app.modal);
+        };
+        assert_eq!(state.cursor[0], (3, 0), "line 4 is row 3");
+        assert!(state.line_prompt.is_none(), "the prompt closes on Enter");
+    }
+
+    /// Every key in the painting views preserves the cached `FrameState`, because painting writes
+    /// `text_mappings` and the caches are built from `entries`. Falling through to `false` here
+    /// re-walked both ASTs on every cursor keystroke, which is what made the view unusable on a
+    /// large file.
+    #[test]
+    fn text_view_keys_do_not_invalidate_the_frame_state() {
+        let text_view = Modal::TextView {
+            state: TextPaintState::default(),
+        };
+        for key in [
+            KeyCode::Char('j'),
+            KeyCode::Char('v'),
+            KeyCode::Char('m'),
+            KeyCode::Char('x'),
+            KeyCode::Esc,
+        ] {
+            assert!(
+                is_state_preserving_key(Some(&text_view), key),
+                "{key:?} should preserve the frame state"
+            );
+        }
+    }
+
     /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
     /// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
     /// one line.
@@ -11021,24 +11229,24 @@ mod tests {
         .unwrap();
 
         let (before_id, after_id, before_kind, after_kind) = match outcome {
-            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
-                before_id,
-                after_id,
-                before_kind,
-                after_kind,
-                recursive,
-            }) => {
-                assert!(
-                    !recursive,
-                    "f should raise a single-pair mismatch, not a recursive one"
-                );
-                (before_id, after_id, before_kind, after_kind)
-            }
+            ActionOutcome::NeedsModal(modal) => match *modal {
+                Modal::ConfirmKindMismatch {
+                    before_id,
+                    after_id,
+                    before_kind,
+                    after_kind,
+                    recursive,
+                } => {
+                    assert!(
+                        !recursive,
+                        "f should raise a single-pair mismatch, not a recursive one"
+                    );
+                    (before_id, after_id, before_kind, after_kind)
+                }
+                other => panic!("expected ConfirmKindMismatch, got {other:?}"),
+            },
             ActionOutcome::Done(msg) => {
                 panic!("expected a kind mismatch modal, action completed instead: {msg}")
-            }
-            ActionOutcome::NeedsModal(other) => {
-                panic!("expected ConfirmKindMismatch, got {other:?}")
             }
         };
         assert_ne!(before_kind, after_kind);
@@ -11118,20 +11326,18 @@ mod tests {
             "the shared a(); b(); prefix should have been matched"
         );
         match outcome {
-            ActionOutcome::NeedsModal(Modal::ConfirmKindMismatch {
-                before_kind,
-                after_kind,
-                ..
-            }) => {
-                assert_ne!(before_kind, after_kind);
-            }
+            ActionOutcome::NeedsModal(modal) => match *modal {
+                Modal::ConfirmKindMismatch {
+                    before_kind,
+                    after_kind,
+                    ..
+                } => assert_ne!(before_kind, after_kind),
+                other => panic!("expected ConfirmKindMismatch, got {other:?}"),
+            },
             ActionOutcome::Done(msg) => panic!(
                 "expected the sweep to stop on a kind mismatch once `c();` has nothing left to pair \
                  with, action completed instead: {msg}"
             ),
-            ActionOutcome::NeedsModal(other) => {
-                panic!("expected ConfirmKindMismatch, got {other:?}")
-            }
         }
 
         let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
@@ -12368,14 +12574,14 @@ mod tests {
         .unwrap();
 
         match outcome {
-            ActionOutcome::NeedsModal(Modal::ConfirmMultiMapGroup { kinds, .. }) => {
-                assert!(kinds.len() > 1, "{:?}", kinds);
-            }
+            ActionOutcome::NeedsModal(modal) => match *modal {
+                Modal::ConfirmMultiMapGroup { kinds, .. } => {
+                    assert!(kinds.len() > 1, "{:?}", kinds);
+                }
+                other => panic!("expected ConfirmMultiMapGroup, got {other:?}"),
+            },
             ActionOutcome::Done(msg) => {
                 panic!("expected a mixed-kinds confirmation, action completed instead: {msg}")
-            }
-            ActionOutcome::NeedsModal(other) => {
-                panic!("expected ConfirmMultiMapGroup, got {other:?}")
             }
         }
         assert!(

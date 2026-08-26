@@ -115,6 +115,14 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
+    /// Swap the ranges, keeping the cursor and scroll where they are - see
+    /// `CodeViewerState::replace_ranges`.
+    pub fn replace_ranges(&mut self, ranges: Vec<RangeMatch>) {
+        let line_count = self.line_count();
+        self.state.replace_ranges(ranges, line_count);
+        self.desired_col = None;
+    }
+
     /// The destination range matched to wherever the cursor currently sits, i.e. the range the
     /// other panel's cursor should follow.
     pub fn cursor_destination(&self) -> Option<TextRange> {
