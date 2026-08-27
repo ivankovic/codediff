@@ -1,7 +1,9 @@
 name: Publish human mapping site
 
 # Builds and deploys the read-only human_mapping.json viewer (generate_mapping_site) to GitHub
-# Pages on every push to main. Nothing this workflow generates is committed to the repo - the
+# Pages on every push to main - both halves of that file: the node mapping, as two annotated ASTs
+# and as code, and every hand-painted account of the same diff as text, stacked in the code view
+# for the reader to flip between. Nothing this workflow generates is committed to the repo - the
 # HTML/CSS/JS is built fresh from src/test/data/diffs/ each run. Requires Pages to be enabled once
 # in this repo's Settings -> Pages, with source set to "GitHub Actions" (a one-time manual step,
 # not something a workflow file can do on its own).

@@ -39,10 +39,11 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 use codediff::test::helper::human_mapping::{
-    NodeStatus, rebuild_caches_for_mapping, status_after, status_before,
+    rebuild_caches_for_mapping, status_after, status_before,
 };
 use codediff::test::helper::{
-    DIFF_DATASETS, code_pair_from_dir, human_mapping, note_as_csv_cell, read_note,
+    DIFF_DATASETS, SampleProvenance, code_pair_from_dir, human_mapping, note_as_csv_cell,
+    read_note, sample_provenance,
 };
 
 #[derive(Parser)]
@@ -219,7 +220,7 @@ fn row_for(
     name: &str,
     dataset: &str,
     dir: &Path,
-    provenance: &HashMap<String, SampleRow>,
+    provenance: &HashMap<String, SampleProvenance>,
 ) -> Result<Option<Row>> {
     let Some((before, after)) = code_pair_from_dir(dir)? else {
         return Ok(None);
@@ -239,8 +240,8 @@ fn row_for(
                 (
                     count_nodes(before_root),
                     count_nodes(after_root),
-                    count_unmarked(before_root, &caches, status_before)
-                        + count_unmarked(after_root, &caches, status_after),
+                    human_mapping::unmarked_node_count(before_root, &caches, status_before)
+                        + human_mapping::unmarked_node_count(after_root, &caches, status_after),
                 )
             }
             // No grammar for this extension: the file pair is still real and still worth inventorying,
@@ -285,26 +286,6 @@ fn row_for(
     }))
 }
 
-/// Nodes in `root`'s tree the mapping says nothing about.
-fn count_unmarked(
-    root: tree_sitter::Node,
-    caches: &human_mapping::Caches,
-    status_fn: fn(tree_sitter::Node, &human_mapping::Caches) -> NodeStatus,
-) -> usize {
-    let mut count = 0;
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        if status_fn(node, caches) == NodeStatus::Unmarked {
-            count += 1;
-        }
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-    count
-}
-
 /// Counts a tree-sitter subtree's size, root inclusive - a local copy of
 /// `codediff::stats::count_nodes` for the same reason `analyze_human_mappings` keeps one: that
 /// function is behind the `stats` feature (git2/rusqlite and the rest of its build cost), which
@@ -320,46 +301,6 @@ fn count_nodes(root: tree_sitter::Node) -> usize {
         }
     }
     count
-}
-
-/// The provenance columns of one `sample.csv` row.
-struct SampleRow {
-    repository: String,
-    commit: String,
-    path: String,
-    comment: String,
-}
-
-/// `sample.csv` keyed by the fixture name it was promoted to.
-///
-/// Rows with an empty `promoted_to` are candidates that were never promoted (or were rejected), so
-/// they name no fixture and are skipped.
-fn sample_provenance() -> Result<HashMap<String, SampleRow>> {
-    let path = data_root().join("sample.csv");
-    let mut out = HashMap::new();
-    if !path.exists() {
-        return Ok(out);
-    }
-    let mut reader = csv::Reader::from_path(&path)
-        .with_context(|| format!("reading sample provenance from {path:?}"))?;
-    for record in reader.deserialize::<HashMap<String, String>>() {
-        let record = record.context("parsing a sample.csv row")?;
-        let promoted_to = record.get("promoted_to").cloned().unwrap_or_default();
-        if promoted_to.is_empty() {
-            continue;
-        }
-        let field = |key: &str| record.get(key).cloned().unwrap_or_default();
-        out.insert(
-            promoted_to,
-            SampleRow {
-                repository: field("repository"),
-                commit: field("commit"),
-                path: field("path"),
-                comment: field("comment"),
-            },
-        );
-    }
-    Ok(out)
 }
 
 fn data_root() -> PathBuf {

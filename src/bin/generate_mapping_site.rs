@@ -40,9 +40,10 @@ use codediff::diff::NodeCache;
 use codediff::diff::text::{RangeMatch, TextDiff, TextOperation};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
-    self, Caches, HumanOperation, MarkKind, NodeStatus, is_identical_after, is_identical_before,
-    is_moved_after, is_moved_before, match_operation_after, match_operation_before,
-    rebuild_caches_for_mapping, status_after, status_before,
+    self, Caches, HumanOperation, HumanTextVerdict, MarkKind, NodeStatus, is_identical_after,
+    is_identical_before, is_moved_after, is_moved_before, match_operation_after,
+    match_operation_before, rebuild_caches_for_mapping, status_after, status_before,
+    unmarked_node_count,
 };
 // Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
 // one the non-test code path uses).
@@ -91,8 +92,16 @@ fn main() -> Result<()> {
     let mut names: Vec<&String> = pairs.keys().collect();
     names.sort();
 
+    // Where each fixture came from, joined once for the whole corpus rather than per page. A
+    // fixture directory holds only the two files, so the repository/commit it was sampled from
+    // lives in `sample.csv`, and turning that row's `owner-repo` slug into a URL needs the clone
+    // list - see `helper::repository_urls` for why the slug can't just be split on a dash.
+    let provenance = helper::sample_provenance()?;
+    let repository_urls = helper::repository_urls()?;
+
     let mut index_entries: Vec<IndexEntry> = Vec::new();
     let mut skipped = 0usize;
+    let mut warnings: Vec<String> = Vec::new();
 
     for name in names {
         let (before, after) = &pairs[name];
@@ -106,8 +115,29 @@ fn main() -> Result<()> {
             }
         };
 
-        let page = render_fixture_page(name, before, after, &mapping)?;
-        fs::write(fixtures_dir.join(format!("{name}.html")), page)
+        // The fixture's own `description.md`, the same note `diffs.csv`'s `comment` column carries
+        // - a person's statement of what this case is and why it is worth keeping, which until now
+        // the site was the only place not to show.
+        let note = helper::read_note(name);
+        let upstream = provenance.get(name).and_then(|sample| {
+            helper::upstream_commit_url(sample, &repository_urls).map(|commit_url| Upstream {
+                commit_url,
+                repository: sample.repository.clone(),
+                commit: sample.commit.clone(),
+                path: sample.path.clone(),
+            })
+        });
+
+        let page = render_fixture_page(
+            name,
+            before,
+            after,
+            &mapping,
+            note.as_deref(),
+            upstream.as_ref(),
+            &mut warnings,
+        )?;
+        fs::write(fixtures_dir.join(format!("{name}.html")), page.html)
             .with_context(|| format!("writing page for '{name}'"))?;
 
         let language = before.metadata.language.unwrap_or_default();
@@ -126,6 +156,16 @@ fn main() -> Result<()> {
             codediff_mismatches: mismatches.codediff,
             unix_diff_mismatches: mismatches.unix_diff,
             total_lines: mismatches.total_lines,
+            // Names, not a count, and the empty list is load-bearing: "nobody painted this" and
+            // "somebody painted it and there was nothing to paint" are different states, and only
+            // the first has no names (see `HumanMapping::text_mappings`).
+            paintings: mapping
+                .text_mappings
+                .iter()
+                .map(|named| named.name.clone())
+                .collect(),
+            note,
+            unmarked_nodes: page.unmarked_nodes,
         });
     }
 
@@ -134,13 +174,49 @@ fn main() -> Result<()> {
         render_index_page(&index_entries),
     )?;
 
+    let painted = index_entries
+        .iter()
+        .filter(|entry| !entry.paintings.is_empty())
+        .count();
+    let incomplete = index_entries
+        .iter()
+        .filter(|entry| entry.unmarked_nodes > 0)
+        .count();
     println!(
-        "Generated {} fixture page(s) into {:?} ({} skipped, no human_mapping.json)",
+        "Generated {} fixture page(s) into {:?} ({painted} with a painting, {incomplete} with \
+         unmarked nodes, {skipped} skipped, no human_mapping.json)",
         index_entries.len(),
         args.out,
-        skipped
     );
+    for warning in &warnings {
+        eprintln!("warning: {warning}");
+    }
     Ok(())
+}
+
+/// Where a fixture's two files were sampled from, resolved to something linkable.
+///
+/// The `url` is the commit the *after* side comes from - the before side is the same file in its
+/// single parent - so it opens on exactly the change this fixture captures. See
+/// `helper::SampleProvenance`.
+struct Upstream {
+    /// The full commit URL, already built by `helper::upstream_commit_url` - not the repository
+    /// URL, so nothing here has to know how a given forge spells a commit path.
+    commit_url: String,
+    /// `owner-repo`, the clone-directory slug `sample.csv` records. Shown as the link's text, since
+    /// a bare commit hash says nothing about which project it belongs to.
+    repository: String,
+    commit: String,
+    path: String,
+}
+
+/// One rendered fixture page, plus the one number the index wants that only rendering computes.
+struct FixturePage {
+    html: String,
+    /// Nodes the human mapping says nothing about. Counted here rather than in `main` because
+    /// `render_fixture_page` already builds the `Caches` it needs; recomputing them per fixture
+    /// for the index would double the corpus's cache-rebuild cost for one integer.
+    unmarked_nodes: usize,
 }
 
 fn render_fixture_page(
@@ -148,7 +224,13 @@ fn render_fixture_page(
     before: &Code,
     after: &Code,
     mapping: &human_mapping::HumanMapping,
-) -> Result<String> {
+    note: Option<&str>,
+    upstream: Option<&Upstream>,
+    // Data problems worth a maintainer's attention that are not worth failing over - currently
+    // only an unreadable painting, which costs its own panel and nothing else. `main` prints them
+    // once the whole corpus has been rendered.
+    warnings: &mut Vec<String>,
+) -> Result<FixturePage> {
     let before_root = before
         .ast
         .as_ref()
@@ -174,6 +256,10 @@ fn render_fixture_page(
     // derives it lazily, client-side, only for whichever single node gets clicked, since baking a
     // `data-path` string into every node measurably added to that same page-size problem (over a
     // third of a node's own markup on a representative fixture).
+    // Counted from the caches already built above, before they are consumed by rendering.
+    let unmarked_nodes = unmarked_node_count(before_root, &caches, status_before)
+        + unmarked_node_count(after_root, &caches, status_after);
+
     let before_quiet_sizes =
         fully_quiet_subtree_sizes(before_root, &caches, status_before, is_identical_before);
     let after_quiet_sizes =
@@ -214,20 +300,121 @@ fn render_fixture_page(
     let text_diff = TextDiff::from(before, after, &human_diff, &node_cache);
     let before_ranges = text_diff.all(0);
     let after_ranges = text_diff.all(1);
-    let before_code_html = render_code_panel(
-        &before.contents,
-        &before_ranges,
-        &code_markers(&after_ranges, before.contents.split('\n').count()),
-        'b',
-        &code_counterparts(&before_ranges, &after_ranges, 'a'),
-    );
-    let after_code_html = render_code_panel(
-        &after.contents,
-        &after_ranges,
-        &code_markers(&before_ranges, after.contents.split('\n').count()),
-        'a',
-        &code_counterparts(&after_ranges, &before_ranges, 'b'),
-    );
+    let row_counts = [
+        before.contents.split('\n').count(),
+        after.contents.split('\n').count(),
+    ];
+
+    // The tree mapping's rendering first, then one per human painting. They are alternative
+    // accounts of the same edit, not a decomposition of it, so they are stacked as separate panels
+    // the reader switches between rather than merged into one - see `HumanMapping::text_mappings`
+    // for why a fixture carries several answers at all.
+    let mut renderings: Vec<(String, String, [PanelRanges; 2])> = vec![(
+        "tree".to_string(),
+        "From the node mapping".to_string(),
+        [
+            PanelRanges::from_tree(
+                "b",
+                "a",
+                before_ranges.clone(),
+                &after_ranges,
+                row_counts[0],
+            ),
+            PanelRanges::from_tree(
+                "a",
+                "b",
+                after_ranges.clone(),
+                &before_ranges,
+                row_counts[1],
+            ),
+        ],
+    )];
+    for (index, named) in mapping.text_mappings.iter().enumerate() {
+        match painting_panels(named, &before.contents, &after.contents, index, row_counts) {
+            Ok(panels) => renderings.push((format!("p{index}"), named.name.clone(), panels)),
+            // One unreadable painting costs its own panel, not the page and not the site build.
+            // Reported by `main`, which is where a maintainer will see it.
+            Err(error) => warnings.push(format!("'{name}' painting: {error:#}")),
+        }
+    }
+
+    // Folding is decided once per side, across every rendering at once, and both halves of that
+    // matter - see `code_visible_rows`.
+    let mut anchors: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+    for (_, _, panels) in &renderings {
+        for side in 0..2 {
+            anchors[side].extend(panels[side].anchor_rows());
+        }
+    }
+    let visible = [
+        code_visible_rows(&anchors[0], row_counts[0]),
+        code_visible_rows(&anchors[1], row_counts[1]),
+    ];
+
+    let mut code_sections = String::new();
+    let mut rendering_buttons = String::new();
+    for (key, label, panels) in &renderings {
+        let selected = key == "tree";
+        // Both the DOM handle and the human name: `viewer.js` switches by handle but *remembers*
+        // by name, since `p0` means a different painting on the next fixture while "Minimal" means
+        // the same thing everywhere.
+        let label_attr = escape_html_attr(label);
+        rendering_buttons.push_str(&format!(
+            r#"<button type="button" data-painting="{key}" data-painting-name="{label_attr}" aria-pressed="{selected}">{}</button>"#,
+            escape_html_text(label)
+        ));
+        code_sections.push_str(&format!(
+            r#"<div class="panels code-panels{hidden}" data-painting="{key}" data-painting-name="{label_attr}">
+<section class="panel code-panel" data-side="before">
+<h2>Before</h2>
+<div class="code">{}</div>
+</section>
+<section class="panel code-panel" data-side="after">
+<h2>After</h2>
+<div class="code">{}</div>
+</section>
+</div>
+"#,
+            render_code_panel(&before.contents, &panels[0], &visible[0]),
+            render_code_panel(&after.contents, &panels[1], &visible[1]),
+            hidden = if selected { "" } else { " hidden" },
+        ));
+    }
+
+    // No switch and no explanation on a fixture nobody has painted: one rendering needs no chooser,
+    // and a note about paintings on a page with none is just noise.
+    let painting_switch = if renderings.len() > 1 {
+        format!(
+            r#"<div class="painting-switch" role="group" aria-label="Code rendering">
+<span class="painting-switch-label">Code view:</span>
+{rendering_buttons}</div>
+<p class="notice painting-notice">A painting is a person's account of this edit <em>as text</em>, recorded independently of the node mapping - a rendering often has several equally defensible answers where the mapping has one. Deletions and insertions carry no position on the opposite side in a painting, so that panel draws no caret for them.</p>"#
+        )
+    } else {
+        String::new()
+    };
+
+    // The human's own words about this fixture, when there are any. First thing on the page after
+    // the header: it says what the case is *for*, which no amount of reading the two trees does.
+    let description = match note {
+        Some(note) => format!(
+            r#"<p class="description">{}</p>"#,
+            escape_html_text(note.trim())
+        ),
+        None => String::new(),
+    };
+
+    // An incomplete mapping and a complete one look identical on this page - every unmarked node
+    // renders as unmarked, which is also how a node the human deliberately left alone renders. Say
+    // which it is, since reviewing ground truth is the whole point of the site.
+    let unmarked_notice = if unmarked_nodes == 0 {
+        String::new()
+    } else {
+        let total = human_mapping::total_node_count_for(before, after);
+        format!(
+            r#"<p class="notice">This mapping is unfinished: {unmarked_nodes} of {total} nodes are still unmarked.</p>"#
+        )
+    };
 
     // `representative_entries` (via `as_ast_diff_for_mapping`) has to collapse each multi-map
     // group down to one concrete pairing to produce an `ASTDiff` at all - but a group exists
@@ -254,13 +441,33 @@ fn render_fixture_page(
                 .map(|f| f.to_string_lossy().into_owned())
         })
         .unwrap_or_else(|| "small".to_string());
+    // The other link in the header points at *our* copy of the two files; this one points at the
+    // change they were cut from. A fixture with no sample row (every handmade one) or an
+    // unresolvable repository simply has no such link - see `helper::repository_urls`.
+    let upstream_link = match upstream {
+        Some(upstream) => {
+            // Seven characters is what every forge abbreviates a hash to, and the full 40 crowds
+            // out the repository name beside it.
+            let short: String = upstream.commit.chars().take(7).collect();
+            format!(
+                r#"<a class="source-link" href="{url}" target="_blank" rel="noopener">Upstream commit {repository}@{short}</a>
+<span class="source-path" title="path in the upstream repository">{path}</span>"#,
+                url = escape_html_attr(&upstream.commit_url),
+                repository = escape_html_text(&upstream.repository),
+                short = escape_html_text(&short),
+                path = escape_html_text(&upstream.path),
+            )
+        }
+        None => String::new(),
+    };
+
     let source_url = format!(
         "https://github.com/{REPO}/tree/main/src/test/data/diffs/{}/{}",
         dataset,
         escape_html_attr(name)
     );
 
-    Ok(format!(
+    let html = format!(
         r##"<!doctype html>
 <html lang="en">
 <head>
@@ -275,6 +482,7 @@ fn render_fixture_page(
 <h1>{name_escaped}</h1>
 <span class="language-badge">{language}</span>
 <a class="source-link" href="{source_url}" target="_blank" rel="noopener">View before/after files on GitHub</a>
+{upstream_link}
 <ul class="legend">
 <li><span class="status-unmarked">&#9679;</span> unmarked</li>
 <li><span class="status-matched">&#9679;</span> matched</li>
@@ -297,18 +505,11 @@ fn render_fixture_page(
 <button type="button" data-view="tree" aria-pressed="false">Tree</button>
 </div>
 </header>
+{description}
+{unmarked_notice}
 {groups_notice}
-<div class="panels code-panels">
-<section class="panel code-panel" data-side="before">
-<h2>Before</h2>
-<div class="code">{before_code_html}</div>
-</section>
-<section class="panel code-panel" data-side="after">
-<h2>After</h2>
-<div class="code">{after_code_html}</div>
-</section>
-</div>
-<div class="panels tree-panels">
+{painting_switch}
+{code_sections}<div class="panels tree-panels">
 <section class="panel" data-side="before">
 <h2>Before</h2>
 <div class="tree">{before_html}</div>
@@ -329,15 +530,22 @@ fn render_fixture_page(
 </body>
 </html>
 "##,
-        before_code_html = before_code_html,
-        after_code_html = after_code_html,
+        painting_switch = painting_switch,
+        code_sections = code_sections,
+        description = description,
+        unmarked_notice = unmarked_notice,
+        upstream_link = upstream_link,
         groups_notice = groups_notice,
         name_escaped = escape_html_text(name),
         name_attr = escape_html_attr(name),
         repo = REPO,
         help_overlay = HELP_OVERLAY_HTML,
         search_prompt = SEARCH_PROMPT_HTML,
-    ))
+    );
+    Ok(FixturePage {
+        html,
+        unmarked_nodes,
+    })
 }
 
 const HELP_OVERLAY_HTML: &str = r#"<div id="help-overlay" class="hidden" role="dialog" aria-label="Keybindings">
@@ -351,6 +559,7 @@ const HELP_OVERLAY_HTML: &str = r#"<div id="help-overlay" class="hidden" role="d
 <dt>a</dt><dd>jump the other panel to this node's mapped counterpart</dd>
 <dt>i</dt><dd>hide identical matches, showing only inserted/deleted/updated nodes and their ancestors</dd>
 <dt>v</dt><dd>cycle the view: split / code only / tree only</dd>
+<dt>p</dt><dd>cycle what the code view renders: the node mapping, then each human painting</dd>
 <dt>?</dt><dd>toggle this help</dd>
 </dl>
 </div>"#;
@@ -640,21 +849,36 @@ struct CodeMarker {
     row: usize,
     column: usize,
     operation: TextOperation,
-    /// Index into the *other* side's range list of the text this caret stands in for. Both this
-    /// caret's own `data-range` (`{side}m{index}`) and the id it points at (`{other side}{index}`)
-    /// are derived from it, which is what keeps the two ends of the pair naming each other.
-    other_index: usize,
+    /// This caret's own `data-range` id.
+    id: String,
+    /// The `data-range` id of the real text, on the other side, that it stands in for. Together
+    /// with `id` this is what makes the two ends of the pair name each other.
+    points_at: String,
+}
+
+/// The `data-range` id each range in a list carries, when the ids are simply positional.
+///
+/// This is what every range gets in the tree-derived panels, where each `RangeMatch` is its own
+/// independent decision. A painting is the exception - see [`painting_panels`], where several
+/// spans deliberately share one id.
+fn positional_ids(side: &str, count: usize) -> Vec<String> {
+    (0..count).map(|index| format!("{side}{index}")).collect()
 }
 
 /// Every caret one side should draw, read off `other`'s ranges (see [`CodeMarker`]).
 ///
 /// `row_count` is this side's own line count, and the clamp against it is load-bearing rather than
 /// defensive: a delete at end-of-file puts its destination at the position *after* the last line,
-/// which is not a row that gets rendered. Unclamped, `code_visible_rows` would still anchor there
+/// which is not a row that gets rendered. Unclamped, `code_anchor_rows` would still anchor there
 /// (it clamps for its own indexing) while the per-row lookup in `render_code_panel` would find
 /// nothing - dropping the one mark that panel had to show, silently. One corpus fixture does
 /// exactly this: `python-api-change` puts a caret at row 18 of an 18-row side.
-fn code_markers(other: &[RangeMatch], row_count: usize) -> Vec<CodeMarker> {
+fn code_markers(
+    other: &[RangeMatch],
+    row_count: usize,
+    side: &str,
+    other_ids: &[String],
+) -> Vec<CodeMarker> {
     other
         .iter()
         .enumerate()
@@ -670,7 +894,8 @@ fn code_markers(other: &[RangeMatch], row_count: usize) -> Vec<CodeMarker> {
                 .min(row_count.saturating_sub(1)),
             column: range_match.destination.start_column,
             operation: range_match.operation.clone(),
-            other_index: index,
+            id: format!("{side}m{index}"),
+            points_at: other_ids[index].clone(),
         })
         .collect()
 }
@@ -692,7 +917,8 @@ fn code_markers(other: &[RangeMatch], row_count: usize) -> Vec<CodeMarker> {
 fn code_counterparts(
     from: &[RangeMatch],
     to: &[RangeMatch],
-    to_side: char,
+    to_side: &str,
+    to_ids: &[String],
 ) -> HashMap<usize, String> {
     let key = |r: &codediff::diff::text_range::TextRange| {
         (r.start_row, r.start_column, r.end_row, r.end_column)
@@ -716,39 +942,192 @@ fn code_counterparts(
             }
             by_source
                 .get(&key(&range_match.destination))
-                .map(|&other| (index, format!("{to_side}{other}")))
+                .map(|&other| (index, to_ids[other].clone()))
         })
         .collect()
 }
 
-/// Which rows of a panel are actually rendered: every row worth anchoring on, plus
-/// `CODE_CONTEXT_ROWS` on each side of it. Everything else is folded away by `render_code_panel`.
+/// One side of one code rendering: the ranges to paint onto that side's source text, the DOM ids
+/// they carry, what each points at on the other side, and the carets standing in for text this
+/// side doesn't have.
 ///
-/// Two kinds of anchor, and the second one is not optional. The obvious one is a changed row (per
-/// `line_operations`, the same row-granular projection `benchmark_other` scores tools with). The
-/// other is a caret ([`CodeMarker`]) - `line_operations` cannot see those, since they have no
-/// columns on this side to color, so a panel anchored on changed rows alone folds a pure
-/// deletion's after side away entirely and renders a page with nothing on it.
-///
-/// If nothing anchors at all (the two sides are wholly unchanged), everything stays visible:
-/// there is no change to center a fold on, and a blank panel is strictly worse than a long one.
-fn code_visible_rows(markers: &[CodeMarker], ops: &[TextOperation]) -> Vec<bool> {
-    let mut anchors: Vec<usize> = ops
-        .iter()
-        .enumerate()
-        .filter(|(_, op)| **op != TextOperation::Identical && **op != TextOperation::NotYetSet)
-        .map(|(row, _)| row)
-        .collect();
-    anchors.extend(markers.iter().map(|marker| marker.row));
+/// One page now holds several of these per side - the tree mapping projected to text, plus one per
+/// human painting (see [`painting_panels`]) - which is why `side` is a *string* prefix rather than
+/// the `'b'`/`'a'` char it used to be. Every `data-range` and row `id` is built from it, and
+/// `viewer.js`'s `spansForRange` looks ids up document-wide, so two renderings sharing a prefix
+/// would have clicks in the visible panel selecting spans in a hidden one.
+struct PanelRanges {
+    /// DOM id prefix for this panel: `b`/`a` for the tree mapping, `b{k}`/`a{k}` for painting *k*.
+    side: String,
+    ranges: Vec<RangeMatch>,
+    /// `data-range` id per range, parallel to `ranges`. Several ranges may deliberately share one
+    /// id - that is how an N:M painted match says "these spans are one decision". `viewer.js`
+    /// already selects by id with `querySelectorAll`, since a multi-row range is rendered as one
+    /// span per row, so a shared id needs no client-side change.
+    ids: Vec<String>,
+    /// `data-counterpart` per range index, where there is something on the other side to point at.
+    counterparts: HashMap<usize, String>,
+    markers: Vec<CodeMarker>,
+    /// This side's per-row operation, from `line_operations` - kept rather than recomputed because
+    /// both the fold anchors and the row tints read it.
+    ops: Vec<TextOperation>,
+}
 
-    if anchors.is_empty() {
-        return vec![true; ops.len()];
+impl PanelRanges {
+    /// One side of the tree mapping's own rendering, the panel this page has always drawn.
+    fn from_tree(
+        side: &str,
+        other_side: &str,
+        ranges: Vec<RangeMatch>,
+        other: &[RangeMatch],
+        row_count: usize,
+    ) -> Self {
+        let ids = positional_ids(side, ranges.len());
+        let other_ids = positional_ids(other_side, other.len());
+        PanelRanges {
+            counterparts: code_counterparts(&ranges, other, other_side, &other_ids),
+            markers: code_markers(other, row_count, side, &other_ids),
+            ops: codediff::diff::text::line_operations(&ranges, row_count),
+            side: side.to_string(),
+            ids,
+            ranges,
+        }
     }
 
-    let mut visible = vec![false; ops.len()];
-    for row in anchors {
+    /// Rows worth centering a fold on for *this* rendering: changed rows, plus every caret's row.
+    ///
+    /// The second kind is not optional. A caret has no columns on this side to color, so
+    /// `line_operations` cannot see it, and a panel anchored on changed rows alone folds a pure
+    /// deletion's after side away entirely and renders a page with nothing on it.
+    fn anchor_rows(&self) -> Vec<usize> {
+        let mut anchors: Vec<usize> = self
+            .ops
+            .iter()
+            .enumerate()
+            .filter(|(_, op)| **op != TextOperation::Identical && **op != TextOperation::NotYetSet)
+            .map(|(row, _)| row)
+            .collect();
+        anchors.extend(self.markers.iter().map(|marker| marker.row));
+        anchors
+    }
+}
+
+/// Both sides of one named painting, as the panels [`render_code_panel`] already draws.
+///
+/// The conversion is deliberately thin: a painted span *is* a range to color, so it becomes a
+/// `RangeMatch` and goes through exactly the renderer the tree-derived panels use. Two things a
+/// painting does not carry, and this does not invent:
+///
+/// * **No destination per span.** `RangeMatch::destination` exists so `TextDiff`'s consumers can
+///   find a range's counterpart by extent; a painting states its correspondences by grouping spans
+///   into one entry instead, so the counterpart links below are built from that grouping directly
+///   and `destination` is left zero. Nothing in the rendering path reads it.
+/// * **No caret positions.** A `Delete` records where text *was*, never where its absence sits on
+///   the after side, so the opposite panel draws no caret for it - unlike the tree panel, where
+///   `TextDiff` computes that position. This is why the fold is unioned across renderings in
+///   `render_fixture_page`: the painting panels then keep the tree panel's caret rows visible
+///   without drawing tree data, and a one-sided fixture's opposite panel doesn't unfold whole.
+///
+/// An N:M match gives every span on a side the same id, so clicking any one of them reveals the
+/// whole opposite side of that entry. That is what the entry asserts - which specific span pairs
+/// with which is explicitly not recorded (see `HumanTextEntry`) - so naming a pairing here would
+/// be inventing one.
+///
+/// `Err` if any entry is malformed or falls outside its file (`HumanTextEntry::verdict`'s own
+/// contract). The caller skips that painting rather than failing the build, for the same reason
+/// `snap_to_char_boundary` clamps: one bad painting should cost its own panel, not the whole site.
+fn painting_panels(
+    named: &human_mapping::NamedTextMapping,
+    before: &str,
+    after: &str,
+    painting: usize,
+    row_counts: [usize; 2],
+) -> Result<[PanelRanges; 2]> {
+    let sides = [format!("b{painting}"), format!("a{painting}")];
+    let mut ranges: [Vec<RangeMatch>; 2] = [Vec::new(), Vec::new()];
+    let mut ids: [Vec<String>; 2] = [Vec::new(), Vec::new()];
+    let mut counterparts: [HashMap<usize, String>; 2] = [HashMap::new(), HashMap::new()];
+
+    for (entry_index, entry) in named.mapping.entries.iter().enumerate() {
+        let verdict = entry
+            .verdict(before, after)
+            .with_context(|| format!("entry {entry_index} of the '{}' painting", named.name))?;
+        let operation = match verdict {
+            HumanTextVerdict::Move => TextOperation::Move,
+            HumanTextVerdict::Update => TextOperation::Update,
+            HumanTextVerdict::Delete => TextOperation::Delete,
+            HumanTextVerdict::Insert => TextOperation::Insert,
+        };
+        // A `Match` is the only entry with text on both sides, so it is the only one whose spans
+        // have anything to point at.
+        let linked = matches!(verdict, HumanTextVerdict::Move | HumanTextVerdict::Update);
+        let entry_ids = [
+            format!("{}e{entry_index}", sides[0]),
+            format!("{}e{entry_index}", sides[1]),
+        ];
+        for (side, spans) in [(0usize, &entry.before), (1usize, &entry.after)] {
+            for span in spans {
+                let index = ranges[side].len();
+                ranges[side].push(RangeMatch {
+                    source: span.to_text_range(),
+                    destination: codediff::diff::text_range::TextRange::zero(),
+                    operation: operation.clone(),
+                });
+                ids[side].push(entry_ids[side].clone());
+                if linked {
+                    counterparts[side].insert(index, entry_ids[1 - side].clone());
+                }
+            }
+        }
+    }
+
+    let [before_ranges, after_ranges] = ranges;
+    let [before_ids, after_ids] = ids;
+    let [before_counterparts, after_counterparts] = counterparts;
+    Ok([
+        PanelRanges {
+            ops: codediff::diff::text::line_operations(&before_ranges, row_counts[0]),
+            side: sides[0].clone(),
+            ranges: before_ranges,
+            ids: before_ids,
+            counterparts: before_counterparts,
+            markers: Vec::new(),
+        },
+        PanelRanges {
+            ops: codediff::diff::text::line_operations(&after_ranges, row_counts[1]),
+            side: sides[1].clone(),
+            ranges: after_ranges,
+            ids: after_ids,
+            counterparts: after_counterparts,
+            markers: Vec::new(),
+        },
+    ])
+}
+
+/// Which rows of a panel are actually rendered: every anchor, plus `CODE_CONTEXT_ROWS` on each
+/// side of it. Everything else is folded away by [`render_code_panel`].
+///
+/// `anchors` is the union over *every* rendering of this side - the tree mapping's and each
+/// painting's - not one panel's own. Two reasons, and the first is the point of the page:
+///
+/// * A reader flips between the tree mapping and a painting to see where they differ. Folding each
+///   panel by its own anchors shifts every row between the two, so the comparison is against a
+///   moving target.
+/// * A painting draws no carets, so a pure insertion's *before* painting panel has no anchors at
+///   all and would fall through to the "show everything" case below - unfolding a 120KB file.
+///   Sharing the tree panel's anchors gives it the fold the caret was there to produce.
+///
+/// If nothing anchors anywhere (the two sides are wholly unchanged), everything stays visible:
+/// there is no change to center a fold on, and a blank panel is strictly worse than a long one.
+fn code_visible_rows(anchors: &[usize], row_count: usize) -> Vec<bool> {
+    if anchors.is_empty() {
+        return vec![true; row_count];
+    }
+
+    let mut visible = vec![false; row_count];
+    for &row in anchors {
         let start = row.saturating_sub(CODE_CONTEXT_ROWS);
-        let end = (row + CODE_CONTEXT_ROWS + 1).min(ops.len());
+        let end = (row + CODE_CONTEXT_ROWS + 1).min(row_count);
         for slot in visible.iter_mut().take(end).skip(start) {
             *slot = true;
         }
@@ -756,7 +1135,7 @@ fn code_visible_rows(markers: &[CodeMarker], ops: &[TextOperation]) -> Vec<bool>
     visible
 }
 
-/// Renders one side's source text with the mapping's changes painted onto it, character-precise -
+/// Renders one side's source text with a rendering's changes painted onto it, character-precise -
 /// the code-shaped counterpart to `render_node`'s tree.
 ///
 /// Built *source-text-first*: the file's own bytes are walked row by row and a `<span>` is opened
@@ -766,20 +1145,13 @@ fn code_visible_rows(markers: &[CodeMarker], ops: &[TextOperation]) -> Vec<bool>
 /// especially; see `line_operations`' doc comment on why *it* is row-granular for the same
 /// reason), so range-concatenation would drop exactly those gap bytes. The
 /// `render_code_panel_reproduces_the_source_text_exactly` test below is what holds this property
-/// down: strip the tags back off and what remains must be the file, byte for byte.
-fn render_code_panel(
-    contents: &str,
-    ranges: &[RangeMatch],
-    markers: &[CodeMarker],
-    side: char,
-    counterparts: &HashMap<usize, String>,
-) -> String {
+/// down, for the painted panels as much as the tree-derived one: strip the tags back off and what
+/// remains must be the file, byte for byte.
+fn render_code_panel(contents: &str, panel: &PanelRanges, visible: &[bool]) -> String {
     let lines: Vec<&str> = contents.split('\n').collect();
-    let ops = codediff::diff::text::line_operations(ranges, lines.len());
-    let visible = code_visible_rows(markers, &ops);
 
     let mut markers_by_row: HashMap<usize, Vec<&CodeMarker>> = HashMap::new();
-    for marker in markers {
+    for marker in &panel.markers {
         markers_by_row.entry(marker.row).or_default().push(marker);
     }
     let no_markers: Vec<&CodeMarker> = Vec::new();
@@ -787,11 +1159,9 @@ fn render_code_panel(
         render_code_row(
             lines[row],
             row,
-            &ops[row],
-            ranges,
+            &panel.ops[row],
+            panel,
             markers_by_row.get(&row).unwrap_or(&no_markers),
-            side,
-            counterparts,
         )
     };
 
@@ -832,17 +1202,17 @@ fn render_code_row(
     line: &str,
     row: usize,
     row_op: &TextOperation,
-    ranges: &[RangeMatch],
+    panel: &PanelRanges,
     markers: &[&CodeMarker],
-    side: char,
-    counterparts: &HashMap<usize, String>,
 ) -> String {
     let row_len = line.len();
+    let side = &panel.side;
 
-    // Every span this row draws, as byte-column bounds in left-to-right order: this side's own
-    // ranges as real, text-covering spans, plus the other side's carets as zero-width ones.
-    // `Identical` ranges are the unpainted default, so they produce nothing.
-    let mut segments: Vec<(usize, usize, &TextOperation, String, Option<&String>)> = ranges
+    // Every span this row draws, as byte-column bounds in left-to-right order: this rendering's
+    // own ranges as real, text-covering spans, plus any carets as zero-width ones. `Identical`
+    // ranges are the unpainted default, so they produce nothing.
+    let mut segments: Vec<(usize, usize, &TextOperation, &String, Option<&String>)> = panel
+        .ranges
         .iter()
         .enumerate()
         .filter(|(_, range_match)| {
@@ -850,43 +1220,28 @@ fn render_code_row(
         })
         .filter_map(|(index, range_match)| {
             range_match.source.columns_on_row(row, row_len).map(
-                |(start, end)| -> (usize, usize, &TextOperation, String, Option<&String>) {
+                |(start, end)| -> (usize, usize, &TextOperation, &String, Option<&String>) {
                     (
                         start,
                         end,
                         &range_match.operation,
-                        format!("{side}{index}"),
-                        counterparts.get(&index),
+                        &panel.ids[index],
+                        panel.counterparts.get(&index),
                     )
                 },
             )
         })
         .collect();
-    let other_side = if side == 'b' { 'a' } else { 'b' };
-    let marker_ids: Vec<(String, String)> = markers
-        .iter()
-        .map(|marker| {
-            (
-                format!("{side}m{}", marker.other_index),
-                format!("{other_side}{}", marker.other_index),
-            )
-        })
-        .collect();
-    segments.extend(
-        markers
-            .iter()
-            .zip(&marker_ids)
-            .map(|(marker, (id, points_at))| {
-                let column = snap_to_char_boundary(line, marker.column);
-                (
-                    column,
-                    column,
-                    &marker.operation,
-                    id.clone(),
-                    Some(points_at),
-                )
-            }),
-    );
+    segments.extend(markers.iter().map(|marker| {
+        let column = snap_to_char_boundary(line, marker.column);
+        (
+            column,
+            column,
+            &marker.operation,
+            &marker.id,
+            Some(&marker.points_at),
+        )
+    }));
     // End position as the secondary key, so a zero-width caret sharing a start column with a real
     // range sorts before it - the same ordering `widgets::code_viewer::build_range_order` uses.
     segments.sort_by_key(|(start, end, _, _, _)| (*start, *end));
@@ -954,6 +1309,16 @@ struct IndexEntry {
     codediff_mismatches: usize,
     unix_diff_mismatches: usize,
     total_lines: usize,
+    /// The fixture's `description.md`, if it has one - shown under its name so the list says what
+    /// each case is, not just how big it is.
+    note: Option<String>,
+    /// Nodes the human mapping still says nothing about. `0` is a finished mapping; anything else
+    /// is work in progress, which a reader picking a fixture to review wants to know before they
+    /// open it.
+    unmarked_nodes: usize,
+    /// Every painting's name, in file order. Empty means unpainted - see the comment at the one
+    /// place this is built for why the names, and not just how many, are what gets carried.
+    paintings: Vec<String>,
 }
 
 fn render_index_page(entries: &[IndexEntry]) -> String {
@@ -962,18 +1327,46 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
         let name_attr = escape_html_attr(&entry.name);
         let name_escaped = escape_html_text(&entry.name);
         rows.push_str(&format!(
-            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}">
-<td><a href="fixtures/{name_attr}.html">{name_escaped}</a></td>
+            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}" data-paintings="{painting_count}" data-unmarked="{unmarked}">
+<td><a href="fixtures/{name_attr}.html">{name_escaped}</a>{note}</td>
 <td><span class="language-badge">{language}</span></td>
 <td>{codediff}</td>
 <td>{unix_diff}</td>
 <td>{total_lines}</td>
+<td class="paintings">{painting_names}</td>
+<td>{unmarked_cell}</td>
 </tr>
 "#,
             language = entry.language,
             codediff = entry.codediff_mismatches,
             unix_diff = entry.unix_diff_mismatches,
             total_lines = entry.total_lines,
+            painting_count = entry.paintings.len(),
+            unmarked = entry.unmarked_nodes,
+            // A finished mapping is the normal state and reads as a clean cell; a count is the
+            // exception worth seeing.
+            unmarked_cell = if entry.unmarked_nodes == 0 {
+                "&mdash;".to_string()
+            } else {
+                entry.unmarked_nodes.to_string()
+            },
+            // Under the name rather than in a column of its own: it is free prose of no fixed
+            // width, and a column wide enough for the longest one would squeeze every number off
+            // the screen.
+            note = match &entry.note {
+                Some(note) => format!(
+                    r#"<div class="fixture-note">{}</div>"#,
+                    escape_html_text(note.trim())
+                ),
+                None => String::new(),
+            },
+            painting_names = if entry.paintings.is_empty() {
+                // Absence, not a zero: the column sorts on `data-paintings` (0 here), while the
+                // cell has to read as "nobody has painted this" rather than as a count.
+                "&mdash;".to_string()
+            } else {
+                escape_html_text(&entry.paintings.join(", "))
+            },
         ));
     }
 
@@ -996,6 +1389,13 @@ and use the "file an issue" button.</p>
 mapping (see the introductory paper for why line granularity, not AST-node granularity, is the only
 fair way to compare codediff against a line-only tool like Unix <code>diff</code>) - click a column
 header to sort by it.</p>
+<p>"Paintings" lists the hand-recorded accounts of each diff <em>as text</em>, kept independently of
+the node mapping because a rendering often has several equally correct answers where the mapping has
+one. Open a fixture and use the Code view's switch to flip between them and the mapping's own
+rendering. A dash means nobody has painted that fixture yet.</p>
+<p>"Unmarked nodes" counts what the human mapping still says nothing about - a dash means the
+mapping is finished. Sort by it to find the ones that still need work. Where a fixture carries a
+description, it appears under its name.</p>
 </header>
 <table class="fixture-table" id="fixture-table">
 <thead>
@@ -1005,6 +1405,8 @@ header to sort by it.</p>
 <th data-sort="codediff" data-type="number" tabindex="0" aria-sort="none">codediff mismatches</th>
 <th data-sort="unix_diff" data-type="number" tabindex="0" aria-sort="none">Unix diff mismatches</th>
 <th data-sort="total_lines" data-type="number" tabindex="0" aria-sort="none">Total lines</th>
+<th data-sort="paintings" data-type="number" tabindex="0" aria-sort="none">Paintings</th>
+<th data-sort="unmarked" data-type="number" tabindex="0" aria-sort="none">Unmarked nodes</th>
 </tr>
 </thead>
 <tbody>
@@ -1030,7 +1432,10 @@ fn escape_html_attr(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper::human_mapping::{HumanMapping, HumanMappingEntry, HumanOperation};
+    use codediff::test::helper::human_mapping::{
+        HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry, HumanTextOperation,
+        HumanTextSpan,
+    };
 
     /// Undoes `escape_html_text` and strips every tag, recovering the plain text of one rendered
     /// row. Only usable on this module's own output, which emits a fixed, tiny set of tags and
@@ -1056,7 +1461,7 @@ mod tests {
     /// Every rendered row of a code panel, as `(row index, plain text)`, recovered from the
     /// `id="{side}L{row}"` attribute `render_code_row` stamps on each one. Fold placeholders carry
     /// no id and are skipped.
-    fn rendered_rows(html: &str, side: char) -> Vec<(usize, String)> {
+    fn rendered_rows(html: &str, side: &str) -> Vec<(usize, String)> {
         let id_prefix = format!("\" id=\"{side}L");
         html.split("<div class=\"cl")
             .filter_map(|chunk| {
@@ -1082,6 +1487,7 @@ mod tests {
     #[test]
     fn render_code_panel_reproduces_the_source_text_exactly() {
         let mut checked = 0usize;
+        let mut painted = 0usize;
         for name in codediff::test::helper::UNIT_TEST_FIXTURES {
             let Ok((before, after)) = helper::handmade_test_code_pair(name) else {
                 continue;
@@ -1094,29 +1500,66 @@ mod tests {
             };
             let node_cache = NodeCache::build(&before, &after);
             let text_diff = TextDiff::from(&before, &after, &diff, &node_cache);
+            let before_ranges = text_diff.all(0);
+            let after_ranges = text_diff.all(1);
+            let row_counts = [
+                before.contents.split('\n').count(),
+                after.contents.split('\n').count(),
+            ];
 
-            for (side, code, ranges, other) in [
-                ('b', &before, text_diff.all(0), text_diff.all(1)),
-                ('a', &after, text_diff.all(1), text_diff.all(0)),
-            ] {
-                let html = render_code_panel(
-                    &code.contents,
-                    &ranges,
-                    &code_markers(&other, code.contents.split('\n').count()),
-                    side,
-                    &HashMap::new(),
-                );
-                let source_lines: Vec<&str> = code.contents.split('\n').collect();
-                let rows = rendered_rows(&html, side);
-                assert!(
-                    !rows.is_empty(),
-                    "'{name}' side '{side}' rendered no rows at all"
-                );
-                for (row, text) in rows {
-                    assert_eq!(
-                        text, source_lines[row],
-                        "'{name}' side '{side}' row {row} does not reproduce its source line"
+            // Every rendering this fixture's page carries, not just the tree mapping's. A painting
+            // is a second, independent producer of ranges into the same renderer - a span read off
+            // hand-recorded row/column pairs rather than computed from a node - so it needs this
+            // guarantee more than the derived one does, not less.
+            let mut renderings = vec![[
+                PanelRanges::from_tree(
+                    "b",
+                    "a",
+                    before_ranges.clone(),
+                    &after_ranges,
+                    row_counts[0],
+                ),
+                PanelRanges::from_tree(
+                    "a",
+                    "b",
+                    after_ranges.clone(),
+                    &before_ranges,
+                    row_counts[1],
+                ),
+            ]];
+            for (index, named) in mapping.text_mappings.iter().enumerate() {
+                let panels =
+                    painting_panels(named, &before.contents, &after.contents, index, row_counts)
+                        .unwrap_or_else(|error| {
+                            panic!("'{name}' painting '{}': {error:#}", named.name)
+                        });
+                renderings.push(panels);
+                painted += 1;
+            }
+
+            let source_lines = [
+                before.contents.split('\n').collect::<Vec<&str>>(),
+                after.contents.split('\n').collect::<Vec<&str>>(),
+            ];
+            for panels in &renderings {
+                for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                    let panel = &panels[side];
+                    // Nothing folded, so every row of the file has to come back - a stricter check
+                    // than any real page performs.
+                    let html = render_code_panel(contents, panel, &vec![true; row_counts[side]]);
+                    let rows = rendered_rows(&html, &panel.side);
+                    assert!(
+                        !rows.is_empty(),
+                        "'{name}' panel '{}' rendered no rows at all",
+                        panel.side
                     );
+                    for (row, text) in rows {
+                        assert_eq!(
+                            text, source_lines[side][row],
+                            "'{name}' panel '{}' row {row} does not reproduce its source line",
+                            panel.side
+                        );
+                    }
                 }
             }
             checked += 1;
@@ -1125,6 +1568,14 @@ mod tests {
             checked > 0,
             "no fixture in UNIT_TEST_FIXTURES had a loadable human mapping - \
              this test would silently pass while checking nothing"
+        );
+        // A floor, not `> 0`: this is the only check that compares a *painted* panel's text back
+        // against the file, and `UNIT_TEST_FIXTURES` is a subset of the corpus, so "some fixture
+        // was painted" would be satisfied by one and leave the property essentially unmeasured.
+        assert!(
+            painted >= 10,
+            "only {painted} painting(s) in UNIT_TEST_FIXTURES reached this check - the painted \
+             half of the test is barely measuring anything"
         );
     }
 
@@ -1142,15 +1593,8 @@ mod tests {
                 operation: TextOperation::Identical,
             },
         ];
-        let html = render_code_row(
-            "let foo = 1;",
-            0,
-            &TextOperation::Update,
-            &ranges,
-            &[],
-            'b',
-            &HashMap::new(),
-        );
+        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1);
+        let html = render_code_row("let foo = 1;", 0, &TextOperation::Update, &panel, &[]);
 
         assert!(
             html.contains(r#"<span class="cd cd-update" data-range="b0" tabindex="0">foo</span>"#),
@@ -1176,9 +1620,9 @@ mod tests {
             destination: TextRange::new(0, 4, 0, 4),
             operation: TextOperation::Delete,
         }];
-        let markers = code_markers(&before, 20);
+        let panel = PanelRanges::from_tree("a", "b", Vec::new(), &before, 20);
         assert_eq!(
-            markers.len(),
+            panel.markers.len(),
             1,
             "the delete should produce exactly one caret"
         );
@@ -1187,10 +1631,8 @@ mod tests {
             "let foo = 1;",
             0,
             &TextOperation::Identical,
-            &[],
-            &markers.iter().collect::<Vec<_>>(),
-            'a',
-            &HashMap::new(),
+            &panel,
+            &panel.markers.iter().collect::<Vec<_>>(),
         );
 
         assert!(
@@ -1201,7 +1643,7 @@ mod tests {
         );
         // And the other end of the pair names the caret, so clicking either reveals the other.
         assert_eq!(
-            code_counterparts(&before, &[], 'a')
+            code_counterparts(&before, &[], "a", &[])
                 .get(&0)
                 .map(String::as_str),
             Some("am0")
@@ -1214,10 +1656,7 @@ mod tests {
 
     #[test]
     fn code_visible_rows_keeps_context_around_a_change_and_drops_the_rest() {
-        let mut ops = vec![TextOperation::Identical; 30];
-        ops[15] = TextOperation::Insert;
-
-        let visible = code_visible_rows(&[], &ops);
+        let visible = code_visible_rows(&[15], 30);
 
         assert!(visible[15], "the changed row itself must be visible");
         assert!(visible[15 - CODE_CONTEXT_ROWS], "context above");
@@ -1233,24 +1672,31 @@ mod tests {
         assert!(!visible[0] && !visible[29]);
     }
 
-    /// The regression this function was rewritten for: on a pure deletion the after side has no
+    /// The regression `anchor_rows` was written for: on a pure deletion the after side has no
     /// changed row at all, only the caret marking where the deleted text used to be. Anchoring on
     /// `line_operations` alone folds that whole panel away.
     #[test]
-    fn code_visible_rows_anchors_on_a_caret_with_no_changed_row() {
+    fn anchor_rows_anchors_on_a_caret_with_no_changed_row() {
         use codediff::diff::text_range::TextRange;
 
-        let ops = vec![TextOperation::Identical; 30];
-        let markers = code_markers(
+        let panel = PanelRanges::from_tree(
+            "a",
+            "b",
+            Vec::new(),
             &[RangeMatch {
                 source: TextRange::new(3, 0, 5, 0),
                 destination: TextRange::new(15, 0, 15, 0),
                 operation: TextOperation::Delete,
             }],
-            ops.len(),
+            30,
+        );
+        assert_eq!(
+            panel.anchor_rows(),
+            vec![15],
+            "the caret's row is the panel's only anchor - it has no changed row of its own"
         );
 
-        let visible = code_visible_rows(&markers, &ops);
+        let visible = code_visible_rows(&panel.anchor_rows(), 30);
 
         assert!(visible[15], "the caret's own row must be visible");
         assert!(visible[15 - CODE_CONTEXT_ROWS] && visible[15 + CODE_CONTEXT_ROWS]);
@@ -1259,9 +1705,50 @@ mod tests {
 
     #[test]
     fn code_visible_rows_shows_everything_when_nothing_anchors() {
-        let ops = vec![TextOperation::Identical; 30];
+        assert!(code_visible_rows(&[], 30).iter().all(|v| *v));
+    }
 
-        assert!(code_visible_rows(&[], &ops).iter().all(|v| *v));
+    /// The reason folding is decided across every rendering at once rather than per panel. A
+    /// painting draws no carets (it records no position for a deletion on the opposite side), so
+    /// on a pure deletion its after panel anchors nowhere - and on its own would fall through to
+    /// "show everything", unfolding the whole file next to a tightly folded tree panel.
+    #[test]
+    fn a_paintings_anchors_are_unioned_with_the_tree_panels_own() {
+        use codediff::diff::text_range::TextRange;
+
+        let tree = PanelRanges::from_tree(
+            "a",
+            "b",
+            Vec::new(),
+            &[RangeMatch {
+                source: TextRange::new(3, 0, 5, 0),
+                destination: TextRange::new(15, 0, 15, 0),
+                operation: TextOperation::Delete,
+            }],
+            30,
+        );
+        let painting = PanelRanges {
+            side: "a0".to_string(),
+            ranges: Vec::new(),
+            ids: Vec::new(),
+            counterparts: HashMap::new(),
+            markers: Vec::new(),
+            ops: vec![TextOperation::Identical; 30],
+        };
+        assert!(
+            painting.anchor_rows().is_empty(),
+            "a painting with nothing on this side anchors nowhere by itself"
+        );
+
+        let mut anchors = tree.anchor_rows();
+        anchors.extend(painting.anchor_rows());
+        let visible = code_visible_rows(&anchors, 30);
+
+        assert!(visible[15], "the union keeps the tree panel's caret row");
+        assert!(
+            !visible[0] && !visible[29],
+            "and it does not fall through to showing the whole file"
+        );
     }
 
     #[test]
@@ -1289,10 +1776,240 @@ mod tests {
             operation: TextOperation::Update,
         }];
 
-        let links = code_counterparts(&before, &after, 'a');
+        let after_ids = positional_ids("a", after.len());
+        let links = code_counterparts(&before, &after, "a", &after_ids);
 
         assert_eq!(links.get(&0).map(String::as_str), Some("a0"));
         assert_eq!(links.get(&1).map(String::as_str), Some("am1"));
+    }
+
+    /// A painting spans `HumanTextSpan`s covering rows/byte-columns of the file, so `to_text_range`
+    /// is the whole of the geometry - but the ids are the part that carries meaning a reader can
+    /// act on, and they are this module's invention rather than the data's.
+    fn painting(entries: Vec<HumanTextEntry>) -> human_mapping::NamedTextMapping {
+        human_mapping::NamedTextMapping {
+            name: "Minimal".to_string(),
+            mapping: human_mapping::HumanTextMapping { entries },
+        }
+    }
+
+    fn span(
+        start_row: usize,
+        start_column: usize,
+        end_row: usize,
+        end_column: usize,
+    ) -> HumanTextSpan {
+        HumanTextSpan {
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+        }
+    }
+
+    /// An N:M match asserts a correspondence *whole* - which before span pairs with which after
+    /// span is explicitly not recorded (see `HumanTextEntry`). So every span on a side gets the
+    /// entry's one id, and points at the other side's one id: clicking any of them reveals all of
+    /// the counterpart, and no pairing is invented to make the link.
+    #[test]
+    fn painting_panels_give_every_span_of_one_match_a_single_shared_id() {
+        // Three `foo` on the before side, two on the after - identical text throughout, which is
+        // what makes the group well formed and its pairing genuinely arbitrary.
+        let before = "foo\nfoo\nfoo\n";
+        let after = "foo\nfoo\n";
+        let named = painting(vec![HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3), span(2, 0, 2, 3)],
+            after: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+        }]);
+
+        let [before_panel, after_panel] =
+            painting_panels(&named, before, after, 0, [4, 3]).unwrap();
+
+        assert_eq!(before_panel.ids, vec!["b0e0".to_string(); 3]);
+        assert_eq!(after_panel.ids, vec!["a0e0".to_string(); 2]);
+        for index in 0..3 {
+            assert_eq!(
+                before_panel.counterparts.get(&index).map(String::as_str),
+                Some("a0e0"),
+                "every before span points at the whole after side of the entry"
+            );
+        }
+        for index in 0..2 {
+            assert_eq!(
+                after_panel.counterparts.get(&index).map(String::as_str),
+                Some("b0e0")
+            );
+        }
+        // Identical text on both sides is a move, not an update - derived from the spans, never
+        // recorded by the painter.
+        assert!(
+            before_panel
+                .ranges
+                .iter()
+                .all(|range| range.operation == TextOperation::Move)
+        );
+    }
+
+    /// The one thing a painting records that the tree mapping's projection does not, and the one
+    /// thing it doesn't. A `Delete` says where text *was*; it says nothing about where its absence
+    /// sits on the after side, so there is no caret to draw and nothing to link to.
+    #[test]
+    fn painting_panels_draw_no_caret_for_a_one_sided_entry() {
+        let before = "keep\ngone\n";
+        let after = "keep\n";
+        let named = painting(vec![HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(1, 0, 1, 4)],
+            after: vec![],
+        }]);
+
+        let [before_panel, after_panel] =
+            painting_panels(&named, before, after, 1, [3, 2]).unwrap();
+
+        assert_eq!(before_panel.ranges.len(), 1);
+        assert_eq!(before_panel.ranges[0].operation, TextOperation::Delete);
+        assert!(
+            before_panel.counterparts.is_empty(),
+            "a delete has nothing on the other side to point at"
+        );
+        assert!(after_panel.ranges.is_empty() && after_panel.markers.is_empty());
+        assert!(
+            before_panel.markers.is_empty(),
+            "painted panels never carry carets - only the tree projection computes those positions"
+        );
+    }
+
+    /// `viewer.js` looks `data-range` ids up document-wide, and a fixture page now stacks several
+    /// renderings of the same two files - so a shared prefix would have a click in the visible
+    /// panel selecting, and scrolling to, spans inside a hidden one.
+    #[test]
+    fn each_rendering_gets_its_own_dom_id_prefix() {
+        let source = "foo\n";
+        let tree = PanelRanges::from_tree("b", "a", Vec::new(), &[], 2);
+        let named = painting(vec![HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(0, 0, 0, 3)],
+            after: vec![],
+        }]);
+        let [first, _] = painting_panels(&named, source, source, 0, [2, 2]).unwrap();
+        let [second, _] = painting_panels(&named, source, source, 1, [2, 2]).unwrap();
+
+        let sides = [tree.side.clone(), first.side.clone(), second.side.clone()];
+        assert_eq!(sides, ["b".to_string(), "b0".to_string(), "b1".to_string()]);
+        assert!(
+            first.ids.iter().all(|id| id.starts_with("b0")),
+            "got: {:?}",
+            first.ids
+        );
+        assert!(second.ids.iter().all(|id| id.starts_with("b1")));
+    }
+
+    /// A malformed painting - here a span past the end of its file - is a data problem in one
+    /// fixture, and the site build renders 500 of them. It costs its own panel and gets reported;
+    /// it does not take the page, let alone the run, down with it.
+    #[test]
+    fn an_unreadable_painting_is_reported_and_skipped_rather_than_failing_the_page() {
+        let source = "fn f() {}\n";
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+        let mapping = HumanMapping {
+            entries: vec![],
+            text_mappings: vec![painting(vec![HumanTextEntry {
+                operation: HumanTextOperation::Delete,
+                before: vec![span(99, 0, 99, 4)],
+                after: vec![],
+            }])],
+            ..Default::default()
+        };
+
+        let mut warnings = Vec::new();
+        let html = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &mapping,
+            None,
+            None,
+            &mut warnings,
+        )
+        .expect("a bad painting must not fail the page")
+        .html;
+
+        assert_eq!(warnings.len(), 1, "got: {warnings:?}");
+        assert!(
+            warnings[0].contains("rust-add-if") && warnings[0].contains("Minimal"),
+            "the warning has to name the fixture and the painting: {warnings:?}"
+        );
+        assert!(
+            !html.contains("painting-switch"),
+            "with the only painting skipped there is one rendering left, and one rendering needs \
+             no chooser"
+        );
+    }
+
+    /// The feature, end to end: a painted fixture's page carries the mapping's own rendering plus
+    /// one panel per painting, a button for each, and exactly one of them visible.
+    #[test]
+    fn a_painted_fixture_page_stacks_one_code_panel_per_painting() {
+        let source = "fn f() {}\n";
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+        let mut minimal = painting(vec![]);
+        minimal.name = "Minimal".to_string();
+        let mut full = painting(vec![]);
+        full.name = "Full".to_string();
+        let mapping = HumanMapping {
+            entries: vec![],
+            text_mappings: vec![minimal, full],
+            ..Default::default()
+        };
+
+        let mut warnings = Vec::new();
+        let html = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &mapping,
+            None,
+            None,
+            &mut warnings,
+        )
+        .expect("should render")
+        .html;
+
+        assert!(warnings.is_empty(), "got: {warnings:?}");
+        for key in ["tree", "p0", "p1"] {
+            assert!(
+                html.contains(&format!(
+                    r#"<div class="panels code-panels" data-painting="{key}""#
+                )) || html.contains(&format!(
+                    r#"<div class="panels code-panels hidden" data-painting="{key}""#
+                )),
+                "expected a code panel for '{key}': {html}"
+            );
+        }
+        // Remembered across fixtures by name, not by the `p0`/`p1` handle - see the switch's own
+        // comment in `viewer.js`.
+        assert!(html.contains(r#"data-painting-name="Minimal""#));
+        assert!(html.contains(r#"data-painting-name="Full""#));
+        // The node mapping is what the page opens on, and it is the only pressed button in this
+        // group - the view switch has its own, which is why this counts buttons carrying a
+        // `data-painting` rather than every pressed button on the page.
+        assert!(html.contains(r#"data-painting="tree" data-painting-name="From the node mapping" aria-pressed="true""#), "got: {html}");
+        for (key, name) in [("p0", "Minimal"), ("p1", "Full")] {
+            assert!(
+                html.contains(&format!(
+                    r#"data-painting="{key}" data-painting-name="{name}" aria-pressed="false""#
+                )),
+                "expected an unpressed button for '{name}': {html}"
+            );
+        }
+        assert_eq!(
+            html.matches("code-panels hidden").count(),
+            2,
+            "the two paintings start hidden: {html}"
+        );
     }
 
     #[test]
@@ -1321,8 +2038,17 @@ mod tests {
             ..Default::default()
         };
 
-        let html =
-            render_fixture_page("rust-add-if", &before, &after, &mapping).expect("should render");
+        let html = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &mapping,
+            None,
+            None,
+            &mut Vec::new(),
+        )
+        .expect("should render")
+        .html;
 
         assert!(
             html.contains(
@@ -1330,6 +2056,80 @@ mod tests {
             ),
             "expected a link straight to this fixture's own before/after files: {html}"
         );
+    }
+
+    /// The other link in the header, and the one this site could not draw at all until the sample
+    /// provenance reached it: the upstream commit the two files were cut from.
+    #[test]
+    fn render_fixture_page_links_to_the_upstream_commit_when_there_is_one() {
+        let source = "fn f() {}\n";
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+        let mapping = HumanMapping::default();
+        let upstream = Upstream {
+            commit_url:
+                "https://github.com/awslabs/aws-c-common/commit/fbb21230e117d2afe49d03ebe8605270dacb4ab3"
+                    .to_string(),
+            repository: "awslabs-aws-c-common".to_string(),
+            commit: "fbb21230e117d2afe49d03ebe8605270dacb4ab3".to_string(),
+            path: "include/aws/common/file.h".to_string(),
+        };
+
+        let html = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &mapping,
+            Some("Only insert, nothing else."),
+            Some(&upstream),
+            &mut Vec::new(),
+        )
+        .expect("should render")
+        .html;
+
+        assert!(
+            html.contains(
+                r#"href="https://github.com/awslabs/aws-c-common/commit/fbb21230e117d2afe49d03ebe8605270dacb4ab3""#
+            ),
+            "expected a link to the upstream commit: {html}"
+        );
+        // Abbreviated in the link text, next to the repository - a bare hash names no project.
+        assert!(
+            html.contains(">Upstream commit awslabs-aws-c-common@fbb2123</a>"),
+            "got: {html}"
+        );
+        assert!(
+            html.contains(">include/aws/common/file.h</span>"),
+            "got: {html}"
+        );
+        assert!(
+            html.contains(r#"<p class="description">Only insert, nothing else.</p>"#),
+            "the fixture's own note belongs on its page: {html}"
+        );
+    }
+
+    /// A handmade fixture was never sampled, so it has no upstream commit to point at - and the
+    /// header has to simply not carry that link rather than carry a broken one.
+    #[test]
+    fn render_fixture_page_has_no_upstream_link_without_provenance() {
+        let source = "fn f() {}\n";
+        let before = Code::from_string(source, &Language::Rust);
+        let after = Code::from_string(source, &Language::Rust);
+
+        let html = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &HumanMapping::default(),
+            None,
+            None,
+            &mut Vec::new(),
+        )
+        .expect("should render")
+        .html;
+
+        assert!(!html.contains("Upstream commit"), "got: {html}");
+        assert!(!html.contains("class=\"description\""), "got: {html}");
     }
 
     fn parse_rust(source: &str) -> tree_sitter::Tree {
@@ -1869,6 +2669,9 @@ mod tests {
                 codediff_mismatches: 0,
                 unix_diff_mismatches: 3,
                 total_lines: 40,
+                paintings: vec!["Minimal".to_string(), "Full".to_string()],
+                note: Some("Requires a N:M match for perfect solution".to_string()),
+                unmarked_nodes: 0,
             },
             IndexEntry {
                 name: "c-linux-small-bugfix".to_string(),
@@ -1876,6 +2679,9 @@ mod tests {
                 codediff_mismatches: 1,
                 unix_diff_mismatches: 5,
                 total_lines: 12,
+                paintings: Vec::new(),
+                note: None,
+                unmarked_nodes: 7,
             },
         ];
 
@@ -1886,6 +2692,27 @@ mod tests {
         assert!(html.contains(">Rust<"));
         assert!(html.contains(r#"href="fixtures/c-linux-small-bugfix.html""#));
         assert!(html.contains(">C<"));
+        // Names, not a count: "painted twice" and "painted once" are different answers to the same
+        // fixture, and an unpainted one has to read as absent rather than as a zero.
+        assert!(
+            html.contains(">Minimal, Full</td>"),
+            "expected a painted fixture to list its paintings by name: {html}"
+        );
+        assert!(
+            html.contains(">&mdash;</td>"),
+            "expected an unpainted fixture to read as absent: {html}"
+        );
+        // A description belongs under its fixture's name, not in a column of its own.
+        assert!(
+            html.contains(
+                r#"<div class="fixture-note">Requires a N:M match for perfect solution</div>"#
+            ),
+            "expected the fixture's description under its name: {html}"
+        );
+        assert!(
+            html.contains(r#"data-unmarked="7""#) && html.contains(">7</td>"),
+            "expected the unfinished mapping's unmarked-node count: {html}"
+        );
     }
 
     #[test]
@@ -1896,6 +2723,9 @@ mod tests {
             codediff_mismatches: 2,
             unix_diff_mismatches: 9,
             total_lines: 40,
+            paintings: vec!["Only one solution".to_string()],
+            note: None,
+            unmarked_nodes: 4,
         }];
 
         let html = render_index_page(&entries);
@@ -1921,7 +2751,23 @@ mod tests {
             html.contains(">9</td>"),
             "Unix diff's count should render as a cell: {html}"
         );
-        for sort_key in ["name", "language", "codediff", "unix_diff", "total_lines"] {
+        assert!(
+            html.contains(r#"data-paintings="1""#),
+            "expected the row to carry how many paintings the fixture has: {html}"
+        );
+        assert!(
+            html.contains(r#"data-unmarked="4""#),
+            "expected the row to carry how much of the mapping is still unmarked: {html}"
+        );
+        for sort_key in [
+            "name",
+            "language",
+            "codediff",
+            "unix_diff",
+            "total_lines",
+            "paintings",
+            "unmarked",
+        ] {
             assert!(
                 html.contains(&format!(r#"data-sort="{sort_key}""#)),
                 "expected a sortable column header for {sort_key}: {html}"
@@ -1940,6 +2786,9 @@ mod tests {
             codediff_mismatches: 0,
             unix_diff_mismatches: 0,
             total_lines: 0,
+            paintings: Vec::new(),
+            note: None,
+            unmarked_nodes: 0,
         }];
         let html = render_index_page(&entries);
         assert!(html.contains("a&amp;b"));

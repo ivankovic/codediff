@@ -1063,6 +1063,31 @@ pub fn rebuild_caches(
 /// failing outright - same "don't let one bad group block the whole caller" posture
 /// [`rebuild_caches`] already takes for a single bad entry (`unresolved`), just without a precise
 /// per-group count, since there's no single caller today that needs one.
+/// Nodes in `root`'s tree the mapping says nothing about - the size of what is left to decide.
+///
+/// Pass [`status_before`] or [`status_after`] as `status_fn`, matching the side `root` is from.
+/// A mapping that resolves nothing at all reports every node, which is exactly true rather than an
+/// error: an unsolved fixture and a fixture with no `human_mapping.json` are the same state to a
+/// completeness count.
+pub fn unmarked_node_count(
+    root: Node,
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+) -> usize {
+    let mut count = 0;
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if status_fn(node, caches) == NodeStatus::Unmarked {
+            count += 1;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    count
+}
+
 pub fn rebuild_caches_for_mapping(
     mapping: &HumanMapping,
     before_root: Node,

@@ -334,6 +334,9 @@
       case "v":
         cycleView();
         break;
+      case "p":
+        cycleRendering();
+        break;
       case "?":
         toggleHelp();
         break;
@@ -441,6 +444,89 @@
       }
     });
   });
+
+  // ------------------------------------------------------------- code renderings
+  //
+  // A page can carry several accounts of the same edit as code: the node mapping projected to
+  // text, plus one panel per human painting (generate_mapping_site.rs renders them all
+  // server-side, stacked). They are alternatives, not layers, so this only chooses which one is
+  // on screen.
+
+  const renderingPanels = Array.from(
+    document.querySelectorAll(".code-panels[data-painting]")
+  );
+  const renderingButtons = Array.from(
+    document.querySelectorAll(".painting-switch button")
+  );
+  const RENDERING_STORAGE_KEY = "codediff-mapping-rendering";
+
+  function renderingName(el) {
+    return el.dataset.paintingName || "";
+  }
+
+  // Keyed by *name*, not by the `p0`/`p1` handle the DOM uses: painting names are per fixture, so
+  // `p0` means something different on the next page, while "Minimal" means the same thing
+  // wherever it appears. A name that isn't on this page falls back to the node mapping, which
+  // every page has.
+  function setRendering(name) {
+    let panel = renderingPanels.filter((el) => renderingName(el) === name)[0];
+    if (!panel) panel = renderingPanels[0];
+    if (!panel) return;
+    const key = panel.dataset.painting;
+    renderingPanels.forEach((el) => {
+      el.classList.toggle("hidden", el !== panel);
+    });
+    renderingButtons.forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.painting === key ? "true" : "false"
+      );
+    });
+    // A selection made in the panel that just went away would keep its outline and, worse, its
+    // counterpart scroll target - both now invisible.
+    clearCodeSelection();
+  }
+
+  // Remembering is deliberately *not* done inside `setRendering`, unlike `setView`: that one is
+  // also called on load, and its `split` default is valid on every page, while a painting name is
+  // not. Most of the corpus is unpainted, so applying a stored name on load would fall back to the
+  // node mapping and then write *that* back - and browsing a few unpainted fixtures would quietly
+  // erase the preference it is supposed to keep. Only a deliberate choice records one.
+  function chooseRendering(name) {
+    setRendering(name);
+    const panel = renderingPanels.filter((el) => renderingName(el) === name)[0];
+    if (!panel) return;
+    try {
+      window.localStorage.setItem(RENDERING_STORAGE_KEY, name);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function cycleRendering() {
+    if (renderingPanels.length < 2) return;
+    let current = 0;
+    renderingPanels.forEach((el, index) => {
+      if (!el.classList.contains("hidden")) current = index;
+    });
+    const next = renderingPanels[(current + 1) % renderingPanels.length];
+    chooseRendering(renderingName(next));
+    setStatus("code view: " + renderingName(next));
+  }
+
+  renderingButtons.forEach((button) => {
+    button.addEventListener("click", () =>
+      chooseRendering(button.dataset.paintingName || "")
+    );
+  });
+
+  let storedRendering = "";
+  try {
+    storedRendering = window.localStorage.getItem(RENDERING_STORAGE_KEY) || "";
+  } catch (e) {
+    /* ignore */
+  }
+  setRendering(storedRendering);
 
   setFocusedSide("before");
 })();

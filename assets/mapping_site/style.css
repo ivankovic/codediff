@@ -592,3 +592,92 @@ body[data-view="code"] .legend:not(.code-legend) {
   height: 0.85em;
   cursor: default;
 }
+
+/* ---------------------------------------------------------------- code renderings
+ *
+ * A fixture page stacks every account of the same edit as code - the node mapping projected to
+ * text, plus one panel per human painting - and viewer.js shows one at a time. They are stacked
+ * rather than laid out side by side on purpose: the two are compared by flipping between them
+ * with the rows in identical positions, which is also why generate_mapping_site.rs folds every
+ * rendering on the same row set. */
+.code-panels.hidden {
+  display: none;
+}
+
+.painting-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.painting-switch-label {
+  color: var(--muted);
+}
+
+/* Same segmented-control treatment as the view switch, so the two read as the same kind of
+ * control - one chooses which half of the page you see, the other which answer it shows. */
+.painting-switch button {
+  font: inherit;
+  padding: 0.15rem 0.6rem;
+  background: var(--button-bg);
+  color: var(--fg);
+  border: 1px solid var(--button-border);
+  cursor: pointer;
+}
+
+.painting-switch button:first-of-type {
+  border-radius: 4px 0 0 4px;
+}
+
+.painting-switch button:last-of-type {
+  border-radius: 0 4px 4px 0;
+}
+
+.painting-switch button + button {
+  border-left: none;
+}
+
+.painting-switch button[aria-pressed="true"] {
+  background: var(--matched);
+  border-color: var(--matched);
+  color: var(--bg);
+}
+
+/* The switch belongs to the code view, so it goes wherever the code panels go. */
+body[data-view="tree"] .painting-switch,
+body[data-view="tree"] .painting-notice {
+  display: none;
+}
+
+.fixture-table td.paintings {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- provenance and notes
+ *
+ * What a fixture is (its description.md) and where it came from (the upstream commit it was
+ * sampled from) - both previously visible only in src/test/data/diffs.csv. */
+.description {
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--matched);
+  background: var(--panel-bg);
+  white-space: pre-wrap;
+}
+
+.source-path {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+/* Second line of the fixture-name cell, not a column: free prose has no fixed width, and it should
+ * read as a subtitle of the name above it rather than compete with the counts beside it. */
+.fixture-note {
+  color: var(--muted);
+  font-size: 0.9em;
+  margin-top: 0.15rem;
+  max-width: 60ch;
+}

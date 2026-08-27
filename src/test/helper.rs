@@ -712,6 +712,144 @@ pub fn note_as_csv_cell(note: &str) -> String {
     note.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+// ─── Upstream provenance ────────────────────────────────────────────────────────────────────
+//
+// Where a fixture came from. Unlike everything above, this does not live in the fixture directory:
+// a promoted fixture keeps only its two files, and the repository/commit/path it was sampled from
+// stay in `sample.csv`, joined on `promoted_to`. Two binaries need that join now
+// (`diff_inventory`, which writes it into `diffs.csv`, and `generate_mapping_site`, which links
+// it), so it lives here rather than being written twice and drifting.
+
+/// The upstream columns of one promoted `sample.csv` row.
+pub struct SampleProvenance {
+    /// The clone-directory slug, `owner` and `repo` joined by a dash - **not** `owner/repo` and
+    /// not a URL. The dash carries no boundary, so `Ondsel-Development-OndselSolver` cannot be
+    /// split back into its two halves by inspection; [`repository_urls`] resolves it by matching
+    /// against the real clone list instead of guessing.
+    pub repository: String,
+    /// The commit the *after* side was taken from. The before side is the same file in that
+    /// commit's single parent (see `sample_code_pairs`' reconstruction contract), so this commit
+    /// *is* the change the fixture captures - which is what makes a link to it meaningful.
+    pub commit: String,
+    /// Path within the repository, at `commit`.
+    pub path: String,
+    /// The comment the sample was recorded with. Superseded by the fixture's own `description.md`
+    /// (see [`read_note`]) for everything promoted; kept here because an unpromoted sample has
+    /// nowhere else to put one.
+    pub comment: String,
+}
+
+/// `sample.csv` keyed by the fixture name each row was promoted to.
+///
+/// Rows with an empty `promoted_to` are candidates that were never promoted (or were rejected):
+/// they name no fixture, so they are skipped rather than keyed under an empty string. A missing
+/// `sample.csv` is an empty map, not an error - a checkout can legitimately have fixtures and no
+/// sampling history.
+pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
+    let path = data_root().join("sample.csv");
+    let mut out = HashMap::new();
+    if !path.exists() {
+        return Ok(out);
+    }
+    let mut reader = csv::Reader::from_path(&path)
+        .with_context(|| format!("reading sample provenance from {path:?}"))?;
+    for record in reader.deserialize::<HashMap<String, String>>() {
+        let record = record.context("parsing a sample.csv row")?;
+        let promoted_to = record.get("promoted_to").cloned().unwrap_or_default();
+        if promoted_to.is_empty() {
+            continue;
+        }
+        let field = |key: &str| record.get(key).cloned().unwrap_or_default();
+        out.insert(
+            promoted_to,
+            SampleProvenance {
+                repository: field("repository"),
+                commit: field("commit"),
+                path: field("path"),
+                comment: field("comment"),
+            },
+        );
+    }
+    Ok(out)
+}
+
+/// Clone URL for each [`SampleProvenance::repository`] slug, from `list_of_repositories.csv`.
+///
+/// The slug is `owner-repo` with the boundary lost, so it is resolved the only way that is sound:
+/// by deriving the same slug from every known clone URL and looking it up. Anything that does not
+/// resolve is simply absent - 447 of the corpus's 449 promoted samples resolve, and the two that
+/// don't come from a host whose URL has no `owner` segment at all
+/// (`https://git.libreoffice.org/core`), which is exactly the case a guessed split would get
+/// wrong silently.
+///
+/// The list covers github.com, gitlab.com and codeberg.org. All three serve a commit at
+/// `<clone url>/commit/<sha>`, which is why callers are handed the repository URL and not a
+/// per-host URL builder.
+pub fn repository_urls() -> Result<HashMap<String, String>> {
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("list_of_repositories.csv");
+    let mut out = HashMap::new();
+    if !path.exists() {
+        return Ok(out);
+    }
+    let mut reader = csv::Reader::from_path(&path)
+        .with_context(|| format!("reading repository list from {path:?}"))?;
+    for record in reader.deserialize::<HashMap<String, String>>() {
+        let record = record.context("parsing a list_of_repositories.csv row")?;
+        let Some(url) = record.get("repository") else {
+            continue;
+        };
+        let url = url.trim().trim_end_matches('/');
+        if let Some(slug) = repository_slug(url) {
+            // First wins: the list is allowed to name the same repository twice, and either row
+            // gives the same URL for the purposes of a link.
+            out.entry(slug).or_insert_with(|| url.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// The clone-directory slug for a clone URL: everything after the host, `.git` dropped, `/`
+/// replaced by `-` - the same shape `sample.csv`'s `repository` column holds.
+///
+/// `None` for a URL with nothing after the host, which is what makes an unresolvable entry absent
+/// rather than wrong.
+fn repository_slug(url: &str) -> Option<String> {
+    let after_scheme = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
+    let (_host, path) = after_scheme.split_once('/')?;
+    let path = path.trim_matches('/');
+    if path.is_empty() {
+        return None;
+    }
+    Some(path.trim_end_matches(".git").replace('/', "-"))
+}
+
+/// The upstream commit URL for one fixture, or `None` when it has no sample row, no commit, or a
+/// repository the clone list doesn't resolve.
+///
+/// Takes the two maps rather than loading them, because every caller wants this for a whole
+/// corpus and re-reading two CSVs per fixture would be pure waste.
+pub fn upstream_commit_url(
+    provenance: &SampleProvenance,
+    repository_urls: &HashMap<String, String>,
+) -> Option<String> {
+    if provenance.commit.is_empty() {
+        return None;
+    }
+    // `sample.csv` records some slugs with the `.git` a bare clone directory carries; the list is
+    // derived from URLs and never does.
+    let slug = provenance.repository.trim_end_matches(".git");
+    let url = repository_urls.get(slug)?;
+    Some(format!("{url}/commit/{}", provenance.commit))
+}
+
+fn data_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+}
+
 /**
 * Loads exactly one named fixture from `src/test/data/diffs/{handmade,small,full}/<name>/`,
 * without touching the rest of the corpus. Unlike [`handmade_test_code_pairs`], which parses and
@@ -1082,9 +1220,87 @@ fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> R
 
 #[cfg(test)]
 mod tests {
-    use crate::code::Language;
-
     use super::*;
+
+    #[test]
+    fn repository_slug_matches_the_clone_directory_name_sample_csv_records() {
+        // The three forges the corpus is drawn from, plus the `.git` a bare clone carries.
+        assert_eq!(
+            repository_slug("https://github.com/awslabs/aws-c-common").as_deref(),
+            Some("awslabs-aws-c-common")
+        );
+        assert_eq!(
+            repository_slug("https://gitlab.com/gitlab-org/gitlab-runner").as_deref(),
+            Some("gitlab-org-gitlab-runner")
+        );
+        assert_eq!(
+            repository_slug("https://codeberg.org/dnkl/foot.git").as_deref(),
+            Some("dnkl-foot")
+        );
+        // An owner whose own name contains dashes is exactly why the slug can't be split back
+        // apart, and exactly why this goes the other way instead.
+        assert_eq!(
+            repository_slug("https://github.com/Ondsel-Development/OndselSolver").as_deref(),
+            Some("Ondsel-Development-OndselSolver")
+        );
+        // A URL with nothing after the host names no repository - absent rather than wrong.
+        assert_eq!(repository_slug("https://git.libreoffice.org"), None);
+    }
+
+    #[test]
+    fn upstream_commit_url_needs_a_commit_and_a_resolvable_repository() {
+        let urls = HashMap::from([(
+            "awslabs-aws-c-common".to_string(),
+            "https://github.com/awslabs/aws-c-common".to_string(),
+        )]);
+        let sample = |repository: &str, commit: &str| SampleProvenance {
+            repository: repository.to_string(),
+            commit: commit.to_string(),
+            path: "include/aws/common/file.h".to_string(),
+            comment: String::new(),
+        };
+
+        assert_eq!(
+            upstream_commit_url(&sample("awslabs-aws-c-common", "fbb2123"), &urls).as_deref(),
+            Some("https://github.com/awslabs/aws-c-common/commit/fbb2123")
+        );
+        // `sample.csv` records some slugs with the `.git` suffix; the clone list never does.
+        assert_eq!(
+            upstream_commit_url(&sample("awslabs-aws-c-common.git", "fbb2123"), &urls).as_deref(),
+            Some("https://github.com/awslabs/aws-c-common/commit/fbb2123")
+        );
+        // A handmade fixture has no commit, and an unknown repository has no URL. Both are the
+        // ordinary "no link" answer, not an error.
+        assert!(upstream_commit_url(&sample("awslabs-aws-c-common", ""), &urls).is_none());
+        assert!(upstream_commit_url(&sample("nobody-nothing", "fbb2123"), &urls).is_none());
+    }
+
+    /// The join is only worth anything if it actually resolves. Measured against the real corpus
+    /// rather than asserted in the abstract: a rename in `list_of_repositories.csv`, or a new
+    /// sampling host, should show up here rather than as pages quietly losing their link.
+    #[test]
+    fn the_corpus_provenance_resolves_to_upstream_urls() {
+        let provenance = sample_provenance().expect("sample.csv should parse");
+        let urls = repository_urls().expect("list_of_repositories.csv should parse");
+        assert!(
+            provenance.len() > 400,
+            "only {} promoted samples - sample.csv is not being read",
+            provenance.len()
+        );
+
+        let resolved = provenance
+            .values()
+            .filter(|sample| upstream_commit_url(sample, &urls).is_some())
+            .count();
+        let rate = 100.0 * resolved as f64 / provenance.len() as f64;
+        assert!(
+            rate > 99.0,
+            "only {resolved} of {} promoted samples resolve to an upstream commit ({rate:.1}%)",
+            provenance.len()
+        );
+    }
+
+    use crate::code::Language;
 
     /// Removes `name`'s description.md on drop, so a test that writes one into the real corpus
     /// cleans up even when it panics. Leaving one behind would change `diffs.csv`, and the
