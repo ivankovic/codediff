@@ -115,11 +115,23 @@ mod rust_add_value_to_enum;
 #[cfg(test)]
 mod rust_cost_optimization;
 #[cfg(test)]
+mod rust_error_handling;
+#[cfg(test)]
+mod rust_hello_world_added_message;
+#[cfg(test)]
+mod rust_hello_world_removed_message;
+#[cfg(test)]
+mod rust_no_change;
+#[cfg(test)]
 mod rust_small_addition_with_reuse_of_binary_expressions;
 #[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
 mod rust_tauri_api_build_1;
+#[cfg(test)]
+mod rust_tauri_api_build_2;
+#[cfg(test)]
+mod typescript_add_error_handling;
 #[cfg(test)]
 mod typescript_add_type_annotations;
 #[cfg(test)]

@@ -296,6 +296,8 @@ mod rust_refirmlabs_binwalk_whitespace_only;
 #[cfg(test)]
 mod rust_skim_rs_skim_format_string;
 #[cfg(test)]
+mod rust_tiffany352_rink_rs_real_change;
+#[cfg(test)]
 mod rust_tursodatabase_turso_unwrap_to_expect;
 #[cfg(test)]
 mod rust_weggli_rs_weggli_move_import_around_and_formatting_change;

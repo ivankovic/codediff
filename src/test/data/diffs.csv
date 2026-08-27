@@ -139,6 +139,7 @@ rust-quietvoid-dovi_tool-change-to-templated-call,src/test/data/diffs/full/rust-
 rust-rbspy-rbspy-add-two-test-cases,src/test/data/diffs/full/rust-rbspy-rbspy-add-two-test-cases,full,Rust,rbspy-rbspy,d7af2134b698e7e2d9d66bbed6c6523011d24012,src/core/ruby_version.rs,,3284,24899,3321,25152,0,none,
 rust-refirmlabs-binwalk-whitespace-only,src/test/data/diffs/full/rust-refirmlabs-binwalk-whitespace-only,full,Rust,ReFirmLabs-binwalk,e460bddb37d668907ca894181062f4209327d3c5,src/binwalk.rs,,922,5373,920,5373,0,none,
 rust-skim-rs-skim-format-string,src/test/data/diffs/full/rust-skim-rs-skim-format-string,full,Rust,skim-rs-skim,cbd176588196b48433dac61962526231663a9823,skim/src/matcher.rs,The best possible diff would require matching a node with part of a string constant,135,1198,135,1196,0,none,
+rust-tiffany352-rink-rs-real-change,src/test/data/diffs/full/rust-tiffany352-rink-rs-real-change,full,Rust,tiffany352-rink-rs,72d856109bd7f4b73082d8f785f0dfdc1d644b1e,cli/src/config.rs,,483,4365,343,2905,20,none,
 rust-tursodatabase-turso-unwrap-to-expect,src/test/data/diffs/full/rust-tursodatabase-turso-unwrap-to-expect,full,Rust,tursodatabase-turso,4416f0d9e92e80d89b2ce2af86b3b3fef593f346,core/io/clock.rs,,102,817,104,825,0,none,
 rust-weggli-rs-weggli-move-import-around-and-formatting-change,src/test/data/diffs/full/rust-weggli-rs-weggli-move-import-around-and-formatting-change,full,Rust,weggli-rs-weggli,9399c2cac29d721fc1f64952cbec5d9c86ba9592,src/main.rs,,474,3861,473,3861,0,none,
 rust-xou816-spot-add-Some-around-existing-code,src/test/data/diffs/full/rust-xou816-spot-add-Some-around-existing-code,full,Rust,xou816-spot,9b443ac55ef3436b60a6d1ca59d8e37c7e8553b5,src/app/components/settings/settings.rs,,284,2383,284,2388,0,none,
@@ -262,26 +263,26 @@ rust-algorithm-change,src/test/data/diffs/handmade/rust-algorithm-change,handmad
 rust-completely-unrelated-main-files,src/test/data/diffs/handmade/rust-completely-unrelated-main-files,handmade,Rust,,,,,241,1806,900,8462,10268,none,
 rust-cost-optimization,src/test/data/diffs/handmade/rust-cost-optimization,handmade,Rust,,,,,29,201,34,217,0,single,Only one solution
 rust-data-structure,src/test/data/diffs/handmade/rust-data-structure,handmade,Rust,,,,,16,104,28,212,0,none,
-rust-error-handling,src/test/data/diffs/handmade/rust-error-handling,handmade,Rust,,,,,14,133,15,168,15,none,
+rust-error-handling,src/test/data/diffs/handmade/rust-error-handling,handmade,Rust,,,,,14,133,15,168,0,minimal+full,Full|Minimal
 rust-firefox-webrenderer-borders,src/test/data/diffs/handmade/rust-firefox-webrenderer-borders,handmade,Rust,,,,,369,2472,369,2444,12,none,
 rust-hash-optimization,src/test/data/diffs/handmade/rust-hash-optimization,handmade,Rust,,,,,22,187,41,386,110,none,
-rust-hello-world-added-message,src/test/data/diffs/handmade/rust-hello-world-added-message,handmade,Rust,,,,,4,22,5,34,0,none,
-rust-hello-world-removed-message,src/test/data/diffs/handmade/rust-hello-world-removed-message,handmade,Rust,,,,,5,34,4,22,0,none,
+rust-hello-world-added-message,src/test/data/diffs/handmade/rust-hello-world-added-message,handmade,Rust,,,,,4,22,5,34,0,single,Only one solution
+rust-hello-world-removed-message,src/test/data/diffs/handmade/rust-hello-world-removed-message,handmade,Rust,,,,,5,34,4,22,0,single,Only one solution
 rust-leetcode-1-bugfix,src/test/data/diffs/handmade/rust-leetcode-1-bugfix,handmade,Rust,,,,,27,220,31,261,0,none,
 rust-multi-map-duplicate-calls,src/test/data/diffs/handmade/rust-multi-map-duplicate-calls,handmade,Rust,,,,,7,38,6,31,56,none,
 rust-next-font-imports-generator,src/test/data/diffs/handmade/rust-next-font-imports-generator,handmade,Rust,,,,,275,2389,275,2372,18,none,
-rust-no-change,src/test/data/diffs/handmade/rust-no-change,handmade,Rust,,,,,50,383,50,383,0,none,
+rust-no-change,src/test/data/diffs/handmade/rust-no-change,handmade,Rust,,,,,50,383,50,383,0,single,Only one solution
 rust-real-logic-change-in-a-huge-75k-node-file,src/test/data/diffs/handmade/rust-real-logic-change-in-a-huge-75k-node-file,handmade,Rust,,,,,9146,74748,9586,78381,152209,none,
 rust-small-addition-with-reuse-of-binary-expressions,src/test/data/diffs/handmade/rust-small-addition-with-reuse-of-binary-expressions,handmade,Rust,,,,,3547,26544,3572,26626,0,minimal+full,Full|Minimal
 rust-sniffnet-protocol,src/test/data/diffs/handmade/rust-sniffnet-protocol,handmade,Rust,,,,,48,415,52,480,0,single,Only one solution
 rust-tauri-api-build-1,src/test/data/diffs/handmade/rust-tauri-api-build-1,handmade,Rust,,,,,52,451,53,456,0,single,Only one solution
-rust-tauri-api-build-2,src/test/data/diffs/handmade/rust-tauri-api-build-2,handmade,Rust,,,,,53,456,53,453,0,none,
+rust-tauri-api-build-2,src/test/data/diffs/handmade/rust-tauri-api-build-2,handmade,Rust,,,,,53,456,53,453,0,minimal+full,Full|Minimal
 rust-tauri-cli-ios-dev,src/test/data/diffs/handmade/rust-tauri-cli-ios-dev,handmade,Rust,,,,,333,2580,333,2582,0,none,
 rust-turbopack-module-rule,src/test/data/diffs/handmade/rust-turbopack-module-rule,handmade,Rust,,,,,225,1775,277,2150,152,none,
 rust-turbopack-persistence-tools-main,src/test/data/diffs/handmade/rust-turbopack-persistence-tools-main,handmade,Rust,,,,,67,457,68,468,0,none,
 rust-zed-git-panel-settings,src/test/data/diffs/handmade/rust-zed-git-panel-settings,handmade,Rust,,,,,72,605,74,627,0,none,
 rust-zed-workspace-tasks,src/test/data/diffs/handmade/rust-zed-workspace-tasks,handmade,Rust,,,,,137,1077,331,2998,0,none,
-typescript-add-error-handling,src/test/data/diffs/handmade/typescript-add-error-handling,handmade,TypeScript,,,,,7,64,14,121,0,none,
+typescript-add-error-handling,src/test/data/diffs/handmade/typescript-add-error-handling,handmade,TypeScript,,,,,7,64,14,121,0,minimal+full,Full|Minimal
 typescript-add-generics,src/test/data/diffs/handmade/typescript-add-generics,handmade,TypeScript,,,,,18,98,19,125,0,none,
 typescript-add-type-annotations,src/test/data/diffs/handmade/typescript-add-type-annotations,handmade,TypeScript,,,,,11,68,17,108,0,minimal+full,Full|Minimal
 typescript-async-await,src/test/data/diffs/handmade/typescript-async-await,handmade,TypeScript,,,,,10,87,13,109,0,minimal+full,Full|Minimal

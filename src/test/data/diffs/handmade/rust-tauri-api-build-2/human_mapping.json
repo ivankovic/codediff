@@ -11087,5 +11087,115 @@
         "):1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 64,
+              "end_row": 28,
+              "end_column": 70
+            }
+          ],
+          "after": [
+            {
+              "start_row": 28,
+              "start_column": 64,
+              "end_row": 28,
+              "end_column": 73
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 71,
+              "end_row": 28,
+              "end_column": 77
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 64,
+              "end_row": 28,
+              "end_column": 70
+            }
+          ],
+          "after": [
+            {
+              "start_row": 28,
+              "start_column": 64,
+              "end_row": 28,
+              "end_column": 73
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 71,
+              "end_row": 28,
+              "end_column": 77
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 70,
+              "end_row": 28,
+              "end_column": 71
+            }
+          ],
+          "after": [
+            {
+              "start_row": 28,
+              "start_column": 73,
+              "end_row": 28,
+              "end_column": 74
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 78,
+              "end_row": 28,
+              "end_column": 94
+            }
+          ],
+          "after": [
+            {
+              "start_row": 28,
+              "start_column": 74,
+              "end_row": 28,
+              "end_column": 90
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

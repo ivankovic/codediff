@@ -9923,5 +9923,11 @@
         "impl_item:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": []
+    }
   ]
 }
