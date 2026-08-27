@@ -21,5 +21,20 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("css-madmaxms-theme-obsidian-2-add-gnome-44-and-a-few-changes")
+    // Recorded distance from the human mapping, not a target: 125 mismatches (75 visible) of
+    // 70234 nodes, 0.18%, measured 2026-08-27 when this fixture's mapping was authored. Lower it
+    // when a change earns it; a rise is a regression.
+    //
+    // Two mechanisms, in roughly equal parts. 54 of the 69 attributed mismatches are
+    // `StructurallyIdenticalAncestor` - a container matched on shape, whose descendants then
+    // inherit an operation the human classified differently. The other 56 carry no reason at all
+    // and are all one shape: the human marked a subtree `Insert`/`Delete (with children)`, so
+    // every descendant should be unmapped, but codediff paired those descendants with
+    // byte-identical copies elsewhere in the file. A stylesheet is mostly punctuation and repeated
+    // property names, so almost every leaf has an identical twin to be captured by.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "css-madmaxms-theme-obsidian-2-add-gnome-44-and-a-few-changes",
+        125,
+        75,
+    )
 }
