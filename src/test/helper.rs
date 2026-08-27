@@ -741,10 +741,15 @@ pub struct SampleProvenance {
 
 /// `sample.csv` keyed by the fixture name each row was promoted to.
 ///
+/// `test-fixtures` only: this module also compiles under a plain `cfg(test)` build with no
+/// features (see `lib.rs`'s gate on `mod test`), where the `csv` crate the read needs is not
+/// linked. Both callers are `test-fixtures` binaries, so nothing loses access.
+///
 /// Rows with an empty `promoted_to` are candidates that were never promoted (or were rejected):
 /// they name no fixture, so they are skipped rather than keyed under an empty string. A missing
 /// `sample.csv` is an empty map, not an error - a checkout can legitimately have fixtures and no
 /// sampling history.
+#[cfg(feature = "test-fixtures")]
 pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
     let path = data_root().join("sample.csv");
     let mut out = HashMap::new();
@@ -775,6 +780,8 @@ pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
 
 /// Clone URL for each [`SampleProvenance::repository`] slug, from `list_of_repositories.csv`.
 ///
+/// `test-fixtures` only, for the same reason as [`sample_provenance`].
+///
 /// The slug is `owner-repo` with the boundary lost, so it is resolved the only way that is sound:
 /// by deriving the same slug from every known clone URL and looking it up. Anything that does not
 /// resolve is simply absent - 447 of the corpus's 449 promoted samples resolve, and the two that
@@ -785,6 +792,7 @@ pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
 /// The list covers github.com, gitlab.com and codeberg.org. All three serve a commit at
 /// `<clone url>/commit/<sha>`, which is why callers are handed the repository URL and not a
 /// per-host URL builder.
+#[cfg(feature = "test-fixtures")]
 pub fn repository_urls() -> Result<HashMap<String, String>> {
     let path =
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("list_of_repositories.csv");
@@ -843,6 +851,9 @@ pub fn upstream_commit_url(
     Some(format!("{url}/commit/{}", provenance.commit))
 }
 
+/// Gated with its only caller ([`sample_provenance`]) - see that function's note on why this
+/// module compiles in builds where `csv` is not linked.
+#[cfg(feature = "test-fixtures")]
 fn data_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -1278,6 +1289,7 @@ mod tests {
     /// The join is only worth anything if it actually resolves. Measured against the real corpus
     /// rather than asserted in the abstract: a rename in `list_of_repositories.csv`, or a new
     /// sampling host, should show up here rather than as pages quietly losing their link.
+    #[cfg(feature = "test-fixtures")]
     #[test]
     fn the_corpus_provenance_resolves_to_upstream_urls() {
         let provenance = sample_provenance().expect("sample.csv should parse");
