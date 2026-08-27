@@ -643,6 +643,75 @@ pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
         .find(|path| path.is_dir())
 }
 
+/// The free-form human note for one fixture: `src/test/data/diffs/<dataset>/<name>/description.md`.
+///
+/// **Not a new convention.** 21 fixtures already carry this file - hand-written prose saying what
+/// the case demonstrates - and until now nothing read it. Wiring it up beats inventing a second
+/// note file beside it, and it complements `sample.csv`'s `comment` column exactly: every one of
+/// those 21 is handmade (never sampled, so no row could hold a comment) and the 20 fixtures with
+/// a sample comment are all promoted. The two sets do not intersect at all today, which is why
+/// preferring this file loses nothing.
+///
+/// `None` for a name no dataset holds - the same "no such case" answer [`diffs_case_dir`] gives,
+/// rather than a path that could never be written.
+///
+/// **A separate file, not a field of `human_mapping.json`.** The mappings come to 1.4 GB across
+/// the corpus with one file at 80 MB, and parsing them all costs about ten seconds - which is why
+/// `human_solver`'s picker already reaches for a substring scan rather than serde when it needs
+/// one bit out of every mapping. A note that has to be *displayed* in a list needs its value, not
+/// a yes/no, and pulling a JSON string value out by substring scan (escapes, embedded newlines)
+/// is a fragile thing to build to avoid a cost this file simply doesn't have.
+///
+/// **Not `README.md`, which is already in these directories.** That one is generated - provenance
+/// and upstream licensing, written by `stats::license` - so anything hand-written there is one
+/// regeneration away from being gone.
+pub fn note_path(name: &str) -> Option<std::path::PathBuf> {
+    diffs_case_dir(name).map(|dir| dir.join("description.md"))
+}
+
+/// The note for `name`, trimmed, or `None` if there is no note file, it can't be read, or it holds
+/// only whitespace.
+///
+/// The three cases are deliberately one answer: a fixture with no note and a fixture whose note is
+/// a stray newline are the same thing to every caller, and distinguishing them would only invite
+/// somebody to handle the difference.
+pub fn read_note(name: &str) -> Option<String> {
+    let text = std::fs::read_to_string(note_path(name)?).ok()?;
+    let trimmed = text.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
+/// Writes `name`'s note, or **deletes** the file when `text` is blank.
+///
+/// Deleting rather than leaving an empty file is what makes "no note" a single state on disk. An
+/// empty `description.md` in 60 fixture directories would be indistinguishable from a note somebody
+/// meant to write, and would show up in every corpus listing as a file worth opening.
+pub fn write_note(name: &str, text: &str) -> Result<()> {
+    let path = note_path(name).with_context(|| format!("no fixture directory for '{name}'"))?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        match std::fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err).with_context(|| format!("removing {path:?}")),
+        }
+    } else {
+        std::fs::write(&path, format!("{trimmed}\n"))
+            .with_context(|| format!("writing note to {path:?}"))
+    }
+}
+
+/// `note` as a single line, for a CSV cell.
+///
+/// `description.md` is markdown and may be several paragraphs; `diffs.csv`'s `comment` column is read as
+/// a one-liner. The csv writer would quote the newlines correctly, but the result is a cell that
+/// no spreadsheet or `cut` pipeline reads the way the rest of the column reads, and a file whose
+/// diff churns whenever a note is rewrapped. So the file keeps its formatting and the CSV gets
+/// every run of whitespace collapsed to one space.
+pub fn note_as_csv_cell(note: &str) -> String {
+    note.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /**
 * Loads exactly one named fixture from `src/test/data/diffs/{handmade,small,full}/<name>/`,
 * without touching the rest of the corpus. Unlike [`handmade_test_code_pairs`], which parses and
@@ -1016,6 +1085,72 @@ mod tests {
     use crate::code::Language;
 
     use super::*;
+
+    /// Removes `name`'s description.md on drop, so a test that writes one into the real corpus
+    /// cleans up even when it panics. Leaving one behind would change `diffs.csv`, and the
+    /// pre-commit hook would then quietly stage a fixture note nobody wrote.
+    struct NoteGuard(&'static str);
+
+    impl Drop for NoteGuard {
+        fn drop(&mut self) {
+            let _ = write_note(self.0, "");
+        }
+    }
+
+    /// Round-trips through the real fixture directory, because the paths come from
+    /// `diffs_case_dir` and cannot be pointed at a temp dir.
+    #[test]
+    fn a_note_round_trips_and_a_blank_one_deletes_the_file() -> Result<()> {
+        // A fixture with no description.md of its own, so nothing real is overwritten.
+        const CASE: &str = "rust-hello-world-added-message";
+        assert!(
+            read_note(CASE).is_none(),
+            "{CASE} was expected to have no note"
+        );
+        let _guard = NoteGuard(CASE);
+
+        write_note(CASE, "  a note, with surrounding space  ")?;
+        assert_eq!(
+            read_note(CASE).as_deref(),
+            Some("a note, with surrounding space")
+        );
+        assert!(note_path(CASE).expect("a real case").exists());
+
+        // Blank deletes rather than leaving an empty file, so "has no note" is one state on disk.
+        write_note(CASE, "   ")?;
+        assert!(read_note(CASE).is_none());
+        assert!(!note_path(CASE).expect("a real case").exists());
+
+        // Deleting a note that is already gone is not an error - `e` can be confirmed empty twice.
+        write_note(CASE, "")?;
+        Ok(())
+    }
+
+    #[test]
+    fn a_name_no_dataset_holds_has_no_note_path() {
+        assert!(note_path("no-such-fixture-anywhere").is_none());
+        assert!(read_note("no-such-fixture-anywhere").is_none());
+        assert!(write_note("no-such-fixture-anywhere", "x").is_err());
+    }
+
+    /// The CSV cell is one line however the markdown is wrapped - otherwise every rewrap of a
+    /// paragraph churns `diffs.csv`, and the cell reads differently from the rest of its column.
+    #[test]
+    fn a_multi_line_note_becomes_one_csv_line() {
+        assert_eq!(
+            note_as_csv_cell("first line\n\nsecond   line\n"),
+            "first line second line"
+        );
+        assert_eq!(note_as_csv_cell(""), "");
+    }
+
+    /// The 21 descriptions that already existed are what this reads; if the filename ever drifts,
+    /// this catches it rather than `diffs.csv` silently losing a column.
+    #[test]
+    fn the_descriptions_already_in_the_corpus_are_readable() {
+        let note = read_note("rust-no-change").expect("rust-no-change has a description.md");
+        assert!(note.contains("identical"), "got {note:?}");
+    }
 
     #[test]
     fn test_node_for_path() -> Result<()> {

@@ -113,7 +113,15 @@
 *                  directory itself untouched. Re-prompts if the reason is empty. Has no effect on
 *                  a real test case or a git-commit-sourced case -- only a sample has a sample.csv
 *                  row to reject
-*   e              on a sample (opened via `O`), enter or edit a free-form comment: prompts for
+*   e              on a diff (`o`) or a sample (`O`), enter or edit a free-form comment. On a
+*                  diff it is written to `description.md` in the fixture's own directory,
+*                  immediately on Enter (not on `w` - that saves human_mapping.json); an empty
+*                  submission deletes the file. The `o` picker marks cases that have one with a
+*                  leading `*` and shows the selected case's note along the bottom.
+*                  `diff_inventory` prefers it over the sample.csv comment when writing
+*                  diffs.csv, and the prompt pre-fills from that comment when no note exists yet,
+*                  so promoting carries one forward. On a sample it still edits sample.csv
+*                  instead: prompts for
 *                  text, pre-filled with whatever's already recorded, and records it verbatim in
 *                  the matching sample.csv row's `comment` column -- unlike `R`, doesn't touch
 *                  `status`, works whether the row is SAMPLED/PROMOTED/REJECTED, and an empty
@@ -200,7 +208,7 @@ use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 use codediff::test::helper::human_mapping::rebuild_caches;
 use codediff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, diffs_case_dir, node_for_path, path_for_node,
-    precompute_paths,
+    precompute_paths, read_note, write_note,
 };
 
 #[derive(Parser, Debug)]
@@ -279,7 +287,9 @@ s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it
 R              on a sample, prompt for a reason and reject it instead of
                  promoting it (recorded in sample.csv; no human mapping needed)
-e              on a sample, enter/edit a free-form comment (recorded in sample.csv,
+e              on a diff, enter/edit its description.md (written on Enter, empty deletes
+                 it; `*` in the o picker marks cases that have one); on a sample, a
+                 free-form comment (recorded in sample.csv,
                  works regardless of status; carried into the generated test stub
                  if present when later promoted)
 o              open a different test case (src/test/data/diffs/); inside, d cycles
@@ -636,6 +646,39 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
             (name, painted)
         })
         .collect()
+}
+
+/// Every case's note, keyed by case name, for the `o` picker. Cases without one are simply
+/// absent.
+///
+/// The cheapest of the three picker scans by a wide margin: a few hundred bytes per fixture where
+/// `compute_diff_text_painted` reads 1.4 GB of JSON and `compute_diff_completeness` parses both
+/// sides with tree-sitter. Most fixtures have no `description.md` at all, so most of this is a
+/// failed `stat`.
+fn compute_diff_comments() -> std::collections::HashMap<String, String> {
+    let Ok(options) = list_available_cases() else {
+        return std::collections::HashMap::new();
+    };
+    options
+        .into_iter()
+        .filter_map(|(name, _)| read_note(&name).map(|note| (name, note)))
+        .collect()
+}
+
+/// Refreshes just `name`'s entry, for the same reason as `refresh_diff_text_painted`: `e` is the
+/// only thing that can change a case's note mid-session, and the row it was typed on should not
+/// read as un-noted until the next restart.
+fn refresh_diff_comment(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_comments {
+        match read_note(name) {
+            Some(note) => {
+                map.insert(name.to_string(), note);
+            }
+            None => {
+                map.remove(name);
+            }
+        }
+    }
 }
 
 /// A sample's disposition, as recorded in its sample.csv row's `status` column - `Sampled` if
@@ -2170,6 +2213,12 @@ struct App {
     /// lazy-once-per-session contract `diff_completeness` has - though this scan is much cheaper,
     /// since it skims JSON rather than parsing source with tree-sitter.
     diff_text_painted: Option<std::collections::HashMap<String, bool>>,
+    /// Every case's `description.md`, for the `o` picker's note marker and footer. `None` until
+    /// the first `o` press, the same lazy-once-per-session contract its two neighbours have - but
+    /// unlike them this is loaded on `o` itself rather than on the key that filters by it, since
+    /// it is displayed rather than filtered on and has to be there the first time the list is
+    /// drawn. Cases with no note are absent from the map, not present-and-empty.
+    diff_comments: Option<std::collections::HashMap<String, String>>,
     /// What the `t` view is painting on screen (see `TextOverlay`) - the human's own ranges,
     /// codediff's, or only where they differ. Cycled by `p` inside that view.
     text_overlay: TextOverlay,
@@ -2238,6 +2287,7 @@ impl App {
             diff_hide_complete: false,
             diff_hide_painted: false,
             diff_text_painted: None,
+            diff_comments: None,
             text_solution,
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,
@@ -4367,6 +4417,7 @@ fn draw_ui(
             app.algo_text_spans.as_ref(),
             app.diff_completeness.as_ref(),
             app.diff_text_painted.as_ref(),
+            app.diff_comments.as_ref(),
         );
     }
 }
@@ -4432,6 +4483,7 @@ fn render_modal(
     algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     diff_completeness: Option<&std::collections::HashMap<String, bool>>,
     diff_text_painted: Option<&std::collections::HashMap<String, bool>>,
+    diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     match modal {
         Modal::ConfirmKindMismatch {
@@ -4483,6 +4535,7 @@ fn render_modal(
                 diff_completeness,
                 *hide_painted,
                 diff_text_painted,
+                diff_comments,
             );
         }
         Modal::OpenSamplePicker {
@@ -5138,6 +5191,7 @@ fn render_open_diff_picker(
     completeness: Option<&std::collections::HashMap<String, bool>>,
     hide_painted: bool,
     text_painted: Option<&std::collections::HashMap<String, bool>>,
+    comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     let visible = visible_diff_options(
         options,
@@ -5151,7 +5205,25 @@ fn render_open_diff_picker(
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
 
-    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    // The note of whatever row is selected gets its own strip along the bottom. A note is
+    // free-form prose and the names here already run to sixty-odd characters, so there is no room
+    // to show one inline - the list carries a marker saying a note exists, and this says what it
+    // is for the one row the reader is actually on.
+    let note = comments.and_then(|map| visible.get(selected).and_then(|name| map.get(name)));
+    let (list_area, note_area) = if note.is_some() {
+        let split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(3), Constraint::Length(4)])
+            .split(popup_area);
+        (split[0], Some(split[1]))
+    } else {
+        (popup_area, None)
+    };
+
+    // Derived from `list_area`, not `popup_area`: the footer takes rows away from the list, and
+    // scrolling computed against the full popup would push the selected row off the bottom by
+    // exactly the footer's height.
+    let inner_height = list_area.height.saturating_sub(2) as usize;
     let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
 
@@ -5166,7 +5238,14 @@ fn render_open_diff_picker(
             } else {
                 Style::default()
             };
-            ListItem::new(Line::from(Span::styled(name.clone(), style)))
+            // Marked rather than shown: which cases carry a note is the part worth seeing at a
+            // glance, and it is also the part that survives a narrow terminal.
+            let marked = match comments {
+                Some(map) if map.contains_key(name) => format!("* {name}"),
+                Some(_) => format!("  {name}"),
+                None => name.clone(),
+            };
+            ListItem::new(Line::from(Span::styled(marked, style)))
         })
         .collect();
 
@@ -5186,7 +5265,21 @@ fn render_open_diff_picker(
                 .add_modifier(Modifier::BOLD),
         );
 
-    frame.render_widget(List::new(items).block(block), popup_area);
+    frame.render_widget(List::new(items).block(block), list_area);
+
+    if let (Some(note_area), Some(note)) = (note_area, note) {
+        frame.render_widget(
+            Paragraph::new(note.as_str())
+                .wrap(Wrap { trim: true })
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("description.md — e to edit")
+                        .border_style(Style::default().fg(Color::DarkGray)),
+                ),
+            note_area,
+        );
+    }
 }
 
 /// Like `render_open_diff_picker`, but for `O`'s sample picker: handled (already-promoted or
@@ -6181,7 +6274,19 @@ fn handle_key(
             None
         }
         KeyCode::Char('e') => {
-            if let CaseOrigin::Sample(source) = &app.origin {
+            if let CaseOrigin::Diffs = &app.origin {
+                // Pre-filled from the note if there is one, and otherwise from the sample.csv
+                // comment this fixture was promoted with. That second fallback is what keeps
+                // "description.md wins" from stranding anything: the old comment appears in the
+                // prompt, and confirming it copies it into the file the inventory now prefers.
+                let existing = read_note(&app.name)
+                    .or_else(|| promoted_sample_comment(&app.name))
+                    .unwrap_or_default();
+                app.modal = Some(Modal::PromptComment {
+                    input: existing,
+                    error: None,
+                });
+            } else if let CaseOrigin::Sample(source) = &app.origin {
                 // Pre-fill with whatever's already recorded, so this is an edit, not a blind
                 // overwrite - same idea as `PromptPromoteName`'s pre-filled default name.
                 let existing = read_sample_csv_rows(&sample_csv_path())
@@ -6193,11 +6298,19 @@ fn handle_key(
                     error: None,
                 });
             } else {
-                app.status = Some("Only an open sample (O) can have a comment".to_string());
+                app.status =
+                    Some("Only an open diff (o) or sample (O) can have a comment".to_string());
             }
             None
         }
         KeyCode::Char('o') => {
+            // Loaded here, unlike the completeness and painted maps which wait for the key that
+            // filters by them: notes are *displayed*, so they have to be present the first time
+            // the list is drawn. Affordable exactly because this scan is the cheap one - a stat
+            // and a short read per fixture, and most have no note at all.
+            if app.diff_comments.is_none() {
+                app.diff_comments = Some(compute_diff_comments());
+            }
             match list_available_cases() {
                 Ok(options) if !options.is_empty() => {
                     app.modal = Some(open_diff_picker_modal(
@@ -6819,7 +6932,10 @@ fn handle_modal_key(
             KeyCode::Enter => {
                 let comment = input.trim().to_string();
                 match action_comment(app, &comment) {
-                    Ok(msg) => app.status = Some(msg),
+                    Ok(msg) => {
+                        refresh_diff_comment(app, &app.name.clone());
+                        app.status = Some(msg);
+                    }
                     Err(err) => {
                         app.modal = Some(Modal::PromptComment {
                             input,
@@ -7473,11 +7589,26 @@ fn action_reject(app: &App, reason: &str) -> Result<String> {
 /// be empty). Only a sample has a sample.csv row to update; a git-commit-sourced case
 /// (`CaseOrigin::GitCommitFile`) has nothing to comment on.
 fn action_comment(app: &App, comment: &str) -> Result<String> {
-    let CaseOrigin::Sample(source) = &app.origin else {
-        bail!("Only a sample (opened via O) can have a comment");
-    };
-
     let comment = comment.trim();
+
+    // A promoted or handmade fixture keeps its note in its own directory, as `description.md`,
+    // because there is no sample.csv row to hold one - a handmade case was never sampled at all.
+    // Written here and now rather than on the next `w`: `app.dirty` means "human_mapping.json has
+    // unsaved edits", and letting one keystroke ride a flag that saves a different file is how a
+    // comment gets lost to a quit-without-saving. The sample branch below has always written
+    // immediately too, so this keeps `e` meaning one thing.
+    if let CaseOrigin::Diffs = &app.origin {
+        write_note(&app.name, comment)?;
+        return Ok(if comment.is_empty() {
+            format!("Cleared note for '{}' (description.md removed)", app.name)
+        } else {
+            format!("Wrote description.md for '{}'", app.name)
+        });
+    }
+
+    let CaseOrigin::Sample(source) = &app.origin else {
+        bail!("Only a diff (o) or a sample (O) can have a comment");
+    };
     match set_sample_comment(source, comment)? {
         true if comment.is_empty() => Ok(format!("Cleared comment for '{}'", app.name)),
         true => Ok(format!("Set comment for '{}': {}", app.name, comment)),
@@ -7579,6 +7710,20 @@ fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
 /// `sample_comment_at`/the `e` keybinding's prefill lookup. `source` uniquely identifies a row by
 /// construction (`sample_test_diffs` never writes two rows for the same commit+path), so "first
 /// match" is never ambiguous in practice.
+/// The `sample.csv` comment recorded against the sample this fixture was promoted from, if any.
+///
+/// Joined on `promoted_to`, the same key `diff_inventory` uses. Only ever a *fallback*: it fills
+/// the `e` prompt for a diff that has no `description.md` yet, so a comment written before
+/// promotion is one Enter away from becoming the note the inventory now prefers. A handmade
+/// fixture was never sampled and has no row at all, which is exactly why `description.md` exists.
+fn promoted_sample_comment(name: &str) -> Option<String> {
+    let rows = read_sample_csv_rows(&sample_csv_path()).ok()?;
+    rows.iter()
+        .find(|row| row.promoted_to == name)
+        .map(|row| row.comment.clone())
+        .filter(|comment| !comment.trim().is_empty())
+}
+
 fn find_sample_row<'a>(
     rows: &'a [SampleCsvRow],
     source: &SampleSource,
@@ -8799,6 +8944,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
             })
             .unwrap();
@@ -8837,6 +8983,7 @@ mod tests {
                     &HumanMapping::default(),
                     "Minimal",
                     TextOverlay::Human,
+                    None,
                     None,
                     None,
                     None,
@@ -9027,6 +9174,93 @@ mod tests {
             solution_picker_names(&app.mapping),
             vec!["Full", "Minimal", "Only one solution"],
             "an existing name must not be offered twice"
+        );
+    }
+
+    /// Presses one key on the main view of a case with `origin`, and hands back the App.
+    ///
+    /// Drives `handle_key`'s dispatch rather than `action_comment`, for the reason the solution
+    /// picker's harness gives: `x` and `c` were once implemented, unit-tested through their
+    /// actions, and unreachable because the key arm was never written.
+    fn press_on_case(origin: CaseOrigin, name: &str, code: KeyCode) -> App {
+        let source = "fn main() {}\n";
+        let tree = parse_rust(source);
+        let root = tree.root_node();
+        let mut app = App::new(
+            name.to_string(),
+            origin,
+            root.id(),
+            root.id(),
+            HumanMapping::default(),
+        );
+        let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+        let hashes = rustc_hash::FxHashMap::default();
+        handle_key(
+            &mut app,
+            code,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &hashes,
+            &hashes,
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+        app
+    }
+
+    /// `e` on a diff opens the comment prompt. It used to refuse - comments lived only in
+    /// sample.csv, which a handmade fixture has no row in at all.
+    #[test]
+    fn e_on_a_diff_opens_the_comment_prompt() {
+        let app = press_on_case(CaseOrigin::Diffs, "rust-no-change", KeyCode::Char('e'));
+        match &app.modal {
+            Some(Modal::PromptComment { input, .. }) => assert!(
+                input.contains("identical"),
+                "must pre-fill from the existing description.md, got {input:?}"
+            ),
+            other => panic!("expected Modal::PromptComment, got {other:?}"),
+        }
+    }
+
+    /// A diff with no description.md yet still gets the prompt - just an empty one.
+    #[test]
+    fn e_on_an_un_noted_diff_opens_an_empty_prompt() {
+        let app = press_on_case(
+            CaseOrigin::Diffs,
+            "rust-hello-world-added-message",
+            KeyCode::Char('e'),
+        );
+        match &app.modal {
+            Some(Modal::PromptComment { input, .. }) => assert_eq!(input, ""),
+            other => panic!("expected Modal::PromptComment, got {other:?}"),
+        }
+    }
+
+    /// A case that is neither a diff nor a sample - `C`'s git-commit view - still has nowhere to
+    /// put a comment, and says so rather than opening a prompt that could not be saved.
+    #[test]
+    fn e_on_a_git_commit_case_refuses_with_a_message() {
+        let app = press_on_case(
+            CaseOrigin::GitCommitFile {
+                path: "src/main.rs".to_string(),
+            },
+            "abc1234",
+            KeyCode::Char('e'),
+        );
+        assert!(app.modal.is_none(), "no prompt should open");
+        assert!(
+            app.status
+                .as_deref()
+                .unwrap_or_default()
+                .contains("diff (o) or sample (O)"),
+            "{:?}",
+            app.status
         );
     }
 

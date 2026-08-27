@@ -41,7 +41,9 @@ use clap::Parser;
 use codediff::test::helper::human_mapping::{
     NodeStatus, rebuild_caches_for_mapping, status_after, status_before,
 };
-use codediff::test::helper::{DIFF_DATASETS, code_pair_from_dir, human_mapping};
+use codediff::test::helper::{
+    DIFF_DATASETS, code_pair_from_dir, human_mapping, note_as_csv_cell, read_note,
+};
 
 #[derive(Parser)]
 #[command(
@@ -235,7 +237,16 @@ fn row_for(
         repository: sample.map(|s| s.repository.clone()).unwrap_or_default(),
         commit: sample.map(|s| s.commit.clone()).unwrap_or_default(),
         source_path: sample.map(|s| s.path.clone()).unwrap_or_default(),
-        comment: sample.map(|s| s.comment.clone()).unwrap_or_default(),
+        // The fixture's own description.md wins over the sample.csv comment it was promoted with.
+        // Both are the same kind of thing - somebody's note about why this case is interesting -
+        // but only one of them can be written for a handmade fixture, or edited after promotion,
+        // so a fixture that has both is one where the note is the later word. `human_solver`'s
+        // `e` pre-fills from the sample comment when no note exists yet, so carrying one forward
+        // is a keystroke and nothing is stranded here.
+        comment: read_note(name)
+            .map(|note| note_as_csv_cell(&note))
+            .or_else(|| sample.map(|s| s.comment.clone()))
+            .unwrap_or_default(),
         before_lines: before.contents.split('\n').count(),
         before_nodes,
         after_lines: after.contents.split('\n').count(),
