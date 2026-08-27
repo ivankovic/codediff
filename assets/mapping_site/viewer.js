@@ -6,6 +6,77 @@
 (function () {
   "use strict";
 
+  // ─── Pure helpers ───────────────────────────────────────────────────────────────────────────
+  //
+  // Everything in this block takes what it needs as arguments instead of reading the document, so
+  // viewer.test.js can drive it under plain Node with hand-built objects - same no-framework,
+  // no-build-step convention as index.js/index.test.js next door. Everything below the DOM guard
+  // that follows is only reachable in a browser and is not covered by that test.
+
+  function otherSide(side) {
+    return side === "before" ? "after" : "before";
+  }
+
+  // The `kind:occurrence` path of one tree node, counting occurrences among same-kind siblings and
+  // reading root-first - the format `helper::path_for_node` produces on the Rust side and
+  // `helper::node_for_path` resolves. It goes into the "file an issue" body, so a path that
+  // doesn't resolve is a silent failure: the reader gets a plausible-looking path that names no
+  // node. That is why this one is tested against a shared example rather than by eye.
+  function nodePath(el) {
+    const segments = [];
+    let current = el;
+    while (true) {
+      const parent = current.parentElement;
+      if (!parent || !parent.classList.contains("node")) break;
+      const siblings = Array.from(parent.children).filter((c) => c.classList.contains("node"));
+      const kind = current.dataset.kind || "";
+      let occurrence = 0;
+      for (const sibling of siblings) {
+        if (sibling === current) break;
+        if (sibling.dataset.kind === kind) occurrence++;
+      }
+      segments.push(`${kind}:${occurrence + 1}`);
+      current = parent;
+    }
+    segments.reverse();
+    return segments.join("/");
+  }
+
+  // Index of the next entry of `texts` containing `query`, searching forward from `startIndex`
+  // and wrapping - or -1 if nothing matches. Starts at `startIndex + 1` so pressing search twice
+  // on a match moves on rather than finding the same node again, and covers exactly `texts.length`
+  // candidates so the one it started on is checked last rather than skipped.
+  function nextMatchIndex(texts, startIndex, query) {
+    if (!query || texts.length === 0) return -1;
+    const needle = query.toLowerCase();
+    const from = startIndex < 0 ? 0 : startIndex;
+    for (let step = 1; step <= texts.length; step++) {
+      const index = (from + step) % texts.length;
+      if (texts[index].toLowerCase().includes(needle)) return index;
+    }
+    return -1;
+  }
+
+  // Which of a page's code renderings to show, given a remembered name. Renderings are keyed by
+  // *name* rather than by the `p0`/`p1` handle the DOM uses, because painting names are per
+  // fixture: `p0` means a different painting on the next page, while "Minimal" means the same
+  // thing wherever it appears. A name this page doesn't have falls back to index 0 - the node
+  // mapping, which every page has - and -1 only when the page has no renderings at all.
+  function pickRendering(names, wanted) {
+    if (names.length === 0) return -1;
+    const found = names.indexOf(wanted);
+    return found === -1 ? 0 : found;
+  }
+
+  // Exposed for viewer.test.js (plain Node, no DOM) - a no-op in the browser, where `module` is
+  // undefined and this branch never runs.
+  if (typeof module !== "undefined") {
+    module.exports = { otherSide, nodePath, nextMatchIndex, pickRendering };
+  }
+
+  // Everything below this line drives the real page and needs a DOM - never runs under Node.
+  if (typeof document === "undefined") return;
+
   const SIDES = ["before", "after"];
   const panels = {
     // Scoped to `.tree-panels`: the page now has a second `.panel[data-side=...]` pair for the
@@ -36,10 +107,6 @@
 
   function setStatus(message) {
     statusLine.textContent = message || "";
-  }
-
-  function otherSide(side) {
-    return side === "before" ? "after" : "before";
   }
 
   function clearCounterpartHighlight() {
@@ -99,26 +166,6 @@
   // one node a click actually needs it for. Mirrors codediff's own `path_for_node` (Rust):
   // "kind:occurrence" per level, walking up to the tree root, where occurrence is the 1-indexed
   // count of same-kind `.node` elements at that level appearing at or before this one.
-  function nodePath(el) {
-    const segments = [];
-    let current = el;
-    while (true) {
-      const parent = current.parentElement;
-      if (!parent || !parent.classList.contains("node")) break;
-      const siblings = Array.from(parent.children).filter((c) => c.classList.contains("node"));
-      const kind = current.dataset.kind || "";
-      let occurrence = 0;
-      for (const sibling of siblings) {
-        if (sibling === current) break;
-        if (sibling.dataset.kind === kind) occurrence++;
-      }
-      segments.push(`${kind}:${occurrence + 1}`);
-      current = parent;
-    }
-    segments.reverse();
-    return segments.join("/");
-  }
-
   function updateIssueLink(side, el) {
     const kind = el.dataset.kind || "";
     const path = nodePath(el);
@@ -203,18 +250,17 @@
     searchQuery[side] = query;
     const nodes = visibleNodes(side);
     if (nodes.length === 0) return;
-    let start = nodes.indexOf(selected[side]);
-    if (start === -1) start = 0;
-    for (let step = 1; step <= nodes.length; step++) {
-      const idx = (start + step) % nodes.length;
-      const node = nodes[idx];
-      if (node.textContent.toLowerCase().includes(query.toLowerCase())) {
-        select(side, node);
-        setStatus(`Found "${query}"`);
-        return;
-      }
+    const index = nextMatchIndex(
+      nodes.map((node) => node.textContent),
+      nodes.indexOf(selected[side]),
+      query
+    );
+    if (index === -1) {
+      setStatus(`No node containing "${query}" found in this panel`);
+      return;
     }
-    setStatus(`No node containing "${query}" found in this panel`);
+    select(side, nodes[index]);
+    setStatus(`Found "${query}"`);
   }
 
   function toggleHelp() {
@@ -464,14 +510,10 @@
     return el.dataset.paintingName || "";
   }
 
-  // Keyed by *name*, not by the `p0`/`p1` handle the DOM uses: painting names are per fixture, so
-  // `p0` means something different on the next page, while "Minimal" means the same thing
-  // wherever it appears. A name that isn't on this page falls back to the node mapping, which
-  // every page has.
   function setRendering(name) {
-    let panel = renderingPanels.filter((el) => renderingName(el) === name)[0];
-    if (!panel) panel = renderingPanels[0];
-    if (!panel) return;
+    const index = pickRendering(renderingPanels.map(renderingName), name);
+    if (index === -1) return;
+    const panel = renderingPanels[index];
     const key = panel.dataset.painting;
     renderingPanels.forEach((el) => {
       el.classList.toggle("hidden", el !== panel);

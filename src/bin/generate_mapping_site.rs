@@ -2132,6 +2132,40 @@ mod tests {
         assert!(!html.contains("class=\"description\""), "got: {html}");
     }
 
+    /// One end of a cross-language pin. `viewer.js`'s `nodePath` walks the HTML this file emits and
+    /// rebuilds the same `kind:occurrence` path `helper::path_for_node` produces from the tree - it
+    /// has to, because that path goes into the "file an issue" body, and a path that doesn't
+    /// resolve is a silent failure: the reader gets a plausible-looking path naming no node.
+    ///
+    /// Two implementations of one format, so neither can be pinned to itself. This asserts the
+    /// Rust side of a shared example; `assets/mapping_site/viewer.test.js` asserts that its
+    /// `nodePath` produces the identical string for the identical tree. Change one and the other
+    /// fails.
+    #[test]
+    fn path_for_node_agrees_with_viewer_js_on_a_shared_example() {
+        let source = "fn f() {\n    let a = 1;\n    let b = 2;\n}\n";
+        let tree = parse_rust(source);
+
+        // The `2` in `let b = 2` - deliberately the *second* `let_declaration`, so the example
+        // exercises the same-kind sibling counting rather than a path of all-firsts.
+        let node = helper::node_for_path(
+            tree.root_node(),
+            &[
+                "function_item:1",
+                "block:1",
+                "let_declaration:2",
+                "integer_literal:1",
+            ],
+        )
+        .expect("the example path should resolve");
+
+        assert_eq!(
+            helper::path_for_node(node).join("/"),
+            "function_item:1/block:1/let_declaration:2/integer_literal:1",
+            "if this string changes, change it in viewer.test.js too - they pin each other"
+        );
+    }
+
     fn parse_rust(source: &str) -> tree_sitter::Tree {
         let language =
             codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
