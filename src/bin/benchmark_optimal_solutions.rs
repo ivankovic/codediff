@@ -26,14 +26,14 @@
 //! mismatches into 4 without yet reaching 0 shows up here as progress; under `cargo test` it's
 //! just "still failing," indistinguishable from a change that made no difference at all.
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use codediff::code::Code;
 use codediff::diff::ASTMappingReason;
 use codediff::diff::cost::diff_cost;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 
 use csv::Writer;
@@ -194,6 +194,17 @@ struct Args {
     /// Output results as a CSV file. Default path: "./research/data/quality/optimal_solutions_benchmark.csv"
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     csv: Option<Option<std::path::PathBuf>>,
+
+    /// Compare this run against a per-fixture quality baseline and exit non-zero if any fixture
+    /// regressed. This is the release gate - see the quality-gate section below for why it is
+    /// per-fixture rather than one aggregate number.
+    #[arg(long, value_name = "PATH")]
+    compare: Option<std::path::PathBuf>,
+
+    /// Write this run out as a new quality baseline. A deliberate step (`make
+    /// update-quality-baseline`), never a side effect of a normal run.
+    #[arg(long, value_name = "PATH")]
+    write_baseline: Option<std::path::PathBuf>,
 
     /// Enable MoveDetectionRecovery / phase 7 (default; see the `--no-solver-...` form).
     #[arg(long = "solver-moved-subtrees", action = clap::ArgAction::SetTrue, default_value_t = true, overrides_with = "no_solver_moved_subtrees")]
@@ -444,6 +455,11 @@ fn main() -> Result<()> {
         write_csv(&rows, &path)?;
     }
 
+    if let Some(path) = &args.write_baseline {
+        write_baseline(&rows, path)?;
+        println!("Wrote quality baseline to {path:?}");
+    }
+
     print_table(&rows);
     print_reason_table(&rows);
     print_goal_progress(&rows);
@@ -453,6 +469,17 @@ fn main() -> Result<()> {
         elapsed.as_secs_f64() * 1000.0 / rows.len() as f64,
         rows.len()
     );
+
+    // Last, and after everything else has printed: a failing gate should still leave the full
+    // table on screen, since the first thing anyone does with a red gate is look at the table.
+    if let Some(path) = &args.compare {
+        let baseline = read_baseline(path)?;
+        let report = compare_to_baseline(&rows, &baseline);
+        print_gate_report(&report, path);
+        if report.failed() {
+            std::process::exit(1);
+        }
+    }
     Ok(())
 }
 
@@ -702,6 +729,227 @@ fn print_reason_table(rows: &[Row]) {
     println!();
 }
 
+// ─── The quality gate ────────────────────────────────────────────────────────────────────────
+//
+// `make check-quality` runs this, and `make deploy` runs that, so what follows decides whether a
+// release may go out.
+//
+// **Per fixture, not in aggregate, and that is the whole point.** The gate used to compare one
+// number - the corpus's total mismatch count - against a checked-in baseline. That cannot
+// distinguish the two things it needs to tell apart. This corpus grows deliberately toward *hard*
+// cases: the 35 fixtures added over three days in August 2026 carried mismatches at 0.44% of their
+// nodes against the corpus's own 0.07%, taking the total from 3235 to 6473. The gate read that as
+// a 100% quality regression when the algorithm had not changed at all. Switching the aggregate to
+// a rate does not fix it either - measured on the same corpus change, the rate went 0.0657% ->
+// 0.1142%, a 74% rise. No aggregate over a growing corpus can separate "the algorithm got worse"
+// from "we added hard fixtures", so the gate asks the only question that survives new data: did
+// any fixture *that already had a baseline* get worse?
+//
+// **Not a second copy of the `optimal_solutions` tests.** Those clamp each fixture at a recorded
+// value, and 151 of the corpus's 509 are clamped above zero - by construction they cannot see a
+// fixture drift from 100 mismatches to 214 under its own 214-mismatch clamp. This is what covers
+// that gap.
+
+/// One fixture's row in the gate baseline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BaselineEntry {
+    mismatches: usize,
+    visible_mismatches: usize,
+}
+
+/// What one run says about one fixture, relative to the baseline.
+#[derive(Debug, Clone)]
+struct GateChange {
+    name: String,
+    before: BaselineEntry,
+    after: BaselineEntry,
+}
+
+/// The result of comparing a run against a baseline.
+#[derive(Debug, Default)]
+struct GateReport {
+    regressed: Vec<GateChange>,
+    improved: Vec<GateChange>,
+    /// Fixtures in the run with no baseline row. Never a failure: a fixture cannot regress before
+    /// it has a baseline, and failing on new data is exactly the behaviour this gate replaced.
+    added: Vec<String>,
+    /// Baseline rows with no fixture in the run. Also never a failure - a fixture can legitimately
+    /// be renamed or dropped - but always printed, because deleting an inconvenient fixture would
+    /// otherwise be a silent way to pass.
+    removed: Vec<String>,
+    /// Fixtures with no `human_mapping.json`, in neither the run's comparison nor the baseline.
+    unsolved: usize,
+}
+
+impl GateReport {
+    fn failed(&self) -> bool {
+        !self.regressed.is_empty()
+    }
+}
+
+/// The scored fixtures of a run, in baseline form. Fixtures with no human mapping are skipped:
+/// there is nothing to be right or wrong about yet.
+fn baseline_from_rows(rows: &[Row]) -> BTreeMap<String, BaselineEntry> {
+    rows.iter()
+        .filter_map(|row| {
+            let (mismatches, _) = row.mismatches?;
+            let (visible_mismatches, _) = row.visible_mismatches?;
+            Some((
+                row.name.clone(),
+                BaselineEntry {
+                    mismatches,
+                    visible_mismatches,
+                },
+            ))
+        })
+        .collect()
+}
+
+fn read_baseline(path: &std::path::Path) -> Result<BTreeMap<String, BaselineEntry>> {
+    let mut reader = csv::Reader::from_path(path)
+        .with_context(|| format!("reading the quality baseline from {path:?}"))?;
+    let mut out = BTreeMap::new();
+    for record in reader.deserialize::<HashMap<String, String>>() {
+        let record = record.context("parsing a quality-baseline row")?;
+        let field = |key: &str| -> Result<usize> {
+            record
+                .get(key)
+                .with_context(|| format!("the baseline has no '{key}' column"))?
+                .trim()
+                .parse()
+                .with_context(|| format!("the baseline's '{key}' column is not a number"))
+        };
+        let name = record
+            .get("solution")
+            .context("the baseline has no 'solution' column")?
+            .clone();
+        out.insert(
+            name,
+            BaselineEntry {
+                mismatches: field("mismatches")?,
+                visible_mismatches: field("visible_mismatches")?,
+            },
+        );
+    }
+    Ok(out)
+}
+
+fn write_baseline(rows: &[Row], path: &std::path::Path) -> Result<()> {
+    let mut writer = Writer::from_writer(
+        File::create(path).with_context(|| format!("writing the quality baseline to {path:?}"))?,
+    );
+    writer.write_record(["solution", "mismatches", "visible_mismatches"])?;
+    for (name, entry) in baseline_from_rows(rows) {
+        writer.write_record([
+            name,
+            entry.mismatches.to_string(),
+            entry.visible_mismatches.to_string(),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// Compares a run against a baseline.
+///
+/// **Both columns gate.** They move independently - a change can leave a fixture's total flat
+/// while turning invisible scaffolding mismatches into ones a reader can see, which is a
+/// regression in the thing the project's accuracy goals are actually stated in. Either going up is
+/// a failure.
+fn compare_to_baseline(rows: &[Row], baseline: &BTreeMap<String, BaselineEntry>) -> GateReport {
+    let current = baseline_from_rows(rows);
+    let mut report = GateReport {
+        unsolved: rows.len() - current.len(),
+        ..Default::default()
+    };
+
+    for (name, after) in &current {
+        let Some(before) = baseline.get(name) else {
+            report.added.push(name.clone());
+            continue;
+        };
+        let change = GateChange {
+            name: name.clone(),
+            before: *before,
+            after: *after,
+        };
+        if after.mismatches > before.mismatches
+            || after.visible_mismatches > before.visible_mismatches
+        {
+            report.regressed.push(change);
+        } else if after != before {
+            report.improved.push(change);
+        }
+    }
+    for name in baseline.keys() {
+        if !current.contains_key(name) {
+            report.removed.push(name.clone());
+        }
+    }
+    report
+}
+
+fn print_gate_report(report: &GateReport, baseline_path: &std::path::Path) {
+    println!("\nQuality gate (per fixture, against {baseline_path:?})");
+    println!(
+        "  {:4} regressed   {:4} improved   {:4} new   {:4} removed   {:4} unsolved",
+        report.regressed.len(),
+        report.improved.len(),
+        report.added.len(),
+        report.removed.len(),
+        report.unsolved,
+    );
+
+    let describe = |change: &GateChange| {
+        format!(
+            "    {:<80} {:>6} -> {:<6}  visible {:>6} -> {}",
+            change.name,
+            change.before.mismatches,
+            change.after.mismatches,
+            change.before.visible_mismatches,
+            change.after.visible_mismatches,
+        )
+    };
+    if !report.regressed.is_empty() {
+        println!("\n  REGRESSED - these fixtures got worse than their baseline:");
+        for change in &report.regressed {
+            println!("{}", describe(change));
+        }
+    }
+    if !report.improved.is_empty() {
+        println!("\n  Improved:");
+        for change in &report.improved {
+            println!("{}", describe(change));
+        }
+    }
+    // New and removed are listed rather than counted, so neither can pass unnoticed: a new fixture
+    // is exempt from the gate by design, and a removed one is how somebody could lower the bar
+    // without any number moving.
+    if !report.added.is_empty() {
+        println!("\n  New since the baseline (not gated):");
+        for name in &report.added {
+            println!("    {name}");
+        }
+    }
+    if !report.removed.is_empty() {
+        println!("\n  In the baseline but not in this run (not gated):");
+        for name in &report.removed {
+            println!("    {name}");
+        }
+    }
+
+    if report.failed() {
+        println!(
+            "\nerror: {} fixture(s) regressed against the baseline. Fix the regression, or - if \
+             this is a reviewed, deliberate trade - re-baseline with `make \
+             update-quality-baseline`.",
+            report.regressed.len()
+        );
+    } else {
+        println!("\nQuality gate passed: no fixture is worse than its baseline.");
+    }
+}
+
 fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let file = File::create(path)?;
     let mut wtr = Writer::from_writer(file);
@@ -790,4 +1038,148 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
 
     wtr.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A scored fixture. `elapsed_ms`/`algorithm_cost` and friends play no part in the gate, so
+    /// they are whatever compiles.
+    fn row(name: &str, mismatches: usize, visible: usize) -> Row {
+        Row {
+            name: name.to_string(),
+            mismatches: Some((mismatches, 1000)),
+            visible_mismatches: Some((visible, 700)),
+            reason_counts: HashMap::new(),
+            algorithm_cost: 0,
+            human_cost: Some(0),
+            elapsed_ms: 0.0,
+        }
+    }
+
+    /// A fixture with no `human_mapping.json` yet: nothing to be right or wrong about, so it must
+    /// stay out of the baseline entirely rather than enter it as a zero.
+    fn unsolved(name: &str) -> Row {
+        Row {
+            name: name.to_string(),
+            mismatches: None,
+            visible_mismatches: None,
+            reason_counts: HashMap::new(),
+            algorithm_cost: 0,
+            human_cost: None,
+            elapsed_ms: 0.0,
+        }
+    }
+
+    fn baseline(entries: &[(&str, usize, usize)]) -> BTreeMap<String, BaselineEntry> {
+        entries
+            .iter()
+            .map(|(name, mismatches, visible_mismatches)| {
+                (
+                    name.to_string(),
+                    BaselineEntry {
+                        mismatches: *mismatches,
+                        visible_mismatches: *visible_mismatches,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_fixture_that_got_worse_fails_the_gate() {
+        let report = compare_to_baseline(
+            &[row("a", 12, 8), row("b", 3, 1)],
+            &baseline(&[("a", 10, 8), ("b", 3, 1)]),
+        );
+
+        assert!(report.failed());
+        assert_eq!(report.regressed.len(), 1);
+        assert_eq!(report.regressed[0].name, "a");
+        assert_eq!(report.regressed[0].before.mismatches, 10);
+        assert_eq!(report.regressed[0].after.mismatches, 12);
+    }
+
+    /// The two columns move independently: a change can leave a fixture's total flat while turning
+    /// invisible scaffolding mismatches into ones a reader actually sees. The project's accuracy
+    /// goals are stated in visible nodes, so that is a regression even though the total didn't
+    /// move.
+    #[test]
+    fn a_fixture_whose_mismatches_became_visible_fails_the_gate() {
+        let report = compare_to_baseline(&[row("a", 10, 9)], &baseline(&[("a", 10, 4)]));
+
+        assert!(report.failed());
+        assert_eq!(report.regressed.len(), 1);
+    }
+
+    #[test]
+    fn improvements_pass_and_are_reported_separately() {
+        let report = compare_to_baseline(
+            &[row("a", 4, 2), row("b", 3, 1)],
+            &baseline(&[("a", 10, 8), ("b", 3, 1)]),
+        );
+
+        assert!(!report.failed());
+        assert_eq!(report.improved.len(), 1, "only 'a' moved");
+        assert_eq!(report.improved[0].name, "a");
+    }
+
+    /// The defect this gate replaced. The corpus grows deliberately toward hard cases, so an
+    /// aggregate baseline reads every such addition as a quality regression. A fixture with no
+    /// baseline row cannot have got worse, so it is reported and not gated.
+    #[test]
+    fn a_new_hard_fixture_is_reported_but_does_not_fail_the_gate() {
+        let report = compare_to_baseline(
+            &[row("old", 3, 1), row("brand-new-and-hard", 334, 227)],
+            &baseline(&[("old", 3, 1)]),
+        );
+
+        assert!(!report.failed(), "a new fixture must never fail the gate");
+        assert_eq!(report.added, vec!["brand-new-and-hard".to_string()]);
+        assert!(report.regressed.is_empty());
+    }
+
+    /// Deleting an inconvenient fixture is the one way to make every number improve without
+    /// improving anything. It can't fail the gate - fixtures are legitimately renamed and dropped -
+    /// so it has to be named in the report instead.
+    #[test]
+    fn a_fixture_missing_from_the_run_is_named_rather_than_silently_ignored() {
+        let report = compare_to_baseline(
+            &[row("a", 3, 1)],
+            &baseline(&[("a", 3, 1), ("gone", 900, 700)]),
+        );
+
+        assert!(!report.failed());
+        assert_eq!(report.removed, vec!["gone".to_string()]);
+    }
+
+    #[test]
+    fn an_unsolved_fixture_is_counted_but_never_enters_the_baseline() {
+        let rows = [row("a", 3, 1), unsolved("not-yet-mapped")];
+
+        assert_eq!(
+            baseline_from_rows(&rows).keys().collect::<Vec<_>>(),
+            vec!["a"],
+            "a fixture with no human mapping has nothing to be right or wrong about"
+        );
+        let report = compare_to_baseline(&rows, &baseline(&[("a", 3, 1)]));
+        assert_eq!(report.unsolved, 1);
+        assert!(report.added.is_empty() && !report.failed());
+    }
+
+    /// A baseline written from a run must compare equal to that same run - otherwise
+    /// `make update-quality-baseline` would leave the gate red.
+    #[test]
+    fn a_freshly_written_baseline_passes_against_its_own_run() {
+        let rows = [row("a", 12, 8), row("b", 0, 0), unsolved("c")];
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("quality_baseline.csv");
+
+        write_baseline(&rows, &path).expect("write");
+        let report = compare_to_baseline(&rows, &read_baseline(&path).expect("read"));
+
+        assert!(!report.failed());
+        assert!(report.improved.is_empty() && report.added.is_empty() && report.removed.is_empty());
+    }
 }

@@ -13,12 +13,18 @@
 test: test-mapping-site-js
 	cargo test --release
 
-# Plain-Node regression test for the human_mapping site's own vanilla JS (assets/mapping_site/) -
+# Plain-Node regression tests for the human_mapping site's own vanilla JS (assets/mapping_site/) -
 # no npm dependency, no build step, matching that directory's own convention (see index.js's header
 # comment). Cargo's test suite can't cover this: it's browser-side JS embedded verbatim via
 # include_str! into generate_mapping_site.rs, never executed by anything Rust runs.
+#
+# Both files, not just index.test.js: viewer.js is by far the larger of the two scripts and went
+# uncovered until 2026-08-27. It is mostly DOM wiring, which these do not fake - what they cover is
+# the logic underneath, including the `kind:occurrence` node path that has to agree with
+# `helper::path_for_node` on the Rust side (the two pin each other through a shared example).
 test-mapping-site-js:
 	node assets/mapping_site/index.test.js
+	node assets/mapping_site/viewer.test.js
 
 # --features stats: every target below this one (file-stats, commit-stats, sample-pairs,
 # benchmark-pairs, and the language-specific variants) runs a stats-gated binary
@@ -63,55 +69,80 @@ benchmark-optimal:
 diff-inventory:
 	cargo run --release --features test-fixtures --bin diff_inventory
 
-QUALITY_BASELINE := research/data/quality/quality_baseline.txt
+# Lints the analysis scripts under research/. Lives here rather than in research/Makefile so that
+# `make lint` covers everything CI lints from one place; the rule set itself is pinned in
+# research/pyproject.toml (see that file for why it is pinned rather than left on ruff's defaults).
+#
+# `ruff check` only, deliberately not `ruff format --check`: adopting the formatter would rewrite 12
+# of the 14 analysis scripts in one go, which is a separate decision from "these should be linted at
+# all" and would bury the next real diff of any of them under a reformat.
+lint-python:
+	ruff check research
+
+QUALITY_BASELINE := research/data/quality/quality_baseline.csv
+RUNTIME_BASELINE := research/data/quality/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
 
-# Runs benchmark_optimal_solutions and gates on it against $(QUALITY_BASELINE) - invoked by
-# `deploy` before it ever tags/pushes. Two numbers, two different treatments:
-# - TOTAL_MISMATCHES (the accuracy score vs. the human-authored ground truth) is algorithm-only,
-#   not machine-dependent, so it's safe to hard-fail on: deploy stops if this got worse.
-# - MS_PER_FIXTURE (wall-clock runtime) varies too much machine-to-machine to gate on an absolute
-#   number reliably - only warns (doesn't fail) if it's jumped more than 2x, as a loose sanity
-#   check for a real, gross regression rather than ordinary noise.
-# Run `make update-quality-baseline` after a deliberate, reviewed improvement to lower the bar -
-# the baseline is never updated automatically as a side effect of a normal deploy.
+# The release gate: `deploy` runs this before it ever tags or publishes.
+#
+# The accuracy half is **per fixture**, not one aggregate number, and that distinction is the whole
+# design - see benchmark_optimal_solutions.rs's own quality-gate section for the measurements
+# behind it. In short: this corpus grows deliberately toward hard cases, so any aggregate (a total,
+# or a rate) reads "we added 35 hard fixtures" as "the algorithm regressed", and the old gate did
+# exactly that. Comparing fixture by fixture, with fixtures that have no baseline row exempt, asks
+# the only question that survives new data - did anything that already had a baseline get worse?
+#
+# The runtime half stays a warning rather than a gate: wall-clock varies too much machine-to-machine
+# to fail on (278.8 and 324.9 ms/fixture on the same machine, days apart), so a >2x jump is flagged
+# as a loose check for a gross regression and nothing more.
+#
+# Run `make update-quality-baseline` after a deliberate, reviewed change to move the bar - never
+# automatically as a side effect of a deploy.
+#
+# `SHELL`/`.SHELLFLAGS` are overridden for this target alone so that `pipefail` is available: the
+# gate's verdict is the benchmark's exit status, and without it the `| tee` would hand make `tee`'s
+# status instead - a red gate that reports success, which is the one failure a gate must not have.
+# (`/bin/sh` is dash on Debian/Ubuntu and has no `pipefail`, so this cannot just be `set -o`.)
+check-quality: SHELL := /bin/bash
+check-quality: .SHELLFLAGS := -o pipefail -c
 check-quality:
-	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions | tee $(BENCH_OUTPUT)
-	@total=$$(grep -m1 '^TOTAL' $(BENCH_OUTPUT) | awk '{print $$2}'); \
-	baseline_total=$$(grep '^TOTAL_MISMATCHES=' $(QUALITY_BASELINE) | cut -d= -f2); \
-	ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
-	baseline_ms=$$(grep '^MS_PER_FIXTURE=' $(QUALITY_BASELINE) | cut -d= -f2); \
+	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
+		--compare $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
+	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
+	baseline_ms=$$(grep '^MS_PER_FIXTURE=' $(RUNTIME_BASELINE) | cut -d= -f2); \
 	echo ""; \
-	echo "Quality: TOTAL mismatches = $$total (baseline: $$baseline_total)"; \
 	echo "Runtime: $$ms ms/fixture (baseline: $$baseline_ms)"; \
-	if [ "$$total" -gt "$$baseline_total" ]; then \
-		echo "error: quality regressed - TOTAL mismatches $$total > baseline $$baseline_total" >&2; \
-		exit 1; \
-	fi; \
 	over_2x=$$(awk -v ms="$$ms" -v base="$$baseline_ms" 'BEGIN { print (ms > base * 2) ? 1 : 0 }'); \
 	if [ "$$over_2x" = "1" ]; then \
 		echo "warning: runtime is more than 2x the baseline ($$ms ms/fixture vs $$baseline_ms ms/fixture) - investigate before deploying" >&2; \
 	fi
 
-# Updates $(QUALITY_BASELINE) to the numbers from a fresh check-quality run - a deliberate,
-# separate step, not something `deploy` ever does on its own.
-update-quality-baseline: check-quality
-	@total=$$(grep -m1 '^TOTAL' $(BENCH_OUTPUT) | awk '{print $$2}'); \
-	ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
+# Rewrites both baselines from a fresh run - a deliberate, separate step, never something `deploy`
+# does on its own.
+#
+# Deliberately does NOT depend on check-quality, and deliberately does not gate: the moment you
+# most need this is right after a *reviewed* regression (a net-positive trade that costs one
+# fixture), and a target that refused to run while the gate was red would be useless exactly then.
+# Run `make check-quality` first and read which fixtures moved - that reading is the review, and
+# there is no way to automate it.
+update-quality-baseline:
+	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
+		--write-baseline $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
+	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
 	{ \
-		echo "# Baseline compared against by \`make check-quality\` / \`make deploy\` - see Makefile."; \
-		echo "# TOTAL_MISMATCHES: benchmark_optimal_solutions' first TOTAL row (mismatches vs. the"; \
-		echo "# human-authored ground truth in src/test/data/diffs/) - a hard gate, since this is"; \
-		echo "# algorithm-only and not machine-dependent: deploy fails if this number goes up."; \
-		echo "# MS_PER_FIXTURE: benchmark_optimal_solutions' own \"Runtime: ... ms/fixture\" line -"; \
-		echo "# informational only (a >2x jump warns but doesn't fail deploy), since wall-clock time"; \
-		echo "# varies by machine."; \
-		echo "# Update deliberately via \`make update-quality-baseline\` after a reviewed improvement,"; \
-		echo "# not automatically as a side effect of every deploy."; \
-		echo "TOTAL_MISMATCHES=$$total"; \
+		echo "# Runtime baseline for \`make check-quality\` - see Makefile."; \
+		echo "#"; \
+		echo "# MS_PER_FIXTURE: benchmark_optimal_solutions' own \"Runtime: ... ms/fixture\" line."; \
+		echo "# Informational only: a >2x jump warns, it never fails a deploy, because wall-clock"; \
+		echo "# time varies by machine far more than any real regression would."; \
+		echo "#"; \
+		echo "# The accuracy gate does NOT live here. It is per-fixture, in quality_baseline.csv"; \
+		echo "# beside this file, because no single number over a corpus that keeps gaining hard"; \
+		echo "# fixtures can tell a real regression apart from new data - measured, see the"; \
+		echo "# quality-gate section in src/bin/benchmark_optimal_solutions.rs."; \
 		echo "MS_PER_FIXTURE=$$ms"; \
-	} > $(QUALITY_BASELINE); \
-	echo "Updated $(QUALITY_BASELINE): TOTAL_MISMATCHES=$$total MS_PER_FIXTURE=$$ms"
+	} > $(RUNTIME_BASELINE); \
+	echo "Updated $(QUALITY_BASELINE) and $(RUNTIME_BASELINE) (MS_PER_FIXTURE=$$ms)"
 
 # Shared preconditions for deploy-github/deploy-crates, not meant to be run directly. Requires a
 # clean working tree and HEAD to already match origin/main (so a tag/publish can't silently point

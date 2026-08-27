@@ -1,11 +1,11 @@
-# Baseline compared against by `make check-quality` / `make deploy` - see Makefile.
-# TOTAL_MISMATCHES: benchmark_optimal_solutions' first TOTAL row (mismatches vs. the
-# human-authored ground truth in src/test/data/diffs/) - a hard gate, since this is
-# algorithm-only and not machine-dependent: deploy fails if this number goes up.
-# MS_PER_FIXTURE: benchmark_optimal_solutions' own "Runtime: ... ms/fixture" line -
-# informational only (a >2x jump warns but doesn't fail deploy), since wall-clock time
-# varies by machine.
-# Update deliberately via `make update-quality-baseline` after a reviewed improvement,
-# not automatically as a side effect of every deploy.
-TOTAL_MISMATCHES=3873
-MS_PER_FIXTURE=278.8
+# Runtime baseline for `make check-quality` - see Makefile.
+#
+# MS_PER_FIXTURE: benchmark_optimal_solutions' own "Runtime: ... ms/fixture" line.
+# Informational only: a >2x jump warns, it never fails a deploy, because wall-clock
+# time varies by machine far more than any real regression would.
+#
+# The accuracy gate does NOT live here. It is per-fixture, in quality_baseline.csv
+# beside this file, because no single number over a corpus that keeps gaining hard
+# fixtures can tell a real regression apart from new data - measured, see the
+# quality-gate section in src/bin/benchmark_optimal_solutions.rs.
+MS_PER_FIXTURE=343.3

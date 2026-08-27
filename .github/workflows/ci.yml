@@ -77,7 +77,44 @@ jobs:
         with:
           node-version: 24
 
+      # Both scripts. viewer.js is the larger of the two and went untested until 2026-08-27; see
+      # the Makefile's `test-mapping-site-js` target for what these do and do not cover.
       - run: node assets/mapping_site/index.test.js
+      - run: node assets/mapping_site/viewer.test.js
+
+  # The analysis scripts under research/ compute the numbers that go into the papers, and until
+  # 2026-08-27 nothing checked them at all while the Rust half had clippy -D warnings across three
+  # feature configs. The ruff version is pinned for the same reason the rule set is pinned in
+  # research/pyproject.toml: an unpinned linter turns CI red on a day nobody touched the code.
+  python-lint:
+    name: ruff check (research/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/ruff-action@v3
+        with:
+          version: 0.16.4
+          args: check
+          src: research
+
+  # The release gate, run on every push rather than only at deploy time - a regression is far
+  # cheaper to find on the commit that caused it than in the middle of a release. Safe to gate in
+  # CI because it is algorithm-only: mismatch counts against the human mapping do not vary by
+  # machine (unlike the runtime figure, which `make check-quality` only warns on).
+  quality:
+    name: quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: quality
+
+      - run: make check-quality
 
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})
