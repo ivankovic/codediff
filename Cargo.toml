@@ -148,6 +148,17 @@ stats = [
     "test-fixtures",
 ]
 
+# The one integration test in this project: `benchmark_other`'s harness end to end, driven through
+# a stand-in tool (`fake_diff_tool`) whose answers are known in advance. It has to live in tests/
+# rather than beside the binary's own unit tests because `CARGO_BIN_EXE_<name>` - the only way to
+# get a built binary's path without shelling out to cargo - is set for integration tests only.
+[[test]]
+name = "benchmark_other_e2e"
+path = "tests/benchmark_other_e2e.rs"
+# Both binaries it spawns are gated this way, and so is the `csv` crate it reads results with, so
+# a bare `cargo test` skips this target instead of failing to build.
+required-features = ["test-fixtures"]
+
 [[bin]]
 name = "codediff"
 path = "src/main.rs"
@@ -179,6 +190,17 @@ required-features = ["test-fixtures"]
 [[bin]]
 name = "generate_mapping_site"
 path = "src/bin/generate_mapping_site.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
+# Not a diff tool: a stand-in that answers predictably (nothing changed / everything changed /
+# a per-line hash / a crash) so `benchmark_other`'s harness can be scored against arithmetic
+# instead of against a real tool whose correct answer nobody knows. Speaks difftastic's JSON, so
+# `DIFFT_BIN` points at it and a real adapter is what runs. See tests/benchmark_other_e2e.rs.
+name = "fake_diff_tool"
+path = "src/bin/fake_diff_tool.rs"
+# No fixture dependency of its own - gated like ascii_visualizer's entry, reusing `test-fixtures`
+# as the general "checkout-only dev tool" gate so it stays out of the published crate.
 required-features = ["test-fixtures"]
 
 [[bin]]

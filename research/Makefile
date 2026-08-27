@@ -336,6 +336,15 @@ benchmark-timing:
 # tool is scored against one fixed, tool-independent set of visible nodes - deliberately unlike
 # benchmark_optimal_solutions' own visible count, which judges codediff by codediff's own
 # rendering. Visible is not a synonym for leaf; see PROVENANCE.md for why they differ both ways.
+# Both targets above take `--fixtures a,b,c` (score only these) and `--accuracy-csv` also takes
+# `--tools name,...` (score only these, `codediff` included) - see `benchmark_other --help`. Worth
+# knowing when iterating on one adapter: a scoped run loads only the fixtures it was asked for
+# rather than parsing the whole corpus, which is 0.6s against 18.8s for a single fixture.
+#
+# They are also what lets `tests/benchmark_other_e2e.rs` exercise this harness end to end in
+# 60ms, by pointing DIFFT_BIN at `fake_diff_tool` - a stand-in that answers predictably
+# (nothing changed / everything changed / a per-line hash / a crash) so the scoring can be checked
+# against arithmetic rather than against a real tool whose right answer nobody knows.
 benchmark-accuracy:
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
 

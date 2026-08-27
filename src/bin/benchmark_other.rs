@@ -143,6 +143,63 @@ struct Args {
     /// mean, so downstream analysis can see the actual spread rather than a single point estimate.
     #[arg(long, default_value_t = 3)]
     repeats: usize,
+
+    /// Only score these fixtures, by name, comma-separated. Default: every fixture with a human
+    /// mapping.
+    ///
+    /// Applied to the corpus *before* it is parsed, which is the whole point: `main` calls
+    /// `ensure_parsed` on every fixture it holds, and on the full corpus that dominates the cost
+    /// of a run that only wanted three of them. An unknown name is an error rather than an empty
+    /// run - a typo that silently scores nothing looks exactly like a tool that found nothing.
+    #[arg(long, value_name = "NAMES", value_delimiter = ',')]
+    fixtures: Vec<String>,
+
+    /// Only score these tools, comma-separated - any `ExternalTool` name plus `codediff`. Default:
+    /// all of them.
+    ///
+    /// **Accuracy runs only.** The timing path builds its tables and CSV header from
+    /// `ExternalTool::ALL` in several places, and a run whose columns don't match its header is a
+    /// worse outcome than not offering the flag; passing this without `--accuracy-csv` is an error
+    /// rather than a silent no-op.
+    ///
+    /// Filters codediff too, not just the external tools. Without that this saves nothing worth
+    /// having: `score_accuracy` runs `diff_code` and all ten tools unconditionally, so scoping to
+    /// one tool would still spawn git four times and shell out to python and neovim per fixture.
+    #[arg(long, value_name = "NAMES", value_delimiter = ',')]
+    tools: Vec<String>,
+}
+
+/// Which tools an accuracy run scores. `None` means all of them.
+///
+/// A set rather than a list of `ExternalTool`s because `codediff` is selectable here too and is
+/// not an `ExternalTool` - it is scored by `score_accuracy`'s own block, through the same
+/// projection, so that it lands in the same columns as everything else.
+struct ToolSelection(Option<std::collections::HashSet<String>>);
+
+impl ToolSelection {
+    /// Errors on a name no tool answers to, listing what does. A mistyped `--tools gumtre` would
+    /// otherwise produce a clean, complete-looking CSV with no rows scored by anything.
+    fn parse(names: &[String]) -> Result<ToolSelection> {
+        if names.is_empty() {
+            return Ok(ToolSelection(None));
+        }
+        let known: Vec<&str> = std::iter::once("codediff")
+            .chain(ExternalTool::ALL.iter().map(|tool| tool.name()))
+            .collect();
+        for name in names {
+            if !known.contains(&name.as_str()) {
+                bail!(
+                    "unknown tool '{name}' - expected one of: {}",
+                    known.join(", ")
+                );
+            }
+        }
+        Ok(ToolSelection(Some(names.iter().cloned().collect())))
+    }
+
+    fn includes(&self, name: &str) -> bool {
+        self.0.as_ref().is_none_or(|wanted| wanted.contains(name))
+    }
 }
 
 /// An external, non-codediff diff tool being scored against the human-authored mapping. Adding a
@@ -1541,7 +1598,26 @@ fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let mut test_diffs = helper::handmade_test_code_pairs()?;
+    let selection = ToolSelection::parse(&args.tools)?;
+    if selection.0.is_some() && args.accuracy_csv.is_none() {
+        bail!("--tools only applies to --accuracy-csv runs (see its own help text for why)");
+    }
+    // `handmade_test_code_pair` per name rather than filtering `handmade_test_code_pairs`, which
+    // reads and tree-sitter-parses all ~500 corpus fixtures before any filter could apply: that
+    // sweep, not the scoring, is what a scoped run spends its time on. Measured on one fixture,
+    // release build: 18.8s filtering the full load, 0.6s loading only what was asked for.
+    let mut test_diffs: HashMap<String, (Code, Code)> = if args.fixtures.is_empty() {
+        helper::handmade_test_code_pairs()?
+    } else {
+        args.fixtures
+            .iter()
+            .map(|name| {
+                let pair = helper::handmade_test_code_pair(name)
+                    .with_context(|| format!("no fixture named '{name}'"))?;
+                Ok((name.clone(), pair))
+            })
+            .collect::<Result<_>>()?
+    };
 
     // `handmade_test_code_pairs` always hands back a fresh `.clone()` of its internal cache (see
     // its own doc comment), and `Code`'s hand-written `Clone` deliberately drops `ast_metadata`
@@ -1586,7 +1662,7 @@ fn main() -> Result<()> {
         let path = path.unwrap_or_else(|| {
             std::path::PathBuf::from("./research/data/comparison/benchmark_accuracy.csv")
         });
-        return run_accuracy(&names, &test_diffs, &path);
+        return run_accuracy(&names, &test_diffs, &path, &selection);
     }
 
     let warm_fixtures: Vec<(&str, &Code, &Code)> = names
@@ -2590,6 +2666,7 @@ fn score_accuracy(
     before: &Code,
     after: &Code,
     provenance: &HashMap<String, (String, String, String, String)>,
+    selection: &ToolSelection,
 ) -> Result<AccuracyRow> {
     let node_cache = codediff::diff::NodeCache::build(before, after);
     let truth_ast = human_mapping::as_ast_diff(name, before, after)?;
@@ -2661,7 +2738,7 @@ fn score_accuracy(
     // codediff itself, scored through the identical projection so its columns sit on the same
     // scale as the external tools' (and, deliberately, not on the same scale as its own
     // `benchmark_optimal_solutions` node-mismatch number).
-    {
+    if selection.includes("codediff") {
         let diff = codediff::diff::diff_code(before, after);
         let ast = diff.ast.as_ref().context("codediff produced no AST")?;
         let (cd_before_lines, cd_after_lines) =
@@ -2704,6 +2781,9 @@ fn score_accuracy(
 
     let language = before.metadata.language.unwrap_or_default();
     for &tool in ExternalTool::ALL {
+        if !selection.includes(tool.name()) {
+            continue;
+        }
         if !tool.supports(language) {
             scores.push(ToolScore {
                 name: tool.name(),
@@ -2867,6 +2947,7 @@ fn run_accuracy(
     names: &[String],
     test_diffs: &HashMap<String, (Code, Code)>,
     path: &std::path::Path,
+    selection: &ToolSelection,
 ) -> Result<()> {
     let provenance = sample_provenance()?;
     let mut rows = Vec::with_capacity(names.len());
@@ -2877,7 +2958,7 @@ fn run_accuracy(
         let (before, after) = test_diffs
             .get(name)
             .expect("name came from test_diffs.keys()");
-        match score_accuracy(name, before, after, &provenance) {
+        match score_accuracy(name, before, after, &provenance, selection) {
             Ok(row) => rows.push(row),
             Err(err) => eprintln!("  {name}: skipped ({err:#})"),
         }
