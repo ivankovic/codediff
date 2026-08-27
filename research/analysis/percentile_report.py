@@ -17,8 +17,9 @@
 #
 # Shared by commit_stats.py and file_stats.py.
 import os
-import polars as pl
+
 import matplotlib.pyplot as plt
+import polars as pl
 
 
 def compute_percentiles_and_plot(

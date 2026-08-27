@@ -16,9 +16,9 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import sys
-import polars as pl
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import polars as pl
 from percentile_report import compute_percentiles_and_plot
 
 

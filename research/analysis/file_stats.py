@@ -16,10 +16,10 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import sys
-import polars as pl
-import numpy as np
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import polars as pl
 from percentile_report import compute_percentiles_and_plot
 
 
@@ -201,8 +201,10 @@ def write_top_node_kinds_by_language(
     lines = [
         "# Most common AST node kinds per language",
         "",
-        f"Top {top_n} TreeSitter node kinds by total occurrence count, per language, as a "
-        "percentage of all counted nodes in that language.",
+        (
+            f"Top {top_n} TreeSitter node kinds by total occurrence count, per language, as a "
+            "percentage of all counted nodes in that language."
+        ),
         "",
     ]
 

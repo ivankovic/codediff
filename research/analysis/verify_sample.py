@@ -55,6 +55,7 @@ def resolves(repo_path, commit):
     result = subprocess.run(
         ["git", "-C", repo_path, "cat-file", "-e", f"{commit}^{{commit}}"],
         capture_output=True,
+        check=False,
     )
     return result.returncode == 0
 
@@ -88,7 +89,7 @@ def main():
     pct = 100.0 * len(unresolved) / len(rows)
 
     print(f"{args.csv_path}: {len(rows)} pairs, {len(commits)} distinct commits, "
-          f"{len(set(r['repository'] for r in rows))} repositories")
+          f"{len({r['repository'] for r in rows})} repositories")
     print(f"unresolved: {len(unresolved)} pairs ({pct:.2f}%)")
 
     # Per-repository, because that is the shape the failure took last time and an aggregate
@@ -114,7 +115,7 @@ def main():
     empty = [(lang, b) for lang in languages for b in buckets if cells[(lang, b)] == 0]
     if empty:
         print(f"\n{len(empty)} empty cells (no such pairs exist in the corpus, not an error): "
-              f"{', '.join(f'{l}/{b}' for l, b in empty[:12])}"
+              f"{', '.join(f'{lang}/{bucket}' for lang, bucket in empty[:12])}"
               f"{' ...' if len(empty) > 12 else ''}")
 
     if pct > args.max_unresolved_pct:

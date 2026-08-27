@@ -21,15 +21,16 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
-import matplotlib.pyplot as plt
 
 
 def git_show(repo_path, ref, path):
     result = subprocess.run(
         ["git", "-C", str(repo_path), "show", f"{ref}:{path}"],
         capture_output=True,
+        check=False,
     )
     return result.stdout if result.returncode == 0 else None
 
@@ -47,10 +48,13 @@ def unix_diff_line_counts(before, after):
         after_file.flush()
 
         result = subprocess.run(
+            # `diff` exits 1 whenever the two files differ, which is the whole point here,
+            # so the exit status is read below rather than raised on.
             ["diff", before_file.name, after_file.name],
             capture_output=True,
             text=True,
             errors="replace",
+            check=False,
         )
 
         added = sum(1 for line in result.stdout.splitlines() if line.startswith("> "))

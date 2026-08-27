@@ -81,8 +81,8 @@ import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode) - same tokens
 # matching_reasons_report.py and diff_pairs_benchmark_comparison.py use.
@@ -783,9 +783,11 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
 
     lines = [
         r"\begin{table}",
-        r"  \caption{Timing noise per series: per-fixture coefficient of variation across repeated"
-        r" measurements of the same fixture (lower means a single run is more trustworthy on its"
-        r" own).}",
+        (
+            r"  \caption{Timing noise per series: per-fixture coefficient of variation across"
+            r" repeated measurements of the same fixture (lower means a single run is more"
+            r" trustworthy on its own).}"
+        ),
         r"  \label{tab:variance}",
         r"  \begin{tabular}{lrrr}",
         r"    \toprule",

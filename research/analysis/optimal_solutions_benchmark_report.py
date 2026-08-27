@@ -62,8 +62,8 @@ import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode) - same tokens
 # benchmark_other_report.py/matching_reasons_report.py/diff_pairs_benchmark_comparison.py use, kept

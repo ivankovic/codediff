@@ -93,8 +93,8 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import ticker
 
 # Same chart-chrome tokens as benchmark_other_report.py / matching_reasons_report.py, from the
 # dataviz skill's reference palette (light mode) - kept identical across every research/plots/*.png
@@ -489,7 +489,7 @@ def main() -> None:
 
     ax.set_ylim(0, 108)
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{l}\nLOC" for l in labels], fontsize=9.5, color=INK_PRIMARY)
+    ax.set_xticklabels([f"{label}\nLOC" for label in labels], fontsize=9.5, color=INK_PRIMARY)
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
     ax.set_ylabel("Pairs processed within 1s", fontsize=10.5, color=INK_PRIMARY)
     ax.set_xlabel("Lines of code (larger of before / after)", fontsize=10.5, color=INK_PRIMARY)

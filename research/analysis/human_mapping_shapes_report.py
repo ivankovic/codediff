@@ -61,8 +61,8 @@ import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import ticker
 
 # Same chart-chrome tokens as benchmark_other_report.py / apted_only_report.py.
 SURFACE = "#fcfcfb"
@@ -161,9 +161,11 @@ def write_paper_fragment(rows: list[dict], output_path: Path) -> None:
     # and for the no-shape complement, which is the honest counterweight - a third of the remaining
     # error sits in fixtures exhibiting none of these shapes, so no single shape explains it all.
     total_mismatches = sum(_int(r, "current_mismatches") for r in rows)
-    any_reparent = (
-        lambda r: _int(r, "depth_delta_1") + _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") > 0
-    )
+    def any_reparent(r):
+        return (
+            _int(r, "depth_delta_1") + _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") > 0
+        )
+
     no_shape = next(p for stem, _, p in SHAPES if stem == "NoShape")
     for stem, predicate in (("AnyReparent", any_reparent), ("NoShape", no_shape)):
         mass = sum(_int(r, "current_mismatches") for r in rows if predicate(r))

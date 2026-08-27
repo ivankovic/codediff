@@ -28,10 +28,9 @@ import csv
 import re
 from pathlib import Path
 
-import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
+import numpy as np
+from matplotlib import ticker
 
 # Language display order, display names, and hex colours.
 LANG_META = {

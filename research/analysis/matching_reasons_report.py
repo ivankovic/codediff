@@ -54,8 +54,8 @@ import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
+from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode).
 SURFACE = "#fcfcfb"
@@ -111,7 +111,7 @@ def apted_shades(n: int) -> list[str]:
     for i in range(n):
         lightness = APTED_MIN_LIGHTNESS + (APTED_MAX_LIGHTNESS - APTED_MIN_LIGHTNESS) * i / (n - 1)
         sr, sg, sb = colorsys.hls_to_rgb(hue, lightness, saturation)
-        shades.append("#{:02x}{:02x}{:02x}".format(round(sr * 255), round(sg * 255), round(sb * 255)))
+        shades.append(f"#{round(sr * 255):02x}{round(sg * 255):02x}{round(sb * 255):02x}")
     return shades
 
 
