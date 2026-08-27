@@ -146,6 +146,8 @@ mod java_junit_pioneer_junit_pioneer_add_block_comment;
 #[cfg(test)]
 mod java_pdftk_java_pdftk_license_comment_change;
 #[cfg(test)]
+mod java_pdftk_java_pdftk_real_change_all_across_the_file;
+#[cfg(test)]
 mod java_zeroc_ice_ice_comment_only_update;
 #[cfg(test)]
 mod javascript_grobian_carbonapi_web_add_binary_expression_to_existing_assignment;
@@ -233,6 +235,8 @@ mod php_rk4an_phpsysinfo_actual_logic_change;
 mod php_smarty_php_smarty_change_version_string;
 #[cfg(test)]
 mod php_symfony_finder_move_elseif_block_to_else;
+#[cfg(test)]
+mod php_theseer_directoryscanner_add_two_test_cases_and_reformat_file;
 #[cfg(test)]
 mod php_zetacomponents_base_whitespace_only_change;
 #[cfg(test)]
@@ -345,6 +349,8 @@ mod scala_ymnk_jzlib_add_a_test_case;
 mod scala_ymnk_jzlib_add_one_test_case;
 #[cfg(test)]
 mod scala_ymnk_jzlib_interesting_probably_has_no_optimal_solution;
+#[cfg(test)]
+mod shellscript_docker_docker_bench_security_move_all_functions_by_one_and_add_one_to_the_end;
 #[cfg(test)]
 mod shellscript_fleetingheart_ksre_multiline_string_change;
 #[cfg(test)]
