@@ -1,0 +1,1 @@
+True solution requires a N:M multi-map because two strings should map to one. And it has a interesting case of modifying the list with version numbers being removed and added, which requires logical analysis not just syntax.

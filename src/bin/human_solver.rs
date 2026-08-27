@@ -7541,8 +7541,19 @@ fn action_promote(
         new_name,
         comment.as_deref(),
     )?;
+
+    // ...and into the fixture's own `description.md`, which is where `diff_inventory` reads a
+    // note from. Without this a promoted case would leave its comment behind in sample.csv - the
+    // one place a fixture's note can be edited but not seen, since `e` on the promoted case now
+    // writes the file. Every commented fixture in the corpus has one; this is what keeps that
+    // true for the next promotion rather than only for the migration that established it.
+    let note_written = match &comment {
+        Some(comment) => write_note(new_name, comment).is_ok(),
+        None => false,
+    };
     refresh_diff_completeness(app, new_name);
     refresh_diff_text_painted(app, new_name);
+    refresh_diff_comment(app, new_name);
 
     let csv_note = match &sample_source {
         Some(source) => match update_sample_csv(source, new_name) {
@@ -7557,8 +7568,16 @@ fn action_promote(
     app.origin = CaseOrigin::Diffs;
 
     Ok(format!(
-        "Promoted to '{}'. {}{}{}",
-        new_name, save_msg, csv_note, readme_note
+        "Promoted to '{}'. {}{}{}{}",
+        new_name,
+        save_msg,
+        csv_note,
+        readme_note,
+        if note_written {
+            " Comment copied to description.md."
+        } else {
+            ""
+        }
     ))
 }
 
@@ -7590,6 +7609,21 @@ fn action_reject(app: &App, reason: &str) -> Result<String> {
 /// (`CaseOrigin::GitCommitFile`) has nothing to comment on.
 fn action_comment(app: &App, comment: &str) -> Result<String> {
     let comment = comment.trim();
+
+    // An already-promoted sample edits its *fixture's* `description.md`, not its own sample.csv
+    // row. That row is no longer what anything reads - `diff_inventory` prefers the file - so
+    // writing to it would be an edit that appears to work and shows up nowhere. One note per
+    // fixture, one writer.
+    if let CaseOrigin::Sample(source) = &app.origin
+        && let Some(promoted) = promoted_case_name(source)
+    {
+        write_note(&promoted, comment)?;
+        return Ok(if comment.is_empty() {
+            format!("Cleared note for '{promoted}' (description.md removed)")
+        } else {
+            format!("Wrote description.md for '{promoted}' (this sample's promoted case)")
+        });
+    }
 
     // A promoted or handmade fixture keeps its note in its own directory, as `description.md`,
     // because there is no sample.csv row to hold one - a handmade case was never sampled at all.
@@ -7710,6 +7744,18 @@ fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Result<()> {
 /// `sample_comment_at`/the `e` keybinding's prefill lookup. `source` uniquely identifies a row by
 /// construction (`sample_test_diffs` never writes two rows for the same commit+path), so "first
 /// match" is never ambiguous in practice.
+/// The fixture name this sample was promoted to, if it has been promoted at all.
+///
+/// The inverse of `promoted_sample_comment`'s join, and the check that tells `action_comment`
+/// whether a sample still owns its own note or whether the promoted fixture's `description.md`
+/// has taken over.
+fn promoted_case_name(source: &SampleSource) -> Option<String> {
+    let rows = read_sample_csv_rows(&sample_csv_path()).ok()?;
+    find_sample_row(&rows, source)
+        .map(|row| row.promoted_to.clone())
+        .filter(|name| !name.trim().is_empty())
+}
+
 /// The `sample.csv` comment recorded against the sample this fixture was promoted from, if any.
 ///
 /// Joined on `promoted_to`, the same key `diff_inventory` uses. Only ever a *fallback*: it fills
@@ -9261,6 +9307,25 @@ mod tests {
                 .contains("diff (o) or sample (O)"),
             "{:?}",
             app.status
+        );
+    }
+
+    /// Every commented fixture in the corpus keeps its note in its own `description.md`, not in
+    /// sample.csv. Pins the migration: the 20 fixtures whose note used to live only in a
+    /// sample.csv row were copied across, and this fails if one is ever removed or if a new
+    /// commented fixture arrives without one.
+    #[test]
+    fn no_fixture_has_a_sample_comment_without_its_own_description() {
+        let rows = read_sample_csv_rows(&sample_csv_path()).expect("sample.csv");
+        let stranded: Vec<&str> = rows
+            .iter()
+            .filter(|row| !row.promoted_to.trim().is_empty() && !row.comment.trim().is_empty())
+            .filter(|row| read_note(&row.promoted_to).is_none())
+            .map(|row| row.promoted_to.as_str())
+            .collect();
+        assert!(
+            stranded.is_empty(),
+            "these fixtures' notes live only in sample.csv, where nothing reads them: {stranded:?}"
         );
     }
 

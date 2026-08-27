@@ -165,6 +165,34 @@ fn main() -> Result<()> {
     }
     writer.flush()?;
 
+    // Two notes for one fixture that disagree is the only way this can now be wrong, and it can
+    // only happen by hand-editing sample.csv after the file exists. Reported rather than resolved:
+    // which one is right is a judgement, and quietly picking is how the wrong note becomes
+    // permanent. Runs on every hook invocation, so it surfaces in the commit that causes it.
+    let divergent: Vec<&str> = rows
+        .iter()
+        .filter(|row| {
+            let Some(sample) = provenance.get(&row.name) else {
+                return false;
+            };
+            let sample_comment = sample.comment.trim();
+            !sample_comment.is_empty()
+                && read_note(&row.name)
+                    .is_some_and(|note| note_as_csv_cell(&note) != sample_comment)
+        })
+        .map(|row| row.name.as_str())
+        .collect();
+    if !divergent.is_empty() {
+        eprintln!(
+            "warning: {} fixture(s) have a description.md that disagrees with their sample.csv \
+             comment; the file is what diffs.csv records:",
+            divergent.len()
+        );
+        for name in &divergent {
+            eprintln!("    {name}");
+        }
+    }
+
     let painted = rows.iter().filter(|r| r.painting != "none").count();
     let tree_done = rows.iter().filter(|r| r.unmatched_nodes == 0).count();
     println!(
@@ -237,12 +265,12 @@ fn row_for(
         repository: sample.map(|s| s.repository.clone()).unwrap_or_default(),
         commit: sample.map(|s| s.commit.clone()).unwrap_or_default(),
         source_path: sample.map(|s| s.path.clone()).unwrap_or_default(),
-        // The fixture's own description.md wins over the sample.csv comment it was promoted with.
-        // Both are the same kind of thing - somebody's note about why this case is interesting -
-        // but only one of them can be written for a handmade fixture, or edited after promotion,
-        // so a fixture that has both is one where the note is the later word. `human_solver`'s
-        // `e` pre-fills from the sample comment when no note exists yet, so carrying one forward
-        // is a keystroke and nothing is stranded here.
+        // The fixture's own description.md wins over the sample.csv comment it was promoted
+        // with. Every commented fixture in the corpus now has the file - the 20 that only had a
+        // sample comment were copied across, and `action_promote` writes one for anything
+        // promoted from here on - so this fallback is a safety net for a hand-edited sample.csv
+        // rather than a live path. `divergent_comments` below reports anything that lands in it
+        // with a *different* note already on disk.
         comment: read_note(name)
             .map(|note| note_as_csv_cell(&note))
             .or_else(|| sample.map(|s| s.comment.clone()))
