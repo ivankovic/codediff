@@ -49,7 +49,10 @@ done
 
 if command -v node >/dev/null 2>&1; then
     echo "pre-push: human_mapping site JS tests"
-    node assets/mapping_site/index.test.js
+    # Via the Makefile target rather than naming the files, so adding a third test file here is
+    # one edit and not three - this hook, CI's mapping-site-js job, and `make test` all have to
+    # agree, and viewer.test.js was already missed by this line once.
+    make test-mapping-site-js
 else
     echo "pre-push: node not found, skipping human_mapping site JS tests (CI still runs these)"
 fi
