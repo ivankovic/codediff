@@ -21,7 +21,10 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-hello-world-removed-message", 100.0)
+    // measured 2026-08-27: minimal 0.000% (0 bytes), full 0.685% (1 of 146 bytes)
+    //
+    // The mirror image of `rust-hello-world-added-message`, and it scores identically - which is
+    // the useful part: the same edit read backwards costs the same, so nothing here is
+    // direction-dependent.
+    assert_matches_human_painting_within_limit("rust-hello-world-removed-message", 0.69)
 }

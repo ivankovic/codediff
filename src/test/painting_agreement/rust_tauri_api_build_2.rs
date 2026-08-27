@@ -21,7 +21,11 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-tauri-api-build-2", 100.0)
+    // measured 2026-08-27: minimal 0.901% (32 of 3550 bytes), full 0.000% (0 bytes)
+    //
+    // The opposite asymmetry to the two hello-world fixtures: here Full is exact and Minimal is
+    // not, so Minimal's filtering is dropping something the human kept painted. Worth a look if
+    // Minimal's rules are revisited - it is a small, cheap counterexample to "Minimal is always
+    // the easier target".
+    assert_matches_human_painting_within_limit("rust-tauri-api-build-2", 0.91)
 }

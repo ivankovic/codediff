@@ -21,7 +21,13 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-no-change", 100.0)
+    // measured 2026-08-27: minimal 0.000%, full 0.000% - zero disagreeing bytes, both modes.
+    //
+    // Clamped at 0.0, so this is a real assertion rather than a recorded distance: the first
+    // fixture in the corpus where codediff's rendering and the human painting agree byte for
+    // byte. A no-change pair is the easiest possible case - every byte is Identical and there is
+    // nothing to attribute - so read it as the floor working, not as the metric being solved.
+    // If this ever rises, something has broken in the unchanged path, which is worth a hard
+    // failure.
+    assert_matches_human_painting_within_limit("rust-no-change", 0.0)
 }

@@ -21,7 +21,10 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-error-handling", 100.0)
+    // measured 2026-08-27: minimal 6.160% (43 of 698 bytes), full 5.014% (35 of 698)
+    //
+    // Byte counts, not just percentages, because the clamp is a 2dp ceiling of the true
+    // fraction and 43/698 is 6.16046% - a first pass recorded 6.16 from the displayed 6.160%
+    // and failed on the very run that set it.
+    assert_matches_human_painting_within_limit("rust-error-handling", 6.17)
 }
