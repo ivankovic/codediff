@@ -21,6 +21,11 @@ exclude = [
     # whoever next touches this.
     "src/bin/**",
     "src/test/data/**",
+    # Excluded for the same reason, one step removed: tests/benchmark_other_e2e.rs spawns two of
+    # those excluded bins through `CARGO_BIN_EXE_*`, so a packaged crate would carry a [[test]]
+    # target that cannot compile - `cargo package` keeps tests/ and the manifest stanza by default
+    # even when the binaries the test names are gone (confirmed by unpacking the .crate).
+    "tests/**",
 ]
 
 # No [profile.release] section existed before this (2026-07-25, speed-goal investigation) - Cargo's

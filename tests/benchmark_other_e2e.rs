@@ -101,7 +101,24 @@ fn run(mode: &str, out_dir: &Path) -> (Output, std::path::PathBuf) {
 
 /// `run`, asserting the process succeeded, and parsing the CSV into `fixture name -> column ->
 /// cell`.
-fn scored(mode: &str, out_dir: &Path) -> HashMap<String, HashMap<String, String>> {
+/// One accuracy CSV. The header is kept, not just the rows: which *columns* exist is what says
+/// whether `--tools` narrowed anything, and a run that ignored the flag has identical row contents
+/// under the columns the assertions read.
+struct Csv {
+    header: Vec<String>,
+    rows: HashMap<String, HashMap<String, String>>,
+}
+
+impl std::ops::Index<&str> for Csv {
+    type Output = HashMap<String, String>;
+    fn index(&self, fixture: &str) -> &Self::Output {
+        self.rows
+            .get(fixture)
+            .unwrap_or_else(|| panic!("no row for {fixture} in {:?}", self.rows.keys()))
+    }
+}
+
+fn scored(mode: &str, out_dir: &Path) -> Csv {
     let (output, csv_path) = run(mode, out_dir);
     assert!(
         output.status.success(),
@@ -111,7 +128,7 @@ fn scored(mode: &str, out_dir: &Path) -> HashMap<String, HashMap<String, String>
     read_csv(&csv_path)
 }
 
-fn read_csv(path: &Path) -> HashMap<String, HashMap<String, String>> {
+fn read_csv(path: &Path) -> Csv {
     let mut reader = csv::Reader::from_path(path).expect("reading the accuracy CSV");
     let header: Vec<String> = reader
         .headers()
@@ -119,7 +136,7 @@ fn read_csv(path: &Path) -> HashMap<String, HashMap<String, String>> {
         .iter()
         .map(str::to_string)
         .collect();
-    reader
+    let rows = reader
         .records()
         .map(|record| {
             let record = record.expect("CSV row");
@@ -130,7 +147,8 @@ fn read_csv(path: &Path) -> HashMap<String, HashMap<String, String>> {
                 .collect();
             (row["solution"].clone(), row)
         })
-        .collect()
+        .collect();
+    Csv { header, rows }
 }
 
 fn cell(row: &HashMap<String, String>, column: &str) -> usize {
@@ -241,7 +259,7 @@ fn a_random_answer_is_neither_degenerate_case() {
         scored("all", out_dir.path()),
         scored("random", out_dir.path()),
     );
-    let counts = |rows: &HashMap<String, HashMap<String, String>>, fixture: &str| -> Vec<usize> {
+    let counts = |rows: &Csv, fixture: &str| -> Vec<usize> {
         GRANULARITIES
             .iter()
             .map(|(column, _)| cell(&rows[fixture], column))
@@ -295,6 +313,68 @@ fn a_failing_tool_is_recorded_as_an_error_without_stopping_the_run() {
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("deliberate failure"),
         "the tool's own error text should reach stderr"
+    );
+}
+
+/// `--fixtures` and `--tools` actually narrow the run.
+///
+/// Every other test here reads `difftastic_*` columns for three named fixtures, and every one of
+/// them still passes if both filters are ignored entirely - the extra rows and the extra columns
+/// are simply never looked at. So this checks the narrowing itself, against a control run with no
+/// `--tools` at all: without it, "no codediff columns" could mean the gate works or could mean
+/// codediff was never scored here in the first place.
+#[test]
+fn the_scoping_flags_narrow_the_run() {
+    let out_dir = tempfile::tempdir().expect("temp dir");
+    let filtered = scored("all", out_dir.path());
+
+    assert_eq!(
+        filtered.rows.len(),
+        SUPPORTED.len() + 1,
+        "--fixtures did not narrow the corpus - scored {:?}",
+        filtered.rows.keys().collect::<Vec<_>>()
+    );
+    let codediff_columns = |csv: &Csv| -> usize {
+        csv.header
+            .iter()
+            .filter(|column| column.starts_with("codediff_"))
+            .count()
+    };
+    assert_eq!(
+        codediff_columns(&filtered),
+        0,
+        "--tools did not gate codediff: {:?}",
+        filtered.header
+    );
+
+    // The control: the same run without `--tools` must score codediff, or the assertion above is
+    // measuring nothing. Cheap - three tiny fixtures, and the tools with no binary configured
+    // fail immediately rather than running.
+    let control_path = out_dir.path().join("control.csv");
+    let output = Command::new(env!("CARGO_BIN_EXE_benchmark_other"))
+        .arg("--accuracy-csv")
+        .arg(&control_path)
+        .args(["--fixtures", SUPPORTED[0]])
+        .env("DIFFT_BIN", env!("CARGO_BIN_EXE_fake_diff_tool"))
+        .env("FAKE_DIFF_MODE", "all")
+        .output()
+        .expect("spawning benchmark_other");
+    assert!(
+        output.status.success(),
+        "unfiltered run failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let control = read_csv(&control_path);
+    assert!(
+        codediff_columns(&control) > 0,
+        "codediff should be scored when --tools is absent: {:?}",
+        control.header
+    );
+    assert!(
+        control.header.len() > filtered.header.len(),
+        "--tools should leave fewer columns than an unfiltered run ({} vs {})",
+        filtered.header.len(),
+        control.header.len()
     );
 }
 
