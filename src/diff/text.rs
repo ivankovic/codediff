@@ -181,9 +181,33 @@ struct TextSpan<'a> {
 }
 
 /// Splits an `Update`/`MatchButNotIdentical` node's own text into up to three sub-ranges - a
-/// common Identical prefix, the differing Update middle, and a common Identical suffix - instead
-/// of reporting the node's entire text as changed. This is what lets a small edit inside a long
+/// common Identical prefix, the differing middle, and a common Identical suffix - instead of
+/// reporting the node's entire text as changed. This is what lets a small edit inside a long
 /// string, comment, or identifier highlight only the part that actually changed.
+///
+/// **The middle is not always an `Update`.** When one side's middle is empty, nothing was
+/// replaced: text was purely added or purely removed, and calling that an update paints an
+/// insertion yellow. `"""Fetch user data from API"""` becoming
+/// `"""Fetch user data from API with improved error handling"""` has an empty before-middle, and
+/// every human painting of that shape in the corpus calls the added words an insert. So the middle
+/// takes its operation from which side actually holds text, which is why `source_is_before` has to
+/// reach here: an insertion is an `Insert` on the after side and a zero-width "added here" marker
+/// on the before side, and the two texts alone cannot tell those apart.
+///
+/// **Content nodes only**, and the corpus is unanimous about why. Applying the insert/delete
+/// reading everywhere improves three fixtures and worsens three, and the losing three are all the
+/// same shape: `IntBox` -> `Box` (`cpp-add-templates`) and `<=` -> `<` (`cpp-fix-segfault`,
+/// `java-fix-array-index`), where the painter called the whole identifier or operator *updated*
+/// rather than calling the dropped affix a deletion. That is the right reading: `IntBox` -> `Box`
+/// is a rename, not the deletion of an `Int`. The winning three are all string literals and
+/// docstrings gaining a phrase, where the added words genuinely are an insertion. So the split is
+/// by what the node's text *is* - content a reader reads, versus a name or an operator - not by
+/// any threshold on how much of it changed.
+///
+/// Only ever one middle, deliberately. A node whose own text contained two separate edits would
+/// need a real sequence diff inside it; measured against the painted corpus on 2026-08-28, **0 of
+/// 31** `Update` node extents carry more than one separately painted run, so that generality has no
+/// customer and the affix split is the whole of what the ground truth asks for.
 ///
 /// Falls back to a single whole-span `Update` range (`whole_source_range`, anchored via
 /// `last_non_move_range` exactly like the pre-existing behavior this replaces) when there's no
@@ -199,20 +223,48 @@ struct TextSpan<'a> {
 /// uses the placeholder anchor, matching the pre-existing convention that only `Identical`
 /// ranges carry cross-file-accurate destinations.
 ///
-/// Symmetric by construction: `common_prefix_byte_len`/`common_suffix_byte_len` only compare
-/// characters pairwise for equality, which doesn't depend on which string is "source" and which is
-/// "destination" - so calling this with the two texts swapped (as `ranges` does, once for
-/// before->after and once for after->before) always produces the same number of sub-ranges, with
-/// the same operations, in the same order. `ranges`'s caller is responsible for the other half of
+/// Symmetric in shape, mirrored in operation. `common_prefix_byte_len`/`common_suffix_byte_len`
+/// only compare characters pairwise for equality, which doesn't depend on which string is "source"
+/// and which is "destination" - so calling this with the two texts swapped (as `ranges` does, once
+/// for before->after and once for after->before) always produces the same number of sub-ranges, in
+/// the same order. The *operations* are mirrored rather than identical, and have to be: an `Insert`
+/// on the after side states the same fact as a zero-width "added here" marker on the before side.
+/// Only the middle can differ that way - prefix and suffix are `Identical` from both directions. `ranges`'s caller is responsible for the other half of
 /// this guarantee: pushing a multi-range result straight into `ranges` rather than through the
 /// usual same-operation-neighbor-merging accumulator, since that merging depends on each side's own
 /// (possibly different) surrounding text and could otherwise make the two sides' sub-range counts
 /// diverge after accumulation even though this function itself is symmetric.
+/// Whether a node's own text is content a reader reads, rather than a name or grammar glue.
+///
+/// Literals and comments are content: adding a phrase to a docstring is an insertion. Identifiers,
+/// keywords and operators are not: `IntBox` becoming `Box` is a rename, and `<=` becoming `<` is a
+/// changed operator - in both, the painter calls the node updated rather than calling the dropped
+/// characters a deletion. See `intra_node_update_ranges`, which is the only caller and carries the
+/// six fixtures this was measured against.
+fn is_content_node(kind: &str) -> bool {
+    // `nodes::is_literal_kind` is not enough on its own and deliberately not widened here: it is
+    // shared with the APTED rename-cost model and `code::hash`, and it lists only the kinds those
+    // need (`string_literal`, `integer_literal`, ...). Python spells its docstrings `string` and
+    // HTML its content `raw_text`, so the substring tests below carry the cases this decision
+    // actually turns on. Kept local for that reason - widening the shared list to serve a
+    // rendering choice would change matching and hashing too.
+    nodes::is_literal_kind(kind)
+        || nodes::is_comment(kind)
+        || kind.contains("string")
+        || kind.contains("comment")
+        || kind.contains("raw_text")
+}
+
 fn intra_node_update_ranges(
     last_non_move_range: &mut TextRange,
     whole_source_range: TextRange,
     source: TextSpan,
     destination: TextSpan,
+    source_is_before: bool,
+    // Whether the node's text is content a reader reads - a literal or a comment - as opposed to
+    // an identifier, keyword or operator. Decides whether a one-sided middle reads as an
+    // insertion/deletion or stays an update.
+    content_node: bool,
 ) -> Vec<RangeMatch> {
     let prefix_len = common_prefix_byte_len(source.text, destination.text);
     let suffix_len =
@@ -244,6 +296,15 @@ fn intra_node_update_ranges(
 
     let source_mid_len = source.text.len() - prefix_len - suffix_len;
     let destination_mid_len = destination.text.len() - prefix_len - suffix_len;
+    // `source` is the side being painted, so "no text here, text there" reads as an insertion from
+    // the before side and as a deletion from the after side. Only for content nodes - see this
+    // function's doc comment for the six fixtures that draw that line.
+    let middle_operation = match (source_mid_len, destination_mid_len, source_is_before) {
+        _ if !content_node => TextOperation::Update,
+        (0, _, true) | (_, 0, false) => TextOperation::Insert,
+        (0, _, false) | (_, 0, true) => TextOperation::Delete,
+        _ => TextOperation::Update,
+    };
     if source_mid_len > 0 || destination_mid_len > 0 {
         let source_mid_start = point_at_byte_offset(source.text, source.start, prefix_len);
         let source_mid_end =
@@ -251,7 +312,7 @@ fn intra_node_update_ranges(
         result.push(advance_and_build_range_with_source(
             last_non_move_range,
             text_range_from_points(source_mid_start, source_mid_end, source.columns),
-            TextOperation::Update,
+            middle_operation,
         ));
     }
 
@@ -286,6 +347,9 @@ fn ranges(
     destination: &Code,
     diff: &ASTDiff,
     node_cache: &NodeCache,
+    // Which file `source` is. Only `intra_node_update_ranges` needs it, and only to tell an
+    // insertion from a deletion - see its doc comment. Everything else in here is symmetric.
+    source_is_before: bool,
 ) -> Vec<RangeMatch> {
     let mut ranges = Vec::new();
 
@@ -481,6 +545,8 @@ fn ranges(
                                         start: destination_node.start_position(),
                                         columns: &destination_columns,
                                     },
+                                    source_is_before,
+                                    is_content_node(node.kind()),
                                 );
                             } else {
                                 new_ranges.push(advance_and_build_range(
@@ -551,6 +617,8 @@ fn ranges(
                                                 start: d_start,
                                                 columns: &destination_columns,
                                             },
+                                            source_is_before,
+                                            is_content_node(node.kind()),
                                         ),
                                         _ => vec![advance_and_build_range(
                                             &mut last_non_move_range,
@@ -816,8 +884,8 @@ impl TextDiff {
     /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
     /// implemented that can construct the TextDiff directly from code.
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
-        let mut before_ranges_plain = ranges(before, after, diff, node_cache);
-        let mut after_ranges_plain = ranges(after, before, diff, node_cache);
+        let mut before_ranges_plain = ranges(before, after, diff, node_cache, true);
+        let mut after_ranges_plain = ranges(after, before, diff, node_cache, false);
 
         // Each `ranges` call above decided `Move` from its own walk order, so the two can name
         // different pairs for the same reorder - see `reconcile_moves`.
@@ -3624,7 +3692,7 @@ mod tests {
             "fn main() {\n    let long_identifier_name = 5;\n}",
             "fn main() {\n    let long_identifier_nome = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3645,7 +3713,7 @@ mod tests {
              20-character identifier"
         );
 
-        let after_ranges = ranges(&after, &before, &ast, &node_cache);
+        let after_ranges = ranges(&after, &before, &ast, &node_cache, false);
         let after_updates: Vec<_> = after_ranges
             .iter()
             .filter(|r| r.operation == TextOperation::Update)
@@ -3666,7 +3734,7 @@ mod tests {
             "fn main() {\n    let foo = 5;\n}",
             "fn main() {\n    let bar = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3690,7 +3758,7 @@ mod tests {
             "// hello world!\nfn main() {}",
             "// hello universe!\nfn main() {}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3757,6 +3825,64 @@ mod tests {
         assert_eq!(
             after_updates[0].source.end_column - after_updates[0].source.start_column,
             1
+        );
+    }
+    /// The defect this split exists to prevent: a phrase appended inside a string literal used to
+    /// render yellow, because the middle was unconditionally an `Update` even when one side of it
+    /// was empty. Nothing was replaced there - the words are new.
+    #[test]
+    fn a_phrase_added_inside_a_string_renders_as_an_insert_not_an_update() {
+        let before = Code::from_string(
+            "let s = \"Fetch user data\";\n",
+            &crate::code::Language::Rust,
+        );
+        let after = Code::from_string(
+            "let s = \"Fetch user data from API\";\n",
+            &crate::code::Language::Rust,
+        );
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff.ast.as_ref().expect("an AST diff");
+        let node_cache = NodeCache::build(&before, &after);
+        let text_diff = TextDiff::from(&before, &after, ast, &node_cache);
+
+        let ops: Vec<TextOperation> = text_diff
+            .all(1)
+            .iter()
+            .filter(|r| !r.source.is_empty())
+            .map(|r| r.operation.clone())
+            .collect();
+        assert!(
+            ops.contains(&TextOperation::Insert),
+            "the added words should read as an insertion, got {ops:?}"
+        );
+        assert!(
+            !ops.contains(&TextOperation::Update),
+            "and nothing here was replaced, so nothing should be an update: {ops:?}"
+        );
+    }
+
+    /// The other half of the same rule, and the reason it is gated on the node kind: `IntBox`
+    /// becoming `Box` shares the suffix `Box`, so the affix split leaves an empty after-middle -
+    /// exactly the shape above. But an identifier is a name, not content, and every painter in the
+    /// corpus calls that a rename rather than the deletion of an `Int`.
+    #[test]
+    fn a_renamed_identifier_stays_an_update_even_though_one_side_is_empty() {
+        let before = Code::from_string("struct IntBox;\n", &crate::code::Language::Rust);
+        let after = Code::from_string("struct Box;\n", &crate::code::Language::Rust);
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff.ast.as_ref().expect("an AST diff");
+        let node_cache = NodeCache::build(&before, &after);
+        let text_diff = TextDiff::from(&before, &after, ast, &node_cache);
+
+        let ops: Vec<TextOperation> = text_diff
+            .all(0)
+            .iter()
+            .filter(|r| !r.source.is_empty())
+            .map(|r| r.operation.clone())
+            .collect();
+        assert!(
+            !ops.contains(&TextOperation::Delete),
+            "a rename is not a deletion of the dropped prefix: {ops:?}"
         );
     }
 }

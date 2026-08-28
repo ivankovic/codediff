@@ -22,5 +22,5 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 #[test]
 fn painting_agreement() -> Result<()> {
     // measured 2026-08-26: minimal 26.505%, full 27.945%
-    assert_matches_human_painting_within_limit("python-api-change", 27.96)
+    assert_matches_human_painting_within_limit("python-api-change", 25.0)
 }
