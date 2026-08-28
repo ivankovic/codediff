@@ -115,11 +115,15 @@ mod rust_add_value_to_enum;
 #[cfg(test)]
 mod rust_cost_optimization;
 #[cfg(test)]
+mod rust_data_structure;
+#[cfg(test)]
 mod rust_error_handling;
 #[cfg(test)]
 mod rust_hello_world_added_message;
 #[cfg(test)]
 mod rust_hello_world_removed_message;
+#[cfg(test)]
+mod rust_multi_map_duplicate_calls;
 #[cfg(test)]
 mod rust_no_change;
 #[cfg(test)]
