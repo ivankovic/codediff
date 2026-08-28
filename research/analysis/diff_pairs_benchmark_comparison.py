@@ -20,6 +20,7 @@ the same sampled pairs and chart the difference.
 Usage (from research/, matching the other analysis scripts' convention):
     uv run ./analysis/diff_pairs_benchmark_comparison.py
 """
+
 import argparse
 import csv
 from collections import Counter
@@ -76,8 +77,12 @@ def plot_nodes_vs_time(pairs, output_path):
     after_ms = np.array([float(a["elapsed_ms"]) for _, a in pairs])
 
     plt.figure(figsize=(9, 7))
-    plt.scatter(total_nodes, before_ms, s=14, alpha=0.5, label="before (optimal_iud)", color="tab:red")
-    plt.scatter(total_nodes, after_ms, s=14, alpha=0.5, label="after (Zhang-Shasha)", color="tab:green")
+    plt.scatter(
+        total_nodes, before_ms, s=14, alpha=0.5, label="before (optimal_iud)", color="tab:red"
+    )
+    plt.scatter(
+        total_nodes, after_ms, s=14, alpha=0.5, label="after (Zhang-Shasha)", color="tab:green"
+    )
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("Combined AST nodes (before + after, log scale)")
@@ -145,10 +150,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Compare two benchmark_diff_pairs runs and chart the speed difference."
     )
-    parser.add_argument("--before", required=True,
-                        help="CSV from an earlier benchmark_diff_pairs run")
-    parser.add_argument("--after", required=True,
-                        help="CSV from a later benchmark_diff_pairs run")
+    parser.add_argument(
+        "--before", required=True, help="CSV from an earlier benchmark_diff_pairs run"
+    )
+    parser.add_argument("--after", required=True, help="CSV from a later benchmark_diff_pairs run")
     parser.add_argument("--plots-dir", default="plots")
     args = parser.parse_args()
 
@@ -160,8 +165,10 @@ if __name__ == "__main__":
     print()
 
     pairs = join_ok_rows(before_rows, after_rows)
-    print(f"Matched {len(pairs)} pairs with status=ok on both sides "
-          f"(of {len(before_rows)} sampled pairs)")
+    print(
+        f"Matched {len(pairs)} pairs with status=ok on both sides "
+        f"(of {len(before_rows)} sampled pairs)"
+    )
     print()
 
     print_timing_summary("before (optimal_iud)", [float(b["elapsed_ms"]) for b, _ in pairs])

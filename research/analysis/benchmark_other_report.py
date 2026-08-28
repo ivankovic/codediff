@@ -76,6 +76,7 @@ Usage (from research/):
     uv run ./analysis/benchmark_other_report.py
     uv run ./analysis/benchmark_other_report.py --csv benchmark_other.csv --plots-dir plots/
 """
+
 import argparse
 import csv
 from pathlib import Path
@@ -158,7 +159,13 @@ COLORS = {
 # one grouped histogram is unreadable, and text-vs-AST is the split the comparison is actually
 # about, not an arbitrary halving to fit the page.
 TEXT_TOOLS = [
-    "unix_diff", "git_myers", "git_minimal", "git_patience", "git_histogram", "bdiff", "nvim_diff",
+    "unix_diff",
+    "git_myers",
+    "git_minimal",
+    "git_patience",
+    "git_histogram",
+    "bdiff",
+    "nvim_diff",
 ]
 AST_TOOLS = ["gumtree", "difftastic", "diffsitter"]
 
@@ -196,7 +203,11 @@ def has_gumtree_warm(rows: list[dict]) -> bool:
     """Whether `gumtree_warm_ms` is present and non-empty for at least one row - the batch driver
     is opt-in per *run*, not per-fixture (see `plot_runtime`'s doc comment), so this is checked
     once per report rather than treated like a per-fixture language scope."""
-    return bool(rows) and "gumtree_warm_ms" in rows[0] and any(r["gumtree_warm_ms"] != "" for r in rows)
+    return (
+        bool(rows)
+        and "gumtree_warm_ms" in rows[0]
+        and any(r["gumtree_warm_ms"] != "" for r in rows)
+    )
 
 
 def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
@@ -210,11 +221,17 @@ def tool_names(fieldnames: list[str]) -> list[str]:
     """Every `ExternalTool` present in the CSV, derived from its `<tool>_mismatches` column -
     `benchmark_other.rs`'s `ExternalTool::ALL` is the source of truth for which tools exist, so
     this just mirrors whatever that produced rather than hardcoding "unix_diff"."""
-    return [c[: -len("_mismatches")] for c in fieldnames if c.endswith("_mismatches") and c != "codediff_mismatches"]
+    return [
+        c[: -len("_mismatches")]
+        for c in fieldnames
+        if c.endswith("_mismatches") and c != "codediff_mismatches"
+    ]
 
 
 def pct(mismatches: np.ndarray, total: np.ndarray) -> np.ndarray:
-    return np.divide(mismatches * 100, total, out=np.zeros_like(mismatches, dtype=float), where=total > 0)
+    return np.divide(
+        mismatches * 100, total, out=np.zeros_like(mismatches, dtype=float), where=total > 0
+    )
 
 
 def ms_values(row: dict, column: str) -> list[float]:
@@ -258,7 +275,12 @@ def agreement(rows: list[dict], tool: str) -> np.ndarray:
 
 
 def _plot_agreement_histogram(
-    ax, panel_rows: list[dict], labels: list[str], colors: list[str], title: str, legend_labels: list[str] | None = None,
+    ax,
+    panel_rows: list[dict],
+    labels: list[str],
+    colors: list[str],
+    title: str,
+    legend_labels: list[str] | None = None,
 ) -> None:
     """One bucketed-agreement histogram panel - factored out so a future tool with much narrower
     corpus coverage than the rest can still get its own comparable panel without duplicating the
@@ -270,7 +292,13 @@ def _plot_agreement_histogram(
     bins = np.arange(0, 101, 10)
 
     counts, _, bar_containers = ax.hist(
-        series, bins=bins, label=legend_labels or labels, color=colors, edgecolor=SURFACE, linewidth=1, zorder=3,
+        series,
+        bins=bins,
+        label=legend_labels or labels,
+        color=colors,
+        edgecolor=SURFACE,
+        linewidth=1,
+        zorder=3,
     )
     # Per-bar counts only while they can actually be read. Past four series the bars are narrow
     # enough that adjacent labels overlap into an unreadable smear ("459459459..."), which looks
@@ -282,9 +310,14 @@ def _plot_agreement_histogram(
             for bar in container:
                 if bar.get_height() > 0:
                     ax.text(
-                        bar.get_x() + bar.get_width() / 2, bar.get_height() + label_offset,
-                        f"{int(bar.get_height())}", ha="center", va="bottom", fontsize=8.5,
-                        color=INK_SECONDARY, zorder=4,
+                        bar.get_x() + bar.get_width() / 2,
+                        bar.get_height() + label_offset,
+                        f"{int(bar.get_height())}",
+                        ha="center",
+                        va="bottom",
+                        fontsize=8.5,
+                        color=INK_SECONDARY,
+                        zorder=4,
                     )
 
     ax.set_xlim(0, 100)
@@ -655,7 +688,9 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     colors = [COLORS[i] for i in ids]
     scoped_rows = [rows_for(i, rows) for i in ids]
     sample_sizes = [len(s) for s in scoped_rows]
-    series_ms = [np.array([v for r in s for v in ms_values(r, f"{i}_ms")]) for i, s in zip(ids, scoped_rows)]
+    series_ms = [
+        np.array([v for r in s for v in ms_values(r, f"{i}_ms")]) for i, s in zip(ids, scoped_rows)
+    ]
 
     series_log = [np.log10(s) for s in series_ms]
 
@@ -672,8 +707,13 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
         # alone can suggest more density than the raw points actually support.
         jitter = rng.uniform(-0.07, 0.07, size=len(log_vals))
         ax.scatter(
-            np.full(len(log_vals), xi) + jitter, log_vals, s=10, alpha=0.35,
-            color=INK_MUTED, linewidth=0, zorder=2,
+            np.full(len(log_vals), xi) + jitter,
+            log_vals,
+            s=10,
+            alpha=0.35,
+            color=INK_MUTED,
+            linewidth=0,
+            zorder=2,
         )
 
     parts = ax.violinplot(series_log, positions=x, widths=0.6, showmedians=False, showextrema=False)
@@ -689,27 +729,44 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
         # Starts past the line's own right end (xi + 0.3), not at the violin's center, so the
         # label never sits on top of the violin body or the line itself.
         ax.text(
-            xi + 0.36, median_log, f"median {10 ** median_log:.2f} ms",
-            ha="left", va="center", fontsize=9, color=INK_SECONDARY, zorder=4,
+            xi + 0.36,
+            median_log,
+            f"median {10**median_log:.2f} ms",
+            ha="left",
+            va="center",
+            fontsize=9,
+            color=INK_SECONDARY,
+            zorder=4,
         )
 
     # Real-ms tick labels on the log10-transformed axis: 1, 3, 10, 30, ... spans the full range
     # (min ~2.3ms, max ~3.9s) in the familiar 1/3 log steps, not raw log10 values.
     tick_ms = [1, 3, 10, 30, 100, 300, 1000, 3000]
-    tick_ms = [v for v in tick_ms if np.log10(v) >= min(s.min() for s in series_log) - 0.3
-               and np.log10(v) <= max(s.max() for s in series_log) + 0.3]
+    tick_ms = [
+        v
+        for v in tick_ms
+        if np.log10(v) >= min(s.min() for s in series_log) - 0.3
+        and np.log10(v) <= max(s.max() for s in series_log) + 0.3
+    ]
     ax.set_yticks(np.log10(tick_ms))
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{10 ** v:,.3g}"))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{10**v:,.3g}"))
 
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{label}\n(n={n})" for label, n in zip(labels, sample_sizes)], fontsize=10, color=INK_MUTED)
+    ax.set_xticklabels(
+        [f"{label}\n(n={n})" for label, n in zip(labels, sample_sizes)],
+        fontsize=10,
+        color=INK_MUTED,
+    )
     # Extra room on the right for the last violin's median label, which sits past its own x
     # position (see the `ax.text` call above) rather than centered on the violin.
     ax.set_xlim(-0.6, len(labels) - 1 + 1.3)
     ax.set_ylabel("Time per fixture (ms, log scale)", fontsize=11, color=INK_SECONDARY)
     ax.set_title(
         "Runtime distribution: time to produce per-line touched/untouched labels (sample size varies by tool, see x-axis)",
-        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+        fontsize=13,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=12,
     )
     ax.tick_params(axis="y", colors=INK_MUTED, labelsize=9)
     ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0, which="major")
@@ -772,7 +829,14 @@ def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, i
         series = coefficients_of_variation(rows_for(id_, rows), f"{id_}_ms")
         if len(series) < 3:
             continue
-        out.append((DISPLAY_NAMES[id_], len(series), float(np.median(series)), float(np.percentile(series, 90))))
+        out.append(
+            (
+                DISPLAY_NAMES[id_],
+                len(series),
+                float(np.median(series)),
+                float(np.percentile(series, 90)),
+            )
+        )
     return out
 
 
@@ -894,7 +958,10 @@ def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] 
 
 
 def write_paper_fragment(
-    rows: list[dict], tools: list[str], accuracy_rows: list[dict] | None, output_path: Path,
+    rows: list[dict],
+    tools: list[str],
+    accuracy_rows: list[dict] | None,
+    output_path: Path,
 ) -> None:
     """Writes the comparison and speed numbers the introductory paper cites as LaTeX macros. See
     this module's doc comment for why this exists and which CSV each half comes from."""
@@ -905,7 +972,9 @@ def write_paper_fragment(
     ]
 
     if accuracy_rows is None:
-        print("note: no benchmark_accuracy.csv - writing speed macros only (run `make benchmark-accuracy`).")
+        print(
+            "note: no benchmark_accuracy.csv - writing speed macros only (run `make benchmark-accuracy`)."
+        )
     else:
         lines.append(f"% Accuracy: {len(accuracy_rows)} fixtures with a human mapping.")
         for id_ in ordered(list(PAPER_MACRO_STEMS)):
@@ -915,7 +984,9 @@ def write_paper_fragment(
             fixtures, mismatches, total = totals
             stem = PAPER_MACRO_STEMS[id_]
             lines.append(f"\\newcommand{{\\{stem}Fixtures}}{{{fixtures}}}")
-            lines.append(f"\\newcommand{{\\{stem}LineMismatches}}{{{mismatches:,}}}".replace(",", "{,}"))
+            lines.append(
+                f"\\newcommand{{\\{stem}LineMismatches}}{{{mismatches:,}}}".replace(",", "{,}")
+            )
             lines.append(f"\\newcommand{{\\{stem}LineRate}}{{{100.0 * mismatches / total:.3f}}}")
 
         shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))
@@ -949,10 +1020,22 @@ def write_paper_fragment(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Compare codediff against other diff tools from benchmark_other.csv.")
-    parser.add_argument("--csv", default="data/comparison/benchmark_other.csv", help="Path to the benchmark CSV (default: data/comparison/benchmark_other.csv)")
-    parser.add_argument("--accuracy-csv", default="data/comparison/benchmark_accuracy.csv", help="Path to the accuracy CSV (default: data/comparison/benchmark_accuracy.csv)")
-    parser.add_argument("--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)")
+    parser = argparse.ArgumentParser(
+        description="Compare codediff against other diff tools from benchmark_other.csv."
+    )
+    parser.add_argument(
+        "--csv",
+        default="data/comparison/benchmark_other.csv",
+        help="Path to the benchmark CSV (default: data/comparison/benchmark_other.csv)",
+    )
+    parser.add_argument(
+        "--accuracy-csv",
+        default="data/comparison/benchmark_accuracy.csv",
+        help="Path to the accuracy CSV (default: data/comparison/benchmark_accuracy.csv)",
+    )
+    parser.add_argument(
+        "--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)"
+    )
     args = parser.parse_args()
 
     csv_path = Path(args.csv)
@@ -987,11 +1070,12 @@ if __name__ == "__main__":
             plots_dir / "benchmark_other_buckets_with_codediff.tex",
             include_codediff=True,
         )
-        write_node_bucket_table(
-            accuracy_rows, plots_dir / "benchmark_other_buckets_node.tex"
-        )
+        write_node_bucket_table(accuracy_rows, plots_dir / "benchmark_other_buckets_node.tex")
         print_bucket_table(accuracy_rows)
 
     write_paper_fragment(
-        rows, tools, accuracy_rows, plots_dir / "variables_comparison.tex",
+        rows,
+        tools,
+        accuracy_rows,
+        plots_dir / "variables_comparison.tex",
     )

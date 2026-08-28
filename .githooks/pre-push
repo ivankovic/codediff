@@ -47,6 +47,16 @@ for features in "" "test-fixtures" "stats"; do
     cargo clippy --tests --features "$features" -- -D warnings
 done
 
+# Skipped rather than failed when ruff isn't installed: this hook is a convenience for whoever has
+# the tools, and CI is the authoritative gate for anyone who doesn't. Same posture as the node
+# check below.
+if command -v ruff >/dev/null 2>&1; then
+    echo "pre-push: ruff check + format --check (research/)"
+    make lint-python
+else
+    echo "pre-push: ruff not found, skipping the research/ Python lint (CI still runs it)"
+fi
+
 if command -v node >/dev/null 2>&1; then
     echo "pre-push: human_mapping site JS tests"
     # Via the Makefile target rather than naming the files, so adding a third test file here is

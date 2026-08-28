@@ -14,7 +14,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-""""Shape" of each human-authored solution in the corpus: for every fixture, what fraction of its
+""" "Shape" of each human-authored solution in the corpus: for every fixture, what fraction of its
 AST nodes are Identical vs. one of the six change operations (Update, MatchButNotIdentical,
 Delete, DeleteWithChildren, Insert, InsertWithChildren), and how do those six break down against
 each other.
@@ -108,15 +108,23 @@ def _int(row: dict, key: str) -> int:
 # rows do not sum to the corpus. `NoShape` is the genuine complement of all four.
 SHAPES = [
     ("Reparent", "wrap/reparent (depth delta 1)", lambda r: _int(r, "depth_delta_1") > 0),
-    ("DeepReparent", "deeper reparent (depth delta 2+)",
-     lambda r: _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") > 0),
+    (
+        "DeepReparent",
+        "deeper reparent (depth delta 2+)",
+        lambda r: _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") > 0,
+    ),
     ("Reorder", "same-kind sibling reorder", lambda r: _int(r, "reorder_signals") > 0),
     ("MultiMap", "human-confirmed ambiguity", lambda r: _int(r, "group_count") > 0),
-    ("NoShape", "none of the above",
-     lambda r: _int(r, "depth_delta_1") == 0
-     and _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") == 0
-     and _int(r, "reorder_signals") == 0
-     and _int(r, "group_count") == 0),
+    (
+        "NoShape",
+        "none of the above",
+        lambda r: (
+            _int(r, "depth_delta_1") == 0
+            and _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") == 0
+            and _int(r, "reorder_signals") == 0
+            and _int(r, "group_count") == 0
+        ),
+    ),
 ]
 
 
@@ -161,6 +169,7 @@ def write_paper_fragment(rows: list[dict], output_path: Path) -> None:
     # and for the no-shape complement, which is the honest counterweight - a third of the remaining
     # error sits in fixtures exhibiting none of these shapes, so no single shape explains it all.
     total_mismatches = sum(_int(r, "current_mismatches") for r in rows)
+
     def any_reparent(r):
         return (
             _int(r, "depth_delta_1") + _int(r, "depth_delta_2") + _int(r, "depth_delta_3plus") > 0
@@ -175,8 +184,10 @@ def write_paper_fragment(rows: list[dict], output_path: Path) -> None:
             f"\\newcommand{{\\Shape{stem}ErrorPct}}{{{100.0 * mass / total_mismatches:.1f}}}",
             f"\\newcommand{{\\Shape{stem}FailingPct}}{{{100.0 * len(failing) / all_failing:.1f}}}",
         ]
-    lines.append(f"\\newcommand{{\\ShapeAnyReparentPct}}{{"
-                 f"{100.0 * sum(1 for r in rows if any_reparent(r)) / len(rows):.1f}}}")
+    lines.append(
+        f"\\newcommand{{\\ShapeAnyReparentPct}}{{"
+        f"{100.0 * sum(1 for r in rows if any_reparent(r)) / len(rows):.1f}}}"
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines) + "\n")
@@ -189,13 +200,19 @@ def write_paper_fragment(rows: list[dict], output_path: Path) -> None:
         if not selected:
             continue
         solved = sum(1 for r in selected if _int(r, "current_mismatches") == 0)
-        print(f"  {label:<32}{len(selected):>10}{100.0 * len(selected) / len(rows):>8.1f}%"
-              f"{100.0 * solved / len(selected):>15.1f}%")
-    print(f"  {'(whole corpus)':<32}{len(rows):>10}{100.0:>8.1f}%{100.0 * solved_all / len(rows):>15.1f}%")
+        print(
+            f"  {label:<32}{len(selected):>10}{100.0 * len(selected) / len(rows):>8.1f}%"
+            f"{100.0 * solved / len(selected):>15.1f}%"
+        )
+    print(
+        f"  {'(whole corpus)':<32}{len(rows):>10}{100.0:>8.1f}%{100.0 * solved_all / len(rows):>15.1f}%"
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--csv", default="data/quality/human_mapping_analysis.csv", type=Path)
     parser.add_argument("--plots-dir", default="plots", type=Path)
     parser.add_argument("--output-png", default="human_mapping_shapes.png")
@@ -213,7 +230,9 @@ def main() -> None:
     rows = [r for r, keep in zip(rows, nonzero) if keep]
     totals = totals[nonzero]
 
-    fractions = {k: np.array([int(r[k]) for r in rows], dtype=float) / totals for k, _, _ in OPERATIONS}
+    fractions = {
+        k: np.array([int(r[k]) for r in rows], dtype=float) / totals for k, _, _ in OPERATIONS
+    }
     density = sum(fractions.values())
 
     order = np.argsort(-density)
@@ -233,7 +252,9 @@ def main() -> None:
     # by density with no such structure - print-only, not plotted, since it's a corpus-wide summary
     # rather than a per-fixture number.
     DOMINANCE_THRESHOLD = 0.6
-    print(f"\nFixtures where one operation is >={DOMINANCE_THRESHOLD:.0%} of the non-Identical mass:")
+    print(
+        f"\nFixtures where one operation is >={DOMINANCE_THRESHOLD:.0%} of the non-Identical mass:"
+    )
     nonzero_density = density_sorted > 0
     for key, label, _ in OPERATIONS:
         share_of_change = np.divide(
@@ -244,7 +265,12 @@ def main() -> None:
     mixed = nonzero_density.sum() - sum(
         int(
             (
-                np.divide(fractions[k], density_sorted, out=np.zeros_like(density_sorted), where=nonzero_density)
+                np.divide(
+                    fractions[k],
+                    density_sorted,
+                    out=np.zeros_like(density_sorted),
+                    where=nonzero_density,
+                )
                 >= DOMINANCE_THRESHOLD
             )[nonzero_density].sum()
         )
@@ -263,9 +289,13 @@ def main() -> None:
     # are dropped rather than plotted as an empty/undefined bar.
     plot_mask = density_sorted > 0
     if (~plot_mask).sum():
-        print(f"\nDropping {(~plot_mask).sum()} zero-density fixture(s) (pure-Identical, nothing to compose) from the plot")
+        print(
+            f"\nDropping {(~plot_mask).sum()} zero-density fixture(s) (pure-Identical, nothing to compose) from the plot"
+        )
     normalized = {
-        key: np.divide(vals, density_sorted, out=np.zeros_like(density_sorted), where=plot_mask)[plot_mask]
+        key: np.divide(vals, density_sorted, out=np.zeros_like(density_sorted), where=plot_mask)[
+            plot_mask
+        ]
         for key, vals in fractions.items()
     }
 
@@ -284,13 +314,18 @@ def main() -> None:
     ax.set_xlim(-0.5, n - 0.5)
     ax.set_ylim(0, 1.0)
     ax.set_xticks([])
-    ax.set_xlabel(f"Fixtures (n={n}), sorted by density of non-Identical AST nodes", fontsize=10.5, color=INK_PRIMARY)
+    ax.set_xlabel(
+        f"Fixtures (n={n}), sorted by density of non-Identical AST nodes",
+        fontsize=10.5,
+        color=INK_PRIMARY,
+    )
     ax.set_ylabel("Share of a fixture's non-Identical AST nodes", fontsize=10.5, color=INK_PRIMARY)
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
     ax.set_title(
         "Shape of human-authored solutions: composition of change per fixture\n"
         "(each bar = 100% of that fixture's changed nodes; Identical excluded; sorted by density, most-changed left)",
-        fontsize=11, color=INK_PRIMARY,
+        fontsize=11,
+        color=INK_PRIMARY,
     )
     ax.grid(axis="y", color=GRIDLINE, zorder=0)
     for spine in ("top", "right"):
@@ -302,7 +337,11 @@ def main() -> None:
     # bars - placed outside the axes instead (`bbox_inches="tight"` on savefig below expands the
     # saved image to include it, rather than clipping it off).
     ax.legend(
-        loc="upper left", bbox_to_anchor=(1.01, 1.0), frameon=False, fontsize=9, labelcolor=INK_SECONDARY
+        loc="upper left",
+        bbox_to_anchor=(1.01, 1.0),
+        frameon=False,
+        fontsize=9,
+        labelcolor=INK_SECONDARY,
     )
 
     args.plots_dir.mkdir(parents=True, exist_ok=True)

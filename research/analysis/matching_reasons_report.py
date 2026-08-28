@@ -48,6 +48,7 @@ Usage (from research/):
     uv run ./analysis/matching_reasons_report.py
     uv run ./analysis/matching_reasons_report.py --csv optimal_solutions_benchmark.csv --plots-dir plots/
 """
+
 import argparse
 import colorsys
 import csv
@@ -123,7 +124,7 @@ def apted_columns(fieldnames: list[str]) -> list[str]:
 
 
 def apted_display_label(column: str) -> str:
-    """"APTED:final_pass" -> "APTED (final_pass)" for the axis tick / legend label."""
+    """ "APTED:final_pass" -> "APTED (final_pass)" for the axis tick / legend label."""
     return f"APTED ({column.split(':', 1)[1]})"
 
 
@@ -177,8 +178,13 @@ def plot_totals(rows: list[dict], columns: list[tuple[str, str, str]], output_pa
 
     for bar, total in zip(bars, totals):
         ax.text(
-            bar.get_x() + bar.get_width() / 2, bar.get_height() + headroom, f"{total:,}",
-            ha="center", va="bottom", fontsize=9, color=INK_SECONDARY,
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + headroom,
+            f"{total:,}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            color=INK_SECONDARY,
         )
 
     ax.set_xticks(x)
@@ -186,7 +192,10 @@ def plot_totals(rows: list[dict], columns: list[tuple[str, str, str]], output_pa
     ax.set_ylabel("Matched node-pairs", fontsize=11, color=INK_SECONDARY)
     ax.set_title(
         "Which pass matched how much of the diff",
-        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+        fontsize=13,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=12,
     )
     ax.tick_params(axis="y", colors=INK_MUTED, labelsize=9)
     ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0)
@@ -200,7 +209,9 @@ def plot_totals(rows: list[dict], columns: list[tuple[str, str, str]], output_pa
     print(f"Plot saved to {output_path}")
 
 
-def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]], output_path: Path) -> None:
+def plot_share_by_fixture(
+    rows: list[dict], columns: list[tuple[str, str, str]], output_path: Path
+) -> None:
     """0-100% stacked bar per fixture: each method's share of that fixture's matches."""
     names = [row["solution"] for row in rows]
     n = len(rows)
@@ -211,9 +222,7 @@ def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]],
 
     x = np.arange(n)
     all_columns = [col for _, _, col in columns] + OTHER_COLUMNS
-    row_totals = np.array(
-        [sum(int(row[c]) for c in all_columns) for row in rows], dtype=float
-    )
+    row_totals = np.array([sum(int(row[c]) for c in all_columns) for row in rows], dtype=float)
 
     bottom = np.zeros(n)
     for label, color, col in columns + [(OTHER_LABEL, OTHER_COLOR, None)]:
@@ -225,8 +234,15 @@ def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]],
             )
         pct = np.divide(counts, row_totals, out=np.zeros(n), where=row_totals > 0) * 100
         ax.bar(
-            x, pct, bottom=bottom, width=0.8, color=color, edgecolor=SURFACE,
-            linewidth=0.5, label=label, zorder=3,
+            x,
+            pct,
+            bottom=bottom,
+            width=0.8,
+            color=color,
+            edgecolor=SURFACE,
+            linewidth=0.5,
+            label=label,
+            zorder=3,
         )
         bottom += pct
 
@@ -234,11 +250,17 @@ def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]],
     ax.set_ylabel("Share of matched node-pairs (%)", fontsize=11, color=INK_SECONDARY)
     ax.set_title(
         "Matching-reason mix per fixture",
-        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+        fontsize=13,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=12,
     )
     ax.set_xticks(x)
     ax.set_xticklabels(
-        [truncate_label(name) for name in names], rotation=90, fontsize=6.5, color=INK_MUTED,
+        [truncate_label(name) for name in names],
+        rotation=90,
+        fontsize=6.5,
+        color=INK_MUTED,
     )
     ax.set_xlim(-0.6, n - 0.4)
     ax.tick_params(axis="y", colors=INK_MUTED, labelsize=9)
@@ -248,8 +270,12 @@ def plot_share_by_fixture(rows: list[dict], columns: list[tuple[str, str, str]],
     ax.spines["bottom"].set_color(BASELINE)
 
     ax.legend(
-        loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=4, frameon=False,
-        fontsize=9, labelcolor=INK_SECONDARY,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncol=4,
+        frameon=False,
+        fontsize=9,
+        labelcolor=INK_SECONDARY,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -263,11 +289,13 @@ if __name__ == "__main__":
         description="Summarise ASTMappingReason totals from optimal_solutions_benchmark.csv."
     )
     parser.add_argument(
-        "--csv", default="data/quality/optimal_solutions_benchmark.csv",
+        "--csv",
+        default="data/quality/optimal_solutions_benchmark.csv",
         help="Path to the benchmark CSV (default: optimal_solutions_benchmark.csv)",
     )
     parser.add_argument(
-        "--plots-dir", default="plots",
+        "--plots-dir",
+        default="plots",
         help="Directory for output PNGs (default: plots/)",
     )
     args = parser.parse_args()

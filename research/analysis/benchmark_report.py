@@ -23,6 +23,7 @@ Usage (from research/):
     uv run ./analysis/benchmark_report.py
     uv run ./analysis/benchmark_report.py --results-dir data/performance/ --plots-dir plots/
 """
+
 import argparse
 import csv
 import re
@@ -34,30 +35,30 @@ from matplotlib import ticker
 
 # Language display order, display names, and hex colours.
 LANG_META = {
-    "rust":        ("Rust",        "#CE422B"),
-    "python":      ("Python",      "#3572A5"),
-    "go":          ("Go",          "#00ADD8"),
-    "kotlin":      ("Kotlin",      "#A97BFF"),
-    "java":        ("Java",        "#B07219"),
-    "javascript":  ("JavaScript",  "#F1E05A"),
-    "typescript":   ("TypeScript",   "#089484"),
-    "c":           ("C",           "#555555"),
-    "cpp":         ("C++",         "#00599C"),
-    "ruby":        ("Ruby",        "#701516"),
-    "php":         ("PHP",         "#4F5D95"),
-    "swift":       ("Swift",       "#FA7343"),
-    "scala":       ("Scala",       "#DC322F"),
-    "lua":         ("Lua",         "#000080"),
-    "tsx":         ("TSX",         "#3178C6"),
-    "csharp":      ("C#",          "#178600"),
-    "css":         ("CSS",         "#663399"),
-    "html":        ("HTML",        "#E34C26"),
-    "json":        ("JSON",        "#292929"),
-    "r":           ("R",           "#198CE7"),
-    "shellscript": ("Shell",       "#89E051"),
-    "vimscript":   ("Vim Script",  "#199F4B"),
-    "xml":         ("XML",         "#0060AC"),
-    "yaml":        ("YAML",        "#CB171E"),
+    "rust": ("Rust", "#CE422B"),
+    "python": ("Python", "#3572A5"),
+    "go": ("Go", "#00ADD8"),
+    "kotlin": ("Kotlin", "#A97BFF"),
+    "java": ("Java", "#B07219"),
+    "javascript": ("JavaScript", "#F1E05A"),
+    "typescript": ("TypeScript", "#089484"),
+    "c": ("C", "#555555"),
+    "cpp": ("C++", "#00599C"),
+    "ruby": ("Ruby", "#701516"),
+    "php": ("PHP", "#4F5D95"),
+    "swift": ("Swift", "#FA7343"),
+    "scala": ("Scala", "#DC322F"),
+    "lua": ("Lua", "#000080"),
+    "tsx": ("TSX", "#3178C6"),
+    "csharp": ("C#", "#178600"),
+    "css": ("CSS", "#663399"),
+    "html": ("HTML", "#E34C26"),
+    "json": ("JSON", "#292929"),
+    "r": ("R", "#198CE7"),
+    "shellscript": ("Shell", "#89E051"),
+    "vimscript": ("Vim Script", "#199F4B"),
+    "xml": ("XML", "#0060AC"),
+    "yaml": ("YAML", "#CB171E"),
 }
 
 
@@ -90,24 +91,45 @@ def compute_stats(rows: list[dict]) -> dict:
     }
     if len(elapsed):
         p50, p75, p90, p99 = np.percentile(elapsed, [50, 75, 90, 99])
-        stats.update({
-            "mean":  elapsed.mean(),
-            "p50":   p50,
-            "p75":   p75,
-            "p90":   p90,
-            "p99":   p99,
-            "max":   elapsed.max(),
-        })
+        stats.update(
+            {
+                "mean": elapsed.mean(),
+                "p50": p50,
+                "p75": p75,
+                "p90": p90,
+                "p99": p99,
+                "max": elapsed.max(),
+            }
+        )
     else:
-        stats.update({"mean": float("nan"), "p50": float("nan"), "p75": float("nan"),
-                      "p90": float("nan"), "p99": float("nan"), "max": float("nan")})
+        stats.update(
+            {
+                "mean": float("nan"),
+                "p50": float("nan"),
+                "p75": float("nan"),
+                "p90": float("nan"),
+                "p99": float("nan"),
+                "max": float("nan"),
+            }
+        )
     return stats
 
 
 def print_table(results: list[tuple[str, str, dict]]) -> None:
     """Print a fixed-width percentile table to stdout."""
-    col_w = {"lang": 8, "ok": 6, "skip": 7, "tout": 7, "panic": 6,
-              "mean": 9, "p50": 8, "p75": 8, "p90": 9, "p99": 10, "max": 10}
+    col_w = {
+        "lang": 8,
+        "ok": 6,
+        "skip": 7,
+        "tout": 7,
+        "panic": 6,
+        "mean": 9,
+        "p50": 8,
+        "p75": 8,
+        "p90": 9,
+        "p99": 10,
+        "max": 10,
+    }
 
     def row(lang, ok, skip, tout, panic, mean, p50, p75, p90, p99, mx):
         return (
@@ -117,21 +139,43 @@ def print_table(results: list[tuple[str, str, dict]]) -> None:
             f"  {p90:>{col_w['p90']}}  {p99:>{col_w['p99']}}  {mx:>{col_w['max']}}"
         )
 
-    header = row("Language", "ok", "skipped", "timeout", "panic",
-                 "mean(ms)", "p50(ms)", "p75(ms)", "p90(ms)", "p99(ms)", "max(ms)")
+    header = row(
+        "Language",
+        "ok",
+        "skipped",
+        "timeout",
+        "panic",
+        "mean(ms)",
+        "p50(ms)",
+        "p75(ms)",
+        "p90(ms)",
+        "p99(ms)",
+        "max(ms)",
+    )
     sep = "-" * len(header)
     print(sep)
     print(header)
     print(sep)
     for _key, display_name, s in results:
+
         def fmt(v):
             return f"{v:,.0f}" if not np.isnan(v) else "—"
-        print(row(
-            display_name,
-            f"{s['n_ok']:,}", f"{s['n_skipped']:,}", f"{s['n_timeout']:,}", f"{s['n_panicked']:,}",
-            fmt(s["mean"]), fmt(s["p50"]), fmt(s["p75"]), fmt(s["p90"]),
-            fmt(s["p99"]), fmt(s["max"]),
-        ))
+
+        print(
+            row(
+                display_name,
+                f"{s['n_ok']:,}",
+                f"{s['n_skipped']:,}",
+                f"{s['n_timeout']:,}",
+                f"{s['n_panicked']:,}",
+                fmt(s["mean"]),
+                fmt(s["p50"]),
+                fmt(s["p75"]),
+                fmt(s["p90"]),
+                fmt(s["p99"]),
+                fmt(s["max"]),
+            )
+        )
     print(sep)
 
 
@@ -147,23 +191,30 @@ def plot_ecdf(results: list[tuple[str, str, dict]], output_path: Path) -> None:
         color = LANG_META.get(lang_key, (display_name, "#888888"))[1]
         sorted_ms = np.sort(elapsed)
         y = np.arange(1, len(sorted_ms) + 1) / len(sorted_ms)
-        ax.step(sorted_ms, y, where="post", label=display_name,
-                color=color, linewidth=2)
+        ax.step(sorted_ms, y, where="post", label=display_name, color=color, linewidth=2)
 
     # Horizontal guide lines at p50 and p90, labelled via axes-fraction x-coordinate
     for pct, ls in ((50, "--"), (90, ":")):
         ax.axhline(pct / 100, color="black", linewidth=0.7, linestyle=ls, alpha=0.35)
-        ax.text(0.01, pct / 100 + 0.015, f"p{pct}",
-                transform=ax.transAxes, fontsize=8, color="black", alpha=0.55,
-                va="bottom")
+        ax.text(
+            0.01,
+            pct / 100 + 0.015,
+            f"p{pct}",
+            transform=ax.transAxes,
+            fontsize=8,
+            color="black",
+            alpha=0.55,
+            va="bottom",
+        )
 
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(
-        lambda x, _: f"{x:,.0f}" if x >= 1 else f"{x:.1f}"
-    ))
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(lambda x, _: f"{x:,.0f}" if x >= 1 else f"{x:.1f}")
+    )
     ax.set_xlabel("diff_code elapsed time (ms, log scale)", fontsize=12)
     ax.set_ylabel("Fraction of pairs ≤ x", fontsize=12)
-    ax.set_title("diff_code timing distribution by language (ok pairs, 16k node limit)",
-                 fontsize=13)
+    ax.set_title(
+        "diff_code timing distribution by language (ok pairs, 16k node limit)", fontsize=13
+    )
     ax.legend(fontsize=11)
     ax.grid(True, which="both", alpha=0.2)
     ax.set_ylim(0, 1.05)
@@ -179,11 +230,13 @@ if __name__ == "__main__":
         description="Summarise benchmark_diff_pairs results across languages."
     )
     parser.add_argument(
-        "--results-dir", default="data/performance",
+        "--results-dir",
+        default="data/performance",
         help="Directory containing benchmark_<language>.csv files (default: data/performance/)",
     )
     parser.add_argument(
-        "--plots-dir", default="plots",
+        "--plots-dir",
+        default="plots",
         help="Directory for output PNG (default: plots/)",
     )
     args = parser.parse_args()
@@ -195,8 +248,10 @@ if __name__ == "__main__":
     order = list(LANG_META.keys())
     csv_files = sorted(
         results_dir.glob("benchmark_*.csv"),
-        key=lambda p: (order.index(lang_key_from_path(p))
-                       if lang_key_from_path(p) in order else 99, p.name),
+        key=lambda p: (
+            order.index(lang_key_from_path(p)) if lang_key_from_path(p) in order else 99,
+            p.name,
+        ),
     )
 
     if not csv_files:

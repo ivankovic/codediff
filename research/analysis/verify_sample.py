@@ -63,11 +63,15 @@ def resolves(repo_path, commit):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv_path", help="sample CSV from sample_code_pairs")
-    parser.add_argument("--repo-root", required=True, help="checkout root the sample is measured against")
     parser.add_argument(
-        "--max-unresolved-pct", type=float, default=0.0,
+        "--repo-root", required=True, help="checkout root the sample is measured against"
+    )
+    parser.add_argument(
+        "--max-unresolved-pct",
+        type=float,
+        default=0.0,
         help="tolerated percentage of unresolvable pairs (default 0: a freshly drawn sample "
-             "should resolve completely, and anything else means the corpus moved under it)",
+        "should resolve completely, and anything else means the corpus moved under it)",
     )
     args = parser.parse_args()
 
@@ -80,16 +84,15 @@ def main():
     # One check per (repository, commit), not per row: a commit typically appears in several rows
     # (one per changed path), and git process startup dominates this loop.
     commits = {(r["repository"], r["commit"]) for r in rows}
-    cache = {
-        key: resolves(os.path.join(args.repo_root, key[0]), key[1])
-        for key in sorted(commits)
-    }
+    cache = {key: resolves(os.path.join(args.repo_root, key[0]), key[1]) for key in sorted(commits)}
 
     unresolved = [r for r in rows if not cache[(r["repository"], r["commit"])]]
     pct = 100.0 * len(unresolved) / len(rows)
 
-    print(f"{args.csv_path}: {len(rows)} pairs, {len(commits)} distinct commits, "
-          f"{len({r['repository'] for r in rows})} repositories")
+    print(
+        f"{args.csv_path}: {len(rows)} pairs, {len(commits)} distinct commits, "
+        f"{len({r['repository'] for r in rows})} repositories"
+    )
     print(f"unresolved: {len(unresolved)} pairs ({pct:.2f}%)")
 
     # Per-repository, because that is the shape the failure took last time and an aggregate
@@ -105,7 +108,9 @@ def main():
     print("\nper-(language, bucket) cell counts:")
     cells = collections.Counter((r["language"], r["size_bucket"]) for r in rows)
     languages = sorted({r["language"] for r in rows})
-    buckets = sorted({r["size_bucket"] for r in rows}, key=lambda b: int(b.split("-")[0].rstrip("+")))
+    buckets = sorted(
+        {r["size_bucket"] for r in rows}, key=lambda b: int(b.split("-")[0].rstrip("+"))
+    )
     header = f"  {'language':<14}" + "".join(f"{b:>11}" for b in buckets)
     print(header)
     for language in languages:
@@ -114,15 +119,21 @@ def main():
 
     empty = [(lang, b) for lang in languages for b in buckets if cells[(lang, b)] == 0]
     if empty:
-        print(f"\n{len(empty)} empty cells (no such pairs exist in the corpus, not an error): "
-              f"{', '.join(f'{lang}/{bucket}' for lang, bucket in empty[:12])}"
-              f"{' ...' if len(empty) > 12 else ''}")
+        print(
+            f"\n{len(empty)} empty cells (no such pairs exist in the corpus, not an error): "
+            f"{', '.join(f'{lang}/{bucket}' for lang, bucket in empty[:12])}"
+            f"{' ...' if len(empty) > 12 else ''}"
+        )
 
     if pct > args.max_unresolved_pct:
-        print(f"\nFAIL: {pct:.2f}% unresolved exceeds the {args.max_unresolved_pct:.2f}% threshold.",
-              file=sys.stderr)
-        print("Do not measure against this sample - re-fetch the corpus and re-draw it.",
-              file=sys.stderr)
+        print(
+            f"\nFAIL: {pct:.2f}% unresolved exceeds the {args.max_unresolved_pct:.2f}% threshold.",
+            file=sys.stderr,
+        )
+        print(
+            "Do not measure against this sample - re-fetch the corpus and re-draw it.",
+            file=sys.stderr,
+        )
         return 1
 
     print("\nOK: every sampled pair resolves against the checkouts.")

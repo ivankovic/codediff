@@ -73,11 +73,12 @@ diff-inventory:
 # `make lint` covers everything CI lints from one place; the rule set itself is pinned in
 # research/pyproject.toml (see that file for why it is pinned rather than left on ruff's defaults).
 #
-# `ruff check` only, deliberately not `ruff format --check`: adopting the formatter would rewrite 12
-# of the 14 analysis scripts in one go, which is a separate decision from "these should be linted at
-# all" and would bury the next real diff of any of them under a reformat.
+# Two passes, mirroring the shape the Rust side already has (`cargo fmt --check` and clippy as
+# separate CI jobs): the formatter decides layout, the linter decides everything else. Width is set
+# to 100 in research/pyproject.toml to match what these scripts were already written to.
 lint-python:
 	ruff check research
+	ruff format --check research
 
 QUALITY_BASELINE := research/data/quality/quality_baseline.csv
 RUNTIME_BASELINE := research/data/quality/quality_baseline.txt

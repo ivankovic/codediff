@@ -89,9 +89,7 @@ def load_data(db_path):
     # Add filename column
     df = df.with_columns(pl.col("path").str.split("/").list.last().alias("filename"))
     # Add extension column
-    df = df.with_columns(
-        pl.col("filename").str.split(".").list.last().alias("extension")
-    )
+    df = df.with_columns(pl.col("filename").str.split(".").list.last().alias("extension"))
 
     # Add category column from tip
     df = df.with_columns(
@@ -321,11 +319,7 @@ def compute_full_dataset_stats(df):
         (project_count, file_count) - repository count and total file count, every category
     """
     # Compute extra columns
-    tip_counts = (
-        df.group_by("category")
-        .agg(pl.len().alias("count"))
-        .sort("count", descending=True)
-    )
+    tip_counts = df.group_by("category").agg(pl.len().alias("count")).sort("count", descending=True)
     print("Type counts:")
     print(tip_counts)
 
@@ -401,9 +395,9 @@ def compute_code_only_stats(df):
     # count, which only happens to land on the right number because "language" alphabetically
     # sorts first among language_agg's two columns - fragile, and one column reorder away from
     # silently printing the wrong count).
-    language_count = df.filter(pl.col("language").is_not_null()).select(
-        pl.col("language").n_unique()
-    ).item()
+    language_count = (
+        df.filter(pl.col("language").is_not_null()).select(pl.col("language").n_unique()).item()
+    )
     print(f"Languages: {language_count}")
     pdf_sorted = pdf.sort_values("count", ascending=False)
 
@@ -469,9 +463,7 @@ def compute_code_only_stats(df):
     plt.close()
 
     # Export percentiles to CSV
-    export_percentiles_to_csv(
-        df, ["bytes", "ast_nodes", "lines_of_code"], "code_percentiles.csv"
-    )
+    export_percentiles_to_csv(df, ["bytes", "ast_nodes", "lines_of_code"], "code_percentiles.csv")
 
     return language_count, bytes_percentiles, loc_percentiles, ast_percentiles, correlation
 
@@ -479,9 +471,7 @@ def compute_code_only_stats(df):
 # Main execution
 if __name__ == "__main__":
     # Get database path from command line argument or use default
-    db_path = (
-        sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
-    )
+    db_path = sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/tiny/stats.sqlite"
 
     os.makedirs("plots", exist_ok=True)
 

@@ -57,6 +57,7 @@ Usage (from research/):
     uv run ./analysis/optimal_solutions_benchmark_report.py
     uv run ./analysis/optimal_solutions_benchmark_report.py --csv optimal_solutions_benchmark.csv --plots-dir plots/
 """
+
 import argparse
 import csv
 from pathlib import Path
@@ -121,7 +122,10 @@ def plot_runtime_histogram(rows: list[dict], output_path: Path) -> None:
     ax.set_ylabel("Number of fixtures", fontsize=11, color=INK_SECONDARY)
     ax.set_title(
         f"CodeDiff runtime distribution across the optimal_solutions corpus ({len(elapsed)} fixtures)",
-        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+        fontsize=13,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=12,
     )
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     style_axes(ax)
@@ -129,8 +133,12 @@ def plot_runtime_histogram(rows: list[dict], output_path: Path) -> None:
     median = float(np.median(elapsed))
     ax.axvline(median, color=INK_PRIMARY, linestyle="--", linewidth=1.2, zorder=4)
     ax.text(
-        median, ax.get_ylim()[1] * 0.97, f" median {median:.2f} ms", color=INK_PRIMARY,
-        fontsize=9.5, va="top",
+        median,
+        ax.get_ylim()[1] * 0.97,
+        f" median {median:.2f} ms",
+        color=INK_PRIMARY,
+        fontsize=9.5,
+        va="top",
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,7 +188,8 @@ def plot_runtime_vs_nodes(rows: list[dict], output_path: Path) -> None:
     elapsed = np.array([float(r["elapsed_ms"]) for r in scoped], dtype=float)
     mask = (nodes > 0) & (elapsed > 0)
     plot_scatter(
-        nodes[mask], elapsed[mask],
+        nodes[mask],
+        elapsed[mask],
         "Combined AST nodes (before + after, log scale)",
         "diff_code elapsed time (ms, log scale)",
         f"Runtime vs input size ({int(mask.sum())} solved fixtures)",
@@ -193,7 +202,8 @@ def plot_runtime_vs_diff_size(rows: list[dict], output_path: Path) -> None:
     elapsed = np.array([float(r["elapsed_ms"]) for r in rows], dtype=float)
     mask = (cost > 0) & (elapsed > 0)
     plot_scatter(
-        cost[mask], elapsed[mask],
+        cost[mask],
+        elapsed[mask],
         "CodeDiff's own edit-script cost (log scale)",
         "diff_code elapsed time (ms, log scale)",
         f"Runtime vs diff size ({int(mask.sum())} of {len(rows)} fixtures)",
@@ -208,7 +218,8 @@ def plot_mismatches_vs_nodes(rows: list[dict], output_path: Path) -> None:
     mask = nodes > 0
     zero_count = int((mismatches[mask] == 0).sum())
     plot_scatter(
-        nodes[mask], mismatches[mask],
+        nodes[mask],
+        mismatches[mask],
         "Combined AST nodes (before + after, log scale)",
         "Mismatches vs the human-authored mapping (0, then log scale)",
         f"Accuracy vs input size ({len(scoped)} solved fixtures - {zero_count} match exactly)",
@@ -238,10 +249,23 @@ def plot_mismatches_vs_visible(rows: list[dict], output_path: Path) -> None:
 
     zero_zero = int(counts.get((0, 0), 0))
     nonzero_mask = mismatches > 0
-    mean_share = float(np.mean(visible[nonzero_mask] / mismatches[nonzero_mask])) if nonzero_mask.any() else float("nan")
+    mean_share = (
+        float(np.mean(visible[nonzero_mask] / mismatches[nonzero_mask]))
+        if nonzero_mask.any()
+        else float("nan")
+    )
 
     fig, ax = plt.subplots(figsize=(9, 7), facecolor=SURFACE)
-    ax.scatter(pts_x, pts_y, s=sizes, alpha=0.6, color=CODEDIFF_COLOR, edgecolor=SURFACE, linewidth=0.6, zorder=3)
+    ax.scatter(
+        pts_x,
+        pts_y,
+        s=sizes,
+        alpha=0.6,
+        color=CODEDIFF_COLOR,
+        edgecolor=SURFACE,
+        linewidth=0.6,
+        zorder=3,
+    )
 
     diag_max = float(max(mismatches.max(), visible.max())) if len(scoped) else 1.0
     ax.plot([0, diag_max], [0, diag_max], color=INK_MUTED, linestyle="--", linewidth=1.2, zorder=2)
@@ -250,17 +274,28 @@ def plot_mismatches_vs_visible(rows: list[dict], output_path: Path) -> None:
     if zero_zero:
         ax.annotate(
             f"{zero_zero} fixtures match exactly",
-            xy=(0, 0), xytext=(diag_max * 0.12, diag_max * 0.05),
-            fontsize=9, color=INK_SECONDARY,
+            xy=(0, 0),
+            xytext=(diag_max * 0.12, diag_max * 0.05),
+            fontsize=9,
+            color=INK_SECONDARY,
             arrowprops={"arrowstyle": "-", "color": INK_MUTED, "linewidth": 0.8},
         )
 
-    ax.set_xlabel("Total mismatches vs the human-authored mapping", fontsize=11, color=INK_SECONDARY)
-    ax.set_ylabel("Visible mismatches (rendered in codediff's own diff output)", fontsize=11, color=INK_SECONDARY)
+    ax.set_xlabel(
+        "Total mismatches vs the human-authored mapping", fontsize=11, color=INK_SECONDARY
+    )
+    ax.set_ylabel(
+        "Visible mismatches (rendered in codediff's own diff output)",
+        fontsize=11,
+        color=INK_SECONDARY,
+    )
     ax.set_title(
         f"How much of a mismatch is visible? ({len(scoped)} solved fixtures, "
         f"mean visible share {mean_share:.0%} among the {int(nonzero_mask.sum())} with any mismatch)",
-        fontsize=13, color=INK_PRIMARY, loc="left", pad=12,
+        fontsize=13,
+        color=INK_PRIMARY,
+        loc="left",
+        pad=12,
     )
     ax.set_xlim(left=-diag_max * 0.02)
     ax.set_ylim(bottom=-diag_max * 0.02)
@@ -277,10 +312,13 @@ if __name__ == "__main__":
         description="CodeDiff's own performance/accuracy characteristics from optimal_solutions_benchmark.csv."
     )
     parser.add_argument(
-        "--csv", default="data/quality/optimal_solutions_benchmark.csv",
+        "--csv",
+        default="data/quality/optimal_solutions_benchmark.csv",
         help="Path to the benchmark CSV (default: optimal_solutions_benchmark.csv)",
     )
-    parser.add_argument("--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)")
+    parser.add_argument(
+        "--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)"
+    )
     args = parser.parse_args()
 
     csv_path = Path(args.csv)
@@ -297,7 +335,9 @@ if __name__ == "__main__":
 
     if "elapsed_ms" not in (rows[0] if rows else {}):
         print("This CSV has no 'elapsed_ms' column - regenerate it with a build that includes")
-        print("benchmark_optimal_solutions.rs's elapsed_ms_for timing (see this script's own doc comment).")
+        print(
+            "benchmark_optimal_solutions.rs's elapsed_ms_for timing (see this script's own doc comment)."
+        )
         raise SystemExit(1)
 
     plots_dir = Path(args.plots_dir)
@@ -307,7 +347,11 @@ if __name__ == "__main__":
     plot_mismatches_vs_nodes(rows, plots_dir / "optimal_solutions_mismatches_vs_nodes.png")
 
     if "visible_mismatches" not in (rows[0] if rows else {}):
-        print("This CSV has no 'visible_mismatches' column - skipping optimal_solutions_mismatches_vs_visible.png.")
-        print("Regenerate with a build that includes the visible-mismatch measurement (see this script's own doc comment).")
+        print(
+            "This CSV has no 'visible_mismatches' column - skipping optimal_solutions_mismatches_vs_visible.png."
+        )
+        print(
+            "Regenerate with a build that includes the visible-mismatch measurement (see this script's own doc comment)."
+        )
     else:
         plot_mismatches_vs_visible(rows, plots_dir / "optimal_solutions_mismatches_vs_visible.png")

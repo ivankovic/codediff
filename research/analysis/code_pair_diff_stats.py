@@ -114,7 +114,9 @@ def describe(name, values):
 
     print(f"{name}:")
     print(f"  n={described.nobs}  mean={described.mean:.1f}  std={described.variance**0.5:.1f}")
-    print(f"  skew={stats.skew(arr):.2f}  p50={p50:.0f}  p90={p90:.0f}  p99={p99:.0f}  max={arr.max():.0f}")
+    print(
+        f"  skew={stats.skew(arr):.2f}  p50={p50:.0f}  p90={p90:.0f}  p99={p99:.0f}  max={arr.max():.0f}"
+    )
 
     return arr
 
@@ -130,7 +132,9 @@ def plot_log_distribution(arr, title, xlabel, output_path):
     plt.hist(positive, bins=bins, density=True, edgecolor="black", alpha=0.7, label="observed")
 
     x = np.logspace(np.log10(positive.min()), np.log10(positive.max()), 200)
-    plt.plot(x, stats.lognorm.pdf(x, shape, loc, scale), "r--", label=f"lognormal fit (σ={shape:.2f})")
+    plt.plot(
+        x, stats.lognorm.pdf(x, shape, loc, scale), "r--", label=f"lognormal fit (σ={shape:.2f})"
+    )
 
     plt.xscale("log")
     plt.title(title)

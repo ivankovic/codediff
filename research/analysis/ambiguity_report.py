@@ -103,7 +103,10 @@ def _log_dates(root: Path) -> tuple[dict[str, str], dict[str, str]]:
     """
     out = subprocess.run(
         ["git", "log", "--format=@@%ad", "--date=short", "--name-only", "--", DIFFS_ROOT],
-        capture_output=True, text=True, cwd=root, check=True,
+        capture_output=True,
+        text=True,
+        cwd=root,
+        check=True,
     ).stdout
     newest: dict[str, str] = {}
     oldest: dict[str, str] = {}
@@ -125,7 +128,11 @@ def derive_eras(root: Path, names: set[str]) -> dict[str, str]:
     denominator of the paper's headline rate - on a data gap rather than on a measurement.
     """
     tracked = subprocess.run(
-        ["git", "ls-files", DIFFS_ROOT], capture_output=True, text=True, cwd=root, check=True,
+        ["git", "ls-files", DIFFS_ROOT],
+        capture_output=True,
+        text=True,
+        cwd=root,
+        check=True,
     ).stdout.split()
     mappings = [p for p in tracked if p.endswith("human_mapping.json")]
     newest, oldest = _log_dates(root)
@@ -168,8 +175,10 @@ def load_or_record_eras(root: Path, names: set[str], cache_path: Path, refresh: 
     if missing or refresh:
         derived = derive_eras(root, names if refresh else set(missing))
         if missing and not refresh:
-            print(f"note: {len(missing)} fixture(s) not in {cache_path.name}; classifying from "
-                  f"git history and appending")
+            print(
+                f"note: {len(missing)} fixture(s) not in {cache_path.name}; classifying from "
+                f"git history and appending"
+            )
         recorded.update(derived)
         rows = sorted((n, e) for n, e in recorded.items() if n in names)
         with open(cache_path, "w", newline="") as f:
@@ -182,7 +191,11 @@ def load_or_record_eras(root: Path, names: set[str], cache_path: Path, refresh: 
 def read_groups(root: Path, names: set[str]) -> dict[str, list[dict]]:
     """Fixture name -> its `groups` list (possibly empty), for every in-scope fixture."""
     tracked = subprocess.run(
-        ["git", "ls-files", DIFFS_ROOT], capture_output=True, text=True, cwd=root, check=True,
+        ["git", "ls-files", DIFFS_ROOT],
+        capture_output=True,
+        text=True,
+        cwd=root,
+        check=True,
     ).stdout.split()
     out = {}
     for path in tracked:
@@ -218,13 +231,14 @@ def paired_decisions(csv_path: Path, names: set[str]) -> int:
         )
 
 
-def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str],
-              paired: int) -> dict:
+def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str], paired: int) -> dict:
     """Every number the paper's RQ3 quotes, in one dict."""
     names = sorted(groups_by_fixture)
     with_groups = [n for n in names if groups_by_fixture[n]]
 
-    by_era = {era: [n for n in names if eras.get(n) == era] for era in ("pre", "fresh", "revisited")}
+    by_era = {
+        era: [n for n in names if eras.get(n) == era] for era in ("pre", "fresh", "revisited")
+    }
     era_rates = {
         era: (len([n for n in members if groups_by_fixture[n]]), len(members))
         for era, members in by_era.items()
@@ -232,9 +246,7 @@ def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str],
 
     all_groups = [g for n in with_groups for g in groups_by_fixture[n]]
     sizes = [max(len(g["before_paths"]), len(g["after_paths"])) for g in all_groups]
-    shapes = Counter(
-        (len(g["before_paths"]), len(g["after_paths"])) for g in all_groups
-    )
+    shapes = Counter((len(g["before_paths"]), len(g["after_paths"])) for g in all_groups)
     # The dominant shape family: N candidates on one side, N-1 or fewer on the other, at the
     # smallest size - one of two interchangeable nodes surviving, or one being added to a pair.
     minority = shapes[(2, 1)] + shapes[(1, 2)]
@@ -243,9 +255,7 @@ def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str],
     # own pairing decisions have no unique answer. `min(N, M)` is exactly how many pairs a group
     # asserts (see MultiMapGroup), and those pairs are not in `paired` - groups are counted
     # separately from `entries` - so the denominator is the sum, not `paired` alone.
-    ambiguous_pairs = sum(
-        min(len(g["before_paths"]), len(g["after_paths"])) for g in all_groups
-    )
+    ambiguous_pairs = sum(min(len(g["before_paths"]), len(g["after_paths"])) for g in all_groups)
 
     return {
         "paired_decisions": paired + ambiguous_pairs,
@@ -261,8 +271,8 @@ def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str],
         "size_median": statistics.median(sizes) if sizes else 0,
         "size_max": max(sizes) if sizes else 0,
         "unequal_pct": pct(
-            sum(1 for g in all_groups
-                if len(g["before_paths"]) != len(g["after_paths"])), len(all_groups)
+            sum(1 for g in all_groups if len(g["before_paths"]) != len(g["after_paths"])),
+            len(all_groups),
         ),
         "minority_pct": pct(minority, len(all_groups)),
         "max_groups_in_fixture": max((len(groups_by_fixture[n]) for n in with_groups), default=0),
@@ -328,20 +338,24 @@ def main() -> None:
     here = Path(__file__).resolve().parent
     root = repo_root(here)
     parser.add_argument(
-        "--csv", type=Path,
+        "--csv",
+        type=Path,
         default=root / "research/data/quality/human_mapping_analysis.csv",
         help="defines which fixtures are in scope (Section 5's corpus state)",
     )
     parser.add_argument("--plots-dir", type=Path, default=root / "research/plots")
     parser.add_argument(
-        "--eras", type=Path, default=root / "research/data/quality/ambiguity_eras.csv",
+        "--eras",
+        type=Path,
+        default=root / "research/data/quality/ambiguity_eras.csv",
         help="committed record of each fixture's annotation era (see load_or_record_eras)",
     )
     parser.add_argument(
-        "--refresh-eras", action="store_true",
+        "--refresh-eras",
+        action="store_true",
         help="re-derive every fixture's era from git history, overwriting the record. Changes the "
-             "paper's headline rate whenever src/test/data/diffs/ has been touched since - only "
-             "use this deliberately.",
+        "paper's headline rate whenever src/test/data/diffs/ has been touched since - only "
+        "use this deliberately.",
     )
     args = parser.parse_args()
 
@@ -349,29 +363,41 @@ def main() -> None:
     groups_by_fixture = read_groups(root, names)
     missing = names - set(groups_by_fixture)
     if missing:
-        print(f"warning: {len(missing)} fixture(s) in the CSV have no tracked mapping file: "
-              f"{sorted(missing)[:5]}")
+        print(
+            f"warning: {len(missing)} fixture(s) in the CSV have no tracked mapping file: "
+            f"{sorted(missing)[:5]}"
+        )
     in_scope = set(groups_by_fixture)
     eras = load_or_record_eras(root, in_scope, args.eras, args.refresh_eras)
     s = summarize(groups_by_fixture, eras, paired_decisions(args.csv, in_scope))
 
     print(f"=== Ground-truth ambiguity, {s['scored']} fixtures in scope ===")
-    print(f"Fixtures with >=1 multi-map group: {s['any_fixtures']} ({s['any_pct']:.1f}%) "
-          f"- corpus-wide, a floor")
+    print(
+        f"Fixtures with >=1 multi-map group: {s['any_fixtures']} ({s['any_pct']:.1f}%) "
+        f"- corpus-wide, a floor"
+    )
     print(f"\nBy annotation era (groups landed {GROUPS_LANDED}):")
     for era in ("pre", "fresh", "revisited"):
         with_g, total = s["era_rates"][era]
         print(f"  {era:<10} {with_g:>3}/{total:<3} ({pct(with_g, total):5.1f}%)")
-    print(f"\nGroups: {s['groups']} total, {s['with_children']} with_children, "
-          f"{s['op_identical']} identical / {s['op_match']} match-but-not-identical")
-    print(f"Size max(before, after): median {s['size_median']}, max {s['size_max']}; "
-          f"{s['unequal_pct']:.1f}% have unequal sides")
-    print("Most common shapes (before -> after): "
-          + ", ".join(f"{b}->{a}: {n}" for (b, a), n in s["shapes"].most_common(6)))
+    print(
+        f"\nGroups: {s['groups']} total, {s['with_children']} with_children, "
+        f"{s['op_identical']} identical / {s['op_match']} match-but-not-identical"
+    )
+    print(
+        f"Size max(before, after): median {s['size_median']}, max {s['size_max']}; "
+        f"{s['unequal_pct']:.1f}% have unequal sides"
+    )
+    print(
+        "Most common shapes (before -> after): "
+        + ", ".join(f"{b}->{a}: {n}" for (b, a), n in s["shapes"].most_common(6))
+    )
     print(f"Most groups in one fixture: {s['max_groups_in_fixture']}")
-    print(f"Pair-weighted: {s['ambiguous_pairs']} of {s['paired_decisions']} non-identical "
-          f"pairings have no unique partner "
-          f"({pct(s['ambiguous_pairs'], s['paired_decisions']):.1f}%)")
+    print(
+        f"Pair-weighted: {s['ambiguous_pairs']} of {s['paired_decisions']} non-identical "
+        f"pairings have no unique partner "
+        f"({pct(s['ambiguous_pairs'], s['paired_decisions']):.1f}%)"
+    )
 
     write_paper_fragment(s, args.plots_dir / "variables_ambiguity.tex")
 

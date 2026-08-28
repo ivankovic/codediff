@@ -276,47 +276,78 @@ RQ_ONE_MACROS = [
 # halves under different stems - `GumTree*` for its accuracy row, `SpeedGumTreeCold*`/
 # `SpeedGumTreeWarm*` for its two timing series - which is why this list is written out per half
 # rather than as one product over a single tool list.
-COMPARISON_MACROS = [
-    f"{tool}{suffix}"
-    for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
-    for suffix in ("Fixtures", "LineMismatches", "LineRate")
-] + ["CommonFixtures"] + [
-    f"Common{tool}LineRate"
-    for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
-] + [
-    f"Speed{tool}{suffix}"
-    for tool in ("CodeDiff", "UnixDiff", "GumTreeCold", "GumTreeWarm", "Difftastic", "Diffsitter")
-    for suffix in ("PFifty", "PNinety", "PNinetyNine")
-]
+COMPARISON_MACROS = (
+    [
+        f"{tool}{suffix}"
+        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+        for suffix in ("Fixtures", "LineMismatches", "LineRate")
+    ]
+    + ["CommonFixtures"]
+    + [
+        f"Common{tool}LineRate"
+        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+    ]
+    + [
+        f"Speed{tool}{suffix}"
+        for tool in (
+            "CodeDiff",
+            "UnixDiff",
+            "GumTreeCold",
+            "GumTreeWarm",
+            "Difftastic",
+            "Diffsitter",
+        )
+        for suffix in ("PFifty", "PNinety", "PNinetyNine")
+    ]
+)
 
 # Every macro the ambiguity fragment (ambiguity_report.py's write_paper_fragment) is expected to
 # define: RQ3's prevalence of ground-truth ambiguity, split by annotation era, plus the shape of
 # the ambiguous cases themselves. No diffing tool appears in any of these - RQ3 is a property of
 # the corpus alone.
 AMBIGUITY_MACROS = [
-    "AmbiguityScored", "AmbiguityAnyFixtures", "AmbiguityAnyPct",
-    "AmbiguityFreshFixtures", "AmbiguityFreshScored", "AmbiguityFreshPct",
-    "AmbiguityPreFixtures", "AmbiguityPreWith", "AmbiguityPrePct",
-    "AmbiguityRevisitedFixtures", "AmbiguityRevisitedWith", "AmbiguityRevisitedPct",
-    "AmbiguityGroups", "AmbiguityGroupsWithChildren",
-    "AmbiguityIdenticalGroups", "AmbiguityMatchGroups",
-    "AmbiguityGroupSizeMedian", "AmbiguityGroupSizeMax",
-    "AmbiguityUnequalPct", "AmbiguityMinorityPct", "AmbiguityMaxGroupsInFixture",
-    "AmbiguityPairs", "AmbiguityPairedDecisions", "AmbiguityPairsPct",
+    "AmbiguityScored",
+    "AmbiguityAnyFixtures",
+    "AmbiguityAnyPct",
+    "AmbiguityFreshFixtures",
+    "AmbiguityFreshScored",
+    "AmbiguityFreshPct",
+    "AmbiguityPreFixtures",
+    "AmbiguityPreWith",
+    "AmbiguityPrePct",
+    "AmbiguityRevisitedFixtures",
+    "AmbiguityRevisitedWith",
+    "AmbiguityRevisitedPct",
+    "AmbiguityGroups",
+    "AmbiguityGroupsWithChildren",
+    "AmbiguityIdenticalGroups",
+    "AmbiguityMatchGroups",
+    "AmbiguityGroupSizeMedian",
+    "AmbiguityGroupSizeMax",
+    "AmbiguityUnequalPct",
+    "AmbiguityMinorityPct",
+    "AmbiguityMaxGroupsInFixture",
+    "AmbiguityPairs",
+    "AmbiguityPairedDecisions",
+    "AmbiguityPairsPct",
 ]
 
 # Every macro the change-shape fragment (human_mapping_shapes_report.py's write_paper_fragment) is
 # expected to define: the corpus-wide fixture count and solve rate, plus prevalence and solve rate
 # for each shape RQ3 asks about. Shape stems mirror that script's own SHAPES list.
-SHAPE_MACROS = ["ShapeFixtures", "ShapeAllSolvedPct", "ShapeAnyReparentPct"] + [
-    f"Shape{stem}{suffix}"
-    for stem in ("Reparent", "DeepReparent", "Reorder", "MultiMap", "NoShape")
-    for suffix in ("Fixtures", "Pct", "SolvedPct")
-] + [
-    f"Shape{stem}{suffix}"
-    for stem in ("AnyReparent", "NoShape")
-    for suffix in ("ErrorPct", "FailingPct")
-]
+SHAPE_MACROS = (
+    ["ShapeFixtures", "ShapeAllSolvedPct", "ShapeAnyReparentPct"]
+    + [
+        f"Shape{stem}{suffix}"
+        for stem in ("Reparent", "DeepReparent", "Reorder", "MultiMap", "NoShape")
+        for suffix in ("Fixtures", "Pct", "SolvedPct")
+    ]
+    + [
+        f"Shape{stem}{suffix}"
+        for stem in ("AnyReparent", "NoShape")
+        for suffix in ("ErrorPct", "FailingPct")
+    ]
+)
 
 
 def command(name, value):
@@ -372,7 +403,10 @@ def build(empirical_lines, rq1_lines, comparison_lines, ambiguity_lines, shape_l
     ]
 
     out += emit_block(
-        empirical_lines, EMPIRICAL_MACROS, "empirical", "make file-stats MODE=<mode>",
+        empirical_lines,
+        EMPIRICAL_MACROS,
+        "empirical",
+        "make file-stats MODE=<mode>",
     )
 
     out += [
@@ -392,7 +426,10 @@ def build(empirical_lines, rq1_lines, comparison_lines, ambiguity_lines, shape_l
         "% re-measure. Rates carry no percent sign; the paper adds \\%.",
     ]
     out += emit_block(
-        comparison_lines, COMPARISON_MACROS, "comparison", "make benchmark-timing-report",
+        comparison_lines,
+        COMPARISON_MACROS,
+        "comparison",
+        "make benchmark-timing-report",
     )
 
     out += [
@@ -402,7 +439,10 @@ def build(empirical_lines, rq1_lines, comparison_lines, ambiguity_lines, shape_l
         "% files themselves; refresh with `make ambiguity-report`. Rates carry no percent sign.",
     ]
     out += emit_block(
-        ambiguity_lines, AMBIGUITY_MACROS, "ambiguity", "make ambiguity-report",
+        ambiguity_lines,
+        AMBIGUITY_MACROS,
+        "ambiguity",
+        "make ambiguity-report",
     )
 
     out += [
@@ -472,22 +512,33 @@ def main():
     output_path = os.path.join(plots, "variables.tex")
 
     empirical, empirical_source = read_generated_block(
-        os.path.join(plots, "variables_empirical.tex"), output_path, EMPIRICAL_MACROS,
+        os.path.join(plots, "variables_empirical.tex"),
+        output_path,
+        EMPIRICAL_MACROS,
         "make file-stats MODE=<mode>",
     )
     rq1, rq1_source = read_generated_block(
-        os.path.join(plots, "variables_rq1.tex"), output_path, RQ_ONE_MACROS, "make rq1-report",
+        os.path.join(plots, "variables_rq1.tex"),
+        output_path,
+        RQ_ONE_MACROS,
+        "make rq1-report",
     )
     comparison, comparison_source = read_generated_block(
-        os.path.join(plots, "variables_comparison.tex"), output_path, COMPARISON_MACROS,
+        os.path.join(plots, "variables_comparison.tex"),
+        output_path,
+        COMPARISON_MACROS,
         "make benchmark-timing-report",
     )
     ambiguity, ambiguity_source = read_generated_block(
-        os.path.join(plots, "variables_ambiguity.tex"), output_path, AMBIGUITY_MACROS,
+        os.path.join(plots, "variables_ambiguity.tex"),
+        output_path,
+        AMBIGUITY_MACROS,
         "make ambiguity-report",
     )
     shapes, shapes_source = read_generated_block(
-        os.path.join(plots, "variables_shapes.tex"), output_path, SHAPE_MACROS,
+        os.path.join(plots, "variables_shapes.tex"),
+        output_path,
+        SHAPE_MACROS,
         "make shapes-report",
     )
     # \NumFixtures{} (authored, CORPUS) and \AmbiguityScored{} (generated, from the fixture set
@@ -496,13 +547,19 @@ def main():
     # different corpus sizes in one paper, which is exactly the drift this whole file exists to
     # prevent - so say so loudly rather than letting it through.
     scored = next(
-        (line.split("}{")[1].rstrip("}") for line in (ambiguity or [])
-         if line.startswith("\\newcommand{\\AmbiguityScored}")), None,
+        (
+            line.split("}{")[1].rstrip("}")
+            for line in (ambiguity or [])
+            if line.startswith("\\newcommand{\\AmbiguityScored}")
+        ),
+        None,
     )
     if scored is not None and scored != str(CORPUS["NumFixtures"]):
-        print(f"WARNING: corpus size disagreement - NumFixtures={CORPUS['NumFixtures']} "
-              f"(authored) vs AmbiguityScored={scored} (generated). Re-run "
-              f"`analyze_human_mappings --csv` and `make ambiguity-report`, then update CORPUS.")
+        print(
+            f"WARNING: corpus size disagreement - NumFixtures={CORPUS['NumFixtures']} "
+            f"(authored) vs AmbiguityScored={scored} (generated). Re-run "
+            f"`analyze_human_mappings --csv` and `make ambiguity-report`, then update CORPUS."
+        )
 
     lines = build(empirical, rq1, comparison, ambiguity, shapes)
 

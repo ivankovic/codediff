@@ -148,13 +148,29 @@ CONFIG_DATA = "config/data"
 
 LANGUAGE_CATEGORY = {
     # General-purpose programming languages.
-    "C": CODE, "CPP": CODE, "CSharp": CODE, "Go": CODE, "Java": CODE, "JavaScript": CODE,
-    "Kotlin": CODE, "LUA": CODE, "PHP": CODE, "Python": CODE, "Ruby": CODE, "Rust": CODE,
-    "Swift": CODE, "TSX": CODE, "TypeScript": CODE,
+    "C": CODE,
+    "CPP": CODE,
+    "CSharp": CODE,
+    "Go": CODE,
+    "Java": CODE,
+    "JavaScript": CODE,
+    "Kotlin": CODE,
+    "LUA": CODE,
+    "PHP": CODE,
+    "Python": CODE,
+    "Ruby": CODE,
+    "Rust": CODE,
+    "Swift": CODE,
+    "TSX": CODE,
+    "TypeScript": CODE,
     # Shell / editor automation.
-    "ShellScript": SCRIPTING, "Vimscript": SCRIPTING,
+    "ShellScript": SCRIPTING,
+    "Vimscript": SCRIPTING,
     # Config, data, and markup.
-    "CSS": CONFIG_DATA, "HTML": CONFIG_DATA, "JSON": CONFIG_DATA, "XML": CONFIG_DATA,
+    "CSS": CONFIG_DATA,
+    "HTML": CONFIG_DATA,
+    "JSON": CONFIG_DATA,
+    "XML": CONFIG_DATA,
     "YAML": CONFIG_DATA,
 }
 
@@ -246,7 +262,9 @@ def node_cross_check(attempted: list[dict], ok: np.ndarray) -> None:
             continue
         n_ok = int(ok[mask].sum())
         label = bucket_label(NODE_BIN_EDGES[i], NODE_BIN_EDGES[i + 1])
-        print(f"  {label:>15} nodes n={n:<6} ok={n_ok:<6} ({100.0 * n_ok / n:5.1f}% processed within 1s)")
+        print(
+            f"  {label:>15} nodes n={n:<6} ok={n_ok:<6} ({100.0 * n_ok / n:5.1f}% processed within 1s)"
+        )
 
 
 def categories_of(rows: list[dict]) -> np.ndarray:
@@ -325,7 +343,9 @@ def write_paper_fragment(
     for cat, macro in [(CODE, "Code"), (CONFIG_DATA, "ConfigData"), (SCRIPTING, "Scripting")]:
         if cat not in results:
             continue
-        lines.append(f"\\newcommand{{\\RqOne{macro}Pairs}}{{{results[cat]['n']:,}}}".replace(",", "{,}"))
+        lines.append(
+            f"\\newcommand{{\\RqOne{macro}Pairs}}{{{results[cat]['n']:,}}}".replace(",", "{,}")
+        )
         lines.append(f"\\newcommand{{\\RqOne{macro}Pct}}{{{pct(results[cat]['pct'])}}}")
     # The two code-category buckets the prose cites by name: the last bucket where whole-tree
     # APTED still (nearly) always fits the budget, and the first where it collapses.
@@ -358,15 +378,27 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
         heights = [0 if np.isnan(p) else p for _, _, _, p in results[cat]["buckets"]]
         ns = [n for _, n, _, _ in results[cat]["buckets"]]
         bars = ax.bar(
-            x + offset, heights, width=width * 0.92, color=colors[cat], edgecolor=SURFACE,
-            linewidth=0.8, zorder=3, label=f"{cat} (n={results[cat]['n']:,})",
+            x + offset,
+            heights,
+            width=width * 0.92,
+            color=colors[cat],
+            edgecolor=SURFACE,
+            linewidth=0.8,
+            zorder=3,
+            label=f"{cat} (n={results[cat]['n']:,})",
         )
         for bar, n in zip(bars, ns):
             if n == 0:
                 continue
             ax.text(
-                bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2, f"{n}",
-                ha="center", va="bottom", fontsize=6.5, color=INK_MUTED, zorder=4,
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 1.2,
+                f"{n}",
+                ha="center",
+                va="bottom",
+                fontsize=6.5,
+                color=INK_MUTED,
+                zorder=4,
             )
 
     ax.set_ylim(0, 108)
@@ -379,7 +411,8 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
         "RQ1: whole-tree tree-edit distance vs. a 1-second budget, by artifact category\n"
         f"({total_n:,} real-world file changes, size-stratified per language - bars are "
         "within-bucket rates; small numbers are per-cell n)",
-        fontsize=10.5, color=INK_PRIMARY,
+        fontsize=10.5,
+        color=INK_PRIMARY,
     )
     ax.legend(frameon=False, fontsize=9, loc="upper right")
     ax.grid(axis="y", color=GRIDLINE, zorder=0)
@@ -393,12 +426,22 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--results", default="data/rq1/apted_only_group*.csv", help="glob pattern for apted_only_benchmark output CSVs")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--results",
+        default="data/rq1/apted_only_group*.csv",
+        help="glob pattern for apted_only_benchmark output CSVs",
+    )
     parser.add_argument("--plots-dir", default="plots", type=Path)
     parser.add_argument("--output-png", default="apted_only_rq1.png")
     parser.add_argument("--output-category-png", default="apted_only_rq1_by_category.png")
-    parser.add_argument("--describe-only", action="store_true", help="print loc_combined quantiles and exit, without plotting")
+    parser.add_argument(
+        "--describe-only",
+        action="store_true",
+        help="print loc_combined quantiles and exit, without plotting",
+    )
     args = parser.parse_args()
 
     verify_matches_rust()
@@ -420,7 +463,9 @@ def main() -> None:
     attempted = [r for r in rows if r["status"] in ("ok", "timed_out")]
     excluded = len(rows) - len(attempted)
     if excluded:
-        print(f"Excluded {excluded} row(s) with status outside {{ok, timed_out}} (e.g. parse_failed) from the percentage below.")
+        print(
+            f"Excluded {excluded} row(s) with status outside {{ok, timed_out}} (e.g. parse_failed) from the percentage below."
+        )
 
     # Keyed by the larger of the two sides, matching `stats::sampling::loc_bucket` - not by
     # combined before+after LOC, which is what this report used before adopting the project-wide
@@ -462,7 +507,7 @@ def main() -> None:
         "1s - NOT a population estimate, since this corpus is size-stratified per language and "
         "deliberately over-represents large files relative to real-world commits (see module "
         "docstring caveat 1). The per-bucket percentages above are the number to cite; this one "
-        "is a summary of the sample actually measured, not of \"real-world file changes\" as a "
+        'is a summary of the sample actually measured, not of "real-world file changes" as a '
         "whole."
     )
 
@@ -483,8 +528,14 @@ def main() -> None:
 
     for bar, pct, n in zip(bars, pct_ok, ns):
         ax.text(
-            bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
-            f"{pct:.0f}%\n(n={n})", ha="center", va="bottom", fontsize=9, color=INK_SECONDARY, zorder=4,
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1.5,
+            f"{pct:.0f}%\n(n={n})",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            color=INK_SECONDARY,
+            zorder=4,
         )
 
     ax.set_ylim(0, 108)
@@ -497,7 +548,8 @@ def main() -> None:
         "RQ1: whole-tree tree-edit distance vs. a 1-second budget\n"
         f"({len(attempted):,} real-world file changes, size-stratified per language - "
         "bars are within-bucket rates, not population-weighted)",
-        fontsize=10.5, color=INK_PRIMARY,
+        fontsize=10.5,
+        color=INK_PRIMARY,
     )
     ax.grid(axis="y", color=GRIDLINE, zorder=0)
     for spine in ("top", "right"):
@@ -509,9 +561,7 @@ def main() -> None:
     fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
     print(f"\nWrote {output_path}")
 
-    plot_by_category(
-        category_results, args.plots_dir / args.output_category_png, len(attempted)
-    )
+    plot_by_category(category_results, args.plots_dir / args.output_category_png, len(attempted))
     write_paper_fragment(category_results, len(attempted), args.plots_dir / "variables_rq1.tex")
 
 

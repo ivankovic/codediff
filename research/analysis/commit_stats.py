@@ -49,21 +49,19 @@ def load_data(db_path):
     )
 
     # Extract file extension
-    df = df.with_columns(
-        pl.col("relative_file_path").str.split(".").list.last().alias("extension")
-    )
+    df = df.with_columns(pl.col("relative_file_path").str.split(".").list.last().alias("extension"))
 
     # Compute derived metrics
     df = df.with_columns(
         (pl.col("bytes_after") - pl.col("bytes_before")).alias("bytes_delta"),
         (pl.col("lines_after") - pl.col("lines_before")).alias("lines_delta"),
         (pl.col("nodes_after") - pl.col("nodes_before")).alias("nodes_delta"),
-        (
-            pl.col("lines_added") + pl.col("lines_removed") + pl.col("lines_changed")
-        ).alias("total_lines_modified"),
-        (
-            pl.col("nodes_added") + pl.col("nodes_removed") + pl.col("nodes_changed")
-        ).alias("total_nodes_modified"),
+        (pl.col("lines_added") + pl.col("lines_removed") + pl.col("lines_changed")).alias(
+            "total_lines_modified"
+        ),
+        (pl.col("nodes_added") + pl.col("nodes_removed") + pl.col("nodes_changed")).alias(
+            "total_nodes_modified"
+        ),
     )
 
     return df
@@ -260,9 +258,7 @@ def compute_repository_stats(df):
 
 if __name__ == "__main__":
     # Get database path from command line argument or use default
-    db_path = (
-        sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/small/stats.sqlite"
-    )
+    db_path = sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/research/small/stats.sqlite"
 
     os.makedirs("plots", exist_ok=True)
 

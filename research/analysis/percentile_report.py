@@ -64,9 +64,7 @@ def compute_percentiles_and_plot(
     df_trimmed = df.filter(pl.col(column_name) <= trim_threshold)
 
     if log_scale:
-        plt.hist(
-            df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black", log=True
-        )
+        plt.hist(df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black", log=True)
     else:
         plt.hist(df_trimmed[column_name].to_numpy(), bins=50, edgecolor="black")
 
