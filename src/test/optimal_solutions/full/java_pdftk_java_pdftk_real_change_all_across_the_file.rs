@@ -21,22 +21,22 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    // Recorded distance from the human mapping, not a target: 214 mismatches (144 visible) of
-    // 8987 nodes, 2.38%, measured 2026-08-27 when this fixture's mapping was authored. Lower it
-    // when a change earns it; a rise is a regression.
+    // Recorded distance from the human mapping, not a target: 993 mismatches (662 visible) of
+    // 8987 nodes, 11.05%, re-measured 2026-08-28 after the mapping was extended by 77k lines
+    // (commit 6b15a71). The previous 214/144 was against a mapping that annotated far less of the
+    // file - a more complete ground truth has more to disagree with, so the rise is the fixture
+    // getting stricter rather than codediff getting worse: `algorithm_cost` is unchanged at 2585
+    // across both measurements. Lower it when a change earns it; a rise from here is a regression.
     //
-    // Not an objective wall - codediff's answer costs 2585 against the human's 179, a gap of 2406.
-    // The human mapping is optimal ground truth, so a gap that size is a defect with a known
-    // owner, not the price of a hard case. 210 of the 214 mismatches carry
-    // `APTED("large_flat_subtree")` and all of them sit under one `class_body`: its four
-    // `constructor_declaration` children (plus two `line_comment`s) are deleted outright and
-    // reinserted rather than matched across the edit, and every descendant of those subtrees is
-    // dragged along - which is where the bulk of the 2406 comes from. The remaining 4 are one
-    // `fast_fallback` and three multi-map-group pairs where codediff chose `Identical` for a
-    // `binary_expression` the human recorded as `MatchButNotIdentical`.
+    // Still not an objective wall, and still the same mechanism the smaller mapping showed: codediff
+    // costs 2585 against the human's 929, a gap of 1656. 888 of the 993 mismatches carry
+    // `APTED("large_flat_subtree")` and 889 are nodes mapped to nothing at all - the class_body's
+    // constructor_declaration children are deleted outright and reinserted rather than matched, and
+    // every descendant of those subtrees goes with them. The remaining 105 are 49 `MovedSubtree`,
+    // one `fast_fallback`, and the multi-map-group operation mismatches.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-pdftk-java-pdftk-real-change-all-across-the-file",
-        214,
-        144,
+        993,
+        662,
     )
 }
