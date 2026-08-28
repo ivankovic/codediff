@@ -751,10 +751,16 @@ fn print_reason_table(rows: &[Row]) {
 // that gap.
 
 /// One fixture's row in the gate baseline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct BaselineEntry {
     mismatches: usize,
     visible_mismatches: usize,
+    /// Wall-clock milliseconds for this fixture's diff. Carried alongside the accuracy numbers but
+    /// deliberately **not** gated on - see [`print_gate_report`]'s latency section for the measured
+    /// reason: run to run on one idle machine, a fixture's own time moves by up to 4.9x while the
+    /// run's aggregate shape moves by 3%. There is no per-fixture threshold that catches a real
+    /// slowdown without also firing on noise.
+    elapsed_ms: f64,
 }
 
 /// What one run says about one fixture, relative to the baseline.
@@ -779,6 +785,9 @@ struct GateReport {
     removed: Vec<String>,
     /// Fixtures with no `human_mapping.json`, in neither the run's comparison nor the baseline.
     unsolved: usize,
+    /// Every fixture present in both, for the latency section. Separate from `regressed`/`improved`
+    /// because latency is reported and never gated - see [`print_gate_report`].
+    latency: Vec<GateChange>,
 }
 
 impl GateReport {
@@ -799,6 +808,7 @@ fn baseline_from_rows(rows: &[Row]) -> BTreeMap<String, BaselineEntry> {
                 BaselineEntry {
                     mismatches,
                     visible_mismatches,
+                    elapsed_ms: row.elapsed_ms,
                 },
             ))
         })
@@ -828,6 +838,13 @@ fn read_baseline(path: &std::path::Path) -> Result<BTreeMap<String, BaselineEntr
             BaselineEntry {
                 mismatches: field("mismatches")?,
                 visible_mismatches: field("visible_mismatches")?,
+                // Absent in a baseline written before latency was recorded: 0.0 reads as "no
+                // previous timing", and the latency section below skips a fixture without one
+                // rather than reporting an infinite speedup.
+                elapsed_ms: record
+                    .get("elapsed_ms")
+                    .and_then(|v| v.trim().parse().ok())
+                    .unwrap_or(0.0),
             },
         );
     }
@@ -838,12 +855,13 @@ fn write_baseline(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let mut writer = Writer::from_writer(
         File::create(path).with_context(|| format!("writing the quality baseline to {path:?}"))?,
     );
-    writer.write_record(["solution", "mismatches", "visible_mismatches"])?;
+    writer.write_record(["solution", "mismatches", "visible_mismatches", "elapsed_ms"])?;
     for (name, entry) in baseline_from_rows(rows) {
         writer.write_record([
             name,
             entry.mismatches.to_string(),
             entry.visible_mismatches.to_string(),
+            format!("{:.2}", entry.elapsed_ms),
         ])?;
     }
     writer.flush()?;
@@ -877,9 +895,17 @@ fn compare_to_baseline(rows: &[Row], baseline: &BTreeMap<String, BaselineEntry>)
             || after.visible_mismatches > before.visible_mismatches
         {
             report.regressed.push(change);
-        } else if after != before {
+        } else if (after.mismatches, after.visible_mismatches)
+            != (before.mismatches, before.visible_mismatches)
+        {
             report.improved.push(change);
         }
+        // Latency moved or not, it is never accuracy - it is reported separately below.
+        report.latency.push(GateChange {
+            name: name.clone(),
+            before: *before,
+            after: *after,
+        });
     }
     for name in baseline.keys() {
         if !current.contains_key(name) {
@@ -938,6 +964,8 @@ fn print_gate_report(report: &GateReport, baseline_path: &std::path::Path) {
         }
     }
 
+    print_latency_report(&report.latency);
+
     if report.failed() {
         println!(
             "\nerror: {} fixture(s) regressed against the baseline. Fix the regression, or - if \
@@ -947,6 +975,93 @@ fn print_gate_report(report: &GateReport, baseline_path: &std::path::Path) {
         );
     } else {
         println!("\nQuality gate passed: no fixture is worse than its baseline.");
+    }
+}
+
+/// A fixture has to be at least this slow before a change in its own time means anything. Measured
+/// 2026-08-28 by running the whole corpus twice on one idle machine: with no floor, the worst
+/// run-to-run swing on a single fixture is 4.9x; above 20ms it is 1.66x, and above 50ms 1.53x. The
+/// noise lives entirely in the fast fixtures, where a millisecond of scheduling is the whole
+/// measurement.
+const LATENCY_FLOOR_MS: f64 = 20.0;
+
+/// And it has to move by at least this much. p99 of the run-to-run swing above the floor is 1.55x,
+/// so 2x is the first threshold that is not mostly noise.
+const LATENCY_FACTOR: f64 = 2.0;
+
+/// Latency against the baseline - **reported, never gated**, and the two thresholds above are why.
+///
+/// Accuracy is algorithm-only and reproduces exactly, which is what makes the gate above safe to
+/// fail on. Wall-clock does not: on one idle machine, a single fixture's own time moves run to run
+/// by up to 4.9x, while the run's *aggregate* shape moves by about 3%. So the aggregate is the
+/// trustworthy signal and is always printed; individual fixtures are only named when they clear
+/// both a floor and a factor, and even then as something to look at rather than something failed.
+fn print_latency_report(changes: &[GateChange]) {
+    let timed: Vec<&GateChange> = changes
+        .iter()
+        .filter(|c| c.before.elapsed_ms > 0.0 && c.after.elapsed_ms > 0.0)
+        .collect();
+    if timed.is_empty() {
+        return;
+    }
+
+    let percentile = |mut v: Vec<f64>, p: f64| -> f64 {
+        v.sort_by(|a, b| a.partial_cmp(b).expect("no NaN timings"));
+        v[((v.len() - 1) as f64 * p / 100.0).round() as usize]
+    };
+    let before: Vec<f64> = timed.iter().map(|c| c.before.elapsed_ms).collect();
+    let after: Vec<f64> = timed.iter().map(|c| c.after.elapsed_ms).collect();
+
+    println!(
+        "\nLatency vs the baseline ({} fixtures timed, reported not gated)",
+        timed.len()
+    );
+    println!(
+        "             {:>12} {:>12} {:>9}",
+        "baseline", "this run", "change"
+    );
+    for (label, p) in [("p50", 50.0), ("p90", 90.0), ("p99", 99.0), ("max", 100.0)] {
+        let (b, a) = (percentile(before.clone(), p), percentile(after.clone(), p));
+        println!(
+            "  {label:<10} {b:>10.1}ms {a:>10.1}ms {:>8.0}%",
+            if b > 0.0 { 100.0 * (a - b) / b } else { 0.0 }
+        );
+    }
+    let (bt, at): (f64, f64) = (before.iter().sum(), after.iter().sum());
+    println!(
+        "  {:<10} {:>10.1}s  {:>10.1}s  {:>8.0}%",
+        "total",
+        bt / 1000.0,
+        at / 1000.0,
+        if bt > 0.0 {
+            100.0 * (at - bt) / bt
+        } else {
+            0.0
+        }
+    );
+
+    let mut moved: Vec<(f64, &GateChange)> = timed
+        .iter()
+        .filter(|c| c.before.elapsed_ms.max(c.after.elapsed_ms) >= LATENCY_FLOOR_MS)
+        .filter_map(|c| {
+            let factor = c.after.elapsed_ms / c.before.elapsed_ms;
+            (factor >= LATENCY_FACTOR || factor <= 1.0 / LATENCY_FACTOR).then_some((factor, *c))
+        })
+        .collect();
+    moved.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("no NaN factors"));
+    if moved.is_empty() {
+        println!("  no fixture over {LATENCY_FLOOR_MS:.0}ms moved by {LATENCY_FACTOR:.0}x or more");
+        return;
+    }
+    println!(
+        "  {} fixture(s) over {LATENCY_FLOOR_MS:.0}ms moved by at least {LATENCY_FACTOR:.0}x:",
+        moved.len()
+    );
+    for (factor, c) in moved {
+        println!(
+            "    {:<70} {:>9.1} -> {:<9.1} {factor:>6.1}x",
+            c.name, c.before.elapsed_ms, c.after.elapsed_ms
+        );
     }
 }
 
@@ -1081,6 +1196,7 @@ mod tests {
                     BaselineEntry {
                         mismatches: *mismatches,
                         visible_mismatches: *visible_mismatches,
+                        elapsed_ms: 0.0,
                     },
                 )
             })
@@ -1166,6 +1282,39 @@ mod tests {
         let report = compare_to_baseline(&rows, &baseline(&[("a", 3, 1)]));
         assert_eq!(report.unsolved, 1);
         assert!(report.added.is_empty() && !report.failed());
+    }
+
+    /// The contract that keeps the gate trustworthy: wall-clock never fails it. A fixture can get
+    /// arbitrarily slower and the gate still passes, because on one idle machine a single fixture's
+    /// own time moves run to run by up to 4.9x - a latency gate at any threshold tight enough to
+    /// catch a real slowdown would fire on noise instead, and a gate that cries wolf gets ignored
+    /// for the accuracy regressions it *can* prove.
+    #[test]
+    fn latency_is_reported_but_never_fails_the_gate() {
+        let mut slow = row("a", 3, 1);
+        slow.elapsed_ms = 5_000.0;
+        let baseline = BTreeMap::from([(
+            "a".to_string(),
+            BaselineEntry {
+                mismatches: 3,
+                visible_mismatches: 1,
+                elapsed_ms: 5.0,
+            },
+        )]);
+
+        let report = compare_to_baseline(&[slow], &baseline);
+
+        assert!(
+            !report.failed(),
+            "a 1000x slowdown is not an accuracy regression"
+        );
+        assert!(report.regressed.is_empty() && report.improved.is_empty());
+        assert_eq!(
+            report.latency.len(),
+            1,
+            "but it is still carried for reporting"
+        );
+        assert_eq!(report.latency[0].after.elapsed_ms, 5_000.0);
     }
 
     /// A baseline written from a run must compare equal to that same run - otherwise
