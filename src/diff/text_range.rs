@@ -175,7 +175,7 @@ impl TextRange {
     ///
     /// Returns true if the ranges touch exactly (see `extends`) OR if all text between
     /// the end of this range and the start of the other range consists of whitespace characters.
-    pub fn can_extend_with_whitespace(&self, other: &TextRange, code: &str) -> bool {
+    pub fn can_extend_with_whitespace(&self, other: &TextRange, code: &SourceText) -> bool {
         is_whitespace_between(self, other, code)
     }
 
@@ -209,7 +209,7 @@ impl TextRange {
 /// Returns true if the ranges touch exactly (a.end == b.start or b.end == a.start),
 /// or if there is a gap containing only whitespace.
 /// Returns false if the ranges overlap or are in the wrong order for extension.
-fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
+fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &SourceText) -> bool {
     // Check if a extends b exactly (a.end touches b.start)
     if a.extends(b) {
         return true;
@@ -238,10 +238,10 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
         return false;
     };
 
-    // Convert positions to byte indices (see `row_col_to_byte_index` - `code[a..b]` below needs
-    // byte offsets, not character counts).
-    let first_end_idx = row_col_to_byte_index(first.end_row, first.end_column, code);
-    let second_start_idx = row_col_to_byte_index(second.start_row, second.start_column, code);
+    // Convert positions to byte indices (see `SourceText::byte_index` - the slice below needs byte
+    // offsets, not character counts).
+    let first_end_idx = code.byte_index(first.end_row, first.end_column);
+    let second_start_idx = code.byte_index(second.start_row, second.start_column);
 
     if first_end_idx >= second_start_idx {
         // No gap or overlapping
@@ -249,52 +249,175 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &str) -> bool {
     }
 
     // Extract the gap text and check if all characters are whitespace
-    let gap_text = &code[first_end_idx..second_start_idx];
+    let gap_text = &code.text()[first_end_idx..second_start_idx];
     gap_text.chars().all(|c| c.is_whitespace())
 }
 
-/// Convert a (row, column) position to a byte index in the code string.
+/// A file's text plus the byte offset every row starts at.
 ///
-/// `TextRange`'s `column` fields come straight from tree-sitter's `Point` (see `TextRange::from`),
-/// which - like all of tree-sitter's offsets - counts *bytes* within the row, not Unicode
-/// characters. This used to advance `current_col`/the returned index by 1 per `char` instead of
-/// by `ch.len_utf8()`, which was silently wrong on any line containing a multi-byte character
-/// before the target column (the row/column match itself could fire at the wrong column), and
-/// separately meant the return value - despite being fed straight into `&code[a..b]` byte-slicing
-/// at this function's only call site - was actually a character *count*, not a byte offset. Any
-/// non-ASCII content before the slice point (e.g. an em dash, accented letter, or emoji anywhere
-/// earlier in the file) could then land the slice mid-character, panicking with "byte index N is
-/// not a char boundary" - see `byte_index_lands_correctly_past_a_multi_byte_character` below,
-/// modeled on a real crash from a file containing "—".
-fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> usize {
-    let mut current_row = 0;
-    let mut current_col = 0; // byte offset within the current row
-    let mut byte_index = 0; // byte offset from the start of the string
+/// **Why this exists.** `is_whitespace_between` needs to turn two (row, column) positions into byte
+/// offsets so it can look at the text between them. It used to do that by walking `code.chars()`
+/// from byte 0 for each position - O(file) per call, and `RangeMatch::extends` makes two of those
+/// calls per side. Profiling the corpus on 2026-08-28 found the result: on
+/// `json-ipfs-ipfs-desktop-only-update-version-strings` (924KB per side), 16,848 calls cost 148
+/// billion instructions - **90% of the entire run** - at 8.8 million instructions each, which is
+/// exactly the cost of walking that file twice. The same fixture's diff took 0.7s and its range
+/// merging took 10.4s.
+///
+/// With the row offsets computed once, the same lookup is an add and a bounds check. This is the
+/// second instance of this shape in this module; see `ranges_for_mode`'s own "built once for the
+/// whole call rather than rescanning the file per range" note.
+pub struct SourceText<'a> {
+    text: &'a str,
+    /// Byte offset where each row begins. Always at least one entry (row 0 starts at 0), since
+    /// even an empty file has one empty row.
+    row_starts: Vec<usize>,
+}
 
-    for ch in code.chars() {
-        // Check if we've reached the target position
-        if current_row == row && current_col == col {
-            return byte_index;
-        }
-
-        let len = ch.len_utf8();
-        if ch == '\n' {
-            current_row += 1;
-            current_col = 0;
-        } else {
-            current_col += len;
-        }
-
-        byte_index += len;
+impl<'a> SourceText<'a> {
+    pub fn new(text: &'a str) -> Self {
+        let mut row_starts = vec![0usize];
+        row_starts.extend(
+            text.bytes()
+                .enumerate()
+                .filter(|(_, b)| *b == b'\n')
+                .map(|(i, _)| i + 1),
+        );
+        SourceText { text, row_starts }
     }
 
-    // Position is at or beyond the end of the string - clamp to the string's byte length.
-    byte_index
+    pub fn text(&self) -> &'a str {
+        self.text
+    }
+
+    /// Byte index of a (row, column) position, or the text's byte length if that position doesn't
+    /// exist.
+    ///
+    /// `TextRange`'s `column` fields come straight from tree-sitter's `Point` (see
+    /// `TextRange::from`), which - like all of tree-sitter's offsets - counts *bytes* within the
+    /// row, not Unicode characters. So the lookup is `row_starts[row] + column`, with two
+    /// rejections that the linear walk this replaced performed implicitly by never matching, and
+    /// that callers depend on:
+    ///
+    /// * A column past the row's own end. The walk carried on into later rows with its row counter
+    ///   already advanced, so it never matched and fell through to the end of the file.
+    /// * A column that lands *inside* a multi-byte character. The walk only ever tested positions
+    ///   at character boundaries, so it skipped straight past such a column - which is what kept
+    ///   the `&code[a..b]` slice at the call site from panicking with "byte index N is not a char
+    ///   boundary". Reproducing that is not defensive: `byte_index_lands_correctly_past_a_multi_
+    ///   byte_character` below is modeled on a real crash from a file containing an em dash.
+    ///
+    /// `byte_index_agrees_with_a_linear_walk_everywhere` checks the equivalence exhaustively
+    /// against the original implementation rather than trusting this description.
+    pub fn byte_index(&self, row: usize, column: usize) -> usize {
+        let Some(&start) = self.row_starts.get(row) else {
+            return self.text.len();
+        };
+        // The row ends just before the next row's first byte - that is, at its newline - or at the
+        // end of the text for the last row. A column exactly *at* the row's end is valid: it is the
+        // position the walk reached before consuming the newline.
+        let row_end = self
+            .row_starts
+            .get(row + 1)
+            .map(|next| next - 1)
+            .unwrap_or(self.text.len());
+        let index = start + column;
+        if index > row_end || !self.text.is_char_boundary(index) {
+            return self.text.len();
+        }
+        index
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The linear walk `SourceText::byte_index` replaced, kept verbatim as the reference the
+    /// equivalence test checks against. Its semantics - including what it does with a column past
+    /// the row's end or inside a multi-byte character - are the contract, and they were implicit in
+    /// the walk rather than written down anywhere.
+    fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> usize {
+        let mut current_row = 0;
+        let mut current_col = 0; // byte offset within the current row
+        let mut byte_index = 0; // byte offset from the start of the string
+
+        for ch in code.chars() {
+            if current_row == row && current_col == col {
+                return byte_index;
+            }
+            let len = ch.len_utf8();
+            if ch == '\n' {
+                current_row += 1;
+                current_col = 0;
+            } else {
+                current_col += len;
+            }
+            byte_index += len;
+        }
+        byte_index
+    }
+
+    /// The same equivalence, over the real corpus rather than hand-picked samples. Kept
+    /// `#[ignore]`d because it parses every fixture; run it deliberately after touching
+    /// `byte_index`.
+    #[test]
+    #[ignore = "slow: reads the whole fixture corpus"]
+    fn byte_index_agrees_with_a_linear_walk_on_the_corpus() {
+        let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
+        let mut checked = 0usize;
+        for (name, (before, after)) in &pairs {
+            for code in [&before.contents, &after.contents] {
+                let index = SourceText::new(code);
+                let rows = code.split('\n').count();
+                for row in 0..=rows {
+                    let width = code.split('\n').nth(row).map(str::len).unwrap_or(0);
+                    for column in 0..=(width + 2) {
+                        assert_eq!(
+                            index.byte_index(row, column),
+                            row_col_to_byte_index(row, column, code),
+                            "'{name}' ({row}, {column})"
+                        );
+                    }
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked > 100, "only checked {checked} files");
+    }
+
+    /// The whole justification for the rewrite: same answers, without the O(file) walk.
+    ///
+    /// Exhaustive over every (row, column) pair in range for each sample, plus a margin past the
+    /// end of both - the out-of-range answers are as load-bearing as the in-range ones, because
+    /// the call site slices with them.
+    #[test]
+    fn byte_index_agrees_with_a_linear_walk_everywhere() {
+        let samples = [
+            "",
+            "\n",
+            "a",
+            "a\n",
+            "one\ntwo\nthree\n",
+            "no trailing newline\nsecond",
+            "a\u{2014}b   c", // em dash: byte columns 1..4 are inside one char
+            "\u{1F600}x\n\u{00E9}\u{00E9}\n\n  tail", // emoji, accents, an empty row
+            "  \t \n\t\n   ", // whitespace-only rows
+        ];
+        for code in samples {
+            let index = SourceText::new(code);
+            let rows = code.split('\n').count() + 2;
+            for row in 0..rows {
+                for column in 0..(code.len() + 3) {
+                    assert_eq!(
+                        index.byte_index(row, column),
+                        row_col_to_byte_index(row, column, code),
+                        "({row}, {column}) in {code:?}"
+                    );
+                }
+            }
+        }
+    }
 
     // Tests for TextRange::intersects()
     #[test]
@@ -531,7 +654,7 @@ mod tests {
         let b = TextRange::new(1, 0, 2, 0);
         let code = "line1\nline2\nline3";
 
-        assert!(a.can_extend_with_whitespace(&b, code));
+        assert!(a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -540,7 +663,7 @@ mod tests {
         let b = TextRange::new(1, 0, 2, 0);
         let code = "line1\n   \nline3"; // Two newlines with spaces in between
 
-        assert!(a.can_extend_with_whitespace(&b, code));
+        assert!(a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -549,7 +672,7 @@ mod tests {
         let b = TextRange::new(0, 7, 0, 10);
         let code = "helloXworld"; // Non-whitespace between
 
-        assert!(!a.can_extend_with_whitespace(&b, code));
+        assert!(!a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -558,7 +681,7 @@ mod tests {
         let b = TextRange::new(0, 7, 0, 10);
         let code = "hello   world"; // spaces between
 
-        assert!(a.can_extend_with_whitespace(&b, code));
+        assert!(a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -567,7 +690,7 @@ mod tests {
         let b = TextRange::new(0, 7, 0, 10);
         let code = "helloXworld"; // 'X' is non-whitespace between
 
-        assert!(!a.can_extend_with_whitespace(&b, code));
+        assert!(!a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -576,7 +699,7 @@ mod tests {
         let b = TextRange::new(2, 0, 3, 0);
         let code = "line1\ntext\nline3"; // Non-whitespace line between
 
-        assert!(!a.can_extend_with_whitespace(&b, code));
+        assert!(!a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 
     #[test]
@@ -601,6 +724,6 @@ mod tests {
         let a = TextRange::new(0, 0, 0, 5); // ends right after "a—b" (byte 5)
         let b = TextRange::new(0, 8, 0, 9); // starts at "c" (byte 8)
 
-        assert!(a.can_extend_with_whitespace(&b, code));
+        assert!(a.can_extend_with_whitespace(&b, &SourceText::new(code)));
     }
 }

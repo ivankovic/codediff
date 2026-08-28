@@ -19,7 +19,10 @@ use tree_sitter::{Node, Point, Range};
 
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
-    diff::{ASTDiff, ASTMappingOperation, NodeCache, nodes, text_range::TextRange},
+    diff::{
+        ASTDiff, ASTMappingOperation, NodeCache, nodes,
+        text_range::{SourceText, TextRange},
+    },
 };
 
 /**
@@ -134,7 +137,7 @@ fn common_suffix_byte_len(a: &str, b: &str) -> usize {
 
 /// The `tree_sitter::Point` reached after advancing `offset` bytes into `text`, starting from
 /// `start`. Byte-based, not char-based, to match tree-sitter's own column convention (see
-/// `text_range::row_col_to_byte_index`'s doc comment) - `offset` must land on a char boundary of
+/// `text_range::SourceText::byte_index`'s doc comment) - `offset` must land on a char boundary of
 /// `text`, which every call site guarantees (see `common_prefix_byte_len`/`common_suffix_byte_len`
 /// above).
 fn point_at_byte_offset(text: &str, start: Point, offset: usize) -> Point {
@@ -289,6 +292,11 @@ fn ranges(
     // Compute columns per row for source and destination
     let source_columns = compute_columns_per_row(&source.contents);
     let destination_columns = compute_columns_per_row(&destination.contents);
+    // Row offsets for both sides, built once for the whole traversal. `RangeMatch::extends` below
+    // needs them for every merge decision it makes, and rebuilding them per decision is exactly the
+    // cost this replaced.
+    let source_text = SourceText::new(&source.contents);
+    let destination_text = SourceText::new(&destination.contents);
 
     match (&source.ast, &destination.ast) {
         (None, None) => {
@@ -578,11 +586,7 @@ fn ranges(
                         current_range = RangeMatch::zero();
                     } else {
                         for new_range in new_ranges {
-                            if new_range.extends(
-                                &current_range,
-                                &source.contents,
-                                &destination.contents,
-                            ) {
+                            if new_range.extends(&current_range, &source_text, &destination_text) {
                                 current_range.extend_into(&new_range);
                             } else {
                                 if !current_range.is_zero() {
@@ -1035,7 +1039,7 @@ fn shared_affix(before_line: &str, after_line: &str) -> Option<(usize, usize)> {
 /// field instead of the whole row. `None` under the same condition as [`shared_affix`].
 ///
 /// Columns are byte offsets within the row, matching tree-sitter's own `Point` convention that
-/// `TextRange` inherits - see `text_range::row_col_to_byte_index`, whose doc comment records the
+/// `TextRange` inherits - see `text_range::SourceText::byte_index`, whose doc comment records the
 /// multi-byte-character crash that established it. `common_prefix_byte_len`/`common_suffix_byte_len`
 /// both guarantee char boundaries, and the suffix is measured on the already-prefix-trimmed
 /// remainders (exactly as `intra_node_update_ranges` does) so prefix + suffix can never overlap on
@@ -1416,7 +1420,17 @@ impl RangeMatch {
             && self.operation == TextOperation::NotYetSet
     }
 
-    pub fn extends(&self, other: &RangeMatch, source_code: &str, dest_code: &str) -> bool {
+    /// Takes a [`SourceText`] per side rather than a `&str`, because deciding this needs to look
+    /// at the text *between* two ranges, which means turning row/column positions into byte
+    /// offsets - and doing that by walking the file was 90% of the corpus's worst fixture. See
+    /// `SourceText`'s own doc comment for the measurement. Callers build one per side per call to
+    /// `ranges`, not one per comparison.
+    pub fn extends(
+        &self,
+        other: &RangeMatch,
+        source_code: &SourceText,
+        dest_code: &SourceText,
+    ) -> bool {
         if self.operation != other.operation {
             return false;
         }
@@ -2310,7 +2324,7 @@ mod tests {
     }
 
     /// Every range on one row, as `(operation, start_column, end_column)` - byte columns, this
-    /// module's convention (see `text_range::row_col_to_byte_index`). The assertion shape the
+    /// module's convention (see `text_range::SourceText::byte_index`). The assertion shape the
     /// intra-line tests below need, where `changed_row_spans` deliberately drops columns.
     fn row_column_spans(ranges: &[RangeMatch], row: usize) -> Vec<(TextOperation, usize, usize)> {
         ranges
