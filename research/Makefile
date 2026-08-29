@@ -262,6 +262,17 @@ shapes-report:
 ambiguity-report:
 	uv run ./analysis/ambiguity_report.py
 
+# What reaches the reader, the paper's rendering questions. Two measurements in one report because
+# the paper makes them one argument: the share of AST nodes that carry text of their own and can
+# therefore be displayed at all (from data/quality/optimal_solutions_benchmark.csv's visible_nodes
+# column, a property of the parsed files rather than of any diff of them), and how often the
+# human-painted text ground truth records two equally correct renderings of the same change (from
+# `text_mappings` in the mapping JSON files). Like ambiguity-report above, it names no diffing
+# tool. Scoped to data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv`
+# first if fixtures were added.
+rendering-report:
+	uv run ./analysis/rendering_report.py
+
 # ── Tool comparison (benchmark_other) ───────────────────────────────────────────────────────────
 
 # Runs the timing benchmark's own analysis/plotting step over whatever

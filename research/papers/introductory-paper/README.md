@@ -1,29 +1,36 @@
 # Introductory paper
 
-An ACM `sigconf`-format LaTeX paper, "CodeDiff: A Fast, Robust, Production-Ready, Syntax-Aware
-Code Diffing Tool". Introduces CodeDiff itself as a production pipeline built from established
-tree-edit-distance algorithms (APTED, GumTree, Myers diff, with Zhang-Shasha as an internal
-correctness oracle), backed by:
+An ACM `sigconf`-format LaTeX paper about syntax-aware code diffing. **It is a research paper with
+a tool contribution at the end, not a tool paper** - a distinction set deliberately on 2026-08-29
+and easy to erode. Six research questions; the first four name no diffing tool at all, because
+they are about what the problem costs and what a correct answer to it even is. Structure:
 
-* an empirical study of real-world repository, file, and AST size, motivating CodeDiff's concrete
-  speed and robustness targets instead of an assumed worst case
-* a per-heuristic ablation study (real numbers from `src/diff.rs`'s `HeuristicConfig` doc comment
-  and `research/data/quality/optimal_solutions_benchmark.csv`), showing that one of GumTree's own two extra
-  heuristics helps CodeDiff's pipeline and one measurably hurts it
-* a head-to-head accuracy, speed, and robustness comparison against GumTree v4.0.0-beta8, Unix
-  `diff`, difftastic, and diffsitter, on 98 real-world fixtures with human-verified ground truth
-  (real numbers and charts from `research/data/comparison/benchmark_other.csv` and
-  `research/analysis/benchmark_other_report.py`'s output)
+1. **Introduction**, 2. **Background** (the algorithms and tools the field is built on)
+3. **The Cost of Exactness** (RQ1) - an empirical study of real-world repository, file, and AST
+   size, and what a whole-tree tree-edit-distance computation costs on it
+4. **A Ground Truth for Code Change** - how the human mapping and the human painting were authored.
+   Methodology only; no measurement, no tool.
+5. **What the Ground Truth Can Ask** (RQ2 uniqueness, RQ3 visibility, RQ4 rendering) - the ground
+   truth measured against itself, with no diffing tool in the section at all. Each answer bounds
+   what any evaluation built on such a corpus can report, this paper's own included.
+6. **How Well Existing Tools Do** (RQ5 accuracy, RQ6 cost) - GumTree, Unix `diff`, difftastic,
+   diffsitter against that ground truth. CodeDiff is absent by construction.
+7. **CodeDiff** - the system contribution: the pipeline, then its own accuracy, speed and
+   robustness. 8. **Related Work**, 9. **Conclusion**.
 
-The comparison is written to be read as generous, not competitive: difftastic and diffsitter
+The tool comparison is written to be read as generous, not competitive: difftastic and diffsitter
 optimize for human readability rather than ground-truth mapping fidelity, and GumTree's own
 evaluation, on its own pipeline and corpus, is what motivated adopting its move-detection
-heuristic in the first place - Section 6 and the Conclusion both frame CodeDiff's numbers as one
+heuristic in the first place - Section 6 and the Conclusion both frame the numbers as one
 way of combining what each tool already does well, not as a claim that any of them are lesser.
+
+**The title still reads as a tool-paper title** ("CodeDiff: A Fast, Robust, Production-Ready,
+Syntax-Aware Code Diffing Tool") and no longer matches the paper's shape. Left alone deliberately -
+retitling is the author's call.
 
 ## Status
 
-Compiles cleanly, 11 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
+Compiles cleanly, 14 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
 
@@ -47,12 +54,14 @@ number comes from. Two populations, kept visibly distinct in the generated outpu
   the assembler." Five blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
   RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), the tool comparison
   (`benchmark_other_report.py` -> `variables_comparison.tex`), RQ3's ground-truth ambiguity
-  (`ambiguity_report.py` -> `variables_ambiguity.tex`, via `make ambiguity-report`), and the
-  change-shape census (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make
-  shapes-report`) - the last currently generated but unreferenced, see the RQ1-RQ3 rule above.
+  (`ambiguity_report.py` -> `variables_ambiguity.tex`, via `make ambiguity-report`), what reaches
+  the reader (`rendering_report.py` -> `variables_rendering.tex`, via `make rendering-report`), and
+  the change-shape census (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make
+  shapes-report`) - the last currently generated but unreferenced, see the RQ rule below.
 * **Authored** - no saved producer to read back from, so the value is transcribed, but into one
   version-controlled place with a comment naming the command that produced it. This covers the
-  corpus/node-accuracy totals, the ablation deltas, the robustness run, and the design targets.
+  corpus/node-accuracy totals, the robustness run, and the design targets. The `Ablation*` block is
+  still generated and now entirely unreferenced - see the 2026-08-29 note in the RQ rule below.
 
 The per-tool comparison and speed tables moved from Authored to Generated on 2026-08-20. At ~30
 hand-transcribed numbers they were the largest authored group and the one every data refresh
@@ -79,20 +88,26 @@ loud `\textbf{??}` when a macro has no value from any source - never silently om
 `main.tex` builds under `-interaction=nonstopmode`, where an *undefined* macro does not fail the
 build; it just yields a PDF with the number quietly missing.
 
-### RQ1-RQ3 are answered without reference to CodeDiff
+### Every RQ is answered without reference to CodeDiff
 
-Set on 2026-08-22, and it is a structural rule, not a stylistic preference: an RQ answer describes
-the problem or the state of the art, so no RA box and none of the argument supporting one mentions
-CodeDiff. Section 3 keeps one attribution - the RQ1 measurement names the APTED implementation it
-ran, because that is what makes its "lower bound, not upper bound" caveat checkable - but states
-it tool-neutrally. Three consequences that are easy to undo by accident:
+Set on 2026-08-22 for RQ1-RQ3, widened on 2026-08-29 to all six. It is a structural rule, not a
+stylistic preference: an RQ answer describes the problem or the state of the art, so no RA box and
+none of the argument supporting one mentions CodeDiff. Section 3 keeps one attribution - the RQ1
+measurement names the APTED implementation it ran, because that is what makes its "lower bound, not
+upper bound" caveat checkable - but states it tool-neutrally. **RQ2, RQ3 and RQ4 go further: their
+whole section (5) names no diffing tool at all**, not even the four compared later, because they
+are properties of code change rather than of any implementation. Consequences that are easy to undo
+by accident:
 
 * **The four-tool comparison excludes CodeDiff entirely.** Table 2 has four rows, and
   `benchmark_other_report.py::plot_accuracy` deliberately drops the `codediff` series (see its doc
-  comment). `plot_runtime` keeps it, because speed is reported as CodeDiff's own production
-  viability rather than as an RQ answer. The `\CodeDiffLineRate{}` family of macros is still
-  generated and simply unused; that is intentional, so the number is one edit away if the framing
-  changes back.
+  comment). Since 2026-08-29 the speed table (`tab:speed-vs-others`) excludes it too, because
+  RQ6 makes tool cost an RA rather than a production-viability note; CodeDiff's own percentiles are
+  prose in Section 7, quoting the same macros, so nothing can drift. `plot_runtime` still keeps
+  CodeDiff in `fig:runtime`, which is why that figure sits in Section 7 rather than Section 6 - it
+  cannot be regenerated without CodeDiff's series. The `\CodeDiffLineRate{}` family of macros is
+  still generated and simply unused; that is intentional, so the number is one edit away if the
+  framing changes back.
 * **RQ3 was pivoted** from "which change shapes need a dedicated heuristic" to "when does a change
   have no single correct mapping". It now covers two phenomena that are deliberately kept apart,
   because they have different consequences and different epistemic status:
@@ -107,10 +122,23 @@ it tool-neutrally. Three consequences that are easy to undo by accident:
   the old RQ3's first half was cut from the paper; `human_mapping_shapes_report.py`, `make
   shapes-report`, and the whole `Shape*` macro block still exist and still run - only `main.tex`'s
   references were removed.
-* **The ablation study stayed but is no longer an RA.** It sits under CodeDiff's own evaluation,
-  after RA3, reframed as a property of this pipeline rather than an answer about the field. Its
-  "unique type matching fires zero times" result is unchanged and is still cited from the
-  Conclusion's recommendations.
+* **The ablation study was cut on 2026-08-29.** It is a measurement of *this pipeline*, which is
+  a tool-paper result; it says nothing about the problem or the state of the art, and it was the
+  last thing in the paper arguing from CodeDiff's internals. Removed together with its table, its
+  Related Work and Conclusion citations, and the phase-5 sentence that quoted it. **Nothing about
+  the study itself was retracted** - `ablation_study.sh`, the `Ablation*` macros and the
+  `HeuristicConfig` doc comment are all untouched and still correct, so it is one edit from
+  returning if a tool paper wants it. Its "unique type matching fires zero times" result is still
+  the sharpest thing measured about this pipeline.
+* **RQ4 (rendering) and RQ3 (visibility) were added on 2026-08-29**, both answered by
+  `analysis/rendering_report.py` (`make rendering-report`). They are the reason Section 4 exists as
+  a separate methodology section: the painted text ground truth needed describing before either
+  could be stated. Two properties of that script matter. It scopes itself to
+  `human_mapping_analysis.csv` exactly as `ambiguity_report.py` does, so its denominators match the
+  rest of the paper. And **the painted subset is not a random sample** - painting is manual, and
+  all 43 painted fixtures are from the `handmade` category, median 14 LOC against 219 for the rest
+  of the corpus. Section 5 states that limit explicitly and argues it runs conservative; do not
+  quote `\PaintingDualPct{}` as a corpus-wide rate.
 
 Two properties of `ambiguity_report.py` are load-bearing and easy to break. It scopes itself to
 the fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one
@@ -160,12 +188,15 @@ took 19m50s, 1.35M files, 1,133 files/sec). Swapping in the real full-corpus num
 finishes, is `make file-stats MODE=full` (slow, run once) followed by `make
 introductory-paper-empirical MODE=full` (fast, re-renders and rebuilds) - no hand-editing required.
 
-**Everything in Section 5 was refreshed on 2026-08-20** against the current 468-fixture corpus
+**Every ground-truth number was refreshed on 2026-08-20** against the current 468-fixture corpus
 (469 fixture directories, 468 of them carrying a `human_mapping.json`), replacing numbers measured
 on 98 fixtures. Refreshed together, deliberately: AST-node accuracy, the ablation study, the
 per-tool line-level comparison, the speed percentiles, and the robustness run were all measured
-against the same corpus, so refreshing one block alone would leave the section internally
-inconsistent. Keep that property on the next refresh.
+against the same corpus, so refreshing one block alone would leave the paper internally
+inconsistent. Keep that property on the next refresh. **Those numbers are now spread across
+Sections 5, 6 and 7** after the 2026-08-29 restructure - the constraint is unchanged and now spans
+three sections rather than one. The rendering block (Section 5's RQ3 and RQ4) was added on
+2026-08-29 against the same corpus state, `rendering_report.py` scoping itself to the same CSV.
 
 That pass changed more than the values:
 
