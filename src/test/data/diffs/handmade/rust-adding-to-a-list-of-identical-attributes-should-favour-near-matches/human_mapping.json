@@ -38240,5 +38240,56 @@
         ";:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 387,
+              "start_column": 0,
+              "end_row": 387,
+              "end_column": 12
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 388,
+              "start_column": 0,
+              "end_row": 388,
+              "end_column": 60
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 449,
+              "start_column": 0,
+              "end_row": 449,
+              "end_column": 12
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 450,
+              "start_column": 0,
+              "end_row": 450,
+              "end_column": 76
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
