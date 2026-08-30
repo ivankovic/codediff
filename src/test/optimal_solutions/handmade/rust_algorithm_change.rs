@@ -37,10 +37,12 @@ fn matches_human_solution() -> Result<()> {
     //    this is a genuine algorithm gap, not a cost tie: matching it would require bridging a
     //    removed loop-nesting level (the before side has the if/return two `for_expression` levels
     //    deep, the after side one), which the pipeline's structural matchers don't currently do.
-    //    The remaining 12 mismatches below are exactly this one chain (the if/return and everything
-    //    under it) failing to bridge that nesting-depth change - left as a known, accepted gap
-    //    rather than a broad "bridge removed nesting" heuristic, which risks regressing the rest of
-    //    the corpus the same way past attempts at similar generalizations have (see `TODO.md`).
+    //    The 40/26 limit below is this same nesting-bridging gap - every mismatch is tagged
+    //    APTED("qualified_name") and sits on the if/return chain or its ancestors - now covering
+    //    more of that chain than before because the human mapping got more thorough, not because
+    //    the gap grew. Left as a known, accepted gap rather than a broad "bridge removed nesting"
+    //    heuristic, which risks regressing the rest of the corpus the same way past attempts at
+    //    similar generalizations have (see `TODO.md`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-algorithm-change",
         40,
