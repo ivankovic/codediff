@@ -561,7 +561,7 @@ pub struct TextMappingCheck {
 }
 
 /// Checks the tree mapping against every painted text solution, and returns the one that agrees
-/// with it best - fewest disagreeing byte runs, ties broken by list order.
+/// with it best - fewest disagreeing **bytes**, ties broken by list order.
 ///
 /// **Best, not all, and deliberately.** The paintings are alternatives, not conjuncts: a fixture
 /// carrying `Minimal` and `Full` is asserting that either is a correct rendering of the same edit,
@@ -570,6 +570,36 @@ pub struct TextMappingCheck {
 /// answer, which is the opposite of what recording them is for. So a diff is judged against the
 /// answer it came closest to, and the name of that answer comes back with the result so a reader
 /// knows which one was used.
+///
+/// **Deliberately not mode-aware** ([`painting_for_mode`]/[`crate::diff::text::ranges_for_mode`]
+/// are the wrong tools here, unlike in [`compare_painting`]). Those exist to validate a *real
+/// product feature* - codediff's own Minimal/Full rendering modes - against the paintings written
+/// for them, which is exactly right when the tree side is `diff_code`'s real output. This function
+/// compares two human-authored ground truths against each other; the tree side never comes from
+/// `diff_code`, only from the human's own `entries` (via [`as_ast_diff_for_mapping`]). Routing that
+/// comparison through `painting_for_mode`/`ranges_for_mode` anyway would make a bug or even just a
+/// debatable design choice in either function indistinguishable, in the result, from a genuine
+/// disagreement between the two ground truths - the same kind of contamination as using
+/// `diff_code` itself, just relocated into the mode-selection machinery instead of the matcher.
+/// (An earlier version of this function did exactly that, mirroring `compare_painting`'s
+/// structure; reverted once this was noticed.) "Best of all paintings, by bytes" needs neither
+/// function, so it can't inherit either one's bugs.
+///
+/// **Byte count, not run count** - the metric this function used before recording only
+/// `disagreements.len()`, which lets one huge disagreeing run beat two tiny ones. Byte count is
+/// what every caller that reports a percentage actually sums, so the selection should optimize the
+/// same quantity being reported.
+///
+/// One rendering choice from [`crate::diff::text::TextDiff::from`] is still unavoidably present:
+/// turning a tree-level node mapping into byte-level labels requires *some* decision about which
+/// matched nodes render as `Move`, and `TextDiff::from`'s column-shift heuristic is that decision.
+/// Neither ground truth expresses `Move` positionally (`HumanOperation` has no `Move` variant;
+/// `HumanTextEntry::verdict` derives it from content identity alone), so no renderer setting
+/// recovers it correctly - a `crossed_backwards`-only variant (real reorders only, never column
+/// shift) was tried and reverted: it fixed nothing `rust-multi-map-duplicate-calls` needed (its
+/// genuine reorder doesn't cross an anchor in the synthetic tree built from `entries`) and broke
+/// `rust-add-if` the other way. Use [`disagreement_is_move_only`] to separate that unavoidable
+/// rendering artifact from genuine structural disagreement, rather than trusting the raw count.
 ///
 /// `Ok(None)` when nothing has been painted - not the same as agreement, and callers counting
 /// fixtures should test `text_mappings.is_empty()` themselves rather than read `None` as a pass.
@@ -591,13 +621,17 @@ pub fn text_mapping_disagreements(
         label_bytes_from_ranges(&after.contents, &text_diff.all(1)),
     ];
 
+    let disagreeing_bytes = |disagreements: &[TextMappingDisagreement]| -> usize {
+        disagreements.iter().map(|d| d.end_byte - d.start_byte).sum()
+    };
+
     let mut best: Option<TextMappingCheck> = None;
     for named in &mapping.text_mappings {
         let disagreements = disagreements_for(&named.mapping, before, after, &tree_labels)
             .with_context(|| format!("checking the '{}' text painting", named.name))?;
         let better = best
             .as_ref()
-            .is_none_or(|current| disagreements.len() < current.disagreements.len());
+            .is_none_or(|current| disagreeing_bytes(&disagreements) < disagreeing_bytes(&current.disagreements));
         if better {
             best = Some(TextMappingCheck {
                 solution: named.name.clone(),
@@ -606,6 +640,18 @@ pub fn text_mapping_disagreements(
         }
     }
     Ok(best)
+}
+
+/// Whether a disagreement is purely about `Move` vs "unchanged in place" - the one rendering
+/// artifact [`text_mapping_disagreements`] cannot avoid (see its doc comment). Excluded from the
+/// headline structural-disagreement figure so that number reflects only what the two
+/// human-authored ground truths themselves actually disagree about, with the `Move`-attributable
+/// share reported separately rather than silently folded in.
+pub fn disagreement_is_move_only(d: &TextMappingDisagreement) -> bool {
+    matches!(
+        (d.painted, d.from_tree),
+        (Some(TextLabel::Move), None) | (None, Some(TextLabel::Move))
+    )
 }
 
 /// One painting against already-computed tree labels.
@@ -4439,5 +4485,185 @@ mod tests {
             count < extents.len(),
             "a one-line span must not touch every node in the file"
         );
+    }
+
+    /// EXPLORATORY, not a permanent check: for every painted fixture, how much do the two
+    /// human-authored ground truths (`entries`/tree mapping vs. `text_mappings`/painting)
+    /// disagree with *each other*, via `mapping_vs_painting_disagreements` - i.e. with codediff's
+    /// own (possibly wrong) node-matching algorithm taken out of the loop entirely, unlike
+    /// `painting_agreement`'s `compare_painting`, which renders `diff_code`'s real output.
+    ///
+    /// Reports two figures per fixture: **structural** disagreement (what the two ground truths
+    /// actually disagree about) and **move-only** disagreement (bytes where the sole difference is
+    /// one side saying `Move`, the other "unchanged in place" - an artifact of `TextDiff::from`'s
+    /// column-shift heuristic, unavoidable in rendering but not a real disagreement between the
+    /// two humans - see `text_mapping_disagreements`'s doc comment). Structural is further split by
+    /// which side claims more: `tree_only` (the tree mapping says something changed, the painting
+    /// doesn't), `painting_only` (reverse), and `both_differ` (both say something changed, but
+    /// disagree on what).
+    #[test]
+    fn exploratory_mapping_vs_painting_agreement_census() -> Result<()> {
+        let names = [
+            "cpp-add-const-correctness",
+            "cpp-add-memory-management",
+            "cpp-add-templates",
+            "cpp-fix-segfault",
+            "cpp-optimize-algorithm",
+            "java-add-exception-handling",
+            "java-add-interface",
+            "java-add-logging",
+            "java-fix-array-index",
+            "java-refactor-constants",
+            "javascript-add-array-method",
+            "javascript-add-destructuring",
+            "javascript-add-event-listener",
+            "javascript-fix-promises",
+            "javascript-refactor-arrow-func",
+            "kotlin-add-data-class",
+            "kotlin-add-null-check",
+            "kotlin-add-validation",
+            "kotlin-fix-loop-bug",
+            "kotlin-refactor-function",
+            "python-added-if-block",
+            "python-added-if-block-small",
+            "python-add-remove-block",
+            "python-api-change",
+            "python-bugfix-loop",
+            "python-refactoring",
+            "rust-add-comments-and-real-new-logic",
+            "rust-add-if",
+            "rust-add-to-existing-use",
+            "rust-add-value-to-enum",
+            "rust-algorithm-change",
+            "rust-cost-optimization",
+            "rust-data-structure",
+            "rust-error-handling",
+            "rust-firefox-webrenderer-borders",
+            "rust-hash-optimization",
+            "rust-hello-world-added-message",
+            "rust-hello-world-removed-message",
+            "rust-leetcode-1-bugfix",
+            "rust-multi-map-duplicate-calls",
+            "rust-no-change",
+            "rust-small-addition-with-reuse-of-binary-expressions",
+            "rust-sniffnet-protocol",
+            "rust-tauri-api-build-1",
+            "rust-tauri-api-build-2",
+            "rust-tauri-cli-ios-dev",
+            "rust-turbopack-persistence-tools-main",
+            "typescript-add-error-handling",
+            "typescript-add-generics",
+            "typescript-add-type-annotations",
+            "typescript-async-await",
+        ];
+
+        struct Row {
+            name: String,
+            solution: String,
+            structural_bytes: usize,
+            tree_only: usize,
+            painting_only: usize,
+            both_differ: usize,
+            move_only_bytes: usize,
+            total_bytes: usize,
+        }
+
+        let mut rows: Vec<Row> = Vec::new();
+        for name in names {
+            let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+            let mapping = load(name)?;
+            let Some(check) = text_mapping_disagreements(&mapping, &before, &after)? else {
+                eprintln!("{name}: no painting - skipped");
+                continue;
+            };
+
+            let mut structural_bytes = 0;
+            let mut tree_only = 0;
+            let mut painting_only = 0;
+            let mut both_differ = 0;
+            let mut move_only_bytes = 0;
+            for d in &check.disagreements {
+                let width = d.end_byte - d.start_byte;
+                if disagreement_is_move_only(d) {
+                    move_only_bytes += width;
+                } else {
+                    structural_bytes += width;
+                    match (d.painted, d.from_tree) {
+                        (None, Some(_)) => tree_only += width,
+                        (Some(_), None) => painting_only += width,
+                        _ => both_differ += width,
+                    }
+                }
+            }
+            let total_bytes = before.contents.len() + after.contents.len();
+            rows.push(Row {
+                name: name.to_string(),
+                solution: check.solution,
+                structural_bytes,
+                tree_only,
+                painting_only,
+                both_differ,
+                move_only_bytes,
+                total_bytes,
+            });
+        }
+
+        rows.sort_by(|a, b| {
+            let pct = |r: &Row| 100.0 * r.structural_bytes as f64 / r.total_bytes.max(1) as f64;
+            pct(b).partial_cmp(&pct(a)).unwrap()
+        });
+        for r in &rows {
+            let pct = 100.0 * r.structural_bytes as f64 / r.total_bytes.max(1) as f64;
+            let move_pct = 100.0 * r.move_only_bytes as f64 / r.total_bytes.max(1) as f64;
+            eprintln!(
+                "{pct:>7.3}%  structural={:>6} (tree_only={:>5} painting_only={:>5} both_differ={:>5})  move_only={move_pct:>6.3}%  [{}]  {}",
+                r.structural_bytes, r.tree_only, r.painting_only, r.both_differ, r.solution, r.name
+            );
+        }
+        let zero = rows.iter().filter(|r| r.structural_bytes == 0).count();
+        let mean: f64 = rows
+            .iter()
+            .map(|r| 100.0 * r.structural_bytes as f64 / r.total_bytes.max(1) as f64)
+            .sum::<f64>()
+            / rows.len() as f64;
+        eprintln!(
+            "\n{}/{} fixtures agree exactly on structure, mean structural disagreement {:.3}%",
+            zero,
+            rows.len(),
+            mean
+        );
+        Ok(())
+    }
+
+    /// EXPLORATORY: prints every disagreement run for one named fixture, to read the *shape* of
+    /// what `exploratory_mapping_vs_painting_agreement_census` only counts.
+    #[test]
+    fn exploratory_mapping_vs_painting_disagreement_detail() -> Result<()> {
+        let name = "rust-add-if";
+        let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+        let mapping = load(name)?;
+        let check = text_mapping_disagreements(&mapping, &before, &after)?
+            .with_context(|| format!("{name} has no painting"))?;
+        eprintln!("best-matching painting: '{}'", check.solution);
+        for d in &check.disagreements {
+            let contents = if d.side == 0 {
+                &before.contents
+            } else {
+                &after.contents
+            };
+            let text = &contents.as_bytes()[d.start_byte..d.end_byte];
+            eprintln!(
+                "side={} row={} bytes={}..{} painted={:?} tree={:?} move_only={} text={:?}",
+                d.side,
+                d.start_row,
+                d.start_byte,
+                d.end_byte,
+                d.painted,
+                d.from_tree,
+                disagreement_is_move_only(d),
+                String::from_utf8_lossy(text)
+            );
+        }
+        Ok(())
     }
 }
