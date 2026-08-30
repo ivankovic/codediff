@@ -225,8 +225,11 @@ impl Code {
         let contents = fs::read_to_string(path)
             .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
 
-        // Determine language from file extension
-        let language = language::language_for_path(path).unwrap_or(Language::Unknown);
+        // Determine language from file extension, refined by content where that's cheap and
+        // unambiguous (e.g. a `.ts` file that's actually Qt Linguist XML, not TypeScript) - see
+        // `language_for_path_and_content`'s doc comment.
+        let language =
+            language::language_for_path_and_content(path, &contents).unwrap_or(Language::Unknown);
 
         let mut code = Code::from_string(&contents, &language);
         code.metadata.path = Some(path.to_path_buf());

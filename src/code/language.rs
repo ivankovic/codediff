@@ -33,6 +33,47 @@ pub fn language_for_path(path: &std::path::Path) -> Option<Language> {
 }
 
 /**
+* Refines [`language_for_path`]'s extension-derived guess by peeking at `content`, for the one
+* collision where a content check is cheap, unambiguous, and worth it: `.ts` is TypeScript in the
+* overwhelming majority of cases, but Qt Linguist also uses `.ts` for its XML translation-source
+* files (`<?xml version="1.0"?><!DOCTYPE TS>...`) - a real, recurring collision (any Qt-based
+* project), not a one-off. Unlike a fuzzy content heuristic, this one is safe to apply
+* unconditionally: a file starting with an XML declaration cannot also be valid TypeScript, so
+* there is no genuine TypeScript source this could misclassify.
+*
+* Every other extension collision this project has hit in practice (e.g. `.r` used by one
+* project's C runtime files instead of R) has been a one-off, single-repository convention rather
+* than a recurring pattern, so it's handled by rejecting that one corpus sample rather than by a
+* general content heuristic here - see `sample.csv`'s REJECTED rows and the "language detection"
+* discussion this function came out of.
+*
+* Callers that already have the file's content in hand (e.g. [`crate::code::Code::from_file`],
+* which reads the whole file before determining its language anyway) should prefer this over
+* [`language_for_path`] - it can only ever be as good or better, never worse, and costs nothing
+* beyond a `starts_with` check. Callers that only have a path, or where reading content first would
+* add real I/O cost against a large corpus (e.g. `sample_test_diffs`'s commit-delta walk, which
+* checks extension before ever touching a blob), should keep using `language_for_path` alone.
+*/
+pub fn language_for_path_and_content(path: &std::path::Path, content: &str) -> Option<Language> {
+    let guess = language_for_path(path)?;
+    if guess == Language::TypeScript && looks_like_xml(content) {
+        return Some(Language::XML);
+    }
+    Some(guess)
+}
+
+/// True if `content` opens with an XML declaration, ignoring a leading UTF-8 BOM and whitespace.
+/// Deliberately just the `<?xml` prolog rather than also requiring Qt Linguist's specific
+/// `<!DOCTYPE TS>` - any XML document misnamed `.ts` is equally not TypeScript, so there is no
+/// value in narrowing this to Qt Linguist specifically.
+fn looks_like_xml(content: &str) -> bool {
+    content
+        .trim_start_matches('\u{feff}')
+        .trim_start()
+        .starts_with("<?xml")
+}
+
+/**
 * Returns the best guess language for a given file extension.
 *
 * Note that some extensions are not uniquely identifiable so the highest probability result is
@@ -141,5 +182,62 @@ mod tests {
         );
         // No inner extension to fall back to.
         assert_eq!(language_for_path(std::path::Path::new("foo.test")), None);
+    }
+
+    #[test]
+    fn ts_extension_with_xml_content_is_qt_linguist_not_typescript() {
+        let qt_linguist = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE TS>\n<TS version=\"2.1\">\n</TS>\n";
+        assert_eq!(
+            language_for_path_and_content(
+                std::path::Path::new("translations/app_de.ts"),
+                qt_linguist
+            ),
+            Some(Language::XML)
+        );
+        // A leading UTF-8 BOM or whitespace before the declaration shouldn't defeat the sniff.
+        assert_eq!(
+            language_for_path_and_content(
+                std::path::Path::new("app.ts"),
+                "\u{feff}  \n<?xml version=\"1.0\"?><TS></TS>"
+            ),
+            Some(Language::XML)
+        );
+    }
+
+    #[test]
+    fn ts_extension_with_ts_content_is_still_typescript() {
+        assert_eq!(
+            language_for_path_and_content(
+                std::path::Path::new("app.ts"),
+                "export function greet(name: string): string {\n    return `hi ${name}`;\n}\n"
+            ),
+            Some(Language::TypeScript)
+        );
+        // Empty/unrelated content: no XML declaration, so no override.
+        assert_eq!(
+            language_for_path_and_content(std::path::Path::new("app.ts"), ""),
+            Some(Language::TypeScript)
+        );
+    }
+
+    #[test]
+    fn xml_content_sniff_is_scoped_to_ts_extension() {
+        // A `.tsx` file starting with `<?xml` is not a real-world collision (Qt Linguist only
+        // ever uses `.ts`) - don't let the sniff misfire on genuinely broken/unusual TSX content.
+        assert_eq!(
+            language_for_path_and_content(
+                std::path::Path::new("app.tsx"),
+                "<?xml version=\"1.0\"?>"
+            ),
+            Some(Language::TSX)
+        );
+        // Other extensions are untouched by this function entirely.
+        assert_eq!(
+            language_for_path_and_content(
+                std::path::Path::new("app.rs"),
+                "<?xml version=\"1.0\"?>"
+            ),
+            Some(Language::Rust)
+        );
     }
 }

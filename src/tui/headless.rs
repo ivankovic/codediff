@@ -27,7 +27,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::code::Code;
-use crate::code::language::language_for_path;
+use crate::code::language::language_for_path_and_content;
 use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
 use crate::diff::text::{
@@ -347,7 +347,7 @@ fn render_side(
     let (flags, spans) = row_overlay(ranges, &lines);
     let keep = lines_to_keep(&flags, context);
 
-    let language = language_for_path(path);
+    let language = language_for_path_and_content(path, contents);
     let parsed = language.map(|lang| Code::from_string(contents, &lang));
 
     // Every printed content line (and the `@` breadcrumb) is prefixed with its 1-indexed line

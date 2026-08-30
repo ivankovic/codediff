@@ -24,7 +24,7 @@ use ratatui::{buffer::Buffer, prelude::*, text::Line, widgets::StatefulWidget};
 use syntect::highlighting::{Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
 
-use crate::code::language::language_for_path;
+use crate::code::language::language_for_path_and_content;
 use crate::diff::text::{RangeMatch, TextOperation};
 use crate::diff::text_range::TextRange;
 use crate::tui::theme::{OverlayPalette, OverlayTheme};
@@ -506,7 +506,7 @@ impl CodeViewerWidget {
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read file: {:?}", path))?;
-        self.language = language_for_path(&path);
+        self.language = language_for_path_and_content(&path, &contents);
         self.file_path = Some(path);
         self.contents = contents;
         self.rebuild_highlight_cache();
@@ -518,7 +518,7 @@ impl CodeViewerWidget {
     /// Used when the content was already read elsewhere (e.g. by a background diff
     /// computation), so the UI thread doesn't redo a blocking file read.
     pub fn load_contents(&mut self, path: PathBuf, contents: String) {
-        self.language = language_for_path(&path);
+        self.language = language_for_path_and_content(&path, &contents);
         self.file_path = Some(path);
         self.contents = contents;
         self.rebuild_highlight_cache();

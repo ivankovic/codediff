@@ -65,7 +65,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use crate::code::Code;
-use crate::code::language::language_for_path;
+use crate::code::language::{language_for_path, language_for_path_and_content};
 use crate::diff::DiffMode;
 use crate::diff::text::{
     DiffSummary, RangeMatch, RenderMode, TextOperation, ranges_for_mode,
@@ -206,7 +206,7 @@ struct JsonDiff {
 /// `contents` to walk it for `nearest_reference_line`, same trade-off `headless::render_side`
 /// already makes (see its own doc comment: not on any hot path, so a redundant parse is fine).
 fn build_side(contents: &str, path: &Path, ranges: &[RangeMatch]) -> JsonSide {
-    let language = language_for_path(path);
+    let language = language_for_path_and_content(path, contents);
     let parsed = language.map(|lang| Code::from_string(contents, &lang));
 
     let mut hunks = Vec::new();

@@ -23,7 +23,8 @@ use rand::rngs::StdRng;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use codediff::code::language::{language_for_path, to_treesitter};
+use codediff::code::Language;
+use codediff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
 use codediff::metadata;
 use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
 use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
@@ -155,9 +156,19 @@ fn sample_repository(
             return Ok(());
         }
 
-        let Some(language) = language_for_path(path) else {
+        let Some(mut language) = language_for_path(path) else {
             return Ok(());
         };
+        // Refine a `.ts` guess by content (Qt Linguist vs. real TypeScript, see
+        // `language_for_path_and_content`'s doc comment) - gated to `TypeScript` specifically so
+        // this walk doesn't pay for a blob read on every other file it passes over.
+        if language == Language::TypeScript
+            && let Ok(blob) = repo.find_blob(delta.new_file().id())
+            && let Ok(text) = std::str::from_utf8(blob.content())
+            && let Some(refined) = language_for_path_and_content(path, text)
+        {
+            language = refined;
+        }
         // Only sample languages diff_code can actually parse.
         if to_treesitter(&language).is_none() {
             return Ok(());
