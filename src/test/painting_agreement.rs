@@ -123,6 +123,8 @@ mod rust_data_structure;
 #[cfg(test)]
 mod rust_error_handling;
 #[cfg(test)]
+mod rust_firefox_webrenderer_borders;
+#[cfg(test)]
 mod rust_hash_optimization;
 #[cfg(test)]
 mod rust_hello_world_added_message;
