@@ -5,7 +5,7 @@ C,PixarAnimationStudios-OpenSubdiv,17530d964d082f9f59fd1b429c5501bb61178329,regr
 C,Tripwire-tripwire-open-source,d06b001efec627f2c287cff3ed660e1182c93cd1,src/core/fsservices.h,c-tripwire-tripwire-open-source-add-single-item-to-list,full,PROMOTED,
 C,awslabs-aws-c-common,fbb21230e117d2afe49d03ebe8605270dacb4ab3,include/aws/common/file.h,c-awslabs-aws-c-common-only-insert,full,PROMOTED,
 C,freeciv-freeciv.git,556f7def010b5f34fbe3c994c66e313bfc9fc2f7,ai/default/daiair.h,c-freeciv-add-parameter-to-function,small,PROMOTED,
-C,graph-algorithms-edge-addition-planarity-suite,4636e2184a315d38ca9a9efdc4d6de000cc53fd6,c/planarityApp/planarityUtils.c,,full,SAMPLED,
+C,graph-algorithms-edge-addition-planarity-suite,4636e2184a315d38ca9a9efdc4d6de000cc53fd6,c/planarityApp/planarityUtils.c,c-graph-algorithms-edge-addition-planarity-suite-real-change-all-across-the-file,full,PROMOTED,
 C,htop-dev-htop.git,23ebdbb5ebcd261d86dc8ba18e6bf0b9b57cf345,Table.h,c-htop-remove-function-declaration,small,PROMOTED,
 C,intel-vpl-gpu-rt,df9b90abb3e8a6cb567fb08aaf0d9515ebdcbae2,_studio/shared/include/mfx_vpp_interface.h,c-intel-vpl-gpu-rt-whitespace-only-change,full,PROMOTED,
 C,libtom-libtomcrypt,6daff83d8239ace38aaad6062a450c277ebe2b7c,src/hashes/md5.c,c-libtom-libtomcrypt-change-function-call,full,PROMOTED,
@@ -104,7 +104,7 @@ HTML,abs-lang-abs,61e340e3fdd40abbf17f933da1fe6c675ca62645,docs/src/.vuepress/di
 HTML,apache-echarts.git,139206be7adab50f0d79e4d8adf3d14bac15b1bb,test/runTest/client/index.html,html-apache-echarts-actual-structure-change,small,PROMOTED,
 HTML,berndporr-iir1,4c139f20d1caf0c1f511f6de282bc795b17f4a2f,docs/classIir_1_1CascadeStages.html,html-berndporr-iir1-a-lot-of-new-functionality,full,PROMOTED,"For some reason, code between @license tags is jsut raw_text"
 HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/a00989_source.html,html-chennes-med-extreme-test,full,PROMOTED,
-HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/a01700_source.html,,full,SAMPLED,
+HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/a01700_source.html,,full,REJECTED,I couldn't solve this.
 HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/a02105_a3c04138a5bfe5d72780bb7e82a18e627.html,html-chennes-med-only-text-value-change,full,PROMOTED,
 HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/dir_000019_000013.html,html-chennes-med-only-text-value-change-2,full,PROMOTED,
 HTML,fatedier-frp.git,31f40aa9136b86d879f3495a601084eba6de873f,assets/frps/static/index.html,html-fatedier-add-attribute,small,PROMOTED,
@@ -411,7 +411,7 @@ TypeScript,microsoft-playwright.git,71e9e8e102b92e10c3edfc48185c791af3a4d6f1,tes
 TypeScript,n8n-io-n8n.git,d00a55f869c3dd3f20a438b8f65573467701528c,packages/@n8n/nodes-langchain/nodes/llms/LMLemonade/LmLemonade.node.ts,typescript-n8n-io-n8n-remove-and-add-imports,small,PROMOTED,
 TypeScript,nextcloud-desktop,60a9dcc5697c2fd03d7521046dabd6b128ae7247,translations/client_sk.ts,,full,REJECTED,This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests.
 TypeScript,pawelsalawa-sqlitestudio,a44584e523a2890ed53a96078c304a9f21212ef5,SQLiteStudio3/guiSQLiteStudio/translations/guiSQLiteStudio_nl_NL.ts,,full,REJECTED,This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests.
-TypeScript,radioacoustick-Coil64,362b627b7e301572608de346ae7b7549d0b53da8,lang/Coil64_tw.ts,,full,REJECETD,This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests.
+TypeScript,radioacoustick-Coil64,362b627b7e301572608de346ae7b7549d0b53da8,lang/Coil64_tw.ts,,full,REJECTED,This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests.
 TypeScript,radioacoustick-Coil64,4cd06a16bafe66e4925cfd40dfa7e6218f6e31cf,lang/Coil64_bg.ts,,full,REJECTED,This is an XML file that uses TypeScript file extension. Such errors are beyond the scope of diff-tests.
 TypeScript,th-ch-youtube-music,4fba3ffd92ca4d12962d4bdac22b8d497aefed39,src/plugins/downloader/main/index.ts,typescript-th-ch-youtube-music-add-a-function-and-some-small-changes,full,PROMOTED,
 Vimscript,chikamichi-mediawiki.vim,03ed9538a8a623c3fe626d07d5085d040a2cfc65,ftdetect/mediawiki.vim,vimscript-chikamichi-mediawiki-add-one-autocmd,full,PROMOTED,

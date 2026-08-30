@@ -64,15 +64,6 @@
       "after_path": [
         "class_declaration:1",
         "type_parameters:1",
-        "type_parameter:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "type_parameters:1",
         ">:1"
       ]
     },
@@ -193,37 +184,6 @@
       ]
     },
     {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "public_field_definition:1",
-        "type_annotation:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "public_field_definition:1",
-        "type_annotation:1",
-        "predefined_type:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "public_field_definition:1",
-        "type_annotation:1",
-        "predefined_type:1",
-        "number:1"
-      ]
-    },
-    {
       "operation": "identical",
       "before_path": [
         "class_declaration:1",
@@ -382,31 +342,6 @@
         "required_parameter:1",
         "type_annotation:1",
         "predefined_type:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:1",
-        "formal_parameters:1",
-        "required_parameter:1",
-        "type_annotation:1",
-        "predefined_type:1",
-        "number:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:1",
-        "formal_parameters:1",
-        "required_parameter:1",
-        "type_annotation:1",
-        "type_identifier:1"
       ]
     },
     {
@@ -772,16 +707,6 @@
       ]
     },
     {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:2",
-        "type_annotation:1",
-        "type_identifier:1"
-      ]
-    },
-    {
       "operation": "delete",
       "before_path": [
         "class_declaration:1",
@@ -789,17 +714,6 @@
         "method_definition:2",
         "type_annotation:1",
         "predefined_type:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:2",
-        "type_annotation:1",
-        "predefined_type:1",
-        "number:1"
       ]
     },
     {
@@ -1134,31 +1048,6 @@
         "required_parameter:1",
         "type_annotation:1",
         "predefined_type:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:3",
-        "formal_parameters:1",
-        "required_parameter:1",
-        "type_annotation:1",
-        "predefined_type:1",
-        "number:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_definition:3",
-        "formal_parameters:1",
-        "required_parameter:1",
-        "type_annotation:1",
-        "type_identifier:1"
       ]
     },
     {
@@ -1911,6 +1800,278 @@
       "after_path": [
         "lexical_declaration:2",
         ";:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "public_field_definition:1",
+        "type_annotation:1",
+        "predefined_type:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "public_field_definition:1",
+        "type_annotation:1",
+        "predefined_type:1",
+        "number:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "public_field_definition:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "predefined_type:1",
+        "number:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:1",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:2",
+        "type_annotation:1",
+        "predefined_type:1",
+        "number:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:2",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:3",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "predefined_type:1",
+        "number:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_definition:3",
+        "formal_parameters:1",
+        "required_parameter:1",
+        "type_annotation:1",
+        "type_identifier:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 6,
+              "end_row": 0,
+              "end_column": 21
+            }
+          ],
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 6,
+              "end_row": 0,
+              "end_column": 15
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 15,
+              "end_row": 0,
+              "end_column": 18
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 19,
+              "end_row": 1,
+              "end_column": 25
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 19,
+              "end_row": 1,
+              "end_column": 20
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 3,
+              "start_column": 23,
+              "end_row": 3,
+              "end_column": 29
+            }
+          ],
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 23,
+              "end_row": 3,
+              "end_column": 24
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 7,
+              "start_column": 16,
+              "end_row": 7,
+              "end_column": 22
+            }
+          ],
+          "after": [
+            {
+              "start_row": 7,
+              "start_column": 16,
+              "end_row": 7,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 11,
+              "start_column": 20,
+              "end_row": 11,
+              "end_column": 26
+            }
+          ],
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 20,
+              "end_row": 11,
+              "end_column": 21
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 16,
+              "start_column": 6,
+              "end_row": 16,
+              "end_column": 15
+            }
+          ],
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 6,
+              "end_row": 16,
+              "end_column": 21
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 16,
+              "start_column": 22,
+              "end_row": 16,
+              "end_column": 37
+            }
+          ],
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 28,
+              "end_row": 16,
+              "end_column": 37
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 37,
+              "end_row": 16,
+              "end_column": 45
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 17,
+              "start_column": 0,
+              "end_row": 17,
+              "end_column": 55
+            }
+          ]
+        }
       ]
     }
   ]

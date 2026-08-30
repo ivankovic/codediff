@@ -18,6 +18,8 @@
 #[cfg(test)]
 mod c_awslabs_aws_c_common_only_insert;
 #[cfg(test)]
+mod c_graph_algorithms_edge_addition_planarity_suite_real_change_all_across_the_file;
+#[cfg(test)]
 mod c_intel_vpl_gpu_rt_whitespace_only_change;
 #[cfg(test)]
 mod c_libtom_libtomcrypt_change_function_call;

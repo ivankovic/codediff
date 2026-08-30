@@ -107,11 +107,15 @@ mod python_bugfix_loop;
 #[cfg(test)]
 mod python_refactoring;
 #[cfg(test)]
+mod rust_add_comments_and_real_new_logic;
+#[cfg(test)]
 mod rust_add_if;
 #[cfg(test)]
 mod rust_add_to_existing_use;
 #[cfg(test)]
 mod rust_add_value_to_enum;
+#[cfg(test)]
+mod rust_algorithm_change;
 #[cfg(test)]
 mod rust_cost_optimization;
 #[cfg(test)]
@@ -119,9 +123,13 @@ mod rust_data_structure;
 #[cfg(test)]
 mod rust_error_handling;
 #[cfg(test)]
+mod rust_hash_optimization;
+#[cfg(test)]
 mod rust_hello_world_added_message;
 #[cfg(test)]
 mod rust_hello_world_removed_message;
+#[cfg(test)]
+mod rust_leetcode_1_bugfix;
 #[cfg(test)]
 mod rust_multi_map_duplicate_calls;
 #[cfg(test)]
@@ -135,7 +143,13 @@ mod rust_tauri_api_build_1;
 #[cfg(test)]
 mod rust_tauri_api_build_2;
 #[cfg(test)]
+mod rust_tauri_cli_ios_dev;
+#[cfg(test)]
+mod rust_turbopack_persistence_tools_main;
+#[cfg(test)]
 mod typescript_add_error_handling;
+#[cfg(test)]
+mod typescript_add_generics;
 #[cfg(test)]
 mod typescript_add_type_annotations;
 #[cfg(test)]
