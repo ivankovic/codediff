@@ -52,7 +52,7 @@ pub(crate) struct UnitCostModel {
     /// Stored pre-reduced rather than as a `Language`, because `ren` runs once per tree-edit-
     /// distance DP cell and re-deriving the family list per call is exactly the O(n^2) string
     /// scanning `KindCostClass` exists to remove.
-    language_family_mask: u8,
+    language_family_mask: u16,
 }
 
 impl UnitCostModel {

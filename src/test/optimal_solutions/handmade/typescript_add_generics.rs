@@ -21,9 +21,13 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // The 4 predefined_type<->type_identifier mismatches (e.g. "number" becoming a generic "T")
+    // are fixed - see TS_TYPE_KEYWORD_KINDS in nodes.rs. The remaining 10/7 is an unrelated
+    // fast_fallback issue: the renamed "const container = new NumberContainer(42)" line fails to
+    // match its "const numberContainer = new Container<number>(42)" counterpart at all.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-add-generics",
-        14,
-        11,
+        10,
+        7,
     )
 }
