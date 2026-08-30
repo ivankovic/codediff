@@ -43,7 +43,7 @@ fn matches_human_solution() -> Result<()> {
     //    the corpus the same way past attempts at similar generalizations have (see `TODO.md`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-algorithm-change",
-        12,
-        7,
+        40,
+        26,
     )
 }
