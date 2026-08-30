@@ -183,7 +183,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{
+        Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Wrap,
+    },
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -198,8 +200,8 @@ use codediff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
 use codediff::test::helper::human_mapping::{
     self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
     HumanTextMapping, HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup,
-    NamedTextMapping, NodeStatus, is_inherited_removed, path_refs, rebuild_caches_for_mapping,
-    status_after, status_before,
+    NamedTextMapping, NodeStatus, disagreement_is_move_only, is_inherited_removed, path_refs,
+    rebuild_caches_for_mapping, status_after, status_before, text_mapping_disagreements,
 };
 use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 // Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
@@ -431,6 +433,17 @@ fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
 /// `diff_case_is_incomplete`). A case missing from `completeness` (not yet scanned, or
 /// `compute_diff_completeness` couldn't load it) is kept visible under `hide_complete` too - fail
 /// open, since hiding something the scan never actually confirmed as done would be misleading.
+///
+/// `hide_agreement`/`disagreement` are the `Y` counterpart: narrows to cases
+/// `diff_case_disagreement_bytes` reports as nonzero (or not yet in the map at all - not painted,
+/// or unloadable - since a case with nothing to compare has nothing to show under "disagreements
+/// only" either). Same fail-open contract at the whole-map level: `disagreement` being `None`
+/// (never scanned this session) hides nothing regardless of `hide_agreement`.
+///
+/// Sorted last, by `sort_order` - `Alphabetical`/`ReverseAlphabetical` re-sort explicitly rather
+/// than relying on `options` already being alphabetical, so this function's output is correct on
+/// its own rather than depending on a caller's ordering.
+#[allow(clippy::too_many_arguments)]
 fn visible_diff_options(
     options: &[(String, &'static str)],
     filter: Option<&'static str>,
@@ -438,8 +451,11 @@ fn visible_diff_options(
     completeness: Option<&std::collections::HashMap<String, bool>>,
     hide_painted: bool,
     text_painted: Option<&std::collections::HashMap<String, bool>>,
+    hide_agreement: bool,
+    disagreement: Option<&std::collections::HashMap<String, usize>>,
+    sort_order: DiffSortOrder,
 ) -> Vec<String> {
-    options
+    let mut visible: Vec<String> = options
         .iter()
         .filter(|(_, dataset)| filter.is_none_or(|f| *dataset == f))
         .filter(|(name, _)| {
@@ -459,8 +475,28 @@ fn visible_diff_options(
                     .copied()
                     .unwrap_or(false)
         })
+        .filter(|(name, _)| {
+            !hide_agreement
+                || disagreement.is_none_or(|m| m.get(name).copied().unwrap_or(0) > 0)
+        })
         .map(|(name, _)| name.clone())
-        .collect()
+        .collect();
+
+    match sort_order {
+        DiffSortOrder::Alphabetical => visible.sort(),
+        DiffSortOrder::ReverseAlphabetical => {
+            visible.sort();
+            visible.reverse();
+        }
+        DiffSortOrder::LeastDisagreementFirst => visible.sort_by_key(|name| {
+            disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0)
+        }),
+        DiffSortOrder::MostDisagreementFirst => visible.sort_by_key(|name| {
+            std::cmp::Reverse(disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0))
+        }),
+    }
+
+    visible
 }
 
 /// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case
@@ -478,6 +514,9 @@ fn open_diff_picker_modal(
     completeness: Option<&std::collections::HashMap<String, bool>>,
     hide_painted: bool,
     text_painted: Option<&std::collections::HashMap<String, bool>>,
+    hide_agreement: bool,
+    disagreement: Option<&std::collections::HashMap<String, usize>>,
+    sort_order: DiffSortOrder,
 ) -> Modal {
     let visible = visible_diff_options(
         &options,
@@ -486,6 +525,9 @@ fn open_diff_picker_modal(
         completeness,
         hide_painted,
         text_painted,
+        hide_agreement,
+        disagreement,
+        sort_order,
     );
     let selected = visible
         .iter()
@@ -498,6 +540,8 @@ fn open_diff_picker_modal(
         dataset_filter,
         hide_complete,
         hide_painted,
+        hide_agreement,
+        sort_order,
     }
 }
 
@@ -645,6 +689,65 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
             let painted = diff_case_has_text_mapping(&name).unwrap_or(false);
             (name, painted)
         })
+        .collect()
+}
+
+/// How many bytes `name`'s human tree mapping and human text painting disagree about, via
+/// `text_mapping_disagreements` - the same pure ground-truth-vs-ground-truth comparison
+/// `test::helper::human_mapping::exploratory_mapping_vs_painting_agreement_census` reports,
+/// excluding `disagreement_is_move_only` runs (the one unavoidable rendering artifact from
+/// `TextDiff::from`'s column-shift `Move` heuristic - see that function's own doc comment). `None`
+/// when the case can't be loaded, or has no text painting yet at all (nothing to compare against -
+/// distinct from "compared and agrees exactly", which is `Some(0)`).
+fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
+    let dir = diffs_case_dir(name)?;
+    let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
+    let mapping = human_mapping::load(name).ok()?;
+    let check = text_mapping_disagreements(&mapping, &before, &after)
+        .ok()
+        .flatten()?;
+    Some(
+        check
+            .disagreements
+            .iter()
+            .filter(|d| !disagreement_is_move_only(d))
+            .map(|d| d.end_byte - d.start_byte)
+            .sum(),
+    )
+}
+
+/// Refreshes just `name`'s entry in `App::diff_disagreement`, for the same reason (and at the same
+/// call sites) as `refresh_diff_completeness`/`refresh_diff_text_painted`: saving is the only
+/// thing that can change a case's disagreement score mid-session.
+fn refresh_diff_disagreement(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_disagreement {
+        match diff_case_disagreement_bytes(name) {
+            Some(bytes) => {
+                map.insert(name.to_string(), bytes);
+            }
+            // A case with no text painting yet has nothing to compare - stays absent from the map
+            // rather than reporting a misleading 0, same as `diff_case_has_text_mapping`'s
+            // presence-not-emptiness distinction.
+            None => {
+                map.remove(name);
+            }
+        }
+    }
+}
+
+/// Builds `App::diff_disagreement` for every case `list_available_cases` lists that already has a
+/// text painting - the `o` picker's `s` disagreement-sort and `Y` filter need this for the whole
+/// corpus before they can rank/hide by it. The most expensive of the four lazy `o`-picker scans:
+/// unlike `compute_diff_completeness` (parses both sides once), this also builds a synthetic
+/// `ASTDiff` from the tree mapping and renders it through `TextDiff::from` per fixture - still
+/// bounded by the same corpus size, just a heavier constant per fixture.
+fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
+    let Ok(options) = list_available_cases() else {
+        return std::collections::HashMap::new();
+    };
+    options
+        .into_iter()
+        .filter_map(|(name, _)| diff_case_disagreement_bytes(&name).map(|bytes| (name, bytes)))
         .collect()
 }
 
@@ -927,6 +1030,44 @@ fn sample_diff_line_count(name: &str) -> usize {
                 || (line.starts_with('-') && !line.starts_with("---"))
         })
         .count()
+}
+
+/// Sort order for the `o` (open diff) picker's list, cycled by pressing `s` while it's open (see
+/// `Modal::OpenDiffPicker`). `Least`/`MostDisagreementFirst` rank by `diff_case_disagreement_bytes`,
+/// the same "human tree mapping vs. human painting" byte count `text_mapping_disagreements`
+/// computes (see that function's own doc comment for why it's pure ground-truth-vs-ground-truth,
+/// with `diff_code`'s own algorithm never in the loop) - so fixtures worth a second look sort to
+/// the top without needing to open each one to find out. A separate enum from `SampleSortOrder`,
+/// not a shared one, even though the shape is identical: the two pickers rank by unrelated
+/// quantities (a sample's raw diff size vs. a solved fixture's ground-truth disagreement), and
+/// conflating them would make either picker's `s` key harder to reason about from its own modal
+/// alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiffSortOrder {
+    Alphabetical,
+    ReverseAlphabetical,
+    LeastDisagreementFirst,
+    MostDisagreementFirst,
+}
+
+impl DiffSortOrder {
+    fn next(self) -> Self {
+        match self {
+            DiffSortOrder::Alphabetical => DiffSortOrder::ReverseAlphabetical,
+            DiffSortOrder::ReverseAlphabetical => DiffSortOrder::LeastDisagreementFirst,
+            DiffSortOrder::LeastDisagreementFirst => DiffSortOrder::MostDisagreementFirst,
+            DiffSortOrder::MostDisagreementFirst => DiffSortOrder::Alphabetical,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            DiffSortOrder::Alphabetical => "A-Z",
+            DiffSortOrder::ReverseAlphabetical => "Z-A",
+            DiffSortOrder::LeastDisagreementFirst => "least disagreement first",
+            DiffSortOrder::MostDisagreementFirst => "most disagreement first",
+        }
+    }
 }
 
 /// Sort order for the `O` (open sample) picker's list, cycled by pressing `s` while it's open (see
@@ -1512,6 +1653,13 @@ enum TextOverlay {
     /// Only the bytes where the two disagree, painted with the *human's* label so the colour still
     /// says what the human claimed. Empty means they agree everywhere.
     Disagreements,
+    /// Only the bytes where the human's *painting* and their own *tree mapping* disagree with each
+    /// other (see `tree_mapping_text_spans`/`diff_case_disagreement_bytes`) - the same
+    /// human-vs-human comparison `text_mapping_disagreements` makes, with `diff_code`'s own
+    /// algorithm never in the loop, unlike `Disagreements` above (which compares the painting
+    /// against codediff's real output). Lets a fixture flagged by the `o` picker's `s`/`Y` sort and
+    /// filter be inspected directly: where, specifically, do the two ground truths disagree.
+    TreeDisagreement,
 }
 
 impl TextOverlay {
@@ -1519,7 +1667,8 @@ impl TextOverlay {
         match self {
             TextOverlay::Human => TextOverlay::CodeDiff,
             TextOverlay::CodeDiff => TextOverlay::Disagreements,
-            TextOverlay::Disagreements => TextOverlay::Human,
+            TextOverlay::Disagreements => TextOverlay::TreeDisagreement,
+            TextOverlay::TreeDisagreement => TextOverlay::Human,
         }
     }
 
@@ -1528,6 +1677,7 @@ impl TextOverlay {
             TextOverlay::Human => "human",
             TextOverlay::CodeDiff => "codediff",
             TextOverlay::Disagreements => "disagreements",
+            TextOverlay::TreeDisagreement => "tree vs painting",
         }
     }
 }
@@ -1573,15 +1723,63 @@ fn codediff_text_spans(before: &Code, after: &Code) -> [Vec<(HumanTextSpan, Huma
     [convert(text_diff.all(0)), convert(text_diff.all(1))]
 }
 
-/// The spans where the human's painting and codediff's rendering disagree, labelled with the
-/// human's verdict.
+/// The human's own *tree* mapping (`HumanMapping::entries`, never `diff_code`'s output) for this
+/// case, as painting spans - the tree-mapping counterpart of `codediff_text_spans`, and what backs
+/// `TextOverlay::TreeDisagreement`.
 ///
-/// Computed here rather than through `text_mapping_disagreements` because that one compares the
-/// painting against the *tree* mapping, which is a different question: this view is about the
-/// human's text against codediff's text, with no node mapping in between.
+/// Goes through the same `as_ast_diff_for_mapping` + `TextDiff::from` pipeline
+/// `text_mapping_disagreements` uses for its own tree side (see that function's doc comment for
+/// why this - not `diff_code` - is the only input that keeps a tree-vs-painting comparison pure
+/// human-vs-human). `None` mapping load failures collapse to an empty pair of spans, same as
+/// `codediff_text_spans` does when `diff_code` produces no AST.
+fn tree_mapping_text_spans(
+    mapping: &HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
+    let Ok(ast_diff) = human_mapping::as_ast_diff_for_mapping(mapping, before, after) else {
+        return [Vec::new(), Vec::new()];
+    };
+    let node_cache = NodeCache::build(before, after);
+    let text_diff = TextDiff::from(before, after, &ast_diff, &node_cache);
+
+    let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
+        ranges
+            .into_iter()
+            .filter(|range_match| !range_match.source.is_empty())
+            .filter_map(|range_match| {
+                let verdict = match range_match.operation {
+                    codediff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
+                    codediff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
+                    codediff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
+                    codediff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
+                    _ => return None,
+                };
+                Some((
+                    HumanTextSpan {
+                        start_row: range_match.source.start_row,
+                        start_column: range_match.source.start_column,
+                        end_row: range_match.source.end_row,
+                        end_column: range_match.source.end_column,
+                    },
+                    verdict,
+                ))
+            })
+            .collect()
+    };
+    [convert(text_diff.all(0)), convert(text_diff.all(1))]
+}
+
+/// The spans where the human's painting and some other span source disagree, labelled with the
+/// human's verdict. Generic over what `other` actually is - `TextOverlay::Disagreements` passes
+/// `codediff_text_spans` (the painting against codediff's own rendering), `TextOverlay::
+/// TreeDisagreement` passes `tree_mapping_text_spans` (the painting against the human's own tree
+/// mapping - the same comparison `text_mapping_disagreements` makes, computed independently here
+/// at row/column granularity rather than reusing that byte-offset-based function, since this is a
+/// different call site with its own existing row-by-row span machinery already in hand).
 fn overlay_disagreement_spans(
     painted: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
-    algo: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
+    other: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
     before_src: &str,
     after_src: &str,
 ) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
@@ -1606,7 +1804,7 @@ fn overlay_disagreement_spans(
             };
             for (column, _) in line.char_indices() {
                 let human = verdict_at(&painted[side], row, column, line.len());
-                let theirs = verdict_at(&algo[side], row, column, line.len());
+                let theirs = verdict_at(&other[side], row, column, line.len());
                 if human == theirs {
                     if let Some(start) = run_start.take() {
                         push(start, column, run_verdict, &mut out[side]);
@@ -2001,7 +2199,11 @@ enum Modal {
     /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time, and `H`
     /// toggles `hide_complete` (narrowing to cases with at least one unmarked node left - see
     /// `diff_case_is_incomplete`/`App::diff_completeness`). Like `OpenSamplePicker`, `selected`
-    /// indexes into the filtered view (`visible_diff_options`), not `options` itself.
+    /// indexes into the filtered view (`visible_diff_options`), not `options` itself. Rendered as
+    /// a table (`render_open_diff_picker`), one status column per filterable dimension, so
+    /// `hide_complete`/`hide_painted`/`hide_agreement` can be combined into compound filters
+    /// ("still needs nodes marked AND disagrees with its own painting", say) with each column's
+    /// state visible at a glance rather than only inferable from the title bar.
     OpenDiffPicker {
         options: Vec<(String, &'static str)>,
         selected: usize,
@@ -2010,6 +2212,13 @@ enum Modal {
         /// The `X` filter: narrow to cases with no painted text mapping yet (see
         /// `App::diff_hide_painted`).
         hide_painted: bool,
+        /// The `Y` filter: narrow to cases where the tree mapping and the text painting actually
+        /// disagree (see `diff_case_disagreement_bytes`/`App::diff_hide_agreement`) - a case with
+        /// no painting yet has nothing to compare, so it is hidden under this filter too, the same
+        /// way `hide_painted` hides a painted case under itself.
+        hide_agreement: bool,
+        /// Cycled by `s` (see `DiffSortOrder`), persisted the same way `App::diff_sort_order` is.
+        sort_order: DiffSortOrder,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with its `SampleTriageStatus` (per the matching sample.csv
@@ -2208,6 +2417,21 @@ struct App {
     /// marked" and "still needs text painted" are different queues and combine as an AND when both
     /// are on.
     diff_hide_painted: bool,
+    /// The `o` picker's "disagreements only" filter (toggled by `Y` inside it), persisted for the
+    /// same reason as `diff_hide_painted` above. A third, independent queue: whether the tree
+    /// mapping and the text painting actually agree with *each other* is a different question from
+    /// whether either one is finished (see `diff_case_disagreement_bytes`).
+    diff_hide_agreement: bool,
+    /// The `o` picker's sort order (cycled by `s` inside it - see `DiffSortOrder`), persisted for
+    /// the same reason as `diff_dataset_filter` above.
+    diff_sort_order: DiffSortOrder,
+    /// Cache of, for every case `list_available_cases` lists that already has a text painting, how
+    /// many bytes its tree mapping and painting disagree about (see
+    /// `diff_case_disagreement_bytes`). `None` until the first `Y` press or `s` sort-cycle past
+    /// `Alphabetical`/`ReverseAlphabetical`, the same lazy-once-per-session contract
+    /// `diff_completeness` has - and the most expensive of the three scans (see that function's
+    /// own doc comment).
+    diff_disagreement: Option<std::collections::HashMap<String, usize>>,
     /// Cache of, for every case `list_available_cases` lists, whether it already has a painted
     /// text mapping (see `diff_case_has_text_mapping`). `None` until the first `X` press, the same
     /// lazy-once-per-session contract `diff_completeness` has - though this scan is much cheaper,
@@ -2226,6 +2450,11 @@ struct App {
     /// when the case changes. `None` until `p` has cycled past `Human` at least once - running the
     /// diff costs real time on a large fixture, and the default view never needs it.
     algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
+    /// The open case's *tree mapping*, rendered as text ranges via `tree_mapping_text_spans` - the
+    /// human-vs-human counterpart of `algo_text_spans` (that one is `diff_code`'s output;  this one
+    /// is `as_ast_diff_for_mapping`'s, i.e. the human's own `entries`, never `diff_code`). Backs
+    /// `TextOverlay::TreeDisagreement`, computed and dropped the same way `algo_text_spans` is.
+    tree_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     /// Which named text painting (`HumanMapping::text_mappings`) the `t` view is editing. Starts
     /// at the fixture's first existing painting, or `SUGGESTED_SOLUTION_NAMES[0]` when it has
     /// none, and is changed by `s` (save-as) / `L` (load) inside that view.
@@ -2286,11 +2515,15 @@ impl App {
             diff_dataset_filter: None,
             diff_hide_complete: false,
             diff_hide_painted: false,
+            diff_hide_agreement: false,
+            diff_sort_order: DiffSortOrder::Alphabetical,
+            diff_disagreement: None,
             diff_text_painted: None,
             diff_comments: None,
             text_solution,
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,
+            tree_text_spans: None,
             diff_completeness: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
@@ -4415,8 +4648,10 @@ fn draw_ui(
             &app.text_solution,
             app.text_overlay,
             app.algo_text_spans.as_ref(),
+            app.tree_text_spans.as_ref(),
             app.diff_completeness.as_ref(),
             app.diff_text_painted.as_ref(),
+            app.diff_disagreement.as_ref(),
             app.diff_comments.as_ref(),
         );
     }
@@ -4481,8 +4716,10 @@ fn render_modal(
     text_solution: &str,
     text_overlay: TextOverlay,
     algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
+    tree_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     diff_completeness: Option<&std::collections::HashMap<String, bool>>,
     diff_text_painted: Option<&std::collections::HashMap<String, bool>>,
+    diff_disagreement: Option<&std::collections::HashMap<String, usize>>,
     diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     match modal {
@@ -4524,6 +4761,8 @@ fn render_modal(
             dataset_filter,
             hide_complete,
             hide_painted,
+            hide_agreement,
+            sort_order,
         } => {
             render_open_diff_picker(
                 frame,
@@ -4535,6 +4774,9 @@ fn render_modal(
                 diff_completeness,
                 *hide_painted,
                 diff_text_painted,
+                *hide_agreement,
+                diff_disagreement,
+                *sort_order,
                 diff_comments,
             );
         }
@@ -4623,6 +4865,7 @@ fn render_modal(
                 text_solution,
                 text_overlay,
                 algo_text_spans,
+                tree_text_spans,
                 state,
             );
         }
@@ -4903,6 +5146,7 @@ fn render_text_view_modal(
     solution: &str,
     overlay: TextOverlay,
     algo_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
+    tree_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     state: &TextPaintState,
 ) {
     let popup_area = centered_rect(96, 92, area);
@@ -4927,11 +5171,15 @@ fn render_text_view_modal(
     ];
     let empty = [Vec::new(), Vec::new()];
     let algo = algo_spans.unwrap_or(&empty);
+    let tree = tree_spans.unwrap_or(&empty);
     let shown = match overlay {
         TextOverlay::Human => human_spans,
         TextOverlay::CodeDiff => algo.clone(),
         TextOverlay::Disagreements => {
             overlay_disagreement_spans(&human_spans, algo, before_src, after_src)
+        }
+        TextOverlay::TreeDisagreement => {
+            overlay_disagreement_spans(&human_spans, tree, before_src, after_src)
         }
     };
 
@@ -5173,13 +5421,16 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     );
 }
 
-/// Renders the `o`/`O` (open) pickers: a scrollable list of names (test cases for `o`, samples
-/// for `O`, per `kind`), with `selected` highlighted. Scroll position is recomputed fresh each
-/// frame from `selected` (no persisted state needed) by roughly centering it in the viewport,
-/// clamped to the list's extent.
-/// The `o` picker. Like `render_open_sample_picker`, the dataset-filtered view
-/// (`visible_diff_options`) is recomputed here from `options`/`dataset_filter` rather than
-/// carried on the modal itself, so the two can never drift out of sync.
+/// Renders the `o` picker as a table, one row per case and one column per filterable/sortable
+/// dimension (`Dataset`/`Cmpl`/`Paint`/`Disagree`), so `H`/`X`/`Y`'s combined effect and `s`'s sort
+/// key are both visible at a glance instead of only inferable from the title bar - the corpus has
+/// three independent per-case questions (tree mapping finished? text painted? do the two ground
+/// truths agree?), and a plain name list can only show which cases survived every filter, not why
+/// a given case did or didn't. Like `render_open_sample_picker`, the filtered/sorted view
+/// (`visible_diff_options`) is recomputed here from `options`/`dataset_filter`/... rather than
+/// carried on the modal itself, so the two can never drift out of sync. Scroll position is
+/// recomputed fresh each frame from `selected` (no persisted state needed) by roughly centering it
+/// in the viewport, clamped to the list's extent.
 #[allow(clippy::too_many_arguments)]
 fn render_open_diff_picker(
     frame: &mut Frame,
@@ -5191,6 +5442,9 @@ fn render_open_diff_picker(
     completeness: Option<&std::collections::HashMap<String, bool>>,
     hide_painted: bool,
     text_painted: Option<&std::collections::HashMap<String, bool>>,
+    hide_agreement: bool,
+    disagreement: Option<&std::collections::HashMap<String, usize>>,
+    sort_order: DiffSortOrder,
     comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     let visible = visible_diff_options(
@@ -5200,17 +5454,20 @@ fn render_open_diff_picker(
         completeness,
         hide_painted,
         text_painted,
+        hide_agreement,
+        disagreement,
+        sort_order,
     );
 
-    let popup_area = centered_rect(60, 70, area);
+    let popup_area = centered_rect(80, 70, area);
     frame.render_widget(Clear, popup_area);
 
     // The note of whatever row is selected gets its own strip along the bottom. A note is
     // free-form prose and the names here already run to sixty-odd characters, so there is no room
-    // to show one inline - the list carries a marker saying a note exists, and this says what it
-    // is for the one row the reader is actually on.
+    // to show one inline - the table carries a marker column saying a note exists, and this says
+    // what it is for the one row the reader is actually on.
     let note = comments.and_then(|map| visible.get(selected).and_then(|name| map.get(name)));
-    let (list_area, note_area) = if note.is_some() {
+    let (table_area, note_area) = if note.is_some() {
         let split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(3), Constraint::Length(4)])
@@ -5220,14 +5477,25 @@ fn render_open_diff_picker(
         (popup_area, None)
     };
 
-    // Derived from `list_area`, not `popup_area`: the footer takes rows away from the list, and
+    // Derived from `table_area`, not `popup_area`: the footer takes rows away from the table, and
     // scrolling computed against the full popup would push the selected row off the bottom by
-    // exactly the footer's height.
-    let inner_height = list_area.height.saturating_sub(2) as usize;
+    // exactly the footer's height. One extra row for the header, on top of the two border rows.
+    let inner_height = table_area.height.saturating_sub(3) as usize;
     let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
 
-    let items: Vec<ListItem> = visible
+    // `options`, not `visible`, carries each name's dataset - looked up per row rather than
+    // threading a second parallel list through `visible_diff_options`, since the table only ever
+    // needs it for the rows actually on screen (at most a few dozen), not the whole corpus.
+    let dataset_of = |name: &str| -> &'static str {
+        options
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| *d)
+            .unwrap_or("?")
+    };
+
+    let rows: Vec<Row> = visible
         .iter()
         .enumerate()
         .skip(scroll)
@@ -5238,24 +5506,49 @@ fn render_open_diff_picker(
             } else {
                 Style::default()
             };
-            // Marked rather than shown: which cases carry a note is the part worth seeing at a
-            // glance, and it is also the part that survives a narrow terminal.
-            let marked = match comments {
-                Some(map) if map.contains_key(name) => format!("* {name}"),
-                Some(_) => format!("  {name}"),
-                None => name.clone(),
+            let noted = comments.is_some_and(|map| map.contains_key(name));
+            let complete_mark = match completeness.and_then(|m| m.get(name)) {
+                Some(true) => "•",
+                Some(false) => "✓",
+                None => "?",
             };
-            ListItem::new(Line::from(Span::styled(marked, style)))
+            let painted_mark = match text_painted.and_then(|m| m.get(name)) {
+                Some(true) => "✓",
+                Some(false) => "•",
+                None => "?",
+            };
+            let disagree_cell = match disagreement.and_then(|m| m.get(name)) {
+                Some(0) => "0".to_string(),
+                Some(bytes) => bytes.to_string(),
+                None => "—".to_string(),
+            };
+            Row::new(vec![
+                Cell::from(if noted {
+                    format!("* {name}")
+                } else {
+                    format!("  {name}")
+                }),
+                Cell::from(dataset_of(name)),
+                Cell::from(complete_mark),
+                Cell::from(painted_mark),
+                Cell::from(disagree_cell),
+            ])
+            .style(style)
         })
         .collect();
+
+    let header = Row::new(vec!["Name", "Dataset", "Cmpl", "Paint", "Disagree"])
+        .style(Style::default().add_modifier(Modifier::BOLD));
 
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            "Open diff [{}]{}{} ({}/{}) — j/k, d dataset, H incomplete-only, X unpainted-only, Enter, Esc",
+            "Open diff [{}]{}{}{} sort:{} ({}/{}) — j/k, d dataset, H incomplete-only, X unpainted-only, Y disagreements-only, s sort, Enter, Esc",
             dataset_filter.unwrap_or("all"),
             if hide_complete { " [incomplete only]" } else { "" },
             if hide_painted { " [unpainted only]" } else { "" },
+            if hide_agreement { " [disagreements only]" } else { "" },
+            sort_order.label(),
             selected + 1,
             visible.len()
         ))
@@ -5265,7 +5558,20 @@ fn render_open_diff_picker(
                 .add_modifier(Modifier::BOLD),
         );
 
-    frame.render_widget(List::new(items).block(block), list_area);
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Min(20),
+            Constraint::Length(9),
+            Constraint::Length(4),
+            Constraint::Length(5),
+            Constraint::Length(8),
+        ],
+    )
+    .header(header)
+    .block(block);
+
+    frame.render_widget(table, table_area);
 
     if let (Some(note_area), Some(note)) = (note_area, note) {
         frame.render_widget(
@@ -5573,6 +5879,7 @@ fn run_event_loop(
                     app.dirty = false;
                     app.algo_diff = None;
                     app.algo_text_spans = None;
+                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     // Follow the newly-opened case's own paintings rather than carrying the last
                     // case's solution name into it, which would silently start a second, near-
@@ -5601,6 +5908,7 @@ fn run_event_loop(
                     app.dirty = false;
                     app.algo_diff = None;
                     app.algo_text_spans = None;
+                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     // Follow the newly-opened case's own paintings rather than carrying the last
                     // case's solution name into it, which would silently start a second, near-
@@ -5643,6 +5951,7 @@ fn run_event_loop(
                     app.dirty = false;
                     app.algo_diff = None;
                     app.algo_text_spans = None;
+                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     // Follow the newly-opened case's own paintings rather than carrying the last
                     // case's solution name into it, which would silently start a second, near-
@@ -6244,6 +6553,7 @@ fn handle_key(
                 if result.is_ok() {
                     refresh_diff_completeness(app, &app.name.clone());
                     refresh_diff_text_painted(app, &app.name.clone());
+                    refresh_diff_disagreement(app, &app.name.clone());
                 }
                 Some(result)
             }
@@ -6321,6 +6631,9 @@ fn handle_key(
                         app.diff_completeness.as_ref(),
                         app.diff_hide_painted,
                         app.diff_text_painted.as_ref(),
+                        app.diff_hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        app.diff_sort_order,
                     ));
                 }
                 Ok(_) => {
@@ -6509,6 +6822,8 @@ fn handle_modal_key(
             dataset_filter,
             hide_complete,
             hide_painted,
+            hide_agreement,
+            sort_order,
         } => {
             let visible = visible_diff_options(
                 &options,
@@ -6517,6 +6832,9 @@ fn handle_modal_key(
                 app.diff_completeness.as_ref(),
                 hide_painted,
                 app.diff_text_painted.as_ref(),
+                hide_agreement,
+                app.diff_disagreement.as_ref(),
+                sort_order,
             );
             match code {
                 KeyCode::Up | KeyCode::Char('k') => {
@@ -6526,6 +6844,8 @@ fn handle_modal_key(
                         dataset_filter,
                         hide_complete,
                         hide_painted,
+                        hide_agreement,
+                        sort_order,
                     });
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
@@ -6535,6 +6855,8 @@ fn handle_modal_key(
                         dataset_filter,
                         hide_complete,
                         hide_painted,
+                        hide_agreement,
+                        sort_order,
                     });
                 }
                 KeyCode::Char('d') | KeyCode::Char('D') => {
@@ -6552,6 +6874,9 @@ fn handle_modal_key(
                         app.diff_completeness.as_ref(),
                         hide_painted,
                         app.diff_text_painted.as_ref(),
+                        hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        sort_order,
                     ));
                 }
                 // Deliberately `H` only, not `h`/`H` the way `O`'s sample picker binds its own
@@ -6579,6 +6904,9 @@ fn handle_modal_key(
                         app.diff_completeness.as_ref(),
                         hide_painted,
                         app.diff_text_painted.as_ref(),
+                        hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        sort_order,
                     ));
                 }
                 // `X`, not `x`: same reasoning as `H` just above, and the two are neighbours in
@@ -6603,6 +6931,60 @@ fn handle_modal_key(
                         app.diff_completeness.as_ref(),
                         new_hide_painted,
                         app.diff_text_painted.as_ref(),
+                        hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        sort_order,
+                    ));
+                }
+                // `Y`: a third, independent queue from `H`/`X` - whether the tree mapping and text
+                // painting actually agree with *each other*, not whether either is finished. Same
+                // lazy-scan/persist-on-App contract as `H`/`X`, and the most expensive of the three
+                // (see `compute_diff_disagreement`'s own doc comment).
+                KeyCode::Char('Y') => {
+                    let current_name = visible.get(selected).cloned();
+                    if app.diff_disagreement.is_none() {
+                        app.diff_disagreement = Some(compute_diff_disagreement());
+                    }
+                    let new_hide_agreement = !hide_agreement;
+                    app.diff_hide_agreement = new_hide_agreement;
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        current_name.as_deref().unwrap_or(&app.name),
+                        dataset_filter,
+                        hide_complete,
+                        app.diff_completeness.as_ref(),
+                        hide_painted,
+                        app.diff_text_painted.as_ref(),
+                        new_hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        sort_order,
+                    ));
+                }
+                // `s`: cycles `sort_order` (see `DiffSortOrder`), same key/convention as `O`'s
+                // sample picker. Sorting by disagreement needs the same corpus-wide scan `Y` does,
+                // so this lazily triggers it too rather than showing an empty ranking.
+                KeyCode::Char('s') => {
+                    let current_name = visible.get(selected).cloned();
+                    let new_sort_order = sort_order.next();
+                    if matches!(
+                        new_sort_order,
+                        DiffSortOrder::LeastDisagreementFirst | DiffSortOrder::MostDisagreementFirst
+                    ) && app.diff_disagreement.is_none()
+                    {
+                        app.diff_disagreement = Some(compute_diff_disagreement());
+                    }
+                    app.diff_sort_order = new_sort_order;
+                    app.modal = Some(open_diff_picker_modal(
+                        options,
+                        current_name.as_deref().unwrap_or(&app.name),
+                        dataset_filter,
+                        hide_complete,
+                        app.diff_completeness.as_ref(),
+                        hide_painted,
+                        app.diff_text_painted.as_ref(),
+                        hide_agreement,
+                        app.diff_disagreement.as_ref(),
+                        new_sort_order,
                     ));
                 }
                 KeyCode::Enter => {
@@ -6621,6 +7003,8 @@ fn handle_modal_key(
                             dataset_filter,
                             hide_complete,
                             hide_painted,
+                            hide_agreement,
+                            sort_order,
                         });
                     }
                 }
@@ -6634,6 +7018,8 @@ fn handle_modal_key(
                         dataset_filter,
                         hide_complete,
                         hide_painted,
+                        hide_agreement,
+                        sort_order,
                     });
                 }
             }
@@ -6842,6 +7228,7 @@ fn handle_modal_key(
                     Ok(_) => {
                         refresh_diff_completeness(app, &app.name.clone());
                         refresh_diff_text_painted(app, &app.name.clone());
+                        refresh_diff_disagreement(app, &app.name.clone());
                         return Some(target);
                     }
                     Err(err) => {
@@ -7128,7 +7515,23 @@ fn handle_modal_key(
                     if next != TextOverlay::Human && app.algo_text_spans.is_none() {
                         app.algo_text_spans = Some(codediff_text_spans(before, after));
                     }
+                    // Same lazy contract, for the tree-mapping side `TreeDisagreement` needs -
+                    // built independently of `algo_text_spans` since a case might be cycled
+                    // straight past `CodeDiff`/`Disagreements` without ever needing it.
+                    if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
+                        app.tree_text_spans = Some(tree_mapping_text_spans(
+                            &app.mapping,
+                            before,
+                            after,
+                        ));
+                    }
                     app.text_overlay = next;
+                    let human_spans_for_status = || {
+                        [
+                            painted_spans(&app.mapping, &app.text_solution, 0, before_text, after_text),
+                            painted_spans(&app.mapping, &app.text_solution, 1, before_text, after_text),
+                        ]
+                    };
                     app.status = Some(match next {
                         TextOverlay::Human => "Showing your painting".to_string(),
                         TextOverlay::CodeDiff => "Showing codediff's own diff".to_string(),
@@ -7136,25 +7539,10 @@ fn handle_modal_key(
                             let differing: usize = app
                                 .algo_text_spans
                                 .as_ref()
-                                .map(|_| {
+                                .map(|algo| {
                                     overlay_disagreement_spans(
-                                        &[
-                                            painted_spans(
-                                                &app.mapping,
-                                                &app.text_solution,
-                                                0,
-                                                before_text,
-                                                after_text,
-                                            ),
-                                            painted_spans(
-                                                &app.mapping,
-                                                &app.text_solution,
-                                                1,
-                                                before_text,
-                                                after_text,
-                                            ),
-                                        ],
-                                        app.algo_text_spans.as_ref().expect("just computed"),
+                                        &human_spans_for_status(),
+                                        algo,
                                         before_text,
                                         after_text,
                                     )
@@ -7167,6 +7555,30 @@ fn handle_modal_key(
                                 "You and codediff agree everywhere".to_string()
                             } else {
                                 format!("Showing {differing} disagreeing range(s)")
+                            }
+                        }
+                        TextOverlay::TreeDisagreement => {
+                            let differing: usize = app
+                                .tree_text_spans
+                                .as_ref()
+                                .map(|tree| {
+                                    overlay_disagreement_spans(
+                                        &human_spans_for_status(),
+                                        tree,
+                                        before_text,
+                                        after_text,
+                                    )
+                                    .iter()
+                                    .map(Vec::len)
+                                    .sum()
+                                })
+                                .unwrap_or(0);
+                            if differing == 0 {
+                                "Your painting and your tree mapping agree everywhere".to_string()
+                            } else {
+                                format!(
+                                    "Showing {differing} disagreeing range(s) between your painting and your tree mapping"
+                                )
                             }
                         }
                     });
@@ -7553,6 +7965,7 @@ fn action_promote(
     };
     refresh_diff_completeness(app, new_name);
     refresh_diff_text_painted(app, new_name);
+    refresh_diff_disagreement(app, new_name);
     refresh_diff_comment(app, new_name);
 
     let csv_note = match &sample_source {
@@ -8991,6 +9404,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
+                    None,
                 )
             })
             .unwrap();
@@ -9029,6 +9444,8 @@ mod tests {
                     &HumanMapping::default(),
                     "Minimal",
                     TextOverlay::Human,
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -9158,13 +9575,33 @@ mod tests {
         ]);
 
         assert_eq!(
-            visible_diff_options(&options, None, false, None, false, Some(&painted)),
-            vec!["painted", "unpainted", "never-scanned"],
+            visible_diff_options(
+                &options,
+                None,
+                false,
+                None,
+                false,
+                Some(&painted),
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
+            vec!["never-scanned", "painted", "unpainted"],
             "the filter off shows everything"
         );
         assert_eq!(
-            visible_diff_options(&options, None, false, None, true, Some(&painted)),
-            vec!["unpainted", "never-scanned"],
+            visible_diff_options(
+                &options,
+                None,
+                false,
+                None,
+                true,
+                Some(&painted),
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
+            vec!["never-scanned", "unpainted"],
             "on, it hides only cases confirmed painted"
         );
     }
@@ -9199,7 +9636,10 @@ mod tests {
                 true,
                 Some(&incomplete),
                 true,
-                Some(&painted)
+                Some(&painted),
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
             ),
             vec!["both"],
             "only the case needing both an unmarked node and a painting survives"
@@ -9675,13 +10115,14 @@ mod tests {
         assert!(solution_entries(&app.mapping, "Full").is_empty());
     }
 
-    /// The overlay cycles through all three and back, so `p` is always the only key needed.
+    /// The overlay cycles through all four and back, so `p` is always the only key needed.
     #[test]
-    fn the_text_overlay_cycles_human_codediff_disagreements() {
+    fn the_text_overlay_cycles_human_codediff_disagreements_tree_disagreement() {
         assert_eq!(TextOverlay::default(), TextOverlay::Human);
         assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
         assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
-        assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::Human);
+        assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::TreeDisagreement);
+        assert_eq!(TextOverlay::TreeDisagreement.next(), TextOverlay::Human);
     }
 
     /// codediff's own rendering comes through `TextDiff`, the projection the real TUI and the
@@ -10436,6 +10877,7 @@ mod tests {
                     "Minimal",
                     TextOverlay::Human,
                     None,
+                    None,
                     &TextPaintState::default(),
                 );
             })
@@ -10476,6 +10918,7 @@ mod tests {
                     &HumanMapping::default(),
                     "Minimal",
                     TextOverlay::Human,
+                    None,
                     None,
                     &TextPaintState::default(),
                 );
@@ -11243,16 +11686,46 @@ mod tests {
         ];
 
         assert_eq!(
-            visible_diff_options(&options, None, false, None, false, None),
+            visible_diff_options(
+                &options,
+                None,
+                false,
+                None,
+                false,
+                None,
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
             vec!["alpha", "bravo", "charlie", "delta"],
             "no filter should show every dataset"
         );
         assert_eq!(
-            visible_diff_options(&options, Some("handmade"), false, None, false, None),
+            visible_diff_options(
+                &options,
+                Some("handmade"),
+                false,
+                None,
+                false,
+                None,
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
             vec!["alpha", "charlie"]
         );
         assert_eq!(
-            visible_diff_options(&options, Some("full"), false, None, false, None),
+            visible_diff_options(
+                &options,
+                Some("full"),
+                false,
+                None,
+                false,
+                None,
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
             vec!["delta"]
         );
     }
@@ -11270,12 +11743,32 @@ mod tests {
         // "charlie" deliberately absent - not yet scanned.
 
         assert_eq!(
-            visible_diff_options(&options, None, true, Some(&completeness), false, None),
+            visible_diff_options(
+                &options,
+                None,
+                true,
+                Some(&completeness),
+                false,
+                None,
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
             vec!["alpha", "charlie"],
             "complete should be hidden, incomplete and unscanned should both stay"
         );
         assert_eq!(
-            visible_diff_options(&options, None, false, Some(&completeness), false, None),
+            visible_diff_options(
+                &options,
+                None,
+                false,
+                Some(&completeness),
+                false,
+                None,
+                false,
+                None,
+                DiffSortOrder::Alphabetical,
+            ),
             vec!["alpha", "bravo", "charlie"],
             "hide_complete=false should show everything regardless of the map"
         );
@@ -11312,6 +11805,9 @@ mod tests {
             None,
             false,
             None,
+            false,
+            None,
+            DiffSortOrder::Alphabetical,
         );
 
         match modal {
@@ -11337,8 +11833,18 @@ mod tests {
         // "alpha" is the currently open case, but it's a "handmade" fixture and the filter below
         // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
         // first visible entry instead of panicking or landing out of bounds.
-        let modal =
-            open_diff_picker_modal(options, "alpha", Some("small"), false, None, false, None);
+        let modal = open_diff_picker_modal(
+            options,
+            "alpha",
+            Some("small"),
+            false,
+            None,
+            false,
+            None,
+            false,
+            None,
+            DiffSortOrder::Alphabetical,
+        );
         match modal {
             Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
@@ -11364,6 +11870,8 @@ mod tests {
             dataset_filter: None,
             hide_complete: false,
             hide_painted: false,
+            hide_agreement: false,
+            sort_order: DiffSortOrder::Alphabetical,
         });
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
@@ -11667,6 +12175,8 @@ mod tests {
             dataset_filter: None,
             hide_complete: false,
             hide_painted: false,
+            hide_agreement: false,
+            sort_order: DiffSortOrder::Alphabetical,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
@@ -11741,6 +12251,8 @@ mod tests {
             dataset_filter: None,
             hide_complete: false,
             hide_painted: false,
+            hide_agreement: false,
+            sort_order: DiffSortOrder::Alphabetical,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
