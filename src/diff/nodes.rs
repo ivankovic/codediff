@@ -1106,15 +1106,15 @@ fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
         .any(|family| family.contains(&kind_a) && family.contains(&kind_b))
 }
 
-/// Every operator family above, in one fixed order, so a kind's membership across all of them can
-/// be packed into the bits of a single `u16` ([`operator_family_mask`]) and a language's applicable
-/// subset into another ([`language_operator_family_mask`]). Order is arbitrary but must stay
-/// consistent between those two functions - which is exactly why both derive from *this* list
-/// rather than hardcoding bit positions of their own. Widen the mask type (currently `u16`, so up
-/// to 16 families) before adding a 9th... no, a 17th family - `u8` silently wrapped
-/// (`1u8 << 8` shifts modulo the bit width in release builds) and collided `TS_TYPE_KEYWORD_KINDS`
-/// (index 8) onto `COMPARISON_OPS` (index 0) until this was caught by
-/// `operator_family_masks_agree_with_string_scanning_kinds_update_allowed`.
+/// Every cross-kind-update family above - operator families and [`TS_TYPE_KEYWORD_KINDS`] alike -
+/// in one fixed order, so a kind's membership across all of them can be packed into the bits of a
+/// single `u16` ([`operator_family_mask`]) and a language's applicable subset into another
+/// ([`language_operator_family_mask`]). Order is arbitrary but must stay consistent between those
+/// two functions - which is exactly why both derive from *this* list rather than hardcoding bit
+/// positions of their own. Widen the mask type (currently `u16`, so up to 16 families) before
+/// adding a 17th: `u8` silently wrapped (`1u8 << 8` shifts modulo the bit width in release builds)
+/// and collided `TS_TYPE_KEYWORD_KINDS` (index 8) onto `COMPARISON_OPS` (index 0) until this was
+/// caught by `operator_family_masks_agree_with_string_scanning_kinds_update_allowed`.
 ///
 /// Deliberately built from the same `const` arrays [`kinds_update_allowed`] itself uses, not a
 /// hand-transcribed copy: the arrays stay the single source of truth, and the bitmask form is a
@@ -1213,10 +1213,10 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
     in_shared_family(kind_a, kind_b, families_for_language(language))
 }
 
-/// Which operator families [`kinds_update_allowed`] recognizes for `language` - empty for any
-/// language with no hand-picked cross-kind exceptions. Extracted so
-/// [`language_operator_family_mask`] derives its bitmask from this same list rather than
-/// duplicating the language-to-families mapping.
+/// Which cross-kind-update families (operator families, and [`TS_TYPE_KEYWORD_KINDS`])
+/// [`kinds_update_allowed`] recognizes for `language` - empty for any language with no hand-picked
+/// cross-kind exceptions. Extracted so [`language_operator_family_mask`] derives its bitmask from
+/// this same list rather than duplicating the language-to-families mapping.
 fn families_for_language(language: &Language) -> &'static [&'static [&'static str]] {
     match language {
         Language::C | Language::Java | Language::Go | Language::CSharp => &[
