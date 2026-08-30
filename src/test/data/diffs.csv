@@ -245,7 +245,7 @@ javascript-add-array-method,src/test/data/diffs/handmade/javascript-add-array-me
 javascript-add-destructuring,src/test/data/diffs/handmade/javascript-add-destructuring,handmade,JavaScript,,,,Requires N:M mapping,12,75,10,59,16,0,0.000,minimal+full,Full|Minimal
 javascript-add-event-listener,src/test/data/diffs/handmade/javascript-add-event-listener,handmade,JavaScript,,,,,8,51,11,95,0,0,0.000,single,Only one solution
 javascript-fix-promises,src/test/data/diffs/handmade/javascript-fix-promises,handmade,JavaScript,,,,,12,90,20,145,0,0,0.000,minimal+full,Full|Minimal
-javascript-refactor-arrow-func,src/test/data/diffs/handmade/javascript-refactor-arrow-func,handmade,JavaScript,,,,,12,95,8,77,0,0,0.000,single,Only one solution
+javascript-refactor-arrow-func,src/test/data/diffs/handmade/javascript-refactor-arrow-func,handmade,JavaScript,,,,,12,95,8,77,0,0,0.000,minimal+full,Full|Minimal
 kotlin-add-data-class,src/test/data/diffs/handmade/kotlin-add-data-class,handmade,Kotlin,,,,,12,94,11,95,0,0,0.000,minimal+full,Full|Minimal
 kotlin-add-null-check,src/test/data/diffs/handmade/kotlin-add-null-check,handmade,Kotlin,,,,,10,71,13,87,0,0,0.000,single,Only one solution
 kotlin-add-validation,src/test/data/diffs/handmade/kotlin-add-validation,handmade,Kotlin,,,,,9,66,15,126,0,0,0.000,single,Only one solution
