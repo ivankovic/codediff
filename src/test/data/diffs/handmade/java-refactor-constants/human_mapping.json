@@ -1557,7 +1557,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Only one solution",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Insert",
@@ -1614,6 +1614,69 @@
               "start_column": 19,
               "end_row": 13,
               "end_column": 21
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 12,
+              "start_column": 19,
+              "end_row": 12,
+              "end_column": 26
+            },
+            {
+              "start_row": 8,
+              "start_column": 15,
+              "end_row": 8,
+              "end_column": 22
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 37,
+              "end_row": 1,
+              "end_column": 44
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 9,
+              "start_column": 15,
+              "end_row": 9,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 13,
+              "start_column": 19,
+              "end_row": 13,
+              "end_column": 21
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 0,
+              "end_row": 1,
+              "end_column": 37
             }
           ]
         }

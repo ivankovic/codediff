@@ -17,13 +17,6 @@
       "operation": "delete",
       "before_path": [
         "function_declaration:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_declaration:1",
         "function_body:1",
         "block:1"
       ]
@@ -200,15 +193,6 @@
         "class_declaration:1",
         "class_body:1",
         "{:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "::1"
       ]
     },
     {
@@ -2288,6 +2272,19 @@
         "navigation_expression:1",
         "identifier:2"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "::1"
+      ]
     }
   ],
   "text_mappings": [
@@ -3164,6 +3161,143 @@
               "start_column": 21,
               "end_row": 0,
               "end_column": 58
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 34,
+              "end_row": 6,
+              "end_column": 35
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 58,
+              "end_row": 0,
+              "end_column": 59
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 15,
+              "end_row": 1,
+              "end_column": 16
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 4,
+              "start_column": 63,
+              "end_row": 4,
+              "end_column": 64
+            }
+          ],
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 20,
+              "end_row": 2,
+              "end_column": 21
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 22,
+              "end_row": 1,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 24,
+              "end_row": 1,
+              "end_column": 25
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 27,
+              "end_row": 2,
+              "end_column": 28
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 29,
+              "end_row": 2,
+              "end_column": 30
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 5,
+              "start_column": 10,
+              "end_row": 5,
+              "end_column": 11
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 10,
+              "end_row": 1,
+              "end_column": 11
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 9,
+              "start_column": 15,
+              "end_row": 9,
+              "end_column": 16
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 10,
+              "start_column": 16,
+              "end_row": 10,
+              "end_column": 17
             }
           ]
         }

@@ -235,23 +235,23 @@ cpp-add-const-correctness,src/test/data/diffs/handmade/cpp-add-const-correctness
 cpp-add-memory-management,src/test/data/diffs/handmade/cpp-add-memory-management,handmade,CPP,,,,,14,89,15,107,0,0,0.000,minimal+full,Full|Minimal
 cpp-add-templates,src/test/data/diffs/handmade/cpp-add-templates,handmade,CPP,,,,,15,105,16,119,0,0,0.000,minimal+full,Full|Minimal
 cpp-fix-segfault,src/test/data/diffs/handmade/cpp-fix-segfault,handmade,CPP,,,,,20,170,20,170,0,0,0.000,single,Only one solution
-cpp-optimize-algorithm,src/test/data/diffs/handmade/cpp-optimize-algorithm,handmade,CPP,,,,,19,169,13,126,0,0,0.000,single,Only one solution
+cpp-optimize-algorithm,src/test/data/diffs/handmade/cpp-optimize-algorithm,handmade,CPP,,,,,19,169,13,126,0,0,0.000,minimal+full,Full|Minimal
 java-add-exception-handling,src/test/data/diffs/handmade/java-add-exception-handling,handmade,Java,,,,,16,145,21,186,0,0,0.000,minimal+full,Full|Minimal
-java-add-interface,src/test/data/diffs/handmade/java-add-interface,handmade,Java,,,,,14,81,19,104,0,0,0.000,single,Only one solution
-java-add-logging,src/test/data/diffs/handmade/java-add-logging,handmade,Java,,,,,12,104,15,164,0,0,0.000,single,Only one solution
+java-add-interface,src/test/data/diffs/handmade/java-add-interface,handmade,Java,,,,,14,81,19,104,0,0,0.000,minimal+full,Full|Minimal
+java-add-logging,src/test/data/diffs/handmade/java-add-logging,handmade,Java,,,,,12,104,15,164,0,0,0.000,minimal+full,Full|Minimal
 java-fix-array-index,src/test/data/diffs/handmade/java-fix-array-index,handmade,Java,,,,,11,89,11,89,0,0,0.000,single,Only one solution
-java-refactor-constants,src/test/data/diffs/handmade/java-refactor-constants,handmade,Java,,,,,16,84,17,96,0,0,0.000,single,Only one solution
-javascript-add-array-method,src/test/data/diffs/handmade/javascript-add-array-method,handmade,JavaScript,,,,,12,96,7,57,0,0,0.000,single,Only one solution
+java-refactor-constants,src/test/data/diffs/handmade/java-refactor-constants,handmade,Java,,,,,16,84,17,96,0,0,0.000,minimal+full,Full|Minimal
+javascript-add-array-method,src/test/data/diffs/handmade/javascript-add-array-method,handmade,JavaScript,,,,,12,96,7,57,0,0,0.000,minimal+full,Full|Minimal
 javascript-add-destructuring,src/test/data/diffs/handmade/javascript-add-destructuring,handmade,JavaScript,,,,Requires N:M mapping,12,75,10,59,16,0,0.000,minimal+full,Full|Minimal
-javascript-add-event-listener,src/test/data/diffs/handmade/javascript-add-event-listener,handmade,JavaScript,,,,,8,51,11,95,0,0,0.000,single,Only one solution
+javascript-add-event-listener,src/test/data/diffs/handmade/javascript-add-event-listener,handmade,JavaScript,,,,,8,51,11,95,0,0,0.000,minimal+full,Full|Minimal
 javascript-fix-promises,src/test/data/diffs/handmade/javascript-fix-promises,handmade,JavaScript,,,,,12,90,20,145,0,0,0.000,minimal+full,Full|Minimal
 javascript-refactor-arrow-func,src/test/data/diffs/handmade/javascript-refactor-arrow-func,handmade,JavaScript,,,,,12,95,8,77,0,0,0.000,minimal+full,Full|Minimal
 kotlin-add-data-class,src/test/data/diffs/handmade/kotlin-add-data-class,handmade,Kotlin,,,,,12,94,11,95,0,0,0.000,minimal+full,Full|Minimal
-kotlin-add-null-check,src/test/data/diffs/handmade/kotlin-add-null-check,handmade,Kotlin,,,,,10,71,13,87,0,0,0.000,single,Only one solution
-kotlin-add-validation,src/test/data/diffs/handmade/kotlin-add-validation,handmade,Kotlin,,,,,9,66,15,126,0,0,0.000,single,Only one solution
+kotlin-add-null-check,src/test/data/diffs/handmade/kotlin-add-null-check,handmade,Kotlin,,,,,10,71,13,87,0,0,0.000,minimal+full,Full|Minimal
+kotlin-add-validation,src/test/data/diffs/handmade/kotlin-add-validation,handmade,Kotlin,,,,,9,66,15,126,0,0,0.000,minimal+full,Full|Minimal
 kotlin-fix-loop-bug,src/test/data/diffs/handmade/kotlin-fix-loop-bug,handmade,Kotlin,,,,,15,133,15,133,0,0,0.000,single,Only one solution
 kotlin-refactor-function,src/test/data/diffs/handmade/kotlin-refactor-function,handmade,Kotlin,,,,Requires N:M mapping,15,135,11,130,29,0,0.000,minimal+full,Full|Minimal
-python-add-remove-block,src/test/data/diffs/handmade/python-add-remove-block,handmade,Python,,,,Code structure change: Added a new filtering block to the process_data function. This represents adding a significant new code block that changes the function's behavior. Key changes: - Added new if block: `if len(result) > 0:` - Added nested for loop for filtering: `for num in result:` - Added conditional filtering: `if num < 10:` - Added early return with filtered results This pattern shows how functions evolve by adding new processing blocks while maintaining the existing structure.,20,133,28,182,0,0,0.000,single,Only one solution
+python-add-remove-block,src/test/data/diffs/handmade/python-add-remove-block,handmade,Python,,,,Code structure change: Added a new filtering block to the process_data function. This represents adding a significant new code block that changes the function's behavior. Key changes: - Added new if block: `if len(result) > 0:` - Added nested for loop for filtering: `for num in result:` - Added conditional filtering: `if num < 10:` - Added early return with filtered results This pattern shows how functions evolve by adding new processing blocks while maintaining the existing structure.,20,133,28,182,0,0,0.000,minimal+full,Full|Minimal
 python-added-if-block,src/test/data/diffs/handmade/python-added-if-block,handmade,Python,,,,,22,168,23,181,0,0,0.000,minimal+full,Full|Minimal
 python-added-if-block-small,src/test/data/diffs/handmade/python-added-if-block-small,handmade,Python,,,,,4,27,5,35,0,0,0.000,minimal+full,Full|Minimal
 python-api-change,src/test/data/diffs/handmade/python-api-change,handmade,Python,,,,"API change and enhancement: Updated API client code with better error handling, type hints, and new functionality. This represents a common evolution of API client code. Key changes: - Added type hints throughout (`int`, `Optional`, `Dict`, etc.) - Updated API version from v1 to v2 in URL - Added timeout parameter to fetch_user_data - Improved error handling with try/except and raise_for_status() - Added new function get_user_info() for comprehensive user data - Enhanced return types and error reporting This shows how API client code evolves to handle new API versions and becomes more robust over time.",18,118,33,316,0,0,0.000,minimal+full,Full|Minimal
