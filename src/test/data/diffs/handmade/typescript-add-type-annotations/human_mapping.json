@@ -1391,6 +1391,63 @@
               "end_column": 30
             }
           ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 22,
+              "end_row": 0,
+              "end_column": 23
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 30,
+              "end_row": 6,
+              "end_column": 31
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 26,
+              "end_row": 0,
+              "end_column": 27
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 42,
+              "end_row": 6,
+              "end_column": 43
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 16,
+              "end_row": 0,
+              "end_column": 17
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 16,
+              "end_row": 6,
+              "end_column": 17
+            }
+          ]
         }
       ]
     }

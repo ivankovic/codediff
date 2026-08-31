@@ -11194,6 +11194,17 @@
               "end_column": 90
             }
           ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 28,
+              "start_column": 77,
+              "end_row": 28,
+              "end_column": 78
+            }
+          ]
         }
       ]
     }
