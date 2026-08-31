@@ -187,6 +187,27 @@ fn count_and_index(positions: &[(usize, usize)], cursor: (usize, usize)) -> Opti
     Some((index, positions.len()))
 }
 
+/// `line`'s character count with any trailing whitespace run excluded - what `overlay_row` passes
+/// as `columns_on_row`'s `row_len`, so a range that spans a row completely paints only up to its
+/// last real character. No human painting a diff by hand ever marks a line's trailing whitespace,
+/// least of all the newline past it, and the algorithmic rendering should read the same way -
+/// see `TextPaintState::selection`/`span_covers` in `human_solver`, which hold the same rule for
+/// the hand-painted ground truth this rendering is checked against.
+///
+/// Only ever narrows the *fallback* width used for a row a range doesn't end on - a range's own
+/// `start_column`/`end_column` come straight from the diff and are untouched.
+fn trailing_whitespace_trimmed_len(line: &Line<'_>) -> usize {
+    let total: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+    let trailing_whitespace = line
+        .spans
+        .iter()
+        .rev()
+        .flat_map(|span| span.content.chars().rev())
+        .take_while(|c| c.is_whitespace())
+        .count();
+    total - trailing_whitespace
+}
+
 /// Paint `style` onto the `[start_col, end_col)` character range of `line`, preserving the
 /// existing styling (e.g. syntax-highlight foreground colors) outside of and underneath it.
 fn paint_columns(
@@ -739,7 +760,7 @@ impl CodeViewerWidget {
     fn overlay_row(&self, row: usize, state: &CodeViewerState) -> Line<'static> {
         let palette = self.overlay_theme.palette();
         let mut line = self.highlighted_lines[row].clone();
-        let row_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+        let row_len = trailing_whitespace_trimmed_len(&line);
         let cursor_range = range_at(
             &state.ranges,
             &state.range_order,
@@ -1153,6 +1174,47 @@ mod tests {
             span.style.bg,
             background_for_operation(&TextOperation::Insert, &palette)
         );
+    }
+
+    /// A multi-row range's middle row is painted only up to its last real character - never the
+    /// trailing whitespace after it, and least of all the newline past that. No human painting a
+    /// diff by hand ever marks either, so the algorithmic rendering must not appear to either.
+    #[test]
+    fn multi_row_range_does_not_paint_a_middle_rows_trailing_whitespace() {
+        let widget = widget_with_line("foo   \nbar");
+        let ranges = vec![RangeMatch {
+            source: TextRange::new(0, 0, 1, 3),
+            destination: TextRange::zero(),
+            operation: TextOperation::Move,
+        }];
+        let range_order = build_range_order(&ranges);
+        let state = CodeViewerState {
+            ranges,
+            range_order,
+            cursor_row: 0,
+            cursor_col: 99,
+            viewport_height: 2,
+            ..Default::default()
+        };
+
+        let first_row = widget.overlay_row(0, &state);
+        let palette = default_palette();
+        let painted_bg = background_for_operation(&TextOperation::Move, &palette);
+
+        // "foo" is painted, the three trailing spaces are not.
+        assert_eq!(first_row.spans[0].content, "foo");
+        assert_eq!(first_row.spans[0].style.bg, painted_bg);
+        let trailing: String = first_row.spans[1..]
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(trailing, "   ");
+        for span in &first_row.spans[1..] {
+            assert_ne!(
+                span.style.bg, painted_bg,
+                "trailing whitespace must not carry the range's background: {first_row:?}"
+            );
+        }
     }
 
     /// A fresh widget must paint **nothing** extra over the focused side's cursor range: the node

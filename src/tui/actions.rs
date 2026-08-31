@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 
 use crate::diff::DiffMode;
-use crate::diff::text::RangeMatch;
+use crate::diff::text::{RangeMatch, RenderOptions};
 use crate::tui::theme::OverlayTheme;
 
 /// One entry in a directory listing shown by the file dialog.
@@ -132,4 +132,9 @@ pub enum Action {
     /// The user confirmed a line number in the jump-to-line prompt (the `g` key) - 1-indexed,
     /// already parsed by the prompt itself.
     JumpToLineSubmitted(usize),
+    /// A toggle or preset changed in the render-options panel (the `M` key) - apply it to the
+    /// viewer behind the dialog and persist it immediately. Unlike `ThemePreviewed`/`ThemeSelected`
+    /// above, there is no separate preview/commit split: a boolean flip has nothing to revert on
+    /// `Esc`, so every change here is already final.
+    RenderOptionsChanged(RenderOptions),
 }

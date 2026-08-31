@@ -110,14 +110,21 @@ struct Args {
     #[arg(long)]
     exact: bool,
 
-    /// Paint only the ranges that carry meaning, leaving standalone brackets and separators
-    /// unpainted (the TUI's `M` key, and its persisted setting when this flag is absent).
+    /// Paint only the ranges that carry meaning: drop standalone brackets/separators and trim
+    /// leading whitespace (the TUI's `M` panel's "everything off" preset, and its persisted
+    /// setting when neither this flag nor `--full` is given).
     ///
-    /// Both readings of a diff are faithful to the same mapping - the corpus's hand-authored
-    /// ground truth records them as two separate paintings rather than one answer plus a mistake.
-    /// See `codediff::diff::text::RenderMode`.
-    #[arg(long)]
+    /// Every reading of a diff this and `--full` produce is faithful to the same mapping - the
+    /// corpus's hand-authored ground truth records both extremes as separate paintings rather than
+    /// one answer plus a mistake. See `codediff::diff::text::RenderOptions`.
+    #[arg(long, conflicts_with = "full")]
     minimal: bool,
+
+    /// The other extreme from `--minimal`: keep standalone brackets/separators and leading
+    /// whitespace (the `M` panel's "everything on" preset). Lets a script force the fullest
+    /// reading regardless of what's persisted, the same way `--minimal` forces the tightest one.
+    #[arg(long)]
+    full: bool,
 
     /// When to ANSI-color headless output: `always`, `never`, or `auto` (the default - color on
     /// unless the `NO_COLOR` environment variable is set; see `use_color` for why auto is not
@@ -238,17 +245,20 @@ fn should_run_json(args: &Args) -> bool {
     args.mode.eq_ignore_ascii_case("json")
 }
 
-/// Which [`RenderMode`] to paint with: `--minimal` if given, otherwise whatever the TUI's `M` key
-/// last persisted.
+/// Which [`RenderOptions`](codediff::diff::text::RenderOptions) preset to paint with: `--minimal`
+/// or `--full` if either is given (`clap`'s `conflicts_with` rules out both at once), otherwise
+/// whatever the TUI's `M` panel last persisted.
 ///
-/// The flag wins over the saved setting rather than toggling it, so a script that passes
-/// `--minimal` gets minimal regardless of how the machine it runs on happens to be configured -
-/// and passing nothing keeps the two front ends agreeing about what the user last chose.
-fn render_mode(args: &Args) -> codediff::diff::text::RenderMode {
+/// A flag wins over the saved setting rather than toggling it, so a script that passes `--minimal`
+/// gets minimal regardless of how the machine it runs on happens to be configured - and passing
+/// neither flag keeps the two front ends agreeing about what the user last chose.
+fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
     if args.minimal {
-        codediff::diff::text::RenderMode::Minimal
+        codediff::diff::text::RenderOptions::MINIMAL
+    } else if args.full {
+        codediff::diff::text::RenderOptions::FULL
     } else {
-        codediff::tui::theme::load_render_mode()
+        codediff::tui::theme::load_render_options()
     }
 }
 
@@ -403,7 +413,7 @@ async fn main() -> Result<()> {
         } else {
             DiffMode::Fast
         };
-        match tui::json_output::run(&before, &after, mode, render_mode(&args)) {
+        match tui::json_output::run(&before, &after, mode, render_options(&args)) {
             Ok(differed) => std::process::exit(exit_code_for(
                 differed,
                 args.exit_code,
@@ -432,7 +442,7 @@ async fn main() -> Result<()> {
             use_color(args.color),
             mode,
             args.context,
-            render_mode(&args),
+            render_options(&args),
         ) {
             Ok(differed) => std::process::exit(exit_code_for(
                 differed,
@@ -566,6 +576,7 @@ mod tests {
             headless,
             exact: false,
             minimal: false,
+            full: false,
             color: ColorChoice::Auto,
             exit_code: false,
             context: tui::headless::CONTEXT_LINES,

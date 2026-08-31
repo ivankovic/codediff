@@ -22,7 +22,7 @@ use ratatui::{prelude::*, text::Line, widgets::Paragraph};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, code_viewer::CodeViewer};
-use crate::diff::text::{RangeMatch, RenderMode, TextOperation, ranges_for_mode};
+use crate::diff::text::{RangeMatch, RenderOptions, TextOperation, ranges_for_options};
 use crate::tui::actions::{Action, DiffSessionData};
 use crate::tui::theme::{OverlayTheme, PanelLayout};
 
@@ -59,13 +59,14 @@ pub struct DiffViewer {
     last_before_content: Option<Rect>,
     last_after_content: Option<Rect>,
 
-    /// The mode the diff is painted in (the `M` key) - see `crate::diff::text::RenderMode`.
-    render_mode: RenderMode,
+    /// Which parts of the diff are painted (the `M` key opens a panel to change this) - see
+    /// `crate::diff::text::RenderOptions`.
+    render_options: RenderOptions,
     /// The unfiltered ranges and sources from the last `load_diff`, per side (0 = before).
     ///
-    /// Kept so `set_render_mode` can re-apply the filter without a reload: `load_diff` resets the
-    /// cursor and the cross-panel highlight, which is right when a new diff arrives and wrong when
-    /// the reader merely asked to see more or less of the one already on screen.
+    /// Kept so `set_render_options` can re-apply the filter without a reload: `load_diff` resets
+    /// the cursor and the cross-panel highlight, which is right when a new diff arrives and wrong
+    /// when the reader merely asked to see more or less of the one already on screen.
     full_ranges: [Vec<RangeMatch>; 2],
     sources: [String; 2],
 }
@@ -125,46 +126,39 @@ impl DiffViewer {
             .load_contents(data.after_path.clone(), data.after_contents.clone());
         self.full_ranges = [data.before_ranges.clone(), data.after_ranges.clone()];
         self.sources = [data.before_contents.clone(), data.after_contents.clone()];
-        self.apply_render_mode(true);
+        self.apply_render_options(true);
         self.active_panel = Panel::Before;
         self.sync_focus();
         self.sync_cross_highlight();
     }
 
-    /// Flip between `Full` and `Minimal` and remember the choice for the next run - the `M` key.
-    pub fn toggle_render_mode(&mut self) {
-        let next = match self.render_mode {
-            RenderMode::Full => RenderMode::Minimal,
-            RenderMode::Minimal => RenderMode::Full,
-        };
-        self.set_render_mode(next);
-        crate::tui::theme::save_render_mode(next);
-    }
-
     /// Switch how much of the diff is painted, keeping the cursor and scroll where they are.
     ///
     /// Re-filters the ranges captured by the last `load_diff` rather than recomputing anything:
-    /// the mapping is identical in both modes, and only how much of it is shown differs.
-    pub fn set_render_mode(&mut self, mode: RenderMode) {
-        self.render_mode = mode;
-        self.apply_render_mode(false);
+    /// the mapping is identical under every set of options, and only how much of it is shown
+    /// differs. Applying and persisting the choice is the caller's job (the `M` panel's own action
+    /// handler in `App`) - unlike the old blind `M`-key toggle this replaces, there is no single
+    /// "next" state to compute here.
+    pub fn set_render_options(&mut self, options: RenderOptions) {
+        self.render_options = options;
+        self.apply_render_options(false);
         // The counterpart highlight was dropped with the old ranges; recompute it for whatever the
         // cursor is now sitting on, so the two panels stay in step across the switch.
         self.sync_cross_highlight();
     }
 
-    pub fn render_mode(&self) -> RenderMode {
-        self.render_mode
+    pub fn render_options(&self) -> RenderOptions {
+        self.render_options
     }
 
     /// `reset_cursor` distinguishes the two callers: `load_diff` (a new diff arrived - jump to its
-    /// first change) from `set_render_mode` (the same diff, painted differently - stay put).
-    fn apply_render_mode(&mut self, reset_cursor: bool) {
+    /// first change) from `set_render_options` (the same diff, painted differently - stay put).
+    fn apply_render_options(&mut self, reset_cursor: bool) {
         for (viewer, side) in [(&mut self.left_viewer, 0), (&mut self.right_viewer, 1)] {
-            let ranges = ranges_for_mode(
+            let ranges = ranges_for_options(
                 &self.full_ranges[side],
                 &self.sources[side],
-                self.render_mode,
+                self.render_options,
             );
             if reset_cursor {
                 viewer.set_ranges(ranges);
@@ -731,14 +725,10 @@ impl Component for DiffViewer {
                 self.toggle_node_highlight();
                 Ok(Some(Action::Render))
             }
-            // Switch how much of the diff is painted. Not a re-diff: the mapping is identical
-            // either way, and only how much of it is worth showing differs - which is why the
-            // hand-painted ground truth records both readings rather than one plus a mistake (see
-            // `research/data/quality/text_painting_findings.md`).
-            crossterm::event::KeyCode::Char('M') => {
-                self.toggle_render_mode();
-                Ok(Some(Action::Render))
-            }
+            // `M` (open the render-options panel) is handled by `App`'s top-level dispatch, not
+            // here - unlike its neighbours above, it opens a dialog (`AppScreen::RenderOptions`)
+            // rather than toggling something in place, the same reason `c`/`o`/`?`/`/` are handled
+            // there instead of inside a `Component`.
             // Tab switches which panel's cursor drives navigation (and, in single panel mode,
             // which panel is shown).
             crossterm::event::KeyCode::Tab => {
@@ -1162,7 +1152,7 @@ mod tests {
     /// Pressing `M` at line 400 must not land you back at the top: it changes how the same diff is
     /// painted, not which diff is loaded.
     #[test]
-    fn switching_render_mode_keeps_the_cursor_where_it_is() {
+    fn switching_render_options_keeps_the_cursor_where_it_is() {
         let mut viewer = DiffViewer::new();
         viewer.load_diff(&sample_diff_data());
 
@@ -1172,7 +1162,7 @@ mod tests {
         let before = viewer.focused_cursor_position();
         assert!(before.is_some());
 
-        viewer.set_render_mode(RenderMode::Minimal);
+        viewer.set_render_options(RenderOptions::MINIMAL);
 
         assert_eq!(
             viewer.focused_cursor_position(),

@@ -1538,42 +1538,97 @@ pub enum TextOperation {
     Delete,
 }
 
-/// How much of a diff to actually paint.
+/// Which parts of a diff to actually paint.
 ///
 /// Not a difference in what was computed - the mapping is identical either way - but in how much
-/// of it is worth showing. Both readings of the same diff are defensible, which is why the
-/// human-authored ground truth records them as two separate paintings rather than one answer plus
-/// a mistake (see `HumanTextMapping`, and `research/data/quality/text_painting_findings.md` for
-/// the measurements this is built from).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum RenderMode {
-    /// Paint every changed range, brackets and separators included. Nothing is dropped, so this is
-    /// exactly `TextDiff::all`.
-    #[default]
-    Full,
-    /// Drop ranges that consist solely of structural punctuation, keeping the content that
-    /// carries meaning.
+/// of it is worth showing. Every option is independent and additive: turning one on paints more,
+/// never less. [`RenderOptions::MINIMAL`]/[`RenderOptions::FULL`] are the two extremes, not the
+/// only two states a reader can be in - each option is meant to be toggled on its own.
+///
+/// **Trailing whitespace is deliberately not an option here.** Nobody painting a diff by hand ever
+/// marks a line's trailing whitespace, and least of all the newline past it, so
+/// `ranges_for_options` trims it unconditionally - under every combination of options, including
+/// `FULL`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RenderOptions {
+    /// Whether a range that starts in whitespace keeps it, or has it trimmed back to the first
+    /// real character. Off in `MINIMAL`: painting by hand, nobody marks the indentation before a
+    /// change as part of it. On in `FULL`.
     ///
-    /// Measured against the corpus's hand-painted ground truth: across the ten fixtures painted
-    /// both ways, `Full` carries 27 entries `Minimal` does not, and **16 of those 27 are a single
-    /// punctuation token** - eight `(`, five `)`, two `):` and one `;`. So the difference between
-    /// the two styles is more than half brackets, and dropping standalone punctuation is what
-    /// most of the distance between them consists of.
-    Minimal,
+    /// Only meaningful for a range that has *some* real character to trim back to - a range that
+    /// is nothing but whitespace start to end is dropped by the unconditional trailing-whitespace
+    /// trim regardless of this option, the same as it always has been under `structural_punctuation`
+    /// (see `range_is_structural_only`, which already treats an all-whitespace range as structural).
+    pub leading_whitespace: bool,
+    /// Whether a range consisting solely of structural punctuation (see [`STRUCTURAL_PUNCTUATION`])
+    /// is kept or dropped. Off in `MINIMAL` - measured against the corpus's hand-painted ground
+    /// truth: across the ten fixtures painted both ways, keeping these carries 27 entries dropping
+    /// them does not, and **16 of those 27 are a single punctuation token** - eight `(`, five `)`,
+    /// two `):` and one `;`. On in `FULL`.
+    pub structural_punctuation: bool,
 }
 
-/// The characters [`RenderMode::Minimal`] treats as structural - brackets, separators and
-/// whitespace.
+impl RenderOptions {
+    /// Every option off: the tightest reading of a diff - drops standalone punctuation and trims
+    /// leading whitespace off what remains. Trailing whitespace is already always trimmed
+    /// regardless of any option - see the struct's own doc comment.
+    pub const MINIMAL: Self = Self {
+        leading_whitespace: false,
+        structural_punctuation: false,
+    };
+    /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
+    /// combination of options ever paints.
+    pub const FULL: Self = Self {
+        leading_whitespace: true,
+        structural_punctuation: true,
+    };
+
+    /// Every option, paired with its label and current value, in the order a settings UI should
+    /// list them. A future option means one new field above and one new entry here - nothing that
+    /// reads this array (the settings dialog, in particular) needs to change.
+    pub fn options(&self) -> [(&'static str, bool); 2] {
+        [
+            ("Leading whitespace", self.leading_whitespace),
+            (
+                "Structural punctuation (brackets, separators)",
+                self.structural_punctuation,
+            ),
+        ]
+    }
+
+    /// Flips the option at [`Self::options`]'s index `i`. A no-op if `i` is out of range, rather
+    /// than a panic: a settings UI driving this from a row index it computed itself has no way to
+    /// pass one out of range, but nothing here should crash the process if it somehow did.
+    pub fn toggle(&mut self, i: usize) {
+        match i {
+            0 => self.leading_whitespace = !self.leading_whitespace,
+            1 => self.structural_punctuation = !self.structural_punctuation,
+            _ => {}
+        }
+    }
+}
+
+impl Default for RenderOptions {
+    /// Matches every release before this setting existed, and `RenderMode`'s own prior default:
+    /// an existing config or script that never mentions this setting keeps behaving exactly as it
+    /// did.
+    fn default() -> Self {
+        Self::FULL
+    }
+}
+
+/// The characters [`RenderOptions::structural_punctuation`] treats as structural - brackets,
+/// separators and whitespace.
 ///
 /// **Operators are deliberately absent.** `+`, `=`, `<`, `&&` are punctuation to a tokenizer but
 /// carry the entire meaning of a change to a reader: an edit from `<` to `<=` is the whole edit,
-/// and a mode that hid it would be reporting a different diff rather than a tighter one. Every
-/// token this actually drops was observed being dropped by hand in the painted corpus; nothing
-/// here is included on the grounds that it merely looks like punctuation.
+/// and dropping it would be reporting a different diff rather than a tighter one. Every token this
+/// actually drops was observed being dropped by hand in the painted corpus; nothing here is
+/// included on the grounds that it merely looks like punctuation.
 const STRUCTURAL_PUNCTUATION: &[char] = &['(', ')', '[', ']', '{', '}', ',', ';', ':'];
 
 /// Whether `text` is nothing but structural punctuation and whitespace - i.e. whether a range
-/// covering it says anything a reader needs in [`RenderMode::Minimal`].
+/// covering it says anything a reader needs when [`RenderOptions::structural_punctuation`] is off.
 ///
 /// Empty text is *not* structural: a zero-width range is an insert/delete placeholder marking a
 /// position, and dropping those would remove the only mark one side has for what the other side
@@ -1585,23 +1640,22 @@ pub fn is_structural_only(text: &str) -> bool {
             .all(|c| c.is_whitespace() || STRUCTURAL_PUNCTUATION.contains(&c))
 }
 
-/// One side's ranges as `mode` would paint them.
+/// One side's ranges as `options` would paint them.
 ///
-/// `Full` returns them unchanged. `Minimal` drops the ranges whose own text is structural only,
-/// and trims whitespace off the ends of the ones that survive.
+/// Trailing whitespace is trimmed off every surviving range's end unconditionally - see
+/// [`RenderOptions`]'s own doc comment for why that is not itself an option. Leading whitespace and
+/// standalone-structural-punctuation ranges are each independently controlled by `options`;
+/// [`RenderOptions::MINIMAL`]/[`RenderOptions::FULL`] are exactly "every option off"/"every option
+/// on", so between them they reproduce this function's whole behavior range.
 ///
-/// **Trimming, not just dropping.** A range that starts or ends in whitespace paints a highlight
-/// running out to the indentation or off the end of the line, which reads as though the blank
-/// space were part of the change. Painting by hand, nobody does that: leading and trailing
-/// whitespace is never marked. Interior whitespace is left alone - it sits *between* two things
-/// the range is genuinely about, and cutting the range in two there would report one edit as two.
-///
-/// A range is never merged, split or re-operated, only narrowed, so a range that survives still
-/// describes the same edit `Full` describes - just without the padding.
-pub fn ranges_for_mode(ranges: &[RangeMatch], source: &str, mode: RenderMode) -> Vec<RangeMatch> {
-    if mode == RenderMode::Full {
-        return ranges.to_vec();
-    }
+/// A range is never merged, split or re-operated, only narrowed or dropped, so a range that
+/// survives still describes the same edit every other combination of options describes - just with
+/// different padding, or absent entirely once nothing else is left in it.
+pub fn ranges_for_options(
+    ranges: &[RangeMatch],
+    source: &str,
+    options: RenderOptions,
+) -> Vec<RangeMatch> {
     // Built once for the whole call rather than rescanning the file per range: `range_text` walked
     // from the top of the source for every range it was asked about, which on a large file with
     // many ranges is the dominant cost of painting a frame.
@@ -1611,58 +1665,47 @@ pub fn ranges_for_mode(ranges: &[RangeMatch], source: &str, mode: RenderMode) ->
         .iter()
         .filter_map(|range_match| {
             // An `Identical` range is the unpainted background in every consumer, so whether it
-            // survives changes nothing on screen - but keeping it keeps the two modes' range lists
-            // structurally comparable, and `line_operations` relies on the identical ranges being
-            // present to colour a row it would otherwise leave blank.
+            // survives changes nothing on screen - but keeping it keeps every combination of
+            // options' range lists structurally comparable, and `line_operations` relies on the
+            // identical ranges being present to colour a row it would otherwise leave blank.
             if range_match.operation == TextOperation::Identical
                 || range_match.operation == TextOperation::NotYetSet
             {
                 return Some(range_match.clone());
             }
-            match range_is_structural_only(&lines, &range_match.source) {
-                Some(true) => return None,
-                Some(false) => {}
-                // A range that doesn't read back is left alone rather than silently dropped: this
-                // is a display filter, and it has no business deciding that a range it could not
-                // interpret is uninteresting.
-                None => return Some(range_match.clone()),
+            if !options.structural_punctuation {
+                match range_is_structural_only(&lines, &range_match.source) {
+                    Some(true) => return None,
+                    Some(false) => {}
+                    // A range that doesn't read back is left alone rather than silently dropped:
+                    // this is a display filter, and it has no business deciding that a range it
+                    // could not interpret is uninteresting.
+                    None => return Some(range_match.clone()),
+                }
             }
             let mut trimmed = range_match.clone();
-            trimmed.source = trim_whitespace(&lines, &range_match.source)?;
+            trimmed.source = trim_trailing_whitespace(&lines, &range_match.source)?;
+            if !options.leading_whitespace {
+                trimmed.source = trim_leading_whitespace(&lines, &trimmed.source)?;
+            }
             Some(trimmed)
         })
         .collect()
 }
 
-/// `range` with leading and trailing whitespace removed, or `None` if nothing but whitespace is
-/// left (which `is_structural_only` will already have caught for any caller that checks it first).
+/// `range` with trailing whitespace removed - its end pulled back to the last non-whitespace
+/// character - or `None` if nothing but whitespace remains between `start` and `end`.
 ///
-/// Only the `source` side is narrowed. The `destination` is a position in the *other* file, whose
-/// text this function cannot see, and each side's ranges are filtered independently against their
-/// own source - so trimming here and there happens separately and correctly, while `destination`
-/// keeps pointing at the untrimmed counterpart region that cross-panel navigation jumps to.
-fn trim_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRange> {
-    let (mut start_row, mut start_column) = (range.start_row, range.start_column);
+/// Applied unconditionally by `ranges_for_options`, regardless of `options`: nobody painting a
+/// diff by hand ever marks a line's trailing whitespace, and least of all the newline past it -
+/// the same rule `human_solver`'s `span_covers` and `columns_on_row`'s callers hold for the
+/// rendered highlight and the hand-painted ground truth this is measured against.
+///
+/// Only the `source` side is narrowed - see [`trim_leading_whitespace`]'s doc comment for why.
+fn trim_trailing_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRange> {
+    let (start_row, start_column) = (range.start_row, range.start_column);
     let (mut end_row, mut end_column) = (range.end_row, range.end_column);
 
-    // Forward from the start, over whitespace, wrapping to the next row at end of line.
-    loop {
-        if (start_row, start_column) >= (end_row, end_column) {
-            return None;
-        }
-        let line = *lines.get(start_row)?;
-        match line[start_column.min(line.len())..].chars().next() {
-            Some(c) if c.is_whitespace() => start_column += c.len_utf8(),
-            // Past the last character of this row: the newline itself is whitespace, so step over
-            // it to the start of the next row.
-            None => {
-                start_row += 1;
-                start_column = 0;
-            }
-            Some(_) => break,
-        }
-    }
-    // Backward from the end, symmetrically.
     loop {
         if (start_row, start_column) >= (end_row, end_column) {
             return None;
@@ -1675,6 +1718,41 @@ fn trim_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRange> {
             None => {
                 end_row = end_row.checked_sub(1)?;
                 end_column = lines.get(end_row)?.len();
+            }
+            Some(_) => break,
+        }
+    }
+    Some(TextRange::new(start_row, start_column, end_row, end_column))
+}
+
+/// `range` with leading whitespace removed - its start pushed forward past any whitespace - or
+/// `None` if nothing but whitespace remains between `start` and `end`.
+///
+/// Gated behind [`RenderOptions::leading_whitespace`] in `ranges_for_options`, unlike
+/// [`trim_trailing_whitespace`]: leading whitespace before a change (indentation, or a run pushed
+/// out by an earlier edit on the same line) is a legitimate thing to show, unlike trailing
+/// whitespace or a newline, which no painting - by hand or by this renderer - ever means to mark.
+///
+/// Only the `source` side is narrowed. The `destination` is a position in the *other* file, whose
+/// text this function cannot see, and each side's ranges are filtered independently against their
+/// own source - so trimming here and there happens separately and correctly, while `destination`
+/// keeps pointing at the untrimmed counterpart region that cross-panel navigation jumps to.
+fn trim_leading_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRange> {
+    let (mut start_row, mut start_column) = (range.start_row, range.start_column);
+    let (end_row, end_column) = (range.end_row, range.end_column);
+
+    loop {
+        if (start_row, start_column) >= (end_row, end_column) {
+            return None;
+        }
+        let line = *lines.get(start_row)?;
+        match line[start_column.min(line.len())..].chars().next() {
+            Some(c) if c.is_whitespace() => start_column += c.len_utf8(),
+            // Past the last character of this row: the newline itself is whitespace, so step over
+            // it to the start of the next row.
+            None => {
+                start_row += 1;
+                start_column = 0;
             }
             Some(_) => break,
         }
@@ -2173,7 +2251,7 @@ mod tests {
         let ranges = vec![changed(0, 3, 4), changed(0, 4, 7)];
 
         assert_eq!(
-            ranges_for_mode(&ranges, source, RenderMode::Full),
+            ranges_for_options(&ranges, source, RenderOptions::FULL),
             ranges,
             "Full is exactly TextDiff::all"
         );
@@ -2185,7 +2263,7 @@ mod tests {
         // `(` alone, then `bar`.
         let ranges = vec![changed(0, 3, 4), changed(0, 4, 7)];
 
-        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+        let minimal = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
 
         assert_eq!(minimal.len(), 1, "got {minimal:?}");
         assert_eq!(minimal[0].source, text_range_on(0, 4, 7));
@@ -2199,7 +2277,7 @@ mod tests {
         let ranges = vec![changed(0, 0, 9)];
 
         assert_eq!(
-            ranges_for_mode(&ranges, source, RenderMode::Minimal),
+            ranges_for_options(&ranges, source, RenderOptions::MINIMAL),
             ranges
         );
     }
@@ -2217,10 +2295,10 @@ mod tests {
         };
 
         assert_eq!(
-            ranges_for_mode(
+            ranges_for_options(
                 std::slice::from_ref(&identical),
                 source,
-                RenderMode::Minimal
+                RenderOptions::MINIMAL
             ),
             vec![identical]
         );
@@ -2234,7 +2312,7 @@ mod tests {
         let source = "    foo   \n";
         let ranges = vec![changed(0, 0, 10)];
 
-        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+        let minimal = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
 
         assert_eq!(minimal.len(), 1);
         assert_eq!(
@@ -2252,18 +2330,68 @@ mod tests {
         let ranges = vec![changed(0, 0, 5)];
 
         assert_eq!(
-            ranges_for_mode(&ranges, source, RenderMode::Minimal)[0].source,
+            ranges_for_options(&ranges, source, RenderOptions::MINIMAL)[0].source,
             text_range_on(0, 0, 5)
         );
     }
 
-    /// `Full` is untouched by any of this - it is exactly `TextDiff::all`.
+    /// `FULL` keeps leading whitespace (that option is on) but still trims trailing whitespace -
+    /// unlike old `RenderMode::Full`, which was untouched by any of this. Trailing whitespace is
+    /// not an option at all; every preset trims it.
     #[test]
-    fn full_does_not_trim() {
+    fn full_keeps_leading_but_still_trims_trailing_whitespace() {
         let source = "    foo   \n";
         let ranges = vec![changed(0, 0, 10)];
 
-        assert_eq!(ranges_for_mode(&ranges, source, RenderMode::Full), ranges);
+        let full = ranges_for_options(&ranges, source, RenderOptions::FULL);
+
+        assert_eq!(full.len(), 1);
+        assert_eq!(
+            full[0].source,
+            text_range_on(0, 0, 7),
+            "leading spaces survive, trailing ones do not"
+        );
+    }
+
+    /// `MINIMAL`'s standalone-punctuation behavior is independent of leading-whitespace: a range
+    /// that survives (real content, not pure punctuation) still gets its leading whitespace kept
+    /// when only `structural_punctuation` is off.
+    #[test]
+    fn structural_punctuation_off_alone_still_keeps_leading_whitespace() {
+        let source = "    foo   \n";
+        let ranges = vec![changed(0, 0, 10)];
+
+        let options = RenderOptions {
+            leading_whitespace: true,
+            structural_punctuation: false,
+        };
+        let result = ranges_for_options(&ranges, source, options);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].source, text_range_on(0, 0, 7));
+    }
+
+    /// Symmetric case: `leading_whitespace` off with `structural_punctuation` on trims leading
+    /// whitespace but does not drop a range merely because part of it is punctuation - only a
+    /// range that is *nothing but* punctuation is ever dropped, and that's gated by the other
+    /// option entirely.
+    #[test]
+    fn leading_whitespace_off_alone_still_keeps_a_range_containing_punctuation() {
+        let source = "    foo();   \n";
+        let ranges = vec![changed(0, 0, 10)]; // "    foo();" - leading spaces, then `foo();`
+
+        let options = RenderOptions {
+            leading_whitespace: false,
+            structural_punctuation: true,
+        };
+        let result = ranges_for_options(&ranges, source, options);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].source,
+            text_range_on(0, 4, 10),
+            "trims the leading spaces, keeps `foo();` whole - it isn't pure punctuation"
+        );
     }
 
     /// Trimming narrows the source only. The destination is a position in the *other* file, whose
@@ -2277,7 +2405,7 @@ mod tests {
             operation: TextOperation::Update,
         }];
 
-        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+        let minimal = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
 
         assert_eq!(minimal[0].source, text_range_on(0, 2, 5));
         assert_eq!(minimal[0].destination, text_range_on(3, 0, 7));
@@ -2294,7 +2422,7 @@ mod tests {
             operation: TextOperation::Update,
         }];
 
-        let minimal = ranges_for_mode(&ranges, source, RenderMode::Minimal);
+        let minimal = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
 
         assert_eq!(minimal.len(), 1, "got {minimal:?}");
         assert_eq!(
@@ -2314,7 +2442,7 @@ mod tests {
             operation: TextOperation::Update,
         }];
 
-        assert!(ranges_for_mode(&ranges, source, RenderMode::Minimal).is_empty());
+        assert!(ranges_for_options(&ranges, source, RenderOptions::MINIMAL).is_empty());
     }
 
     /// A range that doesn't read back is left alone. This is a display filter; deciding that
@@ -2325,7 +2453,7 @@ mod tests {
         let ranges = vec![changed(99, 0, 4)];
 
         assert_eq!(
-            ranges_for_mode(&ranges, source, RenderMode::Minimal),
+            ranges_for_options(&ranges, source, RenderOptions::MINIMAL),
             ranges
         );
     }

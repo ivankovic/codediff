@@ -1206,6 +1206,13 @@ fn render_code_row(
     markers: &[&CodeMarker],
 ) -> String {
     let row_len = line.len();
+    // Only for `columns_on_row`'s fallback width, when a range spans this row completely without
+    // ending on it - stops the paint at the last real character rather than the row's true byte
+    // length, so it never covers trailing whitespace or, past it, the newline. `row_len` itself
+    // stays untrimmed: it still has to bound the unstyled tail appended after the last segment
+    // below, or that trailing whitespace would be dropped from the page's text entirely instead
+    // of just left uncolored.
+    let paint_row_len = line.trim_end().len();
     let side = &panel.side;
 
     // Every span this row draws, as byte-column bounds in left-to-right order: this rendering's
@@ -1219,7 +1226,7 @@ fn render_code_row(
             code_operation_class(&range_match.operation).is_some() && !range_match.source.is_empty()
         })
         .filter_map(|(index, range_match)| {
-            range_match.source.columns_on_row(row, row_len).map(
+            range_match.source.columns_on_row(row, paint_row_len).map(
                 |(start, end)| -> (usize, usize, &TextOperation, &String, Option<&String>) {
                     (
                         start,
@@ -1603,6 +1610,27 @@ mod tests {
         // The Identical range contributes no span, and the untouched tail is plain text - but all
         // of it is still present, which is what `strip_tags` proves.
         assert_eq!(strip_tags(&html), "1let foo = 1;");
+    }
+
+    /// A range spanning a row completely (it isn't the range's own end row) wraps only up to the
+    /// row's last real character - never its trailing whitespace, and least of all the newline
+    /// past it. That trailing text still has to appear in the page, just outside the span.
+    #[test]
+    fn render_code_row_does_not_wrap_a_middle_rows_trailing_whitespace() {
+        let ranges = vec![RangeMatch {
+            source: codediff::diff::text_range::TextRange::new(0, 0, 1, 3),
+            destination: codediff::diff::text_range::TextRange::new(0, 0, 1, 3),
+            operation: TextOperation::Move,
+        }];
+        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1);
+        let html = render_code_row("foo   ", 0, &TextOperation::Move, &panel, &[]);
+
+        assert!(
+            html.contains(r#"<span class="cd cd-move" data-range="b0" tabindex="0">foo</span>"#),
+            "expected exactly 'foo' wrapped, not the trailing spaces: {html}"
+        );
+        // The trailing whitespace is still on the page in full, just outside the span.
+        assert_eq!(strip_tags(&html), "1foo   ");
     }
 
     /// On a pure deletion the after side has no changed text at all - and, as `code_markers`'

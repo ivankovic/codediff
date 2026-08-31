@@ -5767,7 +5767,7 @@
               "start_row": 19,
               "start_column": 30,
               "end_row": 19,
-              "end_column": 40
+              "end_column": 39
             }
           ],
           "after": [
@@ -5775,7 +5775,7 @@
               "start_row": 38,
               "start_column": 25,
               "end_row": 38,
-              "end_column": 35
+              "end_column": 34
             }
           ]
         },

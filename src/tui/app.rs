@@ -31,7 +31,7 @@ use crate::code::{Code, Language};
 use crate::diff::{
     Diff, DiffMode, NodeCache,
     text::{
-        ChangeCounts, DiffSummary, RenderMode, TextDiff, change_counts, is_comment_only_diff,
+        ChangeCounts, DiffSummary, RenderOptions, TextDiff, change_counts, is_comment_only_diff,
         plain_text_line_diff, summarize_diff_with_comment_check,
     },
 };
@@ -42,6 +42,7 @@ use crate::tui::components::{
     file_dialog::FileDialog,
     help_modal::HelpModal,
     line_prompt::LinePrompt,
+    render_options_dialog::RenderOptionsDialog,
     search_modal::SearchModal,
     theme_dialog::ThemeDialog,
 };
@@ -59,6 +60,8 @@ pub enum AppScreen {
     SelectFile,
     /// The theme picker popup is open, drawn over the (still-visible) viewer.
     SelectTheme,
+    /// The render-options panel (the `M` key) is open, drawn over the (still-visible) viewer.
+    RenderOptions,
     /// The background diff computation is running.
     Diffing,
     /// The `?` keybinding reference is open, drawn over the (still-visible) viewer.
@@ -88,6 +91,7 @@ fn esc_should_quit(screen: AppScreen) -> bool {
         AppScreen::Diffing
         | AppScreen::SelectFile
         | AppScreen::SelectTheme
+        | AppScreen::RenderOptions
         | AppScreen::Help
         | AppScreen::Search
         | AppScreen::JumpToLine => false,
@@ -102,6 +106,7 @@ pub struct App {
     diff_viewer: DiffViewer,
     file_dialog: Option<FileDialog>,
     theme_dialog: Option<ThemeDialog>,
+    render_options_dialog: Option<RenderOptionsDialog>,
     help_modal: Option<HelpModal>,
     search_modal: Option<SearchModal>,
     line_prompt: Option<LinePrompt>,
@@ -177,6 +182,7 @@ impl App {
             diff_viewer: DiffViewer::new(),
             file_dialog: None,
             theme_dialog: None,
+            render_options_dialog: None,
             help_modal: None,
             search_modal: None,
             line_prompt: None,
@@ -211,7 +217,8 @@ impl App {
             .set_layout_override(theme::load_panel_layout());
         self.diff_viewer
             .set_node_highlight(theme::load_node_highlight());
-        self.diff_viewer.set_render_mode(theme::load_render_mode());
+        self.diff_viewer
+            .set_render_options(theme::load_render_options());
         // The custom palette has to be installed before anything renders: `OverlayTheme::Custom`
         // resolves through the process-global one, so a user whose saved theme is Custom would
         // otherwise see Dracula's defaults for the first frame.
@@ -353,6 +360,15 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
+                // Open the render-options panel - which parts of the diff get painted, not a
+                // blind Full/Minimal flip any more (see `RenderOptionsDialog`).
+                KeyCode::Char('M') if self.screen == AppScreen::Viewer => {
+                    self.render_options_dialog =
+                        Some(RenderOptionsDialog::new(self.diff_viewer.render_options()));
+                    self.screen = AppScreen::RenderOptions;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
                 KeyCode::Char('?') if self.screen == AppScreen::Viewer => {
                     self.help_modal = Some(HelpModal::new(self.current_theme));
                     self.screen = AppScreen::Help;
@@ -401,6 +417,10 @@ impl App {
                 None => Ok(None),
             },
             AppScreen::SelectTheme => match self.theme_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
+            AppScreen::RenderOptions => match self.render_options_dialog.as_mut() {
                 Some(dialog) => dialog.handle_events(Some(event)),
                 None => Ok(None),
             },
@@ -527,6 +547,13 @@ impl App {
                     self.line_prompt = None;
                     self.screen = AppScreen::Viewer;
                 }
+                // Every toggle in the render-options panel is already final (see the action's own
+                // doc comment) - apply it to the live viewer and persist it in the same step,
+                // rather than waiting for the dialog to close.
+                Action::RenderOptionsChanged(options) => {
+                    self.diff_viewer.set_render_options(*options);
+                    theme::save_render_options(*options);
+                }
                 _ => {}
             }
 
@@ -635,6 +662,11 @@ impl App {
         }
         self.file_dialog = None;
         self.theme_dialog = None;
+        // Nothing to revert here, unlike the theme dialog above: every toggle in the
+        // render-options panel already applied and persisted itself (see
+        // `Action::RenderOptionsChanged`), so closing it is just discarding the dialog's own
+        // cursor state.
+        self.render_options_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
         self.line_prompt = None;
@@ -730,6 +762,7 @@ impl App {
                     None => Ok(()),
                 },
                 AppScreen::SelectTheme => self.draw_theme_dialog(frame, area),
+                AppScreen::RenderOptions => self.draw_render_options_dialog(frame, area),
                 AppScreen::Diffing => {
                     frame.render_widget(diffing_status_paragraph(), area);
                     Ok(())
@@ -828,14 +861,26 @@ impl App {
         if layout != crate::tui::theme::PanelLayout::Auto {
             left_parts.push(format!("[layout: {}]", layout.label()));
         }
-        // Same rule as the layout override above, and it matters more here: `Minimal` deliberately
-        // leaves standalone brackets and separators unpainted, so without a badge a reader who
-        // forgot they pressed `M` - or inherited the setting from a previous run, since it
-        // persists - would read the missing highlights as codediff having missed them. `Full` is
-        // the default and what every release before the mode existed rendered, so labelling it
-        // would put a permanent badge on a screen that has nothing to report.
-        if self.diff_viewer.render_mode() == RenderMode::Minimal {
-            left_parts.push("[minimal]".to_string());
+        // Same rule as the layout override above, and it matters more here: turning an option off
+        // deliberately leaves something unpainted (standalone brackets, leading whitespace), so
+        // without a badge a reader who forgot they pressed `M` - or inherited the setting from a
+        // previous run, since it persists - would read the missing highlights as codediff having
+        // missed them. `FULL` is the default and what every release before this setting existed
+        // rendered, so labelling it would put a permanent badge on a screen that has nothing to
+        // report.
+        let render_options = self.diff_viewer.render_options();
+        if render_options != RenderOptions::FULL {
+            if render_options == RenderOptions::MINIMAL {
+                left_parts.push("[minimal]".to_string());
+            } else {
+                let off: Vec<&str> = render_options
+                    .options()
+                    .into_iter()
+                    .filter(|(_, on)| !on)
+                    .map(|(label, _)| label)
+                    .collect();
+                left_parts.push(format!("[{} off]", off.join(", ")));
+            }
         }
         let left = left_parts.join("   ");
 
@@ -910,6 +955,19 @@ impl App {
         dialog.draw(frame, popup)
     }
 
+    /// Draw the `M` render-options panel as a popup over the (still-visible) viewer behind it -
+    /// same convention as the theme dialog, and for the same reason: every toggle applies
+    /// immediately, so the reader should see the diff repaint live as they check/uncheck options.
+    fn draw_render_options_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(dialog) = self.render_options_dialog.as_mut() else {
+            return Ok(());
+        };
+        let popup = dialog.popup_area(area);
+        frame.render_widget(Clear, popup);
+        dialog.draw(frame, popup)
+    }
+
     /// Draw the `g` jump-to-line prompt as a popup over the (still-visible) viewer behind it,
     /// with a real terminal cursor at the end of the typed number - same convention as the
     /// search modal.
@@ -957,7 +1015,7 @@ impl App {
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
 const FOOTER_HINTS: &str =
-    "?:help  o:open  r:reload  n/p:next/prev  /:search  M:mode  Tab:switch  q:quit";
+    "?:help  o:open  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
 /// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
@@ -1514,13 +1572,14 @@ mod tests {
             .collect()
     }
 
-    /// `Minimal` deliberately leaves brackets and separators unpainted, and the setting persists
-    /// across runs - so without this badge, missing highlights read as codediff having missed
-    /// them rather than as a mode the reader chose (possibly in a previous session).
+    /// `MINIMAL` deliberately leaves brackets, separators and leading whitespace unpainted, and
+    /// the setting persists across runs - so without this badge, missing highlights read as
+    /// codediff having missed them rather than as a preset the reader chose (possibly in a
+    /// previous session).
     #[test]
-    fn draw_viewer_badges_minimal_mode_in_the_footer() -> Result<()> {
+    fn draw_viewer_badges_minimal_options_in_the_footer() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
-        app.diff_viewer.set_render_mode(RenderMode::Minimal);
+        app.diff_viewer.set_render_options(RenderOptions::MINIMAL);
 
         let backend = ratatui::backend::TestBackend::new(120, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
@@ -1536,12 +1595,12 @@ mod tests {
         Ok(())
     }
 
-    /// `Full` is the default and what every release before the mode existed rendered, so a badge
-    /// for it would sit permanently on a screen with nothing to report.
+    /// `FULL` is the default and what every release before this setting existed rendered, so a
+    /// badge for it would sit permanently on a screen with nothing to report.
     #[test]
-    fn draw_viewer_does_not_badge_full_mode() -> Result<()> {
+    fn draw_viewer_does_not_badge_full_options() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
-        app.diff_viewer.set_render_mode(RenderMode::Full);
+        app.diff_viewer.set_render_options(RenderOptions::FULL);
 
         let backend = ratatui::backend::TestBackend::new(120, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
@@ -1553,6 +1612,29 @@ mod tests {
         let text = rendered_text(&terminal);
         assert!(!text.contains("[minimal]"), "got: {text}");
         assert!(!text.contains("[full]"), "got: {text}");
+        Ok(())
+    }
+
+    /// Neither preset - only one option off. The badge must name what's missing, not just
+    /// collapse to the `[minimal]` label, or a reader would misread this as "everything off".
+    #[test]
+    fn draw_viewer_badges_a_single_disabled_option_by_name() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.set_render_options(RenderOptions {
+            leading_whitespace: false,
+            structural_punctuation: true,
+        });
+
+        let backend = ratatui::backend::TestBackend::new(120, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+
+        let text = rendered_text(&terminal);
+        assert!(!text.contains("[minimal]"), "got: {text}");
+        assert!(text.contains("Leading whitespace"), "got: {text}");
         Ok(())
     }
 

@@ -31,7 +31,7 @@ use crate::code::language::language_for_path_and_content;
 use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
 use crate::diff::text::{
-    RangeMatch, RenderMode, TextOperation, ranges_for_mode, summarize_diff_with_comment_check,
+    RangeMatch, RenderOptions, TextOperation, ranges_for_options, summarize_diff_with_comment_check,
 };
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff;
@@ -101,7 +101,11 @@ fn row_overlay(ranges: &[RangeMatch], lines: &[&str]) -> (Vec<RowFlags>, Vec<Row
         }
         let last_row = r.end_row.min(lines.len() - 1);
         for row in r.start_row..=last_row {
-            let row_len = lines[row].chars().count();
+            // Trimmed, not the row's true length: a range that spans this row completely (it
+            // isn't the range's own end row) should only color up to the last real character,
+            // never a line's trailing whitespace or, past it, the newline - `colorize_line`
+            // still prints that trailing text, just uncolored, via its own untrimmed tail append.
+            let row_len = lines[row].trim_end().chars().count();
             let Some((start_col, end_col)) = r.columns_on_row(row, row_len) else {
                 continue;
             };
@@ -521,13 +525,15 @@ pub fn run(
     use_color: bool,
     mode: DiffMode,
     context: usize,
-    render_mode: RenderMode,
+    render_options: RenderOptions,
 ) -> Result<bool> {
     let (mut data, fallback_used) = compute_diff(before, after, mode)?;
-    // Applied here rather than inside `compute_diff`: the mapping is identical in both modes, so
-    // this is a presentation filter over a finished diff, not a different diff.
-    data.before_ranges = ranges_for_mode(&data.before_ranges, &data.before_contents, render_mode);
-    data.after_ranges = ranges_for_mode(&data.after_ranges, &data.after_contents, render_mode);
+    // Applied here rather than inside `compute_diff`: the mapping is identical under every set of
+    // options, so this is a presentation filter over a finished diff, not a different diff.
+    data.before_ranges =
+        ranges_for_options(&data.before_ranges, &data.before_contents, render_options);
+    data.after_ranges =
+        ranges_for_options(&data.after_ranges, &data.after_contents, render_options);
     if fallback_used {
         // Deliberately no "--exact fixes this" suggestion: since the phases-4-7
         // rearchitecture, `PendingDiff::finish` runs the same pipeline regardless of mode, so
@@ -619,6 +625,35 @@ mod tests {
         assert!(rendered.contains("29    line28"));
         // But nothing further out should survive.
         assert!(!rendered.contains("line10\n"));
+    }
+
+    /// A range spanning a row completely (it isn't the range's own end row) is colored only up to
+    /// the row's last real character - never its trailing whitespace, and least of all the
+    /// newline past it. `colorize_line` still prints that trailing text in full, just uncolored.
+    #[test]
+    fn row_overlay_does_not_color_a_middle_rows_trailing_whitespace() {
+        let lines = ["foo   ", "bar"];
+        let ranges = vec![RangeMatch {
+            source: crate::diff::text_range::TextRange::new(0, 0, 1, 3),
+            destination: crate::diff::text_range::TextRange::zero(),
+            operation: TextOperation::Update,
+        }];
+
+        let (_, spans) = row_overlay(&ranges, &lines);
+
+        assert_eq!(
+            spans[0],
+            vec![(0, 3, TextOperation::Update)],
+            "row 0's span must stop at 'foo', not run through its trailing spaces"
+        );
+
+        let colored = colorize_line(lines[0], &spans[0], true);
+        // The trailing spaces are still present in full, just outside any ANSI escape.
+        assert!(
+            colored.ends_with("   "),
+            "trailing whitespace must survive uncolored, not be dropped: {colored:?}"
+        );
+        assert_eq!(colored, "\u{1b}[33mfoo\u{1b}[0m   ");
     }
 
     /// No other test exercises `Move` directly - real move-detection heuristics didn't fire in

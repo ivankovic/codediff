@@ -5081,8 +5081,11 @@ fn render_paint_side(
         }
         push_run(&mut run, run_class, &mut spans_out);
 
-        // An empty row still needs to show a cursor or a selection sitting on it, which no
-        // character run can carry - draw one space for it.
+        // A cursor resting at end-of-line, or a blank row caught inside a multi-row span, has no
+        // character run to carry it - draw one space for it. `span_covers` stops a painted span
+        // one column short of this position on any *non*-empty row, so that space stays plain
+        // there: painting past the last real character would read as the trailing whitespace or
+        // the newline itself being part of the change.
         let end_class = class_at(row, line.len(), line);
         if end_class != PaintClass::Plain {
             spans_out.push(Span::styled(" ".to_string(), paint_class_style(end_class)));
@@ -5127,9 +5130,16 @@ fn span_covers(span: HumanTextSpan, row: usize, column: usize, row_len: usize) -
     };
     let end = if row == span.end_row {
         span.end_column
+    } else if row_len == 0 {
+        // A blank row inside a multi-row span has no character of its own to carry the paint -
+        // `render_paint_side`'s one-space fallback is what actually draws it, this just lets that
+        // fallback see the row as covered.
+        1
     } else {
-        // Past the last character, so a multi-row span also covers this row's newline.
-        row_len + 1
+        // Stop at the row's last real character. No human painting ever means to include a
+        // line's trailing whitespace or its newline, so a middle row of a multi-row span must
+        // not either - see the (row, len) checks below and in `render_paint_side`.
+        row_len
     };
     column >= start && column < end
 }
@@ -10213,6 +10223,59 @@ mod tests {
             verdict_style(HumanTextVerdict::Move).fg,
             Some(palette.overlay_fg)
         );
+    }
+
+    /// A multi-row span's middle row is fully covered up to its last real character, but never
+    /// past it - a human painting never means to paint a line's trailing whitespace, and least of
+    /// all its newline.
+    #[test]
+    fn span_covers_stops_at_the_last_real_character_of_a_middle_row() {
+        let span = HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 2,
+            end_column: 1,
+        };
+        let row_len = 3; // row 1 is "foo"
+
+        assert!(
+            span_covers(span, 1, 2, row_len),
+            "the last real character must still be covered"
+        );
+        assert!(
+            !span_covers(span, 1, 3, row_len),
+            "the position past the last character is the newline - must not be covered"
+        );
+    }
+
+    /// A blank row caught in the middle of a multi-row span has no character of its own, so it is
+    /// still reported as covered at column 0 - `render_paint_side`'s one-space fallback is what
+    /// makes that visible, and it needs `span_covers` to say the row belongs to the span at all.
+    #[test]
+    fn span_covers_still_covers_a_blank_middle_row() {
+        let span = HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 2,
+            end_column: 1,
+        };
+
+        assert!(span_covers(span, 1, 0, 0));
+    }
+
+    /// The span's own end row is unaffected either way - `end_column` already says exactly where
+    /// the human stopped painting.
+    #[test]
+    fn span_covers_uses_the_exact_end_column_on_the_last_row() {
+        let span = HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 3,
+        };
+
+        assert!(span_covers(span, 0, 2, 5));
+        assert!(!span_covers(span, 0, 3, 5));
     }
 
     /// Unset means Dracula, which is what makes these render tests deterministic rather than

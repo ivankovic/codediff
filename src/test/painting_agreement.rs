@@ -16,7 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Codediff's *rendering* against the human-painted text ground truth, one file per painted
-//! fixture, each checking both [`RenderMode`]s.
+//! fixture, each checking both the `Minimal` and `Full` presets of
+//! [`RenderOptions`](codediff::diff::text::RenderOptions).
 //!
 //! One file per fixture, mirroring `optimal_solutions/`, and for the reason that layout
 //! earns there: a clamp accretes an explanation of *why* codediff and the painting differ,

@@ -427,11 +427,16 @@ struct ThemeConfig {
     /// deliberately also this feature's shipped default - see `load_node_highlight`.
     #[serde(default)]
     node_highlight: bool,
-    /// How much of the diff to paint (the `M` key) - see `crate::diff::text::RenderMode`. Defaults
-    /// to `Full`, which is what every release before this setting existed rendered, so an existing
-    /// config file keeps behaving exactly as it did.
+    /// Which parts of the diff to paint (the `M` key) - see `crate::diff::text::RenderOptions`.
+    /// Defaults to `RenderOptions::FULL`, which is what every release before this setting existed
+    /// rendered, so an existing config file keeps behaving exactly as it did.
+    ///
+    /// Supersedes a now-removed `render_mode: RenderMode` field of the same purpose. An existing
+    /// config file's old `render_mode` key is simply ignored (serde skips unknown fields by
+    /// default) and this field falls back to its own default the first time it loads - a one-time
+    /// reset of a single local dotfile setting, not worth a migration shim for.
     #[serde(default)]
-    render_mode: crate::diff::text::RenderMode,
+    render_options: crate::diff::text::RenderOptions,
 }
 
 /// The config file's path: a dotfile in the current working directory, per the exploratory-
@@ -493,16 +498,16 @@ pub fn save_custom_palette(palette: CustomPalette) {
     save_to(config_path(), config);
 }
 
-/// The persisted render mode (the `M` key), or `RenderMode::Full` if none was ever chosen.
-pub fn load_render_mode() -> crate::diff::text::RenderMode {
-    load_from(config_path()).render_mode
+/// The persisted render options (the `M` key), or `RenderOptions::FULL` if none was ever chosen.
+pub fn load_render_options() -> crate::diff::text::RenderOptions {
+    load_from(config_path()).render_options
 }
 
-/// Persist the render mode, preserving the other settings in the same file - same non-fatal
+/// Persist the render options, preserving the other settings in the same file - same non-fatal
 /// failure semantics as `save_overlay_theme`.
-pub fn save_render_mode(mode: crate::diff::text::RenderMode) {
+pub fn save_render_options(options: crate::diff::text::RenderOptions) {
     let mut config = load_from(config_path());
-    config.render_mode = mode;
+    config.render_options = options;
     save_to(config_path(), config);
 }
 
