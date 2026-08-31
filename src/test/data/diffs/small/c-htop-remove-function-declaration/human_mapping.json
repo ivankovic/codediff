@@ -9824,5 +9824,23 @@
         "#endif:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 70,
+              "start_column": 0,
+              "end_row": 70,
+              "end_column": 69
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
