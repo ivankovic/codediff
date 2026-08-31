@@ -594,6 +594,40 @@ mod tests {
 
     /// The node highlight persists, and - the part that matters - a config file written before
     /// the setting existed loads as **off**, not as "unset means the old always-on behaviour".
+    /// The exact hazard `RenderOptions::whole_pair_updates`'s own `#[serde(default)]` exists to
+    /// prevent: a config written before that field existed - which every `.codediff.toml` on disk
+    /// today is - has a `[render_options]` table with the two older keys but not this one.
+    /// Without the attribute, `confy`'s deserialization of the whole file fails on the missing
+    /// key, and `load_from`'s `.unwrap_or_default()` would silently reset *everything* - theme,
+    /// syntax theme, node highlight, all of it - not just this one option.
+    #[test]
+    fn a_pre_existing_render_options_table_without_whole_pair_updates_still_loads() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        // What `save_to` would have written before `whole_pair_updates` existed - a real
+        // `[render_options]` table missing only the new key, not a file missing the table
+        // entirely (`render_options` itself is already `#[serde(default)]`, which is a different,
+        // already-covered case).
+        std::fs::write(
+            file.path(),
+            "theme = \"SolarizedLight\"\n\n[render_options]\nleading_whitespace = true\nstructural_punctuation = true\n",
+        )
+        .expect("write legacy config");
+
+        let loaded = load_from(file.path().to_path_buf());
+
+        assert_eq!(
+            loaded.theme,
+            OverlayTheme::SolarizedLight,
+            "the rest of the config must survive, not silently reset"
+        );
+        assert!(loaded.render_options.leading_whitespace);
+        assert!(loaded.render_options.structural_punctuation);
+        assert!(
+            !loaded.render_options.whole_pair_updates,
+            "the missing key must default to false (narrow), not fail the whole file"
+        );
+    }
+
     #[test]
     fn node_highlight_round_trips_and_defaults_to_off_for_an_older_config() {
         let file = tempfile::NamedTempFile::new().expect("temp file");

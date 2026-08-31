@@ -260,7 +260,11 @@ n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 
 t              text view: read the source, and paint the human text-range ground
                  truth onto it (stored beside the tree mapping, not derived from
-                 it). Tab side, hjkl/0/$/g/G move, v select; d/i paint the
+                 it). Tab side, hjkl/0/$/g/G move, v select. By default a
+                 selection spanning several rows is vertical -- the same columns
+                 on each row, like a stack of squares, not every full line swept
+                 in between; V toggles that to a full-line sweep, for a single
+                 contiguous multi-line block. d/i paint the
                  Before/After selection deleted/inserted, m pairs BOTH sides'
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
@@ -1859,7 +1863,7 @@ fn verdict_at(
 /// span needs no conversion on the way out. Cursor movement steps by *characters* even so - see
 /// [`TextPaintState::step_column`] - since landing mid-character would produce a span that
 /// `span_text` correctly refuses to read back.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct TextPaintState {
     /// 0 = before, 1 = after. Same side convention as `TextDiff::all`.
     side: usize,
@@ -1884,6 +1888,28 @@ struct TextPaintState {
     /// Top visible row per side. Independent, unlike the read-only view this replaced: painting a
     /// move means looking at two places that are nowhere near each other.
     scroll: [usize; 2],
+    /// How a selection spanning several rows reads, toggled with `V`.
+    ///
+    /// `true` (the default): vertical - one span per row, all sharing the anchor-to-cursor column
+    /// range, for picking the same columns down a stack of lines. `false`: the old full-line
+    /// sweep, still needed for a single contiguous multi-line block - e.g. selecting a whole
+    /// moved function body, where `m` requires every span on a side to read identical text and a
+    /// per-row decomposition of one block would fail that check on every row but the first.
+    vertical: bool,
+}
+
+impl Default for TextPaintState {
+    fn default() -> Self {
+        Self {
+            side: 0,
+            cursor: [(0, 0); 2],
+            anchor: [None; 2],
+            line_prompt: None,
+            pending: [Vec::new(), Vec::new()],
+            scroll: [0; 2],
+            vertical: true,
+        }
+    }
 }
 
 impl TextPaintState {
@@ -1940,47 +1966,105 @@ impl TextPaintState {
         }
     }
 
-    /// The selection on `side` as a span, or `None` if nothing is selected there.
+    /// The live selection on `side`: one span per row it touches, empty if nothing is selected.
     ///
-    /// The end is exclusive and includes the character *under* the cursor, which is what a reader
-    /// painting a range sees highlighted - a selection that stopped one character short of its own
-    /// cursor would be a surprise every time.
-    fn selection(&self, side: usize, source: &str) -> Option<HumanTextSpan> {
-        let anchor = self.anchor[side]?;
+    /// `self.vertical` (toggled with `V`) picks the shape: vertical is a stack of squares - each
+    /// row in range gets its own span sharing the anchor-to-cursor column range, clamped to that
+    /// row's own length - for picking the same columns down several lines without also grabbing
+    /// the untouched tail of every line in between. Non-vertical is the older full-line sweep -
+    /// one span running from the anchor straight through to the cursor, covering every line in
+    /// between end to end - which a contiguous multi-line block (an entire moved function body)
+    /// still needs: `m` requires every span on a side to read identical text, so decomposing one
+    /// block into per-row squares would fail that check on every row but the first. A same-row
+    /// selection reads the same either way: with one row in range both shapes collapse to the
+    /// single span every earlier version of this method returned.
+    ///
+    /// Each span's end is exclusive and includes the character *under* whichever endpoint sits
+    /// further right, which is what a reader painting a range sees highlighted - a selection that
+    /// stopped one character short of its own cursor would be a surprise every time. In vertical
+    /// mode, a row shorter than the left column contributes nothing: there is no character there
+    /// to select.
+    fn selection(&self, side: usize, source: &str) -> Vec<HumanTextSpan> {
+        let Some(anchor) = self.anchor[side] else {
+            return Vec::new();
+        };
         let cursor = self.cursor[side];
-        let (start, end) = if anchor <= cursor {
-            (anchor, cursor)
+        let (row_start, row_end) = if anchor.0 <= cursor.0 {
+            (anchor.0, cursor.0)
         } else {
-            (cursor, anchor)
+            (cursor.0, anchor.0)
         };
-        let end_line = Self::row_text(source, end.0);
-        let end_column = match end_line[end.1.min(end_line.len())..].chars().next() {
-            Some(ch) => end.1 + ch.len_utf8(),
-            // The cursor sits past the last character of its row: extend through the newline, so
-            // selecting to end-of-line and pressing `d` deletes the line rather than all but its
-            // break.
-            None => end.1,
+
+        if !self.vertical {
+            let (start, end) = if anchor <= cursor {
+                (anchor, cursor)
+            } else {
+                (cursor, anchor)
+            };
+            let end_line = Self::row_text(source, end.0);
+            let end_column = match end_line[end.1.min(end_line.len())..].chars().next() {
+                Some(ch) => end.1 + ch.len_utf8(),
+                // The cursor sits past the last character of its row: extend through the newline,
+                // so selecting to end-of-line and pressing `d` deletes the line rather than all
+                // but its break.
+                None => end.1,
+            };
+            let span = HumanTextSpan {
+                start_row: start.0,
+                start_column: start.1,
+                end_row: end.0,
+                end_column,
+            };
+            return (!span.is_empty()).then_some(span).into_iter().collect();
+        }
+
+        let (col_left, col_right) = if anchor.1 <= cursor.1 {
+            (anchor.1, cursor.1)
+        } else {
+            (cursor.1, anchor.1)
         };
-        let span = HumanTextSpan {
-            start_row: start.0,
-            start_column: start.1,
-            end_row: end.0,
-            end_column,
+        // Rounds `col` down to the nearest character boundary on `line` - the same clamp
+        // `step_row` applies, needed here because a column valid on the row it was set on can
+        // land mid-character once reused against a different row's different byte content.
+        let clamp_boundary = |line: &str, col: usize| -> usize {
+            let col = col.min(line.len());
+            (0..=col)
+                .rev()
+                .find(|&c| line.is_char_boundary(c))
+                .unwrap_or(0)
         };
-        (!span.is_empty()).then_some(span)
+
+        (row_start..=row_end)
+            .filter_map(|row| {
+                let line = Self::row_text(source, row);
+                let start_column = clamp_boundary(line, col_left);
+                let right = clamp_boundary(line, col_right);
+                let end_column = match line[right..].chars().next() {
+                    Some(ch) => right + ch.len_utf8(),
+                    // Past the last character of this row: extend through the newline, so
+                    // selecting to end-of-line and pressing `d` deletes the line rather than all
+                    // but its break.
+                    None => right,
+                };
+                let span = HumanTextSpan {
+                    start_row: row,
+                    start_column,
+                    end_row: row,
+                    end_column,
+                };
+                (!span.is_empty()).then_some(span)
+            })
+            .collect()
     }
 
-    /// Every range `side` would commit right now: whatever `x` has banked, plus the live selection
-    /// if there is one.
+    /// Every range `side` would commit right now: whatever `x` has banked, plus the live selection.
     ///
     /// Banked-plus-live rather than either alone, so `v`-select-`x`-select-`m` works without a
     /// final `x` - forgetting to bank the last range before committing would otherwise silently
     /// drop it, which is exactly the kind of loss this view has no undo for.
     fn committable(&self, side: usize, source: &str) -> Vec<HumanTextSpan> {
         let mut spans = self.pending[side].clone();
-        if let Some(live) = self.selection(side, source) {
-            spans.push(live);
-        }
+        spans.extend(self.selection(side, source));
         spans
     }
 
@@ -5034,8 +5118,8 @@ fn render_paint_side(
                 class = class.max(PaintClass::Banked);
             }
         }
-        if let Some(selection) = selection {
-            if span_covers(selection, row, column, line.len()) {
+        for span in &selection {
+            if span_covers(*span, row, column, line.len()) {
                 class = class.max(PaintClass::Selected);
             }
         }
@@ -7473,28 +7557,38 @@ fn handle_modal_key(
                         Some(_) => None,
                         None => Some(state.cursor[state.side]),
                     };
+                    let mode = if state.vertical { "vertical" } else { "full-line" };
                     app.status = Some(match state.anchor[state.side] {
-                        Some(_) => "Selecting - move, then d/i/m".to_string(),
+                        Some(_) => format!("Selecting ({mode}) - move, then d/i/m"),
                         None => "Selection cleared".to_string(),
                     });
+                }
+                // Swaps how a selection spanning several rows reads: vertical picks the same
+                // columns down each row (a stack of squares), full-line sweeps every row end to
+                // end - what a single contiguous multi-line block (e.g. a whole moved function)
+                // still needs, since `m` requires every span on a side to read identical text.
+                KeyCode::Char('V') => {
+                    state.vertical = !state.vertical;
+                    let mode = if state.vertical { "vertical" } else { "full-line" };
+                    app.status = Some(format!("Selections are now {mode}"));
                 }
                 // Same pair the tree panels use for their own multi-map selection: `x` banks what
                 // is selected so another range can be selected on the same side, `c` clears both
                 // sides' banks. This is what makes an N:M match reachable - one live selection can
                 // only ever describe one range.
-                KeyCode::Char('x') => match state.selection(state.side, focused_source) {
-                    Some(span) => {
-                        state.pending[state.side].push(span);
+                KeyCode::Char('x') => {
+                    let spans = state.selection(state.side, focused_source);
+                    if spans.is_empty() {
+                        app.status = Some("Nothing selected to bank - press v first".to_string());
+                    } else {
+                        state.pending[state.side].extend(spans);
                         state.anchor[state.side] = None;
                         let banked = state.pending[state.side].len();
                         app.status = Some(format!(
                             "Banked {banked} range(s) on this side - select another, then d/i/m"
                         ));
                     }
-                    None => {
-                        app.status = Some("Nothing selected to bank - press v first".to_string())
-                    }
-                },
+                }
                 KeyCode::Char('c') => {
                     state.pending = [Vec::new(), Vec::new()];
                     state.anchor = [None; 2];
@@ -10693,7 +10787,9 @@ mod tests {
         let source = "let foo = 1;\n";
         let state = paint_state_at(0, (0, 6), Some((0, 4)));
 
-        let span = state.selection(0, source).expect("a selection");
+        let spans = state.selection(0, source);
+        assert_eq!(spans.len(), 1, "a same-row selection is a single span");
+        let span = spans[0];
 
         assert_eq!(
             codediff::test::helper::human_mapping::span_text(source, span),
@@ -10710,10 +10806,7 @@ mod tests {
 
         // Both cover `foo`, but each includes the character under its own cursor, so the backward
         // one runs from 4 through the cursor at 4 and out to the anchor at 6 inclusive.
-        assert_eq!(
-            forward.selection(0, source).unwrap(),
-            backward.selection(0, source).unwrap()
-        );
+        assert_eq!(forward.selection(0, source), backward.selection(0, source));
     }
 
     /// Byte columns, not character columns - a multi-byte character before the selection must not
@@ -10725,11 +10818,130 @@ mod tests {
         // starts at byte 11.
         let state = paint_state_at(0, (0, 11), Some((0, 9)));
 
-        let span = state.selection(0, source).expect("a selection");
+        let span = state.selection(0, source)[0];
 
         assert_eq!(
             codediff::test::helper::human_mapping::span_text(source, span),
             Some("foo")
+        );
+    }
+
+    /// A selection spanning several rows is vertical: one span per row, all sharing the same
+    /// column range, rather than a single span sweeping full lines in between - the bug this
+    /// feature replaces would highlight (and let `d`/`i` swallow) every untouched character
+    /// between the two columns on the middle rows.
+    #[test]
+    fn a_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
+        let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
+        // Column 3 on row 0 through column 4 on row 2 - a one-column-wide block.
+        let state = paint_state_at(0, (2, 4), Some((0, 3)));
+
+        let spans = state.selection(0, source);
+
+        assert_eq!(
+            spans,
+            vec![
+                HumanTextSpan {
+                    start_row: 0,
+                    start_column: 3,
+                    end_row: 0,
+                    end_column: 5
+                },
+                HumanTextSpan {
+                    start_row: 1,
+                    start_column: 3,
+                    end_row: 1,
+                    end_column: 5
+                },
+                HumanTextSpan {
+                    start_row: 2,
+                    start_column: 3,
+                    end_row: 2,
+                    end_column: 5
+                },
+            ]
+        );
+    }
+
+    /// A row too short to reach the selected columns contributes no span - there is nothing there
+    /// to select, rather than the selection falling back to covering whatever the row does have.
+    #[test]
+    fn a_multi_row_selection_skips_a_row_shorter_than_the_selected_columns() {
+        let source = "aaaaaa\nbb\ncccccc\n";
+        let state = paint_state_at(0, (2, 4), Some((0, 4)));
+
+        let spans = state.selection(0, source);
+
+        assert_eq!(
+            spans.iter().map(|s| s.start_row).collect::<Vec<_>>(),
+            vec![0, 2],
+            "row 1 ('bb') is shorter than column 4, so it contributes nothing"
+        );
+    }
+
+    /// `V` swaps a selection back to the pre-vertical behaviour: one span sweeping every full row
+    /// between anchor and cursor end to end, needed for a single contiguous multi-line block where
+    /// `m`'s identical-text-per-side check would otherwise fail on a per-row decomposition.
+    #[test]
+    fn toggling_off_vertical_restores_the_full_line_sweep() {
+        let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
+        let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
+        state.vertical = false;
+
+        let spans = state.selection(0, source);
+
+        assert_eq!(
+            spans,
+            vec![HumanTextSpan {
+                start_row: 0,
+                start_column: 3,
+                end_row: 2,
+                end_column: 5
+            }],
+            "one span end to end, not a per-row stack"
+        );
+    }
+
+    /// Reads back the style painted at one character position of one rendered row, skipping the
+    /// gutter span every row starts with.
+    fn style_at(lines: &[Line<'static>], row: usize, column: usize) -> Style {
+        let line = &lines[row];
+        let mut consumed = 0usize;
+        for span in line.spans.iter().skip(1) {
+            let len = span.content.chars().count();
+            if column < consumed + len {
+                return span.style;
+            }
+            consumed += len;
+        }
+        panic!("column {column} past the end of row {row}'s content: {line:?}");
+    }
+
+    /// The user-visible reason this toggle exists: a vertical selection leaves the untouched tail
+    /// of a middle row unstyled, while the same anchor and cursor in full-line mode sweeps that
+    /// tail in too. Exercises the actual render path, not just the spans `selection` computes.
+    #[test]
+    fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not() {
+        let source = "aaaXaaaaaaaa\nbbbYbbbbbbbb\ncccZcccccccc\n";
+        let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
+        let selected_bg = Some(OverlayTheme::default().palette().cross_highlight_bg);
+        // Row 1, well past the selection's column 3-4 range but still inside the line - the tail
+        // a full-line sweep would highlight and a vertical selection would not.
+        let tail_column = 10;
+
+        let vertical = render_paint_side(source, &[], &state, 0, 5);
+        assert_ne!(
+            style_at(&vertical, 1, tail_column).bg,
+            selected_bg,
+            "vertical: row 1's tail past the selected columns must stay unstyled"
+        );
+
+        state.vertical = false;
+        let full_line = render_paint_side(source, &[], &state, 0, 5);
+        assert_eq!(
+            style_at(&full_line, 1, tail_column).bg,
+            selected_bg,
+            "full-line: row 1's tail is swept into the selection between anchor and cursor"
         );
     }
 

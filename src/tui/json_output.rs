@@ -73,7 +73,7 @@ use crate::diff::text::{
 };
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::DiffSessionData;
-use crate::tui::app::compute_diff;
+use crate::tui::app::compute_diff_with_update_style;
 use crate::tui::headless::nearest_reference_line;
 
 /// A `TextRange`, reshaped for JSON. Kept as a local type rather than `#[derive(Serialize)]` on
@@ -297,7 +297,8 @@ pub fn run(
     mode: DiffMode,
     render_options: RenderOptions,
 ) -> Result<bool> {
-    let (mut data, fallback_used) = compute_diff(before, after, mode)?;
+    let (mut data, fallback_used) =
+        compute_diff_with_update_style(before, after, mode, render_options.whole_pair_updates)?;
     // See `headless::run`'s note: a presentation filter over a finished diff, not a different one.
     data.before_ranges =
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);
@@ -311,6 +312,7 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui::app::compute_diff;
 
     /// Same synthetic 4-line change `headless.rs`'s own tests use (one line changed, modeled as a
     /// Delete on the before side paired with an Insert on the after side).

@@ -265,12 +265,17 @@ fn intra_node_update_ranges(
     // an identifier, keyword or operator. Decides whether a one-sided middle reads as an
     // insertion/deletion or stays an update.
     content_node: bool,
+    // [`RenderOptions::whole_pair_updates`]. `true` skips the affix split below entirely and
+    // reports the node's whole extent as one `Update`, the same single-range shape the "no common
+    // affix at all" case below already produces - painting the matched pair whole is exactly that
+    // case, forced rather than discovered.
+    whole_pair_updates: bool,
 ) -> Vec<RangeMatch> {
     let prefix_len = common_prefix_byte_len(source.text, destination.text);
     let suffix_len =
         common_suffix_byte_len(&source.text[prefix_len..], &destination.text[prefix_len..]);
 
-    if prefix_len == 0 && suffix_len == 0 {
+    if whole_pair_updates || (prefix_len == 0 && suffix_len == 0) {
         return vec![advance_and_build_range_with_source(
             last_non_move_range,
             whole_source_range,
@@ -350,6 +355,9 @@ fn ranges(
     // Which file `source` is. Only `intra_node_update_ranges` needs it, and only to tell an
     // insertion from a deletion - see its doc comment. Everything else in here is symmetric.
     source_is_before: bool,
+    // [`RenderOptions::whole_pair_updates`], forwarded straight through to every
+    // `intra_node_update_ranges` call below - see that parameter's own doc comment.
+    whole_pair_updates: bool,
 ) -> Vec<RangeMatch> {
     let mut ranges = Vec::new();
 
@@ -547,6 +555,7 @@ fn ranges(
                                     },
                                     source_is_before,
                                     is_content_node(node.kind()),
+                                    whole_pair_updates,
                                 );
                             } else {
                                 new_ranges.push(advance_and_build_range(
@@ -619,6 +628,7 @@ fn ranges(
                                             },
                                             source_is_before,
                                             is_content_node(node.kind()),
+                                            whole_pair_updates,
                                         ),
                                         _ => vec![advance_and_build_range(
                                             &mut last_non_move_range,
@@ -879,13 +889,35 @@ fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
 }
 
 impl TextDiff {
-    /// Construct the TextDiff from an ASTDiff.
-    ///
-    /// An ASTDiff must exist to create the TextDiff. There is no algorithm currently
-    /// implemented that can construct the TextDiff directly from code.
+    /// Construct the TextDiff from an ASTDiff, with [`RenderOptions::whole_pair_updates`] off -
+    /// the narrow-update reading every caller but the one that resolves that option wants. See
+    /// [`Self::from_with_update_style`] for the parameterized version and why this stays the
+    /// zero-argument default rather than growing a parameter of its own: touching every call
+    /// site's signature for an option almost none of them resolve is exactly the "risky `ranges()`
+    /// logic" churn that isn't worth it just to type one `false` in one place instead of here.
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
-        let mut before_ranges_plain = ranges(before, after, diff, node_cache, true);
-        let mut after_ranges_plain = ranges(after, before, diff, node_cache, false);
+        Self::from_with_update_style(before, after, diff, node_cache, false)
+    }
+
+    /// [`Self::from`], with [`RenderOptions::whole_pair_updates`] threaded through to every
+    /// `Update` node instead of hardcoded off.
+    ///
+    /// A separate method rather than a parameter on `from` itself: `from` has real call sites in
+    /// `human_solver`, `generate_mapping_site` and the test harness that have no opinion on this
+    /// option and would otherwise all need updating (and re-reviewing) just to keep passing
+    /// `false` - the cost `RenderOptions::whole_pair_updates`'s own doc comment says this design
+    /// avoids. Only `tui::app::assemble_diff_session_data`, which actually resolves the option
+    /// from CLI/config, calls this one.
+    pub fn from_with_update_style(
+        before: &Code,
+        after: &Code,
+        diff: &ASTDiff,
+        node_cache: &NodeCache,
+        whole_pair_updates: bool,
+    ) -> Self {
+        let mut before_ranges_plain = ranges(before, after, diff, node_cache, true, whole_pair_updates);
+        let mut after_ranges_plain =
+            ranges(after, before, diff, node_cache, false, whole_pair_updates);
 
         // Each `ranges` call above decided `Move` from its own walk order, so the two can name
         // different pairs for the same reorder - see `reconcile_moves`.
@@ -1566,6 +1598,31 @@ pub struct RenderOptions {
     /// them does not, and **16 of those 27 are a single punctuation token** - eight `(`, five `)`,
     /// two `):` and one `;`. On in `FULL`.
     pub structural_punctuation: bool,
+    /// Whether an `Update` node's own matched pair is highlighted whole (`argument` and
+    /// `i_am_an_argument` both entirely marked as the changed region), or - the default, and the
+    /// only reading the corpus's own hand-painted ground truth was ever painted against - narrowed
+    /// to just the common-prefix/common-suffix-trimmed middle that actually differs.
+    ///
+    /// **Not a third state of `MINIMAL`/`FULL`, deliberately.** Unlike `leading_whitespace`/
+    /// `structural_punctuation`, this doesn't change how much of an *already-computed* range list
+    /// gets painted - it changes which ranges `TextDiff::from_with_update_style` builds in the
+    /// first place (see `intra_node_update_ranges`), so it can't be applied by
+    /// `ranges_for_options` as a pure post-filter the way the other two are. `MINIMAL`/`FULL` both
+    /// leave it `false`: the corpus was painted narrow either way, so turning this on under either
+    /// preset would disagree with ground truth that was never asked about this axis. Reached only
+    /// via `--whole-updates` (see `main.rs`) for now - not in the `M` panel's live toggle list,
+    /// since toggling it there would silently do nothing until the diff itself was recomputed
+    /// (`DiffViewer::set_render_options` only ever re-filters the cached range list).
+    ///
+    /// `#[serde(default)]`, unlike the two fields above: this one arrived after `RenderOptions`
+    /// was already a field of `theme::ThemeConfig` and so already round-tripping through an
+    /// existing `.codediff.toml` on disk. Without a default, `confy`'s deserialization of that
+    /// pre-existing file would fail on the missing key, and `theme::load_from`'s `.unwrap_or_default()`
+    /// would silently reset not just this option but the *entire* config - theme and syntax theme
+    /// included - back to defaults on the next read. The default (`false`, i.e. narrow) is exactly
+    /// what an old config without an opinion on this axis should mean anyway.
+    #[serde(default)]
+    pub whole_pair_updates: bool,
 }
 
 impl RenderOptions {
@@ -1575,12 +1632,15 @@ impl RenderOptions {
     pub const MINIMAL: Self = Self {
         leading_whitespace: false,
         structural_punctuation: false,
+        whole_pair_updates: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
-    /// combination of options ever paints.
+    /// combination of options ever paints. `whole_pair_updates` stays off even here - see that
+    /// field's own doc comment for why it isn't part of this axis at all.
     pub const FULL: Self = Self {
         leading_whitespace: true,
         structural_punctuation: true,
+        whole_pair_updates: false,
     };
 
     /// Every option, paired with its label and current value, in the order a settings UI should
@@ -1661,6 +1721,34 @@ pub fn ranges_for_options(
     // many ranges is the dominant cost of painting a frame.
     let lines: Vec<&str> = source.split('\n').collect();
 
+    // Rows carrying some Identical/Update/Move content, i.e. content matched to (or from) the
+    // other file - built once and consulted by `extend_leading_whitespace`, which must never grow
+    // an Insert/Delete range backward into a row that also holds one of these: that whitespace
+    // belongs to the matched content sharing the row, not to the inserted/deleted piece. A row
+    // touched only by Insert/Delete (however many separate ones) carries nothing else to protect.
+    let mut matched_rows = std::collections::HashSet::new();
+    for range_match in ranges {
+        if !matches!(
+            range_match.operation,
+            TextOperation::Insert | TextOperation::Delete
+        ) {
+            let source = &range_match.source;
+            // A range ending exactly at column 0 of a later row (the common shape for "matched
+            // content runs through this row's own trailing newline") stops there - the end is
+            // exclusive, so it never actually touches that row's own content, and must not mark it
+            // as matched. Without this, a `RangeMatch` for the newline right before a wholly new
+            // line (`rust-hello-world-added-message`'s own shape) would wrongly veto that line's
+            // own `extend_leading_whitespace` call.
+            let last_touched_row = if source.end_column == 0 && source.end_row > source.start_row
+            {
+                source.end_row - 1
+            } else {
+                source.end_row
+            };
+            matched_rows.extend(source.start_row..=last_touched_row);
+        }
+    }
+
     ranges
         .iter()
         .filter_map(|range_match| {
@@ -1685,7 +1773,15 @@ pub fn ranges_for_options(
             }
             let mut trimmed = range_match.clone();
             trimmed.source = trim_trailing_whitespace(&lines, &range_match.source)?;
-            if !options.leading_whitespace {
+            if options.leading_whitespace {
+                if matches!(
+                    range_match.operation,
+                    TextOperation::Insert | TextOperation::Delete
+                ) && !matched_rows.contains(&trimmed.source.start_row)
+                {
+                    trimmed.source = extend_leading_whitespace(&lines, &trimmed.source);
+                }
+            } else {
                 trimmed.source = trim_leading_whitespace(&lines, &trimmed.source)?;
             }
             Some(trimmed)
@@ -1758,6 +1854,48 @@ fn trim_leading_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRang
         }
     }
     Some(TextRange::new(start_row, start_column, end_row, end_column))
+}
+
+/// `range` with leading whitespace grown back to column 0 of its start row - the counterpart to
+/// [`trim_leading_whitespace`].
+///
+/// **Why this is needed at all.** A whole inserted or deleted node's range comes straight from
+/// tree-sitter's own `node.range()` (`advance_and_build_range`), which never includes the
+/// indentation before it - that indentation isn't part of the node, it's the whitespace between
+/// siblings. So under [`RenderOptions::FULL`] there was, for this one shape of range, nothing for
+/// `leading_whitespace` to keep: [`trim_leading_whitespace`] only ever narrows, and a range that
+/// never captured its own indentation has none to narrow away or keep. Confirmed against the
+/// corpus's own hand-painted ground truth, which paints indentation as part of the insertion for
+/// exactly this shape (a whole new statement/line) - see `rust-hello-world-added-message` and
+/// `rust-add-value-to-enum`.
+///
+/// **Why the caller only calls this when the row's own prefix is pure whitespace, restricts it to
+/// `Insert`/`Delete`, and skips any row `ranges_for_options`'s `matched_rows` marks.** Growing a
+/// range backward risks claiming bytes that read as part of something else sharing the row - most
+/// dangerously indentation in front of content that is itself matched (`Identical`, `Update` or
+/// `Move`) and so unchanged, which this function has no way to tell apart from indentation that
+/// truly belongs to the inserted/deleted piece just by looking at whitespace: a whole-new-row
+/// insert (`rust-hello-world-added-message`) and a same-row insert in front of an otherwise-
+/// unchanged, merely reindented declaration (`cpp-add-const-correctness`, where a `const `
+/// qualifier is inserted before a `Move`d declaration on the same row) look identical from here -
+/// pure whitespace either way. That is why the row-level check has to happen one level up, over
+/// the *whole* range list, not inside this function looking at one range's own text.
+///
+/// Only the `source` side is grown, for the same reason [`trim_leading_whitespace`] only narrows
+/// it: `destination` is a position in the other file, whose text this function cannot see.
+fn extend_leading_whitespace(lines: &[&str], range: &TextRange) -> TextRange {
+    let Some(line) = lines.get(range.start_row) else {
+        return range.clone();
+    };
+    let prefix_end = range.start_column.min(line.len());
+    // Always a char boundary, so the slice below can't panic: `range.start_column` is either
+    // `node.range()`'s own start (tree-sitter never lands mid-character) or a value
+    // `trim_trailing_whitespace` passed through untouched - that function only moves `end`.
+    if line[..prefix_end].chars().all(char::is_whitespace) {
+        TextRange::new(range.start_row, 0, range.end_row, range.end_column)
+    } else {
+        range.clone()
+    }
 }
 
 /// Whether every character `range` covers is structural punctuation or whitespace, given the
@@ -2216,6 +2354,15 @@ mod tests {
         }
     }
 
+    /// Neither preset ever turns `whole_pair_updates` on - the corpus's own ground truth was
+    /// painted narrow either way, so this option lives outside the `MINIMAL`/`FULL` axis entirely.
+    /// See that field's own doc comment.
+    #[test]
+    fn neither_preset_turns_on_whole_pair_updates() {
+        assert!(!RenderOptions::MINIMAL.whole_pair_updates);
+        assert!(!RenderOptions::FULL.whole_pair_updates);
+    }
+
     /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
     /// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
     /// modelling the style it is named after.
@@ -2364,6 +2511,7 @@ mod tests {
         let options = RenderOptions {
             leading_whitespace: true,
             structural_punctuation: false,
+            whole_pair_updates: false,
         };
         let result = ranges_for_options(&ranges, source, options);
 
@@ -2383,6 +2531,7 @@ mod tests {
         let options = RenderOptions {
             leading_whitespace: false,
             structural_punctuation: true,
+            whole_pair_updates: false,
         };
         let result = ranges_for_options(&ranges, source, options);
 
@@ -3820,7 +3969,7 @@ mod tests {
             "fn main() {\n    let long_identifier_name = 5;\n}",
             "fn main() {\n    let long_identifier_nome = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3841,7 +3990,7 @@ mod tests {
              20-character identifier"
         );
 
-        let after_ranges = ranges(&after, &before, &ast, &node_cache, false);
+        let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false);
         let after_updates: Vec<_> = after_ranges
             .iter()
             .filter(|r| r.operation == TextOperation::Update)
@@ -3854,6 +4003,34 @@ mod tests {
         );
     }
 
+    /// [`RenderOptions::whole_pair_updates`] forces the same identifier edit from the test above
+    /// to report one `Update` spanning the *whole* identifier instead of the single changed
+    /// character - the "highlight the matched pair whole" reading `RULES_AND_PREFERENCES.md`'s
+    /// Identifier updates section calls out as the other equally defensible preference.
+    #[test]
+    fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
+        let (before, after, ast, node_cache) = diff_ast(
+            "fn main() {\n    let long_identifier_name = 5;\n}",
+            "fn main() {\n    let long_identifier_nome = 5;\n}",
+        );
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, true);
+
+        let updates: Vec<_> = before_ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Update)
+            .collect();
+        assert_eq!(
+            updates.len(),
+            1,
+            "expected exactly one Update sub-range, got {before_ranges:?}"
+        );
+        assert_eq!(
+            updates[0].source.end_column - updates[0].source.start_column,
+            "long_identifier_name".len(),
+            "the Update range should cover the whole identifier, not just the changed character"
+        );
+    }
+
     /// When the two texts share no common prefix or suffix at all, there's nothing more precise
     /// to report than the whole span - same as the pre-existing whole-node behavior.
     #[test]
@@ -3862,7 +4039,7 @@ mod tests {
             "fn main() {\n    let foo = 5;\n}",
             "fn main() {\n    let bar = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3886,7 +4063,7 @@ mod tests {
             "// hello world!\nfn main() {}",
             "// hello universe!\nfn main() {}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
 
         let updates: Vec<_> = before_ranges
             .iter()

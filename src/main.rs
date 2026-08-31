@@ -126,6 +126,17 @@ struct Args {
     #[arg(long)]
     full: bool,
 
+    /// Highlight an `Update` node's own matched pair whole (e.g. both `argument` and
+    /// `i_am_an_argument`), instead of narrowing to just the part that actually differs.
+    ///
+    /// A separate axis from `--minimal`/`--full`, not a third value either one takes: this decides
+    /// which ranges the diff itself has (see `codediff::diff::text::RenderOptions::
+    /// whole_pair_updates`), not how much of an already-decided range list gets painted, so it
+    /// can't live on the `M` panel's live toggle either - there's nothing there to re-filter.
+    /// Combine freely with `--minimal`/`--full` or neither.
+    #[arg(long)]
+    whole_updates: bool,
+
     /// When to ANSI-color headless output: `always`, `never`, or `auto` (the default - color on
     /// unless the `NO_COLOR` environment variable is set; see `use_color` for why auto is not
     /// tied to stdout being a terminal). The flag beats the environment variable in both
@@ -247,19 +258,25 @@ fn should_run_json(args: &Args) -> bool {
 
 /// Which [`RenderOptions`](codediff::diff::text::RenderOptions) preset to paint with: `--minimal`
 /// or `--full` if either is given (`clap`'s `conflicts_with` rules out both at once), otherwise
-/// whatever the TUI's `M` panel last persisted.
+/// whatever the TUI's `M` panel last persisted - then `--whole-updates` layered on top
+/// independently of that choice, since it isn't part of the `--minimal`/`--full` axis at all (see
+/// `RenderOptions::whole_pair_updates`'s own doc comment).
 ///
 /// A flag wins over the saved setting rather than toggling it, so a script that passes `--minimal`
 /// gets minimal regardless of how the machine it runs on happens to be configured - and passing
-/// neither flag keeps the two front ends agreeing about what the user last chose.
+/// neither flag keeps the two front ends agreeing about what the user last chose. `--whole-updates`
+/// has no saved-setting counterpart to defer to either way: it is never written by the `M` panel
+/// (see its own doc comment), so a script has to ask for it every time it wants it.
 fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
-    if args.minimal {
+    let mut options = if args.minimal {
         codediff::diff::text::RenderOptions::MINIMAL
     } else if args.full {
         codediff::diff::text::RenderOptions::FULL
     } else {
         codediff::tui::theme::load_render_options()
-    }
+    };
+    options.whole_pair_updates = args.whole_updates;
+    options
 }
 
 /// Whether headless output should be ANSI-colored. `Auto` is deliberately not tied to
@@ -577,12 +594,31 @@ mod tests {
             exact: false,
             minimal: false,
             full: false,
+            whole_updates: false,
             color: ColorChoice::Auto,
             exit_code: false,
             context: tui::headless::CONTEXT_LINES,
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }
+    }
+
+    /// `--whole-updates` layers onto whichever `--minimal`/`--full`/persisted choice is otherwise
+    /// in effect, rather than being folded into either preset - see `render_options`'s own doc
+    /// comment for why the two axes are independent.
+    #[test]
+    fn whole_updates_flag_layers_onto_minimal_and_full_alike() {
+        let mut minimal = args_with("TUI", false);
+        minimal.minimal = true;
+        minimal.whole_updates = true;
+        assert!(render_options(&minimal).whole_pair_updates);
+        assert!(!render_options(&minimal).leading_whitespace);
+
+        let mut full = args_with("TUI", false);
+        full.full = true;
+        full.whole_updates = true;
+        assert!(render_options(&full).whole_pair_updates);
+        assert!(render_options(&full).leading_whitespace);
     }
 
     #[test]

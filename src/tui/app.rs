@@ -1104,10 +1104,15 @@ fn assemble_diff_session_data(
     after_code: &Code,
     diff: &Diff,
     mode: DiffMode,
+    // [`RenderOptions::whole_pair_updates`] - unlike the rest of `RenderOptions`, this changes
+    // which ranges `TextDiff` itself builds rather than which of an already-built list get
+    // painted, so it has to reach in here rather than `ranges_for_options`'s later filter pass.
+    whole_pair_updates: bool,
 ) -> Result<DiffSessionData> {
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
-    let text_diff = TextDiff::from(before_code, after_code, ast, &node_cache);
+    let text_diff =
+        TextDiff::from_with_update_style(before_code, after_code, ast, &node_cache, whole_pair_updates);
     // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
     // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
     // field's own doc comment.
@@ -1184,10 +1189,32 @@ fn assemble_plain_text_diff_session_data(
 /// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
 /// terminal-independent diff computation either way - only what happens to the result (draw it
 /// interactively vs. print it as text) differs between the two modes.
+///
+/// [`RenderOptions::whole_pair_updates`] off - see [`compute_diff_with_update_style`] for the
+/// parameterized version and why this stays the plain default rather than growing a parameter:
+/// most of this function's callers (interactive TUI startup/reload, and every test in this
+/// module) have no opinion on that one option and would otherwise all need updating just to keep
+/// passing `false`.
 pub(crate) fn compute_diff(
     before: &Path,
     after: &Path,
     mode: DiffMode,
+) -> Result<(DiffSessionData, bool)> {
+    compute_diff_with_update_style(before, after, mode, false)
+}
+
+/// [`compute_diff`], with [`RenderOptions::whole_pair_updates`] threaded through to the AST-backed
+/// path instead of hardcoded off. Only `tui::headless::run`/`tui::json_output::run` call this one
+/// directly, since they're the callers that actually resolve `RenderOptions` from CLI/config
+/// before a diff is computed - the interactive TUI still opens files through `compute_diff`
+/// itself (see that option's own doc comment on why the `M` panel doesn't drive this: toggling it
+/// there would silently do nothing until the diff is recomputed, which nothing currently triggers
+/// on a `RenderOptions` change).
+pub(crate) fn compute_diff_with_update_style(
+    before: &Path,
+    after: &Path,
+    mode: DiffMode,
+    whole_pair_updates: bool,
 ) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
     if before_code.ast.is_none() || after_code.ast.is_none() {
@@ -1198,7 +1225,15 @@ pub(crate) fn compute_diff(
     let pending = Diff::pending(&before_code, &after_code);
     let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
     let diff = pending.finish(mode);
-    let data = assemble_diff_session_data(before, after, &before_code, &after_code, &diff, mode)?;
+    let data = assemble_diff_session_data(
+        before,
+        after,
+        &before_code,
+        &after_code,
+        &diff,
+        mode,
+        whole_pair_updates,
+    )?;
     Ok((data, fallback_used))
 }
 
@@ -1623,6 +1658,7 @@ mod tests {
         app.diff_viewer.set_render_options(RenderOptions {
             leading_whitespace: false,
             structural_punctuation: true,
+            whole_pair_updates: false,
         });
 
         let backend = ratatui::backend::TestBackend::new(120, 24);

@@ -141,6 +141,7 @@ mod tests {
             Some(Action::RenderOptionsChanged(RenderOptions {
                 leading_whitespace: true,
                 structural_punctuation: false,
+                whole_pair_updates: false,
             }))
         );
     }
@@ -157,6 +158,7 @@ mod tests {
             Some(Action::RenderOptionsChanged(RenderOptions {
                 leading_whitespace: false,
                 structural_punctuation: true,
+                whole_pair_updates: false,
             }))
         );
     }
