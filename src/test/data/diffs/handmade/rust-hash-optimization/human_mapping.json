@@ -5890,6 +5890,88 @@
               "end_column": 51
             }
           ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 5,
+              "start_column": 0,
+              "end_row": 5,
+              "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 19,
+              "start_column": 0,
+              "end_row": 19,
+              "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 0,
+              "end_row": 24,
+              "end_column": 12
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 36,
+              "start_column": 0,
+              "end_row": 36,
+              "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 19,
+              "start_column": 39,
+              "end_row": 19,
+              "end_column": 40
+            }
+          ],
+          "after": [
+            {
+              "start_row": 38,
+              "start_column": 34,
+              "end_row": 38,
+              "end_column": 35
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 15,
+              "start_column": 38,
+              "end_row": 15,
+              "end_column": 40
+            }
+          ],
+          "after": [
+            {
+              "start_row": 32,
+              "start_column": 38,
+              "end_row": 32,
+              "end_column": 40
+            }
+          ]
         }
       ]
     }

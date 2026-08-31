@@ -596,6 +596,17 @@
               "end_column": 9
             }
           ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 0,
+              "end_row": 1,
+              "end_column": 2
+            }
+          ]
         }
       ]
     }

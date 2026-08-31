@@ -504,12 +504,14 @@
       "entries": [
         {
           "operation": "Insert",
-          "after": {
-            "start_row": 2,
-            "start_column": 4,
-            "end_row": 2,
-            "end_column": 18
-          }
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 4,
+              "end_row": 2,
+              "end_column": 18
+            }
+          ]
         }
       ]
     },
@@ -518,27 +520,74 @@
       "entries": [
         {
           "operation": "Insert",
-          "after": {
-            "start_row": 2,
-            "start_column": 4,
-            "end_row": 2,
-            "end_column": 18
-          }
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 4,
+              "end_row": 2,
+              "end_column": 18
+            }
+          ]
         },
         {
           "operation": "Match",
-          "before": {
-            "start_row": 2,
-            "start_column": 4,
-            "end_row": 2,
-            "end_column": 17
-          },
-          "after": {
-            "start_row": 3,
-            "start_column": 6,
-            "end_row": 3,
-            "end_column": 19
-          }
+          "before": [
+            {
+              "start_row": 2,
+              "start_column": 4,
+              "end_row": 2,
+              "end_column": 17
+            }
+          ],
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 6,
+              "end_row": 3,
+              "end_column": 19
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 2,
+              "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 0,
+              "end_row": 3,
+              "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 2,
+              "end_column": 4
+            }
+          ],
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 4,
+              "end_row": 3,
+              "end_column": 6
+            }
+          ]
         }
       ]
     }

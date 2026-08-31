@@ -335,7 +335,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Only one solution",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Insert",
@@ -343,6 +343,22 @@
             {
               "start_row": 2,
               "start_column": 2,
+              "end_row": 2,
+              "end_column": 59
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 0,
               "end_row": 2,
               "end_column": 59
             }

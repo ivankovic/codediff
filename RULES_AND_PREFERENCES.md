@@ -104,8 +104,9 @@ ambiguity with string constants that I believe only a tiny minority would find a
 remaining three options are all acceptable and subjective preference.
 
 Obviously, the same applies if the code block was deleted. If the code block was updated, similar
-options exist, but there is an added option of only highlighting added or removed whitespace at the
-start of the line.
+options exist, but the inserted or deleted whitespace should always be highlighted at the start of
+the line, and existing matching whitespace should be marked as matching between that and the first
+character.
 
 ### Identifier updates
 
