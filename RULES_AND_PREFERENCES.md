@@ -103,6 +103,10 @@ Of these, CodeDiff does **not** support the first choice (no whitespace highligh
 ambiguity with string constants that I believe only a tiny minority would find acceptable. The
 remaining three options are all acceptable and subjective preference.
 
+Obviously, the same applies if the code block was deleted. If the code block was updated, similar
+options exist, but there is an added option of only highlighting added or removed whitespace at the
+start of the line.
+
 ### Identifier updates
 
 Consider the following change:
