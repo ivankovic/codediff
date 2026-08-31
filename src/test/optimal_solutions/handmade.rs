@@ -76,6 +76,8 @@ mod rust_add_to_existing_use;
 #[cfg(test)]
 mod rust_add_value_to_enum;
 #[cfg(test)]
+mod rust_adding_a_variable_and_test_with_comments;
+#[cfg(test)]
 mod rust_adding_many_identical_cfg_test_statements_to_a_signle_file_doesnt_prefer_the_local_insert_but_rather_goes_to_some_other_existing_cfg;
 #[cfg(test)]
 mod rust_adding_to_a_list_of_identical_attributes_should_favour_near_matches;

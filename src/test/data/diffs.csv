@@ -261,6 +261,7 @@ rust-add-comments-and-real-new-logic,src/test/data/diffs/handmade/rust-add-comme
 rust-add-if,src/test/data/diffs/handmade/rust-add-if,handmade,Rust,,,,,9,58,11,81,0,0,0.000,minimal+full,Full|Minimal
 rust-add-to-existing-use,src/test/data/diffs/handmade/rust-add-to-existing-use,handmade,Rust,,,,,6,32,8,37,0,0,0.000,minimal+full,Full|Minimal
 rust-add-value-to-enum,src/test/data/diffs/handmade/rust-add-value-to-enum,handmade,Rust,,,,,22,137,23,140,0,0,0.000,single,Only one solution
+rust-adding-a-variable-and-test-with-comments,src/test/data/diffs/handmade/rust-adding-a-variable-and-test-with-comments,handmade,Rust,,,,,2832,20931,2860,21165,0,0,0.000,minimal+full,Full|Minimal
 rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg,src/test/data/diffs/handmade/rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg,handmade,Rust,,,,,140,858,226,1460,0,0,0.000,single,Only one solution
 rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,src/test/data/diffs/handmade/rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,handmade,Rust,,,,,478,3224,482,3252,0,0,0.000,single,Only one solution
 rust-algorithm-change,src/test/data/diffs/handmade/rust-algorithm-change,handmade,Rust,,,,Requires a N:M multi-map for optimal solution,20,184,24,184,11,0,0.000,minimal+full,Full|Minimal
