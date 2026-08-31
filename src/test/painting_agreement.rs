@@ -144,6 +144,8 @@ mod rust_leetcode_1_bugfix;
 #[cfg(test)]
 mod rust_multi_map_duplicate_calls;
 #[cfg(test)]
+mod rust_next_font_imports_generator;
+#[cfg(test)]
 mod rust_no_change;
 #[cfg(test)]
 mod rust_small_addition_with_reuse_of_binary_expressions;
