@@ -444,6 +444,195 @@
         "variable_declarator:3",
         "subscript_expression:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "array_pattern:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "array_pattern:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "array_pattern:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "array_pattern:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        "variable_declarator:3"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        "variable_declarator:2"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        "variable_declarator:2",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "variable_declaration:2",
+        "variable_declarator:3",
+        "=:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 4,
+              "end_row": 6,
+              "end_column": 5
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 25,
+              "end_row": 6,
+              "end_column": 26
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 5,
+              "end_row": 6,
+              "end_column": 6
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 6,
+              "end_row": 6,
+              "end_column": 7
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 36,
+              "end_row": 6,
+              "end_column": 37
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 8,
+              "end_row": 6,
+              "end_column": 9
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 9,
+              "end_row": 6,
+              "end_column": 10
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 7,
+              "end_row": 6,
+              "end_column": 23
+            }
+          ],
+          "after": [
+            {
+              "start_row": 6,
+              "start_column": 11,
+              "end_row": 6,
+              "end_column": 27
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -64,6 +64,8 @@ mod c_freeciv_add_parameter_to_function;
 #[cfg(test)]
 mod c_htop_remove_function_declaration;
 #[cfg(test)]
+mod c_microsoft_terminal_add_function;
+#[cfg(test)]
 mod cpp_add_const_correctness;
 #[cfg(test)]
 mod cpp_add_memory_management;
@@ -93,6 +95,8 @@ mod javascript_add_event_listener;
 mod javascript_fix_promises;
 #[cfg(test)]
 mod javascript_refactor_arrow_func;
+#[cfg(test)]
+mod javascript_typescript_interesting_small_edit_refactor;
 #[cfg(test)]
 mod kotlin_add_data_class;
 #[cfg(test)]

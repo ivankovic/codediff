@@ -21257,5 +21257,97 @@
         "==:1"
       ]
     }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2",
+          "field_access:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "parenthesized_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2",
+          "field_access:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "parenthesized_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:8",
+          "block:1",
+          "local_variable_declaration:1",
+          "variable_declarator:1",
+          "binary_expression:1",
+          "parenthesized_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "field_access:2"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false
+    }
   ]
 }
