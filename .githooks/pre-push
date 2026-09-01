@@ -21,7 +21,8 @@
 # have to round-trip through GitHub Actions to discover a formatting mistake or a broken build.
 #
 # Deliberately NOT a full CI mirror:
-#   - `cargo clippy` here, not CI's `cargo build --release` + `cargo test` per feature config -
+#   - `cargo clippy` here, not CI's `cargo build --release` + `cargo nextest run --release` per
+#     feature config -
 #     this crate's release profile is `lto = "fat"`, `codegen-units = 1` (see Cargo.toml), which
 #     makes a release build genuinely slow; `cargo clippy` catches the same compile errors (it's a
 #     strict superset of `cargo check`) plus lint violations, in a fraction of the time and

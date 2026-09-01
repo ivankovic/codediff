@@ -149,10 +149,16 @@ documented there.
 
 ### Build, test, quality
 
-* `test` - `cargo test --release`, plus `test-mapping-site-js` (a plain-Node test of the
+* `test` - `cargo nextest run --release`, plus `test-mapping-site-js` (a plain-Node test of the
   human-mapping site's vanilla JS, which cargo's suite cannot cover - see the root Makefile).
-* `build` - `cargo test` + `cargo build --release --features stats` (the `stats` feature builds the
-  dataset-analysis binaries in `src/bin/`).
+  Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time). Unlike `cargo test`, nextest
+  runs each test in its own process rather than as a thread inside one long-lived binary, so the
+  `src/test/helper.rs` fixture caches (never-evicting, process-lifetime) get reclaimed by the OS
+  after every test instead of accumulating for the whole suite. Measured on this repo's full suite,
+  same machine, both `--release`: peak RSS 10.66GB under plain `cargo test --release` vs 5.37GB
+  under `cargo nextest run --release` - about half, at comparable wall-clock time.
+* `build` - the `test` target above + `cargo build --release --features stats` (the `stats` feature
+  builds the dataset-analysis binaries in `src/bin/`).
 * `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.
 * `install-hooks` - one-time setup that points git at `.githooks/pre-push`, which runs the fast
   subset of what CI checks (`cargo fmt --check`, a per-feature-config `cargo check`, the
@@ -190,7 +196,7 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 * `cargo fmt --check`
 * `cargo clippy --tests -- -D warnings`, once each for the three Cargo feature configs (default,
   `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
-* `cargo build` + `cargo test`, once each for the same three feature configs
+* `cargo build` + `cargo nextest run`, once each for the same three feature configs
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
 * The `human_mapping` site's own vanilla-JS tests (`assets/mapping_site/index.test.js`)
 

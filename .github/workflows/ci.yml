@@ -141,8 +141,17 @@ jobs:
         with:
           key: ${{ matrix.features }}
 
+      - uses: taiki-e/install-action@nextest
+
       - name: Build
         run: cargo build --release --features "${{ matrix.features }}"
 
+      # cargo-nextest, not `cargo test`: it runs each test in its own process instead of as a
+      # thread inside one long-lived binary, so this crate's test fixture caches (never-evicting,
+      # process-lifetime - see src/test/helper.rs) get reclaimed by the OS after every test rather
+      # than accumulating for the whole suite. Measured locally: same machine, same --release
+      # build, peak RSS 10.66GB under `cargo test --release` vs 5.37GB under `cargo nextest run
+      # --release`, at comparable wall-clock - the difference between a CI runner OOMing on this
+      # suite and not.
       - name: Test
-        run: cargo test --release --features "${{ matrix.features }}"
+        run: cargo nextest run --release --features "${{ matrix.features }}"

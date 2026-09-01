@@ -11,7 +11,7 @@
 # own regression gate and release gate, not research artifacts.
 
 test: test-mapping-site-js
-	cargo test --release
+	cargo nextest run --release
 
 # Plain-Node regression tests for the human_mapping site's own vanilla JS (assets/mapping_site/) -
 # no npm dependency, no build step, matching that directory's own convention (see index.js's header
