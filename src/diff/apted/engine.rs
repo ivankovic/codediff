@@ -444,9 +444,52 @@ pub(crate) struct EngineCtx<'a> {
     /// pruned descendant already landed. `None` whenever this forest has nothing pruned, in which
     /// case `vren_adjusted` is a pure passthrough.
     pub(crate) containment: Option<&'a ContainmentCtx<'a>>,
+    /// `spf_path`'s `forestdist` scratch table, one per path orientation (index `0` when the
+    /// path lives on `before`, `1` when it lives on `after` - the two have transposed
+    /// dimensions), built on first use and reused by every `spf_path` call of this
+    /// `compute_delta`. It is sized by the *whole* forest, not the current subproblem (see
+    /// `spf_path` for why the absolute indexing is needed), so allocating it fresh per call
+    /// meant one `(n+1)*(m+1)` zeroing per `gted` subproblem - which callgrind put at 75-91% of
+    /// all instructions on every fixture over 400ms (a (848, 679) pair zeroes 4.6MB per call,
+    /// hundreds of times). Reuse is sound for the same reason the table was already shared
+    /// across one call's keyroot sweep: `apted_tree_edit_dist` writes every cell it reads
+    /// within its own sweep, so leftover contents never matter.
+    ///
+    /// `RefCell` rather than a `&mut` threaded through `gted`'s recursion: the recursion is
+    /// deep and the borrow is short (one `spf_path` body, which never re-enters `gted`).
+    forestdist_scratch: std::cell::RefCell<[Option<ForestDist>; 2]>,
 }
 
 impl<'a> EngineCtx<'a> {
+    pub(crate) fn new(
+        before_idx: &'a AptedIndexer,
+        after_idx: &'a AptedIndexer,
+        before_meta: &'a ASTMetadata,
+        after_meta: &'a ASTMetadata,
+        cost_model: &'a UnitCostModel,
+        containment: Option<&'a ContainmentCtx<'a>>,
+    ) -> Self {
+        EngineCtx {
+            before_idx,
+            after_idx,
+            before_meta,
+            after_meta,
+            cost_model,
+            containment,
+            forestdist_scratch: std::cell::RefCell::new([None, None]),
+        }
+    }
+
+    /// Runs `f` with the `forestdist` scratch table for the given path orientation, sized
+    /// `(path.size + 1) x (other.size + 1)` and allocated on the first call for that
+    /// orientation.
+    fn with_forestdist<R>(&self, path_is_before: bool, f: impl FnOnce(&mut ForestDist) -> R) -> R {
+        let (path_idx, other_idx, _, _) = self.sides(path_is_before);
+        let mut scratch = self.forestdist_scratch.borrow_mut();
+        let table = scratch[usize::from(!path_is_before)]
+            .get_or_insert_with(|| ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0));
+        f(table)
+    }
     /// Resolves which indexer/metadata pair is the "path" side and which is "other", given which
     /// global side (`before`/`after`) the path currently lives on. Every single-path function
     /// (`spf_a`, `apted_tree_edit_dist`, `spf_path`) starts with exactly this lookup - pulled out
@@ -1413,23 +1456,25 @@ pub(crate) fn spf_path(
     // Sized and indexed by the same 1-based-boundary convention as `apted_tree_edit_dist`
     // (absolute, not relative to any one call's own extreme-leaf boundary), and reused across the
     // whole keyroot sweep below - see the comment there for why a relative scheme would be
-    // unsound here.
-    let mut forestdist = ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0);
-    for &kr in &keyroots {
-        apted_tree_edit_dist(
-            ctx,
-            delta,
-            dir,
-            path_is_before,
-            path_subtree,
-            kr,
-            &mut forestdist,
-        );
-    }
-    forestdist[(
-        pre_to_post(path_idx, dir, path_subtree) + 1,
-        pre_to_post(other_idx, dir, other_subtree) + 1,
-    )]
+    // unsound here. Shared across every `spf_path` call of this `compute_delta`, too - see
+    // `EngineCtx::forestdist_scratch`.
+    ctx.with_forestdist(path_is_before, |forestdist| {
+        for &kr in &keyroots {
+            apted_tree_edit_dist(
+                ctx,
+                delta,
+                dir,
+                path_is_before,
+                path_subtree,
+                kr,
+                forestdist,
+            );
+        }
+        forestdist[(
+            pre_to_post(path_idx, dir, path_subtree) + 1,
+            pre_to_post(other_idx, dir, other_subtree) + 1,
+        )]
+    })
 }
 
 /// Sentinel cost for a disabled INNER candidate, shared by `compute_opt_strategy_post_l` and
@@ -2086,14 +2131,14 @@ pub(crate) fn compute_delta(
     };
     let path_id_offset = before_idx.size as i64;
 
-    let ctx = EngineCtx {
-        before_idx: &before_idx,
-        after_idx: &after_idx,
+    let ctx = EngineCtx::new(
+        &before_idx,
+        &after_idx,
         before_meta,
         after_meta,
         cost_model,
         containment,
-    };
+    );
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
     ted_init(&ctx, &mut virtual_delta);
     gted(&ctx, &mut virtual_delta, &strategy, path_id_offset, 0, 0);
@@ -2143,14 +2188,14 @@ pub(crate) fn compute_delta_with_driver(
     before_idx.fill_subtree_costs(before_meta, cost_model);
     after_idx.fill_subtree_costs(after_meta, cost_model);
 
-    let ctx = EngineCtx {
-        before_idx: &before_idx,
-        after_idx: &after_idx,
+    let ctx = EngineCtx::new(
+        &before_idx,
+        &after_idx,
         before_meta,
         after_meta,
         cost_model,
         containment,
-    };
+    );
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
     // Drive once per top-level real root (the virtual root's children) - exactly the
     // `other_subtree == 0` fix in `spf_path` above, mirrored on the before/T1 axis:
