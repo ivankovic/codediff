@@ -2272,17 +2272,6 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 13,
-              "start_column": 0,
-              "end_row": 13,
-              "end_column": 4
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
               "start_row": 14,
               "start_column": 21,
               "end_row": 14,
