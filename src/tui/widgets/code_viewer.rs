@@ -345,7 +345,7 @@ impl CodeViewerState {
     /// sentinel, and not a zero-width placeholder), in document order - the ordered list
     /// `next_change_position`/`change_count_and_index` both walk.
     ///
-    /// Consecutive per-row pieces of one `interior_line_indentation: false` split
+    /// Consecutive per-row pieces of one `leading_whitespace: false` split
     /// (`split_into_per_row_pieces`) collapse to a single position here - same operation, same
     /// (always-placeholder, for the `Insert`/`Delete` shapes that split produces) destination,
     /// and contiguous rows, exactly the signature that split leaves and nothing else naturally
@@ -1592,7 +1592,7 @@ mod tests {
         assert_eq!(state.change_count_and_index(), None);
     }
 
-    /// The exact shape `split_into_per_row_pieces` (`RenderOptions::interior_line_indentation:
+    /// The exact shape `split_into_per_row_pieces` (`RenderOptions::leading_whitespace:
     /// false`) produces for one multi-line insert: same operation, same (placeholder) destination,
     /// contiguous rows. `n`/`p` and the "change N/M" counter must treat all three rows as one stop,
     /// not three - otherwise turning that option on would make navigating a multi-line insert three

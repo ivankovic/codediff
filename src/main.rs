@@ -138,18 +138,6 @@ struct Args {
     #[arg(long)]
     whole_updates: bool,
 
-    /// Trim a multi-row inserted/deleted block's *interior* rows back to their own real content,
-    /// instead of keeping each row's full indentation - the rules doc's indentation choice 2
-    /// ("highlight visible characters and whitespace in the same line", as opposed to choice 3/4's
-    /// "in all lines"). See `codediff::diff::text::RenderOptions::interior_line_indentation`
-    /// (this flag turns it off).
-    ///
-    /// Unlike `--minimal`/`--full`, no fixture in the corpus paints this reading yet - it exists
-    /// on request, ahead of ground truth to validate it against. Combine freely with
-    /// `--minimal`/`--full`/`--whole-updates` or neither.
-    #[arg(long)]
-    same_line_indentation: bool,
-
     /// Paint a matched node's relocation as `Move` even when it's known to be a pure reindent
     /// (nesting levels added/removed around otherwise-untouched content, e.g. Rust's `if
     /// let`-chain collapse) - the `M` panel's "Paint reindent-only moves" row, forced on. See
@@ -159,8 +147,7 @@ struct Args {
     /// `--full` paints it - measured against the corpus's own separate `Minimal`/`Full` ground
     /// truths for `rust-next-font-imports-generator`), so this flag only ever forces it *on* -
     /// there's no `--minimal`-with-this-off to ask for, since that's already what `--minimal`
-    /// means. Combine freely with `--minimal`/`--full`/`--whole-updates`/`--same-line-indentation`
-    /// or neither.
+    /// means. Combine freely with `--minimal`/`--full`/`--whole-updates` or neither.
     #[arg(long)]
     paint_reindent_moves: bool,
 
@@ -285,20 +272,15 @@ fn should_run_json(args: &Args) -> bool {
 
 /// Which [`RenderOptions`](codediff::diff::text::RenderOptions) preset to paint with: `--minimal`
 /// or `--full` if either is given (`clap`'s `conflicts_with` rules out both at once), otherwise
-/// whatever the TUI's `M` panel last persisted - then `--whole-updates`/`--same-line-indentation`
-/// layered on top independently of that choice, since neither is part of the `--minimal`/`--full`
-/// axis at all (see `RenderOptions::whole_pair_updates`/`interior_line_indentation`'s own doc
-/// comments).
+/// whatever the TUI's `M` panel last persisted - then `--whole-updates` layered on top
+/// independently of that choice, since it isn't part of the `--minimal`/`--full` axis at all (see
+/// `RenderOptions::whole_pair_updates`'s own doc comment).
 ///
 /// A flag wins over the saved setting rather than toggling it, so a script that passes `--minimal`
 /// gets minimal regardless of how the machine it runs on happens to be configured - and passing
 /// neither flag keeps the two front ends agreeing about what the user last chose. `--whole-updates`
 /// has no saved-setting counterpart to defer to either way: it is never written by the `M` panel
 /// (see its own doc comment), so a script has to ask for it every time it wants it.
-/// `--same-line-indentation` is different - `interior_line_indentation` *is* a plain, persisted `M`
-/// panel toggle like `leading_whitespace`/`structural_punctuation` - so unlike `--whole-updates`
-/// this flag only forces it *off* when passed, rather than always setting it one way or the other;
-/// omitting the flag defers to whatever preset/persisted value was already resolved above.
 fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
     let mut options = if args.minimal {
         codediff::diff::text::RenderOptions::MINIMAL
@@ -308,9 +290,6 @@ fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
         codediff::tui::theme::load_render_options()
     };
     options.whole_pair_updates = args.whole_updates;
-    if args.same_line_indentation {
-        options.interior_line_indentation = false;
-    }
     if args.paint_reindent_moves {
         options.paint_reindent_only_moves = true;
     }
@@ -633,7 +612,6 @@ mod tests {
             minimal: false,
             full: false,
             whole_updates: false,
-            same_line_indentation: false,
             paint_reindent_moves: false,
             color: ColorChoice::Auto,
             exit_code: false,
@@ -661,32 +639,6 @@ mod tests {
         assert!(render_options(&full).leading_whitespace);
     }
 
-    /// `--same-line-indentation` layers onto `--minimal`/`--full` the same way `--whole-updates`
-    /// does, forcing `interior_line_indentation` off regardless of which preset is otherwise in
-    /// effect - unlike `--whole-updates` though, omitting the flag must defer to whatever the
-    /// preset/persisted value already was (both presets already leave it on, so this only shows up
-    /// once something other than the presets sets it).
-    #[test]
-    fn same_line_indentation_flag_layers_onto_minimal_and_full_alike() {
-        let mut minimal = args_with("TUI", false);
-        minimal.minimal = true;
-        minimal.same_line_indentation = true;
-        assert!(!render_options(&minimal).interior_line_indentation);
-        assert!(!render_options(&minimal).leading_whitespace);
-
-        let mut full = args_with("TUI", false);
-        full.full = true;
-        full.same_line_indentation = true;
-        assert!(!render_options(&full).interior_line_indentation);
-        assert!(render_options(&full).leading_whitespace);
-
-        let mut without_the_flag = args_with("TUI", false);
-        without_the_flag.minimal = true;
-        assert!(
-            render_options(&without_the_flag).interior_line_indentation,
-            "omitting the flag must not touch this field"
-        );
-    }
 
     #[test]
     fn paint_reindent_moves_flag_layers_onto_minimal_and_full_alike() {

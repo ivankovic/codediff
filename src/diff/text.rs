@@ -1653,13 +1653,44 @@ pub enum TextOperation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RenderOptions {
     /// Whether a range that starts in whitespace keeps it, or has it trimmed back to the first
-    /// real character. Off in `MINIMAL`: painting by hand, nobody marks the indentation before a
-    /// change as part of it. On in `FULL`.
+    /// real character - applied to *every* row of a multi-row `Insert`/`Delete`, not just the
+    /// range's own first one. Off in `MINIMAL`: painting by hand, nobody marks the indentation
+    /// before a change as part of it, on any of its lines. On in `FULL`, which also keeps a
+    /// multi-row range as one contiguous span rather than splitting it per row.
+    ///
+    /// **Governs both the rules doc's choice-3/4 axis (this range's own leading edge) and its
+    /// choice-2 axis (every interior row's own leading edge) - one field, not two.** Until
+    /// 2026-09-01 these were separate fields (`leading_whitespace` for the first row,
+    /// `interior_line_indentation` for the rest), and unchecking only the first while the corpus's
+    /// own `MINIMAL`/`FULL` ground truth always wanted both moving together (measured: flipping
+    /// `MINIMAL`'s then-separate `interior_line_indentation` to `false` alone dropped the handmade
+    /// aggregate from 1.2590% to 1.1811%, ~40 fixtures improved, one unrelated regression - see
+    /// `painting_disagreement_fix_log.md`) was exactly the confusing, redundant-in-practice split a
+    /// user working the `M` panel by hand ran into directly: unchecking "leading whitespace" left
+    /// every row but the range's own first one still fully indented, because the two fields were
+    /// never actually independent in any painting the corpus holds. Merged into this one field
+    /// rather than kept as two that happen to always agree.
+    ///
+    /// **Off means split.** When this is `false`, a multi-row `Insert`/`Delete` is rendered as one
+    /// piece per row, each trimmed to its own real content, leading *and* trailing (see
+    /// `split_into_per_row_pieces`) - there is no single `TextRange` that can describe "every row's
+    /// own indentation trimmed independently" (a contiguous range's interior rows are always
+    /// `0..row_len` wherever this crate reads one, e.g. `TextRange::columns_on_row`), so
+    /// representing this reading at all requires more than one `RangeMatch` for what was one edit.
     ///
     /// Only meaningful for a range that has *some* real character to trim back to - a range that
     /// is nothing but whitespace start to end is dropped by the unconditional trailing-whitespace
     /// trim regardless of this option, the same as it always has been under `structural_punctuation`
     /// (see `range_is_structural_only`, which already treats an all-whitespace range as structural).
+    ///
+    /// **Scoped to `Insert`/`Delete`, same as before the merge.** A `Move`/`Update` range spanning
+    /// several rows is a *matched* pair, whose `destination` is a real cross-file position rather
+    /// than `Insert`/`Delete`'s placeholder anchor (see `advance_and_build_range`'s doc comment) -
+    /// splitting it into a source-side piece per row would need a matching destination-side split,
+    /// which needs the two sides' row layouts to correspond and isn't implemented. `Update`'s own
+    /// indentation rule is a different, narrower one the rules doc states separately ("inserted or
+    /// deleted whitespace... highlighted at the start of the line") that `intra_node_update_ranges`
+    /// already follows.
     pub leading_whitespace: bool,
     /// Whether a range consisting solely of structural punctuation (see [`STRUCTURAL_PUNCTUATION`])
     /// is kept or dropped. Off in `MINIMAL` - measured against the corpus's hand-painted ground
@@ -1696,39 +1727,6 @@ pub struct RenderOptions {
     /// what an old config without an opinion on this axis should mean anyway.
     #[serde(default)]
     pub whole_pair_updates: bool,
-    /// How a multi-row `Insert`/`Delete` treats its own *interior* rows' leading indentation -
-    /// the rules doc's indentation choices 3/4 (`true`, kept whole - what `FULL` does) versus
-    /// choice 2 (`false`, what `MINIMAL` does since 2026-09-01: every row, not just the first,
-    /// trimmed back to its own first real character - a reader following `leading_whitespace`'s
-    /// example but per row instead of once at the range's very start).
-    ///
-    /// **Corpus-validated, not a guess.** Measured directly against
-    /// `painting_disagreement_census_2026_09_01.md`'s full corpus: flipping `MINIMAL` to `false`
-    /// dropped the handmade aggregate disagreement from 1.2590% to 1.1811% - about 40 fixtures
-    /// improved, several by double digits (`python-refactoring` 7.544%→0.677%,
-    /// `cpp-optimize-algorithm` 5.751%→0.319%, `javascript-add-array-method` 8.312%→0.519%,
-    /// `python-api-change` 5.759%→1.113%) - against exactly one regression
-    /// (`rust-add-to-existing-use`, 10.490%→11.189%, itself dominated by an unrelated single-row
-    /// column-shift disagreement - see `painting_disagreement_fix_log.md`). `FULL` stays
-    /// unaffected either way, confirming the two fields are independent.
-    ///
-    /// **Overrides `leading_whitespace` rather than combining with it, when off.** `leading_whitespace`
-    /// only ever governed the range's own first row (see that field's own doc comment); choice 2 has
-    /// no comparable "grow the first row but not the rest" reading in the doc, so turning this off
-    /// makes every row - first included - trim to its own content, and `leading_whitespace` simply
-    /// doesn't apply while it's off.
-    ///
-    /// **Scoped to `Insert`/`Delete`, like `leading_whitespace`'s own extension.** A `Move`/`Update`
-    /// range spanning several rows is a *matched* pair, whose `destination` is a real cross-file
-    /// position rather than `Insert`/`Delete`'s placeholder anchor (see `advance_and_build_range`'s
-    /// doc comment) - splitting it into a source-side piece per row would need a matching
-    /// destination-side split, which needs the two sides' row layouts to correspond and isn't
-    /// implemented. The rules doc's own indentation discussion is about a wholly inserted/deleted
-    /// block in any case; `Update`'s own indentation rule is a different, narrower one it states
-    /// separately ("inserted or deleted whitespace... highlighted at the start of the line") that
-    /// `intra_node_update_ranges` already follows.
-    #[serde(default = "interior_line_indentation_default")]
-    pub interior_line_indentation: bool,
     /// Whether a matched node that relocated *purely* because nesting levels were added or
     /// removed around it (e.g. Rust's `if let`-chain collapse - `solve_nested_condition_collapse`
     /// tags its `BODY` match this way) still paints as `Move`, or is left unpainted as
@@ -1759,19 +1757,11 @@ pub struct RenderOptions {
     /// `#[serde(default = "paint_reindent_only_moves_default")]`: an existing `.codediff.toml`
     /// predates this field and this pass entirely, so the only sound default is the behavior
     /// every prior release had - always paint the `Move` (`true`) - not `bool::default()`'s
-    /// `false`, which would be the wrong polarity (see `interior_line_indentation`'s identical
-    /// reasoning).
+    /// `false`, which would be the wrong polarity - the same reasoning `leading_whitespace`'s own
+    /// doc comment gives for why merging its old sibling field in didn't need a matching change
+    /// here (that field already had a non-derived default before the merge).
     #[serde(default = "paint_reindent_only_moves_default")]
     pub paint_reindent_only_moves: bool,
-}
-
-/// [`RenderOptions::interior_line_indentation`]'s serde default: `true`, matching every release
-/// before the field existed - an existing `.codediff.toml` without this key keeps behaving exactly
-/// as it did (see that field's own doc comment for why `#[serde(default)]` alone, defaulting to
-/// `bool::default()` = `false`, would be the wrong polarity here and silently switch every old
-/// config to choice 2 instead of leaving it on choice 3/4).
-fn interior_line_indentation_default() -> bool {
-    true
 }
 
 /// [`RenderOptions::paint_reindent_only_moves`]'s serde default - see that field's own doc
@@ -1783,14 +1773,13 @@ fn paint_reindent_only_moves_default() -> bool {
 impl RenderOptions {
     /// Every option off: the tightest reading of a diff - drops standalone punctuation and trims
     /// leading whitespace off what remains, row by row inside a multi-row insert/delete too (see
-    /// `interior_line_indentation`'s own doc comment for the corpus measurement behind that as of
+    /// `leading_whitespace`'s own doc comment for the corpus measurement behind that as of
     /// 2026-09-01). Trailing whitespace is already always trimmed regardless of any option - see
     /// the struct's own doc comment.
     pub const MINIMAL: Self = Self {
         leading_whitespace: false,
         structural_punctuation: false,
         whole_pair_updates: false,
-        interior_line_indentation: false,
         paint_reindent_only_moves: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
@@ -1800,7 +1789,6 @@ impl RenderOptions {
         leading_whitespace: true,
         structural_punctuation: true,
         whole_pair_updates: false,
-        interior_line_indentation: true,
         paint_reindent_only_moves: true,
     };
 
@@ -1813,10 +1801,7 @@ impl RenderOptions {
     /// whether a settings UI can offer it. The `M` panel toggling this one now goes through a
     /// diff reload rather than `DiffViewer::set_render_options`'s plain re-filter (see
     /// `tui::app`'s `Action::RenderOptionsChanged` handler) precisely so it's safe to list here.
-    /// `interior_line_indentation` is listed inverted (`!self.interior_line_indentation`, labeled
-    /// as what turning it *on* means) so a reader sees a checkbox for "trim every row" rather than
-    /// one that reads as checked in both presets' own default state.
-    pub fn options(&self) -> [(&'static str, bool); 5] {
+    pub fn options(&self) -> [(&'static str, bool); 4] {
         [
             ("Leading whitespace", self.leading_whitespace),
             (
@@ -1824,10 +1809,6 @@ impl RenderOptions {
                 self.structural_punctuation,
             ),
             ("Whole-pair updates", self.whole_pair_updates),
-            (
-                "Same-line indentation only (no ground truth yet)",
-                !self.interior_line_indentation,
-            ),
             (
                 "Paint reindent-only moves",
                 self.paint_reindent_only_moves,
@@ -1843,8 +1824,7 @@ impl RenderOptions {
             0 => self.leading_whitespace = !self.leading_whitespace,
             1 => self.structural_punctuation = !self.structural_punctuation,
             2 => self.whole_pair_updates = !self.whole_pair_updates,
-            3 => self.interior_line_indentation = !self.interior_line_indentation,
-            4 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
+            3 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
             _ => {}
         }
     }
@@ -1893,12 +1873,27 @@ pub fn is_structural_only(text: &str) -> bool {
 /// A range is never merged or re-operated - a surviving range still describes the same edit every
 /// other combination of options describes, just with different padding, or absent entirely once
 /// nothing else is left in it. **Split is the one exception**: a multi-row `Insert`/`Delete` under
-/// `interior_line_indentation: false` becomes one range per row (see
+/// `leading_whitespace: false` becomes one range per row (see
 /// `split_into_per_row_pieces`) - there is no single `TextRange` that can describe "every row's own
 /// indentation trimmed independently" (a contiguous range's interior rows are always `0..row_len`
 /// wherever this crate reads one, e.g. `TextRange::columns_on_row`), so representing that choice at
 /// all requires more than one `RangeMatch` for what was one edit.
 pub fn ranges_for_options(
+    ranges: &[RangeMatch],
+    source: &str,
+    options: RenderOptions,
+) -> Vec<RangeMatch> {
+    let result = ranges_for_options_impl(ranges, source, options);
+    if options.structural_punctuation {
+        // Nothing was ever dropped as standalone punctuation - the restoration pass below has
+        // nothing to do, and skipping it avoids computing `with_structural_kept` (a second full
+        // filter pass) for the common case that doesn't need it.
+        return result;
+    }
+    restore_paired_brackets(ranges, source, options, result)
+}
+
+fn ranges_for_options_impl(
     ranges: &[RangeMatch],
     source: &str,
     options: RenderOptions,
@@ -1948,7 +1943,7 @@ pub fn ranges_for_options(
                 return vec![range_match.clone()];
             }
 
-            if !options.interior_line_indentation
+            if !options.leading_whitespace
                 && matches!(
                     range_match.operation,
                     TextOperation::Insert | TextOperation::Delete
@@ -1976,6 +1971,131 @@ pub fn ranges_for_options(
                 .collect()
         })
         .collect()
+}
+
+/// Un-drops any range `ranges_for_options_impl` filtered out purely for being standalone
+/// structural punctuation, if painting it survived on its *own* character but its matching
+/// bracket partner did not - so a reader never sees one half of a `(...)`/`[...]`/`{...}` pair
+/// without the other.
+///
+/// **Why this exists.** `range_is_structural_only` judges one `RangeMatch` in isolation, but the
+/// diff's own range-merging (`RangeMatch::extends`) can bundle one bracket into a bigger range
+/// with real content next to it (`"max_val = max("`, kept - it isn't pure punctuation) while its
+/// partner ends up alone in its own range (`")"`, dropped - it is) - not because the two brackets
+/// disagree about anything, but because of where the *other*, unrelated content around each one
+/// happened to fall. Confirmed on `python-refactoring`: `max_val = max(numbers)` painted the `(`
+/// (bundled with `max`) but silently dropped the `)` (alone in its own range) under `MINIMAL`.
+///
+/// **How.** Recomputes the same filter with `structural_punctuation` forced on (the version that
+/// never drops anything for this reason) and diffs the two outputs to find exactly what the real
+/// call dropped. For each dropped range that is - or starts/ends on - a bracket character, looks
+/// up that bracket's partner via [`bracket_pair_partners`] and restores the range only if the
+/// partner's position is covered by a range the real (requested) output already kept - so a pair
+/// where *both* halves would otherwise be dropped stays dropped, matching `structural_punctuation:
+/// false`'s own reading for an ordinary standalone pair with nothing else painted nearby.
+///
+/// **Bracket pairing is a plain nesting-depth scan over raw text, not lexer-aware** - a bracket
+/// character sitting inside a string literal or comment can desync the rest of the scan for that
+/// file. Accepted: this is a rendering-only heuristic (which range gets a few extra punctuation
+/// bytes highlighted), not a source of truth anything else depends on, and it's validated against
+/// the full painted corpus like every other change in this pass - see
+/// `painting_disagreement_fix_log.md`.
+fn restore_paired_brackets(
+    ranges: &[RangeMatch],
+    source: &str,
+    options: RenderOptions,
+    mut result: Vec<RangeMatch>,
+) -> Vec<RangeMatch> {
+    let with_structural_kept = ranges_for_options_impl(
+        ranges,
+        source,
+        RenderOptions {
+            structural_punctuation: true,
+            ..options
+        },
+    );
+    let dropped: Vec<&RangeMatch> = with_structural_kept
+        .iter()
+        .filter(|candidate| {
+            !result.contains(candidate)
+                // Scoped to Insert/Delete, matching the shape actually observed
+                // (`python-refactoring`'s `max_val = max(numbers)`, where `(` is bundled into
+                // real content and survives while the lone `)` is dropped): a stray Move/Update
+                // punctuation range can legitimately be excluded on its own terms (it's noise from
+                // a column shift, not a pairing question), and restoring one regressed several
+                // fixtures - `javascript-refactor-arrow-func` painted a Move-only `");"` the
+                // human's own ground truth never wanted, once this candidate set included Move.
+                && matches!(candidate.operation, TextOperation::Insert | TextOperation::Delete)
+        })
+        .collect();
+    if dropped.is_empty() {
+        return result;
+    }
+
+    let text = SourceText::new(source);
+    let byte_range = |range: &TextRange| {
+        (
+            text.byte_index(range.start_row, range.start_column),
+            text.byte_index(range.end_row, range.end_column),
+        )
+    };
+    let partners = bracket_pair_partners(source);
+    let covered = |byte: usize| {
+        result.iter().any(|kept| {
+            let (s, e) = byte_range(&kept.source);
+            s <= byte && byte < e
+        })
+    };
+
+    let mut restored = Vec::new();
+    for candidate in dropped {
+        let (start, end) = byte_range(&candidate.source);
+        let Some(text) = source.get(start..end) else {
+            continue;
+        };
+        let has_a_surviving_partner = text
+            .char_indices()
+            .filter(|&(_, c)| matches!(c, '(' | ')' | '[' | ']' | '{' | '}'))
+            .any(|(i, _)| {
+                partners
+                    .get(&(start + i))
+                    .is_some_and(|&partner_byte| covered(partner_byte))
+            });
+        if has_a_surviving_partner {
+            restored.push((*candidate).clone());
+        }
+    }
+    result.extend(restored);
+    result
+}
+
+/// Byte-position -> matching partner byte position, for every `(`/`)`, `[`/`]`, `{`/`}` pair a
+/// plain nesting-depth scan of `source` finds - see [`restore_paired_brackets`]'s own doc comment
+/// for why this is deliberately not lexer-aware. A mismatched or unbalanced bracket (a genuine
+/// syntax error, or - far more likely - one inside a string/comment the scan can't see as such)
+/// simply never gets an entry, rather than panicking or guessing.
+fn bracket_pair_partners(source: &str) -> std::collections::HashMap<usize, usize> {
+    let mut partners = std::collections::HashMap::new();
+    let mut stack: Vec<(char, usize)> = Vec::new();
+    for (byte, ch) in source.char_indices() {
+        match ch {
+            '(' | '[' | '{' => stack.push((ch, byte)),
+            ')' | ']' | '}' => {
+                if let Some(&(open_ch, open_byte)) = stack.last()
+                    && matches!(
+                        (open_ch, ch),
+                        ('(', ')') | ('[', ']') | ('{', '}')
+                    )
+                {
+                    stack.pop();
+                    partners.insert(open_byte, byte);
+                    partners.insert(byte, open_byte);
+                }
+            }
+            _ => {}
+        }
+    }
+    partners
 }
 
 /// [`ranges_for_options`]'s per-range logic for every shape except the interior-line-indentation
@@ -2015,7 +2135,7 @@ fn narrow_one_range(
 }
 
 /// Splits a multi-row `Insert`/`Delete` range into one piece per row, each independently trimmed
-/// to that row's own real content - [`RenderOptions::interior_line_indentation`] off, i.e. the
+/// to that row's own real content - [`RenderOptions::leading_whitespace`] off, i.e. the
 /// rules doc's indentation choice 2 ("highlight visible characters and whitespace **in the same
 /// line** between them", as opposed to choice 3/4's "in all lines"). A row with nothing but
 /// whitespace contributes no piece - there is no real character there to select, the same
@@ -2872,25 +2992,14 @@ mod tests {
         );
     }
 
-    /// `MINIMAL` and `FULL` disagree on `interior_line_indentation` (unlike every other field
-    /// this struct had before 2026-09-01's corpus measurement) - `FULL` keeps a whole interior
-    /// row's own indentation, `MINIMAL` trims it row by row. Pinned as a `const` assertion, not
-    /// just a doc comment, so a casual edit to either preset literal can't silently flip this
-    /// again without a test failing loud - see `interior_line_indentation`'s own doc comment for
-    /// the measurement this is pinning.
-    #[test]
-    fn presets_disagree_on_interior_line_indentation() {
-        const { assert!(!RenderOptions::MINIMAL.interior_line_indentation) };
-        const { assert!(RenderOptions::FULL.interior_line_indentation) };
-    }
-
     /// The rules doc's own indentation example: a whole multi-line block inserted on its own,
-    /// each row indented. `interior_line_indentation: false` (choice 2) must highlight each row's
-    /// own real content only - not the indentation before `def` on row 0, and not the indentation
-    /// before `print` on row 1 either, even though `interior_line_indentation: true` (choice 3,
-    /// what `MINIMAL` does) keeps that second row's indentation whole.
+    /// each row indented. `leading_whitespace: false` (choice 2, what `MINIMAL` does since
+    /// 2026-09-01) must highlight each row's own real content only - not the indentation before
+    /// `def` on row 0, and not the indentation before `print` on row 1 either, even though
+    /// `leading_whitespace: true` (choice 3/4, what `FULL` does) keeps that second row's
+    /// indentation whole.
     #[test]
-    fn interior_line_indentation_off_splits_a_multiline_insert_per_row_trimmed() {
+    fn leading_whitespace_off_splits_a_multiline_insert_per_row_trimmed() {
         let source = "    def added_function():\n        print(\"added\")\n";
         let range = RangeMatch {
             source: TextRange::new(0, 4, 1, 22),
@@ -2898,7 +3007,6 @@ mod tests {
             operation: TextOperation::Insert,
         };
         let options = RenderOptions {
-            interior_line_indentation: false,
             paint_reindent_only_moves: true,
             ..RenderOptions::MINIMAL
         };
@@ -2927,7 +3035,7 @@ mod tests {
     /// A blank row in the middle of a multi-line insert has no real content of its own to select,
     /// so it contributes no piece at all - not an empty one.
     #[test]
-    fn interior_line_indentation_off_drops_a_blank_interior_row() {
+    fn leading_whitespace_off_drops_a_blank_interior_row() {
         let source = "line one\n\nline three\n";
         let range = RangeMatch {
             source: TextRange::new(0, 0, 2, 10),
@@ -2935,7 +3043,6 @@ mod tests {
             operation: TextOperation::Insert,
         };
         let options = RenderOptions {
-            interior_line_indentation: false,
             paint_reindent_only_moves: true,
             ..RenderOptions::MINIMAL
         };
@@ -2952,11 +3059,11 @@ mod tests {
         );
     }
 
-    /// `interior_line_indentation` only ever splits `Insert`/`Delete` - see that field's own doc
-    /// comment for why a matched `Update`/`Move` range isn't split the same way. A multi-row Update
-    /// stays exactly one range, its interior rows unaffected by this option either way.
+    /// The per-row split only ever applies to `Insert`/`Delete` - see `leading_whitespace`'s own
+    /// doc comment for why a matched `Update`/`Move` range isn't split the same way. A multi-row
+    /// Update stays exactly one range, its interior rows unaffected by this option either way.
     #[test]
-    fn interior_line_indentation_off_does_not_split_a_multiline_update() {
+    fn leading_whitespace_off_does_not_split_a_multiline_update() {
         let source = "one\ntwo\nthree\n";
         let range = RangeMatch {
             source: TextRange::new(0, 0, 2, 5),
@@ -2964,7 +3071,6 @@ mod tests {
             operation: TextOperation::Update,
         };
         let options = RenderOptions {
-            interior_line_indentation: false,
             paint_reindent_only_moves: true,
             ..RenderOptions::MINIMAL
         };
@@ -2978,36 +3084,11 @@ mod tests {
         );
     }
 
-    /// A single-row range has no "interior" at all, so this option changes nothing about it either
-    /// way - it collapses to the same single, ordinarily-trimmed range.
-    #[test]
-    fn interior_line_indentation_off_leaves_a_single_row_range_alone() {
-        let source = "    foo\n";
-        let range = RangeMatch {
-            source: TextRange::new(0, 0, 0, 7),
-            destination: TextRange::zero(),
-            operation: TextOperation::Insert,
-        };
-        let with_it_on =
-            ranges_for_options(std::slice::from_ref(&range), source, RenderOptions::MINIMAL);
-        let with_it_off = ranges_for_options(
-            std::slice::from_ref(&range),
-            source,
-            RenderOptions {
-                interior_line_indentation: false,
-                paint_reindent_only_moves: true,
-                ..RenderOptions::MINIMAL
-            },
-        );
-
-        assert_eq!(with_it_on, with_it_off);
-    }
-
     /// The structural-punctuation filter still applies per row after the split - a row that is
     /// nothing but a standalone bracket is dropped under `MINIMAL`'s `structural_punctuation: false`
     /// exactly as a single-row range in the same shape already is.
     #[test]
-    fn interior_line_indentation_off_still_drops_a_structural_only_row() {
+    fn leading_whitespace_off_still_drops_a_structural_only_row() {
         let source = "{\n    body();\n}\n";
         let range = RangeMatch {
             source: TextRange::new(0, 0, 2, 1),
@@ -3015,7 +3096,6 @@ mod tests {
             operation: TextOperation::Insert,
         };
         let options = RenderOptions {
-            interior_line_indentation: false,
             paint_reindent_only_moves: true,
             ..RenderOptions::MINIMAL
         };
@@ -3044,7 +3124,6 @@ mod tests {
             leading_whitespace: true,
             structural_punctuation: false,
             whole_pair_updates: false,
-            interior_line_indentation: true,
             paint_reindent_only_moves: true,
         };
         let result = ranges_for_options(&ranges, source, options);
@@ -3066,7 +3145,6 @@ mod tests {
             leading_whitespace: false,
             structural_punctuation: true,
             whole_pair_updates: false,
-            interior_line_indentation: true,
             paint_reindent_only_moves: true,
         };
         let result = ranges_for_options(&ranges, source, options);
@@ -3076,6 +3154,110 @@ mod tests {
             result[0].source,
             text_range_on(0, 4, 10),
             "trims the leading spaces, keeps `foo();` whole - it isn't pure punctuation"
+        );
+    }
+
+    /// `python-refactoring`'s own shape, minimized: `max_val = max(numbers)` where the diff's own
+    /// range-merging bundles `max_val = max(` (real content, survives `structural_punctuation:
+    /// false` on its own) as one Insert range, leaving `)` alone in a second, purely-structural
+    /// Insert range that would otherwise be dropped. The lone `)` must be restored so a reader
+    /// never sees `(` without its own `)`.
+    #[test]
+    fn a_lone_closing_paren_is_restored_when_its_open_partner_survives() {
+        let source = "max_val = max(numbers)";
+        let ranges = vec![
+            RangeMatch {
+                source: text_range_on(0, 0, 14), // "max_val = max("
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: text_range_on(0, 14, 21), // "numbers" - matched elsewhere, Identical
+                destination: text_range_on(0, 14, 21),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: text_range_on(0, 21, 22), // ")" - alone, purely structural
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+        ];
+
+        let result = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
+
+        assert!(
+            result
+                .iter()
+                .any(|r| r.source == text_range_on(0, 21, 22)),
+            "the lone ')' must be restored: {result:?}"
+        );
+    }
+
+    /// The symmetric case doesn't need restoring at all: `(` is already alone in its own range,
+    /// same as `)` - nothing keeps either half in isolation, so both stay dropped exactly as
+    /// `structural_punctuation: false` says for an ordinary standalone pair with nothing else
+    /// painted nearby.
+    #[test]
+    fn a_pair_that_is_entirely_standalone_punctuation_stays_dropped() {
+        let source = "(x)";
+        let ranges = vec![
+            RangeMatch {
+                source: text_range_on(0, 0, 1), // "(" alone
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: text_range_on(0, 1, 2), // "x" - matched elsewhere
+                destination: text_range_on(0, 1, 2),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: text_range_on(0, 2, 3), // ")" alone
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+        ];
+
+        let result = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
+
+        assert!(
+            !result.iter().any(|r| r.source == text_range_on(0, 0, 1)),
+            "neither half of a wholly standalone pair should be restored: {result:?}"
+        );
+        assert!(!result.iter().any(|r| r.source == text_range_on(0, 2, 3)));
+    }
+
+    /// Restoration is scoped to `Insert`/`Delete` - a `Move`/`Update` range that happens to be
+    /// standalone punctuation is left to its own operation-specific reading rather than restored
+    /// for pairing's sake. Measured directly: including `Move` regressed
+    /// `javascript-refactor-arrow-func`, which paints a lone `");"` `Move` that the human's own
+    /// ground truth never wanted shown at all.
+    #[test]
+    fn a_lone_move_bracket_is_not_restored() {
+        let source = "max_val = max(numbers)";
+        let ranges = vec![
+            RangeMatch {
+                source: text_range_on(0, 0, 14),
+                destination: TextRange::zero(),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: text_range_on(0, 14, 21),
+                destination: text_range_on(0, 14, 21),
+                operation: TextOperation::Identical,
+            },
+            RangeMatch {
+                source: text_range_on(0, 21, 22), // ")" alone, but Move this time
+                destination: text_range_on(0, 21, 22),
+                operation: TextOperation::Move,
+            },
+        ];
+
+        let result = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
+
+        assert!(
+            !result.iter().any(|r| r.source == text_range_on(0, 21, 22)),
+            "a lone Move bracket must not be restored: {result:?}"
         );
     }
 

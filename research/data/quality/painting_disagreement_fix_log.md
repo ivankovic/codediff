@@ -117,6 +117,65 @@ quality, not just painting) → keep only if nothing else got worse.
   1.1811%→**1.1172%** - within 0.12 points of the project's <1% goal. 2 more pre-existing test
   failures now pass as a side effect (`javascript_fix_promises`, `rust_add_if`).
 
+- **python-refactoring's Full-mode 19.536% was bad ground truth, not a codediff bug.** The user
+  reviewed the fixture's human-painted mapping directly in `human_solver` and unmarked several
+  tokens they judged wrong (the 5 reassigned-variable/relocated lines this session had diagnosed
+  as "same-column row-shift, unreachable by the current Move heuristic" - see the earlier entry in
+  this log). After the correction, Full measures **0.000%**. codediff's Move/Identical judgment
+  there was actually correct; the prior painting wasn't. Re-confirms the standing rule that
+  hand-painted ground truth is data, not infallible - check it before assuming code is wrong.
+
+- **`RenderOptions::interior_line_indentation` merged into `leading_whitespace` - the field is
+  gone.** Reported directly by the user testing the `M` panel by hand: manually unchecking every
+  option (landing on `leading_whitespace: false` but the then-separate
+  `interior_line_indentation` still `true`, since that checkbox displayed inverted) left every
+  interior row of a multi-row insert/delete still fully indented - the corpus's own `MINIMAL`
+  ground truth had already established these two fields always move together (see the earlier
+  `interior_line_indentation` entry in this log: flipping `MINIMAL`'s copy alone was the single
+  biggest win of the session), so keeping them as two separately-toggleable fields was exactly the
+  confusing, redundant-in-practice split the user ran into. `leading_whitespace` now governs both
+  the range's own first-row leading edge (as before) and, when off, splits a multi-row
+  `Insert`/`Delete` into one per-row-trimmed piece (what `interior_line_indentation: false` used
+  to do) - one field, not two. Removed the `M` panel's "Same-line indentation only" row, the
+  `--same-line-indentation` CLI flag, and the `interior_line_indentation`-specific serde default
+  fn (old `.codediff.toml` files with a stray `interior_line_indentation` key are silently ignored
+  by serde, no migration needed). `MINIMAL`/`FULL`'s actual boolean values are unchanged, so the
+  corpus aggregate is unchanged by this refactor alone (1.1038%, confirmed before/after) - purely
+  an API/UX simplification, verified via a full `cargo test --lib` pass (1171 pass, only the same
+  pre-existing unrelated failures remain).
+
+- **Bracket-pair symmetry**: reported directly by the user - "if you paint one matching
+  parenthesis, bracket or other paired character, always paint the other one as well," matching
+  `text_painting_findings.md`'s own Rule 2 (426/426 human-painted pairs never split). Root cause:
+  `range_is_structural_only` judges one `RangeMatch` in isolation, but the diff's own range-merging
+  can bundle one bracket into a bigger range with real content next to it (`"max_val = max("`,
+  survives `structural_punctuation: false` on its own) while its partner ends up alone in its own
+  purely-structural range (`")"`, dropped) - confirmed exactly on `python-refactoring`'s
+  `max_val = max(numbers)`. New `restore_paired_brackets` (`src/diff/text.rs`): recomputes the
+  filter with `structural_punctuation` forced on to see what got dropped, pairs bracket characters
+  via a plain nesting-depth scan (`bracket_pair_partners` - not lexer-aware, a rendering-only
+  heuristic, see its own doc comment), and restores a dropped range only if its bracket's partner
+  survived in the real output. **Scoped to `Insert`/`Delete` only** - including `Move`/`Update`
+  candidates was tried first and regressed `javascript-refactor-arrow-func` (a Move-only `");"`
+  the human's own ground truth never wanted shown, restored anyway because *something* elsewhere
+  happened to survive) and several others; narrowing to Insert/Delete (the shape actually
+  reported) recovered all but two small, already-flagged-difficult fixtures.
+  **Result**: `python-refactoring` Minimal 0.290%→0.097% (2 of 3 remaining bytes were exactly this
+  bracket pair), 8 more fixtures newly hit exactly 0.000%
+  (`java-add-interface`, `rust-sniffnet-protocol`, `typescript-add-error-handling`,
+  `cpp-optimize-algorithm`, `javascript-add-array-method`, `kotlin-add-null-check`,
+  `kotlin-add-validation`, `typescript-refactor-interface`). **Two small regressions accepted**:
+  `kotlin-refactor-function` (+0.43pp, already `skip-nm`) and `rust-algorithm-change` (+0.2pp) -
+  both cases where codediff's matching *already* disagreed with the human on one half of a pair
+  for unrelated reasons (a heavily-rewritten fixture's own tie-break, not a pairing question), and
+  restoring symmetry extends that pre-existing disagreement to the other half rather than fixing
+  it. Net aggregate: 1.1038%→**1.1004%**. Added 4 targeted unit tests
+  (`a_lone_closing_paren_is_restored_when_its_open_partner_survives`,
+  `a_pair_that_is_entirely_standalone_punctuation_stays_dropped`,
+  `a_lone_move_bracket_is_not_restored`, plus the existing suite) - verified via the full corpus
+  report and a full `cargo test --lib` pass (1175 pass, same pre-existing unrelated failures,
+  `kotlin-add-validation` newly passes).
+
 ## Investigated, not attempted this session - too risky to touch blind
 
 - **Pattern 1 (single-row column-shift Move calibration)**: re-confirmed via
