@@ -183,9 +183,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Wrap,
-    },
+    widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Wrap},
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -480,8 +478,7 @@ fn visible_diff_options(
                     .unwrap_or(false)
         })
         .filter(|(name, _)| {
-            !hide_agreement
-                || disagreement.is_none_or(|m| m.get(name).copied().unwrap_or(0) > 0)
+            !hide_agreement || disagreement.is_none_or(|m| m.get(name).copied().unwrap_or(0) > 0)
         })
         .map(|(name, _)| name.clone())
         .collect();
@@ -492,9 +489,9 @@ fn visible_diff_options(
             visible.sort();
             visible.reverse();
         }
-        DiffSortOrder::LeastDisagreementFirst => visible.sort_by_key(|name| {
-            disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0)
-        }),
+        DiffSortOrder::LeastDisagreementFirst => {
+            visible.sort_by_key(|name| disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0))
+        }
         DiffSortOrder::MostDisagreementFirst => visible.sort_by_key(|name| {
             std::cmp::Reverse(disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0))
         }),
@@ -7062,7 +7059,8 @@ fn handle_modal_key(
                     let new_sort_order = sort_order.next();
                     if matches!(
                         new_sort_order,
-                        DiffSortOrder::LeastDisagreementFirst | DiffSortOrder::MostDisagreementFirst
+                        DiffSortOrder::LeastDisagreementFirst
+                            | DiffSortOrder::MostDisagreementFirst
                     ) && app.diff_disagreement.is_none()
                     {
                         app.diff_disagreement = Some(compute_diff_disagreement());
@@ -7557,7 +7555,11 @@ fn handle_modal_key(
                         Some(_) => None,
                         None => Some(state.cursor[state.side]),
                     };
-                    let mode = if state.vertical { "vertical" } else { "full-line" };
+                    let mode = if state.vertical {
+                        "vertical"
+                    } else {
+                        "full-line"
+                    };
                     app.status = Some(match state.anchor[state.side] {
                         Some(_) => format!("Selecting ({mode}) - move, then d/i/m"),
                         None => "Selection cleared".to_string(),
@@ -7569,7 +7571,11 @@ fn handle_modal_key(
                 // still needs, since `m` requires every span on a side to read identical text.
                 KeyCode::Char('V') => {
                     state.vertical = !state.vertical;
-                    let mode = if state.vertical { "vertical" } else { "full-line" };
+                    let mode = if state.vertical {
+                        "vertical"
+                    } else {
+                        "full-line"
+                    };
                     app.status = Some(format!("Selections are now {mode}"));
                 }
                 // Same pair the tree panels use for their own multi-map selection: `x` banks what
@@ -7623,17 +7629,26 @@ fn handle_modal_key(
                     // built independently of `algo_text_spans` since a case might be cycled
                     // straight past `CodeDiff`/`Disagreements` without ever needing it.
                     if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
-                        app.tree_text_spans = Some(tree_mapping_text_spans(
-                            &app.mapping,
-                            before,
-                            after,
-                        ));
+                        app.tree_text_spans =
+                            Some(tree_mapping_text_spans(&app.mapping, before, after));
                     }
                     app.text_overlay = next;
                     let human_spans_for_status = || {
                         [
-                            painted_spans(&app.mapping, &app.text_solution, 0, before_text, after_text),
-                            painted_spans(&app.mapping, &app.text_solution, 1, before_text, after_text),
+                            painted_spans(
+                                &app.mapping,
+                                &app.text_solution,
+                                0,
+                                before_text,
+                                after_text,
+                            ),
+                            painted_spans(
+                                &app.mapping,
+                                &app.text_solution,
+                                1,
+                                before_text,
+                                after_text,
+                            ),
                         ]
                     };
                     app.status = Some(match next {
@@ -10225,7 +10240,10 @@ mod tests {
         assert_eq!(TextOverlay::default(), TextOverlay::Human);
         assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
         assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
-        assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::TreeDisagreement);
+        assert_eq!(
+            TextOverlay::Disagreements.next(),
+            TextOverlay::TreeDisagreement
+        );
         assert_eq!(TextOverlay::TreeDisagreement.next(), TextOverlay::Human);
     }
 

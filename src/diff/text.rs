@@ -1809,10 +1809,7 @@ impl RenderOptions {
                 self.structural_punctuation,
             ),
             ("Whole-pair updates", self.whole_pair_updates),
-            (
-                "Paint reindent-only moves",
-                self.paint_reindent_only_moves,
-            ),
+            ("Paint reindent-only moves", self.paint_reindent_only_moves),
         ]
     }
 
@@ -2082,10 +2079,7 @@ fn bracket_pair_partners(source: &str) -> std::collections::HashMap<usize, usize
             '(' | '[' | '{' => stack.push((ch, byte)),
             ')' | ']' | '}' => {
                 if let Some(&(open_ch, open_byte)) = stack.last()
-                    && matches!(
-                        (open_ch, ch),
-                        ('(', ')') | ('[', ']') | ('{', '}')
-                    )
+                    && matches!((open_ch, ch), ('(', ')') | ('[', ']') | ('{', '}'))
                 {
                     stack.pop();
                     partners.insert(open_byte, byte);
@@ -3186,9 +3180,7 @@ mod tests {
         let result = ranges_for_options(&ranges, source, RenderOptions::MINIMAL);
 
         assert!(
-            result
-                .iter()
-                .any(|r| r.source == text_range_on(0, 21, 22)),
+            result.iter().any(|r| r.source == text_range_on(0, 21, 22)),
             "the lone ')' must be restored: {result:?}"
         );
     }

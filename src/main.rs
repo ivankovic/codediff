@@ -639,7 +639,6 @@ mod tests {
         assert!(render_options(&full).leading_whitespace);
     }
 
-
     #[test]
     fn paint_reindent_moves_flag_layers_onto_minimal_and_full_alike() {
         let mut minimal = args_with("TUI", false);

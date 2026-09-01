@@ -5092,7 +5092,11 @@ mod tests {
                     eprintln!("{:?} source={:?}", r.operation, r.source);
                 }
             }
-            eprintln!("(total filtered ranges: {}, raw: {})", filtered.len(), text_diff.all(1).len());
+            eprintln!(
+                "(total filtered ranges: {}, raw: {})",
+                filtered.len(),
+                text_diff.all(1).len()
+            );
             return Ok(());
         }
 
@@ -5124,16 +5128,27 @@ mod tests {
                 ast: &crate::diff::ASTDiff,
                 contents: &[u8],
             ) {
-                let text = node.utf8_text(contents).unwrap_or("").lines().next().unwrap_or("");
+                let text = node
+                    .utf8_text(contents)
+                    .unwrap_or("")
+                    .lines()
+                    .next()
+                    .unwrap_or("");
                 let indent = "  ".repeat(depth);
                 match ast.mapping_for_node(&node.id()) {
                     Some((other, mapping)) => eprintln!(
                         "{indent}#{} [{}] {:?} op={:?} reason={:?} -> #{other}",
-                        node.id(), node.kind(), text, mapping.operation, mapping.reason
+                        node.id(),
+                        node.kind(),
+                        text,
+                        mapping.operation,
+                        mapping.reason
                     ),
                     None => eprintln!(
                         "{indent}#{} [{}] {:?} -> UNMAPPED",
-                        node.id(), node.kind(), text
+                        node.id(),
+                        node.kind(),
+                        text
                     ),
                 }
                 let mut cursor = node.walk();

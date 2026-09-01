@@ -297,14 +297,13 @@ pub fn run(
     mode: DiffMode,
     render_options: RenderOptions,
 ) -> Result<bool> {
-    let (mut data, fallback_used) =
-        compute_diff_with_update_style(
-            before,
-            after,
-            mode,
-            render_options.whole_pair_updates,
-            render_options.paint_reindent_only_moves,
-        )?;
+    let (mut data, fallback_used) = compute_diff_with_update_style(
+        before,
+        after,
+        mode,
+        render_options.whole_pair_updates,
+        render_options.paint_reindent_only_moves,
+    )?;
     // See `headless::run`'s note: a presentation filter over a finished diff, not a different one.
     data.before_ranges =
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);

@@ -128,7 +128,11 @@ fn nearest_mapped_prev_sibling_id(
 /// position: each side's nearest already-matched preceding sibling must be the other's
 /// counterpart (or both absent - both are the first matched child). Nothing with an existing
 /// identity was reordered around the body; only a brand-new heritage clause appeared ahead of it.
-fn shift_explained_by_preceding_insertion(before_body: Node, after_body: Node, diff: &ASTDiff) -> bool {
+fn shift_explained_by_preceding_insertion(
+    before_body: Node,
+    after_body: Node,
+    diff: &ASTDiff,
+) -> bool {
     let before_pred = nearest_mapped_prev_sibling_id(before_body, &diff.before_node_map);
     let after_pred = nearest_mapped_prev_sibling_id(after_body, &diff.after_node_map);
     match (before_pred, after_pred) {
@@ -151,12 +155,12 @@ mod tests {
         let body = "    constructor(public name: string, public email: string) {}\n    \
                      getName(): string {\n        return this.name;\n    }\n    \
                      getEmail(): string {\n        return this.email;\n    }\n";
-        let before = Code::from_string(
-            &format!("class User {{\n{body}}}\n"),
-            &Language::TypeScript,
-        );
+        let before =
+            Code::from_string(&format!("class User {{\n{body}}}\n"), &Language::TypeScript);
         let after = Code::from_string(
-            &format!("interface Person {{\n    name: string;\n}}\n\nclass User implements Person {{\n{body}}}\n"),
+            &format!(
+                "interface Person {{\n    name: string;\n}}\n\nclass User implements Person {{\n{body}}}\n"
+            ),
             &Language::TypeScript,
         );
 
@@ -208,10 +212,8 @@ mod tests {
         let body = "    constructor(public name: string, public email: string) {}\n    \
                      getName(): string {\n        return this.name;\n    }\n    \
                      getEmail(): string {\n        return this.email;\n    }\n";
-        let before = Code::from_string(
-            &format!("class User {{\n{body}}}\n"),
-            &Language::TypeScript,
-        );
+        let before =
+            Code::from_string(&format!("class User {{\n{body}}}\n"), &Language::TypeScript);
         let after = Code::from_string(
             &format!(
                 "interface Person {{\n    name: string;\n}}\n\nclass User implements Person {{\n{body}    newField: string;\n}}\n"

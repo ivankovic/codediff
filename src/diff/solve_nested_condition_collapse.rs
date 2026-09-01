@@ -18,7 +18,9 @@
 use crate::code::metadata::metadata_of;
 use crate::code::{ASTMetadata, Code};
 use crate::diff::hash_tree_matching::pair_children_for_descent;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_UPDATE, NodeCache};
+use crate::diff::{
+    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_UPDATE, NodeCache,
+};
 
 /**
 * Rust's `let`-chains collapse a run of nested `if let PATTERN = EXPR { ... }` statements (each
@@ -98,7 +100,13 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         if diff.before_node_map.contains_key(&outer_if.id()) {
             continue;
         }
-        try_collapse(node_cache, &before_metadata, &after_metadata, diff, outer_if);
+        try_collapse(
+            node_cache,
+            &before_metadata,
+            &after_metadata,
+            diff,
+            outer_if,
+        );
     }
 }
 
@@ -123,7 +131,9 @@ fn single_nested_if(block: tree_sitter::Node) -> Option<tree_sitter::Node> {
 
 /// `if_expression`'s condition and block, rejecting anything with an `else` branch (a let-chain
 /// has no room for one - each wrapper level in the chain must be a bare `if`, no `else`).
-fn condition_and_block(if_expr: tree_sitter::Node) -> Option<(tree_sitter::Node, tree_sitter::Node)> {
+fn condition_and_block(
+    if_expr: tree_sitter::Node,
+) -> Option<(tree_sitter::Node, tree_sitter::Node)> {
     if if_expr.named_child_count() != 2 {
         return None;
     }
@@ -275,7 +285,13 @@ fn try_collapse(
         },
     );
     for (before_cond, after_cond) in conditions.into_iter().zip(after_conditions) {
-        map_identical_subtree(before_cond, after_cond, before_metadata, after_metadata, diff);
+        map_identical_subtree(
+            before_cond,
+            after_cond,
+            before_metadata,
+            after_metadata,
+            diff,
+        );
     }
 }
 
