@@ -134,6 +134,12 @@ fn operator_family_masks_agree_with_string_scanning_kinds_update_allowed() {
         Language::Kotlin,
         Language::PHP,
         Language::Ruby,
+        Language::Swift,
+        Language::Scala,
+        Language::ShellScript,
+        Language::HTML,
+        Language::XML,
+        Language::CSS,
         // No families at all - the `_ => &[]` arm.
         Language::Unknown,
     ];

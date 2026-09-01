@@ -386,7 +386,7 @@ pub struct KindCostClass {
     pub literal_like: bool,
     /// Bit `i` set iff this kind is in `ALL_OPERATOR_FAMILIES[i]` (see
     /// [`crate::diff::nodes::operator_family_mask`]). A kind can be in several families at once.
-    pub operator_families: u16,
+    pub operator_families: crate::diff::nodes::FamilyMask,
 }
 
 /**

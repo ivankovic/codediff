@@ -1049,6 +1049,96 @@ const INCREMENT_OPS: &[&str] = &["++", "--"];
 /// off-by-one fix (e.g. `for i in 0..n` -> `for i in 0..=n`).
 const RUST_RANGE_OPS: &[&str] = &["..", "..=", "..."];
 
+/// Member-access operators: plain `.`, null-safe `?.` (Kotlin/Swift/TypeScript/C#), C/C++'s
+/// pointer `->`, PHP's `?->` and Ruby's `&.`. Switching one for another is the single most common
+/// shape of a null-safety or value-to-pointer refactor (`foo.bar` -> `foo?.bar`, `s.x` -> `s->x`),
+/// and the human mappings consistently read it as the same access edited - the operator leaf sits
+/// in the same `navigation_expression`/`field_expression` slot either way. Not given to PHP, where
+/// `.` is string concatenation (`PHP_ARITHMETIC_OPS`) and pairing it with `->` would be a category
+/// error.
+const MEMBER_ACCESS_OPS: &[&str] = &[".", "?.", "->", "?->", "&."];
+
+/// Deliberately *no* C/C++ `type_identifier`/`primitive_type` family, although the pair is the
+/// most frequent cross-kind leaf edit in the corpus: the ground truth contradicts itself on it.
+/// `cpp-tensorflow-switch-to-primitive-types` (alias -> `int`) pairs the two leaves as an update;
+/// `cpp-add-templates` (`int` -> `T`) and `c-linux-small-change-struct-to-char` (`struct x` ->
+/// `char`) delete one and insert the other in exactly the same declaration slot. Measured
+/// 2026-09-01: the family trades 6 -> 0 on the first for 0 -> 6 and 2 -> 4 on the other two.
+/// Until the annotations agree, neither reading can be encoded.
+
+/// Numeric literal kinds across every grammar that splits integers from floats (tree-sitter names
+/// vary per language, hence the length). `1` -> `1.0` or `0` -> `0.5f` is a value edit of one
+/// literal, not the removal of one literal and the arrival of an unrelated other - the human
+/// mappings pair them without exception. Kinds a grammar doesn't have are simply never seen.
+const NUMERIC_LITERAL_KINDS: &[&str] = &[
+    "integer_literal",
+    "float_literal",
+    "number_literal",
+    "real_literal",
+    "long_literal",
+    "hex_literal",
+    "bin_literal",
+    "decimal_integer_literal",
+    "hex_integer_literal",
+    "octal_integer_literal",
+    "binary_integer_literal",
+    "decimal_floating_point_literal",
+    "hex_floating_point_literal",
+    "int_literal",
+    "imaginary_literal",
+    "floating_point_literal",
+    "integer",
+    "float",
+    "integer_value",
+    "float_value",
+];
+
+/// Shell's `[ a == b ]` / `[ a = b ]` / `[ a != b ]` test-command operators. The bash grammar
+/// yields each as its own anonymous leaf kind, and `==` -> `=` (the POSIX-portable spelling) is a
+/// classic shell cleanup (`shellscript-torvalds-linux-double-equals-to-equals`).
+const SHELL_TEST_OPS: &[&str] = &["==", "=", "!="];
+
+/// Access-modifier keywords. `public` -> `protected` is an edit of the modifier slot, not a
+/// deletion plus an insertion (`java-scrcpy-public-to-protected`). Not given to C#: in
+/// `csharp-glibsharp-gtksharp-interesting-case-...` the only such pair sits in a deleted
+/// constructor and an inserted property, where the cheaper cross-kind pairing is exactly the
+/// wrong answer, and no C# fixture has the same-slot edit that would pay for it.
+const ACCESS_MODIFIERS: &[&str] = &[
+    "public",
+    "private",
+    "protected",
+    "internal",
+    "fileprivate",
+    "open",
+];
+
+/// Variable-declaration keywords: `let`/`var`/`const` (JavaScript, TypeScript, Swift) and
+/// Kotlin's `val`/`var`. Flipping mutability is an edit of the declaration's keyword slot.
+const DECLARATION_KEYWORDS: &[&str] = &["let", "var", "const", "val"];
+
+/// HTML/XML's two ways to end an opening tag: `>` and the self-closing `/>`. Toggling one is a
+/// one-token edit of the tag (`html-hugo-tag-to-selfclosing-tag`), though the grammar then
+/// re-kinds the whole tag (`start_tag` vs `self_closing_tag`) - that container pair is
+/// deliberately *not* a family here, per the `TS_TYPE_KEYWORD_KINDS` lesson: pair the leaf, not
+/// the parent, or APTED takes the parent-level pairing and the leaf mapping comes out wrong.
+const HTML_TAG_END: &[&str] = &["/>", ">"];
+
+/// Ruby's two hash-pair separators - `:key => v` and `key: v`. A style-guide rewrite from one to
+/// the other edits the separator of every pair in place
+/// (`ruby-jmespath-jmespath-formatting-and-style-guide-fixes`). The key itself also changes kind
+/// (`simple_symbol` -> `hash_key_symbol`), but that pair is deliberately *not* a family: measured
+/// 2026-09-01, it let APTED pair a symbol inside a deleted `pair` with one inside an inserted
+/// `element_reference` in both `ruby-homebrew-brew-*` fixtures (cost 1 beats delete + insert),
+/// costing more than the same-slot edits it bought.
+const RUBY_HASH_SEPARATORS: &[&str] = &["=>", ":"];
+
+/// Python's `None` (kind `none`) swapped for a name, or back: `x = None` -> `x = default_value`
+/// edits the value slot (`python-pytorch-pytorch-add-param-to-many-places-and-update-one`). Only
+/// `identifier`, not the wider `IDENTIFIER_KINDS`: a null literal never stands where a field or
+/// type name would. Python only: the C equivalent (`null` <-> `identifier`) was measured to pair
+/// a `return NULL` with an unrelated name in `c-nginx-add-typedef` and buy nothing elsewhere.
+const NULL_LITERAL_KINDS: &[&str] = &["none", "identifier"];
+
 /// TypeScript's built-in type keywords - the anonymous leaf tokens tree-sitter yields *inside* a
 /// `predefined_type` node (`number`, `string`, `boolean`, ... - tree-sitter names an anonymous
 /// token by its own literal text, so the keyword `number` really does have kind `"number"`; see
@@ -1091,6 +1181,7 @@ const IDENTIFIER_KINDS: &[&str] = &[
     "type_identifier",
     "property_identifier",
     "shorthand_property_identifier",
+    "shorthand_property_identifier_pattern",
 ];
 
 /// True if `kind` is one of the name-like leaf kinds in [`IDENTIFIER_KINDS`] - the membership test
@@ -1108,11 +1199,11 @@ fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
 
 /// Every cross-kind-update family above - operator families and [`TS_TYPE_KEYWORD_KINDS`] alike -
 /// in one fixed order, so a kind's membership across all of them can be packed into the bits of a
-/// single `u16` ([`operator_family_mask`]) and a language's applicable subset into another
+/// single [`FamilyMask`] ([`operator_family_mask`]) and a language's applicable subset into another
 /// ([`language_operator_family_mask`]). Order is arbitrary but must stay consistent between those
 /// two functions - which is exactly why both derive from *this* list rather than hardcoding bit
-/// positions of their own. Widen the mask type (currently `u16`, so up to 16 families) before
-/// adding a 17th: `u8` silently wrapped (`1u8 << 8` shifts modulo the bit width in release builds)
+/// positions of their own. Widen [`FamilyMask`] (currently `u32`) before adding a family past its
+/// bit width - the `const` assertion below refuses to compile otherwise: `u8` silently wrapped (`1u8 << 8` shifts modulo the bit width in release builds)
 /// and collided `TS_TYPE_KEYWORD_KINDS` (index 8) onto `COMPARISON_OPS` (index 0) until this was
 /// caught by `operator_family_masks_agree_with_string_scanning_kinds_update_allowed`.
 ///
@@ -1129,7 +1220,23 @@ const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
     INCREMENT_OPS,
     RUST_RANGE_OPS,
     TS_TYPE_KEYWORD_KINDS,
+    MEMBER_ACCESS_OPS,
+    NUMERIC_LITERAL_KINDS,
+    SHELL_TEST_OPS,
+    ACCESS_MODIFIERS,
+    DECLARATION_KEYWORDS,
+    HTML_TAG_END,
+    RUBY_HASH_SEPARATORS,
+    NULL_LITERAL_KINDS,
 ];
+
+/// The mask type below must have a bit per family - a silent shift-overflow is exactly the bug
+/// the `u8` -> `u16` widening fixed, so the 33rd family fails to compile instead.
+const _: () = assert!(ALL_OPERATOR_FAMILIES.len() <= FamilyMask::BITS as usize);
+
+/// Bit-per-family mask type shared by [`operator_family_mask`], [`language_operator_family_mask`]
+/// and `KindCostClass::operator_families`.
+pub type FamilyMask = u32;
 
 /// Bit `i` set iff `kind` belongs to `ALL_OPERATOR_FAMILIES[i]`. A kind may belong to several
 /// (e.g. `+` is in both `ARITHMETIC_OPS` and `PHP_ARITHMETIC_OPS`), which is why this is a mask
@@ -1138,8 +1245,8 @@ const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
 /// Computed once per node at metadata-build time (see `ASTNodeMetadata::kind_cost_class`), turning
 /// what used to be a linear scan over every family on every comparison into a bitwise AND - see
 /// [`update_allowed_from_masks`].
-pub fn operator_family_mask(kind: &str) -> u16 {
-    let mut mask = 0u16;
+pub fn operator_family_mask(kind: &str) -> FamilyMask {
+    let mut mask: FamilyMask = 0;
     for (i, family) in ALL_OPERATOR_FAMILIES.iter().enumerate() {
         if family.contains(&kind) {
             mask |= 1 << i;
@@ -1152,8 +1259,8 @@ pub fn operator_family_mask(kind: &str) -> u16 {
 /// bitmask form of [`kinds_update_allowed`]'s own `match language` arm, derived from it by
 /// identity comparison on the array pointers so the two can't disagree about which families a
 /// language has.
-pub fn language_operator_family_mask(language: &Language) -> u16 {
-    let mut mask = 0u16;
+pub fn language_operator_family_mask(language: &Language) -> FamilyMask {
+    let mut mask: FamilyMask = 0;
     for family in families_for_language(language) {
         for (i, known) in ALL_OPERATOR_FAMILIES.iter().enumerate() {
             if std::ptr::eq(*family as *const [&str], *known as *const [&str]) {
@@ -1175,7 +1282,7 @@ pub fn language_operator_family_mask(language: &Language) -> u16 {
 pub fn update_allowed_from_masks(
     a: &crate::code::KindCostClass,
     b: &crate::code::KindCostClass,
-    language_mask: u16,
+    language_mask: FamilyMask,
 ) -> bool {
     if a.identifier_like && b.identifier_like {
         return true;
@@ -1189,9 +1296,12 @@ pub fn update_allowed_from_masks(
 *
 * By default (and for any language/kind pair not covered below), nodes of different kinds are
 * never allowed to match - see `UnitCostModel::ren`'s doc comment for why. The families below are
-* deliberate, hand-picked exceptions: single-token operator leaves that occupy the same syntactic
-* slot in their language's grammar, where a human would consider a kind change (e.g. `<` -> `<=`)
-* to be an edit of the same node rather than a wholesale replacement.
+* deliberate, hand-picked exceptions: single-token leaves (operators, and since 2026-09-01 also
+* member-access tokens, numeric literals, type names, modifiers and declaration keywords - each
+* family's own doc comment names the corpus fixture that motivated it) that occupy the same
+* syntactic slot in their language's grammar, where a human would consider a kind change (e.g.
+* `<` -> `<=`, `.` -> `?.`, `1` -> `1.0`) to be an edit of the same node rather than a wholesale
+* replacement.
 *
 * Additionally, identifier-like kinds (identifier, field_identifier, type_identifier, etc.) are allowed
 * to match each other across all languages, since they all represent "names" that a human would
@@ -1219,13 +1329,14 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
 /// this same list rather than duplicating the language-to-families mapping.
 fn families_for_language(language: &Language) -> &'static [&'static [&'static str]] {
     match language {
-        Language::C | Language::Java | Language::Go | Language::CSharp => &[
+        Language::C => &[
             COMPARISON_OPS,
             ARITHMETIC_OPS,
             BITWISE_OPS,
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
             INCREMENT_OPS,
+            MEMBER_ACCESS_OPS,
         ],
         Language::CPP => &[
             COMPARISON_OPS,
@@ -1234,6 +1345,37 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
             INCREMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            ACCESS_MODIFIERS,
+        ],
+        Language::Java => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
+            ACCESS_MODIFIERS,
+        ],
+        Language::Go => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
+        ],
+        Language::CSharp => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            INCREMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            NUMERIC_LITERAL_KINDS,
         ],
         Language::Rust => &[
             COMPARISON_OPS,
@@ -1242,6 +1384,7 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
             RUST_RANGE_OPS,
+            NUMERIC_LITERAL_KINDS,
         ],
         Language::TypeScript | Language::TSX => &[
             COMPARISON_OPS,
@@ -1251,6 +1394,9 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             ASSIGNMENT_OPS,
             INCREMENT_OPS,
             TS_TYPE_KEYWORD_KINDS,
+            MEMBER_ACCESS_OPS,
+            ACCESS_MODIFIERS,
+            DECLARATION_KEYWORDS,
         ],
         Language::JavaScript => &[
             COMPARISON_OPS,
@@ -1259,15 +1405,34 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
             INCREMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            DECLARATION_KEYWORDS,
         ],
-        Language::Python => &[COMPARISON_OPS, ARITHMETIC_OPS, LOGICAL_OPS, ASSIGNMENT_OPS],
-        Language::Kotlin => &[COMPARISON_OPS, LOGICAL_OPS, ASSIGNMENT_OPS],
+        Language::Python => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
+            NULL_LITERAL_KINDS,
+        ],
+        Language::Kotlin => &[
+            COMPARISON_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            NUMERIC_LITERAL_KINDS,
+            ACCESS_MODIFIERS,
+            DECLARATION_KEYWORDS,
+        ],
         Language::PHP => &[
             COMPARISON_OPS,
             PHP_ARITHMETIC_OPS,
             BITWISE_OPS,
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
+            ACCESS_MODIFIERS,
         ],
         Language::Ruby => &[
             COMPARISON_OPS,
@@ -1275,7 +1440,33 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             BITWISE_OPS,
             LOGICAL_OPS,
             ASSIGNMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            NUMERIC_LITERAL_KINDS,
+            RUBY_HASH_SEPARATORS,
         ],
+        Language::Swift => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            BITWISE_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            MEMBER_ACCESS_OPS,
+            NUMERIC_LITERAL_KINDS,
+            ACCESS_MODIFIERS,
+            DECLARATION_KEYWORDS,
+        ],
+        Language::Scala => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
+            ACCESS_MODIFIERS,
+            DECLARATION_KEYWORDS,
+        ],
+        Language::ShellScript => &[SHELL_TEST_OPS],
+        Language::HTML | Language::XML => &[HTML_TAG_END],
+        Language::CSS => &[NUMERIC_LITERAL_KINDS],
         _ => &[],
     }
 }
