@@ -1779,6 +1779,69 @@ fn diff_ast(
     (before, after, ast, node_cache)
 }
 
+/// Regression guard for the `Insert`/`Delete`-with-children arm added to `ranges` (see its own
+/// doc comment): a brand-new comment's `line_comment` node splits into a `//` marker leaf plus
+/// un-decomposed trailing text (its own_content). Before that arm existed, only the childless
+/// leaf arms fired, so the marker got an `Insert` range and the comment's actual words - not
+/// covered by any child - were silently dropped. Confirmed against the real bug on
+/// `rust-cost-optimization`, where a brand-new `// Early termination optimization` line
+/// rendered with only its `//` highlighted.
+#[test]
+fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
+    let (before, after, ast, node_cache) =
+        diff_ast("fn main() {}\n", "// hi there\nfn main() {}\n");
+    let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
+
+    let words_painted = after_ranges.iter().any(|r| {
+        r.operation == TextOperation::Insert
+            && r.source.start_row == 0
+            && r.source.start_column >= 2 // past the `//` marker itself
+            && (r.source.end_row > r.source.start_row || r.source.end_column > r.source.start_column)
+    });
+    assert!(
+        words_painted,
+        "a brand-new comment's own words (everything after `//`) must be painted Insert, not \
+         silently dropped: {after_ranges:?}"
+    );
+}
+
+/// Regression guard for the ordering hazard the arm above has to avoid: a content node whose
+/// children *already* fully reconstruct it with no real gap (Rust's `string_literal` is
+/// exactly `"` + `string_content` + `"`, with nothing between them) must fall through to plain
+/// recursive descent rather than take the new arm's `new_ranges.len() > 1` bypass - that bypass
+/// skips the same-operation-neighbor merge accumulator, which is what silently absorbs a
+/// whitespace-only gap into an adjacent `Insert` range. Regressed `java-add-logging` from exact
+/// agreement to six dropped single-space bytes (the spaces around `+` in a brand-new
+/// `"Dividing " + a + " by " + b` expression) before the arm's guard required a genuine,
+/// non-whitespace `own_content_span` before firing.
+///
+/// With merging intact, a whole brand-new statement like `let s = "a" + b;` collapses into
+/// *one* `Insert` range end to end (every child is `Insert`, and every gap between them is
+/// pure whitespace) - so the regression this guards against shows up as that single range
+/// splitting apart around the string literal, not as a byte silently vanishing.
+#[test]
+fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
+    let (before, after, ast, node_cache) =
+        diff_ast("fn main() {}\n", "fn main() {\n    let s = \"a\" + b;\n}\n");
+    let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
+
+    let row1_inserts: Vec<_> = after_ranges
+        .iter()
+        .filter(|r| r.operation == TextOperation::Insert && r.source.start_row == 1)
+        .collect();
+    assert_eq!(
+        row1_inserts.len(),
+        1,
+        "the whole new `let s = \"a\" + b;` statement should merge into one Insert range - \
+         more than one means a gap (like the whitespace around `+`) split it apart: \
+         {after_ranges:?}"
+    );
+    assert_eq!(
+        row1_inserts[0].source.start_column, 4,
+        "the merged Insert range should start at `let`, right after the line's indentation: \
+         {after_ranges:?}"
+    );
+}
 /// Regression test for the `crossed_backwards` check in `ranges`: before it, a pure reorder
 /// of two sibling functions (same column, different rows) produced no non-Identical range at
 /// all - the diff rendered as completely unchanged and `summarize_diff` returned `None`,

@@ -259,8 +259,10 @@ struct TextSpan<'a> {
 /// Literals and comments are content: adding a phrase to a docstring is an insertion. Identifiers,
 /// keywords and operators are not: `IntBox` becoming `Box` is a rename, and `<=` becoming `<` is a
 /// changed operator - in both, the painter calls the node updated rather than calling the dropped
-/// characters a deletion. See `intra_node_update_ranges`, which is the only caller and carries the
-/// six fixtures this was measured against.
+/// characters a deletion. See `intra_node_update_ranges` (the original caller, carrying the six
+/// fixtures this was measured against) and `ranges`'s own `Insert`/`Delete`-with-children arm
+/// (added later, for the same content-vs-glue split on a *whole* new/removed node rather than a
+/// changed one).
 fn is_content_node(kind: &str) -> bool {
     // `nodes::is_literal_kind` is not enough on its own and deliberately not widened here: it is
     // shared with the APTED rename-cost model and `code::hash`, and it lists only the kinds those
@@ -580,6 +582,120 @@ fn ranges(
                                 &source_columns,
                                 TextOperation::Insert,
                             ));
+                        }
+                        // A wholly-new-or-removed content node (a comment, e.g. `// Early
+                        // termination optimization`) whose grammar splits it into a marker leaf
+                        // (`//`) plus un-decomposed trailing text - the same shape
+                        // `own_content`/`own_content_span` exist for on the `MatchButNotIdentical`
+                        // arm below, but for a *whole* node insertion/deletion rather than a
+                        // changed one. Without this arm, the childless-leaf arms above only ever
+                        // painted the marker (`//`), and the comment's actual words - not covered
+                        // by any child - were silently dropped: confirmed on
+                        // `rust-cost-optimization`, where a brand-new `// Early termination
+                        // optimization` comment rendered with only its `//` highlighted and the
+                        // rest in plain, unpainted text.
+                        //
+                        // Scoped tightly to avoid the ordering hazard a naive fix would hit: this
+                        // node's own gap text sits *after* its children in the file, but the
+                        // surrounding pre-order stack walk would visit those children in a later
+                        // iteration, so pushing the gap range here (during the parent's own turn)
+                        // and the children's ranges later (in theirs) would insert the gap into
+                        // `ranges` out of byte order - corrupting every `last_non_move_range`
+                        // anchor computed afterward. Instead, when every direct child is itself a
+                        // leaf (`child_count() == 0` - true for a marker token like `//` or a
+                        // quote character, false for anything with real internal structure this
+                        // arm has no business re-deciding), this computes the *whole* ordered
+                        // range list - each child's own range interleaved with any real (non-
+                        // whitespace) gap text around it - in one pass here, and skips the normal
+                        // per-child descent (`descend = false`) so those children aren't visited
+                        // (and painted) a second time.
+                        //
+                        // `is_content_node` gates this the same way it gates
+                        // `intra_node_update_ranges`'s affix split: only comments/literals/strings
+                        // have meaningful text living in a node's own gaps rather than in a named
+                        // child, so this never fires for a container (a `block`, a `class_body`)
+                        // gaining or losing a whole child - that shape already renders correctly
+                        // via the childless-leaf arms recursing normally.
+                        //
+                        // `own_content_span(node).is_some_and(...)` in the guard - not just inside
+                        // the body - matters: it's what keeps this arm from firing on a node whose
+                        // children already fully reconstruct it with no real gap at all (a Java
+                        // `string_literal` node made of a `"` / `string_fragment` / `"` triple with
+                        // nothing between them, extremely common, unlike a genuinely gappy comment).
+                        // Confirmed as a real regression, not a hypothetical one: an earlier version
+                        // of this arm fired there too and, despite painting every one of those
+                        // three children correctly on their own, its `new_ranges.len() > 1` bypass
+                        // (below) skips the normal same-operation-neighbor merge accumulator that
+                        // silently absorbs a *whitespace-only* gap into an adjacent Insert/Delete
+                        // range (see the comment where `new_ranges.len() > 1` is checked, further
+                        // down) - so cutting a no-gap node like this over to the bypass path dropped
+                        // whitespace at its *boundary* with a sibling (a single space between a
+                        // string literal and a `+` in `"Dividing " + a`) that isn't part of this
+                        // node at all. Regressed `java-add-logging` from exact agreement to six
+                        // dropped bytes before this guard was added.
+                        ASTMappingOperation::Insert | ASTMappingOperation::Delete
+                            if node.child_count() > 0
+                                && is_content_node(node.kind())
+                                && node
+                                    .children(&mut node.walk())
+                                    .all(|c| c.child_count() == 0)
+                                && own_content_span(node).is_some_and(|(_, from, to)| {
+                                    !source.contents[from..to].trim().is_empty()
+                                }) =>
+                        {
+                            let operation = match mapping.operation {
+                                ASTMappingOperation::Insert => TextOperation::Insert,
+                                _ => TextOperation::Delete,
+                            };
+                            let mut pos = node.start_byte();
+                            let mut gap_start_point = node.start_position();
+                            let mut child_cursor = node.walk();
+                            for child in node.children(&mut child_cursor) {
+                                if child.start_byte() > pos
+                                    && !source.contents[pos..child.start_byte()].trim().is_empty()
+                                {
+                                    let gap_text = &source.contents[pos..child.start_byte()];
+                                    let gap_end = point_at_byte_offset(
+                                        gap_text,
+                                        gap_start_point,
+                                        gap_text.len(),
+                                    );
+                                    new_ranges.push(advance_and_build_range_with_source(
+                                        &mut last_non_move_range,
+                                        text_range_from_points(
+                                            gap_start_point,
+                                            gap_end,
+                                            &source_columns,
+                                        ),
+                                        operation.clone(),
+                                    ));
+                                }
+                                new_ranges.push(advance_and_build_range(
+                                    &mut last_non_move_range,
+                                    child,
+                                    &source_columns,
+                                    operation.clone(),
+                                ));
+                                pos = pos.max(child.end_byte());
+                                gap_start_point = child.end_position();
+                            }
+                            if node.end_byte() > pos
+                                && !source.contents[pos..node.end_byte()].trim().is_empty()
+                            {
+                                let gap_text = &source.contents[pos..node.end_byte()];
+                                let gap_end =
+                                    point_at_byte_offset(gap_text, gap_start_point, gap_text.len());
+                                new_ranges.push(advance_and_build_range_with_source(
+                                    &mut last_non_move_range,
+                                    text_range_from_points(
+                                        gap_start_point,
+                                        gap_end,
+                                        &source_columns,
+                                    ),
+                                    operation,
+                                ));
+                            }
+                            descend = false;
                         }
                         // See `intra_node_update_ranges`'s own doc comment for the sub-range
                         // split (common prefix/middle/suffix) and why the prefix/suffix
