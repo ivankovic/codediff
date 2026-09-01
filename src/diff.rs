@@ -33,6 +33,7 @@ pub mod solve_nested_condition_collapse;
 pub mod solve_syntax_aware_matching;
 pub mod solve_unique_type_matching;
 pub mod solve_unresolved_nodes;
+pub mod solve_wrap_growth;
 pub mod text;
 pub mod text_range;
 
@@ -505,6 +506,25 @@ impl<'code> PendingDiff<'code> {
             solve_mutual_ancestors::solve(before, after, &node_cache, &mut ast_diff);
         }
 
+        // Wrap growth (`try { EXISTING } catch (...) { NEW }`, an existing `if`/`else` becoming an
+        // `else if` branch, a module-top-level statement run gaining a brand-new enclosing
+        // construct, ...) - the same re-tag idea as `solve_heritage_clause_growth`, for content
+        // that gained a brand-new wrapper parent chain around it rather than a new sibling. Placed
+        // here, not alongside `solve_heritage_clause_growth` in `pending_with_config`: unlike a
+        // class/interface body (matched immediately by phase 1's hash descent, since its content
+        // alone is byte-identical), the *container* this pass needs already matched above the new
+        // wrapper - `rust-add-if`'s enclosing `expression_statement`, `typescript-add-error-
+        // handling`'s reused statements' shared match to the file's own root - is frequently not
+        // resolved until the terminal fallback (`apted::for_roots_fallback`, "fast_fallback") runs,
+        // because its own text differs (it now wraps the new content too) and it may share no name
+        // or hash with anything phases 1-6 can anchor on. Running any earlier finds no matched
+        // ancestor to climb to and silently does nothing - measured directly: moving this pass here
+        // from right after phase 4 is what let `typescript-add-error-handling` benefit at all. Runs
+        // before the terminal completeness sweep below (not after) so it only ever re-tags a real,
+        // already-verified `Identical` match - never touches a node that sweep is about to resolve.
+        // See that module's own doc comment for the verification itself.
+        solve_wrap_growth::solve(before, after, &node_cache, &mut ast_diff);
+
         // Terminal completeness sweep: everything above is free to leave a node undecided, so this
         // records the delete/insert implied by whatever absence is left. Must be last - it pairs
         // nothing, and any pass running after it would find every node already claimed. See
@@ -898,6 +918,16 @@ pub enum ASTMappingReason {
     /// comment and the two reverted general heuristics documented in text.rs's Move/Identical
     /// branch history). See `solve_heritage_clause_growth`.
     HeritageClauseGrowth,
+    /// A node is byte-identical before and after, but now sits one or more levels deeper because a
+    /// brand-new wrapper construct (`try`/`catch`, a new `if`/`else if`, ...) was inserted directly
+    /// around it - a re-tag of phase 1's already-correct `Identical` match, not a new mapping, the
+    /// same idea as `HeritageClauseGrowth` but for a wrapper that gains the node as its *body*
+    /// rather than a sibling gaining the node as *its* neighbor. Unlike `HeritageClauseGrowth`
+    /// (unconditionally suppressed - both `Minimal`/`Full` ground truth agreed it should never
+    /// paint `Move`), this is gated by [`crate::diff::text::RenderOptions::paint_reindent_only_moves`]
+    /// like `NestedConditionCollapse`: `rust-add-if`'s own ground truth paints this shape `Move`
+    /// under `Full` and unpainted under `Minimal`. See `solve_wrap_growth`.
+    WrapGrowth,
 }
 
 impl ASTMappingReason {
@@ -927,6 +957,7 @@ impl ASTMappingReason {
             ASTMappingReason::MutualAncestor => "MutualAnc",
             ASTMappingReason::NestedConditionCollapse => "CondCollapse",
             ASTMappingReason::HeritageClauseGrowth => "HeritageGrowth",
+            ASTMappingReason::WrapGrowth => "WrapGrowth",
         }
     }
 }

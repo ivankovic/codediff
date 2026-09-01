@@ -71,6 +71,52 @@ quality, not just painting) → keep only if nothing else got worse.
   `java-add-exception-handling`, `kotlin-add-null-check`, `python-add-remove-block`,
   `rust-cost-optimization`.
 
+- **Pattern 2, all 5 affected fixtures** (`rust-add-if`, `java-add-exception-handling`,
+  `typescript-add-error-handling`, `python-added-if-block`, `python-added-if-block-small`) - the
+  largest single lever attempted this session. New pass `solve_wrap_growth` (a `diff.rs` module,
+  same idea as `solve_heritage_clause_growth` but for a different structural shape): when existing
+  content stays byte-identical but gains a brand-new wrapper parent chain around it (Java/TypeScript
+  `try { EXISTING } catch (...) { NEW }`, Rust's `if COND { NEW } else if EXISTING_COND { EXISTING }`,
+  a module-top-level statement run gaining a new enclosing construct), re-tags phase 1's already-
+  correct `Identical` match with a new `ASTMappingReason::WrapGrowth`, gated by
+  `paint_reindent_only_moves` the same way `NestedConditionCollapse` is (unlike
+  `HeritageClauseGrowth`, which suppresses unconditionally) - `rust-add-if`'s own ground truth wants
+  this shape painted `Move` under `Full` and unpainted under `Minimal`, so both readings had to stay
+  reachable.
+
+  Two real bugs found and fixed while getting this from "works on paper" to "works on the corpus,
+  with zero regressions":
+  1. **Wrong pipeline placement.** First placed right after `solve_heritage_clause_growth`
+     (very early - phase 1c/1d) since that's the module it's modeled on. Wrong: unlike a
+     class/interface body (matched immediately by phase 1's hash descent, since its content alone
+     is byte-identical), the *container* this pass needs already matched - `rust-add-if`'s
+     enclosing `expression_statement`, `typescript-add-error-handling`'s reused statements' shared
+     match to the file's own root - usually isn't resolved until much later (`java-add-exception-handling`
+     needed it after phase 4's syntax-aware matching; `typescript-add-error-handling` needed it
+     after the terminal `apted::for_roots_fallback` "fast_fallback" pass, since its statements
+     share no name or hash phases 1-6 can anchor on). Moved to run in `PendingDiff::finish`, right
+     before the terminal completeness sweep - after every real matching pass, so nothing needed is
+     ever unresolved when it runs.
+  2. **Over-fired on ordinary sibling shifts.** The verification climbs through unmatched ancestor
+     levels until it finds one already matched - but with no minimum climb, it also fired when the
+     *immediate* parent was already matched (zero new wrapper levels at all), which is just an
+     ordinary "something inserted before this at the same level" shift - the deliberately-calibrated
+     pattern-1 territory `ranges()` already owns. Firing there too regressed
+     `typescript-refactor-interface` from ~0% to **75%** Full (caught immediately by the
+     whole-corpus regression check, not shipped). Fixed by requiring at least one genuinely new
+     level climbed through before accepting a match.
+  Also excluded leaf nodes (bare keywords/punctuation) from candidacy after they measurably
+  regressed `python-bugfix-loop` (0.465%→1.086%) for no offsetting gain anywhere - the pass's
+  purpose is container-level attribution, the same scope `solve_heritage_clause_growth` restricts
+  itself to by kind whitelist; leaves don't need it.
+
+  **Result, verified zero regressions each step via the full corpus + `cargo test --lib`**:
+  `rust-add-if` 53.623%→**0.000%** Minimal, `java-add-exception-handling` 54.753%→**0.457%**,
+  `typescript-add-error-handling` 30.732%→**0.488%**, `python-added-if-block`
+  3.833%→**0.000%**, `python-added-if-block-small` 18.440%→**0.000%**. Aggregate
+  1.1811%→**1.1172%** - within 0.12 points of the project's <1% goal. 2 more pre-existing test
+  failures now pass as a side effect (`javascript_fix_promises`, `rust_add_if`).
+
 ## Investigated, not attempted this session - too risky to touch blind
 
 - **Pattern 1 (single-row column-shift Move calibration)**: re-confirmed via
@@ -87,15 +133,6 @@ quality, not just painting) → keep only if nothing else got worse.
   prior reverted attempts made and regressed on. Left as `todo` per-row below; a future attempt
   should measure against the *whole* corpus before touching anything, the same discipline that
   worked for pattern 4.
-- **Pattern 2 (reindent-Move scope, Rust-only)**: `rust-add-if` is still 53.623% Minimal after
-  today's fixes - the single largest remaining number in the table. Generalizing
-  `solve_nested_condition_collapse`'s `known_pure_reindent` tagging to Java's try-wrap,
-  TypeScript's try-wrap, and Python's if-wrap would need a per-construct "verified pure
-  relocation" proof the same way that pass proves it for Rust's if-let collapse (see also
-  `solve_heritage_clause_growth`, which does this for class/interface heritage-clause growth) -
-  not a loose column-shift heuristic, which is exactly what regressed `rust-add-if` itself
-  historically. Real, tractable engineering work, but a new pass per construct, not a small fix -
-  deferred to a dedicated session rather than attempted partially here.
 - **typescript-add-generics' `NumberContainer`→`Container` rename** (and the identical-shaped
   gaps in `c-cpython-autogenerated-code`/`c-ffmpeg-added-typedef-to-enum`): codediff does
   Delete+Insert where the human paints Update, and separately does a full statement-level

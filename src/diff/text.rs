@@ -479,17 +479,22 @@ fn ranges(
                                     s.start_row == d.start_row && s.end_row > s.start_row;
                                 let column_shift_is_meaningful = s.start_column != d.start_column
                                     && !shifted_within_its_own_line;
-                                // `NestedConditionCollapse` marks a node whose relocation is
-                                // *known*, by construction, to be a pure reindent - see
-                                // `solve_nested_condition_collapse`'s doc comment. Deliberately
-                                // narrow (only this specific, pre-verified reason, never a bare
-                                // column-shift check): the general heuristic above cannot tell a
-                                // pure reindent from a genuine relocation like `rust-add-if`'s by
-                                // position alone, so gating suppression on anything looser would
-                                // risk that regression - see `RenderOptions::paint_reindent_only_moves`'s
-                                // own doc comment.
+                                // `NestedConditionCollapse`/`WrapGrowth` mark a node whose
+                                // relocation is *known*, by construction, to be a pure reindent -
+                                // see `solve_nested_condition_collapse`'s and `solve_wrap_growth`'s
+                                // own doc comments. Deliberately narrow (only these specific,
+                                // pre-verified reasons, never a bare column-shift check): the
+                                // general heuristic above cannot tell a pure reindent from a genuine
+                                // relocation by position alone - `rust-add-if`'s own shape is
+                                // exactly the counter-example that ruled that out, which is why it's
+                                // included here by *verified reason* (`WrapGrowth`) rather than by
+                                // loosening the position-based heuristic itself.
                                 let known_pure_reindent = !paint_reindent_only_moves
-                                    && mapping.reason == ASTMappingReason::NestedConditionCollapse;
+                                    && matches!(
+                                        mapping.reason,
+                                        ASTMappingReason::NestedConditionCollapse
+                                            | ASTMappingReason::WrapGrowth
+                                    );
                                 // Unlike `NestedConditionCollapse` above, not gated by
                                 // `paint_reindent_only_moves`: this tag only fires when a class's
                                 // or interface's body is byte-identical and its shift is verified

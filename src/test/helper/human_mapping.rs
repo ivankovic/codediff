@@ -5106,7 +5106,7 @@ mod tests {
                 ast: &crate::diff::ASTDiff,
                 contents: &[u8],
             ) -> bool {
-                if node.start_position().row == target_row && depth < 3 {
+                if node.start_position().row == target_row && depth < 20 {
                     dump_subtree(node, 0, ast, contents);
                     return true;
                 }
