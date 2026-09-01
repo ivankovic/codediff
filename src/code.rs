@@ -319,6 +319,13 @@ pub struct ASTNodeMetadata {
     /// Unique per node and, like `start_byte`, a pure function of the tree's shape - not the
     /// arena that happened to produce it - so it's safe to use across separate parses.
     pub preorder_index: usize,
+    /// tree-sitter's `Node::is_named` for this node: `false` for the anonymous tokens a grammar
+    /// spells by their own text (`import`, `{`, `->`), `true` for every rule with a name of its
+    /// own. Reference-node discovery needs it because a keyword token can share its kind string
+    /// with the statement it introduces (Kotlin's `import` statement *and* its `import` keyword
+    /// are both kind `"import"`), and a leaf keyword must never become a hash-matching candidate
+    /// in its own right - see `is_reference`'s two call sites.
+    pub is_named: bool,
     /// Precomputed answers to the kind-membership questions
     /// [`crate::diff::nodes::kinds_update_allowed`] and [`crate::diff::nodes::is_literal_kind`]
     /// would otherwise re-derive by string scanning - see [`KindCostClass`] for why this is
@@ -353,6 +360,8 @@ impl ASTNodeMetadata {
             children,
             start_byte,
             preorder_index,
+            // Hand-built nodes are always meant as real syntax nodes, not keyword tokens.
+            is_named: true,
             kind_cost_class,
         }
     }

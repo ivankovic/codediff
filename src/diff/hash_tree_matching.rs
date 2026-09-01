@@ -81,7 +81,10 @@ pub fn build_extended_node_list(
         let depth = metadata.node_to_depth.get(&node_id).copied().unwrap_or(0);
         let start_byte = info.start_byte;
 
-        let is_reference_node = is_reference(&info.kind, &language);
+        // `is_named`: see `ASTNodeMetadata::is_named` - a keyword token sharing its statement's
+        // kind string (Kotlin `import`) otherwise becomes a hash-matching candidate of its own and
+        // pairs with an arbitrary same-keyword token elsewhere in the file.
+        let is_reference_node = info.is_named && is_reference(&info.kind, &language);
         let is_big_enough = depth >= config.min_depth && subtree_size >= config.min_subtree_size;
 
         if is_reference_node || is_big_enough {

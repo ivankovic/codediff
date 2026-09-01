@@ -218,6 +218,7 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
                 children,
                 start_byte: node.start_byte(),
                 preorder_index,
+                is_named: node.is_named(),
             },
         );
         preorder_index += 1;
@@ -369,7 +370,10 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
 
     walk_preorder(root_node, |node| {
         let node_id = node.id();
-        if nodes::is_reference(node.kind(), language)
+        // `is_named`: an anonymous keyword token can share its kind string with the statement it
+        // introduces (Kotlin's `import`), and must not be listed as a reference node itself.
+        if node.is_named()
+            && nodes::is_reference(node.kind(), language)
             && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
         {
             reference_nodes_with_sizes.push((node_id, subtree_size));

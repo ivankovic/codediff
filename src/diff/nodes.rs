@@ -292,6 +292,42 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
     }
 }
 
+/// True for the import/use/include statement kinds [`is_reference`] lists for `language`.
+///
+/// Split out because phase 1's *shape-only* tier (`solve_hash_descent`'s `KindOnlyHash` call)
+/// must skip them: two imports of unrelated names with the same number of path segments have
+/// identical shape, and the tier had nothing else to go on. In `kotlin-remove-function` it paired
+/// `...service.ChatServiceError` with `...CloudLlmProvider.State.Ready` (both seven segments) and
+/// then spent four identifier Updates making it true - cheaper under the unit cost model than
+/// delete + insert, and wrong to every reader; 64 of that fixture's 66 mismatches (2026-09-01).
+/// Imports were only added to `is_reference` on 2026-07-11, with zero measured benchmark effect,
+/// so nothing is lost by keeping them out of the tier that can't tell them apart. The byte-exact
+/// tier and every later pass still see them.
+pub fn is_import_kind(node_kind: &str, language: &Language) -> bool {
+    match language {
+        Language::Rust => node_kind == "use_declaration",
+        Language::Python => {
+            node_kind == "import_statement"
+                || node_kind == "import_from_statement"
+                || node_kind == "future_import_statement"
+        }
+        Language::Java => node_kind == "import_declaration",
+        Language::C => node_kind == "preproc_include",
+        Language::CPP => node_kind == "preproc_include" || node_kind == "using_declaration",
+        Language::Go => node_kind == "import_declaration",
+        Language::JavaScript | Language::TypeScript | Language::TSX => {
+            node_kind == "import_statement"
+        }
+        Language::PHP => node_kind == "namespace_use_declaration",
+        Language::Swift => node_kind == "import_declaration",
+        Language::Kotlin => node_kind == "import",
+        Language::Scala => node_kind == "import_declaration",
+        Language::CSharp => node_kind == "using_directive",
+        Language::CSS => node_kind == "import_statement",
+        _ => false,
+    }
+}
+
 /// A *scope-local* identity name for nodes like parameters, local variable declarations, and
 /// shell variable assignments - the same kind of stable identity signal `is_semantically_
 /// structural` provides for top-level declarations, but deliberately **not** layered onto that
@@ -1058,13 +1094,13 @@ const RUST_RANGE_OPS: &[&str] = &["..", "..=", "..."];
 /// error.
 const MEMBER_ACCESS_OPS: &[&str] = &[".", "?.", "->", "?->", "&."];
 
-/// Deliberately *no* C/C++ `type_identifier`/`primitive_type` family, although the pair is the
-/// most frequent cross-kind leaf edit in the corpus: the ground truth contradicts itself on it.
-/// `cpp-tensorflow-switch-to-primitive-types` (alias -> `int`) pairs the two leaves as an update;
-/// `cpp-add-templates` (`int` -> `T`) and `c-linux-small-change-struct-to-char` (`struct x` ->
-/// `char`) delete one and insert the other in exactly the same declaration slot. Measured
-/// 2026-09-01: the family trades 6 -> 0 on the first for 0 -> 6 and 2 -> 4 on the other two.
-/// Until the annotations agree, neither reading can be encoded.
+// Deliberately *no* C/C++ `type_identifier`/`primitive_type` family, although the pair is the
+// most frequent cross-kind leaf edit in the corpus: the ground truth contradicts itself on it.
+// `cpp-tensorflow-switch-to-primitive-types` (alias -> `int`) pairs the two leaves as an update;
+// `cpp-add-templates` (`int` -> `T`) and `c-linux-small-change-struct-to-char` (`struct x` ->
+// `char`) delete one and insert the other in exactly the same declaration slot. Measured
+// 2026-09-01: the family trades 6 -> 0 on the first for 0 -> 6 and 2 -> 4 on the other two.
+// Until the annotations agree, neither reading can be encoded.
 
 /// Numeric literal kinds across every grammar that splits integers from floats (tree-sitter names
 /// vary per language, hence the length). `1` -> `1.0` or `0` -> `0.5f` is a value edit of one

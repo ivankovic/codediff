@@ -18,6 +18,7 @@
 use crate::code::Code;
 use crate::code::metadata::metadata_of;
 use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
+use crate::diff::nodes::is_import_kind;
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
@@ -67,7 +68,21 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         &after_metadata.kind_only_hash_to_node,
         ASTMappingReason::StructurallyIdenticalSubtrees,
         ASTMappingReason::StructurallyIdenticalAncestor,
-        |metadata| metadata.reference_nodes_ordered.clone(),
+        // Imports are reference nodes, but shape alone cannot tell two of them apart - see
+        // `nodes::is_import_kind` for the fixture this pairing wrecked.
+        |metadata| {
+            metadata
+                .reference_nodes_ordered
+                .iter()
+                .copied()
+                .filter(|id| {
+                    metadata
+                        .node_info
+                        .get(id)
+                        .is_none_or(|info| !is_import_kind(&info.kind, &metadata.language))
+                })
+                .collect()
+        },
     );
 }
 
