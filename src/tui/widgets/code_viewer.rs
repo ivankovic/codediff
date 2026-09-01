@@ -344,25 +344,47 @@ impl CodeViewerState {
     /// Every change's `(row, column)` start position (anything but `Identical`/the `NotYetSet`
     /// sentinel, and not a zero-width placeholder), in document order - the ordered list
     /// `next_change_position`/`change_count_and_index` both walk.
+    ///
+    /// Consecutive per-row pieces of one `interior_line_indentation: false` split
+    /// (`split_into_per_row_pieces`) collapse to a single position here - same operation, same
+    /// (always-placeholder, for the `Insert`/`Delete` shapes that split produces) destination,
+    /// and contiguous rows, exactly the signature that split leaves and nothing else naturally
+    /// produces. Without this, one multi-line insert would cost `n`/`p` one stop per row instead
+    /// of one stop for the whole change, and the "change N/M" counter would over-count it the
+    /// same way.
     fn change_positions(&self) -> Vec<(usize, usize)> {
         // `range_order` is already sorted by source start position, and filtering preserves that
         // order, so this comes out sorted with no extra work.
-        self.range_order
-            .iter()
-            .map(|&i| &self.ranges[i])
-            .filter(|range_match| {
-                !matches!(
-                    range_match.operation,
-                    TextOperation::Identical | TextOperation::NotYetSet
-                ) && !range_match.source.is_empty()
-            })
-            .map(|range_match| {
-                (
-                    range_match.source.start_row,
-                    range_match.source.start_column,
-                )
-            })
-            .collect()
+        let mut positions = Vec::new();
+        let mut previous_group: Option<(TextOperation, TextRange, usize)> = None;
+        for range_match in self.range_order.iter().map(|&i| &self.ranges[i]) {
+            if matches!(
+                range_match.operation,
+                TextOperation::Identical | TextOperation::NotYetSet
+            ) || range_match.source.is_empty()
+            {
+                continue;
+            }
+            let row = range_match.source.start_row;
+            let continues_previous_group =
+                previous_group
+                    .as_ref()
+                    .is_some_and(|(operation, destination, previous_row)| {
+                        *operation == range_match.operation
+                            && *destination == range_match.destination
+                            && row == previous_row + 1
+                    });
+            previous_group = Some((
+                range_match.operation.clone(),
+                range_match.destination.clone(),
+                row,
+            ));
+            if continues_previous_group {
+                continue;
+            }
+            positions.push((row, range_match.source.start_column));
+        }
+        positions
     }
 
     /// Every current search match's `(row, column)` start position, in document order -
@@ -1568,6 +1590,73 @@ mod tests {
             operation: TextOperation::Identical,
         }]);
         assert_eq!(state.change_count_and_index(), None);
+    }
+
+    /// The exact shape `split_into_per_row_pieces` (`RenderOptions::interior_line_indentation:
+    /// false`) produces for one multi-line insert: same operation, same (placeholder) destination,
+    /// contiguous rows. `n`/`p` and the "change N/M" counter must treat all three rows as one stop,
+    /// not three - otherwise turning that option on would make navigating a multi-line insert three
+    /// times slower for no reason a reader asked for.
+    #[test]
+    fn change_positions_collapses_a_multi_row_insert_split_into_one_stop() {
+        let mut state = CodeViewerState::default();
+        let destination = TextRange::new(4, 0, 4, 0);
+        state.load_ranges(vec![
+            RangeMatch {
+                source: TextRange::new(0, 4, 0, 25),
+                destination: destination.clone(),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: TextRange::new(1, 8, 1, 22),
+                destination: destination.clone(),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: TextRange::new(2, 8, 2, 15),
+                destination,
+                operation: TextOperation::Insert,
+            },
+        ]);
+
+        assert_eq!(
+            state.change_count_and_index(),
+            Some((1, 1)),
+            "three per-row pieces of one insert must count as a single change"
+        );
+        state.cursor_row = 0;
+        state.cursor_col = 0;
+        assert_eq!(
+            state.next_change_position(true),
+            Some((0, 4)),
+            "pressing n from before the group should land on its first row and go nowhere else"
+        );
+    }
+
+    /// The signal `change_positions` groups on (same operation, same destination, contiguous
+    /// rows) must not fire for two genuinely separate changes that happen to land on adjacent
+    /// rows with different destinations - each stays its own stop.
+    #[test]
+    fn change_positions_does_not_collapse_adjacent_but_unrelated_changes() {
+        let mut state = CodeViewerState::default();
+        state.load_ranges(vec![
+            RangeMatch {
+                source: TextRange::new(0, 0, 0, 4),
+                destination: TextRange::new(4, 0, 4, 0),
+                operation: TextOperation::Insert,
+            },
+            RangeMatch {
+                source: TextRange::new(1, 0, 1, 4),
+                destination: TextRange::new(9, 0, 9, 0),
+                operation: TextOperation::Insert,
+            },
+        ]);
+
+        assert_eq!(
+            state.change_count_and_index(),
+            Some((1, 2)),
+            "different destinations mean these are two separate changes, not a split group"
+        );
     }
 
     /// Landing exactly on a change (as `next_change_position` always does) must count that change

@@ -622,16 +622,19 @@ pub fn text_mapping_disagreements(
     ];
 
     let disagreeing_bytes = |disagreements: &[TextMappingDisagreement]| -> usize {
-        disagreements.iter().map(|d| d.end_byte - d.start_byte).sum()
+        disagreements
+            .iter()
+            .map(|d| d.end_byte - d.start_byte)
+            .sum()
     };
 
     let mut best: Option<TextMappingCheck> = None;
     for named in &mapping.text_mappings {
         let disagreements = disagreements_for(&named.mapping, before, after, &tree_labels)
             .with_context(|| format!("checking the '{}' text painting", named.name))?;
-        let better = best
-            .as_ref()
-            .is_none_or(|current| disagreeing_bytes(&disagreements) < disagreeing_bytes(&current.disagreements));
+        let better = best.as_ref().is_none_or(|current| {
+            disagreeing_bytes(&disagreements) < disagreeing_bytes(&current.disagreements)
+        });
         if better {
             best = Some(TextMappingCheck {
                 solution: named.name.clone(),
@@ -830,7 +833,18 @@ pub fn compare_painting(
         .as_ref()
         .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
     let node_cache = crate::diff::NodeCache::build(&before, &after);
-    let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &node_cache);
+    // Not `TextDiff::from` (which hardcodes both construction-time options to their legacy
+    // defaults) - `paint_reindent_only_moves` genuinely differs between `MINIMAL`/`FULL` (unlike
+    // `whole_pair_updates`, which never has), so this must resolve `options`'s own value rather
+    // than assume it.
+    let text_diff = crate::diff::text::TextDiff::from_with_options(
+        &before,
+        &after,
+        ast,
+        &node_cache,
+        options.whole_pair_updates,
+        options.paint_reindent_only_moves,
+    );
 
     let mut mismatched_bytes = 0usize;
     let mut total_bytes = 0usize;
@@ -4683,6 +4697,345 @@ mod tests {
                 disagreement_is_move_only(d),
                 String::from_utf8_lossy(text)
             );
+        }
+        Ok(())
+    }
+
+    /// EXPLORATORY: measures `compare_painting` (Minimal + Full) for every handmade fixture and
+    /// prints a report ranked by absolute mismatched bytes, plus the aggregate rate across the
+    /// whole handmade corpus. Run with `cargo test --lib --features test-fixtures
+    /// handmade_painting_disagreement_report -- --ignored --nocapture`.
+    ///
+    /// Ranked by bytes rather than percent: the `/goal` this backs (fewer than 1% character
+    /// painting disagreement on handmade, in aggregate) is a bytes-summed rate, so a big fixture's
+    /// small percentage can outweigh a tiny fixture's big one - see this test's own printed rows
+    /// for a caller wanting the ranking, not the theory.
+    #[test]
+    #[ignore]
+    fn handmade_painting_disagreement_report() -> Result<()> {
+        use crate::diff::text::RenderOptions;
+
+        let handmade_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("test")
+            .join("data")
+            .join("diffs")
+            .join("handmade");
+        let mut names: Vec<String> = fs::read_dir(&handmade_dir)?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+
+        struct Row {
+            name: String,
+            minimal: PaintingComparison,
+            full: PaintingComparison,
+        }
+        let mut rows = Vec::new();
+        let mut errors = Vec::new();
+        for name in &names {
+            let minimal = compare_painting(name, RenderOptions::MINIMAL);
+            let full = compare_painting(name, RenderOptions::FULL);
+            match (minimal, full) {
+                (Ok(minimal), Ok(full)) => rows.push(Row {
+                    name: name.clone(),
+                    minimal,
+                    full,
+                }),
+                (minimal, full) => {
+                    let msg = minimal.err().or(full.err()).unwrap();
+                    errors.push(format!("{name}: {msg:#}"));
+                }
+            }
+        }
+
+        rows.sort_by_key(|row| {
+            std::cmp::Reverse(row.minimal.mismatched_bytes + row.full.mismatched_bytes)
+        });
+
+        let mut total_mismatched = 0usize;
+        let mut total_bytes = 0usize;
+        eprintln!(
+            "{:<70} {:>10} {:>10} {:>10}",
+            "fixture", "minimal%", "full%", "sum_bytes"
+        );
+        for row in &rows {
+            let sum_bytes = row.minimal.mismatched_bytes + row.full.mismatched_bytes;
+            total_mismatched += sum_bytes;
+            total_bytes += row.minimal.total_bytes + row.full.total_bytes;
+            eprintln!(
+                "{:<70} {:>10.3} {:>10.3} {:>10}",
+                row.name,
+                row.minimal.percent(),
+                row.full.percent(),
+                sum_bytes,
+            );
+        }
+        let aggregate_percent = if total_bytes == 0 {
+            0.0
+        } else {
+            100.0 * total_mismatched as f64 / total_bytes as f64
+        };
+        eprintln!(
+            "\naggregate: {total_mismatched} / {total_bytes} bytes = {aggregate_percent:.4}% \
+             (goal: < 1%)"
+        );
+        if !errors.is_empty() {
+            eprintln!("\n{} fixture(s) could not be measured:", errors.len());
+            for e in &errors {
+                eprintln!("  {e}");
+            }
+        }
+        Ok(())
+    }
+
+    /// EXPLORATORY: `exploratory_mapping_vs_painting_disagreement_detail`, parameterized by a
+    /// `FIXTURE` env var - checks the *tree mapping* against the painting (structural agreement),
+    /// unlike `painting_disagreement_detail` above which checks codediff's *rendering* against it.
+    /// `FIXTURE=name cargo test --lib --features test-fixtures
+    /// mapping_vs_painting_disagreement_detail_for_fixture -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn mapping_vs_painting_disagreement_detail_for_fixture() -> Result<()> {
+        let name = std::env::var("FIXTURE").unwrap_or_else(|_| "rust-add-if".to_string());
+        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
+        let mapping = load(&name)?;
+        let check = text_mapping_disagreements(&mapping, &before, &after)?
+            .with_context(|| format!("{name} has no painting"))?;
+        eprintln!("best-matching painting: '{}'", check.solution);
+        for d in &check.disagreements {
+            let contents = if d.side == 0 {
+                &before.contents
+            } else {
+                &after.contents
+            };
+            let text = &contents.as_bytes()[d.start_byte..d.end_byte];
+            eprintln!(
+                "side={} row={} bytes={}..{} painted={:?} tree={:?} move_only={} text={:?}",
+                d.side,
+                d.start_row,
+                d.start_byte,
+                d.end_byte,
+                d.painted,
+                d.from_tree,
+                disagreement_is_move_only(d),
+                String::from_utf8_lossy(text)
+            );
+        }
+        Ok(())
+    }
+
+    /// EXPLORATORY: prints just the Minimal/Full percentages for fixtures named by the
+    /// `FIXTURES` env var (comma-separated) - for measuring stub tests outside the handmade
+    /// dataset, where `handmade_painting_disagreement_report` doesn't reach: `FIXTURES=a,b,c
+    /// cargo test --lib --features test-fixtures measure_stub_fixtures -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn measure_stub_fixtures() -> Result<()> {
+        use crate::diff::text::RenderOptions;
+
+        let names = std::env::var("FIXTURES").unwrap_or_default();
+        for name in names.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let minimal = compare_painting(name, RenderOptions::MINIMAL)?;
+            let full = compare_painting(name, RenderOptions::FULL)?;
+            eprintln!(
+                "{name}: minimal {:.3}% ({}/{}), full {:.3}% ({}/{})",
+                minimal.percent(),
+                minimal.mismatched_bytes,
+                minimal.total_bytes,
+                full.percent(),
+                full.mismatched_bytes,
+                full.total_bytes
+            );
+        }
+        Ok(())
+    }
+
+    /// TEMPORARY/EXPLORATORY (not for commit): same detail as `painting_disagreement_detail`
+    /// below, but for every fixture named in the comma-separated `FIXTURES` env var, both modes,
+    /// in one process - avoids a `cargo test` recompile+relaunch per fixture/mode when surveying
+    /// many fixtures at once. `FIXTURES=a,b,c cargo test --lib --features test-fixtures
+    /// painting_disagreement_detail_batch -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn painting_disagreement_detail_batch() -> Result<()> {
+        use crate::diff::text::RenderOptions;
+
+        let names = std::env::var("FIXTURES").unwrap_or_default();
+        for name in names.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            for (mode, options) in [
+                ("minimal", RenderOptions::MINIMAL),
+                ("full", RenderOptions::FULL),
+            ] {
+                let (before, after) = match crate::test::helper::handmade_test_code_pair(name) {
+                    Ok(pair) => pair,
+                    Err(e) => {
+                        eprintln!("fixture={name} mode={mode}: ERROR loading code pair: {e:#}");
+                        continue;
+                    }
+                };
+                let mapping = match load(name) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        eprintln!("fixture={name} mode={mode}: ERROR loading mapping: {e:#}");
+                        continue;
+                    }
+                };
+                let painting = match painting_for_mode(&mapping, options) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("fixture={name} mode={mode}: ERROR: {e:#}");
+                        continue;
+                    }
+                };
+
+                let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+                for entry in &painting.mapping.entries {
+                    let label =
+                        TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+                    for span in &entry.before {
+                        painted[0].push((*span, label));
+                    }
+                    for span in &entry.after {
+                        painted[1].push((*span, label));
+                    }
+                }
+
+                let diff = crate::diff::diff_code(&before, &after);
+                let ast = diff
+                    .ast
+                    .as_ref()
+                    .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+                let node_cache = crate::diff::NodeCache::build(&before, &after);
+                let text_diff = crate::diff::text::TextDiff::from_with_options(
+                    &before,
+                    &after,
+                    ast,
+                    &node_cache,
+                    options.whole_pair_updates,
+                    options.paint_reindent_only_moves,
+                );
+
+                let comparison = compare_painting(name, options)?;
+                eprintln!(
+                    "=== fixture={name} mode={mode} percent={:.3}% (painting solution='{}') ===",
+                    comparison.percent(),
+                    painting.name
+                );
+                for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                    let ours_ranges = crate::diff::text::ranges_for_options(
+                        &text_diff.all(side),
+                        contents,
+                        options,
+                    );
+                    let ours = label_bytes_from_ranges(contents, &ours_ranges);
+                    let theirs = label_bytes(contents, &painted[side]);
+
+                    let mut i = 0usize;
+                    while i < ours.len() {
+                        if ours[i] == theirs[i] {
+                            i += 1;
+                            continue;
+                        }
+                        let start = i;
+                        while i < ours.len() && ours[i] != theirs[i] {
+                            i += 1;
+                        }
+                        let row = contents[..start].matches('\n').count();
+                        let text = &contents.as_bytes()[start..i];
+                        eprintln!(
+                            "  side={side} row={row} bytes={start}..{i} ours={:?} theirs={:?} text={:?}",
+                            ours[start],
+                            theirs[start],
+                            String::from_utf8_lossy(text)
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// EXPLORATORY: prints every run of bytes where codediff's rendering (under `options`)
+    /// disagrees with the human painting for one fixture - the `compare_painting` byte-projection
+    /// itself, not `text_mapping_disagreements`' separate node-vs-painting comparison. Fixture and
+    /// mode are read from env vars so this can be pointed at any `handmade_painting_disagreement_report`
+    /// offender without editing this function: `FIXTURE=<name> MODE=<minimal|full> cargo test --lib
+    /// --features test-fixtures painting_disagreement_detail -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn painting_disagreement_detail() -> Result<()> {
+        use crate::diff::text::RenderOptions;
+
+        let name = std::env::var("FIXTURE").unwrap_or_else(|_| "rust-add-if".to_string());
+        let mode = std::env::var("MODE").unwrap_or_else(|_| "minimal".to_string());
+        let options = if mode.eq_ignore_ascii_case("full") {
+            RenderOptions::FULL
+        } else {
+            RenderOptions::MINIMAL
+        };
+
+        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
+        let mapping = load(&name)?;
+        let painting = painting_for_mode(&mapping, options)?;
+
+        let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+        for entry in &painting.mapping.entries {
+            let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+            for span in &entry.before {
+                painted[0].push((*span, label));
+            }
+            for span in &entry.after {
+                painted[1].push((*span, label));
+            }
+        }
+
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff
+            .ast
+            .as_ref()
+            .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+        let node_cache = crate::diff::NodeCache::build(&before, &after);
+        let text_diff = crate::diff::text::TextDiff::from_with_options(
+            &before,
+            &after,
+            ast,
+            &node_cache,
+            options.whole_pair_updates,
+            options.paint_reindent_only_moves,
+        );
+
+        eprintln!(
+            "fixture={name} mode={mode} (painting solution='{}')",
+            painting.name
+        );
+        for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+            let ours_ranges =
+                crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
+            let ours = label_bytes_from_ranges(contents, &ours_ranges);
+            let theirs = label_bytes(contents, &painted[side]);
+
+            let mut i = 0usize;
+            while i < ours.len() {
+                if ours[i] == theirs[i] {
+                    i += 1;
+                    continue;
+                }
+                let start = i;
+                while i < ours.len() && ours[i] != theirs[i] {
+                    i += 1;
+                }
+                let row = contents[..start].matches('\n').count();
+                let text = &contents.as_bytes()[start..i];
+                eprintln!(
+                    "  side={side} row={row} bytes={start}..{i} ours={:?} theirs={:?} text={:?}",
+                    ours[start],
+                    theirs[start],
+                    String::from_utf8_lossy(text)
+                );
+            }
         }
         Ok(())
     }

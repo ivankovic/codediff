@@ -626,6 +626,18 @@ mod tests {
             !loaded.render_options.whole_pair_updates,
             "the missing key must default to false (narrow), not fail the whole file"
         );
+        assert!(
+            loaded.render_options.interior_line_indentation,
+            "the missing key must default to true (interior indentation kept) - the opposite \
+             polarity from whole_pair_updates above, since this field's own bool::default() of \
+             false would be the wrong reading for an old config with no opinion on this axis"
+        );
+        assert!(
+            loaded.render_options.paint_reindent_only_moves,
+            "the missing key must default to true (paint it) - every release before this field \
+             existed always painted a reindented Move, same polarity reasoning as \
+             interior_line_indentation above"
+        );
     }
 
     #[test]

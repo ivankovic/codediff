@@ -21,7 +21,6 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-algorithm-change", 100.0)
+    // measured 2026-09-01: minimal 25.823%, full 28.807% (measured, unexamined)
+    assert_matches_human_painting_within_limit("rust-algorithm-change", 28.83)
 }

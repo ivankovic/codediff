@@ -21,7 +21,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg", 100.0)
+    // measured 2026-09-01: minimal 0.533%, full 0.533% (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg",
+        0.55,
+    )
 }

@@ -23,11 +23,13 @@ pub mod nodes;
 pub mod solve_bottom_up_propagation;
 pub mod solve_greedy_anchor_blocks;
 pub mod solve_hash_descent;
+pub mod solve_heritage_clause_growth;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_large_flat_subtrees;
 pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
 pub mod solve_mutual_ancestors;
+pub mod solve_nested_condition_collapse;
 pub mod solve_syntax_aware_matching;
 pub mod solve_unique_type_matching;
 pub mod solve_unresolved_nodes;
@@ -216,6 +218,16 @@ impl Diff {
 
         // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash).
         solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Phase 1b: nested-condition collapse (e.g. Rust's `if let`-chains) - reacts to whatever
+        // phase 1 just matched to fix up the one attribution gap pure hash matching structurally
+        // cannot close on its own. See that module's doc comment for the full mechanism.
+        solve_nested_condition_collapse::solve(before, after, &node_cache, &mut ast_diff);
+
+        // Phase 1c: heritage-clause growth (`class Foo implements Bar`, `interface Foo extends
+        // Bar`) - the same kind of phase-1 attribution fix-up, for a different structural shape.
+        // See that module's doc comment.
+        solve_heritage_clause_growth::solve(before, after, &node_cache, &mut ast_diff);
 
         // Phase 2: contextual exact matching - houses solve_leading_siblings (a comment or
         // attribute/decorator modifier that immediately precedes a matched node, walking a whole
@@ -870,6 +882,22 @@ pub enum ASTMappingReason {
     /// everything the other's matched descendants map to - a mutual, vote-free correspondence
     /// between two containers holding the same content. See `solve_mutual_ancestors`.
     MutualAncestor,
+    /// A chain of `N` nested single-statement conditional wrappers on one side (each one's block
+    /// contains nothing but the next) matches a single flattened multi-clause conditional on the
+    /// other - Rust's `if let`-chains collapsing several nested `if let`s into one `if ... && let
+    /// ... { }`. Fixes up phase 1's one structural blind spot: hash matching alone finds the
+    /// unchanged body just fine, but has no way to attribute the outermost wrapper as the node
+    /// that persists. See `solve_nested_condition_collapse`.
+    NestedConditionCollapse,
+    /// A class/interface's body is byte-identical before and after, but a heritage clause
+    /// (`implements`/`extends`) was inserted as an earlier sibling within the same declaration,
+    /// shifting the body's row and column - a re-tag of phase 1's already-correct `Identical`
+    /// match, not a new mapping, so `ranges()` can tell this apart from a genuine relocation by
+    /// reason alone rather than re-deriving it from position at render time (which measurably
+    /// cannot make that distinction safely - see `RenderOptions::paint_reindent_only_moves`'s doc
+    /// comment and the two reverted general heuristics documented in text.rs's Move/Identical
+    /// branch history). See `solve_heritage_clause_growth`.
+    HeritageClauseGrowth,
 }
 
 impl ASTMappingReason {
@@ -897,6 +925,8 @@ impl ASTMappingReason {
             ASTMappingReason::UniqueTypeMatching => "UniqueType",
             ASTMappingReason::UnresolvedNode => "Unresolved",
             ASTMappingReason::MutualAncestor => "MutualAnc",
+            ASTMappingReason::NestedConditionCollapse => "CondCollapse",
+            ASTMappingReason::HeritageClauseGrowth => "HeritageGrowth",
         }
     }
 }

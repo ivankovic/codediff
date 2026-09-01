@@ -528,7 +528,13 @@ pub fn run(
     render_options: RenderOptions,
 ) -> Result<bool> {
     let (mut data, fallback_used) =
-        compute_diff_with_update_style(before, after, mode, render_options.whole_pair_updates)?;
+        compute_diff_with_update_style(
+            before,
+            after,
+            mode,
+            render_options.whole_pair_updates,
+            render_options.paint_reindent_only_moves,
+        )?;
     // Applied here rather than inside `compute_diff`: the mapping is identical under every set of
     // options, so this is a presentation filter over a finished diff, not a different diff.
     data.before_ranges =

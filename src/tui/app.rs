@@ -550,10 +550,7 @@ impl App {
                 // Every toggle in the render-options panel is already final (see the action's own
                 // doc comment) - apply it to the live viewer and persist it in the same step,
                 // rather than waiting for the dialog to close.
-                Action::RenderOptionsChanged(options) => {
-                    self.diff_viewer.set_render_options(*options);
-                    theme::save_render_options(*options);
-                }
+                Action::RenderOptionsChanged(options) => self.apply_render_options(*options)?,
                 _ => {}
             }
 
@@ -579,6 +576,35 @@ impl App {
         if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
             self.restore_after_reload = Some((self.diff_viewer.active_panel(), row, col));
         }
+    }
+
+    /// `Action::RenderOptionsChanged`'s handler: apply and persist `options` immediately (every
+    /// toggle in the render-options panel is already final, see the action's own doc comment),
+    /// and - the one field that needs more than a re-filter -  reload the diff if
+    /// `whole_pair_updates` changed.
+    ///
+    /// `whole_pair_updates` changes which ranges the diff itself has, not just how much of an
+    /// already-built range list gets painted - `DiffViewer::set_render_options` alone re-filters
+    /// the cached list and would leave this one option looking like it did nothing until the next
+    /// unrelated reload. The other two fields are real post-filters and stay instant, so the
+    /// reload is gated on this one field specifically rather than firing on every call.
+    ///
+    /// A method of its own, not inlined into `handle_actions`, so it can be unit tested without a
+    /// real `UI` - nothing here touches one.
+    fn apply_render_options(&mut self, options: RenderOptions) -> Result<()> {
+        let previous = self.diff_viewer.render_options();
+        let needs_reload = previous.whole_pair_updates != options.whole_pair_updates
+            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves;
+        self.diff_viewer.set_render_options(options);
+        theme::save_render_options(options);
+        if needs_reload
+            && let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone())
+        {
+            self.remember_cursor_for_restore();
+            self.action_tx
+                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
+        }
+        Ok(())
     }
 
     /// The `e` key's other half: release the terminal, run the user's editor on `path` at
@@ -723,9 +749,23 @@ impl App {
         self.diff_generation += 1;
         let generation = self.diff_generation;
         let tx = self.action_tx.clone();
+        // Read off the live viewer rather than threaded through `Action::StartDiff`: every caller
+        // of `start_diff` (file selection, `x`'s exact-mode re-run, the external-editor reload,
+        // and `Action::RenderOptionsChanged` below) should compute with whatever
+        // `whole_pair_updates`/`paint_reindent_only_moves` currently are, not have to know to pass
+        // them along individually.
+        let render_options = self.diff_viewer.render_options();
+        let whole_pair_updates = render_options.whole_pair_updates;
+        let paint_reindent_only_moves = render_options.paint_reindent_only_moves;
         tokio::task::spawn_blocking(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                compute_diff(&before, &after, mode)
+                compute_diff_with_update_style(
+                    &before,
+                    &after,
+                    mode,
+                    whole_pair_updates,
+                    paint_reindent_only_moves,
+                )
             }));
             let outcome = match result {
                 Ok(Ok((data, fallback_used))) => DiffOutcome::Ready {
@@ -1097,6 +1137,7 @@ fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
 }
 
 /// Builds the textual ranges needed to display an already-`finish`ed `Diff`.
+#[allow(clippy::too_many_arguments)]
 fn assemble_diff_session_data(
     before_path: &Path,
     after_path: &Path,
@@ -1104,15 +1145,23 @@ fn assemble_diff_session_data(
     after_code: &Code,
     diff: &Diff,
     mode: DiffMode,
-    // [`RenderOptions::whole_pair_updates`] - unlike the rest of `RenderOptions`, this changes
-    // which ranges `TextDiff` itself builds rather than which of an already-built list get
-    // painted, so it has to reach in here rather than `ranges_for_options`'s later filter pass.
+    // [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] - unlike
+    // the rest of `RenderOptions`, these change which ranges `TextDiff` itself builds rather than
+    // which of an already-built list get painted, so they have to reach in here rather than
+    // `ranges_for_options`'s later filter pass.
     whole_pair_updates: bool,
+    paint_reindent_only_moves: bool,
 ) -> Result<DiffSessionData> {
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
-    let text_diff =
-        TextDiff::from_with_update_style(before_code, after_code, ast, &node_cache, whole_pair_updates);
+    let text_diff = TextDiff::from_with_options(
+        before_code,
+        after_code,
+        ast,
+        &node_cache,
+        whole_pair_updates,
+        paint_reindent_only_moves,
+    );
     // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
     // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
     // field's own doc comment.
@@ -1190,31 +1239,34 @@ fn assemble_plain_text_diff_session_data(
 /// terminal-independent diff computation either way - only what happens to the result (draw it
 /// interactively vs. print it as text) differs between the two modes.
 ///
-/// [`RenderOptions::whole_pair_updates`] off - see [`compute_diff_with_update_style`] for the
-/// parameterized version and why this stays the plain default rather than growing a parameter:
-/// most of this function's callers (interactive TUI startup/reload, and every test in this
-/// module) have no opinion on that one option and would otherwise all need updating just to keep
-/// passing `false`.
+/// Test-only convenience: [`RenderOptions::whole_pair_updates`] off, unconditionally. Every real
+/// (non-test) caller - `App::start_diff`, `tui::headless::run`, `tui::json_output::run` - resolves
+/// that option from the live viewer or from CLI/config and calls
+/// [`compute_diff_with_update_style`] directly, so as of that option's own toggle reaching the `M`
+/// panel there is no production caller left that has no opinion on it. Kept anyway, `#[cfg(test)]`
+/// gated, purely so the many tests across this module and `headless`/`json_output` that predate
+/// that option don't all need updating just to keep passing `false`.
+#[cfg(test)]
 pub(crate) fn compute_diff(
     before: &Path,
     after: &Path,
     mode: DiffMode,
 ) -> Result<(DiffSessionData, bool)> {
-    compute_diff_with_update_style(before, after, mode, false)
+    compute_diff_with_update_style(before, after, mode, false, true)
 }
 
-/// [`compute_diff`], with [`RenderOptions::whole_pair_updates`] threaded through to the AST-backed
-/// path instead of hardcoded off. Only `tui::headless::run`/`tui::json_output::run` call this one
-/// directly, since they're the callers that actually resolve `RenderOptions` from CLI/config
-/// before a diff is computed - the interactive TUI still opens files through `compute_diff`
-/// itself (see that option's own doc comment on why the `M` panel doesn't drive this: toggling it
-/// there would silently do nothing until the diff is recomputed, which nothing currently triggers
-/// on a `RenderOptions` change).
+/// The real diff computation every production caller uses -
+/// [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] threaded
+/// through to the AST-backed path rather than hardcoded to their legacy defaults.
+/// `App::start_diff` reads them off the live `DiffViewer`; `tui::headless::run`/
+/// `tui::json_output::run` read them off the `RenderOptions` CLI/config already resolved before a
+/// diff is computed.
 pub(crate) fn compute_diff_with_update_style(
     before: &Path,
     after: &Path,
     mode: DiffMode,
     whole_pair_updates: bool,
+    paint_reindent_only_moves: bool,
 ) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
     if before_code.ast.is_none() || after_code.ast.is_none() {
@@ -1233,6 +1285,7 @@ pub(crate) fn compute_diff_with_update_style(
         &diff,
         mode,
         whole_pair_updates,
+        paint_reindent_only_moves,
     )?;
     Ok((data, fallback_used))
 }
@@ -1486,6 +1539,77 @@ mod tests {
         assert!(app.file_dialog.is_none());
     }
 
+    /// `whole_pair_updates` changes which ranges the diff itself has - a plain re-filter can't
+    /// reach it, so this is the one field whose toggle must reload the diff.
+    #[test]
+    fn apply_render_options_reloads_when_whole_pair_updates_changes() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.before_path = Some(PathBuf::from("before.rs"));
+        app.after_path = Some(PathBuf::from("after.rs"));
+        assert!(!app.diff_viewer.render_options().whole_pair_updates);
+
+        app.apply_render_options(RenderOptions {
+            whole_pair_updates: true,
+            ..RenderOptions::default()
+        })?;
+
+        assert!(app.diff_viewer.render_options().whole_pair_updates);
+        let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
+        assert!(
+            matches!(
+                queued.as_slice(),
+                [Action::StartDiff(before, after, DiffMode::Fast)]
+                    if before == Path::new("before.rs") && after == Path::new("after.rs")
+            ),
+            "expected exactly one StartDiff reload, got {queued:?}"
+        );
+        Ok(())
+    }
+
+    /// The other two fields are real post-filters - toggling only them must stay instant, with no
+    /// reload queued.
+    #[test]
+    fn apply_render_options_does_not_reload_for_the_other_fields() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.before_path = Some(PathBuf::from("before.rs"));
+        app.after_path = Some(PathBuf::from("after.rs"));
+
+        app.apply_render_options(RenderOptions {
+            leading_whitespace: false,
+            structural_punctuation: false,
+            whole_pair_updates: false,
+            interior_line_indentation: true,
+            paint_reindent_only_moves: true,
+        })?;
+
+        let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
+        assert!(
+            queued.is_empty(),
+            "leading_whitespace/structural_punctuation must not trigger a reload: {queued:?}"
+        );
+        Ok(())
+    }
+
+    /// Nothing is open yet (the empty-start screen) - there is no pair to reload, so the change
+    /// must apply to the (empty) viewer without trying to queue a diff for a path that doesn't
+    /// exist.
+    #[test]
+    fn apply_render_options_with_no_open_pair_does_not_queue_a_reload() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        assert!(app.before_path.is_none());
+        assert!(app.after_path.is_none());
+
+        app.apply_render_options(RenderOptions {
+            whole_pair_updates: true,
+            ..RenderOptions::default()
+        })?;
+
+        assert!(app.diff_viewer.render_options().whole_pair_updates);
+        let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
+        assert!(queued.is_empty(), "nothing to reload: {queued:?}");
+        Ok(())
+    }
+
     /// Regression test for the exact mechanism `handle_events`'s `globally_handled` guard exists
     /// to prevent: without it, the `?` keystroke that opens the help modal would *also* reach
     /// `dispatch_event_to_active_screen` in the same event cycle (since `self.screen` is already
@@ -1659,6 +1783,8 @@ mod tests {
             leading_whitespace: false,
             structural_punctuation: true,
             whole_pair_updates: false,
+            interior_line_indentation: true,
+            paint_reindent_only_moves: true,
         });
 
         let backend = ratatui::backend::TestBackend::new(120, 24);

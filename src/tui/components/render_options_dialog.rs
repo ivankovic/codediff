@@ -17,12 +17,7 @@
  */
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    Frame,
-    layout::Rect,
-    text::Line,
-    widgets::ListItem,
-};
+use ratatui::{Frame, layout::Rect, text::Line, widgets::ListItem};
 
 use super::{Component, move_selection, render_list_dialog};
 use crate::diff::text::RenderOptions;
@@ -142,6 +137,8 @@ mod tests {
                 leading_whitespace: true,
                 structural_punctuation: false,
                 whole_pair_updates: false,
+                interior_line_indentation: true,
+                paint_reindent_only_moves: false,
             }))
         );
     }
@@ -159,6 +156,8 @@ mod tests {
                 leading_whitespace: false,
                 structural_punctuation: true,
                 whole_pair_updates: false,
+                interior_line_indentation: true,
+                paint_reindent_only_moves: false,
             }))
         );
     }

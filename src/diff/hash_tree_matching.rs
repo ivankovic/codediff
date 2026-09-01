@@ -363,7 +363,7 @@ pub(crate) fn solve_with_hash_map(
 * a way to distinguish between truly identical and reordered") and `ASTMappingReason::
 * FullyMappingSubtrees`'s doc comment.
 */
-fn pair_children_for_descent<'a>(
+pub(crate) fn pair_children_for_descent<'a>(
     before_parent: tree_sitter::Node<'a>,
     after_parent: tree_sitter::Node<'a>,
     before_metadata: &ASTMetadata,

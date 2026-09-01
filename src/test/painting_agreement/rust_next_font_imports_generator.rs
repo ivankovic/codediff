@@ -21,7 +21,7 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn painting_agreement() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 100.0)
+    // measured 2026-09-01: minimal 6.537%, full 22.212% (measured, unexamined) - minimal dropped
+    // from 37.788% after paint_reindent_only_moves shipped (see solve_nested_condition_collapse)
+    assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 22.24)
 }

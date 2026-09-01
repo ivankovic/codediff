@@ -20,7 +20,7 @@ use tree_sitter::{Node, Point, Range};
 use crate::{
     code::{Code, metadata::compute_columns_per_row},
     diff::{
-        ASTDiff, ASTMappingOperation, NodeCache, nodes,
+        ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache, nodes,
         text_range::{SourceText, TextRange},
     },
 };
@@ -358,6 +358,9 @@ fn ranges(
     // [`RenderOptions::whole_pair_updates`], forwarded straight through to every
     // `intra_node_update_ranges` call below - see that parameter's own doc comment.
     whole_pair_updates: bool,
+    // [`RenderOptions::paint_reindent_only_moves`] - see that field's own doc comment and
+    // `known_pure_reindent` below.
+    paint_reindent_only_moves: bool,
 ) -> Vec<RangeMatch> {
     let mut ranges = Vec::new();
 
@@ -476,7 +479,31 @@ fn ranges(
                                     s.start_row == d.start_row && s.end_row > s.start_row;
                                 let column_shift_is_meaningful = s.start_column != d.start_column
                                     && !shifted_within_its_own_line;
-                                if !column_shift_is_meaningful && !crossed_backwards {
+                                // `NestedConditionCollapse` marks a node whose relocation is
+                                // *known*, by construction, to be a pure reindent - see
+                                // `solve_nested_condition_collapse`'s doc comment. Deliberately
+                                // narrow (only this specific, pre-verified reason, never a bare
+                                // column-shift check): the general heuristic above cannot tell a
+                                // pure reindent from a genuine relocation like `rust-add-if`'s by
+                                // position alone, so gating suppression on anything looser would
+                                // risk that regression - see `RenderOptions::paint_reindent_only_moves`'s
+                                // own doc comment.
+                                let known_pure_reindent = !paint_reindent_only_moves
+                                    && mapping.reason == ASTMappingReason::NestedConditionCollapse;
+                                // Unlike `NestedConditionCollapse` above, not gated by
+                                // `paint_reindent_only_moves`: this tag only fires when a class's
+                                // or interface's body is byte-identical and its shift is verified
+                                // to come entirely from a newly-inserted heritage clause (see
+                                // `solve_heritage_clause_growth`'s doc comment), and both `MINIMAL`
+                                // and `FULL` ground truth agree it should never paint `Move`
+                                // (measured on `typescript-refactor-interface`) - a correctness
+                                // fix, not a preference.
+                                let known_pure_relocation =
+                                    mapping.reason == ASTMappingReason::HeritageClauseGrowth;
+                                if (!column_shift_is_meaningful && !crossed_backwards)
+                                    || known_pure_reindent
+                                    || known_pure_relocation
+                                {
                                     last_non_move_range = d.clone();
 
                                     new_ranges.push(RangeMatch {
@@ -889,25 +916,23 @@ fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
 }
 
 impl TextDiff {
-    /// Construct the TextDiff from an ASTDiff, with [`RenderOptions::whole_pair_updates`] off -
-    /// the narrow-update reading every caller but the one that resolves that option wants. See
-    /// [`Self::from_with_update_style`] for the parameterized version and why this stays the
-    /// zero-argument default rather than growing a parameter of its own: touching every call
-    /// site's signature for an option almost none of them resolve is exactly the "risky `ranges()`
-    /// logic" churn that isn't worth it just to type one `false` in one place instead of here.
+    /// Construct the TextDiff from an ASTDiff, with [`RenderOptions::whole_pair_updates`] off and
+    /// [`RenderOptions::paint_reindent_only_moves`] on - the readings every caller but the ones
+    /// that resolve those options from a real `RenderOptions` wants (both match every release
+    /// before either option existed). See [`Self::from_with_options`] for the parameterized
+    /// version and why this stays the zero-argument default rather than growing parameters of its
+    /// own: touching every call site's signature for options almost none of them resolve is
+    /// exactly the "risky `ranges()` logic" churn that isn't worth it just to type two literals in
+    /// one place instead of here.
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
-        Self::from_with_update_style(before, after, diff, node_cache, false)
+        Self::from_with_options(before, after, diff, node_cache, false, true)
     }
 
-    /// [`Self::from`], with [`RenderOptions::whole_pair_updates`] threaded through to every
-    /// `Update` node instead of hardcoded off.
-    ///
-    /// A separate method rather than a parameter on `from` itself: `from` has real call sites in
-    /// `human_solver`, `generate_mapping_site` and the test harness that have no opinion on this
-    /// option and would otherwise all need updating (and re-reviewing) just to keep passing
-    /// `false` - the cost `RenderOptions::whole_pair_updates`'s own doc comment says this design
-    /// avoids. Only `tui::app::assemble_diff_session_data`, which actually resolves the option
-    /// from CLI/config, calls this one.
+    /// [`Self::from_with_update_style`], with [`RenderOptions::paint_reindent_only_moves`] also
+    /// threaded through - kept as a thin wrapper (rather than renaming callers) so the one
+    /// existing caller that only ever resolved `whole_pair_updates` doesn't need to also decide
+    /// an opinion on the newer option; new callers that need both should call
+    /// [`Self::from_with_options`] directly.
     pub fn from_with_update_style(
         before: &Code,
         after: &Code,
@@ -915,9 +940,48 @@ impl TextDiff {
         node_cache: &NodeCache,
         whole_pair_updates: bool,
     ) -> Self {
-        let mut before_ranges_plain = ranges(before, after, diff, node_cache, true, whole_pair_updates);
-        let mut after_ranges_plain =
-            ranges(after, before, diff, node_cache, false, whole_pair_updates);
+        Self::from_with_options(before, after, diff, node_cache, whole_pair_updates, true)
+    }
+
+    /// [`Self::from`], with both [`RenderOptions::whole_pair_updates`] and
+    /// [`RenderOptions::paint_reindent_only_moves`] threaded through to every node that needs
+    /// them, instead of hardcoded to their legacy defaults.
+    ///
+    /// A separate method rather than parameters on `from` itself: `from` has real call sites in
+    /// `human_solver`, `generate_mapping_site` and the test harness that have no opinion on either
+    /// option and would otherwise all need updating (and re-reviewing) just to keep passing the
+    /// same two literals - the cost `RenderOptions::whole_pair_updates`'s own doc comment says
+    /// this design avoids. Callers that resolve a real `RenderOptions` (`tui::app::
+    /// assemble_diff_session_data`, and `test::helper::human_mapping::compare_painting` - the
+    /// latter now builds one `TextDiff` per mode instead of one shared between `Minimal`/`Full`,
+    /// since `paint_reindent_only_moves` genuinely differs between the two presets where
+    /// `whole_pair_updates` never did) call this one.
+    pub fn from_with_options(
+        before: &Code,
+        after: &Code,
+        diff: &ASTDiff,
+        node_cache: &NodeCache,
+        whole_pair_updates: bool,
+        paint_reindent_only_moves: bool,
+    ) -> Self {
+        let mut before_ranges_plain = ranges(
+            before,
+            after,
+            diff,
+            node_cache,
+            true,
+            whole_pair_updates,
+            paint_reindent_only_moves,
+        );
+        let mut after_ranges_plain = ranges(
+            after,
+            before,
+            diff,
+            node_cache,
+            false,
+            whole_pair_updates,
+            paint_reindent_only_moves,
+        );
 
         // Each `ranges` call above decided `Move` from its own walk order, so the two can name
         // different pairs for the same reorder - see `reconcile_moves`.
@@ -1610,9 +1674,13 @@ pub struct RenderOptions {
     /// `ranges_for_options` as a pure post-filter the way the other two are. `MINIMAL`/`FULL` both
     /// leave it `false`: the corpus was painted narrow either way, so turning this on under either
     /// preset would disagree with ground truth that was never asked about this axis. Reached only
-    /// via `--whole-updates` (see `main.rs`) for now - not in the `M` panel's live toggle list,
-    /// since toggling it there would silently do nothing until the diff itself was recomputed
-    /// (`DiffViewer::set_render_options` only ever re-filters the cached range list).
+    /// via `--whole-updates` (see `main.rs`) for batch mode. Also toggleable live in the `M`
+    /// panel - unlike the two fields above, flipping it there triggers a full diff reload rather
+    /// than `DiffViewer::set_render_options`'s plain re-filter, since a re-filter alone can't
+    /// reach a field that changes which ranges get built in the first place - see
+    /// `tui::app::App::start_diff` (reads this off the live `DiffViewer` for every diff, not just
+    /// the ones this option's own toggle triggers) and its `Action::RenderOptionsChanged` handler
+    /// (the one place that notices the field changed and asks for a reload).
     ///
     /// `#[serde(default)]`, unlike the two fields above: this one arrived after `RenderOptions`
     /// was already a field of `theme::ThemeConfig` and so already round-tripping through an
@@ -1623,6 +1691,83 @@ pub struct RenderOptions {
     /// what an old config without an opinion on this axis should mean anyway.
     #[serde(default)]
     pub whole_pair_updates: bool,
+    /// How a multi-row `Insert`/`Delete` treats its own *interior* rows' leading indentation -
+    /// the rules doc's indentation choices 3/4 (`true`, kept whole - what `MINIMAL`/`FULL` both
+    /// do today, the only reading the corpus has ever been painted against) versus choice 2
+    /// (`false`: every row, not just the first, trimmed back to its own first real character - a
+    /// reader following `leading_whitespace`'s example but per row instead of once at the range's
+    /// very start). No fixture in the corpus paints choice 2 yet, so this field is unvalidated
+    /// against hand-painted ground truth in a way none of the other three fields are - built ahead
+    /// of that ground truth on request, not because the corpus asked for it the way
+    /// `structural_punctuation`'s did.
+    ///
+    /// **Overrides `leading_whitespace` rather than combining with it, when off.** `leading_whitespace`
+    /// only ever governed the range's own first row (see that field's own doc comment); choice 2 has
+    /// no comparable "grow the first row but not the rest" reading in the doc, so turning this off
+    /// makes every row - first included - trim to its own content, and `leading_whitespace` simply
+    /// doesn't apply while it's off. `MINIMAL`/`FULL` both leave this on, so it changes nothing about
+    /// either preset's existing, corpus-validated behavior.
+    ///
+    /// **Scoped to `Insert`/`Delete`, like `leading_whitespace`'s own extension.** A `Move`/`Update`
+    /// range spanning several rows is a *matched* pair, whose `destination` is a real cross-file
+    /// position rather than `Insert`/`Delete`'s placeholder anchor (see `advance_and_build_range`'s
+    /// doc comment) - splitting it into a source-side piece per row would need a matching
+    /// destination-side split, which needs the two sides' row layouts to correspond and isn't
+    /// implemented. The rules doc's own indentation discussion is about a wholly inserted/deleted
+    /// block in any case; `Update`'s own indentation rule is a different, narrower one it states
+    /// separately ("inserted or deleted whitespace... highlighted at the start of the line") that
+    /// `intra_node_update_ranges` already follows.
+    #[serde(default = "interior_line_indentation_default")]
+    pub interior_line_indentation: bool,
+    /// Whether a matched node that relocated *purely* because nesting levels were added or
+    /// removed around it (e.g. Rust's `if let`-chain collapse - `solve_nested_condition_collapse`
+    /// tags its `BODY` match this way) still paints as `Move`, or is left unpainted as
+    /// effectively unchanged.
+    ///
+    /// **A real axis, unlike `whole_pair_updates`.** `MINIMAL` and `FULL` disagree here, not just
+    /// leave it off: measured directly against `rust-next-font-imports-generator`'s hand-painted
+    /// ground truth, which carries *separate* `Minimal`/`Full` paintings that disagree on exactly
+    /// this - `Minimal` wants the reindented body unpainted (37.788% -> 6.537% disagreement),
+    /// `Full` wants it painted `Move` (22.212% -> 49.809% if suppressed). So `MINIMAL` sets this
+    /// `false`, `FULL` sets it `true`, matching each preset's own painting exactly. See the
+    /// 2026-09-01 painting-baseline investigation for the measurement.
+    ///
+    /// **Deliberately narrow, not a blanket column-shift heuristic.** `ranges` cannot tell a
+    /// node that relocated by pure reindent from one that genuinely moved to a new position by
+    /// column position alone - both look identical (see `rust-add-if`, a block that really did
+    /// move, cited in `ranges`'s own doc comment on `column_shift_is_meaningful`). Suppressing
+    /// `Move` for *every* column-shifted node when this is `false` would silently regress that
+    /// fixture back to the 56.5% disagreement a past measurement already ruled out. This option
+    /// only ever applies to a node `solve_nested_condition_collapse` has already verified,
+    /// structurally, is a pure reindent - see `ranges`'s `known_pure_reindent` check.
+    ///
+    /// **Construction-time, like `whole_pair_updates`.** It decides `TextOperation::Move` vs.
+    /// `Identical` while `ranges` builds its range list, not a post-filter `ranges_for_options`
+    /// could apply afterward - flipping it in the `M` panel triggers a full diff reload for the
+    /// same reason `whole_pair_updates` does (see `tui::app::App::apply_render_options`).
+    ///
+    /// `#[serde(default = "paint_reindent_only_moves_default")]`: an existing `.codediff.toml`
+    /// predates this field and this pass entirely, so the only sound default is the behavior
+    /// every prior release had - always paint the `Move` (`true`) - not `bool::default()`'s
+    /// `false`, which would be the wrong polarity (see `interior_line_indentation`'s identical
+    /// reasoning).
+    #[serde(default = "paint_reindent_only_moves_default")]
+    pub paint_reindent_only_moves: bool,
+}
+
+/// [`RenderOptions::interior_line_indentation`]'s serde default: `true`, matching every release
+/// before the field existed - an existing `.codediff.toml` without this key keeps behaving exactly
+/// as it did (see that field's own doc comment for why `#[serde(default)]` alone, defaulting to
+/// `bool::default()` = `false`, would be the wrong polarity here and silently switch every old
+/// config to choice 2 instead of leaving it on choice 3/4).
+fn interior_line_indentation_default() -> bool {
+    true
+}
+
+/// [`RenderOptions::paint_reindent_only_moves`]'s serde default - see that field's own doc
+/// comment.
+fn paint_reindent_only_moves_default() -> bool {
+    true
 }
 
 impl RenderOptions {
@@ -1633,6 +1778,8 @@ impl RenderOptions {
         leading_whitespace: false,
         structural_punctuation: false,
         whole_pair_updates: false,
+        interior_line_indentation: true,
+        paint_reindent_only_moves: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
     /// combination of options ever paints. `whole_pair_updates` stays off even here - see that
@@ -1641,17 +1788,37 @@ impl RenderOptions {
         leading_whitespace: true,
         structural_punctuation: true,
         whole_pair_updates: false,
+        interior_line_indentation: true,
+        paint_reindent_only_moves: true,
     };
 
     /// Every option, paired with its label and current value, in the order a settings UI should
     /// list them. A future option means one new field above and one new entry here - nothing that
     /// reads this array (the settings dialog, in particular) needs to change.
-    pub fn options(&self) -> [(&'static str, bool); 2] {
+    ///
+    /// `whole_pair_updates` belongs here despite its own doc comment explaining it isn't part of
+    /// the `MINIMAL`/`FULL` *axis* - that's a statement about what the two presets set, not about
+    /// whether a settings UI can offer it. The `M` panel toggling this one now goes through a
+    /// diff reload rather than `DiffViewer::set_render_options`'s plain re-filter (see
+    /// `tui::app`'s `Action::RenderOptionsChanged` handler) precisely so it's safe to list here.
+    /// `interior_line_indentation` is listed inverted (`!self.interior_line_indentation`, labeled
+    /// as what turning it *on* means) so a reader sees a checkbox for "trim every row" rather than
+    /// one that reads as checked in both presets' own default state.
+    pub fn options(&self) -> [(&'static str, bool); 5] {
         [
             ("Leading whitespace", self.leading_whitespace),
             (
                 "Structural punctuation (brackets, separators)",
                 self.structural_punctuation,
+            ),
+            ("Whole-pair updates", self.whole_pair_updates),
+            (
+                "Same-line indentation only (no ground truth yet)",
+                !self.interior_line_indentation,
+            ),
+            (
+                "Paint reindent-only moves",
+                self.paint_reindent_only_moves,
             ),
         ]
     }
@@ -1663,6 +1830,9 @@ impl RenderOptions {
         match i {
             0 => self.leading_whitespace = !self.leading_whitespace,
             1 => self.structural_punctuation = !self.structural_punctuation,
+            2 => self.whole_pair_updates = !self.whole_pair_updates,
+            3 => self.interior_line_indentation = !self.interior_line_indentation,
+            4 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
             _ => {}
         }
     }
@@ -1708,9 +1878,14 @@ pub fn is_structural_only(text: &str) -> bool {
 /// [`RenderOptions::MINIMAL`]/[`RenderOptions::FULL`] are exactly "every option off"/"every option
 /// on", so between them they reproduce this function's whole behavior range.
 ///
-/// A range is never merged, split or re-operated, only narrowed or dropped, so a range that
-/// survives still describes the same edit every other combination of options describes - just with
-/// different padding, or absent entirely once nothing else is left in it.
+/// A range is never merged or re-operated - a surviving range still describes the same edit every
+/// other combination of options describes, just with different padding, or absent entirely once
+/// nothing else is left in it. **Split is the one exception**: a multi-row `Insert`/`Delete` under
+/// `interior_line_indentation: false` becomes one range per row (see
+/// `split_into_per_row_pieces`) - there is no single `TextRange` that can describe "every row's own
+/// indentation trimmed independently" (a contiguous range's interior rows are always `0..row_len`
+/// wherever this crate reads one, e.g. `TextRange::columns_on_row`), so representing that choice at
+/// all requires more than one `RangeMatch` for what was one edit.
 pub fn ranges_for_options(
     ranges: &[RangeMatch],
     source: &str,
@@ -1739,8 +1914,7 @@ pub fn ranges_for_options(
             // as matched. Without this, a `RangeMatch` for the newline right before a wholly new
             // line (`rust-hello-world-added-message`'s own shape) would wrongly veto that line's
             // own `extend_leading_whitespace` call.
-            let last_touched_row = if source.end_column == 0 && source.end_row > source.start_row
-            {
+            let last_touched_row = if source.end_column == 0 && source.end_row > source.start_row {
                 source.end_row - 1
             } else {
                 source.end_row
@@ -1751,7 +1925,7 @@ pub fn ranges_for_options(
 
     ranges
         .iter()
-        .filter_map(|range_match| {
+        .flat_map(|range_match| {
             // An `Identical` range is the unpainted background in every consumer, so whether it
             // survives changes nothing on screen - but keeping it keeps every combination of
             // options' range lists structurally comparable, and `line_operations` relies on the
@@ -1759,32 +1933,115 @@ pub fn ranges_for_options(
             if range_match.operation == TextOperation::Identical
                 || range_match.operation == TextOperation::NotYetSet
             {
-                return Some(range_match.clone());
+                return vec![range_match.clone()];
             }
-            if !options.structural_punctuation {
-                match range_is_structural_only(&lines, &range_match.source) {
-                    Some(true) => return None,
-                    Some(false) => {}
-                    // A range that doesn't read back is left alone rather than silently dropped:
-                    // this is a display filter, and it has no business deciding that a range it
-                    // could not interpret is uninteresting.
-                    None => return Some(range_match.clone()),
-                }
-            }
-            let mut trimmed = range_match.clone();
-            trimmed.source = trim_trailing_whitespace(&lines, &range_match.source)?;
-            if options.leading_whitespace {
-                if matches!(
+
+            if !options.interior_line_indentation
+                && matches!(
                     range_match.operation,
                     TextOperation::Insert | TextOperation::Delete
-                ) && !matched_rows.contains(&trimmed.source.start_row)
-                {
-                    trimmed.source = extend_leading_whitespace(&lines, &trimmed.source);
-                }
-            } else {
-                trimmed.source = trim_leading_whitespace(&lines, &trimmed.source)?;
+                )
+                && range_match.source.start_row != range_match.source.end_row
+            {
+                // Choice 2: each piece already came out trimmed to its own row's real content
+                // (leading and trailing both - see `split_into_per_row_pieces`), so only the
+                // structural-punctuation filter still applies. Re-running the trailing/leading
+                // trim below would be a harmless no-op for the trim, but `leading_whitespace`'s
+                // extension would grow a row straight back over the indentation this branch
+                // exists to drop - so this shape skips that whole path rather than merely
+                // happening to survive it.
+                return split_into_per_row_pieces(&lines, range_match)
+                    .into_iter()
+                    .filter(|piece| {
+                        options.structural_punctuation
+                            || range_is_structural_only(&lines, &piece.source) != Some(true)
+                    })
+                    .collect();
             }
-            Some(trimmed)
+
+            narrow_one_range(&lines, &matched_rows, options, range_match)
+                .into_iter()
+                .collect()
+        })
+        .collect()
+}
+
+/// [`ranges_for_options`]'s per-range logic for every shape except the interior-line-indentation
+/// split (which needs different treatment - see that branch's own comment): the unconditional
+/// trailing-whitespace trim, the structural-punctuation filter, then either extending or trimming
+/// leading whitespace per [`RenderOptions::leading_whitespace`].
+fn narrow_one_range(
+    lines: &[&str],
+    matched_rows: &std::collections::HashSet<usize>,
+    options: RenderOptions,
+    range_match: &RangeMatch,
+) -> Option<RangeMatch> {
+    if !options.structural_punctuation {
+        match range_is_structural_only(lines, &range_match.source) {
+            Some(true) => return None,
+            Some(false) => {}
+            // A range that doesn't read back is left alone rather than silently dropped: this is
+            // a display filter, and it has no business deciding that a range it could not
+            // interpret is uninteresting.
+            None => return Some(range_match.clone()),
+        }
+    }
+    let mut trimmed = range_match.clone();
+    trimmed.source = trim_trailing_whitespace(lines, &range_match.source)?;
+    if options.leading_whitespace {
+        if matches!(
+            range_match.operation,
+            TextOperation::Insert | TextOperation::Delete
+        ) && !matched_rows.contains(&trimmed.source.start_row)
+        {
+            trimmed.source = extend_leading_whitespace(lines, &trimmed.source);
+        }
+    } else {
+        trimmed.source = trim_leading_whitespace(lines, &trimmed.source)?;
+    }
+    Some(trimmed)
+}
+
+/// Splits a multi-row `Insert`/`Delete` range into one piece per row, each independently trimmed
+/// to that row's own real content - [`RenderOptions::interior_line_indentation`] off, i.e. the
+/// rules doc's indentation choice 2 ("highlight visible characters and whitespace **in the same
+/// line** between them", as opposed to choice 3/4's "in all lines"). A row with nothing but
+/// whitespace contributes no piece - there is no real character there to select, the same
+/// convention `trim_leading_whitespace`/`trim_trailing_whitespace` already hold for a range that is
+/// nothing but whitespace start to end.
+///
+/// Reuses `trim_leading_whitespace`/`trim_trailing_whitespace` per row rather than duplicating
+/// their whitespace-walk, by first carving out each row's own slice of `range_match.source` as its
+/// own single-row `TextRange`. All pieces share `range_match`'s own `operation` and `destination` -
+/// always a placeholder single-point anchor for `Insert`/`Delete` (see
+/// `advance_and_build_range`'s doc comment on `last_non_move_range`), never a real per-row
+/// cross-file position, so there is no per-row destination to compute and every piece pointing at
+/// the same one is exactly as accurate as the single range they replace already was.
+fn split_into_per_row_pieces(lines: &[&str], range_match: &RangeMatch) -> Vec<RangeMatch> {
+    let source = &range_match.source;
+    (source.start_row..=source.end_row)
+        .filter_map(|row| {
+            let line = *lines.get(row)?;
+            let start_column = if row == source.start_row {
+                source.start_column
+            } else {
+                0
+            }
+            .min(line.len());
+            let end_column = if row == source.end_row {
+                source.end_column
+            } else {
+                line.len()
+            }
+            .min(line.len());
+            let row_range = TextRange::new(row, start_column, row, end_column);
+            let row_range = trim_trailing_whitespace(lines, &row_range)?;
+            let row_range = trim_leading_whitespace(lines, &row_range)?;
+            Some(RangeMatch {
+                source: row_range,
+                destination: range_match.destination.clone(),
+                operation: range_match.operation.clone(),
+            })
         })
         .collect()
 }
@@ -2359,8 +2616,95 @@ mod tests {
     /// See that field's own doc comment.
     #[test]
     fn neither_preset_turns_on_whole_pair_updates() {
-        assert!(!RenderOptions::MINIMAL.whole_pair_updates);
-        assert!(!RenderOptions::FULL.whole_pair_updates);
+        const { assert!(!RenderOptions::MINIMAL.whole_pair_updates) };
+        const { assert!(!RenderOptions::FULL.whole_pair_updates) };
+    }
+
+    /// Unlike `whole_pair_updates`, the two presets genuinely disagree on
+    /// `paint_reindent_only_moves` - measured directly against `rust-next-font-imports-generator`'s
+    /// separate `Minimal`/`Full` ground truths (see that field's own doc comment).
+    #[test]
+    fn minimal_and_full_disagree_on_paint_reindent_only_moves() {
+        const { assert!(!RenderOptions::MINIMAL.paint_reindent_only_moves) };
+        const { assert!(RenderOptions::FULL.paint_reindent_only_moves) };
+    }
+
+    /// The actual gate `paint_reindent_only_moves` controls: a node
+    /// `solve_nested_condition_collapse` has tagged `NestedConditionCollapse` (a verified pure
+    /// reindent) paints as `Move` when the option is on, and is left unpainted when it's off -
+    /// while an *ordinary* column-shifted match (no such tag - a genuine relocation, the
+    /// `rust-add-if` shape this option must never touch) keeps painting `Move` regardless of the
+    /// option either way.
+    #[test]
+    fn paint_reindent_only_moves_gates_only_tagged_nodes() {
+        let body = "\x20               step_one();\n\
+                     \x20               step_two();\n\
+                     \x20               step_three();\n\
+                     \x20               step_four();\n\
+                     \x20               step_five();\n\
+                     \x20               step_six();\n";
+        let before = Code::from_string(
+            &format!(
+                "fn f() {{\n\
+                 \x20   if let A(a) = x {{\n\
+                 \x20       if let B(b) = y {{\n\
+                 {body}\
+                 \x20       }}\n\
+                 \x20   }}\n\
+                 }}\n"
+            ),
+            &crate::code::Language::Rust,
+        );
+        let after = Code::from_string(
+            &format!(
+                "fn f() {{\n\
+                 \x20   if let A(a) = x\n\
+                 \x20       && let B(b) = y\n\
+                 \x20   {{\n\
+                 {body}\
+                 \x20   }}\n\
+                 }}\n"
+            ),
+            &crate::code::Language::Rust,
+        );
+        let ast = crate::diff::diff_code(&before, &after);
+        let node_cache = crate::diff::NodeCache::build(&before, &after);
+
+        let painted = TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            false,
+            true,
+        );
+        assert!(
+            painted
+                .all(0)
+                .iter()
+                .any(|r| r.operation == TextOperation::Move
+                    && r.source.start_row >= 2
+                    && r.source.start_row <= 8),
+            "paint_reindent_only_moves: true must still paint the reindented body Move"
+        );
+
+        let unpainted = TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            false,
+            false,
+        );
+        assert!(
+            !unpainted
+                .all(0)
+                .iter()
+                .any(|r| r.operation == TextOperation::Move
+                    && r.source.start_row >= 2
+                    && r.source.start_row <= 8),
+            "paint_reindent_only_moves: false must leave the tagged reindented body unpainted"
+        );
     }
 
     /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
@@ -2500,6 +2844,163 @@ mod tests {
         );
     }
 
+    /// Neither preset turns `interior_line_indentation` off - both keep today's corpus-validated
+    /// behavior of highlighting a whole interior row's own indentation. See that field's own doc
+    /// comment for why (no fixture paints choice 2 yet).
+    #[test]
+    fn neither_preset_turns_off_interior_line_indentation() {
+        const { assert!(RenderOptions::MINIMAL.interior_line_indentation) };
+        const { assert!(RenderOptions::FULL.interior_line_indentation) };
+    }
+
+    /// The rules doc's own indentation example: a whole multi-line block inserted on its own,
+    /// each row indented. `interior_line_indentation: false` (choice 2) must highlight each row's
+    /// own real content only - not the indentation before `def` on row 0, and not the indentation
+    /// before `print` on row 1 either, even though `interior_line_indentation: true` (choice 3,
+    /// what `MINIMAL` does) keeps that second row's indentation whole.
+    #[test]
+    fn interior_line_indentation_off_splits_a_multiline_insert_per_row_trimmed() {
+        let source = "    def added_function():\n        print(\"added\")\n";
+        let range = RangeMatch {
+            source: TextRange::new(0, 4, 1, 22),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        };
+        let options = RenderOptions {
+            interior_line_indentation: false,
+            paint_reindent_only_moves: true,
+            ..RenderOptions::MINIMAL
+        };
+
+        let result = ranges_for_options(std::slice::from_ref(&range), source, options);
+
+        assert_eq!(
+            result,
+            vec![
+                RangeMatch {
+                    source: TextRange::new(0, 4, 0, 25),
+                    destination: TextRange::zero(),
+                    operation: TextOperation::Insert,
+                },
+                RangeMatch {
+                    source: TextRange::new(1, 8, 1, 22),
+                    destination: TextRange::zero(),
+                    operation: TextOperation::Insert,
+                },
+            ],
+            "row 0 keeps its own real content ('def added_function():'), row 1's own indentation \
+             is trimmed independently rather than kept whole"
+        );
+    }
+
+    /// A blank row in the middle of a multi-line insert has no real content of its own to select,
+    /// so it contributes no piece at all - not an empty one.
+    #[test]
+    fn interior_line_indentation_off_drops_a_blank_interior_row() {
+        let source = "line one\n\nline three\n";
+        let range = RangeMatch {
+            source: TextRange::new(0, 0, 2, 10),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        };
+        let options = RenderOptions {
+            interior_line_indentation: false,
+            paint_reindent_only_moves: true,
+            ..RenderOptions::MINIMAL
+        };
+
+        let result = ranges_for_options(std::slice::from_ref(&range), source, options);
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|r| r.source.start_row)
+                .collect::<Vec<_>>(),
+            vec![0, 2],
+            "the blank row 1 must contribute nothing: {result:?}"
+        );
+    }
+
+    /// `interior_line_indentation` only ever splits `Insert`/`Delete` - see that field's own doc
+    /// comment for why a matched `Update`/`Move` range isn't split the same way. A multi-row Update
+    /// stays exactly one range, its interior rows unaffected by this option either way.
+    #[test]
+    fn interior_line_indentation_off_does_not_split_a_multiline_update() {
+        let source = "one\ntwo\nthree\n";
+        let range = RangeMatch {
+            source: TextRange::new(0, 0, 2, 5),
+            destination: TextRange::new(0, 0, 2, 5),
+            operation: TextOperation::Update,
+        };
+        let options = RenderOptions {
+            interior_line_indentation: false,
+            paint_reindent_only_moves: true,
+            ..RenderOptions::MINIMAL
+        };
+
+        let result = ranges_for_options(std::slice::from_ref(&range), source, options);
+
+        assert_eq!(
+            result.len(),
+            1,
+            "an Update range must not be split: {result:?}"
+        );
+    }
+
+    /// A single-row range has no "interior" at all, so this option changes nothing about it either
+    /// way - it collapses to the same single, ordinarily-trimmed range.
+    #[test]
+    fn interior_line_indentation_off_leaves_a_single_row_range_alone() {
+        let source = "    foo\n";
+        let range = RangeMatch {
+            source: TextRange::new(0, 0, 0, 7),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        };
+        let with_it_on =
+            ranges_for_options(std::slice::from_ref(&range), source, RenderOptions::MINIMAL);
+        let with_it_off = ranges_for_options(
+            std::slice::from_ref(&range),
+            source,
+            RenderOptions {
+                interior_line_indentation: false,
+                paint_reindent_only_moves: true,
+                ..RenderOptions::MINIMAL
+            },
+        );
+
+        assert_eq!(with_it_on, with_it_off);
+    }
+
+    /// The structural-punctuation filter still applies per row after the split - a row that is
+    /// nothing but a standalone bracket is dropped under `MINIMAL`'s `structural_punctuation: false`
+    /// exactly as a single-row range in the same shape already is.
+    #[test]
+    fn interior_line_indentation_off_still_drops_a_structural_only_row() {
+        let source = "{\n    body();\n}\n";
+        let range = RangeMatch {
+            source: TextRange::new(0, 0, 2, 1),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        };
+        let options = RenderOptions {
+            interior_line_indentation: false,
+            paint_reindent_only_moves: true,
+            ..RenderOptions::MINIMAL
+        };
+
+        let result = ranges_for_options(std::slice::from_ref(&range), source, options);
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|r| r.source.start_row)
+                .collect::<Vec<_>>(),
+            vec![1],
+            "rows 0 ('{{') and 2 ('}}') are standalone punctuation and must be dropped: {result:?}"
+        );
+    }
+
     /// `MINIMAL`'s standalone-punctuation behavior is independent of leading-whitespace: a range
     /// that survives (real content, not pure punctuation) still gets its leading whitespace kept
     /// when only `structural_punctuation` is off.
@@ -2512,6 +3013,8 @@ mod tests {
             leading_whitespace: true,
             structural_punctuation: false,
             whole_pair_updates: false,
+            interior_line_indentation: true,
+            paint_reindent_only_moves: true,
         };
         let result = ranges_for_options(&ranges, source, options);
 
@@ -2532,6 +3035,8 @@ mod tests {
             leading_whitespace: false,
             structural_punctuation: true,
             whole_pair_updates: false,
+            interior_line_indentation: true,
+            paint_reindent_only_moves: true,
         };
         let result = ranges_for_options(&ranges, source, options);
 
@@ -3969,7 +4474,7 @@ mod tests {
             "fn main() {\n    let long_identifier_name = 5;\n}",
             "fn main() {\n    let long_identifier_nome = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -3990,7 +4495,7 @@ mod tests {
              20-character identifier"
         );
 
-        let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false);
+        let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
         let after_updates: Vec<_> = after_ranges
             .iter()
             .filter(|r| r.operation == TextOperation::Update)
@@ -4013,7 +4518,7 @@ mod tests {
             "fn main() {\n    let long_identifier_name = 5;\n}",
             "fn main() {\n    let long_identifier_nome = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, true);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, true, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -4039,7 +4544,7 @@ mod tests {
             "fn main() {\n    let foo = 5;\n}",
             "fn main() {\n    let bar = 5;\n}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
@@ -4063,7 +4568,7 @@ mod tests {
             "// hello world!\nfn main() {}",
             "// hello universe!\nfn main() {}",
         );
-        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false);
+        let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
 
         let updates: Vec<_> = before_ranges
             .iter()
