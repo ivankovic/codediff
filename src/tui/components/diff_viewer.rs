@@ -31,16 +31,21 @@ use crate::tui::theme::{OverlayTheme, PanelLayout};
 /// own before/after panel layout, which has the same readability constraint.
 pub const SINGLE_PANEL_THRESHOLD: u16 = 220;
 
-/// A component that displays the before/after files side by side for diffing
+/// The TUI's central content pane: the before/after files side by side (or, under
+/// [`DisplayMode::Single`], one at a time), each half owned by its own [`CodeViewer`].
 #[derive(Default)]
 pub struct DiffViewer {
-    /// The "Before" code viewer
+    /// The Before side's own viewer - `left` in the field name, `Before` in every other name in
+    /// this module (`Panel::Before`, `last_before_content`, ...); kept as `left`/`right` here
+    /// specifically because a future single-panel layout could plausibly put Before on the right.
     left_viewer: CodeViewer,
-    /// The "After" code viewer
+    /// The After side's own viewer - see `left_viewer`'s own comment for the left/right vs.
+    /// before/after naming split.
     right_viewer: CodeViewer,
-    /// Action sender
+    /// Set once, by `register_action_handler` (the `Component` trait's own registration hook),
+    /// and forwarded to both `left_viewer`/`right_viewer` there too - `None` only in the brief
+    /// window before that first call.
     command_tx: Option<UnboundedSender<Action>>,
-    /// Current display mode: dual panel or single panel
     display_mode: DisplayMode,
     /// The user's layout preference (the `v` key, persisted): `Auto` keeps the width-based
     /// choice, `Dual`/`Single` force one mode regardless of width - see `update_display_mode`.
@@ -71,13 +76,12 @@ pub struct DiffViewer {
     sources: [String; 2],
 }
 
-/// Display mode for the diff viewer
+/// Whether both panels are drawn side by side, or only `active_panel`'s - see
+/// `update_display_mode` for how this is derived from `layout_override` and terminal width.
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 enum DisplayMode {
-    /// Show both panels side by side
     #[default]
     Dual,
-    /// Show only one panel at a time
     Single,
 }
 
@@ -96,12 +100,10 @@ pub enum Panel {
 }
 
 impl DiffViewer {
-    /// Create a new DiffViewer
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a DiffViewer with specific files
     pub fn with_files(left_path: PathBuf, right_path: PathBuf) -> Self {
         Self {
             left_viewer: CodeViewer::with_file(left_path),

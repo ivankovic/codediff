@@ -490,31 +490,7 @@ impl App {
                         }
                     }
                 }
-                Action::DiffReady(data) => {
-                    self.screen = AppScreen::Viewer;
-                    self.last_error = None;
-                    self.file_dialog = None;
-                    // A pair that diffed successfully is worth remembering for the empty-start
-                    // screen's digit shortcuts (deduplicated and capped in `record_recent_pair`).
-                    theme::record_recent_pair(&data.before_path, &data.after_path);
-                    let pair = (data.before_path.clone(), data.after_path.clone());
-                    self.recent_pairs.retain(|existing| existing != &pair);
-                    self.recent_pairs.insert(0, pair);
-                    self.diff_summary = summarize_diff_with_comment_check(
-                        &data.before_contents,
-                        &data.after_contents,
-                        &data.before_ranges,
-                        &data.after_ranges,
-                        data.comment_only,
-                    );
-                    self.change_counts = Some(change_counts(
-                        &data.before_contents,
-                        &data.after_contents,
-                        &data.before_ranges,
-                        &data.after_ranges,
-                    ));
-                    self.plain_text_fallback = data.plain_text_fallback;
-                }
+                Action::DiffReady(data) => self.handle_diff_ready(data),
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");
                     self.last_error = Some(message.clone());
@@ -568,6 +544,34 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// `Action::DiffReady`'s handler: a background diff (or reload) finished successfully - switch
+    /// to the viewer screen, remember the pair for the empty-start screen's digit shortcuts
+    /// (deduplicated and capped in `record_recent_pair`), and recompute the summary/change-count
+    /// state the header/footer read every frame.
+    fn handle_diff_ready(&mut self, data: &DiffSessionData) {
+        self.screen = AppScreen::Viewer;
+        self.last_error = None;
+        self.file_dialog = None;
+        theme::record_recent_pair(&data.before_path, &data.after_path);
+        let pair = (data.before_path.clone(), data.after_path.clone());
+        self.recent_pairs.retain(|existing| existing != &pair);
+        self.recent_pairs.insert(0, pair);
+        self.diff_summary = summarize_diff_with_comment_check(
+            &data.before_contents,
+            &data.after_contents,
+            &data.before_ranges,
+            &data.after_ranges,
+            data.comment_only,
+        );
+        self.change_counts = Some(change_counts(
+            &data.before_contents,
+            &data.after_contents,
+            &data.before_ranges,
+            &data.after_ranges,
+        ));
+        self.plain_text_fallback = data.plain_text_fallback;
     }
 
     /// Record the focused panel's cursor so the next `DiffReady` puts it back - see

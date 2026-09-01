@@ -133,7 +133,18 @@
 *                  src/test/data/diffs/{handmade,small,full,stratified}/, j/k to move, Enter to
 *                  open, Esc to cancel. Press `d` inside this picker to cycle which folder it's
 *                  narrowed down to (all -> handmade -> small -> full -> stratified -> all - see
-*                  DIFF_DATASETS).
+*                  DIFF_DATASETS). `H` toggles hiding cases whose tree mapping is already complete
+*                  (incomplete-only), `X` toggles hiding cases that already have a text painting
+*                  (unpainted-only), `Y` toggles hiding cases where the tree mapping and the text
+*                  painting agree (disagreements-only) - the three combine as an AND when more than
+*                  one is on, since a tree mapping, a text painting, and whether they agree with
+*                  each other are three independent questions (see `App::diff_hide_painted`'s own
+*                  doc comment). `s` cycles this picker's own sort order: alphabetical, reverse
+*                  alphabetical, least disagreement first, most disagreement first (see
+*                  `DiffSortOrder`) - unlike `H`/`X`/`Y`, changing it always jumps selection to the
+*                  first entry in the new order. All four states persist across closing and
+*                  reopening this picker (they live on `App`, not just this modal instance), same
+*                  as the `O` picker's own hide/sort state below.
 *                  If the current mapping has unsaved changes, asks first whether to save (only
 *                  offered for a real test case; see `s` above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --

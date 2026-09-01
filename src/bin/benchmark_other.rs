@@ -100,7 +100,6 @@ struct Args {
     /// entirely per-language, not a single yes/no - node counts on one fixture's before side,
     /// GumTree vs codediff:
     ///
-    ///   java-jdt 512 / 997 (1.95x)      python 6708 / 10314 (1.54x)
     /// ```text
     /// java-jdt            512 /   997  (1.95x)   python  6708 / 10314  (1.54x)
     /// java-treesitter-ng  585 /   997  (1.70x)   rust     810 /  1344  (1.66x)

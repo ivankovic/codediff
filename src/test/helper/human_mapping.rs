@@ -4555,6 +4555,7 @@ mod tests {
     /// doesn't), `painting_only` (reverse), and `both_differ` (both say something changed, but
     /// disagree on what).
     #[test]
+    #[ignore]
     fn exploratory_mapping_vs_painting_agreement_census() -> Result<()> {
         let names = [
             "cpp-add-const-correctness",
@@ -4691,6 +4692,7 @@ mod tests {
     /// EXPLORATORY: prints every disagreement run for one named fixture, to read the *shape* of
     /// what `exploratory_mapping_vs_painting_agreement_census` only counts.
     #[test]
+    #[ignore]
     fn exploratory_mapping_vs_painting_disagreement_detail() -> Result<()> {
         let name = "rust-add-if";
         let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
@@ -4812,7 +4814,7 @@ mod tests {
 
     /// EXPLORATORY: `exploratory_mapping_vs_painting_disagreement_detail`, parameterized by a
     /// `FIXTURE` env var - checks the *tree mapping* against the painting (structural agreement),
-    /// unlike `painting_disagreement_detail` above which checks codediff's *rendering* against it.
+    /// unlike `painting_disagreement_detail` below which checks codediff's *rendering* against it.
     /// `FIXTURE=name cargo test --lib --features test-fixtures
     /// mapping_vs_painting_disagreement_detail_for_fixture -- --ignored --nocapture`.
     #[test]
