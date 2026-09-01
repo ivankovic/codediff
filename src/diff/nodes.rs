@@ -478,6 +478,15 @@ pub(crate) fn local_identity_name(
             let text = meta.node_info.get(&name_id)?.text.clone();
             Some(("variable_assignment", text))
         }
+        // Deliberately no CSS `declaration` arm, although `css-wordpress-reformat` (a formatter
+        // swapping `margin-bottom`/`margin-top` inside every rule, 30 -> 0 with one) is exactly
+        // the shape this pass exists for. Keyed on (enclosing selector, property) it is unique
+        // per side, yet in `css-madmaxms-theme-obsidian-2-add-gnome-44-...` (125 -> 343,
+        // measured 2026-09-02) the same selector text names *different* rules on the two sides:
+        // one rule's selector was renamed in place and a copy under the old name added far
+        // away, and the human keeps the positional pair (rule 747 <-> rule 747, selector
+        // updated) while the key follows the name to rule 832. A declaration's identity is its
+        // rule's, and a rule's identity in a theme stylesheet is not its selector text alone.
         _ => None,
     }
 }

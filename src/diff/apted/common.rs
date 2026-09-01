@@ -95,6 +95,17 @@ impl UnitCostModel {
                 // Both are leaves
                 if node1.text == node2.text {
                     0 // Identical
+                } else if nodes::is_comment(&node1.kind)
+                    && is_marker_only(&node1.text) != is_marker_only(&node2.text)
+                {
+                    // A substantive comment and a bare marker (`#`, `//`, an empty `/* */`) are
+                    // not one comment edited: the marker is a blank line in a comment block.
+                    // Under plain `COST_UPDATE` the two tie with the right pairing, and the DP
+                    // then takes whichever comes first - `ruby-...-process_executer` paired a
+                    // rewritten `# @return [Boolean] ...` with the new blank `#` inserted above
+                    // it, leaving the real rewrite as an Insert. Strictly dearer than delete +
+                    // insert, so the pairing is never chosen, same as a cross-kind pair.
+                    COST_DELETE + COST_INSERT + 1
                 } else if node1.kind_cost_class.literal_like {
                     // Literals (strings, numbers, etc.) - see the constant's doc comment for why
                     // this tier currently equals COST_UPDATE rather than sitting above it
@@ -141,6 +152,12 @@ impl UnitCostModel {
             COST_DELETE + COST_INSERT + 1 // Make it strictly more expensive
         }
     }
+}
+
+/// True for comment text that carries no words at all - only its own markers, punctuation and
+/// whitespace (`#`, `//`, `/* */`, `--`, `*`). See `UnitCostModel::ren`.
+fn is_marker_only(text: &str) -> bool {
+    !text.chars().any(char::is_alphanumeric)
 }
 
 /// A pruned, postorder-indexed view of one side of a forest comparison.
