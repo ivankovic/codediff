@@ -30,7 +30,7 @@ fn benchmark_diff_code(c: &mut Criterion) {
     group.warm_up_time(Duration::from_secs(2));
 
     // Automatically create benchmarks for all test diffs
-    for (test_name, (before, after)) in &test_diffs {
+    for (test_name, (before, after)) in test_diffs.iter() {
         // Create a safe benchmark name by replacing non-alphanumeric characters
         let benchmark_name = test_name
             .replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_")

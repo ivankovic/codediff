@@ -366,7 +366,7 @@ mod tests {
     fn byte_index_agrees_with_a_linear_walk_on_the_corpus() {
         let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
         let mut checked = 0usize;
-        for (name, (before, after)) in &pairs {
+        for (name, (before, after)) in pairs.iter() {
             for code in [&before.contents, &after.contents] {
                 let index = SourceText::new(code);
                 let rows = code.split('\n').count();

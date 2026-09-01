@@ -1496,17 +1496,18 @@ mod tests {
         let mut checked = 0usize;
         let mut painted = 0usize;
         for name in codediff::test::helper::UNIT_TEST_FIXTURES {
-            let Ok((before, after)) = helper::handmade_test_code_pair(name) else {
+            let Ok(pair) = helper::handmade_test_code_pair(name) else {
                 continue;
             };
+            let (before, after) = &*pair;
             let Ok(mapping) = human_mapping::load(name) else {
                 continue;
             };
-            let Ok(diff) = human_mapping::as_ast_diff_for_mapping(&mapping, &before, &after) else {
+            let Ok(diff) = human_mapping::as_ast_diff_for_mapping(&mapping, before, after) else {
                 continue;
             };
-            let node_cache = NodeCache::build(&before, &after);
-            let text_diff = TextDiff::from(&before, &after, &diff, &node_cache);
+            let node_cache = NodeCache::build(before, after);
+            let text_diff = TextDiff::from(before, after, &diff, &node_cache);
             let before_ranges = text_diff.all(0);
             let after_ranges = text_diff.all(1);
             let row_counts = [

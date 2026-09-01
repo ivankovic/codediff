@@ -1176,9 +1176,9 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
     // a mapping that matches a node to a DIFFERENT node than what APTED would
     // naturally choose, then verify that APTED doesn't create a second mapping
     // for the same node.
-    let (before, after) = helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
+    let (before, after) = &*helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     let before_ast = before.ast.as_ref().unwrap();
@@ -1222,8 +1222,8 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
 
     // Now call APTED with the diff that already has these artificial mappings
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
@@ -1276,9 +1276,9 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     // pass already made (here, faked by hand, same technique as
     // test_already_matched_nodes_are_skipped), and still discovering the nested-reuse
     // match (the print(...) call moved one level deeper) for everything else.
-    let (before, after) = helper::handmade_test_code_pair("python-added-if-block-small")?;
+    let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block-small")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     let before_ast = before.ast.as_ref().unwrap();
@@ -1302,8 +1302,8 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     );
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
@@ -1345,22 +1345,22 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
 
 #[test]
 fn test_no_change() -> Result<()> {
-    let (before, after) = helper::handmade_test_code_pair("rust-no-change")?;
+    let (before, after) = &*helper::handmade_test_code_pair("rust-no-change")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let mapping = diff
         .mapping
@@ -1374,22 +1374,22 @@ fn test_no_change() -> Result<()> {
 
 #[test]
 fn test_hello_world_added_message() -> Result<()> {
-    let (before, after) = helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+    let (before, after) = &*helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
@@ -1420,22 +1420,22 @@ fn test_hello_world_added_message() -> Result<()> {
 
 #[test]
 fn test_hello_world_removed_message() -> Result<()> {
-    let (before, after) = helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
+    let (before, after) = &*helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
@@ -1466,22 +1466,22 @@ fn test_hello_world_removed_message() -> Result<()> {
 
 #[test]
 fn test_python_added_if_block_small() -> Result<()> {
-    let (before, after) = helper::handmade_test_code_pair("python-added-if-block-small")?;
+    let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block-small")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
@@ -1502,22 +1502,22 @@ fn test_python_added_if_block() -> Result<()> {
     // Larger, more realistic version of test_python_added_if_block_small: a function
     // definition precedes the if-block, and the wrapped statement is an f-string print
     // call. Pins that the nested-reuse fix generalizes beyond the minimal repro.
-    let (before, after) = helper::handmade_test_code_pair("python-added-if-block")?;
+    let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
@@ -1555,22 +1555,22 @@ fn test_rust_add_if() -> Result<()> {
     // and with the existing if/else demoted to an `else if` branch (nested one level
     // deeper as the new if's else_clause) instead of nested inside a block - guards
     // against tree-sitter-shape-specific assumptions in the fix.
-    let (before, after) = helper::handmade_test_code_pair("rust-add-if")?;
+    let (before, after) = &*helper::handmade_test_code_pair("rust-add-if")?;
 
-    let node_cache = NodeCache::build(&before, &after);
+    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     for_roots(
-        &before,
-        &after,
+        before,
+        after,
         &node_cache,
         Algorithm::ZhangShasha,
         "test",
         &mut diff,
     );
 
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();

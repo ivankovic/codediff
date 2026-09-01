@@ -613,14 +613,18 @@ fn main() -> Result<()> {
     // reads and tree-sitter-parses all ~500 corpus fixtures before any filter could apply: that
     // sweep, not the scoring, is what a scoped run spends its time on. Measured on one fixture,
     // release build: 18.8s filtering the full load, 0.6s loading only what was asked for.
+    // `.clone()`s out of the shared `Arc` either way: this binary needs its own owned, mutable
+    // `Code` values below (`ensure_parsed` takes `&mut self`), unlike the `cargo test` call sites
+    // that only ever borrow and so share one parse via the `Arc` directly.
     let mut test_diffs: HashMap<String, (Code, Code)> = if args.fixtures.is_empty() {
-        helper::handmade_test_code_pairs()?
+        (*helper::handmade_test_code_pairs()?).clone()
     } else {
         args.fixtures
             .iter()
             .map(|name| {
-                let pair = helper::handmade_test_code_pair(name)
-                    .with_context(|| format!("no fixture named '{name}'"))?;
+                let pair = (*helper::handmade_test_code_pair(name)
+                    .with_context(|| format!("no fixture named '{name}'"))?)
+                .clone();
                 Ok((name.clone(), pair))
             })
             .collect::<Result<_>>()?

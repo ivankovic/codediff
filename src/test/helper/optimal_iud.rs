@@ -944,13 +944,13 @@ mod tests {
 
     #[test]
     fn skip_matched_nodes_test() -> Result<()> {
-        let (_, after) = test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+        let (_, after) = &*test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
         };
 
-        let after_ast = after.ast.unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let added_subtree = test::helper::node_for_path(
             after_ast.root_node(),
@@ -1007,17 +1007,17 @@ mod tests {
     #[test]
     fn solve_for_hello_world_added_message() -> Result<()> {
         let (before, after) =
-            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+            &*test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
         };
 
         let mut memo = HashMap::new();
-        let node_cache = NodeCache::build(&before, &after);
+        let node_cache = NodeCache::build(before, after);
 
-        let before_metadata = crate::code::metadata::metadata_of(&before);
-        let after_metadata = crate::code::metadata::metadata_of(&after);
+        let before_metadata = crate::code::metadata::metadata_of(before);
+        let after_metadata = crate::code::metadata::metadata_of(after);
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
@@ -1061,8 +1061,8 @@ mod tests {
         // Of course it will explore other sub-problems too, but they should all be more expensive.
 
         let total_cost = solve(
-            &before,
-            &after,
+            before,
+            after,
             &before_metadata,
             &after_metadata,
             vec![before_root_id],
@@ -1072,8 +1072,8 @@ mod tests {
             &mut memo,
         )?;
 
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         // First check that the subproblem where before is [] and after is the
         // expression_statement node that as added, and it's subtree, was solved
@@ -1126,24 +1126,24 @@ mod tests {
     fn solve_for_hello_world_deleted_message() -> Result<()> {
         // Swap before and after around to turn an add into a delete.
         let (after, before) =
-            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+            &*test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff = ASTDiff {
             ..Default::default()
         };
 
         let mut memo = HashMap::new();
-        let node_cache = NodeCache::build(&before, &after);
+        let node_cache = NodeCache::build(before, after);
 
-        let before_metadata = crate::code::metadata::metadata_of(&before);
-        let after_metadata = crate::code::metadata::metadata_of(&after);
+        let before_metadata = crate::code::metadata::metadata_of(before);
+        let after_metadata = crate::code::metadata::metadata_of(after);
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
         let total_cost = solve(
-            &before,
-            &after,
+            before,
+            after,
             &before_metadata,
             &after_metadata,
             vec![before_root_id],
@@ -1161,24 +1161,24 @@ mod tests {
     #[test]
     fn solve_for_leetcode_1_bugfix() -> Result<()> {
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
+        let (after, before) = &*test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
         let diff = ASTDiff {
             ..Default::default()
         };
 
         let mut memo = HashMap::new();
-        let node_cache = NodeCache::build(&before, &after);
+        let node_cache = NodeCache::build(before, after);
 
-        let before_metadata = crate::code::metadata::metadata_of(&before);
-        let after_metadata = crate::code::metadata::metadata_of(&after);
+        let before_metadata = crate::code::metadata::metadata_of(before);
+        let after_metadata = crate::code::metadata::metadata_of(after);
 
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
         let after_root_id = after.ast.as_ref().unwrap().root_node().id();
 
         let total_cost = solve(
-            &before,
-            &after,
+            before,
+            after,
             &before_metadata,
             &after_metadata,
             vec![before_root_id],
@@ -1208,21 +1208,22 @@ mod tests {
         let test_diffs =
             test::helper::handmade_test_code_pairs_for(test::helper::UNIT_TEST_FIXTURES)?;
 
-        for (diff_name, (before, after)) in test_diffs {
+        for (diff_name, pair) in test_diffs {
+            let (before, after) = &*pair;
             let mut diff = ASTDiff {
                 ..Default::default()
             };
 
-            let node_cache = NodeCache::build(&before, &after);
-            for_roots(&before, &after, &node_cache, &mut diff)?;
+            let node_cache = NodeCache::build(before, after);
+            for_roots(before, after, &node_cache, &mut diff)?;
 
             assert!(
-                diff.is_valid(&before, &after, &node_cache),
+                diff.is_valid(before, after, &node_cache),
                 "Real diff mappings should always be valid for diff: {}",
                 diff_name
             );
             assert!(
-                diff.is_complete(&before, &after, &node_cache),
+                diff.is_complete(before, after, &node_cache),
                 "Real diff mappings should always be complete for diff: {}",
                 diff_name
             );
@@ -1234,25 +1235,25 @@ mod tests {
     #[test]
     fn hello_world_added_message() -> Result<()> {
         let (before, after) =
-            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+            &*test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
         assert!(
-            diff.is_valid(&before, &after, &node_cache),
+            diff.is_valid(before, after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after, &node_cache),
+            diff.is_complete(before, after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
-        let after_ast = after.ast.unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let added_expression_node = test::helper::node_for_path(
             after_ast.root_node(),
@@ -1281,25 +1282,25 @@ mod tests {
     fn hello_world_deleted_message() -> Result<()> {
         // Note that we flipped after and before so the addition becomes a deletion.
         let (after, before) =
-            test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
+            &*test::helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
         assert!(
-            diff.is_valid(&before, &after, &node_cache),
+            diff.is_valid(before, after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after, &node_cache),
+            diff.is_complete(before, after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
-        let before_ast = before.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
 
         let deleted_expression_node = test::helper::node_for_path(
             before_ast.root_node(),
@@ -1383,26 +1384,26 @@ mod tests {
         //  This is important because this test case makes naive "just do the simple edit distance"
         //  algorithms fail, since those would not usually consider the ability to modify the
         //  parent of a node twice.
-        let (before, after) = test::helper::handmade_test_code_pair("python-added-if-block")?;
+        let (before, after) = &*test::helper::handmade_test_code_pair("python-added-if-block")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
         assert!(
-            diff.is_valid(&before, &after, &node_cache),
+            diff.is_valid(before, after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after, &node_cache),
+            diff.is_complete(before, after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let added_if_node = test::helper::node_for_path(
             after_ast.root_node(),
@@ -1453,26 +1454,26 @@ mod tests {
     #[test]
     fn python_added_if_block_reverse() -> Result<()> {
         // Note that we do a sneaky and flip (before, after) to get a delete instead of an add.
-        let (after, before) = test::helper::handmade_test_code_pair("python-added-if-block")?;
+        let (after, before) = &*test::helper::handmade_test_code_pair("python-added-if-block")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
         assert!(
-            diff.is_valid(&before, &after, &node_cache),
+            diff.is_valid(before, after, &node_cache),
             "Real diff mappings should always be valid"
         );
         assert!(
-            diff.is_complete(&before, &after, &node_cache),
+            diff.is_complete(before, after, &node_cache),
             "Real diff mappings should always be complete"
         );
 
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let deleted_if_node = test::helper::node_for_path(
             before_ast.root_node(),
@@ -1590,20 +1591,20 @@ mod tests {
     #[test]
     fn leetcode_1_bugfix() -> Result<()> {
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
+        let (after, before) = &*test::helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
-        assert!(diff.is_valid(&before, &after, &node_cache));
-        assert!(diff.is_complete(&before, &after, &node_cache));
+        assert!(diff.is_valid(before, after, &node_cache));
+        assert!(diff.is_complete(before, after, &node_cache));
 
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let before_root_id = before_ast.root_node().id();
         let after_root_id = after_ast.root_node().id();
@@ -1624,16 +1625,16 @@ mod tests {
 
     #[test]
     fn no_change_skips_already_matched_nodes() -> Result<()> {
-        let (before, after) = test::helper::handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*test::helper::handmade_test_code_pair("rust-no-change")?;
 
         // First, run the full diff algorithm which should match all nodes
         let mut diff = ASTDiff {
             ..Default::default()
         };
-        let node_cache = NodeCache::build(&before, &after);
+        let node_cache = NodeCache::build(before, after);
 
         // This should match all nodes with IdenticalHash
-        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff);
+        crate::diff::solve_hash_descent::solve(before, after, &node_cache, &mut diff);
 
         // Verify that all nodes are already mapped
         let before_root_id = before.ast.as_ref().unwrap().root_node().id();
@@ -1644,7 +1645,7 @@ mod tests {
         // Now test that for_roots() correctly skips over already matched nodes
         // by measuring execution time - it should be very fast (< 50ms)
         let start_time = std::time::Instant::now();
-        let result = for_roots(&before, &after, &node_cache, &mut diff);
+        let result = for_roots(before, after, &node_cache, &mut diff);
         let duration = start_time.elapsed();
 
         assert!(result.is_ok(), "for_roots() should succeed");
@@ -1655,8 +1656,8 @@ mod tests {
         );
 
         // Verify the diff is still valid and complete
-        assert!(diff.is_valid(&before, &after, &node_cache));
-        assert!(diff.is_complete(&before, &after, &node_cache));
+        assert!(diff.is_valid(before, after, &node_cache));
+        assert!(diff.is_complete(before, after, &node_cache));
 
         Ok(())
     }
@@ -1691,21 +1692,22 @@ mod tests {
         let names: Vec<&str> = expected_costs.keys().copied().collect();
         let test_diffs = test::helper::handmade_test_code_pairs_for(&names)?;
 
-        for (diff_name, (before, after)) in test_diffs {
+        for (diff_name, pair) in test_diffs {
+            let (before, after) = &*pair;
             let mut diff = ASTDiff {
                 ..Default::default()
             };
 
-            let node_cache = NodeCache::build(&before, &after);
-            for_roots(&before, &after, &node_cache, &mut diff)?;
+            let node_cache = NodeCache::build(before, after);
+            for_roots(before, after, &node_cache, &mut diff)?;
 
             assert!(
-                diff.is_valid(&before, &after, &node_cache),
+                diff.is_valid(before, after, &node_cache),
                 "Diff should be valid for: {}",
                 diff_name
             );
             assert!(
-                diff.is_complete(&before, &after, &node_cache),
+                diff.is_complete(before, after, &node_cache),
                 "Diff should be complete for: {}",
                 diff_name
             );
@@ -1738,20 +1740,21 @@ mod tests {
     #[test]
     fn python_added_if_block_small() -> Result<()> {
         // Swap before and after around to turn an add into a delete.
-        let (after, before) = test::helper::handmade_test_code_pair("python-added-if-block-small")?;
+        let (after, before) =
+            &*test::helper::handmade_test_code_pair("python-added-if-block-small")?;
 
         let mut diff = ASTDiff {
             ..Default::default()
         };
 
-        let node_cache = NodeCache::build(&before, &after);
-        for_roots(&before, &after, &node_cache, &mut diff)?;
+        let node_cache = NodeCache::build(before, after);
+        for_roots(before, after, &node_cache, &mut diff)?;
 
-        assert!(diff.is_valid(&before, &after, &node_cache));
-        assert!(diff.is_complete(&before, &after, &node_cache));
+        assert!(diff.is_valid(before, after, &node_cache));
+        assert!(diff.is_complete(before, after, &node_cache));
 
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let before_root_id = before_ast.root_node().id();
         let after_root_id = after_ast.root_node().id();

@@ -827,7 +827,7 @@ pub fn compare_painting(
     name: &str,
     options: crate::diff::text::RenderOptions,
 ) -> Result<PaintingComparison> {
-    let (before, after) = super::handmade_test_code_pair(name)?;
+    let (before, after) = &*super::handmade_test_code_pair(name)?;
     let mapping = load(name)?;
     let painting = painting_for_mode(&mapping, options)?;
 
@@ -846,19 +846,19 @@ pub fn compare_painting(
     // codediff's side, through exactly the pipeline the TUI renders: a real diff, projected by
     // `TextDiff`, then filtered by the options. Not a re-derivation - what is compared is what a
     // reader would actually see.
-    let diff = crate::diff::diff_code(&before, &after);
+    let diff = crate::diff::diff_code(before, after);
     let ast = diff
         .ast
         .as_ref()
         .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
-    let node_cache = crate::diff::NodeCache::build(&before, &after);
+    let node_cache = crate::diff::NodeCache::build(before, after);
     // Not `TextDiff::from` (which hardcodes both construction-time options to their legacy
     // defaults) - `paint_reindent_only_moves` genuinely differs between `MINIMAL`/`FULL` (unlike
     // `whole_pair_updates`, which never has), so this must resolve `options`'s own value rather
     // than assume it.
     let text_diff = crate::diff::text::TextDiff::from_with_options(
-        &before,
-        &after,
+        before,
+        after,
         ast,
         &node_cache,
         options.whole_pair_updates,
@@ -2393,8 +2393,8 @@ pub fn compute_mismatches_with_config(
     name: &str,
     config: &crate::diff::HeuristicConfig,
 ) -> Result<Vec<String>> {
-    let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
-    compute_mismatches_for_with_config(name, &before, &after, config)
+    let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
+    compute_mismatches_for_with_config(name, before, after, config)
 }
 
 /// Same as [`compute_mismatches_with_config`], but via [`compute_visible_mismatches_for_with_config`]
@@ -2403,8 +2403,8 @@ pub fn compute_visible_mismatches_with_config(
     name: &str,
     config: &crate::diff::HeuristicConfig,
 ) -> Result<VisibleMismatches> {
-    let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
-    compute_visible_mismatches_for_with_config(name, &before, &after, config)
+    let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
+    compute_visible_mismatches_for_with_config(name, before, after, config)
 }
 
 /**
@@ -3524,9 +3524,9 @@ mod tests {
     fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
         // rust-no-change is fully identical before/after, so codediff and Unix diff both agree
         // with the (trivially all-untouched) human mapping perfectly.
-        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
-        let result = line_mismatches_for("rust-no-change", &before, &after)?;
+        let result = line_mismatches_for("rust-no-change", before, after)?;
 
         assert_eq!(result.codediff, 0);
         assert_eq!(result.unix_diff, 0);
@@ -3682,7 +3682,7 @@ mod tests {
     #[test]
     fn detects_a_correct_hand_written_mapping_for_rust_no_change() -> Result<()> {
         // rust-no-change is fully identical before/after, so every node should match itself.
-        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let before_ast = before.ast.as_ref().unwrap();
         let root = before_ast.root_node();
@@ -3701,7 +3701,7 @@ mod tests {
             ..Default::default()
         };
 
-        let diff = crate::diff::diff_code(&before, &after);
+        let diff = crate::diff::diff_code(before, after);
         let diff_ast = diff.ast.unwrap();
         let after_ast = after.ast.as_ref().unwrap();
 
@@ -3728,7 +3728,7 @@ mod tests {
     #[test]
     fn detects_an_incorrect_hand_written_mapping() -> Result<()> {
         // Deliberately claim the root is deleted, which is false for rust-no-change.
-        let (before, after) = crate::test::helper::handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let before_ast = before.ast.as_ref().unwrap();
         let root = before_ast.root_node();
@@ -3744,7 +3744,7 @@ mod tests {
             ..Default::default()
         };
 
-        let diff = crate::diff::diff_code(&before, &after);
+        let diff = crate::diff::diff_code(before, after);
         let diff_ast = diff.ast.unwrap();
         let after_ast = after.ast.as_ref().unwrap();
 
@@ -4624,9 +4624,9 @@ mod tests {
 
         let mut rows: Vec<Row> = Vec::new();
         for name in names {
-            let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+            let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
             let mapping = load(name)?;
-            let Some(check) = text_mapping_disagreements(&mapping, &before, &after)? else {
+            let Some(check) = text_mapping_disagreements(&mapping, before, after)? else {
                 eprintln!("{name}: no painting - skipped");
                 continue;
             };
@@ -4695,9 +4695,9 @@ mod tests {
     #[ignore]
     fn exploratory_mapping_vs_painting_disagreement_detail() -> Result<()> {
         let name = "rust-add-if";
-        let (before, after) = crate::test::helper::handmade_test_code_pair(name)?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
         let mapping = load(name)?;
-        let check = text_mapping_disagreements(&mapping, &before, &after)?
+        let check = text_mapping_disagreements(&mapping, before, after)?
             .with_context(|| format!("{name} has no painting"))?;
         eprintln!("best-matching painting: '{}'", check.solution);
         for d in &check.disagreements {
@@ -4821,9 +4821,9 @@ mod tests {
     #[ignore]
     fn mapping_vs_painting_disagreement_detail_for_fixture() -> Result<()> {
         let name = std::env::var("FIXTURE").unwrap_or_else(|_| "rust-add-if".to_string());
-        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
         let mapping = load(&name)?;
-        let check = text_mapping_disagreements(&mapping, &before, &after)?
+        let check = text_mapping_disagreements(&mapping, before, after)?
             .with_context(|| format!("{name} has no painting"))?;
         eprintln!("best-matching painting: '{}'", check.solution);
         for d in &check.disagreements {
@@ -4890,13 +4890,14 @@ mod tests {
                 ("minimal", RenderOptions::MINIMAL),
                 ("full", RenderOptions::FULL),
             ] {
-                let (before, after) = match crate::test::helper::handmade_test_code_pair(name) {
+                let pair = match crate::test::helper::handmade_test_code_pair(name) {
                     Ok(pair) => pair,
                     Err(e) => {
                         eprintln!("fixture={name} mode={mode}: ERROR loading code pair: {e:#}");
                         continue;
                     }
                 };
+                let (before, after) = &*pair;
                 let mapping = match load(name) {
                     Ok(m) => m,
                     Err(e) => {
@@ -4924,15 +4925,15 @@ mod tests {
                     }
                 }
 
-                let diff = crate::diff::diff_code(&before, &after);
+                let diff = crate::diff::diff_code(before, after);
                 let ast = diff
                     .ast
                     .as_ref()
                     .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
-                let node_cache = crate::diff::NodeCache::build(&before, &after);
+                let node_cache = crate::diff::NodeCache::build(before, after);
                 let text_diff = crate::diff::text::TextDiff::from_with_options(
-                    &before,
-                    &after,
+                    before,
+                    after,
                     ast,
                     &node_cache,
                     options.whole_pair_updates,
@@ -4998,7 +4999,7 @@ mod tests {
             RenderOptions::MINIMAL
         };
 
-        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
         let mapping = load(&name)?;
         let painting = painting_for_mode(&mapping, options)?;
 
@@ -5013,15 +5014,15 @@ mod tests {
             }
         }
 
-        let diff = crate::diff::diff_code(&before, &after);
+        let diff = crate::diff::diff_code(before, after);
         let ast = diff
             .ast
             .as_ref()
             .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
-        let node_cache = crate::diff::NodeCache::build(&before, &after);
+        let node_cache = crate::diff::NodeCache::build(before, after);
         let text_diff = crate::diff::text::TextDiff::from_with_options(
-            &before,
-            &after,
+            before,
+            after,
             ast,
             &node_cache,
             options.whole_pair_updates,
@@ -5069,13 +5070,13 @@ mod tests {
     #[ignore]
     fn dump_top_level_mapping() -> Result<()> {
         let name = std::env::var("FIXTURE").unwrap_or_else(|_| "python-api-change".to_string());
-        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
-        let diff = crate::diff::diff_code(&before, &after);
+        let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
+        let diff = crate::diff::diff_code(before, after);
         let ast = diff.ast.as_ref().unwrap();
 
         if std::env::var("DUMP_RAW_RANGES").is_ok() {
-            let node_cache = crate::diff::NodeCache::build(&before, &after);
-            let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &node_cache);
+            let node_cache = crate::diff::NodeCache::build(before, after);
+            let text_diff = crate::diff::text::TextDiff::from(before, after, ast, &node_cache);
             eprintln!("--- raw after_ranges (unfiltered) ---");
             for r in text_diff.all(1) {
                 eprintln!(

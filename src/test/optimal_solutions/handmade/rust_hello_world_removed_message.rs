@@ -24,15 +24,15 @@ use anyhow::Result;
 #[test]
 fn optimal_solution() -> Result<()> {
     let (before, after) =
-        test::helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
+        &*test::helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
 
-    let diff = diff::diff_code(&before, &after);
+    let diff = diff::diff_code(before, after);
 
     assert!(diff.ast.is_some());
 
     let diff_ast = diff.ast.unwrap();
-    let before_ast = before.ast.unwrap();
-    let after_ast = after.ast.unwrap();
+    let before_ast = before.ast.as_ref().unwrap();
+    let after_ast = after.ast.as_ref().unwrap();
 
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();

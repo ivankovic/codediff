@@ -66,7 +66,7 @@ mod tests {
 
     fn load(name: &str) -> Result<(Vec<SimilaritySketch>, Vec<SimilaritySketch>, Vec<String>)> {
         let pairs = crate::test::helper::handmade_test_code_pairs_for(&[name])?;
-        let (before, after) = pairs.get(name).expect("fixture present");
+        let (before, after) = &**pairs.get(name).expect("fixture present");
         let (bc, ac) = (widest_container(before), widest_container(after));
         let names = kinds(before, &bc);
         Ok((sketches(before, &bc), sketches(after, &ac), names))

@@ -571,20 +571,31 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 * Returns a HashMap where the key is the directory name and the value is the (before, after) Code
 * object pair.
 */
-pub fn handmade_test_code_pairs() -> Result<HashMap<String, (Code, Code)>> {
+pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code, Code)>>> {
     // Every fixture directory is re-read and re-parsed with tree-sitter on every call. Fine for
     // the handful of direct callers that run once, but `compute_mismatches` (human_mapping.rs)
     // calls this once *per fixture* it checks - across a whole suite run that turns one full
     // O(fixture count) parse pass into an O(fixture count squared) one. The fixtures are
     // immutable for the life of the process (nothing in this codebase mutates the on-disk test
     // data at runtime), so memoize the whole map after the first successful build and hand out
-    // clones of the cached `Code` pairs from then on.
-    static CACHE: std::sync::OnceLock<HashMap<String, (Code, Code)>> = std::sync::OnceLock::new();
+    // `Arc` clones from then on.
+    //
+    // `Arc`, not a bare clone of the map: this is the *entire* corpus (all `DIFF_DATASETS`,
+    // 500+ fixtures) - `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per
+    // side, so `.clone()`-ing the whole map used to re-materialize every parsed tree in the
+    // corpus on every single call, including the very first. One `Arc` clone is a refcount bump
+    // instead - see `handmade_test_code_pair`'s doc comment for the same fix on the per-name
+    // cache, diagnosed together (2026-09-01) after a `cargo test` run was observed OOM-killed at
+    // 12-16GB RSS.
+    static CACHE: std::sync::OnceLock<std::sync::Arc<HashMap<String, (Code, Code)>>> =
+        std::sync::OnceLock::new();
     if let Some(cached) = CACHE.get() {
-        return Ok(cached.clone());
+        return Ok(std::sync::Arc::clone(cached));
     }
     let result = handmade_test_code_pairs_uncached()?;
-    Ok(CACHE.get_or_init(|| result).clone())
+    Ok(std::sync::Arc::clone(
+        CACHE.get_or_init(|| std::sync::Arc::new(result)),
+    ))
 }
 
 fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
@@ -876,20 +887,33 @@ fn data_root() -> std::path::PathBuf {
 * can't be satisfied by that sample (e.g. `test_handmade_test_code_pairs_returns_all_diffs`, or a
 * `#[ignore = "slow"]` full-corpus check).
 */
-pub fn handmade_test_code_pair(name: &str) -> Result<(Code, Code)> {
-    static CACHE: std::sync::OnceLock<std::sync::Mutex<HashMap<String, (Code, Code)>>> =
-        std::sync::OnceLock::new();
+///
+/// Returns an `Arc` rather than an owned `(Code, Code)`: this cache is process-lifetime and never
+/// evicts, and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side - under
+/// `cargo test`'s default parallelism, every one of this function's 50+ call sites requesting the
+/// same fixture concurrently used to each materialize its own full parsed-tree copy on top of the
+/// one the cache itself retains, with nothing ever freed for the life of the process. Diagnosed
+/// 2026-09-01 after a `cargo test` run was observed OOM-killed at 12-16GB RSS: growth was
+/// monotonic with no plateau under an 8GB cap. An `Arc` clone is a refcount bump instead of a
+/// tree copy, so concurrent requesters of the same fixture now share one parse.
+pub fn handmade_test_code_pair(name: &str) -> Result<std::sync::Arc<(Code, Code)>> {
+    type PairCache = std::sync::Mutex<HashMap<String, std::sync::Arc<(Code, Code)>>>;
+    static CACHE: std::sync::OnceLock<PairCache> = std::sync::OnceLock::new();
     let cache = CACHE.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
 
     if let Some(pair) = cache.lock().unwrap().get(name) {
-        return Ok(pair.clone());
+        return Ok(std::sync::Arc::clone(pair));
     }
 
     let dir = diffs_case_dir(name)
         .with_context(|| format!("No test case directory found for '{}'", name))?;
     let pair = code_pair_from_dir(&dir)?
         .with_context(|| format!("No before/after test code pair found for '{}'", name))?;
-    cache.lock().unwrap().insert(name.to_string(), pair.clone());
+    let pair = std::sync::Arc::new(pair);
+    cache
+        .lock()
+        .unwrap()
+        .insert(name.to_string(), std::sync::Arc::clone(&pair));
     Ok(pair)
 }
 
@@ -899,7 +923,9 @@ pub fn handmade_test_code_pair(name: &str) -> Result<(Code, Code)> {
 * Each name still goes through the same per-name cache, so this is just a convenience wrapper, not
 * a separate loading path.
 */
-pub fn handmade_test_code_pairs_for(names: &[&str]) -> Result<HashMap<String, (Code, Code)>> {
+pub fn handmade_test_code_pairs_for(
+    names: &[&str],
+) -> Result<HashMap<String, std::sync::Arc<(Code, Code)>>> {
     names
         .iter()
         .map(|&name| Ok((name.to_string(), handmade_test_code_pair(name)?)))
@@ -1451,7 +1477,8 @@ mod tests {
             "a name in UNIT_TEST_FIXTURES doesn't match any directory under src/test/data/diffs/ (typo, or fixture renamed/removed)"
         );
 
-        for (name, (before, after)) in &sampled {
+        for (name, pair) in &sampled {
+            let (before, after) = &**pair;
             for (label, code) in [("before", before), ("after", after)] {
                 let ast = code
                     .ast
@@ -1507,7 +1534,8 @@ mod tests {
         // but still-valid node wouldn't show up as a resolution failure at all.
         let sampled = handmade_test_code_pairs_for(UNIT_TEST_FIXTURES)?;
 
-        for (name, (before, after)) in &sampled {
+        for (name, pair) in &sampled {
+            let (before, after) = &**pair;
             for (label, code) in [("before", before), ("after", after)] {
                 let ast = code
                     .ast
@@ -1645,7 +1673,7 @@ mod tests {
 
     #[test]
     fn test_handmade_test_code_pairs_no_change_diff() -> Result<()> {
-        let (before, after) = handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*handmade_test_code_pair("rust-no-change")?;
 
         assert_ne!(before.contents, "");
         assert_ne!(after.contents, "");
@@ -1660,12 +1688,12 @@ mod tests {
     #[test]
     fn test_entire_path_has_mapping() -> Result<()> {
         // Use rust-no-change since all nodes should have Identical mapping
-        let (before, after) = handmade_test_code_pair("rust-no-change")?;
+        let (before, after) = &*handmade_test_code_pair("rust-no-change")?;
 
-        let diff = crate::diff::diff_code(&before, &after);
+        let diff = crate::diff::diff_code(before, after);
         let diff_ast = diff.ast.unwrap();
-        let before_ast = before.ast.unwrap();
-        let after_ast = after.ast.unwrap();
+        let before_ast = before.ast.as_ref().unwrap();
+        let after_ast = after.ast.as_ref().unwrap();
 
         let before_root = before_ast.root_node();
         let after_root = after_ast.root_node();
@@ -1720,12 +1748,12 @@ mod tests {
         )?);
 
         // Test with rust-hello-world-added-message where we know function_item has MatchButNotIdentical
-        let (before2, after2) = handmade_test_code_pair("rust-hello-world-added-message")?;
+        let (before2, after2) = &*handmade_test_code_pair("rust-hello-world-added-message")?;
 
-        let diff2 = crate::diff::diff_code(&before2, &after2);
+        let diff2 = crate::diff::diff_code(before2, after2);
         let diff_ast2 = diff2.ast.unwrap();
-        let before_ast2 = before2.ast.unwrap();
-        let after_ast2 = after2.ast.unwrap();
+        let before_ast2 = before2.ast.as_ref().unwrap();
+        let after_ast2 = after2.ast.as_ref().unwrap();
         let before_root2 = before_ast2.root_node();
         let after_root2 = after_ast2.root_node();
 

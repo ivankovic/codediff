@@ -33,7 +33,7 @@ fn benchmark_optimal_iud_for_roots(c: &mut Criterion) {
     group.warm_up_time(Duration::from_secs(2));
 
     // Automatically create benchmarks for all test code pairs
-    for (test_name, (before, after)) in &test_code_pairs {
+    for (test_name, (before, after)) in test_code_pairs.iter() {
         // Create a safe benchmark name by replacing non-alphanumeric characters
         let benchmark_name = test_name
             .replace(|c: char| !c.is_ascii_alphanumeric() && c != '_', "_")
