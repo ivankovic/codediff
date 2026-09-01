@@ -2515,6 +2515,9 @@ fn resolve_unequal_segment_via_kind_only_anchors(
     if pairs.is_empty() {
         pairs = align_segment_by_similarity(before_seg, after_seg, before_meta, after_meta);
     }
+    if pairs.is_empty() {
+        pairs = align_segment_by_mutual_similarity(before_seg, after_seg, before_meta, after_meta);
+    }
 
     let mut matched_before = vec![false; before_seg.len()];
     let mut matched_after = vec![false; after_seg.len()];
@@ -2590,6 +2593,129 @@ const SEGMENT_SIMILARITY_MIN: f32 = 0.9;
 /// Every cell costs a bottom-k MinHash Jaccard, so this is a real cost bound, not a formality - and
 /// this pass sits on the terminal fallback's path, which exists because p99 matters.
 const SEGMENT_SIMILARITY_MAX_CELLS: usize = 4096;
+
+/// Floor for [`align_segment_by_mutual_similarity`]: below this, two entries share too little
+/// leaf content to be called an edit of one another even when nothing else is closer.
+/// `javascript-add-event-listener`'s `button.onclick = handleClick;` against
+/// `button.addEventListener('click', handleClick);` scores about a third - the genuine "this
+/// statement was rewritten" floor this exists for; unrelated statements that merely share a
+/// keyword and a semicolon sit well under it.
+const SEGMENT_MUTUAL_SIMILARITY_MIN: f32 = 0.3;
+
+/// The unequal-count gap's last resort before atomic delete/insert, for the shape
+/// [`SEGMENT_SIMILARITY_MIN`]'s absolute floor cannot admit: one side's entries all have an
+/// obvious counterpart on the other, and the surplus entries are plain inserts (or deletes).
+/// `typescript-add-generics` is the canonical case - one `const` statement rewritten to use the
+/// new generic *and* a second, brand-new `const` beside it; the rewritten pair scores ~0.5, which
+/// `SEGMENT_SIMILARITY_MIN` (0.9, calibrated to reject two known 0.55 false positives) can never
+/// accept, yet it is unmistakable *relative to the alternatives*.
+///
+/// So the criterion is relative, not absolute: a pair is accepted only when each is the other's
+/// single best candidate (mutual best, same kind, at least
+/// [`SEGMENT_MUTUAL_SIMILARITY_MIN`]), the accepted pairs are order-preserving, and **every entry
+/// of the smaller side is paired** - the last condition is what makes "the rest are inserts" a
+/// reading of the evidence rather than a guess, and what keeps a gap of unrelated fragments
+/// (the `kotlin-refactor-function` pooling hazard) from being partially, wrongly stitched. Any
+/// shortfall returns nothing and the gap falls through to atomic delete/insert exactly as before.
+fn align_segment_by_mutual_similarity(
+    before_seg: &[usize],
+    after_seg: &[usize],
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+) -> Vec<(usize, usize)> {
+    let (n, m) = (before_seg.len(), after_seg.len());
+    if n == 0 || m == 0 || n * m > SEGMENT_SIMILARITY_MAX_CELLS {
+        return Vec::new();
+    }
+    fn kind_of(meta: &ASTMetadata, id: usize) -> Option<&str> {
+        meta.node_info.get(&id).map(|i| i.kind.as_str())
+    }
+    // A declaration's own name: its first direct identifier-like child (`impl ModuleType`'s
+    // `type_identifier`, a function's `identifier`). Only consulted for reference-node kinds.
+    fn declared_name(meta: &ASTMetadata, id: usize) -> Option<&str> {
+        meta.node_info.get(&id)?.children.iter().find_map(|c| {
+            let info = meta.node_info.get(c)?;
+            nodes::is_identifier_kind(&info.kind).then_some(info.text.as_str())
+        })
+    }
+    let language = before_meta.language;
+    let sim: Vec<Vec<f32>> = (0..n)
+        .map(|bi| {
+            (0..m)
+                .map(|ai| {
+                    let kind = kind_of(before_meta, before_seg[bi]);
+                    if kind != kind_of(after_meta, after_seg[ai]) {
+                        return 0.0;
+                    }
+                    // A named declaration whose name changed is not "the same thing rewritten"
+                    // on similarity evidence alone: `rust-turbopack-module-rule`'s
+                    // `impl ModuleType` scores 0.69 against the new `impl ConfiguredModuleType`
+                    // (both are string-matching `from_str`s), and the human deletes one and
+                    // inserts the other - the type `ModuleType` still exists, the impl for it
+                    // simply went away. Renames the corpus does want paired arrive here
+                    // already matched by the name-based passes, never through this gap.
+                    if kind.is_some_and(|k| nodes::is_reference(k, &language))
+                        && let (Some(b), Some(a)) = (
+                            declared_name(before_meta, before_seg[bi]),
+                            declared_name(after_meta, after_seg[ai]),
+                        )
+                        && b != a
+                    {
+                        return 0.0;
+                    }
+                    match (
+                        before_meta.node_to_similarity_sketch.get(&before_seg[bi]),
+                        after_meta.node_to_similarity_sketch.get(&after_seg[ai]),
+                    ) {
+                        (Some(b), Some(a)) => b.jaccard(a),
+                        _ => 0.0,
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    // "Single best": a strict maximum, so a tie between two candidates disqualifies both - there
+    // is then no evidence which one is the counterpart.
+    let strict_argmax = |scores: &mut dyn Iterator<Item = (usize, f32)>| -> Option<usize> {
+        let mut best: Option<(usize, f32)> = None;
+        let mut tied = false;
+        for (idx, v) in scores {
+            match best {
+                Some((_, bv)) if v > bv => {
+                    best = Some((idx, v));
+                    tied = false;
+                }
+                Some((_, bv)) if v == bv => tied = true,
+                None => best = Some((idx, v)),
+                _ => {}
+            }
+        }
+        match best {
+            Some((idx, v)) if !tied && v >= SEGMENT_MUTUAL_SIMILARITY_MIN => Some(idx),
+            _ => None,
+        }
+    };
+    let best_after: Vec<Option<usize>> = (0..n)
+        .map(|bi| strict_argmax(&mut (0..m).map(|ai| (ai, sim[bi][ai]))))
+        .collect();
+    let best_before: Vec<Option<usize>> = (0..m)
+        .map(|ai| strict_argmax(&mut (0..n).map(|bi| (bi, sim[bi][ai]))))
+        .collect();
+
+    let mut pairs: Vec<(usize, usize)> = (0..n)
+        .filter_map(|bi| {
+            let ai = best_after[bi]?;
+            (best_before[ai] == Some(bi)).then_some((bi, ai))
+        })
+        .collect();
+    // Order-preserving (pairs come out sorted by `bi`; the `ai`s must be increasing too) and
+    // covering the smaller side entirely - otherwise this is not the "rest are inserts" shape.
+    let ordered = pairs.windows(2).all(|w| w[0].1 < w[1].1);
+    if !ordered || pairs.len() != n.min(m) {
+        pairs.clear();
+    }
+    pairs
+}
 
 /// Order-preserving alignment of one residual gap's entries by leaf-content similarity, for the
 /// case where [`resolve_unequal_segment_via_kind_only_anchors`]' exact-hash pass found nothing.
