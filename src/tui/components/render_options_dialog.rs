@@ -137,7 +137,7 @@ mod tests {
                 leading_whitespace: true,
                 structural_punctuation: false,
                 whole_pair_updates: false,
-                interior_line_indentation: true,
+                interior_line_indentation: false,
                 paint_reindent_only_moves: false,
             }))
         );
@@ -156,7 +156,7 @@ mod tests {
                 leading_whitespace: false,
                 structural_punctuation: true,
                 whole_pair_updates: false,
-                interior_line_indentation: true,
+                interior_line_indentation: false,
                 paint_reindent_only_moves: false,
             }))
         );

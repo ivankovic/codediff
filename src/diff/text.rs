@@ -1692,21 +1692,26 @@ pub struct RenderOptions {
     #[serde(default)]
     pub whole_pair_updates: bool,
     /// How a multi-row `Insert`/`Delete` treats its own *interior* rows' leading indentation -
-    /// the rules doc's indentation choices 3/4 (`true`, kept whole - what `MINIMAL`/`FULL` both
-    /// do today, the only reading the corpus has ever been painted against) versus choice 2
-    /// (`false`: every row, not just the first, trimmed back to its own first real character - a
-    /// reader following `leading_whitespace`'s example but per row instead of once at the range's
-    /// very start). No fixture in the corpus paints choice 2 yet, so this field is unvalidated
-    /// against hand-painted ground truth in a way none of the other three fields are - built ahead
-    /// of that ground truth on request, not because the corpus asked for it the way
-    /// `structural_punctuation`'s did.
+    /// the rules doc's indentation choices 3/4 (`true`, kept whole - what `FULL` does) versus
+    /// choice 2 (`false`, what `MINIMAL` does since 2026-09-01: every row, not just the first,
+    /// trimmed back to its own first real character - a reader following `leading_whitespace`'s
+    /// example but per row instead of once at the range's very start).
+    ///
+    /// **Corpus-validated, not a guess.** Measured directly against
+    /// `painting_disagreement_census_2026_09_01.md`'s full corpus: flipping `MINIMAL` to `false`
+    /// dropped the handmade aggregate disagreement from 1.2590% to 1.1811% - about 40 fixtures
+    /// improved, several by double digits (`python-refactoring` 7.544%→0.677%,
+    /// `cpp-optimize-algorithm` 5.751%→0.319%, `javascript-add-array-method` 8.312%→0.519%,
+    /// `python-api-change` 5.759%→1.113%) - against exactly one regression
+    /// (`rust-add-to-existing-use`, 10.490%→11.189%, itself dominated by an unrelated single-row
+    /// column-shift disagreement - see `painting_disagreement_fix_log.md`). `FULL` stays
+    /// unaffected either way, confirming the two fields are independent.
     ///
     /// **Overrides `leading_whitespace` rather than combining with it, when off.** `leading_whitespace`
     /// only ever governed the range's own first row (see that field's own doc comment); choice 2 has
     /// no comparable "grow the first row but not the rest" reading in the doc, so turning this off
     /// makes every row - first included - trim to its own content, and `leading_whitespace` simply
-    /// doesn't apply while it's off. `MINIMAL`/`FULL` both leave this on, so it changes nothing about
-    /// either preset's existing, corpus-validated behavior.
+    /// doesn't apply while it's off.
     ///
     /// **Scoped to `Insert`/`Delete`, like `leading_whitespace`'s own extension.** A `Move`/`Update`
     /// range spanning several rows is a *matched* pair, whose `destination` is a real cross-file
@@ -1772,13 +1777,15 @@ fn paint_reindent_only_moves_default() -> bool {
 
 impl RenderOptions {
     /// Every option off: the tightest reading of a diff - drops standalone punctuation and trims
-    /// leading whitespace off what remains. Trailing whitespace is already always trimmed
-    /// regardless of any option - see the struct's own doc comment.
+    /// leading whitespace off what remains, row by row inside a multi-row insert/delete too (see
+    /// `interior_line_indentation`'s own doc comment for the corpus measurement behind that as of
+    /// 2026-09-01). Trailing whitespace is already always trimmed regardless of any option - see
+    /// the struct's own doc comment.
     pub const MINIMAL: Self = Self {
         leading_whitespace: false,
         structural_punctuation: false,
         whole_pair_updates: false,
-        interior_line_indentation: true,
+        interior_line_indentation: false,
         paint_reindent_only_moves: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
@@ -2062,6 +2069,22 @@ fn trim_trailing_whitespace(lines: &[&str], range: &TextRange) -> Option<TextRan
     loop {
         if (start_row, start_column) >= (end_row, end_column) {
             return None;
+        }
+        // `end_row` can land at `lines.len()` - one past the last real row - when a range runs
+        // through to the very end of a file that has no trailing newline: `advance_and_build_range`
+        // reports "through EOF" the same way regardless of whether the file ends in `\n`, but only
+        // a file that *does* end in one gets a genuine trailing empty entry from `str::split('\n')`
+        // for that row to look up. Without this, `lines.get(end_row)?` returned `None` here and the
+        // `?` silently dropped the *entire range* instead of trimming it - confirmed as the root
+        // cause of a wholly-appended function rendering with no highlighting at all in
+        // `python-api-change` (whose fixture file happens to lack a trailing newline). Treat the
+        // missing phantom row exactly like the real one a trailing newline would have provided: step
+        // back to the last real row's own end, the same as the loop's own "previous row's newline"
+        // branch below already does for the file-ends-in-newline case.
+        if end_row >= lines.len() {
+            end_row = end_row.checked_sub(1)?;
+            end_column = lines.get(end_row)?.len();
+            continue;
         }
         let line = *lines.get(end_row)?;
         let column = end_column.min(line.len());
@@ -2844,12 +2867,15 @@ mod tests {
         );
     }
 
-    /// Neither preset turns `interior_line_indentation` off - both keep today's corpus-validated
-    /// behavior of highlighting a whole interior row's own indentation. See that field's own doc
-    /// comment for why (no fixture paints choice 2 yet).
+    /// `MINIMAL` and `FULL` disagree on `interior_line_indentation` (unlike every other field
+    /// this struct had before 2026-09-01's corpus measurement) - `FULL` keeps a whole interior
+    /// row's own indentation, `MINIMAL` trims it row by row. Pinned as a `const` assertion, not
+    /// just a doc comment, so a casual edit to either preset literal can't silently flip this
+    /// again without a test failing loud - see `interior_line_indentation`'s own doc comment for
+    /// the measurement this is pinning.
     #[test]
-    fn neither_preset_turns_off_interior_line_indentation() {
-        const { assert!(RenderOptions::MINIMAL.interior_line_indentation) };
+    fn presets_disagree_on_interior_line_indentation() {
+        const { assert!(!RenderOptions::MINIMAL.interior_line_indentation) };
         const { assert!(RenderOptions::FULL.interior_line_indentation) };
     }
 

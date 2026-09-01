@@ -511,6 +511,20 @@ pub struct TextMappingDisagreement {
 
 /// Per-byte labels for one side, from a list of `(span, label)`. Later spans win on overlap, which
 /// only matters for a malformed painting - the solver never produces overlapping spans.
+///
+/// A literal `\n` byte is never labeled, regardless of what span covers it: the real renderer
+/// (`code_viewer`/`headless`, via `TextRange::columns_on_row`) bounds every row's painted columns
+/// to that row's own content length, which `str::split('\n')`-derived `lines` (what `row_len`
+/// always is at both call sites) excludes the newline from by construction - so a multi-row range
+/// never actually highlights the seam between its rows in the product, only in a naive byte-fill
+/// that doesn't know rows exist. Without this, comparing raw byte spans reported a fixture-measured
+/// disagreement for something no reader of the real output could ever see - confirmed as the whole
+/// of `rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches`'s residual and
+/// part of several others' (see the "connecting-newline seam" pattern in
+/// `painting_disagreement_census_2026_09_01.md`). Applied here rather than only to codediff's own
+/// side so a human's own multi-row entry (Rule 4: "whitespace inside a range is usually kept") is
+/// held to the same never-the-newline floor Rule 1 states unconditionally, not just to whatever
+/// `label_bytes_from_ranges` also happens to call this.
 fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Option<TextLabel>> {
     let mut labels = vec![None; contents.len()];
     for &(span, label) in spans {
@@ -522,6 +536,11 @@ fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Opti
         };
         for slot in labels.iter_mut().take(end.min(contents.len())).skip(start) {
             *slot = Some(label);
+        }
+    }
+    for (byte, label) in contents.bytes().zip(labels.iter_mut()) {
+        if byte == b'\n' {
+            *label = None;
         }
     }
     labels
@@ -5035,6 +5054,155 @@ mod tests {
                     theirs[start],
                     String::from_utf8_lossy(text)
                 );
+            }
+        }
+        Ok(())
+    }
+
+    /// TEMPORARY/EXPLORATORY (not for commit): dumps the top-level after-tree children's AST
+    /// mapping for a fixture named by `FIXTURE`, to find why a whole subtree renders unpainted.
+    /// `FIXTURE=name cargo test --lib --features test-fixtures dump_top_level_mapping --
+    /// --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn dump_top_level_mapping() -> Result<()> {
+        let name = std::env::var("FIXTURE").unwrap_or_else(|_| "python-api-change".to_string());
+        let (before, after) = crate::test::helper::handmade_test_code_pair(&name)?;
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff.ast.as_ref().unwrap();
+
+        if std::env::var("DUMP_RAW_RANGES").is_ok() {
+            let node_cache = crate::diff::NodeCache::build(&before, &after);
+            let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &node_cache);
+            eprintln!("--- raw after_ranges (unfiltered) ---");
+            for r in text_diff.all(1) {
+                eprintln!(
+                    "{:?} source={:?} dest={:?}",
+                    r.operation, r.source, r.destination
+                );
+            }
+            eprintln!("--- after filtering (FULL) ---");
+            let filtered = crate::diff::text::ranges_for_options(
+                &text_diff.all(1),
+                &after.contents,
+                crate::diff::text::RenderOptions::FULL,
+            );
+            for r in &filtered {
+                if r.source.start_row >= 20 {
+                    eprintln!("{:?} source={:?}", r.operation, r.source);
+                }
+            }
+            eprintln!("(total filtered ranges: {}, raw: {})", filtered.len(), text_diff.all(1).len());
+            return Ok(());
+        }
+
+        if let Ok(row) = std::env::var("SUBTREE_AT_ROW") {
+            let target_row: usize = row.parse().unwrap();
+            let after_root = after.ast.as_ref().unwrap().root_node();
+            fn find_and_dump(
+                node: tree_sitter::Node,
+                target_row: usize,
+                depth: usize,
+                ast: &crate::diff::ASTDiff,
+                contents: &[u8],
+            ) -> bool {
+                if node.start_position().row == target_row && depth < 3 {
+                    dump_subtree(node, 0, ast, contents);
+                    return true;
+                }
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if find_and_dump(child, target_row, depth + 1, ast, contents) {
+                        return true;
+                    }
+                }
+                false
+            }
+            fn dump_subtree(
+                node: tree_sitter::Node,
+                depth: usize,
+                ast: &crate::diff::ASTDiff,
+                contents: &[u8],
+            ) {
+                let text = node.utf8_text(contents).unwrap_or("").lines().next().unwrap_or("");
+                let indent = "  ".repeat(depth);
+                match ast.mapping_for_node(&node.id()) {
+                    Some((other, mapping)) => eprintln!(
+                        "{indent}#{} [{}] {:?} op={:?} reason={:?} -> #{other}",
+                        node.id(), node.kind(), text, mapping.operation, mapping.reason
+                    ),
+                    None => eprintln!(
+                        "{indent}#{} [{}] {:?} -> UNMAPPED",
+                        node.id(), node.kind(), text
+                    ),
+                }
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    dump_subtree(child, depth + 1, ast, contents);
+                }
+            }
+            find_and_dump(after_root, target_row, 0, ast, after.contents.as_bytes());
+            return Ok(());
+        }
+
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let mut cursor = after_root.walk();
+        for child in after_root.children(&mut cursor) {
+            let id = child.id();
+            let text = child
+                .utf8_text(after.contents.as_bytes())
+                .unwrap_or("")
+                .lines()
+                .next()
+                .unwrap_or("");
+            match ast.mapping_for_node(&id) {
+                Some((other_id, mapping)) => {
+                    eprintln!(
+                        "after#{id} [{}] {:?} -> before#{other_id} op={:?} reason={:?}",
+                        child.kind(),
+                        text,
+                        mapping.operation,
+                        mapping.reason
+                    );
+                }
+                None => {
+                    eprintln!(
+                        "after#{id} [{}] {:?} -> NOT MAPPED AT ALL",
+                        child.kind(),
+                        text
+                    );
+                }
+            }
+        }
+
+        eprintln!("--- before top-level ---");
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let mut cursor = before_root.walk();
+        for child in before_root.children(&mut cursor) {
+            let id = child.id();
+            let text = child
+                .utf8_text(before.contents.as_bytes())
+                .unwrap_or("")
+                .lines()
+                .next()
+                .unwrap_or("");
+            match ast.mapping_for_node(&id) {
+                Some((other_id, mapping)) => {
+                    eprintln!(
+                        "before#{id} [{}] {:?} -> after#{other_id} op={:?} reason={:?}",
+                        child.kind(),
+                        text,
+                        mapping.operation,
+                        mapping.reason
+                    );
+                }
+                None => {
+                    eprintln!(
+                        "before#{id} [{}] {:?} -> NOT MAPPED AT ALL",
+                        child.kind(),
+                        text
+                    );
+                }
             }
         }
         Ok(())
