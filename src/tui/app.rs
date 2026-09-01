@@ -1259,13 +1259,61 @@ pub(crate) fn compute_diff(
     compute_diff_with_update_style(before, after, mode, false, true)
 }
 
+/// Stack size for the thread [`compute_diff_with_update_style`] runs the actual pipeline on.
+///
+/// Mirrors `file_stats.rs`'s `WORKER_STACK_SIZE` and its rationale: real-world corpora contain
+/// pathologically deep trees (huge generated/minified files, deeply nested JSON, long chained
+/// expressions) whose recursive AST walks (e.g. `apted`'s `gted`/`compute_has_match_below`,
+/// `stats::count_nodes`) can overflow a default-size stack. Every caller of this function runs it
+/// on a thread smaller than the plain OS default: the TUI's `tokio::task::spawn_blocking` pool
+/// (2MB) and, historically, the plain calling thread for `headless::run`/`json_output::run`. A
+/// stack overflow aborts the whole process unconditionally - unlike a panic, it can't be caught by
+/// the `catch_unwind` already wrapping the TUI's `spawn_blocking` closure - so raising the ceiling
+/// here is the only fix, and doing it in this one choke point covers all three entry points at
+/// once.
+const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
+
 /// The real diff computation every production caller uses -
 /// [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] threaded
 /// through to the AST-backed path rather than hardcoded to their legacy defaults.
 /// `App::start_diff` reads them off the live `DiffViewer`; `tui::headless::run`/
 /// `tui::json_output::run` read them off the `RenderOptions` CLI/config already resolved before a
 /// diff is computed.
+///
+/// Runs the actual work on a dedicated thread with [`DIFF_COMPUTE_STACK_SIZE`] - see that
+/// constant's doc comment - and joins it. A panic on that thread is re-raised here via
+/// `resume_unwind` rather than converted to an `Err`, so it still looks like an ordinary panic on
+/// the calling thread to every existing caller (the TUI's `catch_unwind`, and headless/json's
+/// unwrapped default panic behavior).
 pub(crate) fn compute_diff_with_update_style(
+    before: &Path,
+    after: &Path,
+    mode: DiffMode,
+    whole_pair_updates: bool,
+    paint_reindent_only_moves: bool,
+) -> Result<(DiffSessionData, bool)> {
+    let before = before.to_path_buf();
+    let after = after.to_path_buf();
+    match std::thread::Builder::new()
+        .stack_size(DIFF_COMPUTE_STACK_SIZE)
+        .spawn(move || {
+            compute_diff_with_update_style_inner(
+                &before,
+                &after,
+                mode,
+                whole_pair_updates,
+                paint_reindent_only_moves,
+            )
+        })
+        .expect("failed to spawn diff-computation thread")
+        .join()
+    {
+        Ok(result) => result,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
+}
+
+fn compute_diff_with_update_style_inner(
     before: &Path,
     after: &Path,
     mode: DiffMode,
