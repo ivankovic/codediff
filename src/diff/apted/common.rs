@@ -1399,6 +1399,59 @@ fn resolve_flat_tree_pair(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
+    resolve_child_sequence(
+        before_children,
+        after_children,
+        before_meta,
+        after_meta,
+        LeftoverPool::Flat,
+        source,
+        diff,
+    );
+    diff.add_mapping(
+        before_root,
+        after_root,
+        ASTMapping {
+            cost: 0,
+            operation: ASTMappingOperation::MatchButNotIdentical,
+            reason: ASTMappingReason::FlatSequenceDiff,
+        },
+    );
+}
+
+/// How [`resolve_child_sequence`] treats leftovers whose counts differ on the two sides - the one
+/// place a pooled, multi-candidate APTED call is on the table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LeftoverPool {
+    /// A flat container's children: pool up to `FLAT_UNMATCHED_RECURSE_LIMIT` entries /
+    /// `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE` nodes, else atomic delete/insert - the caps whose
+    /// history is on those constants.
+    Flat,
+    /// An oversized pair's children (`resolve_oversized_pair`): the whole point is to stay under
+    /// `APTED_MAX_CELLS`, so the pool is bounded by that product rather than by entry count, and
+    /// a pool that still doesn't fit goes through `resolve_unequal_segment_via_kind_only_anchors`
+    /// (shape anchors, then similarity, then atomic) instead of straight to atomic - the pair
+    /// would have been solved exactly by APTED before the gate existed, so plain atomic
+    /// delete/insert here is the one outcome measurably worse than the old behaviour
+    /// (`lua-luakit-...-merging-two-tests-into-one` 107 -> 389 with atomic, 2026-09-02).
+    Oversized,
+}
+
+/// The child-level half of [`resolve_flat_tree_pair`], without the root pairing: anchors
+/// `before_children`/`after_children` by exact hash (Myers per already-anchored segment), then
+/// resolves the leftovers positionally, as a bounded pool, or as atomic delete/insert - see the
+/// comments inside for each branch's history. Nothing here assumes the children are leaves; the
+/// "flat" in the caller's name is that caller's gate, not this function's requirement, which is
+/// what lets [`resolve_oversized_pair`] reuse it for an arbitrarily deep child list.
+fn resolve_child_sequence(
+    before_children: Vec<usize>,
+    after_children: Vec<usize>,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    leftover_pool: LeftoverPool,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
     let segments = split_into_anchored_segments(&before_children, &after_children, diff);
 
     let mut before_unmatched: Vec<usize> = Vec::new();
@@ -1512,9 +1565,18 @@ fn resolve_flat_tree_pair(
         }
     } else if !before_unmatched.is_empty()
         && !after_unmatched.is_empty()
-        && before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
-        && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
-        && unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE
+        && match leftover_pool {
+            LeftoverPool::Flat => {
+                before_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+                    && after_unmatched.len() <= FLAT_UNMATCHED_RECURSE_LIMIT
+                    && unmatched_total_size <= FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE
+            }
+            LeftoverPool::Oversized => {
+                subtree_size_sum(&before_unmatched, before_meta)
+                    * subtree_size_sum(&after_unmatched, after_meta)
+                    <= APTED_MAX_CELLS
+            }
+        }
     {
         let cost_model = UnitCostModel::new(before_meta.language);
         resolve_forest(
@@ -1527,6 +1589,15 @@ fn resolve_flat_tree_pair(
             source,
             diff,
         );
+    } else if leftover_pool == LeftoverPool::Oversized {
+        resolve_unequal_segment_via_kind_only_anchors(
+            &before_unmatched,
+            &after_unmatched,
+            before_meta,
+            after_meta,
+            source,
+            diff,
+        );
     } else {
         for &id in &before_unmatched {
             add_delete_mappings(id, before_meta, source, diff);
@@ -1535,16 +1606,6 @@ fn resolve_flat_tree_pair(
             add_insert_mappings(id, after_meta, source, diff);
         }
     }
-
-    diff.add_mapping(
-        before_root,
-        after_root,
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::MatchButNotIdentical,
-            reason: ASTMappingReason::FlatSequenceDiff,
-        },
-    );
 }
 
 /// Minimum direct-child count worth pre-matching via [`prematch_identical_statement_siblings`] -
@@ -3673,6 +3734,113 @@ impl<'a> ContainmentCtx<'a> {
 /// Resolve the mapping for a forest of (possibly already partially mapped) sibling roots on
 /// each side. This is the single entry point that builds the pruned postorder indexers, runs
 /// the keyroot-based forest-distance computation, and translates the result into `diff`.
+/// Largest `before.size * after.size` (pruned node counts) a *single* subtree pair may hand to the
+/// full tree-edit-distance engine. Above it, [`resolve_oversized_pair`] decomposes the pair one
+/// level instead.
+///
+/// Every multi-root forest reaching `resolve_forest` is already bounded by its caller
+/// (`FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`, the residual segment caps), but a single pair never
+/// was: `fast_fallback`'s per-position recursion, `qualified_name`'s per-entity call and
+/// `large_flat_subtree_container` each hand over whole functions or classes of 500-1100 nodes,
+/// and profiling (callgrind + gdb on every fixture over 400ms, 2026-09-01) found that one such
+/// call was the entire latency story every time - the O(n*m)-and-worse edit-distance kernel on
+/// a (848, 679) pair, not anything file-wide.
+///
+/// Calibrated 2026-09-02 by sweeping the corpus per fixture (`--compare`): 250,000 and 400,000
+/// both regress `lua-luakit-luakit-actual-test-change-merging-two-tests-into-one` (107 -> 380) -
+/// its whole file is one (848, 679) = 575,632-cell pair whose top-level statements all changed
+/// quote style, so exact-hash anchoring finds nothing and the decomposition falls to shape
+/// anchors and atomic delete/insert where full APTED aligned everything; 250,000 also trades
+/// `c-graph-algorithms-...` (70 -> 87) for `c-postgres-real-logic-change` (27 -> 14). 600,000
+/// is the first value with no fixture worse and none better: every pair the corpus needs solved
+/// exactly stays exact, and the pairs above it (rustdesk's (716, 878), openvr's (1068, 1088))
+/// decompose to the same mapping they had. Lowering it is a latency-for-quality trade that the
+/// per-fixture gate will show; raising it buys nothing today.
+const APTED_MAX_CELLS: usize = 600_000;
+
+/// What `resolve_forest` does with a single pair over [`APTED_MAX_CELLS`]: pair the two roots
+/// (or delete/insert them if their kinds may not meet), then resolve their children as an
+/// anchored sequence exactly the way a flat container's children are - exact-hash LCS first,
+/// leftovers positionally when the counts agree, as a bounded APTED pool otherwise. Each
+/// leftover pair re-enters `resolve_forest` on its own, so the gate applies again a level down.
+///
+/// The decomposition is the same one every flat container already gets, so the risk is not a
+/// new kind of guess but a coarser one: a function body that gained a statement *and* edited a
+/// neighbour lands in the unequal-count branch, where the flat path's pool caps decide between a
+/// bounded pool and atomic delete/insert. Measured per fixture before landing (see the commit).
+fn resolve_oversized_pair(
+    before_root: usize,
+    after_root: usize,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    cost_model: &UnitCostModel,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) {
+    let before_children = before_meta
+        .node_info
+        .get(&before_root)
+        .map(|info| info.children.clone())
+        .unwrap_or_default();
+    let after_children = after_meta
+        .node_info
+        .get(&after_root)
+        .map(|info| info.children.clone())
+        .unwrap_or_default();
+
+    let roots_may_pair = match (
+        before_meta.node_info.get(&before_root),
+        after_meta.node_info.get(&after_root),
+    ) {
+        (Some(b), Some(a)) => kinds_update_allowed(&b.kind, &a.kind, &before_meta.language),
+        _ => false,
+    };
+    if roots_may_pair {
+        let (operation, cost) =
+            classify_match(before_root, after_root, before_meta, after_meta, cost_model);
+        diff.add_mapping(
+            before_root,
+            after_root,
+            ASTMapping {
+                cost,
+                operation,
+                reason: ASTMappingReason::APTED(source),
+            },
+        );
+    } else {
+        // Root only - the children get their own decisions below, same as `emit_before_subtree`'s
+        // "something below is reused" branch.
+        diff.add_mapping(
+            before_root,
+            0,
+            ASTMapping {
+                cost: COST_DELETE,
+                operation: ASTMappingOperation::Delete,
+                reason: ASTMappingReason::APTED(source),
+            },
+        );
+        diff.add_mapping(
+            0,
+            after_root,
+            ASTMapping {
+                cost: COST_INSERT,
+                operation: ASTMappingOperation::Insert,
+                reason: ASTMappingReason::APTED(source),
+            },
+        );
+    }
+
+    resolve_child_sequence(
+        before_children,
+        after_children,
+        before_meta,
+        after_meta,
+        LeftoverPool::Oversized,
+        source,
+        diff,
+    );
+}
+
 /// Which tree-edit-distance algorithm `resolve_forest` should run to populate the delta table
 /// that `compute_edit_mapping` then backtraces through. Both produce optimal distances; this is
 /// purely a backend choice threaded through from `for_roots`/`for_nodes`.
@@ -3746,6 +3914,22 @@ pub(crate) fn resolve_forest(
 
     let before_idx = PostorderIndexer::build(before_meta, &before_root_ids, &diff.before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, &after_root_ids, &diff.after_node_map);
+
+    if before_root_ids.len() == 1
+        && after_root_ids.len() == 1
+        && before_idx.size * after_idx.size > APTED_MAX_CELLS
+    {
+        resolve_oversized_pair(
+            before_root_ids[0],
+            after_root_ids[0],
+            before_meta,
+            after_meta,
+            cost_model,
+            source,
+            diff,
+        );
+        return;
+    }
 
     // Built once and threaded into every `ren()` evaluation below (both the delta sweep and the
     // backtrace), so a "hollowed out" ancestor left behind by pruning can't freely rename onto a
