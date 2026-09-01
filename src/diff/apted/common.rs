@@ -1167,6 +1167,26 @@ fn flat_children(root_id: usize, meta: &ASTMetadata) -> Option<Vec<usize>> {
     }
 }
 
+/// `root_id`'s one flat child (`flat_children`), if exactly one of its children is flat - the
+/// "thin wrapper around a flat container" shape `resolve_forest` decomposes rather than solving
+/// as one tree. The wrapper's other children (the `struct` keyword, the type name, braces, an
+/// `attribute_specifier` - `c-sched-ext-scx`'s structs carry `__attribute__((aligned))` after
+/// the field list) are resolved by the same child-sequence pass and may be anything but flat
+/// themselves; two flat children would mean the wrapper's own structure is the edit.
+fn sole_flat_child(root_id: usize, meta: &ASTMetadata) -> Option<usize> {
+    let info = meta.node_info.get(&root_id)?;
+    let mut flat = info
+        .children
+        .iter()
+        .copied()
+        .filter(|&c| flat_children(c, meta).is_some());
+    let candidate = flat.next()?;
+    if flat.next().is_some() {
+        return None;
+    }
+    Some(candidate)
+}
+
 /// Myers O(ND) LCS on two sequences of hashes. Returns matched `(a_idx, b_idx)` pairs
 /// in ascending order, or `None` if the edit distance exceeds `max_edit`.
 ///
@@ -1419,6 +1439,115 @@ fn resolve_flat_tree_pair(
     );
 }
 
+/// Second anchoring pass over a container's exact-hash leftovers, keyed on each member's declared
+/// name (`nodes::member_identity_name`): a leftover pair with the same `(kind, name)`, unique
+/// among the leftovers on both sides, is resolved on its own through `resolve_forest` (a real,
+/// scoped, size-gated APTED call, so a member whose body changed gets a proper
+/// `MatchButNotIdentical` mapping, never a false `Identical`). Returns whatever is still
+/// unanchored, in document order, for the positional / pooled / atomic handling that follows.
+///
+/// The gap this closes is the flat-container pass's biggest: it anchors direct children by
+/// *whole-subtree* hash only, so every member whose body changed at all fell to the leftover
+/// branches, none of which used the member's identity. Two fixtures put ~15% of the corpus's
+/// mismatches there (2026-09-01): `java-pdftk-...-real-change-all-across-the-file` (888 - more
+/// than 20 changed methods trip the pool cap, and the cap-exceeded branch deletes every one of
+/// them wholesale) and `c-sched-ext-scx-many-many-moves-...` (245 - the equal-count zip pairs
+/// near-identical `volatile <type> <name>;` fields with the wrong twins).
+///
+/// Same shape as `prematch_unique_named_locals` (unique-on-both-sides, per-pair scoped APTED) and
+/// the kind-only sub-anchor before it; an exact declared name is a far less ambiguous key than a
+/// kind-only hash, so it needs no size floor. It only ever *adds* same-name pairs that the exact
+/// hash missed - a name present on one side only is left exactly where it was.
+fn anchor_leftovers_by_member_name(
+    before_unmatched: Vec<usize>,
+    after_unmatched: Vec<usize>,
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    source: &'static str,
+    diff: &mut ASTDiff,
+) -> (Vec<usize>, Vec<usize>) {
+    if before_unmatched.is_empty() || after_unmatched.is_empty() {
+        return (before_unmatched, after_unmatched);
+    }
+    let language = before_meta.language;
+    let bucket = |ids: &[usize], meta: &ASTMetadata| {
+        let mut groups: rustc_hash::FxHashMap<(&'static str, String), Vec<usize>> =
+            rustc_hash::FxHashMap::default();
+        for &id in ids {
+            if let Some(key) = nodes::member_identity_name(id, meta, &language) {
+                groups.entry(key).or_default().push(id);
+            }
+        }
+        groups
+    };
+    let before_groups = bucket(&before_unmatched, before_meta);
+    if before_groups.is_empty() {
+        return (before_unmatched, after_unmatched);
+    }
+    let after_groups = bucket(&after_unmatched, after_meta);
+
+    let preorder = |meta: &ASTMetadata, id: usize| {
+        meta.node_info
+            .get(&id)
+            .map(|i| i.preorder_index)
+            .unwrap_or(usize::MAX)
+    };
+    // A name with exactly one holder per side is an unambiguous pair. A name with the *same*
+    // number of holders on both sides - Java's overloads and constructors, which all carry the
+    // class's own name - is zipped in document order: overloads keep their relative order across
+    // an edit far more often than not, and the alternative (leaving every constructor to the
+    // pool caps) is what deleted all six of `java-pdftk-...`'s constructors wholesale. A name
+    // whose count differs (an overload was added or removed) is left alone: which one is new is
+    // exactly the question this pass has no evidence for.
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for (key, before_ids) in &before_groups {
+        let Some(after_ids) = after_groups.get(key) else {
+            continue;
+        };
+        if before_ids.len() != after_ids.len() {
+            continue;
+        }
+        let mut before_ids = before_ids.clone();
+        let mut after_ids = after_ids.clone();
+        before_ids.sort_unstable_by_key(|&id| preorder(before_meta, id));
+        after_ids.sort_unstable_by_key(|&id| preorder(after_meta, id));
+        pairs.extend(before_ids.into_iter().zip(after_ids));
+    }
+    if pairs.is_empty() {
+        return (before_unmatched, after_unmatched);
+    }
+    // Deterministic order - `HashMap` iteration isn't - by document position.
+    pairs.sort_unstable_by_key(|&(b, _)| preorder(before_meta, b));
+
+    let cost_model = UnitCostModel::new(language);
+    let mut anchored_before: rustc_hash::FxHashSet<usize> = rustc_hash::FxHashSet::default();
+    let mut anchored_after: rustc_hash::FxHashSet<usize> = rustc_hash::FxHashSet::default();
+    for (b, a) in pairs {
+        resolve_forest(
+            vec![b],
+            vec![a],
+            before_meta,
+            after_meta,
+            &cost_model,
+            Algorithm::Apted,
+            source,
+            diff,
+        );
+        anchored_before.insert(b);
+        anchored_after.insert(a);
+    }
+    (
+        before_unmatched
+            .into_iter()
+            .filter(|id| !anchored_before.contains(id))
+            .collect(),
+        after_unmatched
+            .into_iter()
+            .filter(|id| !anchored_after.contains(id))
+            .collect(),
+    )
+}
+
 /// How [`resolve_child_sequence`] treats leftovers whose counts differ on the two sides - the one
 /// place a pooled, multi-candidate APTED call is on the table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1510,6 +1639,15 @@ fn resolve_child_sequence(
             }
         }
     }
+
+    let (before_unmatched, after_unmatched) = anchor_leftovers_by_member_name(
+        before_unmatched,
+        after_unmatched,
+        before_meta,
+        after_meta,
+        source,
+        diff,
+    );
 
     // A Myers-unmatched entry only failed *exact-hash* equality - it can still share real
     // structure with an entry on the other side (a small edit inside an otherwise-
@@ -3908,6 +4046,26 @@ pub(crate) fn resolve_forest(
         if let (Some(bc), Some(ac)) = (flat_children(b, before_meta), flat_children(a, after_meta))
         {
             resolve_flat_tree_pair(b, a, bc, ac, before_meta, after_meta, source, diff);
+            return;
+        }
+        // A thin wrapper around a flat container - `struct_specifier` around its
+        // `field_declaration_list`, `class_declaration` around its `class_body` - gets the same
+        // one-level decomposition an oversized pair does, so the flat container underneath
+        // reaches the Myers path above instead of the wrapper being solved as one ordered tree.
+        // Same kind on both sides is required of the flat child only; the wrappers themselves
+        // are the pair the caller already decided corresponds.
+        // Ordered tree-edit-distance cannot express a reordering of the container's members at
+        // all: `c-sched-ext-scx-many-many-moves-...` (2026-09-02) is a 100-field struct whose
+        // fields moved, and general APTED on the `struct_specifier` pair mis-paired 96 of them
+        // with same-shaped neighbours (245 mismatches), while the flat path one level down
+        // anchors every moved field by exact hash and by name.
+        if let (Some(bf), Some(af)) = (
+            sole_flat_child(b, before_meta),
+            sole_flat_child(a, after_meta),
+        ) && before_meta.node_info.get(&bf).map(|i| &i.kind)
+            == after_meta.node_info.get(&af).map(|i| &i.kind)
+        {
+            resolve_oversized_pair(b, a, before_meta, after_meta, cost_model, source, diff);
             return;
         }
     }

@@ -361,6 +361,86 @@ pub(crate) fn has_local_identity_coverage(language: &Language) -> bool {
     )
 }
 
+/// The declared name of a *container member* - a method, constructor or field of a Java class
+/// body, a field of a C/C++ struct, a C/C++ function definition - as `(kind, name)`, from
+/// `ASTNodeMetadata` alone (same design as [`local_identity_name`], and confirmed against real
+/// parse trees the same way: `ascii_visualizer` on a Java class and a C struct, 2026-09-02).
+///
+/// Feeds `apted::common::anchor_leftovers_by_member_name`: when a flat container's children fail
+/// exact-hash anchoring because their *bodies* changed, this is the signal that still says which
+/// member is which. Java's `method_declaration` name is its first direct `identifier` (modifiers,
+/// type parameters and the return type all precede it but none is an `identifier`); a field's is
+/// under its `variable_declarator`; a C field's `field_identifier` may sit under a chain of
+/// `pointer_declarator`/`array_declarator`/`function_declarator` wrappers, and a function's
+/// `identifier` under `function_declarator` (itself possibly under `pointer_declarator`).
+///
+/// Overloads and same-named fields in different structs are not a concern here: the caller only
+/// trusts a name that is unique among the leftovers on *both* sides of one container.
+pub(crate) fn member_identity_name(
+    node_id: usize,
+    meta: &ASTMetadata,
+    language: &Language,
+) -> Option<(&'static str, String)> {
+    let info = meta.node_info.get(&node_id)?;
+    let first_child_of_kind = |parent_id: usize, wanted: &str| -> Option<usize> {
+        meta.node_info
+            .get(&parent_id)?
+            .children
+            .iter()
+            .copied()
+            .find(|&c| meta.node_info.get(&c).is_some_and(|i| i.kind == wanted))
+    };
+    // Walks down through declarator wrappers (`*name`, `name[4]`, `(*name)(int)`) to the first
+    // leaf of `wanted` kind.
+    let through_declarators = |mut parent_id: usize, wanted: &str| -> Option<usize> {
+        for _ in 0..8 {
+            if let Some(id) = first_child_of_kind(parent_id, wanted) {
+                return Some(id);
+            }
+            let next = meta
+                .node_info
+                .get(&parent_id)?
+                .children
+                .iter()
+                .copied()
+                .find(|&c| {
+                    meta.node_info
+                        .get(&c)
+                        .is_some_and(|i| i.kind.ends_with("_declarator"))
+                })?;
+            parent_id = next;
+        }
+        None
+    };
+    let text_of = |id: usize| meta.node_info.get(&id).map(|i| i.text.clone());
+    match (language, info.kind.as_str()) {
+        (Language::Java, "method_declaration") => Some((
+            "method_declaration",
+            text_of(first_child_of_kind(node_id, "identifier")?)?,
+        )),
+        (Language::Java, "constructor_declaration") => Some((
+            "constructor_declaration",
+            text_of(first_child_of_kind(node_id, "identifier")?)?,
+        )),
+        (Language::Java, "field_declaration") => {
+            let declarator = first_child_of_kind(node_id, "variable_declarator")?;
+            Some((
+                "field_declaration",
+                text_of(first_child_of_kind(declarator, "identifier")?)?,
+            ))
+        }
+        (Language::C | Language::CPP, "field_declaration") => Some((
+            "field_declaration",
+            text_of(through_declarators(node_id, "field_identifier")?)?,
+        )),
+        (Language::C | Language::CPP, "function_definition") => Some((
+            "function_definition",
+            text_of(through_declarators(node_id, "identifier")?)?,
+        )),
+        _ => None,
+    }
+}
+
 pub(crate) fn local_identity_name(
     node_id: usize,
     meta: &ASTMetadata,
