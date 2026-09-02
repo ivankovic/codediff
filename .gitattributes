@@ -1,0 +1,12 @@
+# Fixture corpus: byte-exact, never normalized.
+#
+# `src/test/data/diffs/**/*.test` files are measurement input, not source. 38 of them across 19
+# fixtures legitimately contain CRLF, because the real-world file they were sampled from did, and
+# the diff algorithm's output depends on those bytes. Without this, a clone on git's Windows
+# default (`core.autocrlf=true`) converts every LF fixture to CRLF on checkout, so that machine's
+# benchmark disagrees with CI on far more than the 19 - and any commit touching one of the 38
+# silently re-normalizes it to LF, changing corpus bytes and every number downstream of them.
+#
+# Scoped to `*.test` deliberately: a repo-wide `text=auto` policy would be a far larger blast
+# radius than the hazard warrants.
+*.test -text
