@@ -41,6 +41,14 @@ What the corpus *looks like*, independent of any diff: per-file size percentiles
 distribution per language, and size/LOC-changed statistics for the sampled Rust pairs. Written by
 `analysis/file_stats.py` and `analysis/code_pair_diff_stats.py`.
 
+`edit_shape.csv` is how big a real-world *edit* is, per language, over the most recent 50 commits
+of each repository (`make edit-shape MODE=<mode>`, `analysis/edit_shape_stats.py`) - the source of
+the paper's Table 2. Per-language rows only: the per-edit population is ~48k modifications and the
+uncapped one ~20M, neither of which belongs in git. The 50-commit cap is load-bearing rather than
+a speed measure - these clones are shallow but not uniformly so, and `torvalds-linux.git` alone
+carries 1.29M of the corpus's 2.31M reachable commits, so an uncapped walk measures the Linux
+kernel and calls it the corpus.
+
 ## quality/
 
 How well the diff algorithm reproduces the human-authored ground-truth mappings in

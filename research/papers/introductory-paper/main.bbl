@@ -2,7 +2,7 @@
 %%% Do NOT edit. File created by BibTeX with style
 %%% ACM-Reference-Format-Journals [18-Jan-2012].
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{10}
 
 %%% ====================================================================
 %%% NOTE TO THE USER: you can override these defaults by providing
@@ -119,6 +119,23 @@
   open-source {Java} projects}. In \bibinfo{booktitle}{\emph{Proceedings of the
   2011 ACM Symposium on Applied Computing}}. \bibinfo{pages}{1317--1324}.
 \newblock
+
+
+\bibitem[Lu et~al\mbox{.}(2025)]%
+        {bdiff}
+\bibfield{author}{\bibinfo{person}{Yao Lu}, \bibinfo{person}{Wanwei Liu},
+  \bibinfo{person}{Tanghaoran Zhang}, \bibinfo{person}{Kang Yang},
+  \bibinfo{person}{Yang Zhang}, \bibinfo{person}{Wenyu Xu},
+  \bibinfo{person}{Longfei Sun}, \bibinfo{person}{Xinjun Mao},
+  \bibinfo{person}{Shuzheng Gao}, {and} \bibinfo{person}{Michael~R. Lyu}.}
+  \bibinfo{year}{2025}\natexlab{}.
+\newblock \bibinfo{title}{{BDiff}: Block-aware and Accurate Text-based Code
+  Differencing}.
+\newblock \bibinfo{howpublished}{arXiv preprint arXiv:2510.21094,
+  \url{https://github.com/BDiff/BDiff}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-08-23}.
 
 
 \bibitem[Myers(1986)]%

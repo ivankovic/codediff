@@ -13,7 +13,7 @@
 \input{figures/variables.tex}
 
 %% Result boxes. Each research question stated in the introduction is answered by a correspondingly
-%% numbered research answer, RA1--RA3, set in one of these at the point where its supporting
+%% numbered research answer, RA1.1--RA4.2, set in one of these at the point where its supporting
 %% measurement is reported. A box holds the answer statement only - two or three sentences, every
 %% measured number a macro from figures/variables.tex - with the argument behind it following as
 %% ordinary prose. Keeping the boxes short is a two-column-layout constraint, not a style
@@ -73,34 +73,39 @@
 \begin{document}
 
 \begin{abstract}
-A syntax-aware diff maps one abstract syntax tree (AST) onto another, and every evaluation of one
-rests on three assumptions: that computing the mapping is affordable, that the correct mapping is
-unique, and that the mapping is what the reader sees. This paper tests all three, and finds each
-of them false often enough to change how such tools should be measured.
+A syntax-aware diff maps one abstract syntax tree (AST) onto another, and every tool built on one
+rests on assumptions its evaluation rarely tests: that the correct mapping can be expressed with
+the four standard operations and is the cheapest one, that computing it is affordable, that the
+mapping and its rendering are unique, and that today's tools recover it. This paper tests each of
+them on real code, without reference to any one tool, and then presents a tool built against what
+the measurements found.
 
-We first measure what exactness costs. Across \RqOnePairsAttempted{} file pairs sampled from
+\emph{Viability.} We built a corpus of \NumFixtures{} real-world changes in
+\NumFixtureLanguages{} languages, each carrying a human-authored AST mapping, and
+\PaintingFixtures{} of them a human-painted rendering. Among the changes annotated with the
+facility to record it, \AmbiguityFullFreshPct{}\% on the larger repository list require a
+correspondence in which several nodes on one side answer to one or several on the other, which
+insert, delete, update and move cannot express; and on at least \CostHumanHigherPct{}\% the
+mapping the annotators judged correct costs strictly more, under unit operation costs, than one
+an algorithm found. \emph{Speed.} Across \RqOnePairsAttempted{} file pairs sampled from
 \NumRepos{} open-source repositories, a single whole-tree tree-edit-distance computation completes
-within a one-second budget for \RqOneCodePct{}\% of code pairs, and the collapse falls between two
-adjacent, entirely ordinary file sizes. We then turn to the ground truth itself, with no diffing
-tool involved: a corpus of \NumFixtures{} real-world changes in \NumFixtureLanguages{} languages,
-each carrying a human-authored AST mapping in which a set of interchangeable nodes can be recorded
-as admitting several equally correct pairings, and \PaintingFixtures{} of them carrying a
-human-painted rendering of the same change. In \AmbiguityFreshPct{}\% of the changes annotated with
-the facility to record it, no single mapping is the correct one; in a rarer class, no one-to-one
-mapping is correct at all, because the true correspondence is $N{:}M$. \InvisibleNodeShare{}\% of
-AST nodes carry no text of their own and never reach the screen, so a node-level metric scores
-heavily on decisions no reader can see. And where the rendering was painted by hand,
-\PaintingDualPct{}\% of changes admit two equally correct renderings of one settled mapping.
-Together these bound what any evaluation scoring a tool against one fixed answer can report.
+within one second for \RqOneCodePct{}\% of code pairs, and the collapse falls between two
+adjacent, entirely ordinary file sizes. \emph{Uniqueness.} \InvisibleNodeShare{}\% of AST nodes
+carry no text of their own and never reach the screen, so a node-level metric scores heavily on
+decisions no reader can see; and where the rendering was painted by hand, \PaintingDualPct{}\% of
+changes admit two equally correct renderings of one settled mapping. \emph{Implementation.}
+Against the same ground truth, nine established tools---Unix \texttt{diff}, four \texttt{git}
+algorithms, BDiff, Neovim, GumTree, difftastic and diffsitter---show line-level mismatch rates
+from \GitMyersLineRate{}\% to \GumTreeLineRate{}\%, with no AST-aware tool among them beating
+plain line-based \texttt{diff}.
 
-Against that ground truth we measure four established tools---GumTree, Unix \texttt{diff},
-difftastic, and diffsitter---and find line-level mismatch rates from \UnixDiffLineRate{}\% to
-\GumTreeLineRate{}\%, with no AST-aware tool among them beating plain line-based \texttt{diff}.
-Finally, as a system contribution, we present \textsc{CodeDiff}, a tree-sitter-based diffing tool
+Finally, as a tool contribution, we present \textsc{CodeDiff}, a tree-sitter-based diffing tool
 that combines APTED's exact tree edit distance, scoped to bounded subtree pairs rather than whole
 files, with GumTree's move-recovery heuristic and Myers' sequence diff into one
 \NumPhasesWord{}-phase pipeline, engineered against the measurements above rather than against a
-worst-case bound, and mapping \NodeAccuracyPct{}\% of AST nodes correctly on the same corpus.
+worst-case bound. It maps \NodeAccuracyPct{}\% of AST nodes correctly on the same corpus and, at
+the line level, reaches \CodeDiffLineRate{}\%, the lowest mismatch rate of any tool measured on
+the full corpus.
 \end{abstract}
 
 \maketitle
@@ -134,39 +139,48 @@ Additionally, an AST diff is not directly usable to the developers. It has to be
 the textual representation of the source code. For any given AST diff, there are several equally
 correct visualizations, and the quality of the visualization determines tool adoption as well.
 
+This paper asks four groups of research questions. Each group is answered in its own section,
+in the order listed here, and each question is restated verbatim next to the measurement that
+answers it.
+
+%% The RQ statements below are restated verbatim in Sections 5-8 next to their answers. Edit both
+%% or neither.
 \begin{itemize}
-  \item \textbf{Research Question Group 1 (Viability):} What percentage of real-world code changes
-    have an optimal AST node mapping that cannot be expressed using common AST diff operations
-    (Insert, Delete, Update, Move)? What percentage of real-world code changes have a solutions
-    that humans prefer whose cost is higher than the optimal AST diff, using the commonly accepted
-    costs of common AST diff operations?
-  \item \textbf{Research Question Group 2 (Speed):} What percentage of real-world source-code
-    changes can a single, whole-tree tree-edit-distance computation complete within one
+  \item \textbf{Research Question Group 1 (Viability):} (RQ1.1) What percentage of real-world
+    code changes have an optimal AST node mapping that cannot be expressed using common AST diff
+    operations (Insert, Delete, Update, Move)? (RQ1.2) What percentage of real-world code changes
+    have solutions that humans prefer whose cost is higher than the optimal AST diff, using the
+    commonly accepted costs of common AST diff operations?
+  \item \textbf{Research Question Group 2 (Speed):} (RQ2) What percentage of real-world
+    source-code changes can a single, whole-tree tree-edit-distance computation complete within one
     second?~\footnote{One second was chosen based on the generally accepted average human response
-    time to visual stimulus, which is 250 ms. See the~\ref{sec:cost} for details.}
-  \item \textbf{Research Question Group 3 (Uniqueness):} What percentage of real-world code changes have multiple optimal
-    AST node mappings? What percentage of real-world code changes have multiple equally correct textual
-    visualizations of the diff? What percentage of the AST influences the textual visualization?
-  \item \textbf{Research Question Group 4 (Implementation):} How accurately do current state-of-the-art
-    code diffing tools find optimal visualizations? How fast are real-world state-of-the-art tools?
+    time to visual stimulus, which is 250 ms. See Section~\ref{sec:speed} for details.}
+  \item \textbf{Research Question Group 3 (Uniqueness):} (RQ3.1) What percentage of real-world
+    code changes have multiple optimal AST node mappings? (RQ3.2) What percentage of real-world
+    code changes have multiple equally correct textual visualizations of the diff? (RQ3.3) What
+    percentage of the AST influences the textual visualization?
+  \item \textbf{Research Question Group 4 (Implementation):} (RQ4.1) How accurately do current
+    state-of-the-art code diffing tools find optimal visualizations? (RQ4.2) How fast are
+    real-world state-of-the-art tools?
 \end{itemize}
 
 This paper makes the following contributions:
 
 \begin{itemize}
-  \item \textbf{Dataset:} A set of \NumFixtures{} real-world code changes. The changes cover \NumLanguages
-    and were selected using 3 different selection algorithms from \NumRepos open source repositories.
+  \item \textbf{Dataset:} A set of \NumFixtures{} real-world code changes. The changes cover
+    \NumFixtureLanguages{} languages and were selected using 3 different selection algorithms from
+    \NumRepos{} open source repositories.
     The repositories themselves are a combination of a curated list and every repository used by the Gentoo
     Linux distribution. Every change was solved by hand and the optimal map between the two ASTs is
     available, or if the optimal map is impossible using the common AST diff operations, a best-possible
-    solution with a comment explaining the missing part. Additionally, \PaintingFixtures of those
+    solution with a comment explaining the missing part. Additionally, \PaintingFixtures{} of those
     solutions also has the optimal visualizations: the spans of text a developer should see marked,
     independently of which AST nodes carry them. Often, two visualizations are provided: the minimal one
     and the maximal one, covering human preferences between equally valid solutions.
     The dataset, the tool used to create the dataset and the entire history of the dataset is available
-    freely for future research. The dataset is described in detail in~\ref{sec:dataset}.
+    freely for future research. The dataset is described in detail in Section~\ref{sec:dataset}.
   \item \textbf{Evaluation:} Answers to all research questions. An analysis of the real-world code change
-    data shape, irrespective of any concrete implementation, and a quantified compasion of several
+    data shape, irrespective of any concrete implementation, and a quantified comparison of several
     state-of-the-art code diffing tools on the human annotated dataset.
   \item \textbf{Tool:} \textsc{CodeDiff}, a new state-of-the-art tool. Combining all current research
     with strict engineering principles and carefully implemented to maximize performance. \textsc{CodeDiff}
@@ -176,7 +190,7 @@ This paper makes the following contributions:
 \section{Background}
 \label{sec:background}
 
-This sections lists two types of existing work: theorethical research papers and actual tool
+This section lists two types of existing work: theoretical research papers and actual tool
 implementations.
 
 \subsection{Algorithms}
@@ -214,9 +228,24 @@ version-controlled file.
 
 \subsection{Tools}
 
-\textbf{Unix \texttt{diff}} TODO
+\textbf{Unix \texttt{diff}} is the line-based baseline every other tool in this paper is
+measured against. It treats each file as a sequence of lines, computes a shortest edit script
+between the two sequences with Myers' algorithm, and reports it as hunks of deleted and inserted
+whole lines. It has no move operation and no sub-line detail, and it is what most developers read
+every day.
 
-\textbf{git diff} TODO
+\textbf{\texttt{git diff}} is the same line-based model inside version control. Its
+\texttt{xdiff} engine offers four algorithms, selected with \texttt{--diff-algorithm}: Myers, the
+default; \emph{minimal}, which spends more time to find a shortest script; \emph{patience}, which
+anchors on lines unique to both sides before recursing; and \emph{histogram}, a faster
+generalization of patience. All four emit the same output form as Unix \texttt{diff}, so any
+difference between them is a difference in which lines they choose to pair.
+
+\textbf{BDiff}~\cite{bdiff} is a recent text-based tool that reasons about blocks of lines rather
+than single lines and reports character ranges within changed lines. \textbf{Neovim's diff mode}
+(\texttt{nvim -d}) runs the same \texttt{xdiff} line pass as \texttt{git} and then a second,
+character-level pass that highlights what changed inside each paired line; it is included as the
+most widely deployed sub-line diff view developers see inside an editor.
 
 \textbf{difftastic}~\cite{difftastic} and \textbf{diffsitter}~\cite{diffsitter} are a newer
 generation of practical, tree-sitter-based diffing tools. Both prioritize a diff a human reads
@@ -228,7 +257,7 @@ alignment over a smaller, hand-picked set of compiled-in grammars.
 \label{sec:dataset}
 
 To understand the real-world environment code diffing tools are used in, we built a dataset of
-\NumFixtures real open source code changes.
+\NumFixtures{} real open source code changes.
 
 To ensure good coverage, we built two sets of open-source repositories:
 
@@ -284,7 +313,71 @@ for quick estimates.
 Arafat and Riehle report that 47.5\% of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
 over 10 000 lines still occur.
 
-TODO: Add our own metrics here
+We measured the same shape on our own corpus, because a diffing tool is not handed a commit but a
+file pair, and it is the per-file distribution that sets its budget. Over the Curated list's
+\EditsRepositories{} repositories we walked the most recent \CorpusCloneDepth{} commits of each,
+excluding merges, and recorded for every file they touched how many lines \texttt{git} reports
+added and removed. That is \EditsCommits{} commits touching \EditsCodeFileEdits{} code files
+across \EditsLanguages{} languages. Code files are \EditsCodeSharePct{}\% of all files touched,
+close to the two-thirds share Figure~\ref{fig:tips} finds among files at rest. Of the code-file
+edits, \EditsModifiedSharePct{}\% modify a file that exists on both sides; the rest create or
+delete one, and are excluded from everything below, since a file with only one version presents
+nothing to map. Every figure that follows therefore describes the \EditsFileEdits{} genuine file
+modifications.
+
+Capping each repository at \CorpusCloneDepth{} commits is what makes this a statement about the
+corpus rather than about its largest member. These clones are shallow but not uniformly so: the
+Linux kernel alone carries 1.29M of the 2.31M commits reachable across the corpus, and an
+uncapped walk reports its habits with the other 99 repositories as rounding error. The cap
+also matches the depth the corpus was fetched at. This is a census of that window, not a sample of
+it, and deliberately not the stratified draw of Section~\ref{sec:speed}, which over-represents
+large files by construction and so cannot answer a question about a typical edit.
+
+\begin{table}
+  \caption{Size of a real-world edit on the Curated list, in lines added plus removed, over the
+  \EditsFileEdits{} file modifications in the sampled window. Per file is one file's share of one
+  commit, which is the unit a diffing tool is invoked on; per commit sums that over the commit's
+  code files.}
+  \label{tab:edit-shape}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Metric & p50 & p90 & p99 & Max \\
+    \midrule
+    Lines changed, per file   & \EditsLinesPerFilePFifty{}   & \EditsLinesPerFilePNinety{}   & \EditsLinesPerFilePNinetyNine{}   & \EditsLinesPerFileMax{} \\
+    Lines changed, per commit & \EditsLinesPerCommitPFifty{} & \EditsLinesPerCommitPNinety{} & \EditsLinesPerCommitPNinetyNine{} & \EditsLinesPerCommitMax{} \\
+    Code files, per commit    & \EditsFilesPerCommitPFifty{} & \EditsFilesPerCommitPNinety{} & \EditsFilesPerCommitPNinetyNine{} & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:edit-shape} reports the result, and the per-file row is the striking one. The
+median file modification changes \EditsLinesPerFilePFifty{} lines, and
+\EditsFileEditsUnderTenPct{}\% of them change 10 lines or fewer. Per commit the figures are
+larger, a median of \EditsLinesPerCommitPFifty{} lines across a median of
+\EditsFilesPerCommitPFifty{} files, and \EditsCommitsUnderTenPct{}\% of commits touch 10 lines of
+code or fewer---below Arafat and Riehle's 47.5\%, which is measured over a different corpus and
+counts every file a commit touches rather than only its code. The tail is real at both
+granularities: the same window holds a single-file modification of \EditsLinesPerFileMax{} lines.
+Both regimes occur, which is why Section~\ref{sec:codediff} states a design target for each.
+
+For an AST diffing tool the absolute size of an edit matters less than the share of the file it
+touches, because what an algorithm can skip is whatever both versions agree on. That share is
+derivable exactly: counting the lines of the after-side file gives the before-side count too,
+since the added and removed counts are what separate them. The median modification rewrites
+\EditsChurnPFiftyPct{}\% of the lines of the file it lands in, \EditsChurnUnderFivePct{}\% of
+modifications leave at least 95\% of the file untouched, and \EditsChurnUnderTwentyPct{}\% leave
+at least 80\%. This is the measurement Section~\ref{sec:codediff}'s first pipeline phase is
+designed against: when the overwhelming majority of a file is byte-identical across an edit,
+resolving that majority by hashing before any tree-edit-distance computation runs removes most of
+the work rather than a constant factor of it. The fraction is measured over lines; the AST-node
+fraction it stands in for would require parsing both sides of every pair, which this measurement
+does not do.
+
+Two limits bound these numbers, and both cut against generality rather than against the direction
+of the result. The window is each repository's most recent commits rather than its whole history,
+and the Curated list is 100 repositories chosen for language coverage rather than drawn at random.
+Neither a shallower window nor a curated repository list has an obvious mechanism by which it
+would systematically shrink the share of a file that an edit rewrites.
 
 \subsection{Shape of optimal file diffs}
 
@@ -300,7 +393,7 @@ used for other languages. This resulted in a dataset of \SampleCuratedPromoted{}
 Curated and \SampleFullPromoted{} diffs from the Full list.
 
 Each diff was then solved by hand by us, the authors. We have each at least 15 years of experience in
-software developement, and have reviewed tens of thousands of real world code changes in industrial
+software development, and have reviewed tens of thousands of real world code changes in industrial
 environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
 Instead, the dataset supports multiple correct solutions for each diff, and it supports marking diffs
 that cannot be solved at all using the standard set of AST diff operations: Insert, Delete, Update and Move.
@@ -312,146 +405,44 @@ to our annotation tool partway through building the corpus, and \AmbiguityCurate
 mapping whatever their content. Across the \AmbiguityCuratedFreshTotal{} annotated afterwards the
 rate is \AmbiguityCuratedFreshPct{}\% (\AmbiguityCuratedFreshWith{} diffs). We therefore quote the
 Full list as the estimate and report the Curated list only for the diffs where the option existed. The most common cause is a refactoring, where two or more similar blocks
- of code are moved to a common function. The correct solutions is the one that maps all nodes as moved.
+ of code are moved to a common function. The correct solution is the one that maps all nodes as moved.
 
-Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
+\subsection{Recording the AST mapping}
 
-\section{Viability}
-\label{sec:cost}
+For every diff, the annotator used a purpose-built tool, \texttt{human\_solver}, to walk the
+before and after syntax trees side by side and label every node with one of seven operations:
+identical, update, match-but-not-identical, insert, insert-with-children, delete, and
+delete-with-children. Nodes are addressed by a path of kind and sibling position, not by
+parser-internal node identity, since that identity is not stable across separate parses of the
+same file. Alongside the sampled diffs, the corpus holds \PaintingHandmadeTotal{} hand-written
+fixtures, each a small, curated example of a single common change pattern, annotated the same way.
 
+Where the correct correspondence is not one-to-one, the annotator records a \emph{multi-map
+group}: a set of $N$ before-side nodes and $M$ after-side nodes that correspond as a set. Because
+every algorithm measured in this paper emits a one-to-one mapping, the ground truth scores such a
+site by its closest one-to-one approximations: a tool is correct on it if it realizes any
+consistent pairing of $\min(N, M)$ pairs drawn from the group and treats the remainder of the
+larger side as inserted or deleted. A group is not an expression of annotator uncertainty. It is
+the annotator's finding that the change has no single one-to-one answer, and it is what
+Sections~\ref{sec:viability} and~\ref{sec:uniqueness} measure. This human-authored mapping,
+groups included, is the ground truth every accuracy number in this paper is measured against.
 
-* I STOPPED HERE *
+\subsection{Recording the visualization}
 
-\section{The Cost of Exactness}
-
-Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
-complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
-This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
-documentation states that it targets research use, not production deployment at scale—a
-reasonable scope for its own goals, but one that leaves open a question every production diff
-tool must answer:
-
-%% Verbatim reprise of the RQ1 statement in Section 1's introduction - edit both or neither.
-\textbf{RQ1 (Cost of exactness)}, stated in Section~\ref{sec:intro} and restated here: what percentage of
-real-world source-code changes can a single, whole-tree
-tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff tool is built
-on—complete within a one-second budget?
-
-A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
-for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
-analysis never quantified. Answering RQ1 needs measurement, not further asymptotic analysis.
-
-
-\textbf{Measurement.} To answer RQ1's percentage directly, we sampled \RqOnePairsAttempted{} real
-(before, after) file pairs from single-parent commits in these repositories, stratified per
-language and per size bucket so that large files are represented rather than drowned out by the
-far more common small ones. We ran a single whole-tree tree-edit-distance computation on every
-pair—one APTED implementation, applied to the full before and after trees with no pipeline
-heuristics of any kind around it—under a hard one-second budget enforced by terminating the
-computation's process. This implementation includes an optimization that makes it
-faster than a textbook APTED, so the failure rates below are a lower bound on how often a
-whole-tree computation misses the budget, not an upper bound.
-
-Every sampled pair was checked to still resolve against the local clones before measurement, and
-all of them did. This is worth stating because the check has failed before: an earlier sample,
-drawn against a shallower corpus, had decayed to roughly 41\% unresolvable by the time it was
-re-measured, and the losses fell on whole repositories rather than spreading evenly across the
-sample. A measurement over that sample would have reported a healthy-looking rate while quietly
-answering a question about a different, smaller corpus.
-
-Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket,
-split by what kind of artifact the file is: code (\RqOneCodePairs{} pairs across general-purpose
-programming languages), configuration, data, and markup formats (\RqOneConfigDataPairs{} pairs),
-and scripting languages (\RqOneScriptingPairs{} pairs). The split matters because the three
-populations behave differently—blended, the headline
-number would move with how many configuration files a sample happens to contain, independently of
-anything the algorithm does to source code.
-
-\begin{figure*}
-  \centering
-  \includegraphics[width=0.85\linewidth]{figures/apted_only_rq1_by_category.png}
-  \caption{Fraction of sampled file pairs a whole-tree tree-edit-distance computation completes
-  within a one-second budget, per size bucket and artifact category.}
-  \label{fig:rq1}
-\end{figure*}
-
-\begin{resultbox}{RA1 (Cost of exactness)}
-For source code, a whole-tree tree-edit-distance computation is dependable only for small files,
-and the transition is abrupt rather than gradual: it completes within one second for
-\RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but for only
-\RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines, and never recovers above
-one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in time.
-\end{resultbox}
-
-What makes that a design problem rather than a tail problem is where the collapse falls: between
-two adjacent buckets, neither of which is an unusual size for a source file, and both well inside
-the range ordinary source files occupy (Table~\ref{tab:file-size-percentiles}). The corpus-wide figure is a sample-weighted aggregate: it
-deliberately over-represents large files and therefore
-understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
-the answer regardless of weighting.
-
-The three artifact categories do not behave alike. Scripting languages complete within the budget
-\RqOneScriptingPct{}\% of the time, well clear of code at \RqOneCodePct{}\% and configuration,
-data, and markup formats at \RqOneConfigDataPct{}\%; the latter two are close to each other and
-separated by less than six points, so the meaningful split is scripting against the rest rather
-than a clean three-way ordering. Figure~\ref{fig:rq1} shows the same pattern per bucket: scripting
-stays above every other category in all seven, while configuration and data fall furthest in the
-large buckets, despite containing the most repetitive and most regularly structured files in the
-corpus. We conjecture this reflects tree edit distance being sensitive to tree shape rather than to
-node count alone, a large flat sequence of similar siblings being an unfavorable shape for it.
-This measurement does not isolate shape from size, so we state it as a conjecture rather than a
-result.
-
-The common case is genuinely cheap—most files and most
-commits are small—but the tail is real: files up to \AstMax{} AST nodes occur in this corpus, and
-Arafat and Riehle's data shows commits of over 10{,}000 lines occur in practice. A production
-diff tool must be engineered for both regimes, and cannot rely on a whole-tree computation alone
-for either. Section~\ref{sec:codediff} turns this answer into \textsc{CodeDiff}'s concrete
-design targets.
-
-\section{A Ground Truth for Code Change}
-\label{sec:ground-truth}
-
-The three sections that follow all measure against one artifact: a corpus of human-authored answers
-to the question ``what changed here?'', built without reference to any diffing tool. This section
-describes how it was made and what it records, because everything Section~\ref{sec:limits} finds
-is a property of that record rather than of any algorithm.
-
-\textbf{Mapping the syntax trees.} The corpus holds \NumFixtures{} fixtures spanning
-\NumFixtureLanguages{} languages. Each fixture
-pairs a before and after version of a source file, representing a realistic code change—a bug
-fix, a refactor, an added feature, or a performance-motivated rewrite. Most
-fixtures are captured directly from a specific commit in a real open-source repository; the rest are
-curated examples of a common, realistic change pattern. For every fixture, a human annotator used a
-purpose-built tool, \texttt{human\_solver}, to walk the before and after syntax trees side by side
-and label every node with one of seven operations: identical, update, match-but-not-identical,
-insert, insert-with-children, delete, and delete-with-children. Nodes are addressed by a path of
-kind and sibling position, not by parser-internal node identity, since that identity is not stable
-across separate parses of the same file.
-
-Where several candidate nodes are genuinely interchangeable, a single pairing would be an
-arbitrary choice rather than a fact about the change, so the tool also lets the annotator record a
-\emph{multi-map group}: a set of $N$ before-side nodes and $M$ after-side nodes in which any
-consistent pairing is correct, scored as correct as long as a tool realizes
-$\min(N, M)$ pairs and treats the remainder of the larger side as inserted or deleted. A group is
-not an expression of annotator uncertainty. It is the annotator's finding that more than one
-mapping is equally right, and it is what RQ2 measures. This human-authored mapping, groups
-included, is the ground truth every number in this paper is measured against.
-
-\textbf{Painting the rendering.} A mapping between syntax trees is not what a developer reads. A
-tool must turn its mapping into highlighted regions of text, and that projection is a second
-decision the mapping does not determine. So a subset of the corpus carries a second, independent
-ground truth: a \emph{painting}, in which the annotator marks the spans of source text a reader
-should see highlighted, labelled moved, updated, inserted or deleted, working from the two files
-rather than from either tree. A painting is authored in the same tool, in a separate view, and it
-is deliberately not derived from the mapping---it is the answer to ``what should this look like'',
+A mapping between syntax trees is not what a developer reads. A tool must turn its mapping into
+highlighted regions of text, and that projection is a second decision the mapping does not
+determine. So a subset of the corpus carries a second, independent ground truth: a
+\emph{painting}, in which the annotator marks the spans of source text a reader should see
+highlighted, labelled moved, updated, inserted or deleted, working from the two files rather than
+from either tree. A painting is authored in the same tool, in a separate view, and it is
+deliberately not derived from the mapping---it is the answer to ``what should this look like'',
 recorded so that the two questions can be scored apart.
 
-Painting is slower per fixture than mapping, and it was done on the small, curated changes first:
-\PaintingFixtures{} of the \PaintingScored{} fixtures carry one, all of them from the
-hand-written portion of the corpus, spanning \PaintingLanguages{} languages, with a median of
-\PaintingLocMedian{} lines against \PaintingUnpaintedLocMedian{} for the rest of the corpus.
-Section~\ref{sec:limits} states what that population does and does not license.
+Painting is slower per fixture than mapping, and it was done on the hand-written fixtures first:
+\PaintingFixtures{} of the \PaintingScored{} fixtures carry one, nearly all of them hand-written,
+spanning \PaintingLanguages{} languages, with a median of \PaintingLocMedian{} lines against
+\PaintingUnpaintedLocMedian{} for the rest of the corpus. Section~\ref{sec:uniqueness} states what
+that population does and does not license.
 
 The annotator records either one painting or two. Two is the interesting case and the reason the
 facility is shaped this way: the same change often has a tight rendering and a generous one, and
@@ -465,70 +456,61 @@ is therefore the datum, exactly as a multi-map group's existence is the datum on
 A painting also has one degree of freedom the mapping format lacks. A painted entry carries a
 \emph{list} of spans per side rather than a single span, so an annotator who finds that three
 comment lines became one, or that one import became two, can record that correspondence directly
-instead of approximating it. Section~\ref{sec:limits} uses this: it is the only place in the corpus
-where an $N{:}M$ correspondence is written down as what it is.
+instead of approximating it. It is the one place in the corpus where an $N{:}M$ correspondence is
+written down as what it is rather than as its one-to-one approximation.
 
-\section{What the Ground Truth Can Ask}
-\label{sec:limits}
+Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
 
-This section measures the ground truth of Section~\ref{sec:ground-truth} against itself. No
-diffing tool appears in it. Every question here is about what a correct answer to a code change
-even is---whether it is unique, how much of it a reader can see, and whether the rendering that
-follows from it is unique either---and each answer bounds what any evaluation built on such a
-corpus, including this paper's own in Section~\ref{sec:tools}, is able to report.
+\section{Viability}
+\label{sec:viability}
 
-%% RQ2, RQ3 and RQ4 below are verbatim copies of the RQ list in Section 1's introduction, restated
+Every algorithm in Section~\ref{sec:background} produces the same kind of answer: a one-to-one
+mapping between the nodes of two trees, built from insert, delete, update and move, and ranked by
+a cost that adds up the operations it uses. Before asking how fast such a mapping can be computed
+(Section~\ref{sec:speed}) or how well tools recover it (Section~\ref{sec:tools}), the first group
+of research questions asks whether the answer a human reader wants lies inside that space at all.
+It can fall outside in two ways: the true correspondence may not be one-to-one, and the mapping
+humans judge correct may not be the cheapest one.
+
+%% RQ1.1 and RQ1.2 below are verbatim copies of the RQ list in Section 1's introduction, restated
 %% here next to the measurements that answer them. Same reason every measured number in this paper
 %% is a macro: a statement typed in two places drifts when only one copy is edited. Edit both or
 %% neither.
-\textbf{RQ2 (Uniqueness).} When does a real-world code change have no single correct mapping
-between the two syntax trees---because several one-to-one mappings are equally correct, or because
-the true correspondence is not one-to-one at all?
+\textbf{RQ1.1.} What percentage of real-world code changes have an optimal AST node mapping that
+cannot be expressed using common AST diff operations (Insert, Delete, Update, Move)?
 
-\textbf{RQ3 (Visibility).} What share of an AST mapping can a rendered diff display at all, and
-how much of it is therefore scaffolding a reader never sees?
+\textbf{RQ1.2.} What percentage of real-world code changes have solutions that humans prefer
+whose cost is higher than the optimal AST diff, using the commonly accepted costs of common AST
+diff operations?
 
-\textbf{RQ4 (Rendering).} Once the mapping is settled, is the rendering that follows from it
-unique---or does one correct mapping admit several equally correct renderings?
+\subsection{Correspondences the four operations cannot express}
 
-\textbf{Uniqueness.} Any accuracy metric of the usual kind rests on an assumption worth testing
-before any tool is measured by it: that for a given change there is one correct mapping to recover.
-RQ2 asks when that assumption holds, and the corpus shows it failing in two different ways, which
-we keep apart because they have different consequences.
+An ordered tree edit distance maps each node of one tree to at most one node of the other. That
+is part of the definition of the edit script it computes, not a limitation of any particular
+implementation, and a move changes only where a matched node sits, not how many nodes it is
+matched to. A correspondence in which $N$ nodes on one side answer to $M$ on the other---two call
+sites refactored into one function, a block of comment lines condensed into a single line, one
+import split across two---is therefore not in the output language of any algorithm in this
+family, which is every tool measured in this paper. It cannot be found by a better heuristic,
+because there is nothing in the output language to find it with.
 
-\emph{Multiple optimal solutions exist.} Several candidate nodes are genuinely
-interchangeable—one of two identical calls is removed, a member is appended to an expression
-chain, an argument is added to a list of similar arguments—so more than one one-to-one pairing
-reproduces the change equally well, and choosing between them is arbitrary rather than correct. A
-diffing algorithm can still emit a correct answer here; what fails is the assumption that the
-correct answer is unique.
-
-\emph{No one-to-one optimal solution exists.} The true correspondence is $N{:}M$: several nodes on
-one side correspond to one or several on the other, all of them at once. Two call sites are
-refactored into one, a block of comment lines is condensed into a single line, one import is split
-across two. Here no one-to-one mapping is correct, however the algorithm chooses, and the
-qualifier matters: not that no optimal solution exists, but that none in the one-to-one form these
-algorithms produce reaches the true correspondence.
-
-The first is measurable on this corpus, because the annotation tool records it explicitly as a
-multi-map group (Section~\ref{sec:ground-truth}). The second is not, and we treat it accordingly below.
-
-One property of the corpus has to be stated before the rate, because it bounds what the rate can
-mean. The multi-mapping facility was added to the annotation tool partway through corpus
-construction. \AmbiguityPreFixtures{} fixtures were last annotated before it existed and were
-never revisited; none of them records an ambiguity, and none of them could, whatever the change
-actually contained. Table~\ref{tab:ambiguity} therefore splits the corpus by annotation era rather
-than reporting one blended rate, which would measure annotation practice as much as the
-phenomenon.
+The ground truth records such a site as a multi-map group (Section~\ref{sec:dataset}), and the
+group's existence is the datum RQ1.1 counts. One property of the corpus has to be stated before
+the rate, because it bounds what the rate can mean. The facility was added to the annotation tool
+partway through corpus construction. \AmbiguityPreFixtures{} fixtures were last annotated before
+it existed and were never revisited; none of them records a group, and none of them could,
+whatever the change actually contained. Table~\ref{tab:ambiguity} therefore splits the corpus by
+annotation era rather than reporting one blended rate, which would measure annotation practice as
+much as the phenomenon.
 
 \begin{table}
-  \caption{How often the ground truth admits no unique mapping, split by whether the annotator had
-  the multi-mapping facility available. Only the second row is an unbiased estimate; the third is
-  selection-biased and the first is structurally zero.}
+  \caption{How often the ground truth records a correspondence the four operations cannot
+  express, split by whether the annotator had the multi-map facility available. Only the second
+  row is an unbiased estimate; the third is selection-biased and the first is structurally zero.}
   \label{tab:ambiguity}
   \begin{tabular}{lrrr}
     \toprule
-    Annotation era & Fixtures & Ambiguous & Rate \\
+    Annotation era & Fixtures & With group & Rate \\
     \midrule
     Before the facility existed & \AmbiguityPreFixtures{} & \AmbiguityPreWith{} & \AmbiguityPrePct{}\% \\
     Annotated with it available & \AmbiguityFreshScored{} & \AmbiguityFreshFixtures{} & \AmbiguityFreshPct{}\% \\
@@ -539,59 +521,46 @@ phenomenon.
   \end{tabular}
 \end{table}
 
-The middle row is the estimate. Of the \AmbiguityFreshScored{} fixtures annotated from the start by
-someone who had multi-mapping available, \AmbiguityFreshFixtures{}—\AmbiguityFreshPct{}\%—contain
-at least one place where no single pairing is the correct one. The third row is reported for
-completeness and excluded from that estimate: those \AmbiguityRevisitedFixtures{} fixtures predate
+The middle row is the estimate. Of the \AmbiguityFreshScored{} fixtures annotated from the start
+by someone who had the facility available, \AmbiguityFreshFixtures{}---\AmbiguityFreshPct{}\%---%
+contain at least one site whose correspondence is not one-to-one. Split by repository list, as
+Section~\ref{sec:dataset} reports, the Full list gives \AmbiguityFullFreshPct{}\% and the freshly
+annotated part of the Curated list \AmbiguityCuratedFreshPct{}\%; the Full list is the figure we
+quote, because it is the larger and uniformly fresh population. The third row is reported for
+completeness and excluded from the estimate: those \AmbiguityRevisitedFixtures{} fixtures predate
 the facility and were reopened afterwards, and a fixture is reopened precisely because something
 in it needed attention, so their \AmbiguityRevisitedPct{}\% rate is selection-biased upward by
 construction. The corpus-wide \AmbiguityAnyPct{}\% is a floor rather than a census, for the reason
 the first row makes explicit.
 
-The ambiguity is local. Across the \AmbiguityGroups{} groups in the corpus, the median group spans
-\AmbiguityGroupSizeMedian{} candidate nodes on its larger side and the largest spans
-\AmbiguityGroupSizeMax{}; exactly \AmbiguityGroupsWithChildren{} extends the ambiguity to whole
-subtrees rather than to individual nodes. \AmbiguityUnequalPct{}\% of groups have different
-candidate counts on the two sides, and \AmbiguityMinorityPct{}\% of all groups are the smallest
-such case, two candidates on one side and one on the other or the reverse. An unequal group
-usually asks which of $N$ interchangeable nodes is the one that was added or the one that
-survived—but not always, and the next subsection is about the cases where it asks something else.
-Ambiguity is also unevenly spread: one fixture alone carries \AmbiguityMaxGroupsInFixture{} of those
-groups. The two operations a group can carry split almost evenly, \AmbiguityIdenticalGroups{}
-identical against \AmbiguityMatchGroups{} matched-but-not-identical, so ambiguity is not a property
-of unchanged code alone.
+The sites are local. Across the \AmbiguityGroups{} groups in the corpus, the median group spans
+\AmbiguityGroupSizeMedian{} nodes on its larger side and the largest spans
+\AmbiguityGroupSizeMax{}; \AmbiguityGroupsWithChildren{} of them extend the correspondence to
+whole subtrees rather than to individual nodes. \AmbiguityUnequalPct{}\% of groups have different
+node counts on the two sides, and \AmbiguityMinorityPct{}\% of all groups are the smallest such
+case, two nodes on one side and one on the other or the reverse. The two operations a group can
+carry split almost evenly, \AmbiguityIdenticalGroups{} identical against \AmbiguityMatchGroups{}
+matched-but-not-identical, so the phenomenon is not a property of unchanged code alone. It is
+also unevenly spread: one fixture alone carries \AmbiguityMaxGroupsInFixture{} of the groups. How
+many fixtures are affected and how much of the ground truth is affected are different quantities.
+Weighted by mapping decisions rather than by fixtures, the groups account for \AmbiguityPairs{} of
+the \AmbiguityPairedDecisions{} node pairs the ground truth records outside identical
+code---\AmbiguityPairsPct{}\%. A metric aggregated over nodes or lines absorbs a share of this
+size almost invisibly; a metric that asks whether a fixture was mapped exactly right inherits the
+full \AmbiguityFreshPct{}\%, because one such site is enough to fail a fixture.
 
-How many fixtures are affected and how much of the ground truth is affected are different
-quantities, and both are worth stating. Weighted by mapping decisions rather than by fixtures, the
-groups account for \AmbiguityPairs{} of the \AmbiguityPairedDecisions{} node pairs the ground
-truth records outside identical code—\AmbiguityPairsPct{}\%. The two readings are both correct and
-they answer different questions: a metric aggregated over nodes or lines absorbs an ambiguity of
-this size almost invisibly, while a metric that asks whether a fixture was mapped exactly right
-inherits the full \AmbiguityFreshPct{}\%, because one ambiguous pair is enough to fail a
-fixture.
-
-\textbf{No one-to-one optimal solution exists.} The second failure is not a matter of degree. An
-ordered tree edit distance maps each node of one tree to at most one node of the other; that is
-part of the definition of the edit script it computes, not a limitation of any particular
-implementation. An $N{:}M$ correspondence is therefore not in the codomain of any algorithm in
-this family, which is every tool measured in this paper. It cannot be found by a better heuristic,
-because there is nothing in the output language to find it with. The best such an algorithm can do
-is pick one pair and render the rest as insertions or deletions—which is not an approximation
-that happens to score badly, but a statement that is false about the change.
-
-We report this as an existence result, not a rate. Nothing in the \emph{mapping} format marks it:
-it records one node against one node, so an annotator who meets an $N{:}M$ correspondence records
-the closest one-to-one approximation and writes the real one in prose, in the fixture's test case.
-The instances in Table~\ref{tab:nm} were found by reading those comments, not by enumeration, so
-they are a lower bound of unknown tightness and no denominator is quoted for them. The painting
-format is the exception, and RA4 quotes a rate from it: a painted entry carries a list of spans per
-side, so there the correspondence can be written down as what it is.
+Table~\ref{tab:nm} shows what these correspondences look like. Its rows were found by reading the
+annotators' own commentary in the fixtures' test cases rather than by enumeration, so the table is
+illustrative and feeds no rate. Four of the six carry a group at the site. The other two were
+noted in prose and left unencoded, which is why the rates in Table~\ref{tab:ambiguity} are floors
+for a second reason the corpus cannot correct for: a group exists only where an annotator both
+noticed the correspondence and recorded it. Two of the six also postdate the corpus snapshot every
+rate in this paper is measured against.
 
 \begin{table}
   \caption{Changes in the corpus whose true correspondence is $N{:}M$, found by inspection of
-  annotator commentary rather than by enumeration. ``Encoded'' is whether the ground truth carries
-  a multi-map group at the site (``Enc.''); where it does, that group is the approximation, not
-  the correspondence.}
+  annotator commentary rather than by enumeration. ``Enc.'' is whether the ground truth carries a
+  multi-map group at the site.}
   \label{tab:nm}
   \small
   \begin{tabular}{llc}
@@ -608,104 +577,250 @@ side, so there the correspondence can be written down as what it is.
   \end{tabular}
 \end{table}
 
-Four of the six carry a multi-map group sitting exactly at the $N{:}M$ site, and reading those
-groups is what shows the encoding is doing double duty. In the condensed license block the group
-lists five before-side comment nodes against one after-side comment; in the split import, one
-before-side identifier against two after-side identifiers. None of the four is a set of
-interchangeable candidates of which one survived. Every member corresponds, and the group's own
-semantics—realize
-$\min(N,M)$ pairs, delete or insert the remainder—assert the opposite. The same encoding therefore
-carries two different phenomena, and only the annotator's prose separates them. The remaining two
-instances carry no group at all: the correspondence was noted and left unencoded, which is the
-more honest of the two options available.
+The painted portion of the corpus gives a second reading with a different denominator. A painted
+entry carries a list of spans per side (Section~\ref{sec:dataset}), so there the correspondence is
+written down as what it is instead of approximated: \PaintingNmEntries{} of the
+\PaintingMatchEntries{} matched entries are $N{:}M$ rather than one-to-one, \PaintingNmPct{}\%, in
+shapes from two-to-one to three-to-two. Measured by matched region rather than by change, roughly
+one region in twenty-five corresponds in a way no one-to-one node mapping can represent.
 
-This also qualifies a claim made above. Accepting any consistent pairing within a group removes
-the scoring error for the first phenomenon exactly, because every pairing it admits really is
-correct. For the second it does not: it scores the leftover deletions as correct when the truth is
-that those nodes correspond too. The corpus is right about interchangeability and charitable about
-$N{:}M$. Two of the instances in Table~\ref{tab:nm} postdate the corpus snapshot every other
-number in this section is measured against, which is why they appear here and in no rate.
+\begin{resultbox}{RA1.1 (Expressibility)}
+Not every real-world change has a mapping the four operations can express. Of the fixtures
+annotated with the facility to record it, \AmbiguityFreshPct{}\% contain at least one site whose
+true correspondence is $N{:}M$; on the Full repository list, the unbiased population, the rate is
+\AmbiguityFullFreshPct{}\% (\AmbiguityFullFreshWith{} of \AmbiguityFullFreshTotal{} diffs), and
+the corpus-wide \AmbiguityAnyPct{}\% stands as a floor. The sites are small---a median of
+\AmbiguityGroupSizeMedian{} nodes, \AmbiguityPairsPct{}\% of all non-identical mapping
+decisions---so a node- or line-weighted metric barely registers them, while a per-change metric
+fails roughly one change in seven on them. Where the rendering was painted by hand,
+\PaintingNmPct{}\% of matched regions correspond $N{:}M$.
+\end{resultbox}
 
-\begin{resultbox}{RA2 (Uniqueness)}
-A correct AST mapping is not always unique. In \AmbiguityFreshPct{}\% of the fixtures annotated
+The practical consequence bounds every accuracy figure in this paper, its own included. On these
+sites the best any one-to-one algorithm can do is pick one pairing and render the rest as
+insertions or deletions, and the ground truth scores exactly that as correct: any consistent
+pairing of $\min(N, M)$ pairs from the group, with the remainder inserted or deleted, as
+Section~\ref{sec:dataset} describes. That is what makes the tools scoreable at all, but it is a
+charitable reading, since the leftover nodes correspond too. Section~\ref{sec:uniqueness} returns
+to what the same sites imply for uniqueness.
+
+\subsection{Solutions humans prefer over the cheapest one}
+
+RQ1.2 asks a question about the cost function rather than the output language. Every algorithm
+in this family ranks candidate mappings by a cost that adds up its operations, and the standard
+model, which we adopt as stated, charges one unit for each insert, delete and update and nothing
+for a move: a relocated subtree is charged only for whatever changed inside it, not for how far
+it travelled.\footnote{This is the cost model of the benchmark harness that computes both figures
+below. It is more generous to moves than GumTree's edit-script length, which counts a move as one
+action; under that model a mapping with fewer moves would be preferred, and the rate below would
+shift in a direction we have not measured.} If humans systematically prefer a mapping that is not
+the cheapest one, then an algorithm that minimizes this cost exactly is optimizing the wrong
+thing, and no amount of search will bring it closer to the human answer.
+
+\textbf{Measurement.} The optimal cost for a pair of trees is not available for every fixture,
+because Section~\ref{sec:speed} finds a whole-tree exact computation infeasible on a large share
+of real files. We therefore compare the human mapping's cost against the cost of a mapping
+produced by an automated matcher on the same two files.\footnote{The matcher is the one in this
+paper's own benchmark harness, \textsc{CodeDiff}'s (Section~\ref{sec:codediff}), named so that the
+bound is checkable. Nothing in the answer depends on which matcher it is, only on its output being
+a valid mapping scored under the same cost model as the human's.} That matcher is heuristic, so
+its cost is an upper bound on the optimum, and a human mapping that costs strictly more than it
+therefore costs strictly more than the optimum as well. The rate below is a lower bound: a human
+mapping costlier than the optimum but cheaper than the heuristic's is not counted.
+
+Of the \CostScored{} fixtures with a human mapping, the two costs are equal on
+\CostTieFixtures{}. On \CostAlgorithmHigherFixtures{} the heuristic's mapping is the costlier one,
+which says something about the heuristic and nothing about RQ1.2. On
+\CostHumanHigherFixtures{}---\CostHumanHigherPct{}\%---the human mapping is strictly costlier than
+a mapping an algorithm found, by a median of \CostHumanHigherExcessMedian{} units and at most
+\CostHumanHigherExcessMax{}.
+
+The annotators' own notes on those fixtures describe one pattern repeatedly. When a unit of code
+is removed or rewritten as a whole---a function, a string literal, an argument list---the human
+marks the whole subtree deleted and its replacement inserted, whereas the cheapest mapping
+salvages every byte-identical token inside it: a closing brace, a \texttt{return} keyword, a
+string delimiter, matched to some unrelated survivor elsewhere in the file. Each salvaged token
+saves a unit of cost and produces a mapping no reader would draw. The human answer is costlier
+precisely because it refuses to count a coincidental match as a correspondence.
+
+\begin{resultbox}{RA1.2 (Cost)}
+The cheapest mapping is not always the one humans judge correct. On at least
+\CostHumanHigherPct{}\% of the changes in the corpus (\CostHumanHigherFixtures{} of
+\CostScored{}), the human-authored mapping costs strictly more, under unit costs for insert,
+delete and update and a free move, than a mapping an automated matcher found for the same change;
+the rate is a lower bound because the comparison mapping is itself only an upper bound on the
+optimum. The dominant cause is the cost model rewarding coincidental matches of identical tokens
+inside code a human reads as replaced wholesale. An algorithm that minimizes this cost exactly is
+therefore optimizing a proxy that disagrees with its readers on a measurable minority of changes.
+\end{resultbox}
+
+\section{Speed}
+\label{sec:speed}
+
+Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
+complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
+This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
+documentation states that it targets research use, not production deployment at scale---a
+reasonable scope for its own goals, but one that leaves open a question every production diff
+tool must answer:
+
+%% Verbatim reprise of the RQ2 statement in Section 1's introduction - edit both or neither.
+\textbf{RQ2.} What percentage of real-world source-code changes can a single, whole-tree
+tree-edit-distance computation complete within one second?
+
+The budget is generous by design. The average human response to a visual stimulus is about
+250\,ms (Section~\ref{sec:intro}), and a whole-tree computation is only the core of a diff, which
+must still parse both files and render the result, so a computation that misses one second misses
+any interactive budget by a wide margin. A tool engineered only against a worst-case bound risks
+two failure modes. It can over-engineer for inputs that never occur in practice. It can
+under-engineer for a real tail its asymptotic analysis never quantified. Answering RQ2 needs
+measurement, not further asymptotic analysis.
+
+\textbf{Measurement.} To answer RQ2's percentage directly, we sampled \RqOnePairsAttempted{} real
+(before, after) file pairs from single-parent commits in the repositories of
+Section~\ref{sec:dataset}, stratified per language and per size bucket so that large files are
+represented rather than drowned out by the far more common small ones. We ran a single whole-tree
+tree-edit-distance computation on every pair---one APTED implementation, applied to the full
+before and after trees with no pipeline heuristics of any kind around it---under a hard one-second
+budget enforced by terminating the computation's process. This implementation includes an
+optimization that makes it faster than a textbook APTED, so the failure rates below are a lower
+bound on how often a whole-tree computation misses the budget, not an upper bound.
+
+Every sampled pair was checked to still resolve against the local clones before measurement, and
+all of them did. This is worth stating because the check has failed before: an earlier sample,
+drawn against a shallower corpus, had decayed to roughly 41\% unresolvable by the time it was
+re-measured, and the losses fell on whole repositories rather than spreading evenly across the
+sample. A measurement over that sample would have reported a healthy-looking rate while quietly
+answering a question about a different, smaller corpus.
+
+Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket,
+split by what kind of artifact the file is: code (\RqOneCodePairs{} pairs across general-purpose
+programming languages), configuration, data, and markup formats (\RqOneConfigDataPairs{} pairs),
+and scripting languages (\RqOneScriptingPairs{} pairs). The split matters because the three
+populations behave differently---blended, the headline number would move with how many
+configuration files a sample happens to contain, independently of anything the algorithm does to
+source code.
+
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/apted_only_rq1_by_category.png}
+  \caption{Fraction of sampled file pairs a whole-tree tree-edit-distance computation completes
+  within a one-second budget, per size bucket and artifact category.}
+  \label{fig:rq1}
+\end{figure*}
+
+\begin{resultbox}{RA2 (Speed)}
+For source code, a whole-tree tree-edit-distance computation is dependable only for small files,
+and the transition is abrupt rather than gradual: it completes within one second for
+\RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but for only
+\RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines, and never recovers above
+one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in time.
+\end{resultbox}
+
+What makes that a design problem rather than a tail problem is where the collapse falls: between
+two adjacent buckets, neither of which is an unusual size for a source file, and both well inside
+the range ordinary source files occupy (Table~\ref{tab:file-size-percentiles}). The corpus-wide
+figure is a sample-weighted aggregate: it deliberately over-represents large files and therefore
+understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
+the answer regardless of weighting.
+
+The three artifact categories do not behave alike. Scripting languages complete within the budget
+\RqOneScriptingPct{}\% of the time, well clear of code at \RqOneCodePct{}\% and configuration,
+data, and markup formats at \RqOneConfigDataPct{}\%; the latter two are close to each other and
+separated by less than six points, so the meaningful split is scripting against the rest rather
+than a clean three-way ordering. Figure~\ref{fig:rq1} shows the same pattern per bucket: scripting
+stays above every other category in all seven, while configuration and data fall furthest in the
+large buckets, despite containing the most repetitive and most regularly structured files in the
+corpus. We conjecture this reflects tree edit distance being sensitive to tree shape rather than to
+node count alone, a large flat sequence of similar siblings being an unfavorable shape for it.
+This measurement does not isolate shape from size, so we state it as a conjecture rather than a
+result.
+
+The common case is genuinely cheap---most files and most commits are small---but the tail is
+real: files up to \AstMax{} AST nodes occur in this corpus, and Arafat and Riehle's data shows
+commits of over 10{,}000 lines occur in practice. A production diff tool must be engineered for
+both regimes, and cannot rely on a whole-tree computation alone for either.
+Section~\ref{sec:codediff} turns this answer into \textsc{CodeDiff}'s concrete design targets.
+
+\section{Uniqueness}
+\label{sec:uniqueness}
+
+This section measures the ground truth of Section~\ref{sec:dataset} against itself. No diffing
+tool appears in it. Every question here is about whether a correct answer to a code change is
+unique---as a mapping, and as the text a reader sees---and how much of the mapping that text even
+depends on. Each answer bounds what any evaluation built on such a corpus, including this paper's
+own in Section~\ref{sec:tools}, is able to report.
+
+%% RQ3.1--RQ3.3 below are verbatim copies of the RQ list in Section 1's introduction, restated
+%% here next to the measurements that answer them. Same reason every measured number in this paper
+%% is a macro: a statement typed in two places drifts when only one copy is edited. Edit both or
+%% neither.
+\textbf{RQ3.1.} What percentage of real-world code changes have multiple optimal AST node
+mappings?
+
+\textbf{RQ3.2.} What percentage of real-world code changes have multiple equally correct textual
+visualizations of the diff?
+
+\textbf{RQ3.3.} What percentage of the AST influences the textual visualization?
+
+\subsection{Multiple optimal mappings}
+
+Any accuracy metric of the usual kind rests on an assumption worth testing before any tool is
+measured by it: that for a given change there is one correct mapping to recover. The corpus shows
+it failing in two ways, and we keep them apart because they rest on different evidence.
+
+The first follows from RA1.1. At every site the ground truth records as $N{:}M$, the format
+accepts any consistent pairing of $\min(N, M)$ pairs as correct, and there is more than one such
+pairing whenever $N$ or $M$ exceeds one, which is every group. Each of those sites is therefore
+also a site where several one-to-one mappings are equally correct---one of two identical calls is
+removed, a member is appended to an expression chain, an argument is added to a list of similar
+arguments---and choosing between them is arbitrary rather than correct. A diffing algorithm can
+still emit a correct answer here; what fails is the assumption that the correct answer is unique.
+The rates are the ones Table~\ref{tab:ambiguity} reports: \AmbiguityFreshPct{}\% of the fixtures
+annotated with the facility available contain such a site, and the sites account for
+\AmbiguityPairsPct{}\% of all non-identical mapping decisions.
+
+The second is independent of the annotation format, and comes from the cost comparison behind
+RA1.2. On \CostTieDifferentFixtures{} of the \CostScored{} fixtures---\CostTieDifferentPct{}\%---%
+the automated matcher produced a mapping that differs from the human's and costs exactly the same.
+Under the cost model the two are indistinguishable; the annotator, asked for the mapping a reader
+would draw, chose one of them. These are not sites the ground truth marks as ambiguous. They are
+changes on which the cost function alone under-determines the answer, and the figure is a lower
+bound of the same kind as RA1.2's, since only one alternative mapping per change was examined.
+
+\begin{resultbox}{RA3.1 (Mapping uniqueness)}
+A correct AST mapping is often not unique. In \AmbiguityFreshPct{}\% of the fixtures annotated
 with multi-mapping available (\AmbiguityFreshFixtures{} of \AmbiguityFreshScored{}), at least one
 set of nodes admits several equally correct pairings, with the corpus-wide \AmbiguityAnyPct{}\%
-standing as a floor; weighted by mapping decisions rather than fixtures, that is
-\AmbiguityPairs{} of \AmbiguityPairedDecisions{} non-identical node pairs, \AmbiguityPairsPct{}\%. An evaluation that scores a diffing tool against one fixed pairing therefore
-risks marking correct output wrong on roughly one change in six—whenever the tool picks a
-different, equally valid pairing—and any accuracy metric defined over a single ground-truth
-mapping carries that error term whether or not it reports it. A second, rarer failure is
-categorical rather than statistical: where the true correspondence is $N{:}M$, no one-to-one
-mapping is correct at all, and no algorithm whose output is a one-to-one node mapping can express
-one. We report instances of that rather than a rate, because neither the corpus format nor the
-algorithms have a way to represent the thing being counted.
+standing as a floor; weighted by mapping decisions rather than fixtures, that is \AmbiguityPairs{}
+of \AmbiguityPairedDecisions{} non-identical node pairs, \AmbiguityPairsPct{}\%. Independently, on
+\CostTieDifferentPct{}\% of changes a second, different mapping exists at exactly the human
+mapping's cost, so the cost model by itself does not single out an answer either. An evaluation
+that scores a tool against one fixed pairing therefore risks marking correct output wrong on
+roughly one change in seven, whenever the tool picks a different, equally valid pairing.
 \end{resultbox}
 
-Both rates in Table~\ref{tab:ambiguity} remain lower bounds for a second reason the corpus cannot
-correct for: a group exists only where an annotator noticed the ambiguity and recorded it. Nothing detects an ambiguity the
-annotator resolved without noticing it was a choice. That the count is conservative in this
-direction is what makes it usable—an over-count would be an argument about annotation discipline,
-whereas an under-count still establishes that the phenomenon is common enough to affect how
-accuracy is measured.
+Both rates in Table~\ref{tab:ambiguity} remain lower bounds for the reason RA1.1 gives: a group
+exists only where an annotator noticed that a choice was a choice. That the count is conservative
+in this direction is what makes it usable---an over-count would be an argument about annotation
+discipline, whereas an under-count still establishes that the phenomenon is common enough to
+affect how accuracy is measured. The practical consequence is a claim about methodology rather
+than about any tool. Scoring against a single pairing is the default in this area, and on a corpus
+like this one it puts a measurable error term into every reported rate: on the affected changes, a
+tool that picks a different valid pairing is recorded as wrong for a choice that was never wrong.
+The corpus in this paper avoids that by validating any consistent pairing within a group, which is
+why the accuracy numbers reported in Section~\ref{sec:tools} do not inherit its error term. For the
+$N{:}M$ sites themselves it has no such escape, and neither does any corpus built on one-to-one
+mappings. Reporting a fixed-pairing metric is still defensible, but the rate belongs alongside it.
 
-The practical consequence is a claim about methodology rather than about any tool. Scoring against
-a single pairing is the default in this area, and on a corpus like this one it puts a
-measurable error term into every reported rate: on the affected sixth of changes, a tool that
-picks a different valid pairing is recorded as wrong for a choice that was never wrong. The corpus
-in this paper avoids that for the first phenomenon by validating any consistent pairing within a
-group, as Section~\ref{sec:ground-truth} describes, which is why the accuracy numbers reported in
-Section~\ref{sec:tools} do not inherit its error term. For the second it has no such escape, and neither does any corpus
-built on one-to-one mappings. Reporting a fixed-pairing metric is still defensible, but the ambiguity
-rate belongs alongside it.
+\subsection{Multiple correct visualizations}
 
-\textbf{Visibility.} RQ2 asks whether the mapping is unique. RQ3 asks a prior question about the
-same object: how much of it anyone ever sees. A syntax tree contains two kinds of node. Some carry
-text of their own---an identifier, an operator, a literal, a comment. Others are pure structure: a
-\texttt{block} whose extent is exactly its children's, an \texttt{expression\_statement} wrapping
-one expression, the chain of single-child nodes a grammar interposes between a statement and the
-name inside it. A rendered diff highlights regions of source text, so a node of the second kind
-cannot appear in the output on its own. Whatever a tool decides about it is invisible unless the
-decision propagates to a node of the first kind.
-
-This matters because it separates two things a node-level accuracy metric silently merges. A tool
-that maps every displayed token correctly and every structural wrapper wrongly produces a diff a
-reader cannot fault; the same tool scores badly on a metric that counts all nodes equally. The
-converse is worse: a tool can be flattered by a grammar that nests deeply, since each extra layer
-of scaffolding adds nodes that are easy to get right and impossible to see.
-
-We measure the split structurally, from the parsed files alone. A node is visible if any byte
-inside its extent lies outside every one of its children---that is, if it contributes text of its
-own to the rendering. The definition depends only on the input, never on any diff of it, which is
-what lets it stand in this section: two different tools disagreeing about a file still agree
-exactly on which of its nodes are visible. The alternative---asking which nodes a given tool's
-output actually displayed---is not usable as a denominator, because it moves with the tool. A diff
-that renders very coarsely has almost nothing visible and therefore almost nothing it can visibly
-get wrong. One fixture in this corpus, whose grammar fails on it and collapses 32{,}682 nodes
-into two rendered spans, would score zero visible mismatches by that definition while holding 124
-real ones.
-
-\begin{resultbox}{RA3 (Visibility)}
-\InvisibleNodeShare{}\% of the AST nodes in this corpus carry no text of their own and cannot
-appear in a rendered diff at all: \VisibleNodeShare{}\% are visible, pooled over
-\NumFixtures{} fixtures. The two readings agree, which is the useful part---the per-fixture median
-is \VisibleNodeShareMedian{}\% visible, with \VisibleNodeSharePTen{}\% and
-\VisibleNodeSharePNinety{}\% at the tenth and ninetieth percentiles, so this is a property of source
-code generally rather than of a few large outliers. Roughly one AST node in three is scaffolding,
-and a node-level accuracy metric spends a third of its weight on decisions no reviewer can see.
-\end{resultbox}
-
-The consequence is not that node-level metrics should be abandoned. It is that a rate over all
-nodes and a rate over visible nodes answer different questions, and a paper reporting one should
-say which. This paper reports both wherever it reports an accuracy figure, and
-Section~\ref{sec:tools} avoids the issue entirely by scoring the established tools at the line
-level, which is the only granularity all four of them share.
-
-\textbf{Rendering.} RQ3 narrows the question to what a reader sees. RQ4 asks whether \emph{that}
-has a unique answer. It is the natural place to hope the ambiguity of RQ2 washes out: several
-mappings may be equally correct, but perhaps they project onto the same highlighted text, so a
-tool that picks any of them renders the same diff and the choice never reaches the reader. The
-painted portion of the corpus (Section~\ref{sec:ground-truth}) is what tests that hope, because it
-records the rendering directly instead of deriving it from a mapping.
+RQ3.1 asked whether the mapping is unique. RQ3.2 asks whether the text a reader sees is. It is the
+natural place to hope the ambiguity of RQ3.1 washes out: several mappings may be equally correct,
+but perhaps they project onto the same highlighted text, so a tool that picks any of them renders
+the same diff and the choice never reaches the reader. The painted portion of the corpus
+(Section~\ref{sec:dataset}) is what tests that hope, because it records the rendering directly
+instead of deriving it from a mapping.
 
 It does not wash out. Of the \PaintingFixtures{} painted fixtures, \PaintingDual{}---%
 \PaintingDualPct{}\%---carry two paintings, the annotator's finding that both are correct
@@ -725,126 +840,176 @@ separators that a change drags along with it are part of what changed. A tool th
 bracket unpainted disagrees with \emph{Full} and agrees with \emph{Minimal}, and both are on file
 precisely so that this is not scored as an error.
 
-This is where the corpus can also say something the mapping format cannot. A painted entry carries
-a list of spans per side, so an $N{:}M$ correspondence is expressible rather than approximated, and
-in the painted subset it is not rare: \PaintingNmEntries{} of the \PaintingMatchEntries{} matched
-entries are $N{:}M$ rather than one-to-one, \PaintingNmPct{}\%, in shapes from two-to-one to
-three-to-two. RA2 reports the same phenomenon on the mapping side as an existence result with no
-denominator, because nothing there can express it. Here there is a denominator, and it says that
-roughly one matched region in sixteen corresponds in a way no one-to-one node mapping can
-represent.
-
-\begin{resultbox}{RA4 (Rendering)}
+\begin{resultbox}{RA3.2 (Visualization uniqueness)}
 Settling the mapping does not settle the rendering. Of the \PaintingFixtures{} changes whose
 rendering was painted by hand, \PaintingDualPct{}\% (\PaintingDual{}) admit two equally correct
 renderings, differing systematically over whether punctuation dragged along by a change counts as
 part of it: \PaintingFullExtraPunctuationPct{}\% of the spans separating the two styles hold
 punctuation alone. Line-based and syntax-aware tools alike are therefore scored, on those changes,
-against one of two right answers---and on the same subset, \PaintingNmPct{}\% of matched regions
-correspond $N{:}M$, which no one-to-one node mapping can express at all.
+against one of two right answers.
 \end{resultbox}
 
 Two limits bound that rate, and they run in opposite directions. The painted subset is not a random
 sample: painting is manual, and it was done on the hand-written portion of the corpus first, so
-every painted fixture is a small, curated example of a single change pattern---median
+nearly every painted fixture is a small, curated example of a single change pattern---median
 \PaintingLocMedian{} lines, at most \PaintingLocMax{}, across \PaintingLanguages{} of the corpus's
 \NumFixtureLanguages{} languages. That is a real restriction on what the rate describes. But it is
 a restriction toward the conservative side of the claim being made: a minimal example of one
 change pattern offers the least room for two renderings to diverge, and the rate is measured
 there. Whether it holds on the corpus's large, multi-site real-world changes is open, and the
-direction we would expect is upward. The second limit is the one RA2 already names: a painting
+direction we would expect is upward. The second limit is the one RA3.1 already names: a painting
 records what an annotator noticed, so a change whose second rendering nobody saw is filed as
 unambiguous.
 
-\section{How Well Existing Tools Do}
+\subsection{How much of the mapping reaches the reader}
+
+RQ3.2 asked whether what a reader sees is unique. RQ3.3 asks how much of the mapping ever reaches
+them. A syntax tree contains two kinds of node. Some carry text of their own---an identifier, an
+operator, a literal, a comment. Others are pure structure: a \texttt{block} whose extent is
+exactly its children's, an \texttt{expression\_statement} wrapping one expression, the chain of
+single-child nodes a grammar interposes between a statement and the name inside it. A rendered
+diff highlights regions of source text, so a node of the second kind cannot appear in the output
+on its own. Whatever a tool decides about it is invisible unless the decision propagates to a node
+of the first kind.
+
+This matters because it separates two things a node-level accuracy metric silently merges. A tool
+that maps every displayed token correctly and every structural wrapper wrongly produces a diff a
+reader cannot fault; the same tool scores badly on a metric that counts all nodes equally. The
+converse is worse: a tool can be flattered by a grammar that nests deeply, since each extra layer
+of scaffolding adds nodes that are easy to get right and impossible to see.
+
+We measure the split structurally, from the parsed files alone. A node is visible if any byte
+inside its extent lies outside every one of its children---that is, if it contributes text of its
+own to the rendering. The definition depends only on the input, never on any diff of it, which is
+what lets it stand in this section: two different tools disagreeing about a file still agree
+exactly on which of its nodes are visible. The alternative---asking which nodes a given tool's
+output actually displayed---is not usable as a denominator, because it moves with the tool. A diff
+that renders very coarsely has almost nothing visible and therefore almost nothing it can visibly
+get wrong. One fixture in this corpus, whose grammar fails on it and collapses 32{,}682 nodes
+into two rendered spans, would score zero visible mismatches by that definition while holding 124
+real ones.
+
+\begin{resultbox}{RA3.3 (Visible share of the AST)}
+\InvisibleNodeShare{}\% of the AST nodes in this corpus carry no text of their own and cannot
+appear in a rendered diff at all: \VisibleNodeShare{}\% are visible, pooled over
+\NumFixtures{} fixtures. The two readings agree, which is the useful part---the per-fixture median
+is \VisibleNodeShareMedian{}\% visible, with \VisibleNodeSharePTen{}\% and
+\VisibleNodeSharePNinety{}\% at the tenth and ninetieth percentiles, so this is a property of source
+code generally rather than of a few large outliers. Roughly one AST node in three is scaffolding,
+and a node-level accuracy metric spends a third of its weight on decisions no reviewer can see.
+\end{resultbox}
+
+The consequence is not that node-level metrics should be abandoned. It is that a rate over all
+nodes and a rate over visible nodes answer different questions, and a paper reporting one should
+say which. This paper reports both wherever it reports an accuracy figure, and
+Section~\ref{sec:tools} avoids the issue entirely by scoring the established tools at the line
+level, which is the only granularity all of them share.
+
+\section{Implementation}
 \label{sec:tools}
 
-With the ground truth characterized, and with RA2, RA3 and RA4 bounding what it can be asked, this
-section measures what existing tools recover from it, and what they cost to do so.
+With the ground truth characterized, and with RA1.1, RA3.1 and RA3.2 bounding what it can be
+asked, the last group of research questions measures what existing tools recover from it, and
+what they cost to do so.
 
-%% RQ5 and RQ6 below are verbatim copies of the RQ list in Section 1's introduction, restated here
-%% next to the measurements that answer them. Same reason every measured number in this paper is a
-%% macro: a statement typed in two places drifts when only one copy is edited. Edit both or neither.
-\textbf{RQ5 (Tool accuracy).} How accurately do current state-of-the-art code-diffing tools
-recover real-world code changes, measured against human-authored ground-truth mappings of those
-changes?
+%% RQ4.1 and RQ4.2 below are verbatim copies of the RQ list in Section 1's introduction, restated
+%% here next to the measurements that answer them. Same reason every measured number in this paper
+%% is a macro: a statement typed in two places drifts when only one copy is edited. Edit both or
+%% neither.
+\textbf{RQ4.1.} How accurately do current state-of-the-art code diffing tools find optimal
+visualizations?
 
-\textbf{RQ6 (Tool cost).} What does each of those tools cost to run on the same corpus, and how
-does that cost distribute across easy and hard changes?
+\textbf{RQ4.2.} How fast are real-world state-of-the-art tools?
 
-\textbf{Comparison tools.} We measure four established tools on the
-\NumFixtures{}-fixture corpus: GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014}, Unix \texttt{diff}, and the two
-tree-sitter-based tools from Section~\ref{sec:background}, difftastic~\cite{difftastic} and
-diffsitter~\cite{diffsitter}. \textsc{CodeDiff} is deliberately absent from this comparison: RQ5
-asks what the state of the art recovers, and that question is answered without reference to the
-tool this paper introduces. \textsc{CodeDiff}'s own accuracy is reported separately, in
-Section~\ref{sec:codediff}, against the same ground truth but not as a ranking against these
-four.
+\textbf{Comparison tools.} We measure nine established tools, all introduced in
+Section~\ref{sec:background}, on the \NumFixtures{}-fixture corpus. Five report at line
+granularity only: Unix \texttt{diff}, and \texttt{git diff} under each of its four algorithms,
+Myers, minimal, patience and histogram. Four report sub-line detail: BDiff~\cite{bdiff}, Neovim's
+diff mode, and the three AST-aware tools, GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014},
+difftastic~\cite{difftastic} and diffsitter~\cite{diffsitter}. \textsc{CodeDiff} is deliberately
+absent from this comparison: RQ4.1 asks what the state of the art recovers, and that question is
+answered without reference to the tool this paper introduces. \textsc{CodeDiff}'s own figures are
+reported in Section~\ref{sec:codediff}, on the same basis and against the same ground truth.
 
 This comparison measures one specific property: agreement with the human-authored ground-truth
 mapping above. difftastic and diffsitter deliberately optimize for something this metric does not
 capture, a diff that reads comfortably to a human, not a mapping that reproduces a ground truth
 line for line, so a lower score here reflects a different design goal, not a defect. GumTree's
 broader language and backend flexibility likewise stays valuable well beyond what this single
-corpus measures. One consequence of that flexibility is visible in the
-numbers below: every generator GumTree offers is included here, and all but two of them are
-marked ``Testing'' rather than ``Stable'' by GumTree's own documentation, so its rate reflects a
-deliberately wide language scope rather than its performance on the backends it considers ready.
-Read what follows as a measurement of where each tool's design goals place it on this one metric,
-not as a ranking of which tool is best.
+corpus measures. One consequence of that flexibility is visible in the numbers below: every
+generator GumTree offers is included here, and all but two of them are marked ``Testing'' rather
+than ``Stable'' by GumTree's own documentation, so its rate reflects a deliberately wide language
+scope rather than its performance on the backends it considers ready. Read what follows as a
+measurement of where each tool's design goals place it on this one metric, not as a ranking of
+which tool is best.
 
-\textbf{Line-level agreement.} None of the four tools report an AST-node mapping, so we
-compare them on a common ground: which source lines each marks as touched, against the
-same human mapping (Table~\ref{tab:accuracy-vs-others}, Table~\ref{tab:agreement-buckets}).
-Coverage
-varies widely: of the \UnixDiffFixtures{} fixtures this comparison was run over, diffsitter's
-compiled-in grammar set matches \DiffsitterFixtures{} languages, GumTree's generator set matches
-\GumTreeFixtures{}, difftastic's \DifftasticFixtures{}, and only Unix \texttt{diff} covers all
-\UnixDiffFixtures{}. Each tool's own row is scored only on its own
-applicable subset, not padded with unscored fixtures. Because those subsets differ so much, the
-table also reports every tool on the \CommonFixtures{} fixtures all four scored, which holds the
-fixture set fixed at the cost of over-representing the mainstream languages every tool supports.
+\textbf{Line-level agreement.} None of the nine tools reports an AST-node mapping in a form the
+ground truth can be compared with directly, so we compare them on a common ground: which source
+lines each marks as touched, against the lines the human mapping touches
+(Table~\ref{tab:accuracy-vs-others}, Table~\ref{tab:agreement-buckets}). That is the
+visualization RQ4.1 asks about, at the coarsest granularity every tool shares. Coverage varies
+widely: of the \UnixDiffFixtures{} fixtures this comparison was run over, the text-based tools
+cover all of them, while diffsitter's compiled-in grammar set matches \DiffsitterFixtures{},
+GumTree's generator set \GumTreeFixtures{}, and difftastic's \DifftasticFixtures{}. Each tool's
+own row is scored only on its own applicable subset, not padded with unscored fixtures. Because
+those subsets differ so much, the table also reports every tool on the \CommonFixtures{} fixtures
+all nine scored, which holds the fixture set fixed at the cost of over-representing the mainstream
+languages every tool supports.
 
-\begin{resultbox}{RA5 (Tool accuracy)}
-Across the four tools (Table~\ref{tab:accuracy-vs-others}), line-level mismatch rates against the
-human mapping range from
-\UnixDiffLineRate{}\% (Unix \texttt{diff}) to \GumTreeLineRate{}\% (GumTree). Every tool agrees
-with the human mapping on the great majority of lines, so what separates them is the small,
-structurally interesting remainder—and on that remainder no AST-aware tool among the four
-beats plain line-based \texttt{diff}, on either basis. Syntax-awareness alone does not guarantee
-that a tool recovers a change the way a human reads it.
+\begin{resultbox}{RA4.1 (Tool accuracy)}
+Across the nine tools (Table~\ref{tab:accuracy-vs-others}), line-level mismatch rates against the
+human mapping range from \GitMyersLineRate{}\% (\texttt{git diff}, Myers) to
+\GumTreeLineRate{}\% (GumTree). Every tool agrees with the human mapping on the great majority of
+lines, so what separates them is the small, structurally interesting remainder---and on that
+remainder no AST-aware tool beats plain line-based \texttt{diff}, on either basis. The choice of
+line-diff algorithm barely registers: Unix \texttt{diff} and the four \texttt{git} algorithms lie
+within two hundredths of a percentage point of one another. Syntax-awareness alone does not
+guarantee that a tool recovers a change the way a human reads it.
 \end{resultbox}
 
 Table~\ref{tab:agreement-buckets} reports the same agreement per fixture rather than pooled over
 lines, and the two readings weight the corpus differently: a pooled rate is dominated by a handful
-of very large fixtures, while the buckets weight every change equally. On the pooled rate the four
-tools span 1.13\% to 4.85\%; by fixtures mapped with no mismatched line at all they span 50\% down
-to 34\%. The table also groups the tools by whether their output carries sub-line detail at all,
-which is a statement about what each tool reports, not about how it was scored here -- every
-number in this section is line-level.
+of very large fixtures, while the buckets weight every change equally. The two readings do not
+even rank the tools the same way: by the share of fixtures mapped with no mismatched line at all,
+difftastic leads every tool and diffsitter trails every tool, whereas on the pooled rate both sit
+between the line-based tools and GumTree. The table also groups the tools by whether their output
+carries sub-line detail at all, which is a statement about what each tool reports, not about how
+it was scored here---every number in this section is line-level.
 
 Two details behind that answer are worth stating. The first is how wide the agreement is: even the
 highest mismatch rate leaves more than 95\% of lines in agreement, so the question that separates
-tools is a narrow one. The second is the qualification RA2 and RA4 already attach to every number
-in the table: on the changes where the ground truth admits more than one correct mapping, or more
-than one correct rendering, a tool that picked a different valid answer can be recorded here as
-wrong. For the mapping ambiguity the corpus removes that error, by accepting any consistent pairing
-within a group. For the other two it does not. These rates score which \emph{lines} each tool
-marks as touched against the human mapping---the only granularity all four tools share---so the
-paintings, which are the only place the corpus records a second correct rendering, never enter the
-comparison at all; RA4's error term and RA2's $N{:}M$ term both sit in the tables below unremoved
-and unmeasured. Neither can be signed: they may run in a tool's favour or against it.
+tools is a narrow one. The second is the qualification RA1.1, RA3.1 and RA3.2 already attach to
+every number in the table: on the changes where the ground truth admits more than one correct
+mapping, or more than one correct rendering, a tool that picked a different valid answer can be
+recorded here as wrong. For the mapping ambiguity the corpus removes that error, by accepting any
+consistent pairing within a group. For the other two it does not. These rates score which
+\emph{lines} each tool marks as touched against the human mapping---the only granularity all nine
+tools share---so the paintings, which are the only place the corpus records a second correct
+rendering, never enter the comparison at all; RA3.2's error term and RA1.1's $N{:}M$ term both sit
+in the tables below unremoved and unmeasured. Neither can be signed: they may run in a tool's
+favour or against it.
 
 \begin{table}
-  \caption{Line-level mismatch rate against human ground truth, for the four established tools, on
+  \caption{Line-level mismatch rate against human ground truth for the nine established tools, on
   each tool's own applicable subset of the \NumFixtures{}-fixture corpus and on the
-  \CommonFixtures{} fixtures every tool scored.}
+  \CommonFixtures{} fixtures every tool scored. Grouped by whether the tool's output carries
+  sub-line detail; every rate is line-level regardless.}
   \label{tab:accuracy-vs-others}
+  \small
   \begin{tabular}{lrrrr}
     \toprule
-    Tool & Fixtures & Mismatched lines & Rate & Common \\
+    Tool & Fixtures & Mism.\ lines & Rate & Common \\
     \midrule
+    \multicolumn{5}{l}{\emph{Line granularity only}} \\
     Unix \texttt{diff} & \UnixDiffFixtures{} & \UnixDiffLineMismatches{} & \UnixDiffLineRate{}\% & \CommonUnixDiffLineRate{}\% \\
+    \texttt{git} (Myers) & \GitMyersFixtures{} & \GitMyersLineMismatches{} & \GitMyersLineRate{}\% & \CommonGitMyersLineRate{}\% \\
+    \texttt{git} (minimal) & \GitMinimalFixtures{} & \GitMinimalLineMismatches{} & \GitMinimalLineRate{}\% & \CommonGitMinimalLineRate{}\% \\
+    \texttt{git} (patience) & \GitPatienceFixtures{} & \GitPatienceLineMismatches{} & \GitPatienceLineRate{}\% & \CommonGitPatienceLineRate{}\% \\
+    \texttt{git} (histogram) & \GitHistogramFixtures{} & \GitHistogramLineMismatches{} & \GitHistogramLineRate{}\% & \CommonGitHistogramLineRate{}\% \\
+    \addlinespace
+    \multicolumn{5}{l}{\emph{Reports sub-line detail}} \\
+    BDiff & \BDiffFixtures{} & \BDiffLineMismatches{} & \BDiffLineRate{}\% & \CommonBDiffLineRate{}\% \\
+    \texttt{nvim -d} & \NvimDiffFixtures{} & \NvimDiffLineMismatches{} & \NvimDiffLineRate{}\% & \CommonNvimDiffLineRate{}\% \\
     diffsitter & \DiffsitterFixtures{} & \DiffsitterLineMismatches{} & \DiffsitterLineRate{}\% & \CommonDiffsitterLineRate{}\% \\
     difftastic & \DifftasticFixtures{} & \DifftasticLineMismatches{} & \DifftasticLineRate{}\% & \CommonDifftasticLineRate{}\% \\
     GumTree & \GumTreeFixtures{} & \GumTreeLineMismatches{} & \GumTreeLineRate{}\% & \CommonGumTreeLineRate{}\% \\
@@ -854,52 +1019,65 @@ and unmeasured. Neither can be signed: they may run in a tool's favour or agains
 
 \input{figures/benchmark_other_buckets.tex}
 
-\textbf{Cost.} RQ6 asks the same four tools a different question. Table~\ref{tab:speed-vs-others}
+\textbf{Cost.} RQ4.2 asks the same nine tools a different question. Table~\ref{tab:speed-vs-others}
 reports wall-clock percentiles, sorted fastest to slowest by median. Each tool is measured over
 the fixtures it supports rather than over one common subset, so the populations behind these rows
-differ---the text tools and \textsc{CodeDiff} draw on every fixture, while an AST tool draws only
-on the languages its grammars cover, which for diffsitter is roughly three fifths of them. The
-per-row \emph{n} in Table~\ref{tab:accuracy-vs-others} gives the size of each, and a tool covering
-fewer, more mainstream languages is doing correspondingly less work per fixture. We
-report GumTree twice: once invoked as a fresh process per fixture, the realistic cost of a single
-CLI invocation, and once run inside one persistent JVM across all fixtures, isolating JVM startup
-from GumTree's own matching cost.
+differ---the text-based tools draw on every fixture, while an AST tool draws only on the languages
+its grammars cover, which for diffsitter is roughly three fifths of them. The per-row fixture
+count in Table~\ref{tab:accuracy-vs-others} gives the size of each, and a tool covering fewer,
+more mainstream languages is doing correspondingly less work per fixture. Two tools are reported
+twice: GumTree once invoked as a fresh process per fixture, the realistic cost of a single CLI
+invocation, and once run inside one persistent JVM across all fixtures, isolating JVM startup from
+GumTree's own matching cost; and BDiff likewise per process and inside one persistent Python
+interpreter, for the same reason.
 
 \begin{table}
-  \caption{Wall-clock time percentiles for the four established tools, milliseconds, sorted
+  \caption{Wall-clock time percentiles for the nine established tools, milliseconds, sorted
   fastest to slowest by median. \textsc{CodeDiff} is reported separately in
   Section~\ref{sec:codediff}, for the same reason it is absent from
   Table~\ref{tab:accuracy-vs-others}.}
   \label{tab:speed-vs-others}
+  \small
   \begin{tabular}{lrrr}
     \toprule
     Tool & p50 & p90 & p99 \\
     \midrule
+    \texttt{git} (minimal) & \SpeedGitMinimalPFifty{} & \SpeedGitMinimalPNinety{} & \SpeedGitMinimalPNinetyNine{} \\
+    \texttt{git} (Myers) & \SpeedGitMyersPFifty{} & \SpeedGitMyersPNinety{} & \SpeedGitMyersPNinetyNine{} \\
+    \texttt{git} (patience) & \SpeedGitPatiencePFifty{} & \SpeedGitPatiencePNinety{} & \SpeedGitPatiencePNinetyNine{} \\
+    \texttt{git} (histogram) & \SpeedGitHistogramPFifty{} & \SpeedGitHistogramPNinety{} & \SpeedGitHistogramPNinetyNine{} \\
     Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} \\
+    BDiff (warm interpreter) & \SpeedBDiffWarmPFifty{} & \SpeedBDiffWarmPNinety{} & \SpeedBDiffWarmPNinetyNine{} \\
     diffsitter & \SpeedDiffsitterPFifty{} & \SpeedDiffsitterPNinety{} & \SpeedDiffsitterPNinetyNine{} \\
+    \texttt{nvim -d} & \SpeedNvimDiffPFifty{} & \SpeedNvimDiffPNinety{} & \SpeedNvimDiffPNinetyNine{} \\
     difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} \\
     GumTree (warm JVM) & \SpeedGumTreeWarmPFifty{} & \SpeedGumTreeWarmPNinety{} & \SpeedGumTreeWarmPNinetyNine{} \\
+    BDiff (cold, per-invocation) & \SpeedBDiffColdPFifty{} & \SpeedBDiffColdPNinety{} & \SpeedBDiffColdPNinetyNine{} \\
     GumTree (cold, per-invocation) & \SpeedGumTreeColdPFifty{} & \SpeedGumTreeColdPNinety{} & \SpeedGumTreeColdPNinetyNine{} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\begin{resultbox}{RA6 (Tool cost)}
-The four tools span three orders of magnitude at the median, from Unix \texttt{diff}'s
-\SpeedUnixDiffPFifty{}\,ms to GumTree's \SpeedGumTreeColdPFifty{}\,ms per invocation, and the
+\begin{resultbox}{RA4.2 (Tool cost)}
+The nine tools span more than two orders of magnitude at the median, from \texttt{git}'s
+\SpeedGitMinimalPFifty{}\,ms to GumTree's \SpeedGumTreeColdPFifty{}\,ms per invocation, and the
 spread widens rather than narrows into the tail: at the 99th percentile the same range runs from
-\SpeedUnixDiffPNinetyNine{}\,ms to \SpeedGumTreeColdPNinetyNine{}\,ms. Every AST-aware tool has a
-tail heavier than its median suggests---the ratio between a tool's own p99 and p50 is at least
-20$\times$ for each of the three, against under 5$\times$ for Unix \texttt{diff}---so
-cost on this corpus is governed by the hard minority of changes, not by the common case.
+\SpeedGitPatiencePNinetyNine{}\,ms to \SpeedGumTreeColdPNinetyNine{}\,ms. Every AST-aware tool has
+a tail heavier than its median suggests---the ratio between a tool's own p99 and p50 is at least
+20$\times$ for each of the three, against under 6$\times$ for Unix \texttt{diff} and every
+\texttt{git} algorithm---so cost on this corpus is governed by the hard minority of changes, not by
+the common case.
 \end{resultbox}
 
 The two GumTree rows bracket how much of its cost is JVM startup rather than matching. A warm JVM
 takes its median from \SpeedGumTreeColdPFifty{}\,ms to \SpeedGumTreeWarmPFifty{}\,ms, so most of
-the per-invocation figure is process startup, not GumTree's algorithm. We report both because each
-answers a different question: the cold number is what a developer running a diff from the command
-line actually waits for, and the warm number is what GumTree's matching costs once that is
-amortized away.
+the per-invocation figure is process startup, not GumTree's algorithm. The two BDiff rows tell the
+same story more sharply: its per-invocation median of \SpeedBDiffColdPFifty{}\,ms is almost
+entirely Python interpreter start and imports, and the algorithm itself runs in
+\SpeedBDiffWarmPFifty{}\,ms at the median, though with a tail heavier than any other text-based
+tool's. We report both figures for each because they answer different questions: the cold number
+is what a developer running a diff from the command line actually waits for, and the warm number
+is what the matching costs once that is amortized away.
 
 These percentiles must be read against the right population. The fixture corpus is not the
 distribution of real commits, in which 47.5\% touch 10 lines or
@@ -918,19 +1096,20 @@ rather than trusting a single measurement.
 \section{\textsc{CodeDiff}}
 \label{sec:codediff}
 
-Everything above is about the problem. This section is the paper's system contribution: a
+Everything above is about the problem. This section is the paper's tool contribution: a
 syntax-aware diffing tool built against those measurements. It is presented last, and evaluated
-against the same ground truth as Section~\ref{sec:tools}'s four tools but not as a ranking against
-them, for the reason Section~\ref{sec:tools} gives---each of those tools optimizes for something
-this corpus does not measure.
+against the same ground truth and on the same basis as Section~\ref{sec:tools}'s nine tools, with
+the qualification Section~\ref{sec:tools} gives---each of those tools optimizes for something this
+corpus does not measure.
 
-The measurements in Section~\ref{sec:cost} give \textsc{CodeDiff} two concrete, named
-design targets, stated in place of an asymptotic bound. \textbf{Robust}: \textsc{CodeDiff} must
-handle every file up to the measured maximum, \AstMax{} AST nodes, with headroom above that number.
-\textbf{Fast}: \textsc{CodeDiff} must compute a diff in under \SpeedTargetMs{}\,ms for \SpeedTargetPct{}\% of real-world
-commits, the range that covers the overwhelming majority of commits per Arafat and Riehle's
-measurement. The rest of this section reports how well \textsc{CodeDiff} meets both targets in practice,
-and how accurately it maps the corpus of Section~\ref{sec:ground-truth}.
+The measurements in Sections~\ref{sec:dataset} and~\ref{sec:speed} give \textsc{CodeDiff} two
+concrete, named design targets, stated in place of an asymptotic bound. \textbf{Robust}:
+\textsc{CodeDiff} must handle every file up to the measured maximum, \AstMax{} AST nodes, with
+headroom above that number. \textbf{Fast}: \textsc{CodeDiff} must compute a diff in under
+\SpeedTargetMs{}\,ms for \SpeedTargetPct{}\% of real-world commits, the range that covers the
+overwhelming majority of commits per Arafat and Riehle's measurement. The rest of this section
+reports how well \textsc{CodeDiff} meets both targets in practice, and how accurately it maps the
+corpus of Section~\ref{sec:dataset}.
 
 \textsc{CodeDiff} matches two ASTs in \NumPhasesWord{} phases. Each phase either resolves part of the
 mapping directly or narrows the residual left for the next phase. Later phases only ever see
@@ -939,33 +1118,31 @@ insertion implied by whatever every phase above left undecided.
 
 \textbf{Phase 1, hash-based descent.} \textsc{CodeDiff} matches subtrees by two hash variants, in
 order: byte-identical subtrees, then same-shape subtrees with any leaf value. Each variant claims
-what it can before the next runs. This
-phase is \textsc{CodeDiff}'s own design, motivated directly by Section~\ref{sec:cost}'s
-commit-size data: since most commits touch a small fraction of a file's lines, most of a typical
-file's AST is byte-identical between before and after. Resolving that identical majority with cheap
-hashing, before any tree-edit-distance computation runs at all, avoids paying that computation's
-cost on content that never changed.
+what it can before the next runs. This phase is \textsc{CodeDiff}'s own design, motivated directly
+by the commit-size data of Section~\ref{sec:dataset}: since most commits touch a small fraction of
+a file's lines, most of a typical file's AST is byte-identical between before and after. Resolving
+that identical majority with cheap hashing, before any tree-edit-distance computation runs at all,
+avoids paying that computation's cost on content that never changed.
 
 \textbf{Phase 2, contextual exact matching.} Comments and modifiers (attributes, decorators) that
 immediately precede an already-matched node, and diagnostic statements (logging calls, assertions,
-panics) that are byte-identical on
-both sides, get matched directly. Both are cheap, high-confidence matches that reduce the work
-left for the tree-edit-distance phases below. Neither is reachable by phase 1's structural hashing:
-comments and modifiers are not part of the hashed AST shape, and diagnostic statements are held
-back deliberately, so that matching one does not fragment a larger match around it.
+panics) that are byte-identical on both sides, get matched directly. Both are cheap,
+high-confidence matches that reduce the work left for the tree-edit-distance phases below. Neither
+is reachable by phase 1's structural hashing: comments and modifiers are not part of the hashed AST
+shape, and diagnostic statements are held back deliberately, so that matching one does not
+fragment a larger match around it.
 
 \textbf{Phase 3, syntax-aware subtree matching.} This phase generalizes three matching strategies
 into one engine: matching by fully-resolved name (handling overloads and duplicate names across
 scopes), a greedy cost-estimate matcher for containers with no name structure, such as an
 \texttt{if} block or a loop body, and an overlap matcher pairing import statements that share a
-base path. Before any of these run, large flat subtrees, such as a macro's
-token list or a big flat argument list, are pre-matched directly with Myers'
-algorithm~\cite{myers-1986}, since a flat sequence has no tree structure worth exploiting—exactly
-the structures that drive Section~\ref{sec:cost}'s measured AST-size tail. Each accepted
-pair is then handed to APTED~\cite{apted-2015}, scoped to that pair alone, to compute its exact
-internal edit script. This is the only place a tree-edit-distance computation runs at all, and the
-scoping is what keeps it affordable: APTED sees one accepted container pair at a time, never the
-whole file.
+base path. Before any of these run, large flat subtrees, such as a macro's token list or a big
+flat argument list, are pre-matched directly with Myers' algorithm~\cite{myers-1986}, since a flat
+sequence has no tree structure worth exploiting---exactly the structures that drive the measured
+AST-size tail of Section~\ref{sec:dataset}. Each accepted pair is then handed to
+APTED~\cite{apted-2015}, scoped to that pair alone, to compute its exact internal edit script. This
+is the only place a tree-edit-distance computation runs at all, and the scoping is what keeps it
+affordable: APTED sees one accepted container pair at a time, never the whole file.
 
 \textbf{Phase 4, residual alignment.} Whatever remains unmatched after phases 1 through 3 is
 resolved by a Myers-LCS alignment~\cite{myers-1986} over the residual forest, bracketed by two
@@ -977,20 +1154,19 @@ their now-complete ancestors.
 Earlier versions of \textsc{CodeDiff} instead ran one whole-residual APTED computation here, with
 the Myers-LCS alignment substituting only when that computation looked too expensive. That design
 was abandoned: its cost is driven by residual \emph{shape} rather than size, which makes it
-impossible to gate reliably. Two measured cases make the point—an 11{,}647-node Vimscript residual
+impossible to gate reliably. Two measured cases make the point---an 11{,}647-node Vimscript residual
 took 87 seconds, while a 258{,}504-node JSON residual took 9.4. No size threshold separates those
 two, so the exact computation was removed from the whole-file path entirely and survives only in
-phase 3's scoped form. This is a direct consequence of the size tail in
-Section~\ref{sec:cost}: an unbounded whole-residual computation cannot meet the
-\SpeedTargetMs{}\,ms target at any threshold.
+phase 3's scoped form. This is a direct consequence of RA2: an unbounded whole-residual
+computation cannot meet the \SpeedTargetMs{}\,ms target at any threshold.
 
 \textbf{Phase 5, move-detection recovery.} The final matching pass. Ordered tree edit distance cannot
 express a subtree that relocated across a matched boundary as anything but a delete plus an
 insert. This phase, adapted directly from GumTree's recovery-mappings
 phase~\cite{gumtreediff-2014}, pairs up whole subtrees left fully deleted on one side and fully
 inserted on the other, when they are byte-identical and large enough to rule out coincidence. It
-runs last by necessity rather than by preference: every phase above requires some anchor—a hash, a
-name, a shared matched ancestor—before it will consider a pair at all, and content that moved
+runs last by necessity rather than by preference: every phase above requires some anchor---a hash, a
+name, a shared matched ancestor---before it will consider a pair at all, and content that moved
 between two containers that both changed identity has none. It is also, of the pipeline's optional
 passes, the one whose absence costs the most accuracy: a relocated subtree is the single shape
 ordered tree edit distance cannot express except as a delete plus an insert, so nothing downstream
@@ -1006,16 +1182,42 @@ against a second, independently-implemented ground truth, not only against itsel
 \NodesMatched{} of \NodesTotal{} AST nodes correctly across the \NumFixtures{} fixtures,
 \NodeMismatches{} mismatches, or \NodeAccuracyPct{}\% node-level accuracy. That denominator counts
 every AST node, including every ancestor of every change up to the root, so it partly reflects how
-deeply a given grammar nests. Restricted to the \VisibleNodeShare{}\% of nodes RA3 finds visible---those carrying text of their
-own, and therefore able to reach the screen when the diff is rendered---the figure is
-\VisibleNodeAccuracyPct{}\%,
-\VisibleNodeMismatches{} mismatches out of \VisibleNodesTotal{}. The two rates agreeing to two
-decimal places is itself the useful result, and it is exactly the check RA3 argues every
-node-level accuracy claim should carry: \textsc{CodeDiff}'s residual errors are not concentrated in
-the invisible third of the tree, so the headline figure is not being flattered by nodes no reviewer
-ever sees.
+deeply a given grammar nests. Restricted to the \VisibleNodeShare{}\% of nodes RA3.3 finds
+visible---those carrying text of their own, and therefore able to reach the screen when the diff
+is rendered---the figure is \VisibleNodeAccuracyPct{}\%, \VisibleNodeMismatches{} mismatches out
+of \VisibleNodesTotal{}. The two rates agreeing to two decimal places is itself the useful result,
+and it is exactly the check RA3.3 argues every node-level accuracy claim should carry:
+\textsc{CodeDiff}'s residual errors are not concentrated in the invisible third of the tree, so
+the headline figure is not being flattered by nodes no reviewer ever sees.
 
-\textbf{Speed.} Against the four tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} sits
+Scored on the same line-level basis as the nine tools of Table~\ref{tab:accuracy-vs-others},
+\textsc{CodeDiff} marks \CodeDiffLineMismatches{} lines differently from the human mapping over
+the same \CodeDiffFixtures{} fixtures, a rate of \CodeDiffLineRate{}\%, below every tool in that
+table on its own applicable subset. On the \CommonFixtures{}-fixture subset every tool scored, its
+rate is \CommonCodeDiffLineRate{}\%, which places it above the line-based tools
+(\CommonGitMyersLineRate{}\% for \texttt{git}) and below difftastic and GumTree. We report both
+rather than choose, and the reason they disagree is worth stating, because it is a property of the
+metric rather than of the subset's language mix. A pooled line rate weights a fixture by its
+length, and on this subset \textsc{CodeDiff}'s errors are extremely concentrated:
+\CommonTopK{} fixtures hold \CommonTopKMismatches{} of its \CommonCodeDiffMismatches{} mismatched
+lines, \CommonTopKSharePct{}\% of them on \CommonTopKLinesPct{}\% of the lines. Set those aside and
+the remaining \CommonExTopKFixtures{} fixtures give \CommonExTopKCodeDiffRate{}\% against
+\texttt{git}'s \CommonExTopKGitMyersRate{}\%. The per-fixture reading does not reorder at all:
+on the same subset \textsc{CodeDiff} matches the human mapping on every line in
+\CommonCodeDiffPerfect{} fixtures against \texttt{git}'s \CommonGitMyersPerfect{}, and is closer
+than \texttt{git} on \CommonCodeDiffBetter{} fixtures against \CommonCodeDiffWorse{} the other
+way.
+
+Those \CommonTopK{} fixtures are not a random tail. Three are long files whose annotations record
+exactly the phenomena Section~\ref{sec:viability} measures---one of them the merged call site of
+Table~\ref{tab:nm}, and one the auto-generated file where the human deletes whole function
+declarations while a cost-minimizing matcher salvages their braces and keywords into surviving
+functions, the RA1.2 pattern in its purest form. The other two are open, un-root-caused gaps in
+\textsc{CodeDiff} recorded as such in the corpus. RA4.1's qualifications apply to every figure in
+this paragraph exactly as to the others: it is a line-level projection of a node mapping, scored
+against one of possibly several correct answers.
+
+\textbf{Speed.} Against the tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} sits
 between the two other tree-sitter-based tools at the median, \SpeedCodeDiffPFifty{}\,ms against
 diffsitter's \SpeedDiffsitterPFifty{}\,ms and difftastic's \SpeedDifftasticPFifty{}\,ms. Its figure
 includes parsing, so that it measures the same span as the external tools, each of which is timed
@@ -1023,17 +1225,16 @@ as a whole process---temporary file, process start, its own parse and diff, and 
 back. One asymmetry remains in \textsc{CodeDiff}'s favour and we state it rather than carry it
 silently: measured in-process, it pays no process-startup cost, which every external tool here
 pays in full. That ordering does not hold across the distribution either. diffsitter, whose
-narrower hand-picked grammar set does markedly
-less work, overtakes it at the 90th percentile (\SpeedDiffsitterPNinety{}\,ms against
-\SpeedCodeDiffPNinety{}\,ms) and is an order of magnitude ahead at the 99th
-(\SpeedDiffsitterPNinetyNine{}\,ms against \SpeedCodeDiffPNinetyNine{}\,ms); difftastic's tail is
-heavier still in aggregate cost and essentially ties \textsc{CodeDiff} at the 99th percentile. Unix
-\texttt{diff} remains fastest at every percentile, since it never parses or compares tree
-structure. \textsc{CodeDiff}'s tail is heavy, and the design above explains why: the phases that
-resolve the common case cheaply do nothing for a large, genuinely dissimilar residual, which is
-exactly what the slowest fixtures in this corpus are.
+narrower hand-picked grammar set does markedly less work, overtakes it at the 90th percentile
+(\SpeedDiffsitterPNinety{}\,ms against \SpeedCodeDiffPNinety{}\,ms) and is an order of magnitude
+ahead at the 99th (\SpeedDiffsitterPNinetyNine{}\,ms against \SpeedCodeDiffPNinetyNine{}\,ms);
+difftastic's tail is heavier still in aggregate cost and essentially ties \textsc{CodeDiff} at the
+99th percentile. The line-based tools remain fastest at every percentile, since they never parse
+or compare tree structure. \textsc{CodeDiff}'s tail is heavy, and the design above explains why:
+the phases that resolve the common case cheaply do nothing for a large, genuinely dissimilar
+residual, which is exactly what the slowest fixtures in this corpus are.
 
-Read against the Fast target, the percentiles need the population qualification RA6 already
+Read against the Fast target, the percentiles need the population qualification RA4.2 already
 attaches to the same measurements. The target---\SpeedTargetMs{}\,ms for \SpeedTargetPct{}\% of
 real-world commits---is a claim about the real distribution of commits, in which 47.5\% touch 10
 lines or fewer~\cite{commit-size-distribution-paper}, and the fixture corpus is deliberately not
@@ -1066,10 +1267,11 @@ result is consistent with \textsc{CodeDiff}'s stated Robust target in this secti
 
 \textbf{Summary.} Combining established techniques rather than inventing new ones,
 \textsc{CodeDiff} reaches \NodeAccuracyPct{}\% AST-node accuracy against human-verified ground
-truth---\VisibleNodeAccuracyPct{}\% on the nodes a reader can see---a median well inside its
-interactive budget, and zero panics or timeouts across the sampled robustness evaluation.
-Building a production-grade syntax-aware diffing tool did not require a new matching algorithm,
-only careful combination and measurement of existing ones, against a problem measured first.
+truth---\VisibleNodeAccuracyPct{}\% on the nodes a reader can see---the lowest line-level mismatch
+rate of any tool measured on the full corpus, a median well inside its interactive budget, and
+zero panics or timeouts across the sampled robustness evaluation. Building a production-grade
+syntax-aware diffing tool did not require a new matching algorithm, only careful combination and
+measurement of existing ones, against a problem measured first.
 
 \section{Related Work}
 \label{sec:related}
@@ -1081,21 +1283,24 @@ research use, with broad language and backend flexibility, while \textsc{CodeDif
 tree-sitter-only frontend and spends the saved generality on production targets.
 difftastic~\cite{difftastic} and diffsitter~\cite{diffsitter} share \textsc{CodeDiff}'s parsing
 layer but optimize for a diff a human reads comfortably rather than for fidelity of the underlying
-node mapping; RA5 reflects that difference in design goal, not a defect in either tool. GumTree
-remains the foundation \textsc{CodeDiff}'s move-recovery phase builds on directly, and its
-language and backend flexibility stays valuable well beyond what RA5's single corpus measures. Unix \texttt{diff}, built on Myers'
-algorithm~\cite{myers-1986}, remains the baseline every one of these tools must justify itself
-against—on our corpus it is both the fastest tool measured and, at the line level, more accurate
-than every pre-existing AST-aware tool compared.
+node mapping; RA4.1 reflects that difference in design goal, not a defect in either tool. GumTree's
+language and backend flexibility stays valuable well beyond what RA4.1's single corpus measures.
+Unix \texttt{diff} and \texttt{git diff}, built on Myers' algorithm~\cite{myers-1986}, remain the
+baseline every one of these tools must justify itself against---on our corpus they are the fastest
+tools measured and, at the line level, more accurate than every pre-existing AST-aware tool
+compared, and BDiff's~\cite{bdiff} block awareness does not move that metric either.
 
 \textbf{Ground truth and its ambiguity.} GumTree's own evaluation, and most that followed it,
-score a tool against a single reference mapping per change. RA2 and RA4 are an argument that this
-default understates what a corpus can be asked: on the changes where several mappings, or several
-renderings, are equally correct, a fixed reference records a correct answer as wrong. The corpus
-here departs from the default in two ways---a multi-map group, which admits any consistent pairing
-of an interchangeable set, and a second, independently authored painting where the rendering is
-not unique---and both were added because annotating real changes forced them, not by design.
-We are not aware of a code-diffing ground truth that records either.
+score a tool against a single reference mapping per change. RA1.1, RA3.1 and RA3.2 are an argument
+that this default understates what a corpus can be asked: on the changes where the correspondence
+is not one-to-one, where several mappings are equally correct, or where several renderings are, a
+fixed reference records a correct answer as wrong. The corpus here departs from the default in two
+ways---a multi-map group, which records an $N{:}M$ site and admits any consistent one-to-one
+pairing of it, and a second, independently authored painting where the rendering is not
+unique---and both were added because annotating real changes forced them, not by design. We are
+not aware of a code-diffing ground truth that records either. RA1.2 adds a third departure from
+the usual assumptions: the unit cost model that ranks candidate mappings disagrees with the
+annotators on a measurable minority of changes.
 
 \textbf{Empirical studies.} Dyer et al.~\cite{ast-api-1} and L\"{a}mmel et al.~\cite{ast-api-2}
 mine AST nodes at scale to study API usage; Arafat and
@@ -1107,14 +1312,18 @@ distributions specifically to set, and then evaluate, the engineering targets of
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
 
-This paper's most transferable result is not about any tool. It is that the ground truth
-syntax-aware diffing is measured against is weaker than the metrics built on it assume, in three
-independent ways, each measured here: a correct mapping is often not unique (RA2), a third of the
-nodes a node-level metric scores are invisible to the reader (RA3), and even a settled mapping does
-not settle the rendering (RA4). None of these is a defect in a particular corpus. They are
-properties of code change, and any evaluation that scores a diff against one fixed answer carries
-all three as an error term whether or not it reports them. Reporting a fixed-answer metric is still
-defensible; reporting it alone is not.
+This paper's most transferable result is not about any tool. It is that the answer a
+syntax-aware diff is asked to compute is less well defined than the algorithms and metrics assume,
+in ways measured here without reference to any implementation: the true correspondence is
+sometimes not one-to-one at all, so no mapping built from insert, delete, update and move
+expresses it (RA1.1); the cheapest mapping is not always the one humans judge correct (RA1.2); a
+correct mapping is often not unique (RA3.1); a settled mapping does not settle the rendering
+(RA3.2); and a third of the nodes a node-level metric scores are invisible to the reader (RA3.3).
+Underneath all of that, the exact computation every such tool is built on is affordable only for
+small files (RA2). None of these is a defect in a particular corpus. They are properties of code
+change, and any evaluation that scores a diff against one fixed answer carries them as an error
+term whether or not it reports them. Reporting a fixed-answer metric is still defensible;
+reporting it alone is not.
 
 Against that background, the tool contribution is deliberately modest. None of
 \textsc{CodeDiff}'s matching algorithms are new: it combines APTED's exact tree edit distance,
@@ -1142,6 +1351,10 @@ syntax-aware developer tooling:
   \item Let the annotation format record ambiguity rather than resolve it. Where several answers
   are equally correct, forcing one makes an arbitrary choice into ground truth, and every tool that
   chooses differently is then scored wrong for a choice that was never wrong.
+  \item Do not assume the cost-minimal mapping is the one readers want. On a measurable minority
+  of changes the human answer is strictly costlier under unit costs, because it declines to count
+  a coincidental match of identical tokens as a correspondence; an exact optimizer of that cost
+  is exact about the wrong objective there.
   \item Engineer against the measured distribution of real inputs, not against the worst-case
   bound alone: the common case and the tail require different machinery, and both occur in
   practice.
@@ -1154,17 +1367,20 @@ syntax-aware developer tooling:
 \end{itemize}
 
 Future work includes widening the robustness corpus beyond Rust and extending the accuracy
-comparison to more languages GumTree also supports, but the clearest directions are the ones RA2
-and RA4 open. Both rates are floors: the corpus establishes that ambiguity is common, and
-establishes it only where an annotator noticed and recorded it. Detecting candidate ambiguity
-automatically, and re-annotating the \AmbiguityPreFixtures{} fixtures that predate the
-multi-mapping facility, would turn a floor into a census. RA4's floor is narrower still and easier
-to raise: painting is manual, and the \PaintingFixtures{} changes painted so far are the corpus's
-small curated ones, so whether \PaintingDualPct{}\% holds on large, multi-site real-world changes
-is simply unmeasured. The $N{:}M$ result needs more than annotation effort. The painted format can
-express such a correspondence and finds \PaintingNmPct{}\% of matched regions carrying one; the
-mapping format cannot express it at all, and until a node-level ground truth can, its prevalence
-there stays something found by reading rather than counted.
+comparison to more languages GumTree also supports, but the clearest directions are the ones RA1.1,
+RA1.2 and RA3.2 open. The uniqueness rates are floors: the corpus establishes that ambiguity is
+common, and establishes it only where an annotator noticed and recorded it. Detecting candidate
+ambiguity automatically, and re-annotating the \AmbiguityPreFixtures{} fixtures that predate the
+multi-mapping facility, would turn a floor into a census. RA3.2's floor is narrower still and
+easier to raise: painting is manual, and the \PaintingFixtures{} changes painted so far are the
+corpus's small curated ones, so whether \PaintingDualPct{}\% holds on large, multi-site real-world
+changes is simply unmeasured. The $N{:}M$ result needs more than annotation effort. The painted
+format can express such a correspondence and finds \PaintingNmPct{}\% of matched regions carrying
+one; the mapping format records the site but only its one-to-one approximation, and no algorithm
+in the family measured here can emit anything else, so an output language and a ground truth that
+carry the correspondence itself are both open. RA1.2 opens the last one: the comparison mapping
+was a heuristic's, so the rate at which humans prefer a costlier mapping is a lower bound, and a
+cost model that agrees with readers on those changes is unwritten.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

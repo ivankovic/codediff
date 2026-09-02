@@ -24,6 +24,9 @@ LIST_TINY := ../list_of_repositories_tiny.csv
 # Default mode is "tiny", can be overridden with "make MODE=small" or "make MODE=full"
 MODE ?= tiny
 
+# Commits per repository the edit-shape census walks; see the `edit-shape` target.
+EDIT_SHAPE_COMMITS ?= 50
+
 # Resolve the appropriate list based on mode. Deliberately `=` (recursive/lazy), not `:=`
 # (immediate): `tiny`/`small`/`full` below set MODE as a target-specific variable (`override
 # MODE=...`), which only reaches these via lazy re-expansion at the point each recipe line
@@ -251,6 +254,26 @@ benchmark-optimal-report:
 # describe the same corpus state, since this report joins prevalence against codediff's own result.
 shapes-report:
 	uv run ./analysis/human_mapping_shapes_report.py
+
+# Shape of real-world file edits: how many lines a commit touches, across how many files, and what
+# fraction of a file an edit changes. Section 3 of the introductory paper cited only Arafat and
+# Riehle's commit-size distribution for this and carried a TODO for our own numbers.
+#
+# Reads the cloned corpus under $(CORPUS_ROOT)/$(MODE)/repositories directly with `git log
+# --numstat`, so it needs the clones (`make fetch MODE=<mode>`) but no build and no parse. It is a
+# census of each clone's (depth-limited) history, NOT a draw from data/samples/ - those pairs are
+# stratified by size bucket and so cannot answer "how big is a typical edit".
+#
+# EDIT_SHAPE_COMMITS caps how many commits per repository are walked, and defaults to the corpus's
+# own clone depth. It is not a speed knob: these clones are shallow but NOT uniformly so, and an
+# uncapped walk is dominated by torvalds-linux.git (1.29M of the corpus's 2.31M reachable commits),
+# so it would report one repository's edit habits as the corpus's.
+#
+# Churn is derived from numstat plus the after-side blob's line count, not read from stats.sqlite:
+# that database's lines_added/lines_removed/lines_changed/nodes_* columns are all zero, hardcoded
+# by commit_stats.rs.
+edit-shape:
+	uv run ./analysis/edit_shape_stats.py --repositories $(REPOSITORIES_DIR) --max-commits $(EDIT_SHAPE_COMMITS)
 
 # Ground-truth ambiguity over the human-authored mappings: how often a real-world change admits no
 # unique correct AST mapping, i.e. how often the annotator recorded a multi-map group. This is the

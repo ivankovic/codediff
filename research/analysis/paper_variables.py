@@ -399,6 +399,35 @@ SHAPE_MACROS = (
 )
 
 
+# Every macro the edit-shape fragment (edit_shape_stats.py) is expected to define: how big a
+# real-world edit is, in lines per file edit and per commit, and what fraction of the file it
+# lands in. The churn block (Edits*Churn*) depends on stats.sqlite being present alongside the
+# clones, so those five are listed here but legitimately absent on a machine without it - the
+# paper's prose must not cite them when they are.
+EDIT_SHAPE_MACROS = [
+    "EditsRepositories",
+    "EditsCommits",
+    "EditsFileEdits",
+    "EditsCodeFileEdits",
+    "EditsModifiedSharePct",
+    "EditsLanguages",
+    "EditsCodeSharePct",
+    "EditsLinesPerFilePFifty",
+    "EditsLinesPerFilePNinety",
+    "EditsLinesPerFilePNinetyNine",
+    "EditsLinesPerFileMax",
+    "EditsFileEditsUnderTenPct",
+    "EditsLinesPerCommitPFifty",
+    "EditsLinesPerCommitPNinety",
+    "EditsLinesPerCommitPNinetyNine",
+    "EditsLinesPerCommitMax",
+    "EditsCommitsUnderTenPct",
+    "EditsFilesPerCommitPFifty",
+    "EditsFilesPerCommitPNinety",
+    "EditsFilesPerCommitPNinetyNine",
+]
+
+
 def command(name, value):
     return f"\\newcommand{{\\{name}}}{{{value}}}"
 
@@ -488,6 +517,161 @@ def sampling_provenance(repo_root):
     return out
 
 
+def cost_preference(research_dir):
+    """RQ1.2's and RQ3.1's cost comparison, derived from
+    `data/quality/optimal_solutions_benchmark.csv` - the same artifact the CORPUS block is
+    totalled from, so both describe one corpus state.
+
+    Every row with a human mapping carries two costs under one cost model (unit insert/delete/
+    update, free move - see `human_mapping::operation_cost`): `human_cost`, the annotator's
+    mapping, and `algorithm_cost`, the harness's own matcher's mapping for the same pair. Three
+    cells matter to the paper:
+
+    * `human_cost > algorithm_cost` - the human preferred a mapping strictly costlier than one an
+      algorithm found. Because the matcher is heuristic its cost is an upper bound on the optimum,
+      so this is a lower bound on "humans prefer a non-optimal mapping" (RA1.2).
+    * `human_cost == algorithm_cost` with `mismatches > 0` - two different mappings the cost
+      model cannot tell apart, one of them the human's (RA3.1's second, format-independent
+      reading). Ties with zero mismatches are the same mapping and say nothing.
+    * `human_cost < algorithm_cost` - the heuristic was suboptimal; reported only so the three
+      cells visibly sum to the scored total.
+
+    The one `human_unsolved` row (no human mapping at all) is excluded, matching NumFixtures.
+    """
+    path = os.path.join(research_dir, "data", "quality", "optimal_solutions_benchmark.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r["human_unsolved"] == "false"]
+
+    def cost(r, key):
+        return float(r[key])
+
+    human_higher = [r for r in rows if cost(r, "human_cost") > cost(r, "algorithm_cost")]
+    ties = [r for r in rows if cost(r, "human_cost") == cost(r, "algorithm_cost")]
+    tie_different = [r for r in ties if int(r["mismatches"]) > 0]
+    algorithm_higher = [r for r in rows if cost(r, "human_cost") < cost(r, "algorithm_cost")]
+    excess = sorted(cost(r, "human_cost") - cost(r, "algorithm_cost") for r in human_higher)
+
+    def pct(n):
+        return f"{n / len(rows) * 100:.1f}" if rows else PLACEHOLDER
+
+    def whole(value):
+        return latex_number(int(value)) if value == int(value) else f"{value:g}"
+
+    def median(values):
+        if not values:
+            return PLACEHOLDER
+        mid = len(values) // 2
+        return whole(values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2)
+
+    return {
+        "CostScored": len(rows),
+        "CostHumanHigherFixtures": len(human_higher),
+        "CostHumanHigherPct": pct(len(human_higher)),
+        "CostHumanHigherExcessMedian": median(excess),
+        "CostHumanHigherExcessMax": whole(excess[-1]) if excess else PLACEHOLDER,
+        "CostTieFixtures": len(ties),
+        "CostTieDifferentFixtures": len(tie_different),
+        "CostTieDifferentPct": pct(len(tie_different)),
+        "CostAlgorithmHigherFixtures": len(algorithm_higher),
+        "CostAlgorithmHigherPct": pct(len(algorithm_higher)),
+    }
+
+
+# Tools whose coverage defines the common subset. Mirrors `benchmark_other_report.py`'s
+# PAPER_MACRO_STEMS: a fixture is in the subset when every one of these scored it. The check at
+# the bottom of `common_subset_concentration` fails loudly if this drifts from \CommonFixtures.
+COMMON_SUBSET_TOOLS = [
+    "codediff",
+    "unix_diff",
+    "git_myers",
+    "git_minimal",
+    "git_patience",
+    "git_histogram",
+    "bdiff",
+    "nvim_diff",
+    "gumtree",
+    "diffsitter",
+    "difftastic",
+]
+
+# How many of CodeDiff's worst fixtures the paper sets aside when showing that its common-subset
+# rate is carried by a few long files. Five is a stated editorial choice, not a fitted cutoff:
+# the concentration is visible at any small k, and the macro below reports what share of the
+# mismatches those k hold so a reader can judge the choice.
+COMMON_SUBSET_TOP_K = 5
+
+
+def common_subset_concentration(research_dir):
+    """Why CodeDiff's pooled line rate rises on the common subset, derived from
+    `data/comparison/benchmark_accuracy.csv` - the same artifact the COMPARISON block comes from.
+
+    A pooled line rate weights a fixture by its length, so a handful of very long fixtures decides
+    it. These macros let Section 8 say that in numbers instead of guessing at a cause: the share
+    of CodeDiff's common-subset mismatches held by its `COMMON_SUBSET_TOP_K` worst fixtures, the
+    two rates with those set aside, and the per-fixture reading, which does not reorder at all.
+
+    `git_myers` is the line-based comparator throughout, because it is the best of the five
+    line-granularity tools on this subset and therefore the strongest form of the comparison.
+    """
+    path = os.path.join(research_dir, "data", "comparison", "benchmark_accuracy.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    # "line_only" is a scored status, not a failure - see benchmark_other_report.py::common_subset.
+    scored = ("ok", "line_only")
+    common = [
+        r for r in rows if all(r[f"{t}_status"] in scored for t in COMMON_SUBSET_TOOLS)
+    ]
+    if not common:
+        return {}
+
+    def mismatches(subset, tool):
+        return sum(int(r[f"{tool}_line_mismatches"]) for r in subset)
+
+    def rate(subset, tool):
+        lines = sum(int(r["total_lines"]) for r in subset)
+        return f"{mismatches(subset, tool) / lines * 100:.3f}" if lines else PLACEHOLDER
+
+    worst = sorted(common, key=lambda r: -int(r["codediff_line_mismatches"]))
+    top = worst[:COMMON_SUBSET_TOP_K]
+    rest = worst[COMMON_SUBSET_TOP_K:]
+    top_share = mismatches(top, "codediff") / mismatches(common, "codediff") * 100
+    top_lines = sum(int(r["total_lines"]) for r in top)
+    all_lines = sum(int(r["total_lines"]) for r in common)
+
+    better = sum(
+        1
+        for r in common
+        if int(r["codediff_line_mismatches"]) < int(r["git_myers_line_mismatches"])
+    )
+    worse = sum(
+        1
+        for r in common
+        if int(r["codediff_line_mismatches"]) > int(r["git_myers_line_mismatches"])
+    )
+    return {
+        "CommonTopK": COMMON_SUBSET_TOP_K,
+        "CommonTopKMismatches": latex_number(mismatches(top, "codediff")),
+        "CommonCodeDiffMismatches": latex_number(mismatches(common, "codediff")),
+        "CommonTopKSharePct": f"{top_share:.0f}",
+        "CommonTopKLinesPct": f"{top_lines / all_lines * 100:.0f}",
+        "CommonExTopKFixtures": len(rest),
+        "CommonExTopKCodeDiffRate": rate(rest, "codediff"),
+        "CommonExTopKGitMyersRate": rate(rest, "git_myers"),
+        "CommonCodeDiffPerfect": sum(
+            1 for r in common if int(r["codediff_line_mismatches"]) == 0
+        ),
+        "CommonGitMyersPerfect": sum(
+            1 for r in common if int(r["git_myers_line_mismatches"]) == 0
+        ),
+        "CommonCodeDiffBetter": better,
+        "CommonCodeDiffWorse": worse,
+    }
+
+
 def build(
     empirical_lines,
     rq1_lines,
@@ -495,7 +679,10 @@ def build(
     ambiguity_lines,
     rendering_lines,
     shape_lines,
+    edit_shape_lines,
     sampling,
+    cost,
+    concentration,
 ):
     """Returns the complete variables.tex as a list of lines."""
     out = [
@@ -579,6 +766,20 @@ def build(
     ]
     out += emit_block(shape_lines, SHAPE_MACROS, "change-shape", "make shapes-report")
 
+    out += [
+        "",
+        "% --- Shape of real-world file edits: how many lines a commit touches, across how many",
+        "% files, and what fraction of a file an edit changes. Generated by",
+        "% analysis/edit_shape_stats.py from the cloned corpus itself; refresh with",
+        "% `make edit-shape MODE=<tiny|small|full>`. Rates carry no percent sign.",
+    ]
+    out += emit_block(
+        edit_shape_lines,
+        EDIT_SHAPE_MACROS,
+        "edit-shape",
+        "make edit-shape MODE=<mode>",
+    )
+
     # Corpus size and node accuracy. NodeMismatches and NodeAccuracyPct are derived here rather
     # than transcribed separately: three independent literals for one measurement can drift apart,
     # and the paper states all three.
@@ -634,6 +835,23 @@ def build(
     ]
     out += [command(name, value) for name, value in sorted(sampling.items())]
 
+    out += [
+        "",
+        "% --- Cost comparison: how often the human mapping is costlier than a mapping the harness's",
+        "% own matcher found, and how often the two tie at different mappings (DERIVED from",
+        "% data/quality/optimal_solutions_benchmark.csv, the same artifact the CORPUS block is",
+        "% totalled from - see `cost_preference`). Refresh with the benchmark's --csv run.",
+    ]
+    out += [command(name, value) for name, value in cost.items()]
+
+    out += [
+        "",
+        "% --- Why CodeDiff's pooled line rate rises on the common subset: the concentration of its",
+        "% mismatches in a few very long fixtures, and the per-fixture reading that does not reorder",
+        "% (DERIVED from data/comparison/benchmark_accuracy.csv - see `common_subset_concentration`).",
+    ]
+    out += [command(name, value) for name, value in concentration.items()]
+
     return out
 
 
@@ -681,6 +899,12 @@ def main():
         output_path,
         SHAPE_MACROS,
         "make shapes-report",
+    )
+    edit_shape, edit_shape_source = read_generated_block(
+        os.path.join(plots, "variables_edits.tex"),
+        output_path,
+        EDIT_SHAPE_MACROS,
+        "make edit-shape MODE=<mode>",
     )
 
     # \NumFixtures{} (authored, CORPUS), \AmbiguityScored{} and \PaintingScored{} (generated, from
@@ -732,7 +956,42 @@ def main():
     sampling = sampling_provenance(repo_root)
     if not sampling:
         print("note: no src/test/data/sample.csv; corpus-construction macros will be placeholders")
-    lines = build(empirical, rq1, comparison, ambiguity, rendering, shapes, sampling)
+    cost = cost_preference(research_dir)
+    if not cost:
+        print(
+            "note: no data/quality/optimal_solutions_benchmark.csv; cost-comparison macros will be "
+            "placeholders"
+        )
+    concentration = common_subset_concentration(research_dir)
+    if not concentration:
+        print(
+            "note: no data/comparison/benchmark_accuracy.csv; common-subset concentration macros "
+            "will be placeholders"
+        )
+    else:
+        # The subset these are computed over must be the same 262 fixtures the COMPARISON block's
+        # \CommonFixtures names, or Section 8 would explain a number Table 4 never printed.
+        common_fixtures = scored_by(comparison, "CommonFixtures")
+        counted = concentration["CommonExTopKFixtures"] + concentration["CommonTopK"]
+        if common_fixtures is not None and common_fixtures != str(counted):
+            print(
+                f"WARNING: common-subset disagreement - CommonFixtures={common_fixtures} "
+                f"(benchmark_other_report.py) vs {counted} counted here. COMMON_SUBSET_TOOLS has "
+                f"drifted from that script's PAPER_MACRO_STEMS."
+            )
+
+    lines = build(
+        empirical,
+        rq1,
+        comparison,
+        ambiguity,
+        rendering,
+        shapes,
+        edit_shape,
+        sampling,
+        cost,
+        concentration,
+    )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
@@ -743,7 +1002,8 @@ def main():
         f"{macro_count} paper variables written to {output_path} "
         f"(empirical block from: {empirical_source}; RQ1 block from: {rq1_source}; "
         f"comparison block from: {comparison_source}; ambiguity block from: {ambiguity_source}; "
-        f"rendering block from: {rendering_source}; shape block from: {shapes_source})"
+        f"rendering block from: {rendering_source}; shape block from: {shapes_source}; "
+        f"edit-shape block from: {edit_shape_source})"
     )
 
 
