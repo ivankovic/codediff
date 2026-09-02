@@ -622,9 +622,7 @@ def common_subset_concentration(research_dir):
         rows = list(csv.DictReader(f))
     # "line_only" is a scored status, not a failure - see benchmark_other_report.py::common_subset.
     scored = ("ok", "line_only")
-    common = [
-        r for r in rows if all(r[f"{t}_status"] in scored for t in COMMON_SUBSET_TOOLS)
-    ]
+    common = [r for r in rows if all(r[f"{t}_status"] in scored for t in COMMON_SUBSET_TOOLS)]
     if not common:
         return {}
 
@@ -661,12 +659,8 @@ def common_subset_concentration(research_dir):
         "CommonExTopKFixtures": len(rest),
         "CommonExTopKCodeDiffRate": rate(rest, "codediff"),
         "CommonExTopKGitMyersRate": rate(rest, "git_myers"),
-        "CommonCodeDiffPerfect": sum(
-            1 for r in common if int(r["codediff_line_mismatches"]) == 0
-        ),
-        "CommonGitMyersPerfect": sum(
-            1 for r in common if int(r["git_myers_line_mismatches"]) == 0
-        ),
+        "CommonCodeDiffPerfect": sum(1 for r in common if int(r["codediff_line_mismatches"]) == 0),
+        "CommonGitMyersPerfect": sum(1 for r in common if int(r["git_myers_line_mismatches"]) == 0),
         "CommonCodeDiffBetter": better,
         "CommonCodeDiffWorse": worse,
     }
