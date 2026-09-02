@@ -425,9 +425,22 @@ struct Row {
     /// same way `benchmark_optimal_solutions` treats a fixture with no `human_mapping.json` yet.
     tools: Vec<Option<(usize, usize)>>,
     /// Milliseconds to go from `before`/`after` to codediff's per-line touched labels
-    /// (`diff::diff_code` plus the `touched_lines` projection) - timed the same way as each
-    /// `ExternalTool`, so the two are comparable: "cost to produce a line-level touched/untouched
-    /// verdict," not just "cost to run the underlying algorithm." One entry per `--repeats`
+    /// (`diff::diff_code` plus the `touched_lines` projection).
+    ///
+    /// **Not comparable to an `ExternalTool`'s timing as it stands, and this comment used to claim
+    /// it was.** `main` calls `ensure_parsed()` on every fixture before any timing begins, so this
+    /// number excludes parsing entirely, while a tool's timed region is its whole subprocess:
+    /// temp-file write, spawn, its own parse and diff, and parsing its output back. Measured
+    /// 2026-09-02, the omission was worth codediff's entire parse cost - a p50 of 7.09 ms against
+    /// diffsitter's 8.62, which became 10.07 once the parse was added back, reversing the ordering
+    /// the paper reported.
+    ///
+    /// The parse is measured, per repeat, as `treesitter_parse_ms`, and
+    /// `benchmark_other_report.py`'s `speed_percentiles` now adds the two for the published
+    /// figure. Both columns stay separate here on purpose: the split is what makes "algorithm
+    /// only" and "end to end" both answerable from one run. Anything reading `codediff_ms` alone
+    /// and putting it beside a `tool_ms` is comparing a bare algorithm against a whole process.
+    /// One entry per `--repeats`
     /// iteration (default 3, see `Args::repeats`) - kept as the full sample, not collapsed to a
     /// mean, so a noisy fixture is visible as noise rather than silently averaged away.
     codediff_ms: Vec<f64>,

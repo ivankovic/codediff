@@ -789,10 +789,10 @@ not as a ranking of which tool is best.
 compare them on a common ground: which source lines each marks as touched, against the
 same human mapping (Table~\ref{tab:accuracy-vs-others}, Table~\ref{tab:agreement-buckets}).
 Coverage
-varies widely: diffsitter's compiled-in grammar set matches \DiffsitterFixtures{} of the
-\NumFixtures{} fixtures' languages, GumTree's generator set matches \GumTreeFixtures{},
-difftastic's \DifftasticFixtures{}, and only Unix \texttt{diff} covers all
-\NumFixtures{}. Each tool's own row is scored only on its own
+varies widely: of the \UnixDiffFixtures{} fixtures this comparison was run over, diffsitter's
+compiled-in grammar set matches \DiffsitterFixtures{} languages, GumTree's generator set matches
+\GumTreeFixtures{}, difftastic's \DifftasticFixtures{}, and only Unix \texttt{diff} covers all
+\UnixDiffFixtures{}. Each tool's own row is scored only on its own
 applicable subset, not padded with unscored fixtures. Because those subsets differ so much, the
 table also reports every tool on the \CommonFixtures{} fixtures all four scored, which holds the
 fixture set fixed at the cost of over-representing the mainstream languages every tool supports.
@@ -847,7 +847,12 @@ and unmeasured. Neither can be signed: they may run in a tool's favour or agains
 \input{figures/benchmark_other_buckets.tex}
 
 \textbf{Cost.} RQ6 asks the same four tools a different question. Table~\ref{tab:speed-vs-others}
-reports wall-clock percentiles over the same fixtures, sorted fastest to slowest by median. We
+reports wall-clock percentiles, sorted fastest to slowest by median. Each tool is measured over
+the fixtures it supports rather than over one common subset, so the populations behind these rows
+differ---the text tools and \textsc{CodeDiff} draw on every fixture, while an AST tool draws only
+on the languages its grammars cover, which for diffsitter is roughly three fifths of them. The
+per-row \emph{n} in Table~\ref{tab:accuracy-vs-others} gives the size of each, and a tool covering
+fewer, more mainstream languages is doing correspondingly less work per fixture. We
 report GumTree twice: once invoked as a fresh process per fixture, the realistic cost of a single
 CLI invocation, and once run inside one persistent JVM across all fixtures, isolating JVM startup
 from GumTree's own matching cost.
@@ -1002,10 +1007,15 @@ node-level accuracy claim should carry: \textsc{CodeDiff}'s residual errors are 
 the invisible third of the tree, so the headline figure is not being flattered by nodes no reviewer
 ever sees.
 
-\textbf{Speed.} Against the four tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} is
-the fastest AST-aware tool at the median, \SpeedCodeDiffPFifty{}\,ms against diffsitter's
-\SpeedDiffsitterPFifty{}\,ms and difftastic's \SpeedDifftasticPFifty{}\,ms, but that ordering does
-not hold across the distribution. diffsitter, whose narrower hand-picked grammar set does markedly
+\textbf{Speed.} Against the four tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} sits
+between the two other tree-sitter-based tools at the median, \SpeedCodeDiffPFifty{}\,ms against
+diffsitter's \SpeedDiffsitterPFifty{}\,ms and difftastic's \SpeedDifftasticPFifty{}\,ms. Its figure
+includes parsing, so that it measures the same span as the external tools, each of which is timed
+as a whole process---temporary file, process start, its own parse and diff, and reading its output
+back. One asymmetry remains in \textsc{CodeDiff}'s favour and we state it rather than carry it
+silently: measured in-process, it pays no process-startup cost, which every external tool here
+pays in full. That ordering does not hold across the distribution either. diffsitter, whose
+narrower hand-picked grammar set does markedly
 less work, overtakes it at the 90th percentile (\SpeedDiffsitterPNinety{}\,ms against
 \SpeedCodeDiffPNinety{}\,ms) and is an order of magnitude ahead at the 99th
 (\SpeedDiffsitterPNinetyNine{}\,ms against \SpeedCodeDiffPNinetyNine{}\,ms); difftastic's tail is

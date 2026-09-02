@@ -68,6 +68,7 @@ with the number silently missing, which is strictly worse than the literal it re
 Usage (from research/):  uv run ./analysis/paper_variables.py
 """
 
+import glob
 import os
 import re
 import sys
@@ -558,6 +559,7 @@ def build(
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     research_dir = os.path.dirname(here)
+    repo_root = os.path.dirname(research_dir)
     plots = os.path.join(research_dir, "plots")
     # plots/ is the single source of truth: papers/introductory-paper/figures/variables.tex is a
     # symlink to this file, so there is exactly one copy and no copy step to keep in sync.
@@ -624,6 +626,27 @@ def main():
                 f"(authored) vs {macro}={scored} (generated). Re-run "
                 f"`analyze_human_mappings --csv` and `{refresh}`, then update CORPUS."
             )
+
+    # The three names above agreeing proves only that they were generated together - all three go
+    # stale as a set, and did: NumFixtures sat at 468 while the corpus grew past 500, so the check
+    # passed while the paper printed a number the repository had outgrown. Compare against the
+    # corpus on disk, which is the one figure here that cannot be stale.
+    #
+    # A warning, not an error: a paper is legitimately written against a frozen corpus state, and
+    # the measured blocks (NodesMatched, NodesTotal and friends) come from one run that must be
+    # refreshed together or not at all. What must not happen is nobody noticing.
+    ground_truth_fixtures = len(
+        glob.glob(
+            os.path.join(repo_root, "src", "test", "data", "diffs", "*", "*", "human_mapping.json")
+        )
+    )
+    if ground_truth_fixtures and ground_truth_fixtures != CORPUS["NumFixtures"]:
+        print(
+            f"WARNING: NumFixtures={CORPUS['NumFixtures']} (authored) but the corpus on disk now "
+            f"holds {ground_truth_fixtures} fixtures with a human_mapping.json. Every CORPUS entry "
+            f"comes from one `analyze_human_mappings` run, so refresh them together - re-run it "
+            f"and update the whole block - rather than editing NumFixtures alone."
+        )
 
     lines = build(empirical, rq1, comparison, ambiguity, rendering, shapes)
 

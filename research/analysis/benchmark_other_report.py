@@ -949,8 +949,36 @@ def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] 
     disagree. Pooling is sound here because `benchmark_other` runs a uniform `--repeats` for every
     fixture and tool, so no fixture is over-weighted; that would stop being true if repeats ever
     became adaptive (as they are in `benchmark_diff_pairs`, which skips repeats for already-slow
-    pairs). Returns None for a series with no measurements."""
+    pairs). Returns None for a series with no measurements.
+
+    For `codediff` the parse is added back in. `benchmark_other` calls `ensure_parsed()` on every
+    fixture *before* timing starts, so `codediff_ms` covers `diff_code` alone - no parse, no
+    process spawn, no IO - while every external tool's timed region is its whole subprocess:
+    temp-file write, spawn, that tool's own parse and diff, and parsing its output back. Reporting
+    the two side by side compared different things and flattered codediff by its entire parse cost
+    (2026-09-02: p50 7.09 ms against diffsitter's 8.62, which became 10.07 once the parse it had
+    already measured was included - reversing the ordering the paper stated).
+
+    `treesitter_parse_ms` is measured per repeat by the same harness, so this needs no re-run: it
+    is a reporting fix, not new data. The remaining asymmetry runs the *other* way and is stated in
+    the paper rather than silently carried - codediff still pays no process-startup cost, which
+    every external tool pays in full."""
     values = [v for r in rows_for(id_, rows) for v in ms_values(r, f"{id_}_ms")]
+    if id_ == "codediff":
+        # Paired per repeat, not pooled separately, so a fixture's parse is added to that same
+        # fixture's diff rather than to some other fixture's.
+        values = []
+        for r in rows_for(id_, rows):
+            diff_ms = ms_values(r, "codediff_ms")
+            parse_ms = ms_values(r, "treesitter_parse_ms")
+            if not diff_ms:
+                continue
+            if len(parse_ms) == len(diff_ms):
+                values.extend(d + p for d, p in zip(diff_ms, parse_ms, strict=True))
+            else:
+                # A row missing its parse column contributes the diff alone: understating one row
+                # is better than dropping it and quietly shrinking the population.
+                values.extend(diff_ms)
     if not values:
         return None
     array = np.array(values, dtype=float)
