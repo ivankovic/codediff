@@ -276,12 +276,14 @@ dataset has \NumFiles{} files in \NumLanguages{} languages. While we cannot guar
 remain accessible, the entire list of repositories, the cloning script and all analysis is available from
 the projects repository and can be replicated by readers, if desired.
 
+This section describes the overall shape of the resulting dataset.
+
 \subsection{Shape of real-world files}
 
 The first thing to note about the dataset is that only two-thirds of the files are actually code files.
 The rest is configuration, data, and documentation (Figure~\ref{fig:tips}).~\footnote{Note however that any
-``code'' diffing tool still must support showing changes to non-code files.}
-Restricted to code files, Table~\ref{tab:file-size-percentiles} reports size percentiles in bytes,
+``code'' diffing tool still must support visualizing changes to non-code files as well.}
+Restricted to code files, Table~\ref{tab:file-size-percentiles} reports a choice of size percentiles of bytes,
 lines of code, and AST nodes.
 
 \begin{figure}
@@ -305,23 +307,21 @@ lines of code, and AST nodes.
   \end{tabular}
 \end{table}
 
-The largest file in the corpus has \AstMax{} AST nodes. Byte size and AST node count have a strong
-correlation, Pearson $r = \CorrelationR{}$, which simplifies to $|\text{AST}| \approx \text{bytes} / 5$
-for quick estimates.
+Byte size and AST node count have a strong correlation, Pearson $r = \CorrelationR{}$, which simplifies to
+$|\text{AST}| \approx \text{bytes} / 5$ for quick estimates.
 
 \subsection{Shape of real-world file edits}
 
-We measured the same shape on our own corpus. In the Curated dataset, we analyzed \EditsCommits{}
-commits, touching \EditsCodeFileEdits{} code files, of which \EditsCodeSharePct{} were code files.
-Of the code-file edits, \EditsModifiedSharePct{}\% were file modifications, the rest were file
-creation or deletions. To avoid large repositories, notably the Linux kernel, from skewing the results
-each repository was only analyzed up to \CorpusCloneDepth{} commits deep.
+In the Curated dataset, we analyzed \EditsCommits{} commits, touching \EditsCodeFileEdits{} code files, of
+which \EditsCodeSharePct{} were code files. Of the code-file edits, \EditsModifiedSharePct{}\% were file
+modifications, the rest were file creation or deletions. To avoid large repositories, notably the Linux kernel,
+from skewing the results each repository was only analyzed up to \CorpusCloneDepth{} commits deep.
+
+To allow for comparison with existing research, \texttt{git diff} was used to compute the number of
+changed lines.
 
 \begin{table}
-  \caption{Size of a real-world edit on the Curated list, in lines added plus removed, over the
-  \EditsFileEdits{} file modifications in the sampled window. Per file is one file's share of one
-  commit, which is the unit a diffing tool is invoked on; per commit sums that over the commit's
-  code files.}
+  \caption{Size of real-world edits}
   \label{tab:edit-shape}
   \begin{tabular}{lrrrr}
     \toprule
@@ -329,14 +329,15 @@ each repository was only analyzed up to \CorpusCloneDepth{} commits deep.
     \midrule
     Lines changed, per file   & \EditsLinesPerFilePFifty{}   & \EditsLinesPerFilePNinety{}   & \EditsLinesPerFilePNinetyNine{}   & \EditsLinesPerFileMax{} \\
     Lines changed, per commit & \EditsLinesPerCommitPFifty{} & \EditsLinesPerCommitPNinety{} & \EditsLinesPerCommitPNinetyNine{} & \EditsLinesPerCommitMax{} \\
-    Code files, per commit    & \EditsFilesPerCommitPFifty{} & \EditsFilesPerCommitPNinety{} & \EditsFilesPerCommitPNinetyNine{} & \\
+    TODO: Percentage of lines changed, per file
     \bottomrule
   \end{tabular}
 \end{table}
 
 Table~\ref{tab:edit-shape} shows the sizes of real-world edits. Our results are broadly aligned
 with existing research. Arafat and Riehle report that 47.5\% of all commits touch 10 lines or
-fewer~\cite{commit-size-distribution-paper}, while commits of over 10 000 lines still occur.
+fewer~\cite{commit-size-distribution-paper}, with the long tail stretching to tens of thousands of
+lines.
 
 \subsection{Shape of optimal file diffs}
 \label{sec:diff-shape}
@@ -344,11 +345,9 @@ fewer~\cite{commit-size-distribution-paper}, while commits of over 10 000 lines 
 From both Curated and Full list of repositories, we fully randomly sampled \SampleDiffsPerLanguage{}
 diffs per language. That gave \SampleCuratedSampled{} diffs from the Curated list across
 \SampleCuratedLanguages{} languages, and \SampleFullSampled{} from the Full list across
-\SampleFullLanguages{} languages---more than \SampleDiffsPerLanguage{} per language for the latter,
-because \SampleFullResampled{} languages had to be drawn a second time after most of their first
-round was rejected. Every sampled diff was first manually inspected for any errors. At this stage,
-\SampleRejectedTotal{} diffs were rejected, mostly because of errors in sampling where, in particular
-TypeScript (\SampleRejectedTypeScript{} rejected) and R (\SampleRejectedR{}), file extensions were
+\SampleFullLanguages{} languages. Every sampled diff was first manually inspected for any errors.
+At this stage, \SampleRejectedTotal{} diffs were rejected, mostly because of errors in sampling where,
+in particular TypeScript (\SampleRejectedTypeScript{} rejected) and R (\SampleRejectedR{}), file extensions were
 used for other languages. This resulted in a dataset of \SampleCuratedPromoted{} diffs from the
 Curated and \SampleFullPromoted{} diffs from the Full list.
 
@@ -356,7 +355,7 @@ Each diff was then solved by hand by us, the authors. We have each at least 15 y
 software development, and have reviewed tens of thousands of real world code changes in industrial
 environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
 Instead, the dataset supports multiple correct solutions for each diff, and it supports marking diffs
-that cannot be solved at all using the standard set of AST diff operations: Insert, Delete, Update and Move.
+that cannot be solved at all using the standard set of AST diff operations (Insert, Delete, Update and Move).
 In particular, \AmbiguityFullFreshWith{} of the Full list's \AmbiguityFullFreshTotal{} diffs
 (\AmbiguityFullFreshPct{}\%) require a N:M mapping, i.e. one or more nodes from one side maps to one or
  more nodes from the other side.~\footnote{ The most common cause of an N:M mapping is a refactoring,
@@ -368,13 +367,11 @@ Note, diffing multiple files and detecting cross-file code moves is out of scope
 \section{Viability}
 \label{sec:viability}
 
-In Section~\ref{sec:diff-shape} we explain how human solvers were not able to solve all diffs using
-the four standard AST diff operations. We used this dataset to answer the following research question:
+In Section~\ref{sec:diff-shape} we note that human solvers were not able to solve all diffs using
+the four standard AST diff operations. We used that information to answer the following research question:
 
 \textbf{RQ1.1.} What percentage of real-world code changes have an optimal AST node mapping that
 cannot be expressed using common AST diff operations (Insert, Delete, Update, Move)?
-
-**UP TO HERE**
 
 \begin{table}
   \caption{Changes in the corpus whose true correspondence is $N{:}M$, found by inspection of
@@ -396,133 +393,68 @@ cannot be expressed using common AST diff operations (Insert, Delete, Update, Mo
   \end{tabular}
 \end{table}
 
-The painted portion of the corpus gives a second reading with a different denominator. A painted
-entry carries a list of spans per side (Section~\ref{sec:dataset}), so there the correspondence is
-written down as what it is instead of approximated: \PaintingNmEntries{} of the
-\PaintingMatchEntries{} matched entries are $N{:}M$ rather than one-to-one, \PaintingNmPct{}\%, in
-shapes from two-to-one to three-to-two. Measured by matched region rather than by change, roughly
-one region in twenty-five corresponds in a way no one-to-one node mapping can represent.
-
-\begin{resultbox}{RA1.1 (Expressibility)}
-Not every real-world change has a mapping the four operations can express. Of the fixtures
-annotated with the facility to record it, \AmbiguityFreshPct{}\% contain at least one site whose
-true correspondence is $N{:}M$; on the Full repository list, the unbiased population, the rate is
-\AmbiguityFullFreshPct{}\% (\AmbiguityFullFreshWith{} of \AmbiguityFullFreshTotal{} diffs), and
-the corpus-wide \AmbiguityAnyPct{}\% stands as a floor. The sites are small---a median of
-\AmbiguityGroupSizeMedian{} nodes, \AmbiguityPairsPct{}\% of all non-identical mapping
-decisions---so a node- or line-weighted metric barely registers them, while a per-change metric
-fails roughly one change in seven on them. Where the rendering was painted by hand,
-\PaintingNmPct{}\% of matched regions correspond $N{:}M$.
+\begin{resultbox}{RA1.1.}
+  \AmbiguityFullFreshPct{}\% (\AmbiguityFullFreshWith{} of \AmbiguityFullFreshTotal{}) diffs have
+  optimal solutions that cannot be expressed at all using the common AST diff operations
+  (Insert, Delete, Update, Move).
 \end{resultbox}
 
-The practical consequence bounds every accuracy figure in this paper, its own included. On these
-sites the best any one-to-one algorithm can do is pick one pairing and render the rest as
-insertions or deletions, and the ground truth scores exactly that as correct: any consistent
-pairing of $\min(N, M)$ pairs from the group, with the remainder inserted or deleted, as
-Section~\ref{sec:dataset} describes. That is what makes the tools scoreable at all, but it is a
-charitable reading, since the leftover nodes correspond too. Section~\ref{sec:uniqueness} returns
-to what the same sites imply for uniqueness.
+Please note that this result has direct implications for other results in this paper. Because
+no tool can possibly solve these diffs fully, we used a charitable interpretation when evaluating
+tools and exclude those nodes from the evaluation. In the datasets, the nodes are left unmatched.
 
-\subsection{Solutions humans prefer over the cheapest one}
+Tree diffing algorithms find the lowest cost diff, i.e. smallest number of operations needed to
+transform one tree into another. However, this doesn't necessarily correspond to the optimal
+visualization of the diff overlayed over the text of the source code.
 
 \textbf{RQ1.2.} What percentage of real-world code changes have solutions that humans prefer
-whose cost is higher than the optimal AST diff, using the commonly accepted costs of common AST
-diff operations?
+whose tree edit distance is higher than the optimal AST diff, using the commonly accepted
+costs of common AST diff operations?
 
-RQ1.2 asks a question about the cost function rather than the output language. Every algorithm
-in this family ranks candidate mappings by a cost that adds up its operations, and the standard
-model, which we adopt as stated, charges one unit for each insert, delete and update and nothing
-for a move: a relocated subtree is charged only for whatever changed inside it, not for how far
-it travelled.\footnote{This is the cost model of the benchmark harness that computes both figures
-below. It is more generous to moves than GumTree's edit-script length, which counts a move as one
-action; under that model a mapping with fewer moves would be preferred, and the rate below would
-shift in a direction we have not measured.} If humans systematically prefer a mapping that is not
-the cheapest one, then an algorithm that minimizes this cost exactly is optimizing the wrong
-thing, and no amount of search will bring it closer to the human answer.
+To compute the lowest cost tree edit distance, we used a heavily optimized implementation of APTED,
+further augmented with a hash-based algorithm for efficiently prunning identical subtrees. This was
+necessary, since the size of the diffs makes a pure APTED, even optimized, impractical.
 
-\textbf{Measurement.} The optimal cost for a pair of trees is not available for every fixture,
-because Section~\ref{sec:speed} finds a whole-tree exact computation infeasible on a large share
-of real files. We therefore compare the human mapping's cost against the cost of a mapping
-produced by an automated matcher on the same two files.\footnote{The matcher is the one in this
-paper's own benchmark harness, \textsc{CodeDiff}'s (Section~\ref{sec:codediff}), named so that the
-bound is checkable. Nothing in the answer depends on which matcher it is, only on its output being
-a valid mapping scored under the same cost model as the human's.} That matcher is heuristic, so
-its cost is an upper bound on the optimum, and a human mapping that costs strictly more than it
-therefore costs strictly more than the optimum as well. The rate below is a lower bound: a human
-mapping costlier than the optimum but cheaper than the heuristic's is not counted.
-
-Of the \CostScored{} fixtures with a human mapping, the two costs are equal on
-\CostTieFixtures{}. On \CostAlgorithmHigherFixtures{} the heuristic's mapping is the costlier one,
-which says something about the heuristic and nothing about RQ1.2. On
-\CostHumanHigherFixtures{}---\CostHumanHigherPct{}\%---the human mapping is strictly costlier than
-a mapping an algorithm found, by a median of \CostHumanHigherExcessMedian{} units and at most
-\CostHumanHigherExcessMax{}.
-
-The annotators' own notes on those fixtures describe one pattern repeatedly. When a unit of code
-is removed or rewritten as a whole---a function, a string literal, an argument list---the human
-marks the whole subtree deleted and its replacement inserted, whereas the cheapest mapping
-salvages every byte-identical token inside it: a closing brace, a \texttt{return} keyword, a
-string delimiter, matched to some unrelated survivor elsewhere in the file. Each salvaged token
-saves a unit of cost and produces a mapping no reader would draw. The human answer is costlier
-precisely because it refuses to count a coincidental match as a correspondence.
+Of the \CostScored{} fixtures with a human mapping, the two costs are equal
+\CostTieFixtures{} times. In \CostHumanHigherFixtures{} (\CostHumanHigherPct{}\%) diffs, the human
+solution has a larger edit, by a median of \CostHumanHigherExcessMedian{} units and at most
+\CostHumanHigherExcessMax{}. The most common reason for this is that humans treat groups of tokens
+as one unit, not based on their syntax or semantical meaning, but rather based on higher-level logic.
+A token, a common example is the \texttt{return} keyword, in a function that was completely deleted
+does theoretically match exactly a \texttt{return} in a newly added function. Matching the two leads
+to an optimal tree edit distance, but a human would find the match confusing because they typically
+treat the keyword as ``belonging'' to the logic of the function containing it. Existing tools do take
+notice of this as well. GumTreeDiff~\cite{gumtreediff-2014} avoids matching subtrees smaller than a
+threshold size to avoid such spurrious mappings.
 
 \begin{resultbox}{RA1.2 (Cost)}
-The cheapest mapping is not always the one humans judge correct. On at least
-\CostHumanHigherPct{}\% of the changes in the corpus (\CostHumanHigherFixtures{} of
-\CostScored{}), the human-authored mapping costs strictly more, under unit costs for insert,
-delete and update and a free move, than a mapping an automated matcher found for the same change;
-the rate is a lower bound because the comparison mapping is itself only an upper bound on the
-optimum. The dominant cause is the cost model rewarding coincidental matches of identical tokens
-inside code a human reads as replaced wholesale. An algorithm that minimizes this cost exactly is
-therefore optimizing a proxy that disagrees with its readers on a measurable minority of changes.
+  On \CostHumanHigherPct{}\% of the changes in the corpus (\CostHumanHigherFixtures{} of
+  \CostScored{}), the human-authored mapping costs strictly more, under unit costs for insert,
+  delete and update and a free move, than a pure tree edit distance mapping.
 \end{resultbox}
 
 \section{Speed}
 \label{sec:speed}
 
-Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
-complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
-This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
-documentation states that it targets research use, not production deployment at scale---a
-reasonable scope for its own goals, but one that leaves open a question every production diff
-tool must answer:
+The asymptotic complexity of APTED and Zhang-Shasha both is $O(n^3)$ for general trees, where $n$
+is the number of nodes in the tree. However, APTED performs considerably better in real trees
+because it is less sensitive to the tree shape. Given this existing direction in the literature,
+we wanted to further focus on source-code trees specifically and ask the following question:
 
-%% Verbatim reprise of the RQ2 statement in Section 1's introduction - edit both or neither.
 \textbf{RQ2.} What percentage of real-world source-code changes can a single, whole-tree
 tree-edit-distance computation complete within one second?
 
-The budget is generous by design. The average human response to a visual stimulus is about
-250\,ms (Section~\ref{sec:intro}), and a whole-tree computation is only the core of a diff, which
-must still parse both files and render the result, so a computation that misses one second misses
-any interactive budget by a wide margin. A tool engineered only against a worst-case bound risks
-two failure modes. It can over-engineer for inputs that never occur in practice. It can
-under-engineer for a real tail its asymptotic analysis never quantified. Answering RQ2 needs
-measurement, not further asymptotic analysis.
+One second was chosen as a budget as a practical limit that can actually be computed. From an
+industry perspective, one second is on the high end of acceptable. The average human response to a
+visual stimulus is about 250 milliseconds. Existing research has shown that developers are very
+sensitive to latency (TODO: find a good citation source) and developers have had decades to get
+used to instant diffs using existing tools, so any AST diffing tool that expects to be adopted must
+meet a similar bar.
 
-\textbf{Measurement.} To answer RQ2's percentage directly, we sampled \RqOnePairsAttempted{} real
-(before, after) file pairs from single-parent commits in the repositories of
-Section~\ref{sec:dataset}, stratified per language and per size bucket so that large files are
-represented rather than drowned out by the far more common small ones. We ran a single whole-tree
-tree-edit-distance computation on every pair---one APTED implementation, applied to the full
-before and after trees with no pipeline heuristics of any kind around it---under a hard one-second
-budget enforced by terminating the computation's process. This implementation includes an
-optimization that makes it faster than a textbook APTED, so the failure rates below are a lower
-bound on how often a whole-tree computation misses the budget, not an upper bound.
-
-Every sampled pair was checked to still resolve against the local clones before measurement, and
-all of them did. This is worth stating because the check has failed before: an earlier sample,
-drawn against a shallower corpus, had decayed to roughly 41\% unresolvable by the time it was
-re-measured, and the losses fell on whole repositories rather than spreading evenly across the
-sample. A measurement over that sample would have reported a healthy-looking rate while quietly
-answering a question about a different, smaller corpus.
-
-Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket,
-split by what kind of artifact the file is: code (\RqOneCodePairs{} pairs across general-purpose
-programming languages), configuration, data, and markup formats (\RqOneConfigDataPairs{} pairs),
-and scripting languages (\RqOneScriptingPairs{} pairs). The split matters because the three
-populations behave differently---blended, the headline number would move with how many
-configuration files a sample happens to contain, independently of anything the algorithm does to
-source code.
+We sampled \RqOnePairsAttempted{} real (before, after) file pairs from single-parent commits in the
+dataset, stratified per language and per size bucket. On each pair, we ran our highly optimized,
+state of the art APTED implementation, with a one second runtime budget enforced using common operating
+system runtime limits.
 
 \begin{figure*}
   \centering
@@ -532,61 +464,23 @@ source code.
   \label{fig:rq1}
 \end{figure*}
 
+Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket.
+
 \begin{resultbox}{RA2 (Speed)}
-For source code, a whole-tree tree-edit-distance computation is dependable only for small files,
-and the transition is abrupt rather than gradual: it completes within one second for
-\RqOneCodeTenToThirtyPct{}\% of code pairs of 10--30 lines, but for only
-\RqOneCodeHundredToThreeHundredPct{}\% of code pairs of 100--300 lines, and never recovers above
-one third in any larger bucket. Across all sampled code pairs, \RqOneCodePct{}\% complete in time.
+  Within one second, pure tree edit distance algorithms can find the optimal diff for
+  \RqOneCodeTenToThirtyPct{}\% of files between 10 and 30 LOC. For larger files, fewer than a
+  third of files can be processed within one second. In total, only \RqOneCodePct{}\% of diffs
+  compute under one second.
 \end{resultbox}
 
-What makes that a design problem rather than a tail problem is where the collapse falls: between
-two adjacent buckets, neither of which is an unusual size for a source file, and both well inside
-the range ordinary source files occupy (Table~\ref{tab:file-size-percentiles}). The corpus-wide
-figure is a sample-weighted aggregate: it deliberately over-represents large files and therefore
-understates the rate a uniform sample of real commits would show, but the per-bucket rates carry
-the answer regardless of weighting.
-
-The three artifact categories do not behave alike. Scripting languages complete within the budget
-\RqOneScriptingPct{}\% of the time, well clear of code at \RqOneCodePct{}\% and configuration,
-data, and markup formats at \RqOneConfigDataPct{}\%; the latter two are close to each other and
-separated by less than six points, so the meaningful split is scripting against the rest rather
-than a clean three-way ordering. Figure~\ref{fig:rq1} shows the same pattern per bucket: scripting
-stays above every other category in all seven, while configuration and data fall furthest in the
-large buckets, despite containing the most repetitive and most regularly structured files in the
-corpus. We conjecture this reflects tree edit distance being sensitive to tree shape rather than to
-node count alone, a large flat sequence of similar siblings being an unfavorable shape for it.
-This measurement does not isolate shape from size, so we state it as a conjecture rather than a
-result.
-
-The common case is genuinely cheap---most files and most commits are small---but the tail is
-real: files up to \AstMax{} AST nodes occur in this corpus, and Arafat and Riehle's data shows
-commits of over 10{,}000 lines occur in practice. A production diff tool must be engineered for
-both regimes, and cannot rely on a whole-tree computation alone for either.
-Section~\ref{sec:codediff} turns this answer into \textsc{CodeDiff}'s concrete design targets.
+The data also makes the algorithms dependence on the tree shape visible. Scripting languages perform
+slightly better, and data and configuration slightly worse.
 
 \section{Uniqueness}
 \label{sec:uniqueness}
 
-This section measures the ground truth of Section~\ref{sec:dataset} against itself. No diffing
-tool appears in it. Every question here is about whether a correct answer to a code change is
-unique---as a mapping, and as the text a reader sees---and how much of the mapping that text even
-depends on. Each answer bounds what any evaluation built on such a corpus, including this paper's
-own in Section~\ref{sec:tools}, is able to report.
-
-%% RQ3.1--RQ3.3 below are verbatim copies of the RQ list in Section 1's introduction, restated
-%% here next to the measurements that answer them. Same reason every measured number in this paper
-%% is a macro: a statement typed in two places drifts when only one copy is edited. Edit both or
-%% neither.
 \textbf{RQ3.1.} What percentage of real-world code changes have multiple optimal AST node
 mappings?
-
-\textbf{RQ3.2.} What percentage of real-world code changes have multiple equally correct textual
-visualizations of the diff?
-
-\textbf{RQ3.3.} What percentage of the AST influences the textual visualization?
-
-\subsection{Multiple optimal mappings}
 
 Any accuracy metric of the usual kind rests on an assumption worth testing before any tool is
 measured by it: that for a given change there is one correct mapping to recover. The corpus shows
@@ -638,6 +532,9 @@ mappings. Reporting a fixed-pairing metric is still defensible, but the rate bel
 
 \subsection{Multiple correct visualizations}
 
+\textbf{RQ3.2.} What percentage of real-world code changes have multiple equally correct textual
+visualizations of the diff?
+
 RQ3.1 asked whether the mapping is unique. RQ3.2 asks whether the text a reader sees is. It is the
 natural place to hope the ambiguity of RQ3.1 washes out: several mappings may be equally correct,
 but perhaps they project onto the same highlighted text, so a tool that picks any of them renders
@@ -685,6 +582,8 @@ records what an annotator noticed, so a change whose second rendering nobody saw
 unambiguous.
 
 \subsection{How much of the mapping reaches the reader}
+
+\textbf{RQ3.3.} What percentage of the AST influences the textual visualization?
 
 RQ3.2 asked whether what a reader sees is unique. RQ3.3 asks how much of the mapping ever reaches
 them. A syntax tree contains two kinds of node. Some carry text of their own---an identifier, an

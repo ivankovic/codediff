@@ -150,9 +150,10 @@
 *                         visible under either direction of that column's filter (see
 *                         `FlagFilter::keeps`).
 *                  Cmpl/Unmarked, Paint and Disagree each need a corpus-wide scan that only runs
-*                  when `s` or `f` is first pressed on them (tens of seconds for Cmpl/Unmarked and
-*                  Disagree, and it blocks; h/l alone never triggers one), so those columns read
-*                  `?` until then. Cursor column, sort and
+*                  when `s` or `f` is first pressed on them, and it blocks - roughly 12s for
+*                  Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine (see
+*                  `scan_corpus`, which runs them across threads; h/l alone never triggers one),
+*                  so those columns read `?` until then. Cursor column, sort and
 *                  every filter persist across closing and reopening this picker (they live on
 *                  `App::diff_view`, not just this modal instance), same as the `O` picker's own
 *                  hide/sort state below. Every filter and sort change re-anchors the selection on
@@ -326,8 +327,8 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  f filters on it -- substring on Name, dataset cycle on Dataset,
                  off/yes/no on the rest. Filters AND together across columns.
                  The scans behind Cmpl/Unmarked, Paint and Disagree run on the
-                 first s or f on that column (Cmpl/Unmarked and Disagree block
-                 for tens of seconds on the full corpus); until then those
+                 first s or f on that column (Cmpl/Unmarked blocks for ~12s and
+                 Disagree ~7s on the full corpus); until then those
                  columns read ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
@@ -596,12 +597,133 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     }
 }
 
+/// Runs `scan` over every case name in `names` across several threads, collecting the `Some`
+/// results into a map. The shared shape of all four of the `o` picker's corpus scans - each is a
+/// pure per-case function of the filesystem, so the only thing they had in common before this was
+/// a `filter_map` over `list_available_cases`, and the only thing they need now is a work queue.
+///
+/// **Why this is safe to run concurrently.** Every scan body reaches the filesystem through
+/// `code_pair_from_dir`, `human_mapping::mapping_path`/`load` or `read_note`, all of which read and
+/// parse per call with no shared state. In particular none of them goes through
+/// `handmade_test_code_pair`'s process-wide `Mutex<HashMap<_, Arc<(Code, Code)>>>` - that cache
+/// never evicts, and filling it from N threads is exactly the shape that got a `cargo test` run
+/// OOM-killed at 12-16GB (see its own doc comment). Nothing a worker parses outlives the closure
+/// that made it; only the plain `T` result crosses a thread boundary.
+///
+/// **A worker panic propagates**, rather than being turned into a missing map entry. A dropped
+/// slice of the corpus would read as `?` in the picker - indistinguishable from "not scanned yet"
+/// under `FlagFilter::keeps` - so silently returning a partial map would quietly lie about which
+/// cases were measured. `main` installs a panic hook that restores the terminal first, so this
+/// fails the same visible way a sequential scan always did.
+///
+/// Deterministic despite the interleaving: results land in a `HashMap`, and every consumer orders
+/// through `visible_diff_options`, which breaks every tie on the case name. All four scans were
+/// measured to return byte-identical entry counts single-threaded and parallel.
+///
+/// Used for all four scans even though two of them are already cheap (`compute_diff_text_painted`
+/// 616ms -> 292ms, `compute_diff_comments` 14ms -> 1.6ms over 513 fixtures): they are I/O-bound
+/// rather than CPU-bound, so the gain is smaller, but it is a gain on the measurements above and
+/// keeping one code path for all four is worth more than the handful of milliseconds either way.
+fn scan_corpus<T, F>(
+    names: &[(String, &'static str)],
+    scan: F,
+) -> std::collections::HashMap<String, T>
+where
+    T: Send,
+    F: Fn(&str) -> Option<T> + Sync,
+{
+    scan_corpus_with_threads(names, default_scan_threads(), scan)
+}
+
+/// How many threads `scan_corpus` uses: the machine's parallelism, capped at
+/// `MAX_SCAN_THREADS`.
+fn default_scan_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .min(MAX_SCAN_THREADS)
+}
+
+/// Ceiling on `scan_corpus`'s worker count, on top of `available_parallelism`. Each worker holds
+/// one fixture's two parsed trees (and, for the disagreement scan, an `ASTDiff` + `NodeCache` +
+/// `TextDiff` on top) at a time, so peak RSS scales with this number and nothing else bounds it -
+/// and this repo has been OOM-killed by exactly that kind of multiplier before (see
+/// `handmade_test_code_pair`).
+///
+/// Measured on the unmarked scan over 513 fixtures (release, 4-core machine, 2026-09-02): 833 MB
+/// at one worker, 2053 MB at four, 2978 MB at eight - so roughly 300 MB of headroom per extra
+/// worker. The same run shows why the ceiling costs nothing in speed: at eight workers on four
+/// cores the wall clock was 11.9s against 12.4s at four, i.e. within noise, while the disagreement
+/// scan was actually *slower* oversubscribed (8.2s vs 7.5s). Past the core count this buys memory
+/// pressure and no time, so eight is a bound on big machines rather than a target.
+///
+/// The other place this multiplies is the test suite, where nextest runs each corpus-scanning test
+/// in its own process concurrently. Measured after this change: peak 1.99 GB summed across every
+/// `human_solver` test process, with the suite down from 37.2s to 12.5s - well inside the headroom
+/// the nextest migration established, so no per-test thread limit is needed.
+const MAX_SCAN_THREADS: usize = 8;
+
+/// `scan_corpus` with the worker count pinned - the seam the tests use to check that a parallel
+/// run returns exactly what a single-threaded one does.
+fn scan_corpus_with_threads<T, F>(
+    names: &[(String, &'static str)],
+    threads: usize,
+    scan: F,
+) -> std::collections::HashMap<String, T>
+where
+    T: Send,
+    F: Fn(&str) -> Option<T> + Sync,
+{
+    if threads <= 1 || names.len() <= 1 {
+        return names
+            .iter()
+            .filter_map(|(name, _)| scan(name).map(|value| (name.clone(), value)))
+            .collect();
+    }
+
+    // A shared cursor rather than a fixed slice per thread: fixtures differ in size by orders of
+    // magnitude (one mapping file alone is 80 MB), so an even split by count would leave most
+    // workers idle waiting for whichever one drew the giants.
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let scan = &scan;
+    let next = &next;
+    let chunks: Vec<Vec<(String, T)>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..threads.min(names.len()))
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut found = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some((name, _)) = names.get(index) else {
+                            break;
+                        };
+                        if let Some(value) = scan(name) {
+                            found.push((name.clone(), value));
+                        }
+                    }
+                    found
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| match handle.join() {
+                Ok(found) => found,
+                Err(payload) => std::panic::resume_unwind(payload),
+            })
+            .collect()
+    });
+
+    chunks.into_iter().flatten().collect()
+}
+
 /// Runs, if it hasn't already this session, whichever corpus-wide scan `column` reads - so `s` and
 /// `f` on a column show a real ranking or a real filter rather than a table of `?`.
 ///
-/// Called only from those two keys, never from `h`/`l`: the scans take real wall-clock time the
-/// first time (tens of seconds for `Cmpl`/`Unmarked` and `Disagree` - see `compute_diff_unmarked`
-/// for the measurement), and stalling on plain
+/// Called only from those two keys, never from `h`/`l`: the scans still take real wall-clock time
+/// the first time even after `scan_corpus` parallelized them (order of ten seconds for
+/// `Cmpl`/`Unmarked`, under ten for `Disagree`, both sub-second for `Paint` - see
+/// `compute_diff_unmarked` for the full numbers), and stalling on plain
 /// cursor movement across the header would make the picker feel broken. Pressing `s`/`f` is a
 /// deliberate request for that column's data, which is exactly when paying for it is reasonable -
 /// the same bargain the `H`/`X`/`Y` keys this replaces each struck on their own.
@@ -692,36 +814,39 @@ fn refresh_diff_unmarked(app: &mut App, name: &str) {
 /// picker's `Cmpl` and `Unmarked` columns need this for the whole corpus before either can filter
 /// or sort, unlike `O`'s `hide_solved` (a cheap lookup against sample.csv, no parsing involved).
 ///
-/// **Measured at ~42s across this repo's 513 fixtures** (release build, 2026-09-02) - not the
-/// "roughly 10s" an older comment here claimed, which dated from a ~230-fixture corpus. Nearly all
-/// of it - ~34s of the ~42s, measured the same day - is `code_pair_from_dir` (tree-sitter, both
-/// sides) plus `human_mapping::load` (the corpus' mapping JSON runs to over a gigabyte); the two
-/// tree walks are the remaining ~8s. That is what made counting affordable in place of the
-/// short-circuiting "is any node unmarked?" predicate this replaced: dropping the early bail costs
-/// a fraction of that ~8s (only unfinished fixtures ever bailed early), against a fixed ~34s of
-/// loading that neither form avoids. It is
-/// bearable at all only because `rebuild_caches_for_mapping` resolves every entry's path through a
-/// `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own doc comment
-/// for the very different cost that used to be. Still: this is a single blocking keypress with no
-/// progress indication, and it is the obvious thing to parallelize if it starts to hurt.
+/// **The most expensive of the four scans.** Measured over this repo's 513 fixtures (release
+/// build, 4-core machine, 2026-09-02): **38.9s single-threaded, 12.4s through `scan_corpus`**
+/// (peak RSS 833 MB and 2053 MB respectively), returning the same 512 entries either way - one
+/// case fails to load and stays absent. The old comment here claimed "roughly 10s", which dated
+/// from a ~230-fixture corpus and was never true at this size.
+///
+/// Almost all of the single-threaded 38.9s is per-case work with no shared state -
+/// `code_pair_from_dir` (tree-sitter, both sides) plus `human_mapping::load` (the corpus' mapping
+/// JSON runs to over a gigabyte, one file of it 80 MB) - which is exactly why it parallelizes
+/// nearly linearly. The two tree walks are about 8s of it, which is what made counting affordable
+/// in place of the short-circuiting "is any node unmarked?" predicate this replaced.
+///
+/// It is bearable at all only because `rebuild_caches_for_mapping` resolves every entry's path
+/// through a `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own
+/// doc comment for the very different cost that used to be.
 fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     let Ok(options) = list_available_cases() else {
         return std::collections::HashMap::new();
     };
-    options
-        .into_iter()
-        .filter_map(|(name, _)| diff_case_unmarked_count(&name).map(|count| (name, count)))
-        .collect()
+    scan_corpus(&options, diff_case_unmarked_count)
 }
 
 /// Whether `name`'s human mapping already carries a painted text-range mapping (see
 /// `HumanTextMapping`) - the text-painting counterpart of `diff_case_unmarked_count`.
 ///
-/// **A substring scan, not a JSON parse, and that is not a micro-optimization.** The corpus's 500
+/// **A substring scan, not a JSON parse, and that is not a micro-optimization.** The corpus's 513
 /// `human_mapping.json` files come to ~1.4 GB (one is ~29,600 lines on its own), and parsing them
-/// all to ask whether one key is present costs about ten seconds - the same order as the `H` scan
-/// this was meant to be the cheap counterpart of. Searching for the quoted key instead is a
-/// linear scan with no allocation per entry.
+/// all to ask whether one key is present costs on the order of the whole-corpus scans it was meant
+/// to be the cheap counterpart of. Searching for the quoted key instead is a linear scan with no
+/// allocation per entry, and it works: `compute_diff_text_painted` measured **616ms
+/// single-threaded, 292ms through `scan_corpus`** over the full corpus (release, 2026-09-02),
+/// against `compute_diff_unmarked`'s 38.9s/12.4s on the same run. It is the one column whose data
+/// is effectively free.
 ///
 /// The token includes its quotes deliberately. Every string this file stores is either a
 /// tree-sitter node kind or a `kind:index` path element, and `serde_json` escapes any quote inside
@@ -765,13 +890,13 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
     let Ok(options) = list_available_cases() else {
         return std::collections::HashMap::new();
     };
-    options
-        .into_iter()
-        .map(|(name, _)| {
-            let painted = diff_case_has_text_mapping(&name).unwrap_or(false);
-            (name, painted)
-        })
-        .collect()
+    // `Some(..unwrap_or(false))`, not `diff_case_has_text_mapping` directly: this map is keyed on
+    // every listed case, with an unreadable one recorded as unpainted rather than left absent -
+    // the fail-open direction this scan has always had, and the one place the four scans differ
+    // in what they do with a `None`.
+    scan_corpus(&options, |name| {
+        Some(diff_case_has_text_mapping(name).unwrap_or(false))
+    })
 }
 
 /// How many bytes `name`'s human tree mapping and human text painting disagree about, via
@@ -827,10 +952,7 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
     let Ok(options) = list_available_cases() else {
         return std::collections::HashMap::new();
     };
-    options
-        .into_iter()
-        .filter_map(|(name, _)| diff_case_disagreement_bytes(&name).map(|bytes| (name, bytes)))
-        .collect()
+    scan_corpus(&options, diff_case_disagreement_bytes)
 }
 
 /// Every case's note, keyed by case name, for the `o` picker. Cases without one are simply
@@ -844,10 +966,7 @@ fn compute_diff_comments() -> std::collections::HashMap<String, String> {
     let Ok(options) = list_available_cases() else {
         return std::collections::HashMap::new();
     };
-    options
-        .into_iter()
-        .filter_map(|(name, _)| read_note(&name).map(|note| (name, note)))
-        .collect()
+    scan_corpus(&options, read_note)
 }
 
 /// Refreshes just `name`'s entry, for the same reason as `refresh_diff_text_painted`: `e` is the
@@ -2850,8 +2969,8 @@ struct App {
     /// picker's `Unmarked` column shows and its `Cmpl` column reduces to a glyph. `None` until the
     /// first `s`/`f` on either of those columns, since scanning the whole corpus (parsing every
     /// case's before/after code, not just listing directory names) takes real wall-clock time -
-    /// ~42s across this repo's 513 fixtures, measured 2026-09-02; see `compute_diff_unmarked` for
-    /// where that goes. Cases that fail to load are absent from
+    /// ~12s across this repo's 513 fixtures on a 4-core machine, measured 2026-09-02; see
+    /// `compute_diff_unmarked` for the full numbers. Cases that fail to load are absent from
     /// the map rather than present with a made-up count, which is what makes them read as `?`
     /// rather than as finished. Kept for the rest of the session once built; refreshed for just
     /// the current case's own entry after `s` saves it, rather than dropped and rebuilt from
@@ -13113,6 +13232,87 @@ mod tests {
         );
     }
 
+    /// The work queue must not drop, duplicate or reorder anything relative to a plain loop -
+    /// every worker count has to produce the identical map. Runs over enough synthetic names that
+    /// the shared cursor is genuinely contended, with a `scan` that returns `None` for some of
+    /// them so the filtering path is covered too.
+    #[test]
+    fn scan_corpus_returns_the_same_map_at_every_worker_count() {
+        let names: Vec<(String, &'static str)> = (0..500)
+            .map(|i| (format!("case-{i:03}"), "handmade"))
+            .collect();
+        // Deliberately a pure function of the name, so the expected map is knowable independently
+        // of which thread happened to run which entry.
+        let scan = |name: &str| {
+            let n: usize = name.trim_start_matches("case-").parse().unwrap();
+            (n % 3 != 0).then_some(n * 2)
+        };
+
+        let sequential = scan_corpus_with_threads(&names, 1, scan);
+        assert_eq!(
+            sequential.len(),
+            500 - 500usize.div_ceil(3),
+            "the sequential baseline itself must drop exactly the None entries"
+        );
+
+        for threads in [2, 3, 8, 64] {
+            assert_eq!(
+                scan_corpus_with_threads(&names, threads, scan),
+                sequential,
+                "{threads} workers must produce the same map as one"
+            );
+        }
+    }
+
+    /// More workers than entries must not spawn idle threads or lose work - the cursor runs out
+    /// immediately for most of them.
+    #[test]
+    fn scan_corpus_handles_more_workers_than_entries() {
+        let names = vec![("only".to_string(), "handmade")];
+        assert_eq!(
+            scan_corpus_with_threads(&names, 8, |name| Some(name.len())),
+            std::collections::HashMap::from([("only".to_string(), 4)])
+        );
+        assert!(
+            scan_corpus_with_threads(&[], 8, |name: &str| Some(name.len())).is_empty(),
+            "an empty corpus is not an error"
+        );
+    }
+
+    /// A panicking worker must take the process down the way a sequential scan always did, rather
+    /// than quietly handing back a map missing that thread's share - which would read as `?` in
+    /// the picker and be indistinguishable from "not scanned yet".
+    #[test]
+    fn scan_corpus_propagates_a_worker_panic() {
+        let names: Vec<(String, &'static str)> =
+            (0..64).map(|i| (format!("case-{i}"), "handmade")).collect();
+
+        // The default hook would dump a backtrace for a panic this test is deliberately causing.
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let result = std::panic::catch_unwind(|| {
+            scan_corpus_with_threads(&names, 4, |name: &str| {
+                if name == "case-40" {
+                    panic!("scan blew up");
+                }
+                Some(name.len())
+            })
+        });
+
+        std::panic::set_hook(hook);
+
+        assert!(result.is_err(), "the panic must not be swallowed");
+    }
+
+    #[test]
+    fn default_scan_threads_is_at_least_one_and_within_the_cap() {
+        let threads = default_scan_threads();
+        assert!(
+            (1..=MAX_SCAN_THREADS).contains(&threads),
+            "got {threads}, outside 1..={MAX_SCAN_THREADS}"
+        );
+    }
+
     #[test]
     fn diff_case_unmarked_count_returns_some_for_a_real_case_on_disk() {
         // Full integrated path (`diffs_case_dir`/`code_pair_from_dir`/`human_mapping::load`, not
@@ -13254,8 +13454,18 @@ mod tests {
             .as_ref()
             .expect("s on Unmarked should compute the map lazily when it wasn't cached yet");
         // Cases that fail to load are deliberately absent rather than present with a made-up
-        // count, so this is an upper bound, not an equality.
+        // count, so an equality would be wrong - but a *loose* upper bound alone would pass even
+        // if the parallel work queue silently dropped most of the corpus, which is the thing
+        // worth guarding here. `scan_corpus_returns_the_same_map_at_every_worker_count` proves
+        // the queue itself loses nothing; this only has to prove the real scan is wired to it and
+        // reaches nearly every case.
         assert!(map.len() <= options.len());
+        assert!(
+            map.len() * 10 >= options.len() * 9,
+            "the scan covered only {} of {} cases - the work queue is dropping fixtures",
+            map.len(),
+            options.len()
+        );
     }
 
     #[test]
