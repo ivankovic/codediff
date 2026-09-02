@@ -499,8 +499,35 @@ fn ranges(
                                 //   0.7% to 56.5% disagreement with its painting.
                                 let shifted_within_its_own_line =
                                     s.start_row == d.start_row && s.end_row > s.start_row;
+                                // A single-row node pushed sideways by an edit *elsewhere on its
+                                // own row* is not a Move either: `void process(int x)` ->
+                                // `void process(const int x)` shifts `int x` by six columns, and
+                                // the human paints only the inserted `const`. The test is that
+                                // the node lies wholly inside the common prefix or common suffix
+                                // of its source row and destination row - its own text is
+                                // untouched and the row's one edit is beside it. A node inside
+                                // the *rewritten* part of the row keeps the Move treatment:
+                                // `function fetchData(callback: ...): void {` ->
+                                // `async function fetchData(): Promise<string> {` shifts
+                                // `function fetchData(` the same way, but the row was rewritten
+                                // around it and its painter calls the surviving fragments moved
+                                // (`typescript-async-await`, which a plain same-row-same-indent
+                                // rule regressed 27.5% -> 36.1% on 2026-09-01, the fourth attempt
+                                // at this shape; the three before it are in the fix log).
+                                // Restricted to nodes that stayed on their own row and were not
+                                // reindented, so a reindent-only move keeps reaching
+                                // `paint_reindent_only_moves` below.
+                                let shifted_by_an_edit_beside_it = s.end_row == s.start_row
+                                    && s.start_row == d.start_row
+                                    && node_untouched_on_its_row(
+                                        &source.contents,
+                                        &destination.contents,
+                                        &s,
+                                        &d,
+                                    );
                                 let column_shift_is_meaningful = s.start_column != d.start_column
-                                    && !shifted_within_its_own_line;
+                                    && !shifted_within_its_own_line
+                                    && !shifted_by_an_edit_beside_it;
                                 // `NestedConditionCollapse`/`WrapGrowth` mark a node whose
                                 // relocation is *known*, by construction, to be a pure reindent -
                                 // see `solve_nested_condition_collapse`'s and `solve_wrap_growth`'s
@@ -863,6 +890,44 @@ fn ranges(
     }
 
     ranges
+}
+
+/// True if the single-row node at `s` (in `source`) / `d` (in `destination`) lies wholly inside
+/// the common prefix or the common suffix of its two rows - i.e. the rows differ only in one
+/// stretch that does not overlap the node, and the node merely slid sideways. Columns are the
+/// character columns `TextRange` carries; a row past either text's end counts as empty. See the
+/// `shifted_by_an_edit_beside_it` call site in `ranges`.
+fn node_untouched_on_its_row(
+    source: &str,
+    destination: &str,
+    s: &TextRange,
+    d: &TextRange,
+) -> bool {
+    let row = |text: &str, row: usize| -> Vec<char> {
+        text.split('\n')
+            .nth(row)
+            .map(|line| line.chars().collect())
+            .unwrap_or_default()
+    };
+    let source_row = row(source, s.start_row);
+    let destination_row = row(destination, d.start_row);
+    let prefix = source_row
+        .iter()
+        .zip(destination_row.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let suffix = source_row
+        .iter()
+        .rev()
+        .zip(destination_row.iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count()
+        .min(source_row.len() - prefix)
+        .min(destination_row.len() - prefix);
+    let in_prefix = s.end_column <= prefix && d.end_column <= prefix;
+    let in_suffix = s.start_column + suffix >= source_row.len()
+        && d.start_column + suffix >= destination_row.len();
+    in_prefix || in_suffix
 }
 
 /// Build the `RangeMatch` for a non-Identical, non-Move node: advances `last_non_move_range` to
