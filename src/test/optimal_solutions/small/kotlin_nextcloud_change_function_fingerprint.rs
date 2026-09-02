@@ -31,9 +31,16 @@ fn optimal_solution() -> Result<()> {
     // duplicate but distinct reuse-vs-replace" gap (see `kotlin-remove-function`/`rust-algorithm-
     // change`), tried and reverted twice already (`TODO.md`, container-dissimilarity-surcharge
     // and leaf-rename-graduation) - not re-attempted here.
+    //
+    // 2026-09-02: 1 -> 4 when this fixture's human mapping was re-verified by hand. Not an
+    // algorithm regression - nothing under `src/diff/` changed; the ground truth this is scored
+    // against did. Three of the four are the two `,` parameter separators and their pairing (the
+    // mapping now says the comma that survives the inserted `viewModel` parameter is a different
+    // comma than the one codediff matches it to), and the fourth is one `identifier` inside a
+    // nested lambda that the re-verified mapping moves rather than deletes.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-change-function-fingerprint",
-        1,
-        1,
+        4,
+        4,
     )
 }

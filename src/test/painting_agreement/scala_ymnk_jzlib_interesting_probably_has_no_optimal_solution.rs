@@ -23,5 +23,8 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 fn painting_agreement() -> Result<()> {
     // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
     // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("scala-ymnk-jzlib-interesting-probably-has-no-optimal-solution", 100.0)
+    assert_matches_human_painting_within_limit(
+        "scala-ymnk-jzlib-interesting-probably-has-no-optimal-solution",
+        100.0,
+    )
 }
