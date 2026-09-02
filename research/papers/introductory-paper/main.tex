@@ -140,27 +140,26 @@ the textual representation of the source code. For any given AST diff, there are
 correct visualizations, and the quality of the visualization determines tool adoption as well.
 
 This paper asks four groups of research questions. Each group is answered in its own section,
-in the order listed here, and each question is restated verbatim next to the measurement that
-answers it.
+in the order listed here.
 
 %% The RQ statements below are restated verbatim in Sections 5-8 next to their answers. Edit both
 %% or neither.
 \begin{itemize}
-  \item \textbf{Research Question Group 1 (Viability):} (RQ1.1) What percentage of real-world
+  \item \textbf{Research Question Group 1 (Viability):} What percentage of real-world
     code changes have an optimal AST node mapping that cannot be expressed using common AST diff
-    operations (Insert, Delete, Update, Move)? (RQ1.2) What percentage of real-world code changes
+    operations (Insert, Delete, Update, Move)? What percentage of real-world code changes
     have solutions that humans prefer whose cost is higher than the optimal AST diff, using the
     commonly accepted costs of common AST diff operations?
-  \item \textbf{Research Question Group 2 (Speed):} (RQ2) What percentage of real-world
+  \item \textbf{Research Question Group 2 (Speed):} What percentage of real-world
     source-code changes can a single, whole-tree tree-edit-distance computation complete within one
     second?~\footnote{One second was chosen based on the generally accepted average human response
     time to visual stimulus, which is 250 ms. See Section~\ref{sec:speed} for details.}
-  \item \textbf{Research Question Group 3 (Uniqueness):} (RQ3.1) What percentage of real-world
-    code changes have multiple optimal AST node mappings? (RQ3.2) What percentage of real-world
-    code changes have multiple equally correct textual visualizations of the diff? (RQ3.3) What
+  \item \textbf{Research Question Group 3 (Uniqueness):} What percentage of real-world
+    code changes have multiple optimal AST node mappings? What percentage of real-world
+    code changes have multiple equally correct textual visualizations of the diff? What
     percentage of the AST influences the textual visualization?
-  \item \textbf{Research Question Group 4 (Implementation):} (RQ4.1) How accurately do current
-    state-of-the-art code diffing tools find optimal visualizations? (RQ4.2) How fast are
+  \item \textbf{Research Question Group 4 (Implementation):} How accurately do current
+    state-of-the-art code diffing tools find optimal visualizations? How fast are
     real-world state-of-the-art tools?
 \end{itemize}
 
@@ -241,14 +240,16 @@ anchors on lines unique to both sides before recursing; and \emph{histogram}, a 
 generalization of patience. All four emit the same output form as Unix \texttt{diff}, so any
 difference between them is a difference in which lines they choose to pair.
 
-\textbf{BDiff}~\cite{bdiff} is a recent text-based tool that reasons about blocks of lines rather
-than single lines and reports character ranges within changed lines. \textbf{Neovim's diff mode}
-(\texttt{nvim -d}) runs the same \texttt{xdiff} line pass as \texttt{git} and then a second,
-character-level pass that highlights what changed inside each paired line; it is included as the
-most widely deployed sub-line diff view developers see inside an editor.
+\textbf{Neovim's diff mode} (\texttt{nvim -d}) runs the same \texttt{xdiff} line pass as
+\texttt{git} and then a second, character-level pass that highlights what changed inside
+each paired line; it is included as the most widely deployed sub-line diff view developers
+see inside an editor.
+
+\textbf{BDiff}~\cite{bdiff} is a text-based tool that reasons about blocks of lines rather
+than single lines and reports character ranges within changed lines.
 
 \textbf{difftastic}~\cite{difftastic} and \textbf{diffsitter}~\cite{diffsitter} are a newer
-generation of practical, tree-sitter-based diffing tools. Both prioritize a diff a human reads
+generation of tree-sitter-based diffing tools. Both prioritize a diff a human reads
 comfortably over an exact node-to-node mapping: difftastic reduces the parse tree to an s-expression
 and aligns it with its own structural algorithm, and diffsitter applies a related tree-sitter-based
 alignment over a smaller, hand-picked set of compiled-in grammars.
@@ -310,28 +311,11 @@ for quick estimates.
 
 \subsection{Shape of real-world file edits}
 
-Arafat and Riehle report that 47.5\% of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
-over 10 000 lines still occur.
-
-We measured the same shape on our own corpus, because a diffing tool is not handed a commit but a
-file pair, and it is the per-file distribution that sets its budget. Over the Curated list's
-\EditsRepositories{} repositories we walked the most recent \CorpusCloneDepth{} commits of each,
-excluding merges, and recorded for every file they touched how many lines \texttt{git} reports
-added and removed. That is \EditsCommits{} commits touching \EditsCodeFileEdits{} code files
-across \EditsLanguages{} languages. Code files are \EditsCodeSharePct{}\% of all files touched,
-close to the two-thirds share Figure~\ref{fig:tips} finds among files at rest. Of the code-file
-edits, \EditsModifiedSharePct{}\% modify a file that exists on both sides; the rest create or
-delete one, and are excluded from everything below, since a file with only one version presents
-nothing to map. Every figure that follows therefore describes the \EditsFileEdits{} genuine file
-modifications.
-
-Capping each repository at \CorpusCloneDepth{} commits is what makes this a statement about the
-corpus rather than about its largest member. These clones are shallow but not uniformly so: the
-Linux kernel alone carries 1.29M of the 2.31M commits reachable across the corpus, and an
-uncapped walk reports its habits with the other 99 repositories as rounding error. The cap
-also matches the depth the corpus was fetched at. This is a census of that window, not a sample of
-it, and deliberately not the stratified draw of Section~\ref{sec:speed}, which over-represents
-large files by construction and so cannot answer a question about a typical edit.
+We measured the same shape on our own corpus. In the Curated dataset, we analyzed \EditsCommits{}
+commits, touching \EditsCodeFileEdits{} code files, of which \EditsCodeSharePct{} were code files.
+Of the code-file edits, \EditsModifiedSharePct{}\% were file modifications, the rest were file
+creation or deletions. To avoid large repositories, notably the Linux kernel, from skewing the results
+each repository was only analyzed up to \CorpusCloneDepth{} commits deep.
 
 \begin{table}
   \caption{Size of a real-world edit on the Curated list, in lines added plus removed, over the
@@ -350,36 +334,12 @@ large files by construction and so cannot answer a question about a typical edit
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:edit-shape} reports the result, and the per-file row is the striking one. The
-median file modification changes \EditsLinesPerFilePFifty{} lines, and
-\EditsFileEditsUnderTenPct{}\% of them change 10 lines or fewer. Per commit the figures are
-larger, a median of \EditsLinesPerCommitPFifty{} lines across a median of
-\EditsFilesPerCommitPFifty{} files, and \EditsCommitsUnderTenPct{}\% of commits touch 10 lines of
-code or fewer---below Arafat and Riehle's 47.5\%, which is measured over a different corpus and
-counts every file a commit touches rather than only its code. The tail is real at both
-granularities: the same window holds a single-file modification of \EditsLinesPerFileMax{} lines.
-Both regimes occur, which is why Section~\ref{sec:codediff} states a design target for each.
-
-For an AST diffing tool the absolute size of an edit matters less than the share of the file it
-touches, because what an algorithm can skip is whatever both versions agree on. That share is
-derivable exactly: counting the lines of the after-side file gives the before-side count too,
-since the added and removed counts are what separate them. The median modification rewrites
-\EditsChurnPFiftyPct{}\% of the lines of the file it lands in, \EditsChurnUnderFivePct{}\% of
-modifications leave at least 95\% of the file untouched, and \EditsChurnUnderTwentyPct{}\% leave
-at least 80\%. This is the measurement Section~\ref{sec:codediff}'s first pipeline phase is
-designed against: when the overwhelming majority of a file is byte-identical across an edit,
-resolving that majority by hashing before any tree-edit-distance computation runs removes most of
-the work rather than a constant factor of it. The fraction is measured over lines; the AST-node
-fraction it stands in for would require parsing both sides of every pair, which this measurement
-does not do.
-
-Two limits bound these numbers, and both cut against generality rather than against the direction
-of the result. The window is each repository's most recent commits rather than its whole history,
-and the Curated list is 100 repositories chosen for language coverage rather than drawn at random.
-Neither a shallower window nor a curated repository list has an obvious mechanism by which it
-would systematically shrink the share of a file that an edit rewrites.
+Table~\ref{tab:edit-shape} shows the sizes of real-world edits. Our results are broadly aligned
+with existing research. Arafat and Riehle report that 47.5\% of all commits touch 10 lines or
+fewer~\cite{commit-size-distribution-paper}, while commits of over 10 000 lines still occur.
 
 \subsection{Shape of optimal file diffs}
+\label{sec:diff-shape}
 
 From both Curated and Full list of repositories, we fully randomly sampled \SampleDiffsPerLanguage{}
 diffs per language. That gave \SampleCuratedSampled{} diffs from the Curated list across
@@ -399,163 +359,22 @@ Instead, the dataset supports multiple correct solutions for each diff, and it s
 that cannot be solved at all using the standard set of AST diff operations: Insert, Delete, Update and Move.
 In particular, \AmbiguityFullFreshWith{} of the Full list's \AmbiguityFullFreshTotal{} diffs
 (\AmbiguityFullFreshPct{}\%) require a N:M mapping, i.e. one or more nodes from one side maps to one or
- more nodes from the other side. The Curated list cannot be read the same way: multi-mapping was added
-to our annotation tool partway through building the corpus, and \AmbiguityCuratedPre{} of its
-\AmbiguityCuratedTotal{} diffs were annotated before it existed, so they could not record such a
-mapping whatever their content. Across the \AmbiguityCuratedFreshTotal{} annotated afterwards the
-rate is \AmbiguityCuratedFreshPct{}\% (\AmbiguityCuratedFreshWith{} diffs). We therefore quote the
-Full list as the estimate and report the Curated list only for the diffs where the option existed. The most common cause is a refactoring, where two or more similar blocks
- of code are moved to a common function. The correct solution is the one that maps all nodes as moved.
-
-\subsection{Recording the AST mapping}
-
-For every diff, the annotator used a purpose-built tool, \texttt{human\_solver}, to walk the
-before and after syntax trees side by side and label every node with one of seven operations:
-identical, update, match-but-not-identical, insert, insert-with-children, delete, and
-delete-with-children. Nodes are addressed by a path of kind and sibling position, not by
-parser-internal node identity, since that identity is not stable across separate parses of the
-same file. Alongside the sampled diffs, the corpus holds \PaintingHandmadeTotal{} hand-written
-fixtures, each a small, curated example of a single common change pattern, annotated the same way.
-
-Where the correct correspondence is not one-to-one, the annotator records a \emph{multi-map
-group}: a set of $N$ before-side nodes and $M$ after-side nodes that correspond as a set. Because
-every algorithm measured in this paper emits a one-to-one mapping, the ground truth scores such a
-site by its closest one-to-one approximations: a tool is correct on it if it realizes any
-consistent pairing of $\min(N, M)$ pairs drawn from the group and treats the remainder of the
-larger side as inserted or deleted. A group is not an expression of annotator uncertainty. It is
-the annotator's finding that the change has no single one-to-one answer, and it is what
-Sections~\ref{sec:viability} and~\ref{sec:uniqueness} measure. This human-authored mapping,
-groups included, is the ground truth every accuracy number in this paper is measured against.
-
-\subsection{Recording the visualization}
-
-A mapping between syntax trees is not what a developer reads. A tool must turn its mapping into
-highlighted regions of text, and that projection is a second decision the mapping does not
-determine. So a subset of the corpus carries a second, independent ground truth: a
-\emph{painting}, in which the annotator marks the spans of source text a reader should see
-highlighted, labelled moved, updated, inserted or deleted, working from the two files rather than
-from either tree. A painting is authored in the same tool, in a separate view, and it is
-deliberately not derived from the mapping---it is the answer to ``what should this look like'',
-recorded so that the two questions can be scored apart.
-
-Painting is slower per fixture than mapping, and it was done on the hand-written fixtures first:
-\PaintingFixtures{} of the \PaintingScored{} fixtures carry one, nearly all of them hand-written,
-spanning \PaintingLanguages{} languages, with a median of \PaintingLocMedian{} lines against
-\PaintingUnpaintedLocMedian{} for the rest of the corpus. Section~\ref{sec:uniqueness} states what
-that population does and does not license.
-
-The annotator records either one painting or two. Two is the interesting case and the reason the
-facility is shaped this way: the same change often has a tight rendering and a generous one, and
-both are defensible. A \emph{Minimal} painting leaves indentation, brackets and other pure
-punctuation unpainted, marking only the content that carries meaning; a \emph{Full} painting
-accounts for every byte whose role changed. Recording one painting instead is a positive
-assertion, not an omission---it is the annotator's finding that this change has a single
-defensible rendering, and the fixture then holds both render modes to that one answer. The count
-is therefore the datum, exactly as a multi-map group's existence is the datum on the mapping side.
-
-A painting also has one degree of freedom the mapping format lacks. A painted entry carries a
-\emph{list} of spans per side rather than a single span, so an annotator who finds that three
-comment lines became one, or that one import became two, can record that correspondence directly
-instead of approximating it. It is the one place in the corpus where an $N{:}M$ correspondence is
-written down as what it is rather than as its one-to-one approximation.
+ more nodes from the other side.~\footnote{ The most common cause of an N:M mapping is a refactoring,
+ where two or more similar blocks of code are moved to a common function. The correct solution is the
+ one that maps all nodes as moved.}.
 
 Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
 
 \section{Viability}
 \label{sec:viability}
 
-Every algorithm in Section~\ref{sec:background} produces the same kind of answer: a one-to-one
-mapping between the nodes of two trees, built from insert, delete, update and move, and ranked by
-a cost that adds up the operations it uses. Before asking how fast such a mapping can be computed
-(Section~\ref{sec:speed}) or how well tools recover it (Section~\ref{sec:tools}), the first group
-of research questions asks whether the answer a human reader wants lies inside that space at all.
-It can fall outside in two ways: the true correspondence may not be one-to-one, and the mapping
-humans judge correct may not be the cheapest one.
+In Section~\ref{sec:diff-shape} we explain how human solvers were not able to solve all diffs using
+the four standard AST diff operations. We used this dataset to answer the following research question:
 
-%% RQ1.1 and RQ1.2 below are verbatim copies of the RQ list in Section 1's introduction, restated
-%% here next to the measurements that answer them. Same reason every measured number in this paper
-%% is a macro: a statement typed in two places drifts when only one copy is edited. Edit both or
-%% neither.
 \textbf{RQ1.1.} What percentage of real-world code changes have an optimal AST node mapping that
 cannot be expressed using common AST diff operations (Insert, Delete, Update, Move)?
 
-\textbf{RQ1.2.} What percentage of real-world code changes have solutions that humans prefer
-whose cost is higher than the optimal AST diff, using the commonly accepted costs of common AST
-diff operations?
-
-\subsection{Correspondences the four operations cannot express}
-
-An ordered tree edit distance maps each node of one tree to at most one node of the other. That
-is part of the definition of the edit script it computes, not a limitation of any particular
-implementation, and a move changes only where a matched node sits, not how many nodes it is
-matched to. A correspondence in which $N$ nodes on one side answer to $M$ on the other---two call
-sites refactored into one function, a block of comment lines condensed into a single line, one
-import split across two---is therefore not in the output language of any algorithm in this
-family, which is every tool measured in this paper. It cannot be found by a better heuristic,
-because there is nothing in the output language to find it with.
-
-The ground truth records such a site as a multi-map group (Section~\ref{sec:dataset}), and the
-group's existence is the datum RQ1.1 counts. One property of the corpus has to be stated before
-the rate, because it bounds what the rate can mean. The facility was added to the annotation tool
-partway through corpus construction. \AmbiguityPreFixtures{} fixtures were last annotated before
-it existed and were never revisited; none of them records a group, and none of them could,
-whatever the change actually contained. Table~\ref{tab:ambiguity} therefore splits the corpus by
-annotation era rather than reporting one blended rate, which would measure annotation practice as
-much as the phenomenon.
-
-\begin{table}
-  \caption{How often the ground truth records a correspondence the four operations cannot
-  express, split by whether the annotator had the multi-map facility available. Only the second
-  row is an unbiased estimate; the third is selection-biased and the first is structurally zero.}
-  \label{tab:ambiguity}
-  \begin{tabular}{lrrr}
-    \toprule
-    Annotation era & Fixtures & With group & Rate \\
-    \midrule
-    Before the facility existed & \AmbiguityPreFixtures{} & \AmbiguityPreWith{} & \AmbiguityPrePct{}\% \\
-    Annotated with it available & \AmbiguityFreshScored{} & \AmbiguityFreshFixtures{} & \AmbiguityFreshPct{}\% \\
-    Predates it, later revisited & \AmbiguityRevisitedFixtures{} & \AmbiguityRevisitedWith{} & \AmbiguityRevisitedPct{}\% \\
-    \midrule
-    Whole corpus (a floor) & \AmbiguityScored{} & \AmbiguityAnyFixtures{} & \AmbiguityAnyPct{}\% \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-The middle row is the estimate. Of the \AmbiguityFreshScored{} fixtures annotated from the start
-by someone who had the facility available, \AmbiguityFreshFixtures{}---\AmbiguityFreshPct{}\%---%
-contain at least one site whose correspondence is not one-to-one. Split by repository list, as
-Section~\ref{sec:dataset} reports, the Full list gives \AmbiguityFullFreshPct{}\% and the freshly
-annotated part of the Curated list \AmbiguityCuratedFreshPct{}\%; the Full list is the figure we
-quote, because it is the larger and uniformly fresh population. The third row is reported for
-completeness and excluded from the estimate: those \AmbiguityRevisitedFixtures{} fixtures predate
-the facility and were reopened afterwards, and a fixture is reopened precisely because something
-in it needed attention, so their \AmbiguityRevisitedPct{}\% rate is selection-biased upward by
-construction. The corpus-wide \AmbiguityAnyPct{}\% is a floor rather than a census, for the reason
-the first row makes explicit.
-
-The sites are local. Across the \AmbiguityGroups{} groups in the corpus, the median group spans
-\AmbiguityGroupSizeMedian{} nodes on its larger side and the largest spans
-\AmbiguityGroupSizeMax{}; \AmbiguityGroupsWithChildren{} of them extend the correspondence to
-whole subtrees rather than to individual nodes. \AmbiguityUnequalPct{}\% of groups have different
-node counts on the two sides, and \AmbiguityMinorityPct{}\% of all groups are the smallest such
-case, two nodes on one side and one on the other or the reverse. The two operations a group can
-carry split almost evenly, \AmbiguityIdenticalGroups{} identical against \AmbiguityMatchGroups{}
-matched-but-not-identical, so the phenomenon is not a property of unchanged code alone. It is
-also unevenly spread: one fixture alone carries \AmbiguityMaxGroupsInFixture{} of the groups. How
-many fixtures are affected and how much of the ground truth is affected are different quantities.
-Weighted by mapping decisions rather than by fixtures, the groups account for \AmbiguityPairs{} of
-the \AmbiguityPairedDecisions{} node pairs the ground truth records outside identical
-code---\AmbiguityPairsPct{}\%. A metric aggregated over nodes or lines absorbs a share of this
-size almost invisibly; a metric that asks whether a fixture was mapped exactly right inherits the
-full \AmbiguityFreshPct{}\%, because one such site is enough to fail a fixture.
-
-Table~\ref{tab:nm} shows what these correspondences look like. Its rows were found by reading the
-annotators' own commentary in the fixtures' test cases rather than by enumeration, so the table is
-illustrative and feeds no rate. Four of the six carry a group at the site. The other two were
-noted in prose and left unencoded, which is why the rates in Table~\ref{tab:ambiguity} are floors
-for a second reason the corpus cannot correct for: a group exists only where an annotator both
-noticed the correspondence and recorded it. Two of the six also postdate the corpus snapshot every
-rate in this paper is measured against.
+**UP TO HERE**
 
 \begin{table}
   \caption{Changes in the corpus whose true correspondence is $N{:}M$, found by inspection of
@@ -605,6 +424,10 @@ charitable reading, since the leftover nodes correspond too. Section~\ref{sec:un
 to what the same sites imply for uniqueness.
 
 \subsection{Solutions humans prefer over the cheapest one}
+
+\textbf{RQ1.2.} What percentage of real-world code changes have solutions that humans prefer
+whose cost is higher than the optimal AST diff, using the commonly accepted costs of common AST
+diff operations?
 
 RQ1.2 asks a question about the cost function rather than the output language. Every algorithm
 in this family ranks candidate mappings by a cost that adds up its operations, and the standard
