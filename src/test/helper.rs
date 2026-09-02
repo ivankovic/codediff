@@ -598,8 +598,25 @@ pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code
     ))
 }
 
-fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
-    let mut result = HashMap::new();
+/**
+* Every fixture in the corpus as a `(name, directory)` pair, sorted by name - the corpus walk on
+* its own, with no file read and no parse.
+*
+* Exists so that a caller that visits each fixture exactly once (`benchmark_optimal_solutions`)
+* can stream them - resolve a name, load it, measure it, drop it - instead of going through
+* [`handmade_test_code_pairs`], which necessarily holds all 500+ fixtures parsed in memory at
+* once. That distinction is worth ~5.5GB of resident memory: `code_pair_from_dir` calls
+* `ensure_parsed`, so the full-corpus map retains a `tree_sitter::Tree` *and* its `ast_metadata`
+* per side for the life of the process (measured 2026-09-02: the benchmark's RSS climbed to
+* 5564MB during the load and then sat flat there for the whole measurement run, against a 7GB
+* limit on a standard CI runner).
+*
+* A cache is the right shape for repeated lookups of the same few fixtures, which is what almost
+* every test does; it is pure cost for a single ordered pass over all of them, which is what the
+* benchmark does. Use this for the latter and [`handmade_test_code_pair`] for the former.
+*/
+pub fn handmade_test_case_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
+    let mut cases = Vec::new();
 
     for dataset in DIFF_DATASETS {
         let dataset_root = diffs_root().join(dataset);
@@ -612,11 +629,25 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
 
             if path.is_dir() {
                 let dir_name = path.file_name().unwrap().to_string_lossy().into_owned();
-
-                if let Some(pair) = code_pair_from_dir(&path)? {
-                    result.insert(dir_name, pair);
-                }
+                cases.push((dir_name, path));
             }
+        }
+    }
+
+    // Sorted so that every caller sees the same order regardless of the filesystem's `read_dir`
+    // order, which differs between machines (and so between a local run and CI).
+    cases.sort();
+    Ok(cases)
+}
+
+fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
+    let mut result = HashMap::new();
+
+    // Shares `handmade_test_case_dirs`' walk rather than repeating it, so the two can't drift on
+    // what counts as a fixture directory.
+    for (dir_name, path) in handmade_test_case_dirs()? {
+        if let Some(pair) = code_pair_from_dir(&path)? {
+            result.insert(dir_name, pair);
         }
     }
 

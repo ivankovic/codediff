@@ -293,13 +293,15 @@ struct Row {
 fn dump_mapping(name: &str, config: &codediff::diff::HeuristicConfig) -> Result<()> {
     use codediff::test::helper::path_for_node;
 
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let (before, after) = test_diffs
-        .get(name)
-        .ok_or_else(|| anyhow::anyhow!("no before/after test code pair found for '{}'", name))?
-        .clone();
+    // Per-name, not the full-corpus map: this dumps one fixture, so parsing all 500+ to reach one
+    // of them is ~5.5GB and ~18s of pure waste (see the streaming comment in `main`). Used by
+    // reference rather than cloned, which also preserves the `ast_metadata` that
+    // `code_pair_from_dir` already computed - `Code`'s hand-written `Clone` drops it to `None`
+    // (see its doc comment), which would silently make every `metadata_of` call below recompute.
+    let pair = helper::handmade_test_code_pair(name)?;
+    let (before, after) = (&pair.0, &pair.1);
 
-    let diff = codediff::diff::diff_code_with_config(&before, &after, config);
+    let diff = codediff::diff::diff_code_with_config(before, after, config);
     let ast = diff.ast.expect("diff has AST");
 
     let before_ast = before.ast.as_ref().expect("before parsed");
@@ -376,30 +378,32 @@ fn main() -> Result<()> {
         return dump_mapping(&name, &config);
     }
 
-    let test_diffs = helper::handmade_test_code_pairs()?;
-    let mut names: Vec<String> = test_diffs.keys().cloned().collect();
-    names.sort();
+    // Streamed one fixture at a time, deliberately *not* via `handmade_test_code_pairs`: this
+    // binary visits every fixture exactly once, in order, so the full-corpus cache buys it
+    // nothing and costs it the whole corpus resident at once - all 500+ fixtures with a parsed
+    // `tree_sitter::Tree` and its `ast_metadata` per side. Measured 2026-09-02: RSS climbed to
+    // 5564MB over the first 18 seconds and then sat flat there for the remaining ~130s of
+    // measurement, i.e. that memory was retention, not working set, against a 7GB limit on a
+    // standard CI runner. Loading per fixture and dropping it at the end of each iteration makes
+    // the peak the largest single fixture instead of the sum of all of them.
+    //
+    // `code_pair_from_dir` calls `ensure_parsed` itself, so what it hands back already carries
+    // the `ast_metadata` the timed diff below needs. That is also why this no longer clones:
+    // cloning was only ever needed because the cache handed out shared `Code`s whose
+    // hand-written `Clone` drops `ast_metadata` to `None` (see its doc comment), which without a
+    // re-`ensure_parsed` here silently turned every `metadata_of` call into a full whole-tree
+    // recompute (measured 2026-08-17: ~26 recomputes per `diff_code_with_config` call, ~6s on
+    // the largest fixture, inflating `elapsed_ms` ~6x over the production path). Owning a
+    // freshly-loaded pair sidesteps that entirely and matches what `Code::from_file` does in
+    // production.
+    let cases = helper::handmade_test_case_dirs()?;
 
     let started = std::time::Instant::now();
-    let mut rows = Vec::with_capacity(names.len());
-    for name in &names {
-        let (before, after) = test_diffs
-            .get(name)
-            .expect("name came from test_diffs.keys()");
-        // `handmade_test_code_pairs` hands out clones, and `Code`'s hand-written `Clone` drops
-        // `ast_metadata` to `None` (see its doc comment) - without re-caching it here, every
-        // `metadata_of` call across the pipeline silently recomputes whole-tree metadata from
-        // scratch (measured 2026-08-17: ~26 full recomputes per `diff_code_with_config` call,
-        // ~6s of pure recompute overhead on the largest fixture - inflating `elapsed_ms` ~6x
-        // over what the production path, which precomputes metadata in `Code::from_string`/
-        // `from_file`, actually costs). Mutate local clones so the timed diff below measures the
-        // pipeline, not the harness artifact.
-        let (mut before, mut after) = (before.clone(), after.clone());
-        for code in [&mut before, &mut after] {
-            if code.metadata.language.is_some() {
-                code.ensure_parsed()?;
-            }
-        }
+    let mut rows = Vec::with_capacity(cases.len());
+    for (name, dir) in &cases {
+        let Some((before, after)) = helper::code_pair_from_dir(dir)? else {
+            continue;
+        };
         let (before, after) = (&before, &after);
         let reason_counts = reason_counts_for(before, after, &config);
         let algorithm_cost = algorithm_cost_for(before, after, &config);
