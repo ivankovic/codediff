@@ -135,15 +135,15 @@ the textual representation of the source code. For any given AST diff, there are
 correct visualizations, and the quality of the visualization determines tool adoption as well.
 
 \begin{itemize}
-  \item \textbf{Research Question Group 1 (Speed):} What percentage of real-world source-code
-    changes can a single, whole-tree tree-edit-distance computation complete within one
-    second?~\footnote{One second was chosen based on the generally accepted average human response
-    time to visual stimulus, which is 250 ms. See the~\ref{sec:cost} for details.}
-  \item \textbf{Research Question Group 2 (Viability):} What percentage of real-world code changes
+  \item \textbf{Research Question Group 1 (Viability):} What percentage of real-world code changes
     have an optimal AST node mapping that cannot be expressed using common AST diff operations
     (Insert, Delete, Update, Move)? What percentage of real-world code changes have a solutions
     that humans prefer whose cost is higher than the optimal AST diff, using the commonly accepted
     costs of common AST diff operations?
+  \item \textbf{Research Question Group 2 (Speed):} What percentage of real-world source-code
+    changes can a single, whole-tree tree-edit-distance computation complete within one
+    second?~\footnote{One second was chosen based on the generally accepted average human response
+    time to visual stimulus, which is 250 ms. See the~\ref{sec:cost} for details.}
   \item \textbf{Research Question Group 3 (Uniqueness):} What percentage of real-world code changes have multiple optimal
     AST node mappings? What percentage of real-world code changes have multiple equally correct textual
     visualizations of the diff? What percentage of the AST influences the textual visualization?
@@ -164,7 +164,7 @@ This paper makes the following contributions:
     independently of which AST nodes carry them. Often, two visualizations are provided: the minimal one
     and the maximal one, covering human preferences between equally valid solutions.
     The dataset, the tool used to create the dataset and the entire history of the dataset is available
-    freely for future research.
+    freely for future research. The dataset is described in detail in~\ref{sec:dataset}.
   \item \textbf{Evaluation:} Answers to all research questions. An analysis of the real-world code change
     data shape, irrespective of any concrete implementation, and a quantified compasion of several
     state-of-the-art code diffing tools on the human annotated dataset.
@@ -224,53 +224,35 @@ comfortably over an exact node-to-node mapping: difftastic reduces the parse tre
 and aligns it with its own structural algorithm, and diffsitter applies a related tree-sitter-based
 alignment over a smaller, hand-picked set of compiled-in grammars.
 
-\section{The Cost of Exactness}
-\label{sec:cost}
+\section{Empirical Dataset}
+\label{sec:dataset}
 
-Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
-complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
-This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
-documentation states that it targets research use, not production deployment at scale—a
-reasonable scope for its own goals, but one that leaves open a question every production diff
-tool must answer:
+To understand the real-world environment code diffing tools are used in, we built a dataset of
+\NumFixtures real open source code changes.
 
-%% Verbatim reprise of the RQ1 statement in Section 1's introduction - edit both or neither.
-\textbf{RQ1 (Cost of exactness)}, stated in Section~\ref{sec:intro} and restated here: what percentage of
-real-world source-code changes can a single, whole-tree
-tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff tool is built
-on—complete within a one-second budget?
+To ensure good coverage, we built two sets of open-source repositories:
 
-A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
-for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
-analysis never quantified. Answering RQ1 needs measurement, not further asymptotic analysis.
+\begin{itemize}
+  \item The Curated list - 100 open source repositories, selected manually from several lists of
+    most popular repositories, enhanced further by repositories we, the authors, were already
+    aware of. The Curated list was used as a smaller list to repeatedly test the analysis infrastructure
+    although it does represent good coverage of most popular programming languages.
+  \item The Full List - \NumRepos{} repositories. This list was created by expanding the Curated list
+    with all repositories present in the Gentoo Linux distribution's package list.
+\end{itemize}
 
-We measure this directly. We built a corpus of \NumRepos{} open-source repositories, drawn from
-the Gentoo Linux distribution's package list and popular repositories on GitHub. We cloned each
-repository to a depth of \CorpusCloneDepth{} commits from every branch tip and parsed every file
-with Tree-sitter, recording byte size, line count,
-language, and AST node count per file. The depth limit matters for what follows: it bounds how far
-back the commit sampling in this section can reach, and a sampled (repository, commit, path) triple
-stays resolvable only while that commit remains within the depth window of the local clone. The
-full methodology, and every per-language number, is
-reproducible from the project's research repository; here, we summarize the numbers that bound
-what any syntax-aware diff tool has to process.
+We cloned each repository to a depth of \CorpusCloneDepth{} commits from every main branch. The resulting
+dataset has \NumFiles{} files in \NumLanguages{} languages. While we cannot guarantee that all repositories
+remain accessible, the entire list of repositories, the cloning script and all analysis is available from
+the projects repository and can be replicated by readers, if desired.
 
-%% TODO: \NumRepos{} etc. currently reflect the 100-repository `small` sample (fast, already
-%% computed), not the target 7,423-repository full corpus (slow - see README.md). Re-run
-%% `make introductory-paper-empirical` after a full `file-stats` run to swap in the real numbers.
-%%
-%% The ground-truth numbers were all refreshed together on 2026-08-20 against the current
-%% 468-fixture corpus - node accuracy, per-tool comparison, speed percentiles, robustness - and the
-%% rendering block (visibility, paintings) was added on 2026-08-29 against the same corpus state.
-%% Keep that property: Sections 4 through 7 share one corpus, so refreshing one block alone makes
-%% them inconsistent. The comparison, ambiguity and rendering blocks are generated
-%% (analysis/benchmark_other_report.py, ambiguity_report.py, rendering_report.py), so only the
-%% corpus totals and robustness blocks in paper_variables.py still need transcribing by hand.
+\subsection{Shape of real-world files}
 
-The corpus has \NumFiles{} files across \NumLanguages{} languages. About two-thirds of all files
-are code. The rest is configuration, data, and documentation (Figure~\ref{fig:tips}). Restricted to
-code files, Table~\ref{tab:file-size-percentiles} reports size percentiles in bytes, lines of code,
-and AST nodes.
+The first thing to note about the dataset is that only two-thirds of the files are actually code files.
+The rest is configuration, data, and documentation (Figure~\ref{fig:tips}).~\footnote{Note however that any
+``code'' diffing tool still must support showing changes to non-code files.}
+Restricted to code files, Table~\ref{tab:file-size-percentiles} reports size percentiles in bytes,
+lines of code, and AST nodes.
 
 \begin{figure}
   \centering
@@ -294,10 +276,63 @@ and AST nodes.
 \end{table}
 
 The largest file in the corpus has \AstMax{} AST nodes. Byte size and AST node count have a strong
-correlation, Pearson $r = \CorrelationR{}$, which simplifies to
-$|\text{AST}| \approx \text{bytes} / 5$ for quick estimates. Arafat and Riehle report that 47.5\%
-of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
-over 10{,}000 lines still occur.
+correlation, Pearson $r = \CorrelationR{}$, which simplifies to $|\text{AST}| \approx \text{bytes} / 5$
+for quick estimates.
+
+\subsection{Shape of real-world file edits}
+
+Arafat and Riehle report that 47.5\% of all commits touch 10 lines or fewer~\cite{commit-size-distribution-paper}, while commits of
+over 10 000 lines still occur.
+
+TODO: Add our own metrics here
+
+\subsection{Shape of optimal file diffs}
+
+From both Curated and Full list of repositories, we fully randomly sampled 10 (TODO: use variable)
+diffs per language. The resulting 220 (TODO: Correct number and variable) diffs from the Curated list
+and 220 (TODO: correct number and variable) diffs from the Full list were first manually inspected
+for any errors. At this stage, ? (TODO: number and variable) diffs were rejected, mostly because of
+errors in sampling where, in particular TypeScript and R, file extensions were used for other languages.
+This resulted in a dataset of ? (TODO: number and variable) diffs from the Curated and ? (TODO: number and var)
+diffs from the Full list.
+
+Each diff was then solved by hand by us, the authors. We have each at least 15 years of experience in
+software developement, and have reviewed tens of thousands of real world code changes in industrial
+environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
+Instead, the dataset supports multiple correct solutions for each diff, and it supports marking diffs
+that cannot be solved at all using the standard set of AST diff operations: Insert, Delete, Update and Move.
+In particular, ? (TODO: number and variable) in the Curated and ? (TODO: number and variable) in the Full list,
+ ? and ? percent, of diffs require a N:M mapping, i.e. one or more nodes from one side maps to one or
+ more nodes from the other side. The most common cause is a refactoring, where two or more similar blocks
+ of code are moved to a common function. The correct solutions is the one that maps all nodes as moved.
+
+Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
+
+\section{Viability}
+\label{sec:cost}
+
+
+* I STOPPED HERE *
+
+\section{The Cost of Exactness}
+
+Formal treatments of the algorithms in Section~\ref{sec:background} report worst-case asymptotic
+complexity: APTED and Zhang-Shasha are both $O(n^3)$ for general trees, where $n$ is tree size.
+This analysis is necessary, but it is not sufficient for a production tool. GumTree's own
+documentation states that it targets research use, not production deployment at scale—a
+reasonable scope for its own goals, but one that leaves open a question every production diff
+tool must answer:
+
+%% Verbatim reprise of the RQ1 statement in Section 1's introduction - edit both or neither.
+\textbf{RQ1 (Cost of exactness)}, stated in Section~\ref{sec:intro} and restated here: what percentage of
+real-world source-code changes can a single, whole-tree
+tree-edit-distance computation—the algorithmic core every exact, syntax-aware diff tool is built
+on—complete within a one-second budget?
+
+A tool engineered only against a worst-case bound risks two failure modes. It can over-engineer
+for inputs that never occur in practice. It can under-engineer for a real tail its asymptotic
+analysis never quantified. Answering RQ1 needs measurement, not further asymptotic analysis.
+
 
 \textbf{Measurement.} To answer RQ1's percentage directly, we sampled \RqOnePairsAttempted{} real
 (before, after) file pairs from single-parent commits in these repositories, stratified per
