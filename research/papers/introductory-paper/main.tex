@@ -128,85 +128,56 @@ One way to compute diffs with a genuine move operation is to compare the code's 
 tree (AST) instead of its raw text. An AST diff maps nodes of one tree onto nodes of the other; a
 move is a mapping whose nodes match but whose ancestry changed. Tree diffing is a well-studied
 field, and Section~\ref{sec:background} surveys the work this paper builds on. In practice,
-however, tree diffing has seen little adoption, and we argue the central reason is cost: the best
-exact tree-diffing algorithms are $O(n^3)$ in tree size, and Section~\ref{sec:cost}
-measures directly how often a whole-tree computation at real-world file sizes exceeds an
-interactive time budget.
-
-This paper is about the three assumptions that sit underneath every such tool, and about what
-happens to its evaluation when they fail. The first is that computing an AST mapping is
-affordable: the best exact tree-diffing algorithms are $O(n^3)$ in tree size, and
-Section~\ref{sec:cost} measures directly how often a whole-tree computation at real-world file
-sizes exceeds an interactive budget. The second is that the mapping a tool should recover is
-unique. The third is that the mapping is what the reader sees. Sections~\ref{sec:ground-truth}
-and~\ref{sec:limits} test the second and third against a corpus of human-authored ground truth,
-without reference to any diffing tool at all, because they are properties of code change rather
-than of any implementation. Only then, in Section~\ref{sec:tools}, do we measure what existing
-tools recover, and in Section~\ref{sec:codediff} present a tool of our own.
-
-The paper is organized around six research questions, each answered by the correspondingly
-numbered research answer, RA1--RA6, set in a box at the point in the paper where the measurement
-supporting it is reported. The first four name no diffing tool: they are about what the problem
-costs and what a correct answer to it even is.
+however, tree diffing has seen little adoption. We speculate that the reason is the runtime.
+Pure exact tree-diffing algorithms are $O(n^3)$, where $n$ is the number of nodes in the tree.
+Additionally, an AST diff is not directly usable to the developers. It has to be visualized on
+the textual representation of the source code. For any given AST diff, there are several equally
+correct visualizations, and the quality of the visualization determines tool adoption as well.
 
 \begin{itemize}
-  \item \textbf{RQ1 (Cost of exactness).} What percentage of real-world source-code changes can a
-  single, whole-tree tree-edit-distance computation—the algorithmic core every exact,
-  syntax-aware diff tool is built on—complete within a one-second budget? Answered by RA1,
-  Section~\ref{sec:cost}.
-  \item \textbf{RQ2 (Uniqueness).} When does a real-world code change have no single
-  correct mapping between the two syntax trees---because several one-to-one mappings are equally
-  correct, or because the true correspondence is not one-to-one at all? Answered by RA2,
-  Section~\ref{sec:limits}.
-  \item \textbf{RQ3 (Visibility).} What share of an AST mapping can a rendered diff display at
-  all, and how much of it is therefore scaffolding a reader never sees? Answered by RA3,
-  Section~\ref{sec:limits}.
-  \item \textbf{RQ4 (Rendering).} Once the mapping is settled, is the rendering that follows from
-  it unique---or does one correct mapping admit several equally correct renderings? Answered by
-  RA4, Section~\ref{sec:limits}.
-  \item \textbf{RQ5 (Tool accuracy).} How accurately do current state-of-the-art code-diffing
-  tools recover real-world code changes, measured against human-authored ground-truth mappings of
-  those changes? Answered by RA5, Section~\ref{sec:tools}.
-  \item \textbf{RQ6 (Tool cost).} What does each of those tools cost to run on the same corpus,
-  and how does that cost distribute across easy and hard changes? Answered by RA6,
-  Section~\ref{sec:tools}.
+  \item \textbf{Research Question Group 1 (Speed):} What percentage of real-world source-code
+    changes can a single, whole-tree tree-edit-distance computation complete within one
+    second?~\footnote{One second was chosen based on the generally accepted average human response
+    time to visual stimulus, which is 250 ms. See the~\ref{sec:cost} for details.}
+  \item \textbf{Research Question Group 2 (Viability):} What percentage of real-world code changes
+    have an optimal AST node mapping that cannot be expressed using common AST diff operations
+    (Insert, Delete, Update, Move)? What percentage of real-world code changes have a solutions
+    that humans prefer whose cost is higher than the optimal AST diff, using the commonly accepted
+    costs of common AST diff operations?
+  \item \textbf{Research Question Group 3 (Uniqueness):} What percentage of real-world code changes have multiple optimal
+    AST node mappings? What percentage of real-world code changes have multiple equally correct textual
+    visualizations of the diff? What percentage of the AST influences the textual visualization?
+  \item \textbf{Research Question Group 4 (Implementation):} How accurately do current state-of-the-art
+    code diffing tools find optimal visualizations? How fast are real-world state-of-the-art tools?
 \end{itemize}
 
-This paper makes four contributions, one empirical, one dataset, one evaluation, and one system:
+This paper makes the following contributions:
+
 \begin{itemize}
-  \item \textbf{Empirical study.} An empirical study of \NumRepos{} real-world open-source
-  repositories, about \NumFilesMillions{} million files in \NumLanguages{} languages, showing
-  that the worst-case inputs tree-diffing algorithms are analyzed against are rare in practice,
-  but that the tail is real and large enough that a production tool must handle inputs beyond
-  what a whole-tree tree-edit-distance computation can process within an interactive budget.
-  \item \textbf{Dataset.} A corpus of \NumFixtures{} real-world code changes in
-  \NumFixtureLanguages{} languages, each carrying a human-authored ground-truth AST mapping in
-  which every node is labeled with one of seven operations---and in which a set of interchangeable
-  nodes can be recorded as admitting several equally correct pairings rather than forced to one,
-  which is what makes RQ2 measurable. \PaintingFixtures{} of those changes additionally carry a
-  human-painted \emph{rendering}: the spans of text a reader should see marked, independently of
-  which AST nodes carry them, recorded once or twice according to whether the annotator judged the
-  rendering unique. Both were produced with a purpose-built annotation tool
-  (Section~\ref{sec:ground-truth}), and the methodology is reproducible from the project's
-  research repository.
-  \item \textbf{Evaluation.} A measurement of what that ground truth can and cannot ask of a tool:
-  how often it admits no unique mapping, how much of it a reader ever sees, and how often its
-  rendering is itself ambiguous---together bounding what any evaluation scoring a tool against one
-  fixed answer can report---followed by a quantified comparison of four established diffing tools,
-  GumTree, Unix \texttt{diff}, difftastic, and diffsitter, against it on accuracy and on cost.
-  \item \textbf{System.} \textsc{CodeDiff}, a \NumPhasesWord{}-phase diffing pipeline built from
-  APTED tree edit distance, scoped to bounded subtree pairs rather than to whole files, together
-  with GumTree's move-recovery heuristic and Myers' sequence diff, engineered as one production
-  tool against the measurements above rather than against a worst-case bound.
+  \item \textbf{Dataset:} A set of \NumFixtures{} real-world code changes. The changes cover \NumLanguages
+    and were selected using 3 different selection algorithms from \NumRepos open source repositories.
+    The repositories themselves are a combination of a curated list and every repository used by the Gentoo
+    Linux distribution. Every change was solved by hand and the optimal map between the two ASTs is
+    available, or if the optimal map is impossible using the common AST diff operations, a best-possible
+    solution with a comment explaining the missing part. Additionally, \PaintingFixtures of those
+    solutions also has the optimal visualizations: the spans of text a developer should see marked,
+    independently of which AST nodes carry them. Often, two visualizations are provided: the minimal one
+    and the maximal one, covering human preferences between equally valid solutions.
+    The dataset, the tool used to create the dataset and the entire history of the dataset is available
+    freely for future research.
+  \item \textbf{Evaluation:} Answers to all research questions. An analysis of the real-world code change
+    data shape, irrespective of any concrete implementation, and a quantified compasion of several
+    state-of-the-art code diffing tools on the human annotated dataset.
+  \item \textbf{Tool:} \textsc{CodeDiff}, a new state-of-the-art tool. Combining all current research
+    with strict engineering principles and carefully implemented to maximize performance. \textsc{CodeDiff}
+    drastically outperforms existing tools and meets strict reliability and usability criteria.
 \end{itemize}
 
 \section{Background}
 \label{sec:background}
 
-This section introduces the algorithms and tools the rest of the paper depends on: the
-algorithms \textsc{CodeDiff} builds its pipeline from, and the tools it is evaluated alongside.
-Section~\ref{sec:related} returns to the closest prior work in more depth once the paper's own
-results are in hand.
+This sections lists two types of existing work: theorethical research papers and actual tool
+implementations.
 
 \subsection{Algorithms}
 
@@ -231,7 +202,9 @@ isomorphic subtrees, then a bottom-up phase that matches remaining container nod
 coefficient of their already-matched descendants. GumTree also introduces a distinct edit
 operation, move, and a recovery pass that pairs up deleted and inserted identical subtrees the
 top-down and bottom-up phases missed. This design favors speed over exactness, at the scale real
-source files require.
+source files require. For performance, it also introduces InsertTree and DeleteTree operations
+that are equivalent to repeatedly calling Insert or Delete operations on all children in the given
+subtree.
 
 \textbf{Myers' O(ND) algorithm}~\cite{myers-1986} solves a different, more restricted problem: the
 shortest edit script between two flat sequences, not two trees. It underlies most line-based diff
@@ -241,16 +214,15 @@ version-controlled file.
 
 \subsection{Tools}
 
+\textbf{Unix \texttt{diff}} TODO
+
+\textbf{git diff} TODO
+
 \textbf{difftastic}~\cite{difftastic} and \textbf{diffsitter}~\cite{diffsitter} are a newer
-generation of practical, tree-sitter-based diffing tools, the same parsing layer
-\textsc{CodeDiff} itself is built on. Both prioritize a diff a human reads comfortably over an
-exact node-to-node mapping: difftastic reduces the parse tree to an s-expression and aligns it
-with its own structural algorithm, and diffsitter applies a related tree-sitter-based alignment
-over a smaller, hand-picked set of compiled-in grammars. Neither computes a full tree-edit-distance
-mapping the way APTED or GumTree do, so neither directly targets the ground-truth-accuracy metric
-this paper measures against in Section~\ref{sec:tools}—a difference in design goal, not a
-shortcoming, and the reason we include both as companions in the same problem space rather than as
-head-to-head competitors on identical terms.
+generation of practical, tree-sitter-based diffing tools. Both prioritize a diff a human reads
+comfortably over an exact node-to-node mapping: difftastic reduces the parse tree to an s-expression
+and aligns it with its own structural algorithm, and diffsitter applies a related tree-sitter-based
+alignment over a smaller, hand-picked set of compiled-in grammars.
 
 \section{The Cost of Exactness}
 \label{sec:cost}

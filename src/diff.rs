@@ -186,8 +186,8 @@ impl Diff {
         Self::pending_with_config(before, after, config).finish(DiffMode::Fast)
     }
 
-    /// Runs phases 1-5 of the seven-phase pipeline (every heuristic pass except final APTED and
-    /// the moved-subtree fallback) and returns a [`PendingDiff`] paused right before phase 6, so a
+    /// Runs phases 1-4 of the matching pipeline (every heuristic pass except final APTED and
+    /// everything from phase 6 on) and returns a [`PendingDiff`] paused right before phase 6, so a
     /// caller can inspect [`PendingDiff::looks_expensive`] and choose a [`DiffMode`] - e.g. to ask
     /// a human, or to apply a CLI flag - before paying for (or skipping) full tree-edit-distance.
     /// See [`PendingDiff`]'s doc comment for why this split exists and its safety invariant.
@@ -210,12 +210,30 @@ impl Diff {
             ..Default::default()
         };
 
-        // Seven-phase pipeline (`TODO.md`, 2026-07-17/18) - replaced the previous ~15-pass
-        // pipeline outright once verified to be at least as accurate on every fixture in the
-        // `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782 mismatches, zero
-        // fixtures worse). See `TODO.md` for the full design history and the accuracy gap that
-        // had to be closed first. Phases 1-5 live here, in `pending_with_config`; phases 6-7 live
-        // in `PendingDiff::finish` - see that struct's doc comment for why they're split.
+        // Matching pipeline (`TODO.md`, 2026-07-17/18) - originally "seven-phase," replaced the
+        // previous ~15-pass pipeline outright once verified to be at least as accurate on every
+        // fixture in the `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782
+        // mismatches, zero fixtures worse). Grew three more phases since (8-10, added for the same
+        // "re-tag an already-correct match, don't invent a new one" reason as 1b/1c) without a
+        // renumber, so it now runs ten. See `TODO.md` for the full design history and the accuracy
+        // gap the original seven had to close. Phases 1-4 live here, in `pending_with_config`;
+        // phases 6-10 live in `PendingDiff::finish` (phases 3 and 5 were removed, see below) - see
+        // `PendingDiff`'s doc comment for why the two halves are split. Execution order, each with
+        // its own comment at the call site below:
+        //   1  solve_hash_descent               - hash-based largest-subtree-first descent
+        //   1b solve_nested_condition_collapse   - if-let-chain attribution fix-up on phase 1
+        //   1c solve_heritage_clause_growth      - implements/extends-clause attribution fix-up
+        //   2  solve_leading_siblings,
+        //      solve_identical_diagnostic_statements - cheap high-confidence exact matches
+        //   (3, 5 removed 2026-08-16 - net-negative in ablation, see below)
+        //   4  solve_syntax_aware_matching       - fully-resolved-name N:M matching
+        //   6  prematch_unique_named_locals, solve_bottom_up_propagation (rearchitecture step 2),
+        //      solve_unique_type_matching, apted::for_roots_fallback, solve_bottom_up_propagation
+        //      again                             - final whole-file residual resolution
+        //   7  solve_moved_subtrees               - unanchored cross-tree move fallback
+        //   8  solve_mutual_ancestors             - mutual-ancestor recovery
+        //   9  solve_wrap_growth                  - new-wrapper-parent-chain re-tag
+        //   10 solve_unresolved_nodes             - terminal completeness sweep (delete/insert)
 
         // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash).
         solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff);
@@ -284,13 +302,19 @@ impl Diff {
     }
 }
 
-/// Controls how [`PendingDiff::finish`] runs phase 6 (final whole-tree APTED).
+/// Historically controlled how [`PendingDiff::finish`] runs phase 6. **As of the phases-4-7
+/// rearchitecture, it no longer does anything** - phase 6 unconditionally runs the cheap fallback
+/// regardless of this value (see the "Phase 6" comment at the `finish` call site, and
+/// [`PendingDiff::looks_expensive`]'s doc, for why and what replaced it). Kept only for API
+/// compatibility (the `--exact` CLI flag still constructs one) pending a follow-up commit that
+/// removes it. The rest of this doc comment describes the pre-rearchitecture behavior for
+/// historical context.
 ///
-/// `Fast` is the default for every public entry point (`Diff::from_code`, `diff_code`, ...) - this
+/// `Fast` was the default for every public entry point (`Diff::from_code`, `diff_code`, ...) - this
 /// is an intentional behavior change from "always run exact APTED," made to fix a measured
 /// pathological case: two completely unrelated Rust files (`src/test/data/diffs/handmade/
 /// rust-completely-unrelated-main-files/`) took **14.5 seconds** to diff, ~36x the project's
-/// stated 400ms budget, because phases 1-5 left 86% of the larger tree unmatched and phase 6 had
+/// stated 400ms budget, because phases 1-4 left 86% of the larger tree unmatched and phase 6 had
 /// to run full tree-edit-distance over nearly the whole thing with almost nothing to prune
 /// against. See `TODO.md`'s "Size/dissimilarity-capped approximate fallback" entry (2026-07-25)
 /// for a documented *prior*, narrower attempt at a similar idea (a per-subtree-pair size/
@@ -303,19 +327,21 @@ impl Diff {
 /// trusted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum DiffMode {
-    /// Run phase 6 normally unless [`PendingDiff::looks_expensive`] is true, in which case
-    /// substitute [`apted::for_roots_fallback`] (Myers LCS over the residual forest) for full
-    /// APTED.
+    /// Pre-rearchitecture: run phase 6 normally unless [`PendingDiff::looks_expensive`] is true,
+    /// in which case substitute [`apted::for_roots_fallback`] (Myers LCS over the residual forest)
+    /// for full APTED. No effect today - see [`DiffMode`]'s doc comment.
     #[default]
     Fast,
-    /// Always run full APTED for phase 6, ignoring the guard entirely - what `--exact` (CLI) and
-    /// the TUI's "Exact" prompt choice select.
+    /// Pre-rearchitecture: always run full APTED for phase 6, ignoring the guard entirely - what
+    /// `--exact` (CLI) and the TUI's "Exact" prompt choice select. No effect today - see
+    /// [`DiffMode`]'s doc comment.
     Exact,
 }
 
-/// Guard threshold consulted by [`PendingDiff::looks_expensive`]: if the larger of
-/// `unmatched_before`/`unmatched_after` (node counts still unmapped after phase 5) exceeds this,
-/// [`DiffMode::Fast`] substitutes [`apted::for_roots_fallback`] for phase 6 instead of full APTED.
+/// Guard threshold consulted by [`PendingDiff::looks_expensive`] (diagnostic-only today, see that
+/// method's doc): if the larger of `unmatched_before`/`unmatched_after` (node counts still
+/// unmapped after phase 4) exceeds this, [`DiffMode::Fast`] used to substitute
+/// [`apted::for_roots_fallback`] for phase 6 instead of full APTED.
 ///
 /// Measured against every fixture in the `optimal_solutions` corpus (`cargo test -- --nocapture`
 /// a residual-distribution dump, or `benchmark_optimal_solutions`): the largest legitimate
@@ -330,16 +356,16 @@ pub enum DiffMode {
 /// [`DiffMode`]'s doc comment for the known limitations of this kind of guard in general.
 pub const EXPENSIVE_RESIDUAL_THRESHOLD: usize = 5000;
 
-/// Phases 1-5 of the seven-phase pipeline (see [`Diff::from_code_with_config`]), paused
+/// Phases 1-4 of the matching pipeline (see [`Diff::from_code_with_config`]), paused
 /// immediately before phase 6 so a caller can inspect [`PendingDiff::looks_expensive`] and choose
 /// a [`DiffMode`] before running (or skipping) full tree-edit-distance. [`PendingDiff::finish`]
-/// runs phases 6-7 and assembles the final [`Diff`].
+/// runs phases 6-10 and assembles the final [`Diff`].
 ///
 /// # Safety invariant
 ///
 /// Holds a [`NodeCache`] under the exact same erased-`'static` invariant documented on that
 /// struct (unchanged - this struct doesn't fix that), plus explicit `&'code Code` borrows of the
-/// two [`Code`] values phases 1-5 ran against. The `'code` lifetime is what makes the compiler -
+/// two [`Code`] values phases 1-4 ran against. The `'code` lifetime is what makes the compiler -
 /// not just a doc comment - refuse to let a `PendingDiff` outlive those `Code` values.
 ///
 /// If a caller needs to pause mid-computation for user input (e.g. a TUI prompting for
@@ -360,7 +386,7 @@ pub struct PendingDiff<'code> {
 impl<'code> PendingDiff<'code> {
     /// `max(unmatched_before, unmatched_after) > EXPENSIVE_RESIDUAL_THRESHOLD`.
     ///
-    /// As of the phases-4-7 rearchitecture's Phase 1 (`TODO.md`,
+    /// As of the phases-4-7 rearchitecture's Step 1 (`TODO.md`,
     /// `~/.claude/plans/iterative-herding-panda.md`), `finish` no longer branches on this - it
     /// always runs the cheap fallback, regardless of residual size - so this is now a diagnostic
     /// signal only ("this diff had a large residual"), not something that changes `finish`'s
@@ -403,7 +429,8 @@ impl<'code> PendingDiff<'code> {
         // panda.md`), this branched: `DiffMode::Exact` (or `Fast` below `EXPENSIVE_RESIDUAL_
         // THRESHOLD`) ran unconditional whole-residual full APTED (`apted::for_roots(...,
         // Algorithm::Apted, "final_pass", ...)`) instead. That call is deleted as of this commit
-        // (Phase 1 of the rearchitecture): its Θ(n1×n2) dense-matrix cost is driven by residual
+        // (Step 1 of the rearchitecture, not to be confused with this file's own outer Phase 1):
+        // its Θ(n1×n2) dense-matrix cost is driven by residual
         // shape, not size, and cannot meet the project's p99<400ms target no matter how it's
         // gated - see the measured pathology (`vimscript-neovim-...add-two-functions`: 87s at
         // 11,647 nodes, vs. `json-iwalton3-jellyfin-web-...`: 9.4s at 258,504 nodes) recorded in
@@ -415,7 +442,8 @@ impl<'code> PendingDiff<'code> {
         // only recovers whole-subtree byte-identical matches, so any residual with even one
         // genuinely-changed node lost partial credit for everything around it. This is why the
         // change first landed on the `phases-4-7-rearchitecture` branch rather than `main`
-        // directly: Phases 2-3 (bottom-up propagation, region-scoped real APTED dispatch) had to
+        // directly: Steps 2-3 of the rearchitecture (bottom-up propagation, region-scoped real
+        // APTED dispatch) had to
         // land alongside it first, replacing what real tree-edit-distance-quality matching this
         // call provided with bounded, per-region matching.
         //
@@ -424,7 +452,8 @@ impl<'code> PendingDiff<'code> {
         // what `main` does today. Quality is back at or above the pre-Phase-1 baseline (see
         // `research/data/quality/optimal_solutions_benchmark.csv` and TODO.md's later 2026-08-16/17 entries:
         // kind-only sub-anchoring, trivial-entry filtering) - the regression described above was
-        // real but transient, measured mid-migration before Phases 2-3 shipped, not a standing
+        // real but transient, measured mid-migration before Steps 2-3 of the rearchitecture
+        // shipped, not a standing
         // cost of this design.
         //
         // `prematch_unique_named_locals` now runs unconditionally too (previously only in the
@@ -449,8 +478,9 @@ impl<'code> PendingDiff<'code> {
             );
         }
 
-        // Phase 2 of the rearchitecture: strict bottom-up propagation (`solve_bottom_up_
-        // propagation`), gated on `solver_bottom_up_propagation` (default `true` - see
+        // Step 2 of the rearchitecture (not this file's own outer Phase 2): strict bottom-up
+        // propagation (`solve_bottom_up_propagation`), gated on `solver_bottom_up_propagation`
+        // (default `true` - see
         // `HeuristicConfig`'s doc comment for the measurement that earned it). Runs here, right
         // before the terminal fallback, specifically to shrink that fallback's residual before it
         // ever sees it: a parent this resolves is one less "maximal unmatched root" the fallback
@@ -497,16 +527,17 @@ impl<'code> PendingDiff<'code> {
             solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        // Recovery for containers the passes above left unclaimed: an ancestor sitting above an
-        // edit whose descendants all still live inside one corresponding ancestor on the other
-        // side. Runs last among the matching passes, so its lowest-common-ancestor evidence is
-        // computed from the most complete set of matched descendants available, and strictly
-        // before the completeness sweep, which would otherwise spend these nodes on delete/insert.
+        // Phase 8: mutual-ancestor recovery, for containers the passes above left unclaimed - an
+        // ancestor sitting above an edit whose descendants all still live inside one corresponding
+        // ancestor on the other side. Runs last among the matching passes, so its
+        // lowest-common-ancestor evidence is computed from the most complete set of matched
+        // descendants available, and strictly before the completeness sweep, which would otherwise
+        // spend these nodes on delete/insert.
         if config.solver_mutual_ancestors {
             solve_mutual_ancestors::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        // Wrap growth (`try { EXISTING } catch (...) { NEW }`, an existing `if`/`else` becoming an
+        // Phase 9: wrap growth (`try { EXISTING } catch (...) { NEW }`, an existing `if`/`else` becoming an
         // `else if` branch, a module-top-level statement run gaining a brand-new enclosing
         // construct, ...) - the same re-tag idea as `solve_heritage_clause_growth`, for content
         // that gained a brand-new wrapper parent chain around it rather than a new sibling. Placed
@@ -525,10 +556,10 @@ impl<'code> PendingDiff<'code> {
         // See that module's own doc comment for the verification itself.
         solve_wrap_growth::solve(before, after, &node_cache, &mut ast_diff);
 
-        // Terminal completeness sweep: everything above is free to leave a node undecided, so this
-        // records the delete/insert implied by whatever absence is left. Must be last - it pairs
-        // nothing, and any pass running after it would find every node already claimed. See
-        // `solve_unresolved_nodes`.
+        // Phase 10: terminal completeness sweep. Everything above is free to leave a node
+        // undecided, so this records the delete/insert implied by whatever absence is left. Must
+        // be last - it pairs nothing, and any pass running after it would find every node already
+        // claimed. See `solve_unresolved_nodes`.
         solve_unresolved_nodes::solve(before, after, &node_cache, &mut ast_diff);
 
         Diff {
@@ -540,7 +571,7 @@ impl<'code> PendingDiff<'code> {
 }
 
 /**
-* Per-pass on/off switches for [`Diff::from_code_with_config`]'s seven-phase pipeline, for the
+* Per-pass on/off switches for [`Diff::from_code_with_config`]'s matching pipeline, for the
 * passes whose accuracy contribution is ambiguous enough to be worth re-measuring independently.
 * [`HeuristicConfig::default`] is what plain [`Diff::from_code`]/[`diff_code`] use, and is the
 * only configuration any production caller should need.
@@ -1022,7 +1053,7 @@ mod tests {
     /// Regression guard for the pathological case that motivated `DiffMode`: two files with
     /// nothing structurally in common (see the fixture's own `before.rs.test`/`after.rs.test`)
     /// used to take 14.5s under the old always-exact pipeline, ~36x this project's 400ms budget,
-    /// because phases 1-5 left the bulk of both trees unmatched and full APTED had almost nothing
+    /// because phases 1-4 left the bulk of both trees unmatched and full APTED had almost nothing
     /// to prune against. Under the default `DiffMode::Fast`, `PendingDiff::looks_expensive()`
     /// should trip and substitute the cheap fallback well before that.
     ///
@@ -1037,9 +1068,9 @@ mod tests {
     #[test]
     fn rust_completely_unrelated_main_files_resolves_fast_under_default_fast_mode() -> Result<()> {
         let (before, after) =
-            test::helper::handmade_test_code_pair("rust-completely-unrelated-main-files")?;
+            &*test::helper::handmade_test_code_pair("rust-completely-unrelated-main-files")?;
 
-        let pending = Diff::pending(&before, &after);
+        let pending = Diff::pending(before, after);
         assert!(
             pending.looks_expensive(),
             "this fixture's residual (~40%/~86% unmatched) should trip the guard - counts: {:?}",
@@ -1047,7 +1078,7 @@ mod tests {
         );
 
         let started = std::time::Instant::now();
-        let diff = Diff::from_code(&before, &after);
+        let diff = Diff::from_code(before, after);
         let elapsed = started.elapsed();
 
         assert!(diff.ast.is_some());
