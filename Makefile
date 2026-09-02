@@ -104,9 +104,19 @@ BENCH_OUTPUT := target/benchmark_optimal_output.txt
 # gate's verdict is the benchmark's exit status, and without it the `| tee` would hand make `tee`'s
 # status instead - a red gate that reports success, which is the one failure a gate must not have.
 # (`/bin/sh` is dash on Debian/Ubuntu and has no `pipefail`, so this cannot just be `set -o`.)
+#
+# The `mkdir -p` is what makes that `tee` safe on a machine that has never built this project.
+# Both sides of a pipeline start at once, so `tee` opens `$(BENCH_OUTPUT)` immediately - it does
+# not wait for `cargo` to create `target/` first, and loses that race on a clean checkout. With
+# `pipefail` that is a hard failure of the gate, and it is invisible locally, where `target/`
+# always exists: it only fires in CI, and only when the Rust cache misses (evicted after 7 days
+# of no pushes), which is exactly when nobody is expecting an infrastructure failure. Observed
+# for real - `tee: target/benchmark_optimal_output.txt: No such file or directory`, while cargo
+# was still downloading crates.
 check-quality: SHELL := /bin/bash
 check-quality: .SHELLFLAGS := -o pipefail -c
 check-quality:
+	@mkdir -p $(dir $(BENCH_OUTPUT))
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
 		--compare $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
 	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
@@ -126,7 +136,13 @@ check-quality:
 # fixture), and a target that refused to run while the gate was red would be useless exactly then.
 # Run `make check-quality` first and read which fixtures moved - that reading is the review, and
 # there is no way to automate it.
+#
+# `mkdir -p` for the same clean-checkout `tee` race described on `check-quality` above, where it
+# fails worse rather than louder: this recipe has no `pipefail`, so a failed `tee` would not stop
+# it - it would go on to grep an absent $(BENCH_OUTPUT), find no runtime line, and write an empty
+# `MS_PER_FIXTURE=` over the runtime baseline.
 update-quality-baseline:
+	@mkdir -p $(dir $(BENCH_OUTPUT))
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
 		--write-baseline $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
 	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
