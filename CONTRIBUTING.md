@@ -164,6 +164,13 @@ documented there.
   subset of what CI checks (`cargo fmt --check`, a per-feature-config `cargo check`, the
   mapping-site JS tests) before a `git push` leaves your machine - see that file's own comment for
   exactly what it does and does not cover. `git push --no-verify` skips it for one push.
+* `ci` - the whole of CI, locally: every job in `.github/workflows/ci.yml`, in that file's own
+  order. Unlike the pre-push hook above it includes the release build, the full test suite for all
+  three feature configs, and the quality gate, so it takes minutes rather than seconds - run it
+  when you mean to push, not on every push. It reads the commands out of `ci.yml` itself rather
+  than keeping a copy, so it cannot drift from CI; `python3 scripts/ci_local.py --list` shows the
+  job ids and `--job <id>` runs one of them. See that script's module docstring for what it can
+  and cannot mirror.
 * `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
   gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
 * `check-quality` - what `deploy` runs before it tags a release. This target gates on a checked-in
@@ -200,6 +207,12 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
 * The `human_mapping` site's own vanilla-JS tests (`assets/mapping_site/index.test.js`)
 
-All of these checks must pass before a PR is done. `make install-hooks` runs the fast subset of
-these (fmt, clippy, the JS tests) locally before every `git push`, so most failures show up before
-CI does - see "Makefile targets" above.
+All of these checks must pass before a PR is done. Two things run them locally, before GitHub
+does - see "Makefile targets" above:
+
+* `make install-hooks` puts the fast subset (fmt, clippy, the JS tests) on every `git push`, so
+  the common mistakes never leave your machine.
+* `make ci` runs *all* of the above, driven by parsing `ci.yml` itself so the two cannot drift.
+  Minutes, not seconds - it does the release build and full test matrix. What it does not
+  reproduce is the runner: it uses your toolchain and OS, where CI gets a clean pinned
+  `ubuntu-latest`.

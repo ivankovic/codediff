@@ -80,6 +80,21 @@ lint-python:
 	ruff check research
 	ruff format --check research
 
+# Runs everything .github/workflows/ci.yml runs, here, before the push rather than after it.
+#
+# Distinct from `install-hooks`' pre-push hook, which is deliberately the fast subset (fmt, clippy,
+# the JS tests) and stays that way: this one includes the release-profile build and full test suite
+# for all three feature configs and the quality gate, so it is minutes, not seconds - a thing you
+# run when you mean to push, not on every push.
+#
+# It reads the job list and every command out of ci.yml itself rather than repeating them here, so
+# it cannot drift from CI the way a hand-copied list would - see scripts/ci_local.py's own module
+# docstring for what it can and cannot mirror (short version: the commands, yes; the clean pinned
+# ubuntu-latest runner, no). `python3 scripts/ci_local.py --list` shows the jobs and
+# `--job <id>` runs one.
+ci:
+	python3 scripts/ci_local.py
+
 QUALITY_BASELINE := research/data/quality/quality_baseline.csv
 RUNTIME_BASELINE := research/data/quality/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
