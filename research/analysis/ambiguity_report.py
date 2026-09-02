@@ -231,7 +231,28 @@ def paired_decisions(csv_path: Path, names: set[str]) -> int:
         )
 
 
-def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str], paired: int) -> dict:
+def datasets_for(root: Path, names: set[str]) -> dict[str, str]:
+    """Fixture name -> the dataset directory it lives in (`handmade`, `small`, `full`, ...).
+
+    Section 4 discusses the Curated and Full repository lists separately, which are the `small` and
+    `full` directories here (see src/test/helper.rs's DIFF_DATASETS)."""
+    out = {}
+    for dataset in ("handmade", "small", "full", "stratified"):
+        base = root / DIFFS_ROOT / dataset
+        if not base.is_dir():
+            continue
+        for entry in base.iterdir():
+            if entry.is_dir() and entry.name in names:
+                out[entry.name] = dataset
+    return out
+
+
+def summarize(
+    groups_by_fixture: dict[str, list[dict]],
+    eras: dict[str, str],
+    paired: int,
+    datasets: dict[str, str] | None = None,
+) -> dict:
     """Every number the paper's RQ3 quotes, in one dict."""
     names = sorted(groups_by_fixture)
     with_groups = [n for n in names if groups_by_fixture[n]]
@@ -243,6 +264,23 @@ def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str], pa
         era: (len([n for n in members if groups_by_fixture[n]]), len(members))
         for era, members in by_era.items()
     }
+
+    # Per repository list, restricted to the `fresh` era. Section 4 wants to compare the Curated
+    # and Full lists, and the raw per-list rate cannot support that: the Curated list was annotated
+    # almost entirely before multi-map groups existed, so most of its fixtures are structurally
+    # incapable of showing one, while the Full list is uniformly `fresh`. Comparing the raw rates
+    # would report a difference in annotation history as a difference in the phenomenon. The `pre`
+    # count is carried alongside so the size of that gap is visible rather than implied.
+    per_list = {}
+    for label, dataset in (("Curated", "small"), ("Full", "full")):
+        members = [n for n in names if (datasets or {}).get(n) == dataset]
+        fresh = [n for n in members if eras.get(n) == "fresh"]
+        per_list[label] = {
+            "total": len(members),
+            "pre": len([n for n in members if eras.get(n) == "pre"]),
+            "fresh_total": len(fresh),
+            "fresh_with": len([n for n in fresh if groups_by_fixture[n]]),
+        }
 
     all_groups = [g for n in with_groups for g in groups_by_fixture[n]]
     sizes = [max(len(g["before_paths"]), len(g["after_paths"])) for g in all_groups]
@@ -264,6 +302,7 @@ def summarize(groups_by_fixture: dict[str, list[dict]], eras: dict[str, str], pa
         "any_fixtures": len(with_groups),
         "any_pct": pct(len(with_groups), len(names)),
         "era_rates": era_rates,
+        "per_list": per_list,
         "groups": len(all_groups),
         "with_children": sum(1 for g in all_groups if g.get("with_children")),
         "op_identical": sum(1 for g in all_groups if g["operation"] == "identical"),
@@ -291,6 +330,7 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
     rev_with, rev_total = s["era_rates"]["revisited"]
     pre_with, pre_total = s["era_rates"]["pre"]
 
+    per_list = s.get("per_list", {})
     macros = {
         # Corpus-wide, i.e. the floor: includes fixtures annotated before groups existed.
         "AmbiguityScored": s["scored"],
@@ -326,6 +366,18 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
         "% regenerate: make ambiguity-report (from research/). Merged into plots/variables.tex",
         "% by analysis/paper_variables.py; see that script's module doc comment.",
     ]
+    # Per repository list, `fresh` era only - see `summarize`. `Pre` is emitted so the paper can
+    # state how much of each list is structurally unable to show a group, which is the whole
+    # reason the raw per-list rates are not comparable to one another.
+    for label, stats in sorted(per_list.items()):
+        macros[f"Ambiguity{label}Total"] = stats["total"]
+        macros[f"Ambiguity{label}Pre"] = stats["pre"]
+        macros[f"Ambiguity{label}FreshTotal"] = stats["fresh_total"]
+        macros[f"Ambiguity{label}FreshWith"] = stats["fresh_with"]
+        macros[f"Ambiguity{label}FreshPct"] = (
+            f"{pct(stats['fresh_with'], stats['fresh_total']):.1f}"
+        )
+
     lines += [f"\\newcommand{{\\{k}}}{{{v}}}" for k, v in macros.items()]
     output_path.write_text("\n".join(lines) + "\n")
     print(f"\nWrote {len(macros)} macros to {output_path}")
@@ -369,7 +421,35 @@ def main() -> None:
         )
     in_scope = set(groups_by_fixture)
     eras = load_or_record_eras(root, in_scope, args.eras, args.refresh_eras)
-    s = summarize(groups_by_fixture, eras, paired_decisions(args.csv, in_scope))
+
+    # A `pre` fixture that contains a group is a contradiction: `pre` means "last touched before
+    # the facility existed, and so structurally cannot record one", which is exactly the claim the
+    # paper makes about that row of the table. The recorded classification is deliberately frozen
+    # (see `load_or_record_eras`) so that rewriting history cannot move the headline rate - but
+    # that also means a fixture annotated with a group *after* being recorded keeps the stale
+    # label, and the table then prints a non-zero count in a row defined as impossible. Four
+    # fixtures had drifted that way by 2026-09-02.
+    #
+    # Correcting them here rather than re-deriving from git keeps the frozen-record design intact:
+    # this is implied by the mapping file's own contents, not by mutable history. Such a fixture
+    # necessarily existed before the facility and was edited after it, which is the definition of
+    # `revisited` - the era that is already reported separately and excluded from the headline
+    # rate precisely because it is selection-biased.
+    contradictory = sorted(n for n in in_scope if eras.get(n) == "pre" and groups_by_fixture[n])
+    if contradictory:
+        print(
+            f"note: {len(contradictory)} fixture(s) recorded as `pre` now contain a group, so they "
+            f"were edited after the facility landed; reclassifying as `revisited`: "
+            f"{', '.join(contradictory[:4])}{' ...' if len(contradictory) > 4 else ''}"
+        )
+        for name in contradictory:
+            eras[name] = "revisited"
+    s = summarize(
+        groups_by_fixture,
+        eras,
+        paired_decisions(args.csv, in_scope),
+        datasets_for(root, in_scope),
+    )
 
     print(f"=== Ground-truth ambiguity, {s['scored']} fixtures in scope ===")
     print(

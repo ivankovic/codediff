@@ -68,6 +68,8 @@ with the number silently missing, which is strictly worse than the literal it re
 Usage (from research/):  uv run ./analysis/paper_variables.py
 """
 
+import collections
+import csv
 import glob
 import os
 import re
@@ -89,22 +91,32 @@ def latex_number(value):
 # produced it, so a refresh is a known operation rather than an archaeology exercise.
 # ---------------------------------------------------------------------------------------------
 
+# The per-language draw size the corpus was sampled at. Authored because it is a decision, not a
+# measurement - `sampling_provenance` reports how many languages had to be drawn again beyond it.
+SAMPLE_PER_LANGUAGE = 10
+
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-08-20. The corpus directory holds 469 fixtures; 468 of them carry a
-# human_mapping.json and are what every accuracy number in the paper is scored against. The 469th
+# Measured 2026-09-02. The corpus directory holds 513 fixtures; 512 of them carry a
+# human_mapping.json and are what every accuracy number in the paper is scored against. The 513th
 # (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
 # pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
 #
-# NumFixtures is therefore the ground-truth-bearing count, 468, which is the denominator of every
+# NumFixtures is therefore the ground-truth-bearing count, 512, which is the denominator of every
 # per-tool row, the ablation study, and the node accuracy below.
+#
+# Refreshed together, from one corpus state, on 2026-09-02 (previously 2026-08-20 / 468 fixtures).
+# These four move as a set and must be refreshed as a set: re-run the benchmark with --csv, re-run
+# `analyze_human_mappings --csv` so the scope artifact agrees with it, then recompute here. The
+# check at the bottom of this file compares NumFixtures against the corpus on disk precisely
+# because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 468,
-    "NodesMatched": 4_956_544,
-    "NodesTotal": 4_959_531,
+    "NumFixtures": 512,
+    "NodesMatched": 5_713_065,
+    "NodesTotal": 5_719_183,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-08-20). Not the same number as the empirical study's
+    # language" census (24 as of 2026-09-02). Not the same number as the empirical study's
     # \NumLanguages, which counts languages in the 100-repository file-stats corpus.
     "NumFixtureLanguages": 24,
 }
@@ -114,8 +126,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_378_653,
-    "VisibleNodesTotal": 3_380_690,
+    "VisibleNodesMatched": 3_904_275,
+    "VisibleNodesTotal": 3_908_441,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
@@ -422,8 +434,68 @@ def emit_block(fragment_lines, expected_macros, label, refresh_hint):
     return fragment_lines + [command(name, PLACEHOLDER) for name in missing]
 
 
+def sampling_provenance(repo_root):
+    """The corpus-construction pipeline's own numbers, derived from `src/test/data/sample.csv`.
+
+    DERIVED, not authored: that file is the committed record of every sampling decision - one row
+    per sampled diff, carrying the dataset it was drawn for, whether it was PROMOTED into the
+    fixture corpus or REJECTED, and why. Section 4's account of how the corpus was built quoted
+    these by hand, and two of the hand-written figures were already wrong (the Full list's sample
+    size, and both post-rejection totals), which is exactly what this file exists to prevent.
+
+    A note on two numbers a reader may check and find surprising:
+
+    * The Full list was sampled at 10 per language like the Curated one, but R and Scala were drawn
+      again after their first rounds were largely rejected - R's file extension collides with
+      several other languages - so its total exceeds 10 x languages. `SampleFullResampled` names
+      how many languages that happened to.
+    * `Sample*Promoted` counts fixtures that entered the corpus *through sampling*, which is two
+      short of what is on disk per dataset: `javascript-typescript-use-strict-2` and
+      `typescript-lxqt-lxqt-panel-not-actually-ts-but-still` were added by hand and have no
+      sample.csv row. Section 4 describes the sampling pipeline, so the sampled figure is the
+      correct one there; `NumFixtures` remains the count of everything with ground truth.
+    """
+    path = os.path.join(repo_root, "src", "test", "data", "sample.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    # "small" and "full" are the dataset directory names for what the paper calls the Curated and
+    # Full repository lists - see src/test/helper.rs's DIFF_DATASETS.
+    out = {}
+    for key, dataset in (("Curated", "small"), ("Full", "full")):
+        drawn = [r for r in rows if r["dataset"] == dataset]
+        if not drawn:
+            continue
+        by_language = collections.Counter(r["language"] for r in drawn)
+        out[f"Sample{key}Sampled"] = len(drawn)
+        out[f"Sample{key}Languages"] = len(by_language)
+        out[f"Sample{key}Rejected"] = sum(1 for r in drawn if r["status"] == "REJECTED")
+        out[f"Sample{key}Promoted"] = sum(1 for r in drawn if r["status"] == "PROMOTED")
+        out[f"Sample{key}Resampled"] = sum(
+            1 for n in by_language.values() if n > SAMPLE_PER_LANGUAGE
+        )
+
+    rejected = [r for r in rows if r["status"] == "REJECTED"]
+    by_language = collections.Counter(r["language"] for r in rejected)
+    out["SampleRejectedTotal"] = len(rejected)
+    # The paper names these two specifically as the dominant cause; deriving them keeps the claim
+    # and the number from drifting apart.
+    out["SampleRejectedR"] = by_language.get("R", 0)
+    out["SampleRejectedTypeScript"] = by_language.get("TypeScript", 0)
+    out["SampleDiffsPerLanguage"] = SAMPLE_PER_LANGUAGE
+    return out
+
+
 def build(
-    empirical_lines, rq1_lines, comparison_lines, ambiguity_lines, rendering_lines, shape_lines
+    empirical_lines,
+    rq1_lines,
+    comparison_lines,
+    ambiguity_lines,
+    rendering_lines,
+    shape_lines,
+    sampling,
 ):
     """Returns the complete variables.tex as a list of lines."""
     out = [
@@ -553,6 +625,15 @@ def build(
     ]
     out += [command(name, value) for name, value in TARGETS.items()]
 
+    out += [
+        "",
+        "% --- Corpus construction: how the fixture corpus was sampled, what was rejected, and what",
+        "% survived (DERIVED from src/test/data/sample.csv, the committed record of every sampling",
+        "% decision - see `sampling_provenance`). No refresh command: the record is in the",
+        "% repository, so these track it on every run of this script.",
+    ]
+    out += [command(name, value) for name, value in sorted(sampling.items())]
+
     return out
 
 
@@ -648,7 +729,10 @@ def main():
             f"and update the whole block - rather than editing NumFixtures alone."
         )
 
-    lines = build(empirical, rq1, comparison, ambiguity, rendering, shapes)
+    sampling = sampling_provenance(repo_root)
+    if not sampling:
+        print("note: no src/test/data/sample.csv; corpus-construction macros will be placeholders")
+    lines = build(empirical, rq1, comparison, ambiguity, rendering, shapes, sampling)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:

@@ -288,22 +288,30 @@ TODO: Add our own metrics here
 
 \subsection{Shape of optimal file diffs}
 
-From both Curated and Full list of repositories, we fully randomly sampled 10 (TODO: use variable)
-diffs per language. The resulting 220 (TODO: Correct number and variable) diffs from the Curated list
-and 220 (TODO: correct number and variable) diffs from the Full list were first manually inspected
-for any errors. At this stage, ? (TODO: number and variable) diffs were rejected, mostly because of
-errors in sampling where, in particular TypeScript and R, file extensions were used for other languages.
-This resulted in a dataset of ? (TODO: number and variable) diffs from the Curated and ? (TODO: number and var)
-diffs from the Full list.
+From both Curated and Full list of repositories, we fully randomly sampled \SampleDiffsPerLanguage{}
+diffs per language. That gave \SampleCuratedSampled{} diffs from the Curated list across
+\SampleCuratedLanguages{} languages, and \SampleFullSampled{} from the Full list across
+\SampleFullLanguages{} languages---more than \SampleDiffsPerLanguage{} per language for the latter,
+because \SampleFullResampled{} languages had to be drawn a second time after most of their first
+round was rejected. Every sampled diff was first manually inspected for any errors. At this stage,
+\SampleRejectedTotal{} diffs were rejected, mostly because of errors in sampling where, in particular
+TypeScript (\SampleRejectedTypeScript{} rejected) and R (\SampleRejectedR{}), file extensions were
+used for other languages. This resulted in a dataset of \SampleCuratedPromoted{} diffs from the
+Curated and \SampleFullPromoted{} diffs from the Full list.
 
 Each diff was then solved by hand by us, the authors. We have each at least 15 years of experience in
 software developement, and have reviewed tens of thousands of real world code changes in industrial
 environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
 Instead, the dataset supports multiple correct solutions for each diff, and it supports marking diffs
 that cannot be solved at all using the standard set of AST diff operations: Insert, Delete, Update and Move.
-In particular, ? (TODO: number and variable) in the Curated and ? (TODO: number and variable) in the Full list,
- ? and ? percent, of diffs require a N:M mapping, i.e. one or more nodes from one side maps to one or
- more nodes from the other side. The most common cause is a refactoring, where two or more similar blocks
+In particular, \AmbiguityFullFreshWith{} of the Full list's \AmbiguityFullFreshTotal{} diffs
+(\AmbiguityFullFreshPct{}\%) require a N:M mapping, i.e. one or more nodes from one side maps to one or
+ more nodes from the other side. The Curated list cannot be read the same way: multi-mapping was added
+to our annotation tool partway through building the corpus, and \AmbiguityCuratedPre{} of its
+\AmbiguityCuratedTotal{} diffs were annotated before it existed, so they could not record such a
+mapping whatever their content. Across the \AmbiguityCuratedFreshTotal{} annotated afterwards the
+rate is \AmbiguityCuratedFreshPct{}\% (\AmbiguityCuratedFreshWith{} diffs). We therefore quote the
+Full list as the estimate and report the Curated list only for the diffs where the option existed. The most common cause is a refactoring, where two or more similar blocks
  of code are moved to a common function. The correct solutions is the one that maps all nodes as moved.
 
 Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
